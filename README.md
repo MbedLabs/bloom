@@ -1,0 +1,57 @@
+# EmbedLabs Bloom - Application Lifecycle Management
+
+Backend API for **Bloom**, EmbedLabs' requirements and lifecycle management platform. Similar to Polarion ALM, Bloom manages requirements, test cases, and traceability across the product lifecycle.
+
+## Features
+
+- **Project Management** - Organize requirements and test cases by project with auto-generated IDs (e.g. `PROJ-REQ-001`, `PROJ-TC-001`)
+- **Requirement Hierarchy** - Parent/child requirement relationships with statuses (Draft → Review → Approved → Implemented → Verified)
+- **Test Case Management** - Create test cases with structured steps and link them to requirements
+- **Traceability Matrix** - Full coverage tracking (Covered / Partial / Uncovered) across requirements and test cases
+- **Test Station Integration** - Link requirements to test runs in the [Bud Test Station app](https://github.com/elomariamin/bud-app-backend)
+- **REST API** - FastAPI with automatic OpenAPI documentation
+
+## Tech Stack
+
+- **Python 3.11** with FastAPI
+- **PostgreSQL** with SQLAlchemy 2.0 async
+- **Pydantic v2** for validation
+
+## Quick Start
+
+```bash
+# Set environment variables
+export DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/bloom_db"
+export SECRET_KEY="your-secret-key-at-least-32-characters"
+
+# Install and run
+pip install .
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+API docs available at `http://localhost:8000/api/docs`
+
+## API Endpoints
+
+| Path | Description |
+|------|-------------|
+| `GET /api/health` | Health check |
+| `GET /api/version` | Version info |
+| `GET/POST /api/projects` | List/Create projects |
+| `GET/POST /api/requirements` | List/Create requirements |
+| `POST /api/requirements/{id}/link-testcase` | Link test case to requirement |
+| `POST /api/requirements/{id}/link-testrun` | Link external test run to requirement |
+| `GET/POST /api/test-cases` | List/Create test cases |
+| `GET /api/traceability` | Traceability matrix by project |
+
+## Docker
+
+```bash
+docker build -t bloom-backend .
+docker run -p 8000:8000 -e DATABASE_URL=... -e SECRET_KEY=... bloom-backend
+```
+
+## Part of EmbedLabs Suite
+
+- **[Bud](https://github.com/elomariamin/bud-app-backend)** - Test Station Manager (test execution platform)
+- **[Bloom](https://github.com/elomariamin/bloom-app-backend)** - Lifecycle Manager (this repo)
