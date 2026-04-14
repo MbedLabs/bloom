@@ -37,5 +37,5 @@ docker run -p 3000:80 bloom-frontend
 
 ## Part of EmbedLabs Suite
 
-- **[Bud](https://github.com/elomariamin/bud-app-frontend)** - Test Station Manager (test execution platform)
-- **[Bloom](https://github.com/elomariamin/bloom-app-frontend)** - Lifecycle Manager (this repo)
+- **[Bud](https://github.com/MbedLabs/bud-app-frontend)** - Test Station Manager (test execution platform)
+- **[Bloom](https://github.com/MbedLabs/bloom-app-frontend)** - Lifecycle Manager (this repo)
