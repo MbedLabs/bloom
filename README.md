@@ -53,5 +53,5 @@ docker run -p 8000:8000 -e DATABASE_URL=... -e SECRET_KEY=... bloom-backend
 
 ## Part of EmbedLabs Suite
 
-- **[Bud](https://github.com/elomariamin/bud-app-backend)** - Test Station Manager (test execution platform)
-- **[Bloom](https://github.com/elomariamin/bloom-app-backend)** - Lifecycle Manager (this repo)
+- **[Bud](https://github.com/MbedLabs/bud-app-backend)** - Test Station Manager (test execution platform)
+- **[Bloom](https://github.com/MbedLabs/bloom-app-backend)** - Lifecycle Manager (this repo)
