@@ -62,6 +62,10 @@ export default function ImpactAnalysis() {
             <span className="text-sm text-muted-foreground">Type</span>
             <p className="font-medium text-foreground">{analysis.root_requirement.req_type}</p>
           </div>
+          <div>
+            <span className="text-sm text-muted-foreground">Origin</span>
+            <p className="font-medium text-foreground">{analysis.root_requirement.req_origin}</p>
+          </div>
           <div className="ml-auto flex items-center space-x-6">
             <div className="text-center">
               <p className="text-2xl font-bold text-blue-600">{totalUpstream}</p>

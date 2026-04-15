@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { projectsApi, requirementsApi, testCasesApi } from '../api/client'
+import { projectsApi, requirementsApi, testCasesApi, TcsRow } from '../api/client'
+import { TcsArteTable } from '../components/TcsArteTable'
 import { ArrowLeft, Plus, FileText, CheckCircle, GitBranch, Search, BookOpen, Beaker } from 'lucide-react'
 
 type Tab = 'requirements' | 'test-cases' | 'documents' | 'test-concepts' | 'traceability'
@@ -39,8 +40,9 @@ export default function ProjectDetail() {
   const [showCreateReq, setShowCreateReq] = useState(false)
   const [showCreateTc, setShowCreateTc] = useState(false)
   const [showCreateConcept, setShowCreateConcept] = useState(false)
-  const [reqForm, setReqForm] = useState({ title: '', description: '', priority: 'Medium', req_type: 'Functional' })
+  const [reqForm, setReqForm] = useState({ title: '', description: '', priority: 'Medium', req_type: 'Functional', req_origin: 'Internal' })
   const [tcForm, setTcForm] = useState({ title: '', description: '', preconditions: '' })
+  const [tcRows, setTcRows] = useState<TcsRow[]>([])
   const [conceptForm, setConceptForm] = useState({ name: '', description: '' })
   const [testConcepts, setTestConcepts] = useState<TestConcept[]>(() => loadTestConcepts(projectId))
   const queryClient = useQueryClient()
@@ -69,7 +71,7 @@ export default function ProjectDetail() {
       queryClient.invalidateQueries({ queryKey: ['requirements', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       setShowCreateReq(false)
-      setReqForm({ title: '', description: '', priority: 'Medium', req_type: 'Functional' })
+      setReqForm({ title: '', description: '', priority: 'Medium', req_type: 'Functional', req_origin: 'Internal' })
     },
   })
 
@@ -80,6 +82,7 @@ export default function ProjectDetail() {
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       setShowCreateTc(false)
       setTcForm({ title: '', description: '', preconditions: '' })
+      setTcRows([])
     },
   })
 
@@ -91,6 +94,7 @@ export default function ProjectDetail() {
       description: reqForm.description || undefined,
       priority: reqForm.priority,
       req_type: reqForm.req_type,
+      req_origin: reqForm.req_origin,
     })
   }
 
@@ -101,6 +105,7 @@ export default function ProjectDetail() {
       title: tcForm.title,
       description: tcForm.description || undefined,
       preconditions: tcForm.preconditions || undefined,
+      steps: tcRows.length > 0 ? tcRows : undefined,
     })
   }
 
@@ -237,6 +242,7 @@ export default function ProjectDetail() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Priority</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Origin</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">TCs</th>
                   </tr>
                 </thead>
@@ -260,6 +266,7 @@ export default function ProjectDetail() {
                         <PriorityBadge priority={req.priority} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{req.req_type}</td>
+                      <td className="px-6 py-4 whitespace-nowrap"><OriginBadge origin={req.req_origin} /></td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{req.test_case_count}</td>
                     </tr>
                   ))}
@@ -479,7 +486,7 @@ export default function ProjectDetail() {
                     placeholder="Requirement description..."
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1">Priority</label>
                     <select
@@ -505,6 +512,22 @@ export default function ProjectDetail() {
                       <option>Performance</option>
                       <option>Security</option>
                       <option>Usability</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">Origin</label>
+                    <select
+                      value={reqForm.req_origin}
+                      onChange={(e) => setReqForm({ ...reqForm, req_origin: e.target.value })}
+                      className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
+                    >
+                      <option>Internal</option>
+                      <option>Customer</option>
+                      <option>Compliance</option>
+                      <option>Regulatory</option>
+                      <option>Legal</option>
+                      <option>Business</option>
+                      <option>Technical</option>
                     </select>
                   </div>
                 </div>
@@ -722,5 +745,22 @@ function CoverageBar({ coverage }: { coverage: number }) {
       </div>
       <span className="text-sm text-muted-foreground">{coverage}%</span>
     </div>
+  )
+}
+
+function OriginBadge({ origin }: { origin: string }) {
+  const colors: Record<string, string> = {
+    Internal: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
+    Customer: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400',
+    Compliance: 'bg-violet-500/10 text-violet-700 dark:text-violet-400',
+    Regulatory: 'bg-rose-500/10 text-rose-700 dark:text-rose-400',
+    Legal: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400',
+    Business: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+    Technical: 'bg-teal-500/10 text-teal-700 dark:text-teal-400',
+  }
+  return (
+    <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[origin] || 'bg-gray-500/10 text-gray-700 dark:text-gray-400'}`}>
+      {origin}
+    </span>
   )
 }

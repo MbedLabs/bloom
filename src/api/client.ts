@@ -9,6 +9,82 @@ export const api = axios.create({
   },
 })
 
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('bloom_token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('bloom_token')
+      window.location.href = '/login'
+    }
+    return Promise.reject(error)
+  }
+)
+
+export interface User {
+  id: number
+  email: string
+  full_name: string
+  role: 'admin' | 'maintainer' | 'reviewer'
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface LoginResponse {
+  access_token: string
+  token_type: string
+  user: User
+}
+
+export const authApi = {
+  login: async (email: string, password: string): Promise<LoginResponse> => {
+    const response = await api.post<LoginResponse>('/auth/login', { email, password })
+    return response.data
+  },
+  getMe: async (): Promise<User> => {
+    const response = await api.get<User>('/auth/me')
+    return response.data
+  },
+  updateMe: async (data: { full_name?: string; email?: string }): Promise<User> => {
+    const response = await api.put<User>('/auth/me', data)
+    return response.data
+  },
+  changePassword: async (currentPassword: string, newPassword: string): Promise<User> => {
+    const response = await api.put<User>('/auth/me/password', { current_password: currentPassword, new_password: newPassword })
+    return response.data
+  },
+}
+
+export const usersApi = {
+  list: async (): Promise<User[]> => {
+    const response = await api.get<User[]>('/users')
+    return response.data
+  },
+  get: async (id: number): Promise<User> => {
+    const response = await api.get<User>(`/users/${id}`)
+    return response.data
+  },
+  create: async (data: { email: string; full_name: string; password: string; role?: string }): Promise<User> => {
+    const response = await api.post<User>('/users', data)
+    return response.data
+  },
+  update: async (id: number, data: { full_name?: string; email?: string; role?: string; is_active?: boolean }): Promise<User> => {
+    const response = await api.patch<User>(`/users/${id}`, data)
+    return response.data
+  },
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/users/${id}`)
+  },
+}
+
 export interface DashboardStats {
   total_projects: number
   active_projects: number
@@ -54,6 +130,7 @@ export interface Requirement {
   status: string
   priority: string
   req_type: string
+  req_origin: string
   test_case_count: number
   children: Requirement[]
   linked_test_cases: TestCase[]
@@ -69,7 +146,7 @@ export interface TestCase {
   title: string
   description: string | null
   preconditions: string | null
-  steps: Step[] | null
+  steps: Step[] | TcsRow[] | null
   status: string
   requirement_count: number
   linked_requirements: Requirement[]
@@ -81,6 +158,18 @@ export interface Step {
   step_number: number
   action: string
   expected_result: string
+}
+
+export type TcsRowType = 'precondition' | 'step' | 'loop' | 'postcondition'
+
+export interface TcsRow {
+  id: string
+  row_type: TcsRowType
+  label: string
+  description: string
+  expected_result: string
+  indent_level: number
+  collapsed: boolean
 }
 
 export interface TestRunLink {
@@ -168,7 +257,7 @@ export const projectsApi = {
 
 export const requirementsApi = {
   list: async (projectId: number) => {
-    const response = await api.get<Requirement[]>(`/projects/${projectId}/requirements`)
+    const response = await api.get<Requirement[]>(`/requirements`, { params: { project_id: projectId } })
     return response.data
   },
 
@@ -183,6 +272,7 @@ export const requirementsApi = {
     description?: string
     priority?: string
     req_type?: string
+    req_origin?: string
     parent_id?: number | null
   }) => {
     const response = await api.post<Requirement>('/requirements', data)
@@ -220,7 +310,7 @@ export const requirementsApi = {
 
 export const testCasesApi = {
   list: async (projectId: number) => {
-    const response = await api.get<TestCase[]>(`/projects/${projectId}/test-cases`)
+    const response = await api.get<TestCase[]>(`/test-cases`, { params: { project_id: projectId } })
     return response.data
   },
 

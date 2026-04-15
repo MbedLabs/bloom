@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react'
-import { Outlet, Link, useLocation } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { projectsApi } from '../api/client'
+import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, FolderKanban, FileText, CheckSquare,
   GitBranch, BarChart3, Sun, Moon,
   ExternalLink, ChevronDown, Search, Flower2,
-  BookOpen, Layers, FlaskConical
+  BookOpen, Layers, FlaskConical, LogOut, Users
 } from 'lucide-react'
 
 const TESTSTATION_APP_URL = import.meta.env.VITE_TESTSTATION_APP_URL || 'http://localhost:3000'
@@ -55,10 +56,24 @@ function Beaker(props: { className?: string }) {
 
 export default function Layout() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
   const [dark, setDark] = useDarkMode()
   const [projectDropdownOpen, setProjectDropdownOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const userMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const { data: projects } = useQuery({
     queryKey: ['projects'],
@@ -68,6 +83,21 @@ export default function Layout() {
   const isInProject = location.pathname.startsWith('/projects/')
 
   const breadcrumbs = getBreadcrumbs(location)
+
+  const roleBadgeColor = user?.role === 'admin'
+    ? 'bg-red-500/10 text-red-400'
+    : user?.role === 'maintainer'
+    ? 'bg-blue-500/10 text-blue-400'
+    : 'bg-green-500/10 text-green-400'
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
+
+  const userInitials = user?.full_name
+    ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : 'U'
 
   return (
     <div className="min-h-screen flex">
@@ -111,6 +141,15 @@ export default function Layout() {
               </Link>
             )
           })}
+          {user?.role === 'admin' && (
+            <Link
+              to="/users"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-teal-100/70 hover:bg-[var(--sidebar-hover)] hover:text-white transition-all duration-200 group"
+            >
+              <Users className="h-[18px] w-[18px] text-teal-400/50 group-hover:text-teal-300" />
+              Users
+            </Link>
+          )}
         </nav>
 
         {/* Project Section */}
@@ -208,6 +247,9 @@ export default function Layout() {
             {dark ? <Sun className="h-[18px] w-[18px] text-teal-400/50 group-hover:text-teal-300" /> : <Moon className="h-[18px] w-[18px] text-teal-400/50 group-hover:text-teal-300" />}
             {dark ? 'Light Mode' : 'Dark Mode'}
           </button>
+          <div className="pt-2 pb-1 px-3 text-center">
+            <p className="text-[10px] text-teal-300/30">by Embedlabs</p>
+          </div>
         </div>
       </aside>
 
@@ -264,9 +306,41 @@ export default function Layout() {
                 {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </button>
 
-              {/* User avatar */}
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-teal-700 flex items-center justify-center text-white text-xs font-bold">
-                U
+              {/* User menu */}
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="flex items-center gap-2 p-1 rounded-lg hover:bg-accent transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-teal-700 flex items-center justify-center text-white text-xs font-bold">
+                    {userInitials}
+                  </div>
+                  <span className="text-sm text-foreground font-medium hidden sm:block max-w-[120px] truncate">
+                    {user?.full_name}
+                  </span>
+                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                </button>
+
+                {userMenuOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-64 bg-card border border-border rounded-lg shadow-elegant overflow-hidden z-50">
+                    <div className="px-4 py-3 border-b border-border">
+                      <p className="text-sm font-medium text-foreground">{user?.full_name}</p>
+                      <p className="text-xs text-muted-foreground">{user?.email}</p>
+                      <span className={`inline-block mt-1.5 px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${roleBadgeColor}`}>
+                        {user?.role}
+                      </span>
+                    </div>
+                    <div className="py-1">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Sign out
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
