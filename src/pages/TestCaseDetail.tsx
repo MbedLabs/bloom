@@ -1,9 +1,20 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { testCasesApi } from '../api/client'
+import { testCasesApi, TcsRow } from '../api/client'
+import { TcsArteTable, migrateOldSteps } from '../components/TcsArteTable'
 import { ArrowLeft, Pencil, FileText } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
+
+function isTcsRow(row: unknown): row is TcsRow {
+  return typeof row === 'object' && row !== null && 'row_type' in row
+}
+
+function normalizeSteps(steps: Array<Record<string, unknown>> | null | undefined): TcsRow[] {
+  if (!steps || steps.length === 0) return []
+  if (steps.every(isTcsRow)) return steps as TcsRow[]
+  return migrateOldSteps(steps as Array<{ step_number: number; action: string; expected_result: string }>)
+}
 
 export default function TestCaseDetail() {
   const { id } = useParams<{ id: string }>()
@@ -23,6 +34,7 @@ export default function TestCaseDetail() {
     preconditions: '',
     status: '',
   })
+  const [editRows, setEditRows] = useState<TcsRow[]>([])
 
   useEffect(() => {
     if (testCase && isEditing) {
@@ -32,6 +44,7 @@ export default function TestCaseDetail() {
         preconditions: testCase.preconditions || '',
         status: testCase.status,
       })
+      setEditRows(normalizeSteps(testCase.steps as Array<Record<string, unknown>> | null))
     }
   }, [testCase, isEditing])
 
@@ -50,6 +63,7 @@ export default function TestCaseDetail() {
       description: editForm.description || null,
       preconditions: editForm.preconditions || null,
       status: editForm.status,
+      steps: editRows.length > 0 ? editRows : null,
     })
   }
 
@@ -68,6 +82,8 @@ export default function TestCaseDetail() {
     )
   }
 
+  const tcsRows = normalizeSteps(testCase.steps as Array<Record<string, unknown>> | null)
+
   return (
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between">
@@ -84,17 +100,17 @@ export default function TestCaseDetail() {
           </div>
         </div>
         <button
-          onClick={() => setIsEditing(true)}
+          onClick={() => setIsEditing(!isEditing)}
           className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
         >
           <Pencil className="h-4 w-4 mr-2" />
-          Edit
+          {isEditing ? 'Cancel Editing' : 'Edit'}
         </button>
       </div>
 
       {isEditing ? (
-        <div className="bg-card rounded-lg shadow-elegant p-6">
-          <form onSubmit={handleEditSubmit} className="space-y-4">
+        <form onSubmit={handleEditSubmit} className="space-y-6">
+          <div className="bg-card rounded-lg shadow-elegant p-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Title</label>
               <input
@@ -115,7 +131,7 @@ export default function TestCaseDetail() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Preconditions</label>
+              <label className="block text-sm font-medium text-foreground mb-1">Preconditions (Text)</label>
               <textarea
                 value={editForm.preconditions}
                 onChange={(e) => setEditForm({ ...editForm, preconditions: e.target.value })}
@@ -135,24 +151,30 @@ export default function TestCaseDetail() {
                 <option>Deprecated</option>
               </select>
             </div>
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setIsEditing(false)}
-                className="px-4 py-2 border border-input rounded-md text-foreground hover:bg-accent/50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={updateMutation.isPending}
-                className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50"
-              >
-                {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
-              </button>
-            </div>
-          </form>
-        </div>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-medium text-foreground mb-2">TCS Artefact Table</h3>
+            <TcsArteTable rows={editRows} onChange={setEditRows} editable />
+          </div>
+
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={() => setIsEditing(false)}
+              className="px-4 py-2 border border-input rounded-md text-foreground hover:bg-accent/50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={updateMutation.isPending}
+              className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50"
+            >
+              {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
       ) : (
         <>
           <div className="bg-card rounded-lg shadow-elegant p-6">
@@ -171,73 +193,49 @@ export default function TestCaseDetail() {
         </>
       )}
 
-      {testCase.steps && testCase.steps.length > 0 && (
-        <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
-          <div className="px-6 py-4 border-b border-border">
-            <h3 className="text-lg font-semibold">Steps</h3>
-          </div>
-          <table className="min-w-full divide-y divide-border">
-            <thead className="bg-muted/50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase w-20">Step</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Action</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Expected Result</th>
-              </tr>
-            </thead>
-            <tbody className="bg-card divide-y divide-border">
-              {testCase.steps.map((step) => (
-                <tr key={step.step_number} className="hover:bg-accent/50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
-                    {step.step_number}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-foreground whitespace-pre-wrap">
-                    {step.action}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-foreground whitespace-pre-wrap">
-                    {step.expected_result}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {!isEditing && tcsRows.length > 0 && (
+        <TcsArteTable rows={tcsRows} onChange={() => {}} editable={false} />
       )}
 
-      <div className="bg-card rounded-lg shadow-elegant">
-        <div className="px-6 py-4 border-b border-border flex justify-between items-center">
-          <h3 className="text-lg font-semibold">Linked Requirements</h3>
-          <span className="text-sm text-muted-foreground">{testCase.linked_requirements?.length || 0} linked</span>
-        </div>
-        {testCase.linked_requirements && testCase.linked_requirements.length > 0 ? (
-          <div className="divide-y divide-border">
-            {testCase.linked_requirements.map((req) => (
-              <Link
-                key={req.id}
-                to={`/requirements/${req.id}`}
-                className="flex items-center justify-between px-6 py-4 hover:bg-accent/50 transition-colors"
-              >
-                <div className="flex items-center">
-                  <FileText className="h-5 w-5 text-primary mr-3" />
-                  <div>
-                    <span className="font-mono text-sm text-primary mr-2">{req.req_id}</span>
-                    <span className="text-foreground">{req.title}</span>
-                  </div>
-                </div>
-                <RequirementStatusBadge status={req.status} />
-              </Link>
-            ))}
+      {!isEditing && (
+        <>
+          <div className="bg-card rounded-lg shadow-elegant">
+            <div className="px-6 py-4 border-b border-border flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Linked Requirements</h3>
+              <span className="text-sm text-muted-foreground">{testCase.linked_requirements?.length || 0} linked</span>
+            </div>
+            {testCase.linked_requirements && testCase.linked_requirements.length > 0 ? (
+              <div className="divide-y divide-border">
+                {testCase.linked_requirements.map((req) => (
+                  <Link
+                    key={req.id}
+                    to={`/requirements/${req.id}`}
+                    className="flex items-center justify-between px-6 py-4 hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="flex items-center">
+                      <FileText className="h-5 w-5 text-primary mr-3" />
+                      <div>
+                        <span className="font-mono text-sm text-primary mr-2">{req.req_id}</span>
+                        <span className="text-foreground">{req.title}</span>
+                      </div>
+                    </div>
+                    <RequirementStatusBadge status={req.status} />
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 text-center text-muted-foreground">
+                No requirements linked to this test case.
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="p-6 text-center text-muted-foreground">
-            No requirements linked to this test case.
-          </div>
-        )}
-      </div>
 
-      <div className="text-sm text-muted-foreground flex items-center space-x-6">
-        <span>Created {formatDistanceToNow(new Date(testCase.created_at))} ago</span>
-        <span>Updated {formatDistanceToNow(new Date(testCase.updated_at))} ago</span>
-      </div>
+          <div className="text-sm text-muted-foreground flex items-center space-x-6">
+            <span>Created {formatDistanceToNow(new Date(testCase.created_at))} ago</span>
+            <span>Updated {formatDistanceToNow(new Date(testCase.updated_at))} ago</span>
+          </div>
+        </>
+      )}
     </div>
   )
 }

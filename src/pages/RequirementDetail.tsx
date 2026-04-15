@@ -23,6 +23,7 @@ export default function RequirementDetail() {
     status: '',
     priority: '',
     req_type: '',
+    req_origin: '',
   })
   const [showLinkModal, setShowLinkModal] = useState(false)
 
@@ -40,6 +41,7 @@ export default function RequirementDetail() {
         status: requirement.status,
         priority: requirement.priority,
         req_type: requirement.req_type,
+        req_origin: requirement.req_origin,
       })
     }
   }, [requirement, isEditing])
@@ -68,8 +70,8 @@ export default function RequirementDetail() {
       status: editForm.status,
       priority: editForm.priority,
       req_type: editForm.req_type,
+      req_origin: editForm.req_origin,
     })
-  }
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
@@ -102,6 +104,7 @@ export default function RequirementDetail() {
               <RequirementStatusBadge status={requirement.status} />
               <PriorityBadge priority={requirement.priority} />
               <TypeBadge reqType={requirement.req_type} />
+              <OriginBadge origin={requirement.req_origin} />
             </div>
             <h2 className="text-2xl font-bold text-foreground mt-1">{requirement.title}</h2>
           </div>
@@ -155,7 +158,7 @@ export default function RequirementDetail() {
                 rows={4}
               />
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Status</label>
                 <select
@@ -196,6 +199,22 @@ export default function RequirementDetail() {
                   <option>Performance</option>
                   <option>Security</option>
                   <option>Usability</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Origin</label>
+                <select
+                  value={editForm.req_origin}
+                  onChange={(e) => setEditForm({ ...editForm, req_origin: e.target.value })}
+                  className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
+                >
+                  <option>Internal</option>
+                  <option>Customer</option>
+                  <option>Compliance</option>
+                  <option>Regulatory</option>
+                  <option>Legal</option>
+                  <option>Business</option>
+                  <option>Technical</option>
                 </select>
               </div>
             </div>
@@ -412,6 +431,23 @@ function TypeBadge({ reqType }: { reqType: string }) {
   return (
     <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-500/10 text-purple-700 dark:text-purple-400">
       {reqType}
+    </span>
+  )
+}
+
+function OriginBadge({ origin }: { origin: string }) {
+  const colors: Record<string, string> = {
+    Internal: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
+    Customer: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400',
+    Compliance: 'bg-violet-500/10 text-violet-700 dark:text-violet-400',
+    Regulatory: 'bg-rose-500/10 text-rose-700 dark:text-rose-400',
+    Legal: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400',
+    Business: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+    Technical: 'bg-teal-500/10 text-teal-700 dark:text-teal-400',
+  }
+  return (
+    <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[origin] || 'bg-gray-500/10 text-gray-700 dark:text-gray-400'}`}>
+      {origin}
     </span>
   )
 }
