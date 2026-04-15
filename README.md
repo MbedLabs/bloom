@@ -1,6 +1,6 @@
 # EmbedLabs Bloom - Application Lifecycle Management
 
-Frontend for **Bloom**, EmbedLabs' requirements and lifecycle management platform. A Polarion-like interface for managing requirements, test cases, and traceability across the product lifecycle.
+Frontend for **Bloom**, EmbedLabs' requirements and lifecycle management platform. An ALM interface for managing requirements, test cases, and traceability across the product lifecycle.
 
 ## Features
 
@@ -9,7 +9,7 @@ Frontend for **Bloom**, EmbedLabs' requirements and lifecycle management platfor
 - **Requirement Editor** - Hierarchical requirements with status tracking (Draft → Verified)
 - **Test Case Editor** - Structured test cases with steps, preconditions, and requirement linking
 - **Traceability Matrix** - Visual coverage tracking across all requirements
-- **Test Station Links** - Direct links to test runs in the Bud Test Station app
+- **Test Station Links** - Direct links to test runs in the Bud Test Platform
 
 ## Tech Stack
 
@@ -38,4 +38,4 @@ docker run -p 3000:80 bloom-frontend
 ## Part of EmbedLabs Suite
 
 - **[Bud](https://github.com/MbedLabs/bud-app-frontend)** - Test Station Manager (test execution platform)
-- **[Bloom](https://github.com/MbedLabs/bloom-app-frontend)** - Lifecycle Manager (this repo)
+- **[Bloom](https://github.com/MbedLabs/bloom-app-frontend)** - ALM (this repo)

@@ -9,6 +9,29 @@ export const api = axios.create({
   },
 })
 
+export interface DashboardStats {
+  total_projects: number
+  active_projects: number
+  total_requirements: number
+  total_test_cases: number
+  total_documents: number
+  total_campaigns: number
+  active_campaigns: number
+  coverage_percent: number
+  uncovered_requirements: number
+  requirement_status_distribution: Record<string, number>
+  test_case_status_distribution: Record<string, number>
+  campaign_result_distribution: Record<string, number>
+  projects: { id: number; name: string; prefix: string; status: string; requirement_count: number; test_case_count: number }[]
+}
+
+export const dashboardApi = {
+  getStats: async () => {
+    const response = await api.get<DashboardStats>('/dashboard/stats')
+    return response.data
+  },
+}
+
 export interface Project {
   id: number
   name: string
@@ -75,6 +98,46 @@ export interface TraceabilityItem {
   linked_test_cases: TestCase[]
   linked_test_runs: TestRunLink[]
   coverage_status: string
+}
+
+export interface ImpactNode {
+  requirement: Requirement
+  link_type: string
+  direction: string
+  depth: number
+  children: ImpactNode[]
+}
+
+export interface ImpactAnalysisResponse {
+  root_requirement: Requirement
+  upstream: ImpactNode[]
+  downstream: ImpactNode[]
+}
+
+export interface CoverageGap {
+  requirement: Requirement
+  gap_type: string
+  linked_test_cases: TestCase[]
+  all_test_cases_draft: boolean
+  missing_link_types: string[]
+}
+
+export interface CoverageGapReport {
+  project_id: number
+  total_requirements: number
+  covered: number
+  partial: number
+  uncovered: number
+  coverage_percent: number
+  gaps: CoverageGap[]
+}
+
+export interface RequirementLinkResponse {
+  id: number
+  source_id: number
+  target_id: number
+  link_type: string
+  created_at: string
 }
 
 export const projectsApi = {
@@ -188,8 +251,205 @@ export const testCasesApi = {
 }
 
 export const traceabilityApi = {
-  getMatrix: async (projectId: number) => {
-    const response = await api.get<TraceabilityItem[]>(`/traceability/${projectId}`)
+  getMatrix: async (projectId: number, params?: { coverage_filter?: string; priority_filter?: string; sort_by?: string }) => {
+    const query = new URLSearchParams()
+    query.set('project_id', String(projectId))
+    if (params?.coverage_filter) query.set('coverage_filter', params.coverage_filter)
+    if (params?.priority_filter) query.set('priority_filter', params.priority_filter)
+    if (params?.sort_by) query.set('sort_by', params.sort_by)
+    const response = await api.get<TraceabilityItem[]>(`/traceability?${query.toString()}`)
+    return response.data
+  },
+
+  getImpactAnalysis: async (requirementId: number, depth?: number) => {
+    const query = depth ? `?depth=${depth}` : ''
+    const response = await api.get<ImpactAnalysisResponse>(`/traceability/impact/${requirementId}${query}`)
+    return response.data
+  },
+
+  getCoverageGaps: async (projectId: number) => {
+    const response = await api.get<CoverageGapReport>(`/traceability/coverage-gaps/${projectId}`)
+    return response.data
+  },
+
+  createRequirementLink: async (sourceId: number, data: { target_id: number; link_type: string }) => {
+    const response = await api.post<RequirementLinkResponse>(`/traceability/requirement-links?source_id=${sourceId}`, data)
+    return response.data
+  },
+
+  deleteRequirementLink: async (linkId: number) => {
+    await api.delete(`/traceability/requirement-links/${linkId}`)
+  },
+
+  getRequirementLinks: async (requirementId: number, direction?: string) => {
+    const query = direction ? `?direction=${direction}` : ''
+    const response = await api.get<RequirementLinkResponse[]>(`/traceability/requirement-links/${requirementId}${query}`)
+    return response.data
+  },
+}
+
+export interface Document {
+  id: number
+  project_id: number
+  title: string
+  doc_type: string
+  status: string
+  version: string
+  description: string | null
+  created_at: string
+  updated_at: string
+  section_count: number
+}
+
+export interface DocumentSection {
+  id: number
+  document_id: number
+  parent_section_id: number | null
+  order: number
+  title: string
+  content: string | null
+  section_type: string
+  linked_requirement_id: number | null
+  created_at: string
+  updated_at: string
+  child_sections: DocumentSection[]
+}
+
+export interface DocumentDetail extends Omit<Document, 'section_count'> {
+  sections: DocumentSection[]
+}
+
+export const documentsApi = {
+  list: async (projectId: number) => {
+    const response = await api.get<Document[]>(`/projects/${projectId}/documents`)
+    return response.data
+  },
+  get: async (documentId: number) => {
+    const response = await api.get<DocumentDetail>(`/documents/${documentId}`)
+    return response.data
+  },
+  create: async (data: { project_id: number; title: string; doc_type?: string; description?: string }) => {
+    const response = await api.post<Document>('/projects/' + data.project_id + '/documents', data)
+    return response.data
+  },
+  update: async (id: number, data: Partial<Document>) => {
+    const response = await api.patch<Document>('/documents/' + id, data)
+    return response.data
+  },
+  delete: async (id: number) => {
+    await api.delete('/documents/' + id)
+  },
+  addSection: async (documentId: number, data: { title: string; content?: string; section_type?: string; order?: number; linked_requirement_id?: number }) => {
+    const response = await api.post<DocumentSection>('/documents/' + documentId + '/sections', data)
+    return response.data
+  },
+  updateSection: async (sectionId: number, data: Partial<DocumentSection>) => {
+    const response = await api.patch<DocumentSection>('/document-sections/' + sectionId, data)
+    return response.data
+  },
+  deleteSection: async (sectionId: number) => {
+    await api.delete('/document-sections/' + sectionId)
+  },
+  reorderSections: async (documentId: number, sectionOrders: { id: number; order: number }[]) => {
+    const response = await api.post('/documents/' + documentId + '/sections/reorder', { section_orders: sectionOrders })
+    return response.data
+  },
+}
+
+export interface TestConfiguration {
+  id: number
+  project_id: number
+  name: string
+  description: string | null
+  environment: string | null
+  parameters: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+}
+
+export interface TestCampaignItem {
+  id: number
+  campaign_id: number
+  test_case_id: number
+  status: string
+  result: string | null
+  comment: string | null
+  executed_at: string | null
+  created_at: string
+  test_case: TestCase | null
+}
+
+export interface TestCampaign {
+  id: number
+  project_id: number
+  configuration_id: number | null
+  name: string
+  description: string | null
+  status: string
+  started_at: string | null
+  completed_at: string | null
+  created_at: string
+  updated_at: string
+  total_items: number
+  passed: number
+  failed: number
+  blocked: number
+  pending: number
+  configuration: TestConfiguration | null
+}
+
+export interface TestCampaignDetail extends TestCampaign {
+  items: TestCampaignItem[]
+}
+
+export const campaignsApi = {
+  list: async (projectId: number, status?: string) => {
+    const params = new URLSearchParams({ project_id: String(projectId) })
+    if (status) params.set('status', status)
+    const response = await api.get<TestCampaign[]>(`/campaigns?${params}`)
+    return response.data
+  },
+
+  get: async (campaignId: number) => {
+    const response = await api.get<TestCampaignDetail>(`/campaigns/${campaignId}`)
+    return response.data
+  },
+
+  create: async (data: { project_id: number; name: string; description?: string; configuration_id?: number; test_case_ids?: number[] }) => {
+    const response = await api.post<TestCampaignDetail>('/campaigns', data)
+    return response.data
+  },
+
+  update: async (campaignId: number, data: Partial<Pick<TestCampaign, 'name' | 'description' | 'status'>> & { configuration_id?: number }) => {
+    const response = await api.patch<TestCampaign>(`/campaigns/${campaignId}`, data)
+    return response.data
+  },
+
+  delete: async (campaignId: number) => {
+    await api.delete(`/campaigns/${campaignId}`)
+  },
+
+  addItem: async (campaignId: number, testCaseId: number) => {
+    const response = await api.post<TestCampaignItem>(`/campaigns/${campaignId}/items?test_case_id=${testCaseId}`)
+    return response.data
+  },
+
+  updateItem: async (campaignId: number, itemId: number, data: { status?: string; result?: string; comment?: string }) => {
+    const response = await api.patch<TestCampaignItem>(`/campaigns/${campaignId}/items/${itemId}`, data)
+    return response.data
+  },
+
+  removeItem: async (campaignId: number, itemId: number) => {
+    await api.delete(`/campaigns/${campaignId}/items/${itemId}`)
+  },
+
+  listConfigurations: async (projectId: number) => {
+    const response = await api.get<TestConfiguration[]>(`/campaigns/configurations?project_id=${projectId}`)
+    return response.data
+  },
+
+  createConfiguration: async (data: { project_id: number; name: string; description?: string; environment?: string; parameters?: Record<string, unknown> }) => {
+    const response = await api.post<TestConfiguration>('/campaigns/configurations', data)
     return response.data
   },
 }
