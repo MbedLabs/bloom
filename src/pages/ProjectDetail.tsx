@@ -39,8 +39,7 @@ function getActiveTab(value: string | null): Tab {
 }
 
 export default function ProjectDetail() {
-  const { id } = useParams<{ id: string }>()
-  const projectId = Number(id)
+  const { prefix } = useParams<{ prefix: string }>()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const activeTab = getActiveTab(searchParams.get('tab'))
@@ -70,10 +69,12 @@ export default function ProjectDetail() {
   }
 
   const { data: project, isLoading: projectLoading } = useQuery({
-    queryKey: ['project', projectId],
-    queryFn: () => projectsApi.get(projectId),
-    enabled: !!projectId,
+    queryKey: ['project-by-prefix', prefix],
+    queryFn: () => projectsApi.getByPrefix(prefix!),
+    enabled: !!prefix,
   })
+
+  const projectId = project?.id || 0
 
   const { data: requirements, isLoading: reqsLoading } = useQuery({
     queryKey: ['requirements', projectId],
@@ -356,7 +357,7 @@ export default function ProjectDetail() {
           <SectionToolbar
             countLabel={`${filteredRequirements.length} requirement${filteredRequirements.length !== 1 ? 's' : ''}`}
             actionLabel="New Requirement"
-            onAction={() => navigate(`/projects/${projectId}/docs/new?type=REQ`)}
+            onAction={() => navigate(`/projects/${prefix}/docs/new?type=REQ`)}
           >
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -393,8 +394,8 @@ export default function ProjectDetail() {
                 <tbody className="bg-card divide-y divide-border">
                   {filteredRequirements.map((req) => (
                     <tr key={req.id} className="hover:bg-accent/50">
-                      <Td><Link to={`/projects/${projectId}/requirements/${req.id}`} className="text-primary font-mono text-sm font-medium">{req.req_id}</Link></Td>
-                      <Td><Link to={`/projects/${projectId}/requirements/${req.id}`} className="text-foreground hover:text-primary/80 font-medium">{req.title}</Link></Td>
+                      <Td><Link to={`/projects/${prefix}/docs/${req.req_id}`} className="text-primary font-mono text-sm font-medium">{req.req_id}</Link></Td>
+                      <Td><Link to={`/projects/${prefix}/docs/${req.req_id}`} className="text-foreground hover:text-primary/80 font-medium">{req.title}</Link></Td>
                       <Td><RequirementStatusBadge status={req.status} /></Td>
                       <Td><PriorityBadge priority={req.priority} /></Td>
                       <Td>{req.req_type}</Td>
@@ -414,7 +415,7 @@ export default function ProjectDetail() {
           <SectionToolbar
             countLabel={`${filteredTestCases.length} test case${filteredTestCases.length !== 1 ? 's' : ''}`}
             actionLabel="New Test Case"
-            onAction={() => navigate(`/projects/${projectId}/docs/new?type=TC`)}
+            onAction={() => navigate(`/projects/${prefix}/docs/new?type=TC`)}
           >
             <select
               value={tcStatusFilter}
@@ -442,8 +443,8 @@ export default function ProjectDetail() {
                 <tbody className="bg-card divide-y divide-border">
                   {filteredTestCases.map((tc) => (
                     <tr key={tc.id} className="hover:bg-accent/50">
-                      <Td><Link to={`/projects/${projectId}/test-cases/${tc.id}`} className="text-primary font-mono text-sm font-medium">{tc.tc_id}</Link></Td>
-                      <Td><Link to={`/projects/${projectId}/test-cases/${tc.id}`} className="text-foreground hover:text-primary/80 font-medium">{tc.title}</Link></Td>
+                      <Td><Link to={`/projects/${prefix}/docs/${tc.tc_id}`} className="text-primary font-mono text-sm font-medium">{tc.tc_id}</Link></Td>
+                      <Td><Link to={`/projects/${prefix}/docs/${tc.tc_id}`} className="text-foreground hover:text-primary/80 font-medium">{tc.title}</Link></Td>
                       <Td><TcStatusBadge status={tc.status} /></Td>
                       <Td>{tc.requirement_count}</Td>
                     </tr>
@@ -457,7 +458,7 @@ export default function ProjectDetail() {
 
       {activeTab === 'design' && (
         <div className="space-y-4">
-          <SectionToolbar countLabel={`${designItems?.length ?? 0} design item${(designItems?.length ?? 0) !== 1 ? 's' : ''}`} actionLabel="New Design Item" onAction={() => navigate(`/projects/${projectId}/docs/new?type=DES`)} />
+          <SectionToolbar countLabel={`${designItems?.length ?? 0} design item${(designItems?.length ?? 0) !== 1 ? 's' : ''}`} actionLabel="New Design Item" onAction={() => navigate(`/projects/${prefix}/docs/new?type=DES`)} />
           <TableCard emptyTitle="No Design Items" emptyText="Capture architecture, interfaces, and implementation design here.">
             <table className="min-w-full divide-y divide-border">
               <thead className="bg-muted/50">
@@ -473,8 +474,8 @@ export default function ProjectDetail() {
               <tbody className="bg-card divide-y divide-border">
                 {(designItems ?? []).map((item) => (
                   <tr key={item.id} className="hover:bg-accent/50">
-                    <Td><Link to={`/projects/${projectId}/designs/${item.id}`} className="text-primary font-mono text-sm font-medium">{item.design_id}</Link></Td>
-                    <Td><Link to={`/projects/${projectId}/designs/${item.id}`} className="text-foreground hover:text-primary/80 font-medium">{item.title}</Link></Td>
+                    <Td><Link to={`/projects/${prefix}/docs/${item.design_id}`} className="text-primary font-mono text-sm font-medium">{item.design_id}</Link></Td>
+                    <Td><Link to={`/projects/${prefix}/docs/${item.design_id}`} className="text-foreground hover:text-primary/80 font-medium">{item.title}</Link></Td>
                     <Td>{item.design_type}</Td>
                     <Td><NeutralBadge value={item.status} /></Td>
                     <Td><PriorityBadge priority={item.priority} /></Td>
@@ -489,7 +490,7 @@ export default function ProjectDetail() {
 
       {activeTab === 'risks' && (
         <div className="space-y-4">
-          <SectionToolbar countLabel={`${riskItems?.length ?? 0} risk${(riskItems?.length ?? 0) !== 1 ? 's' : ''}`} actionLabel="New Risk" onAction={() => navigate(`/projects/${projectId}/docs/new?type=RSK`)} />
+          <SectionToolbar countLabel={`${riskItems?.length ?? 0} risk${(riskItems?.length ?? 0) !== 1 ? 's' : ''}`} actionLabel="New Risk" onAction={() => navigate(`/projects/${prefix}/docs/new?type=RSK`)} />
           <TableCard emptyTitle="No Risks" emptyText="Track technical, business, and compliance risks here.">
             <table className="min-w-full divide-y divide-border">
               <thead className="bg-muted/50">
@@ -505,8 +506,8 @@ export default function ProjectDetail() {
               <tbody className="bg-card divide-y divide-border">
                 {(riskItems ?? []).map((item) => (
                   <tr key={item.id} className="hover:bg-accent/50">
-                    <Td><Link to={`/projects/${projectId}/risks/${item.id}`} className="text-primary font-mono text-sm font-medium">{item.risk_id}</Link></Td>
-                    <Td><Link to={`/projects/${projectId}/risks/${item.id}`} className="text-foreground hover:text-primary/80 font-medium">{item.title}</Link></Td>
+                    <Td><Link to={`/projects/${prefix}/docs/${item.risk_id}`} className="text-primary font-mono text-sm font-medium">{item.risk_id}</Link></Td>
+                    <Td><Link to={`/projects/${prefix}/docs/${item.risk_id}`} className="text-foreground hover:text-primary/80 font-medium">{item.title}</Link></Td>
                     <Td><NeutralBadge value={item.status} /></Td>
                     <Td><RiskBadge value={item.severity} /></Td>
                     <Td><RiskBadge value={item.probability} /></Td>
@@ -521,7 +522,7 @@ export default function ProjectDetail() {
 
       {activeTab === 'changes' && (
         <div className="space-y-4">
-          <SectionToolbar countLabel={`${changeRequests?.length ?? 0} change request${(changeRequests?.length ?? 0) !== 1 ? 's' : ''}`} actionLabel="New Change" onAction={() => navigate(`/projects/${projectId}/docs/new?type=CHG`)} />
+          <SectionToolbar countLabel={`${changeRequests?.length ?? 0} change request${(changeRequests?.length ?? 0) !== 1 ? 's' : ''}`} actionLabel="New Change" onAction={() => navigate(`/projects/${prefix}/docs/new?type=CHG`)} />
           <TableCard emptyTitle="No Change Requests" emptyText="Capture requested changes and impact assessments here.">
             <table className="min-w-full divide-y divide-border">
               <thead className="bg-muted/50">
@@ -536,8 +537,8 @@ export default function ProjectDetail() {
               <tbody className="bg-card divide-y divide-border">
                 {(changeRequests ?? []).map((item) => (
                   <tr key={item.id} className="hover:bg-accent/50">
-                    <Td><Link to={`/projects/${projectId}/changes/${item.id}`} className="text-primary font-mono text-sm font-medium">{item.change_id}</Link></Td>
-                    <Td><Link to={`/projects/${projectId}/changes/${item.id}`} className="text-foreground hover:text-primary/80 font-medium">{item.title}</Link></Td>
+                    <Td><Link to={`/projects/${prefix}/docs/${item.change_id}`} className="text-primary font-mono text-sm font-medium">{item.change_id}</Link></Td>
+                    <Td><Link to={`/projects/${prefix}/docs/${item.change_id}`} className="text-foreground hover:text-primary/80 font-medium">{item.title}</Link></Td>
                     <Td><NeutralBadge value={item.status} /></Td>
                     <Td><PriorityBadge priority={item.priority} /></Td>
                     <Td>{item.change_type}</Td>
@@ -553,21 +554,23 @@ export default function ProjectDetail() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">{documents?.length ?? 0} documents inside this project</p>
-              <p className="text-xs text-muted-foreground mt-1">Specifications, reports, and concepts are visible here before opening the full editor.</p>
+              <p className="text-sm text-muted-foreground">All documents across all types in this project</p>
             </div>
-            <Link to={`/projects/${projectId}/documents`} className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm font-medium">
-              <BookOpen className="h-4 w-4 mr-2" />
-              Open Documents Workspace
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link to={`/projects/${prefix}/docs`} className="inline-flex items-center px-4 py-2 border border-input rounded-md hover:bg-accent/50 text-sm font-medium">
+                <BookOpen className="h-4 w-4 mr-2" />
+                Open Full View
+              </Link>
+              <NewDocDropdown prefix={prefix || ''} />
+            </div>
           </div>
 
           {!documents || documents.length === 0 ? (
-            <EmptyCard title="No Documents" text="Create a document from the documents workspace to start building rich project specifications." icon={BookOpen} />
+            <EmptyCard title="No Documents" text="Create your first document to get started." icon={BookOpen} />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {documents.slice(0, 6).map((doc) => (
-                <Link key={doc.id} to={`/documents/${doc.id}`} className="block bg-card rounded-lg border border-border shadow-elegant hover:border-primary/20 hover:shadow-glow transition-all p-5">
+                <Link key={doc.id} to={`/projects/${prefix}/docs/${doc.doc_id || doc.id}`} className="block bg-card rounded-lg border border-border shadow-elegant hover:border-primary/20 hover:shadow-glow transition-all p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <h3 className="font-semibold text-foreground">{doc.title}</h3>
@@ -576,7 +579,6 @@ export default function ProjectDetail() {
                     <NeutralBadge value={doc.status} />
                   </div>
                   {doc.description && <p className="text-sm text-muted-foreground mt-3 line-clamp-3">{doc.description}</p>}
-                  <div className="mt-4 text-xs text-muted-foreground">{doc.section_count} section{doc.section_count !== 1 ? 's' : ''}</div>
                 </Link>
               ))}
             </div>
@@ -586,7 +588,7 @@ export default function ProjectDetail() {
 
       {activeTab === 'test-concepts' && (
         <div className="space-y-4">
-          <SectionToolbar countLabel={`${testConcepts?.length ?? 0} test concept${(testConcepts?.length ?? 0) !== 1 ? 's' : ''}`} actionLabel="New Test Concept" onAction={() => navigate(`/projects/${projectId}/docs/new?type=TCO`)} />
+          <SectionToolbar countLabel={`${testConcepts?.length ?? 0} test concept${(testConcepts?.length ?? 0) !== 1 ? 's' : ''}`} actionLabel="New Test Concept" onAction={() => navigate(`/projects/${prefix}/docs/new?type=TCO`)} />
           {!testConcepts || testConcepts.length === 0 ? (
             <EmptyCard title="No Test Concepts" text="Create your first test concept for this project." icon={Beaker} />
           ) : (
@@ -605,7 +607,7 @@ export default function ProjectDetail() {
                     <tr key={concept.id} className="hover:bg-accent/50">
                       <Td>
                         <div>
-                          <Link to={`/projects/${projectId}/test-concepts/${concept.id}`} className="font-medium text-foreground hover:text-primary/80">{concept.name}</Link>
+                          <Link to={`/projects/${prefix}/docs/${concept.concept_id}`} className="font-medium text-foreground hover:text-primary/80">{concept.name}</Link>
                           {concept.description && <div className="text-sm text-muted-foreground mt-1">{concept.description}</div>}
                         </div>
                       </Td>
@@ -636,7 +638,7 @@ export default function ProjectDetail() {
                 <h3 className="font-semibold text-foreground">Inline Traceability View</h3>
                 <p className="text-sm text-muted-foreground mt-1">Coverage problems are visible here without leaving the project workspace.</p>
               </div>
-              <Link to={`/traceability/${projectId}`} className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 text-sm">
+              <Link to={`/projects/${prefix}/traceability`} className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 text-sm">
                 <GitBranch className="h-4 w-4 mr-2" />
                 Open Full Matrix
               </Link>
@@ -649,7 +651,7 @@ export default function ProjectDetail() {
                 {uncoveredRequirements.map((item) => (
                   <div key={item.requirement.id} className="flex items-center justify-between gap-4 p-3 rounded-lg border border-border bg-background/60">
                     <div>
-                      <Link to={`/projects/${projectId}/requirements/${item.requirement.id}`} className="font-medium text-foreground hover:text-primary/80">
+                      <Link to={`/projects/${prefix}/docs/${item.requirement.req_id}`} className="font-medium text-foreground hover:text-primary/80">
                         {item.requirement.req_id} · {item.requirement.title}
                       </Link>
                       <div className="text-sm text-muted-foreground mt-1">{item.linked_test_cases.length} linked test case{item.linked_test_cases.length !== 1 ? 's' : ''}</div>
@@ -764,6 +766,45 @@ export default function ProjectDetail() {
         </Modal>
       )}
 
+    </div>
+  )
+}
+
+function NewDocDropdown({ prefix }: { prefix: string }) {
+  const [open, setOpen] = useState(false)
+  const navigate = useNavigate()
+  const types = [
+    { code: 'REQ', label: 'Requirement' },
+    { code: 'TC', label: 'Test Case' },
+    { code: 'DES', label: 'Design' },
+    { code: 'RSK', label: 'Risk' },
+    { code: 'CHG', label: 'Change Request' },
+    { code: 'TCO', label: 'Test Concept' },
+    { code: 'DOC', label: 'Document' },
+  ]
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm font-medium"
+      >
+        <Plus className="h-4 w-4 mr-2" />
+        New Document
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-48 bg-card border border-border rounded-lg shadow-elegant overflow-hidden z-50">
+          {types.map((t) => (
+            <button
+              key={t.code}
+              onClick={() => { setOpen(false); navigate(`/projects/${prefix}/docs/new?type=${t.code}`) }}
+              className="w-full text-left px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors"
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

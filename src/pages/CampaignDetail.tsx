@@ -4,8 +4,7 @@ import { campaignsApi } from '../api/client'
 import { ArrowLeft, Clock, MessageSquare } from 'lucide-react'
 
 export default function CampaignDetail() {
-  const { id, campaignId } = useParams<{ id: string; campaignId: string }>()
-  const projId = parseInt(id || '0')
+  const { prefix, campaignId } = useParams<{ prefix: string; campaignId: string }>()
   const campId = parseInt(campaignId || '0')
 
   const { data: campaign, isLoading } = useQuery({
@@ -22,7 +21,7 @@ export default function CampaignDetail() {
     return (
       <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6 text-center">
         <h3 className="text-lg font-medium text-destructive">Campaign Not Found</h3>
-        <Link to={`/projects/${projId}/campaigns`} className="mt-4 inline-block text-primary hover:text-primary/80">
+        <Link to={`/projects/${prefix}/campaigns`} className="mt-4 inline-block text-primary hover:text-primary/80">
           &larr; Back to Campaigns
         </Link>
       </div>
@@ -35,7 +34,7 @@ export default function CampaignDetail() {
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <Link to={`/projects/${projId}/campaigns`} className="p-2 hover:bg-accent/50 rounded-md">
+          <Link to={`/projects/${prefix}/campaigns`} className="p-2 hover:bg-accent/50 rounded-md">
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
           <div>
@@ -100,7 +99,7 @@ export default function CampaignDetail() {
         {campaign.related_requirements && campaign.related_requirements.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {campaign.related_requirements.map((req) => (
-              <Link key={req.id} to={`/requirements/${req.id}`} className="inline-flex items-center px-3 py-2 rounded-md bg-primary/10 text-primary hover:bg-primary/15 text-sm">
+              <Link key={req.id} to={`/projects/${prefix}/docs/${req.req_id}`} className="inline-flex items-center px-3 py-2 rounded-md bg-primary/10 text-primary hover:bg-primary/15 text-sm">
                 <span className="font-mono mr-2">{req.req_id}</span>
                 {req.title}
               </Link>
@@ -126,7 +125,7 @@ export default function CampaignDetail() {
                     <Clock className="h-5 w-5 text-primary/60" />
                     <div>
                       {item.test_case ? (
-                        <Link to={`/test-cases/${item.test_case.id}`} className="font-mono text-sm text-primary hover:text-primary/80 font-medium">
+                        <Link to={`/projects/${prefix}/docs/${item.test_case.tc_id}`} className="font-mono text-sm text-primary hover:text-primary/80 font-medium">
                           {item.test_case.tc_id}
                         </Link>
                       ) : (
@@ -136,7 +135,7 @@ export default function CampaignDetail() {
                       {item.test_case?.linked_requirements && item.test_case.linked_requirements.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-2">
                           {item.test_case.linked_requirements.map((req) => (
-                            <Link key={req.id} to={`/requirements/${req.id}`} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary hover:bg-primary/15">
+                            <Link key={req.id} to={`/projects/${prefix}/docs/${req.req_id}`} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary hover:bg-primary/15">
                               <span className="font-mono mr-1">{req.req_id}</span>
                               {req.title}
                             </Link>

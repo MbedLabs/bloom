@@ -44,10 +44,10 @@ const projectNav = [
   { name: 'Risks', icon: AlertTriangle, tab: 'risks' },
   { name: 'Changes', icon: GitPullRequest, tab: 'changes' },
   { name: 'Test Campaigns', icon: FlaskConical, tab: '', href: 'campaigns' as const },
-  { name: 'Documents', icon: BookOpen, tab: 'documents' },
+  { name: 'Documents', icon: BookOpen, tab: '', href: 'docs' as const },
   { name: 'Parameters', icon: SlidersHorizontal, tab: '', href: 'parameters' as const },
   { name: 'Test Concepts', icon: Beaker, tab: 'test-concepts' },
-  { name: 'Traceability', icon: GitBranch, tab: 'traceability' },
+  { name: 'Traceability', icon: GitBranch, tab: '', href: 'traceability' as const },
 ]
 
 function Beaker(props: { className?: string }) {
@@ -85,9 +85,9 @@ export default function Layout() {
   })
 
   const isInProject = location.pathname.startsWith('/projects/')
-  const currentProjectId = isInProject ? Number(location.pathname.split('/')[2]) : null
-  const currentProjectName = currentProjectId && Number.isFinite(currentProjectId)
-    ? projects?.find((p) => p.id === currentProjectId)?.name || `Project #${currentProjectId}`
+  const currentProjectSlug = isInProject ? location.pathname.split('/')[2] : null
+  const currentProjectName = currentProjectSlug
+    ? projects?.find((p) => p.prefix === currentProjectSlug || String(p.id) === currentProjectSlug)?.name || currentProjectSlug
     : null
 
   const breadcrumbs = useMemo(() => getBreadcrumbs(location, projects || []), [location, projects])
@@ -182,7 +182,7 @@ export default function Layout() {
                   {projects.map((p) => (
                     <Link
                       key={p.id}
-                      to={`/projects/${p.id}`}
+                      to={`/projects/${p.prefix}`}
                       onClick={() => setProjectDropdownOpen(false)}
                       className="block px-3 py-2 text-sm text-teal-100 hover:bg-white/10 truncate transition-colors"
                     >
@@ -364,105 +364,63 @@ export default function Layout() {
   )
 }
 
-function getBreadcrumbs(location: ReturnType<typeof useLocation>, projects: Array<{ id: number; name: string }>) {
+function getBreadcrumbs(location: ReturnType<typeof useLocation>, projects: Array<{ id: number; name: string; prefix: string }>) {
   const path = location.pathname
   const crumbs: { label: string; href?: string }[] = [{ label: 'Home', href: '/' }]
-
   const parts = path.split('/')
-  const projectId = Number(parts[2])
-  const projectName = Number.isFinite(projectId)
-    ? (projects.find((p) => p.id === projectId)?.name || `Project #${parts[2]}`)
+  const slug = parts[2]
+  const projectName = slug
+    ? (projects.find((p) => p.prefix === slug || String(p.id) === slug)?.name || slug)
     : undefined
+
+  if (path === '/') return [{ label: 'Dashboard' }]
+  if (path === '/reports') return [{ label: 'Home', href: '/' }, { label: 'Reports' }]
+  if (path === '/baselines') return [{ label: 'Home', href: '/' }, { label: 'Baselines' }]
+  if (path === '/settings') return [{ label: 'Home', href: '/' }, { label: 'Settings' }]
 
   if (path.startsWith('/projects')) {
     crumbs.push({ label: 'Projects', href: '/projects' })
+    if (!slug) return crumbs
 
-    if (parts[2]) {
-      if (parts[3] === 'campaigns') {
-        crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}` })
-        crumbs.push({ label: 'Campaigns' })
-        if (parts[4]) crumbs.push({ label: 'Campaign Detail' })
-      } else if (parts[3] === 'suites') {
-        crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}` })
-        crumbs.push({ label: 'Suite Detail' })
-      } else if (parts[3] === 'documents') {
-        crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}` })
-        crumbs.push({ label: 'Documents' })
-      } else if (parts[3] === 'parameters') {
-        crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}` })
-        crumbs.push({ label: 'Parameters' })
+    const sub = parts[3]
+    const projCrumb = { label: projectName!, href: `/projects/${slug}` }
+
+    if (!sub) {
+      crumbs.push({ label: projectName! })
+      return crumbs
+    }
+
+    crumbs.push(projCrumb)
+
+    const subMap: Record<string, string> = {
+      docs: 'Documents',
+      campaigns: 'Campaigns',
+      suites: 'Suites',
+      traceability: 'Traceability Matrix',
+      'impact-analysis': 'Impact Analysis',
+      parameters: 'Parameters',
+      baselines: 'Baselines',
+    }
+
+    if (sub === 'docs') {
+      if (parts[4] === 'new') {
+        crumbs.push({ label: 'Documents', href: `/projects/${slug}/docs` })
+        crumbs.push({ label: 'New' })
+      } else if (parts[4]) {
+        crumbs.push({ label: 'Documents', href: `/projects/${slug}/docs` })
+        crumbs.push({ label: parts[4] })
       } else {
-        crumbs.push({ label: projectName || `Project #${parts[2]}` })
+        crumbs.push({ label: 'Documents' })
       }
+    } else if (sub === 'campaigns' && parts[4]) {
+      crumbs.push({ label: 'Campaigns', href: `/projects/${slug}/campaigns` })
+      crumbs.push({ label: 'Campaign Detail' })
+    } else if (sub === 'suites' && parts[4]) {
+      crumbs.push({ label: 'Suites', href: `/projects/${slug}/campaigns` })
+      crumbs.push({ label: 'Suite Detail' })
+    } else if (subMap[sub]) {
+      crumbs.push({ label: subMap[sub] })
     }
-  }
-
-  if (path.startsWith('/projects') && parts.length >= 4) {
-    const subRoute = parts[3]
-    if (subRoute === 'requirements' && parts[4]) {
-      crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}?tab=requirements` })
-      crumbs.push({ label: 'Requirement' })
-    } else if (subRoute === 'test-cases' && parts[4]) {
-      crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}?tab=test-cases` })
-      crumbs.push({ label: 'Test Case' })
-    } else if (subRoute === 'designs' && parts[4]) {
-      crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}?tab=design` })
-      crumbs.push({ label: 'Design' })
-    } else if (subRoute === 'risks' && parts[4]) {
-      crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}?tab=risks` })
-      crumbs.push({ label: 'Risk' })
-    } else if (subRoute === 'changes' && parts[4]) {
-      crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}?tab=changes` })
-      crumbs.push({ label: 'Change Request' })
-    } else if (subRoute === 'test-concepts' && parts[4]) {
-      crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}?tab=test-concepts` })
-      crumbs.push({ label: 'Test Concept' })
-    } else if (subRoute === 'traceability') {
-      crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}` })
-      crumbs.push({ label: 'Traceability Matrix' })
-    } else if (subRoute === 'impact-analysis') {
-      crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}` })
-      crumbs.push({ label: 'Impact Analysis' })
-    } else if (subRoute === 'baselines') {
-      crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}` })
-      crumbs.push({ label: 'Baselines' })
-    }
-  }
-
-  if (path.startsWith('/requirements/')) {
-    crumbs.push({ label: 'Requirement' })
-  }
-
-  if (path.startsWith('/test-cases/')) {
-    crumbs.push({ label: 'Test Case' })
-  }
-
-  if (path.startsWith('/documents/') && !path.startsWith('/documents/new')) {
-    crumbs.push({ label: 'Document' })
-  }
-
-  if (path.startsWith('/traceability/')) {
-    crumbs.push({ label: 'Traceability Matrix' })
-  }
-
-  if (path.startsWith('/impact-analysis/')) {
-    crumbs.push({ label: 'Impact Analysis' })
-  }
-
-  if (path === '/reports') {
-    return [{ label: 'Home', href: '/' }, { label: 'Reports' }]
-  }
-
-  if (path === '/baselines') {
-    return [{ label: 'Home', href: '/' }, { label: 'Baselines' }]
-  }
-
-  if (path === '/settings') {
-    return [{ label: 'Home', href: '/' }, { label: 'Settings' }]
-  }
-
-  if (path === '/') {
-    return [{ label: 'Dashboard' }]
   }
 
   return crumbs

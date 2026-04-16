@@ -1,18 +1,25 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { traceabilityApi } from '../api/client'
+import { traceabilityApi, docsApi } from '../api/client'
 import { ArrowLeft, ArrowUpCircle, ArrowDownCircle, ChevronRight, ChevronDown, CheckCircle } from 'lucide-react'
 import { useState } from 'react'
 import type { ImpactNode } from '../api/client'
 
 export default function ImpactAnalysis() {
-  const { requirementId } = useParams<{ requirementId: string }>()
-  const reqId = parseInt(requirementId || '0')
+  const { prefix, requirementId } = useParams<{ prefix: string; requirementId: string }>()
+
+  const { data: resolvedDoc } = useQuery({
+    queryKey: ['resolve-doc', prefix, requirementId],
+    queryFn: () => docsApi.get(prefix!, requirementId!),
+    enabled: !!prefix && !!requirementId,
+  })
+
+  const numericId = resolvedDoc?.id || 0
 
   const { data: analysis, isLoading, error } = useQuery({
-    queryKey: ['impact-analysis', reqId],
-    queryFn: () => traceabilityApi.getImpactAnalysis(reqId, 5),
-    enabled: !!reqId,
+    queryKey: ['impact-analysis', numericId],
+    queryFn: () => traceabilityApi.getImpactAnalysis(numericId, 5),
+    enabled: !!numericId,
   })
 
   const totalUpstream = analysis ? countNodes(analysis.upstream) : 0
@@ -36,7 +43,7 @@ export default function ImpactAnalysis() {
   return (
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center space-x-4">
-        <Link to={`/requirements/${reqId}`} className="p-2 hover:bg-accent/50 rounded-md">
+        <Link to={`/projects/${prefix}/docs/${requirementId}`} className="p-2 hover:bg-accent/50 rounded-md">
           <ArrowLeft className="h-5 w-5 text-muted-foreground" />
         </Link>
         <div>
@@ -99,7 +106,7 @@ export default function ImpactAnalysis() {
                 <p className="text-sm">No upstream dependencies found</p>
               </div>
             ) : (
-              <ImpactTree nodes={analysis.upstream} direction="upstream" />
+              <ImpactTree nodes={analysis.upstream} direction="upstream" prefix={prefix!} />
             )}
           </div>
         </div>
@@ -119,7 +126,7 @@ export default function ImpactAnalysis() {
                 <p className="text-sm">No downstream impacts found</p>
               </div>
             ) : (
-              <ImpactTree nodes={analysis.downstream} direction="downstream" />
+              <ImpactTree nodes={analysis.downstream} direction="downstream" prefix={prefix!} />
             )}
           </div>
         </div>
@@ -143,20 +150,19 @@ function countNodes(nodes: ImpactNode[]): number {
   return count
 }
 
-function ImpactTree({ nodes, direction }: { nodes: ImpactNode[]; direction: string }) {
+function ImpactTree({ nodes, direction, prefix }: { nodes: ImpactNode[]; direction: string; prefix: string }) {
   return (
     <div className="space-y-1">
       {nodes.map((node) => (
-        <ImpactTreeNode key={`${node.direction}-${node.requirement.id}`} node={node} direction={direction} depth={0} />
+        <ImpactTreeNode key={`${node.direction}-${node.requirement.id}`} node={node} direction={direction} depth={0} prefix={prefix} />
       ))}
     </div>
   )
 }
 
-function ImpactTreeNode({ node, direction, depth }: { node: ImpactNode; direction: string; depth: number }) {
+function ImpactTreeNode({ node, direction, depth, prefix }: { node: ImpactNode; direction: string; depth: number; prefix: string }) {
   const [expanded, setExpanded] = useState(depth < 1)
   const hasChildren = node.children.length > 0
-  const isTestCase = node.requirement.req_type === 'test_case'
   const borderColor = direction === 'upstream' ? 'border-l-blue-400' : 'border-l-orange-400'
 
   return (
@@ -173,13 +179,13 @@ function ImpactTreeNode({ node, direction, depth }: { node: ImpactNode; directio
             <div className="w-5 flex-shrink-0" />
           )}
           <Link
-            to={isTestCase ? `/test-cases/${node.requirement.id}` : `/requirements/${node.requirement.id}`}
+            to={`/projects/${prefix}/docs/${node.requirement.req_id}`}
             className="font-mono text-xs text-primary hover:text-primary/80 font-medium flex-shrink-0"
           >
             {node.requirement.req_id}
           </Link>
           <Link
-            to={isTestCase ? `/test-cases/${node.requirement.id}` : `/requirements/${node.requirement.id}`}
+            to={`/projects/${prefix}/docs/${node.requirement.req_id}`}
             className="text-sm text-foreground truncate hover:text-primary/80"
           >
             {node.requirement.title}
@@ -198,6 +204,7 @@ function ImpactTreeNode({ node, direction, depth }: { node: ImpactNode; directio
               node={child}
               direction={direction}
               depth={depth + 1}
+              prefix={prefix}
             />
           ))}
         </div>

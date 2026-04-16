@@ -1,19 +1,33 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { requirementsApi, testCasesApi, usersApi } from '../api/client'
+import { requirementsApi, testCasesApi, usersApi, projectsApi } from '../api/client'
 import { ArrowLeft, Pencil, Link2, ExternalLink, ChevronRight, CheckCircle, UserCheck, UserCog, X, Search } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
-export default function RequirementDetail() {
-  const { itemId } = useParams<{ id: string; itemId: string }>()
-  const reqId = parseInt(itemId || '0')
+export default function RequirementDetail({ resolvedId }: { resolvedId?: number } = {}) {
+  const { itemId } = useParams<{ prefix: string; itemId: string }>()
+  const reqId = resolvedId || parseInt(itemId || '0')
   const queryClient = useQueryClient()
 
   const { data: requirement, isLoading, error } = useQuery({
     queryKey: ['requirement', reqId],
     queryFn: () => requirementsApi.get(reqId),
     enabled: !!reqId,
+  })
+
+  const { data: project } = useQuery({
+    queryKey: ['project', requirement?.project_id],
+    queryFn: () => projectsApi.get(requirement!.project_id),
+    enabled: !!requirement?.project_id,
+  })
+
+  const projectPrefix = project?.prefix || ''
+
+  const { data: parentReq } = useQuery({
+    queryKey: ['requirement', requirement?.parent_id],
+    queryFn: () => requirementsApi.get(requirement!.parent_id!),
+    enabled: !!requirement?.parent_id,
   })
 
   const [isEditing, setIsEditing] = useState(false)
@@ -163,7 +177,7 @@ export default function RequirementDetail() {
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <Link to={`/projects/${requirement.project_id}`} className="p-2 hover:bg-accent/50 rounded-md">
+          <Link to={`/projects/${projectPrefix}`} className="p-2 hover:bg-accent/50 rounded-md">
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
           <div>
@@ -195,11 +209,11 @@ export default function RequirementDetail() {
         </div>
       </div>
 
-      {requirement.parent_id && (
+      {requirement.parent_id && parentReq && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <span className="text-sm text-blue-600 font-medium">Parent Requirement: </span>
-          <Link to={`/requirements/${requirement.parent_id}`} className="text-sm text-primary hover:text-primary/80 font-medium">
-            View Parent →
+          <Link to={`/projects/${projectPrefix}/docs/${parentReq.req_id}`} className="text-sm text-primary hover:text-primary/80 font-medium">
+            {parentReq.req_id} — {parentReq.title} →
           </Link>
         </div>
       )}
@@ -386,7 +400,7 @@ export default function RequirementDetail() {
             {requirement.children.map((child) => (
               <Link
                 key={child.id}
-                to={`/requirements/${child.id}`}
+                to={`/projects/${projectPrefix}/docs/${child.req_id}`}
                 className="flex items-center justify-between px-6 py-4 hover:bg-accent/50 transition-colors"
               >
                 <div className="flex items-center">
@@ -445,7 +459,7 @@ export default function RequirementDetail() {
             {filteredLinkedTestCases.map((link) => (
               <Link
                 key={link.id}
-                to={`/test-cases/${link.test_case.id}`}
+                to={`/projects/${projectPrefix}/docs/${link.test_case.tc_id}`}
                 className="flex items-center justify-between px-6 py-4 hover:bg-accent/50 transition-colors"
               >
                 <div className="flex items-center">

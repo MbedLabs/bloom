@@ -3,21 +3,17 @@ import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Plus, SlidersHorizontal, Trash2 } from 'lucide-react'
 
-import { projectVariablesApi, projectsApi, ProjectVariable } from '../api/client'
+import { projectVariablesApi, ProjectVariable } from '../api/client'
+import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 
 export default function ProjectParameters() {
-  const { id } = useParams<{ id: string }>()
-  const projectId = Number(id)
+  const { prefix } = useParams<{ prefix: string }>()
+  const { data: project, isLoading: projectLoading } = useProjectByPrefix(prefix)
+  const projectId = project?.id || 0
   const queryClient = useQueryClient()
 
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState({ key: '', value: '', description: '' })
-
-  const { data: project, isLoading: projectLoading } = useQuery({
-    queryKey: ['project', projectId],
-    queryFn: () => projectsApi.get(projectId),
-    enabled: !!projectId,
-  })
 
   const { data: variables, isLoading: variablesLoading } = useQuery({
     queryKey: ['projectVariables', projectId],
@@ -75,7 +71,7 @@ export default function ProjectParameters() {
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Link to={`/projects/${projectId}`} className="p-2 hover:bg-accent/50 rounded-md">
+          <Link to={`/projects/${prefix}`} className="p-2 hover:bg-accent/50 rounded-md">
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
           <div>

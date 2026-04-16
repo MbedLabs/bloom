@@ -3,13 +3,15 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Check, ChevronRight, Download, AlertCircle } from 'lucide-react'
 import { projectsApi, requirementsApi, testCasesApi, importApi } from '../api/client'
+import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import type { ImportResult } from '../api/client'
 
 type WizardStep = 1 | 2 | 3 | 4 | 5
 
 export default function ImportWizard() {
-  const { id } = useParams<{ id: string }>()
-  const projectId = Number(id)
+  const { prefix } = useParams<{ prefix: string }>()
+  const { data: currentProject } = useProjectByPrefix(prefix)
+  const projectId = currentProject?.id || 0
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
@@ -73,7 +75,7 @@ export default function ImportWizard() {
   return (
     <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
       <div className="flex items-center gap-3">
-        <Link to={`/projects/${projectId}`} className="p-2 hover:bg-accent/50 rounded-md">
+        <Link to={`/projects/${prefix}`} className="p-2 hover:bg-accent/50 rounded-md">
           <ArrowLeft className="h-5 w-5 text-muted-foreground" />
         </Link>
         <div>
@@ -286,7 +288,7 @@ export default function ImportWizard() {
               </div>
             )}
             <button
-              onClick={() => navigate(`/projects/${projectId}`)}
+              onClick={() => navigate(`/projects/${prefix}`)}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90"
             >
               Back to Project

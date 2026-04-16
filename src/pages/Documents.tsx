@@ -1,175 +1,202 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { documentsApi, Document } from '../api/client'
-import { Plus, FileText, Search, BookOpen } from 'lucide-react'
+import { docsApi, type DocShell } from '../api/client'
+import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
+import { Plus, Search, BookOpen, ChevronDown } from 'lucide-react'
 
-function DocTypeBadge({ docType }: { docType: string }) {
-  const config: Record<string, string> = {
-    Specification: 'bg-primary/10 text-primary',
-    'Test Concept': 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400',
-    Report: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-    Other: 'bg-muted text-muted-foreground',
-  }
-
-  return (
-    <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${config[docType] || config.Other}`}>
-      {docType}
-    </span>
-  )
+const TYPE_BADGES: Record<string, { label: string; color: string }> = {
+  REQ: { label: 'Requirement', color: 'bg-blue-500/10 text-blue-700 dark:text-blue-400' },
+  TC: { label: 'Test Case', color: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' },
+  DES: { label: 'Design', color: 'bg-violet-500/10 text-violet-700 dark:text-violet-400' },
+  RSK: { label: 'Risk', color: 'bg-orange-500/10 text-orange-700 dark:text-orange-400' },
+  CHG: { label: 'Change', color: 'bg-rose-500/10 text-rose-700 dark:text-rose-400' },
+  TCO: { label: 'Test Concept', color: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400' },
+  DOC: { label: 'Document', color: 'bg-primary/10 text-primary' },
 }
 
-function DocStatusBadge({ status }: { status: string }) {
-  const config: Record<string, string> = {
+function TypeBadge({ type }: { type: string }) {
+  const cfg = TYPE_BADGES[type] || { label: type, color: 'bg-muted text-muted-foreground' }
+  return <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${cfg.color}`}>{cfg.label}</span>
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const colors: Record<string, string> = {
     Draft: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
     Review: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
     Approved: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+    Active: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+    Open: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+    Submitted: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
   }
-
-  return (
-    <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${config[status] || config.Draft}`}>
-      {status}
-    </span>
-  )
+  return <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${colors[status] || 'bg-muted text-muted-foreground'}`}>{status}</span>
 }
 
-function DocumentCard({ document, projectId }: { document: Document; projectId: number }) {
-  return (
-    <Link to={`/projects/${projectId}/documents/${document.id}`} className="block group">
-      <div className="bg-card rounded-lg border border-border shadow-elegant hover:shadow-glow hover:border-primary/20 transition-all duration-300 overflow-hidden">
-        <div className={`h-1 ${
-          document.status === 'Approved'
-            ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
-            : document.status === 'Review'
-              ? 'bg-gradient-to-r from-blue-500 to-blue-400'
-              : 'bg-gradient-to-r from-amber-500 to-amber-400'
-        }`} />
+const DOC_TYPES = [
+  { code: '', label: 'All Types' },
+  { code: 'REQ', label: 'Requirements' },
+  { code: 'TC', label: 'Test Cases' },
+  { code: 'DES', label: 'Design' },
+  { code: 'RSK', label: 'Risks' },
+  { code: 'CHG', label: 'Changes' },
+  { code: 'TCO', label: 'Test Concepts' },
+  { code: 'DOC', label: 'Documents' },
+]
 
-        <div className="p-5">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                <FileText className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground text-sm group-hover:text-primary transition-colors">
-                  {document.title}
-                </h3>
-                <span className="text-xs text-muted-foreground">v{document.version}</span>
-              </div>
-            </div>
-            <DocStatusBadge status={document.status} />
-          </div>
-
-          {document.description && (
-            <p className="text-xs text-muted-foreground mb-4 line-clamp-2">{document.description}</p>
-          )}
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <DocTypeBadge docType={document.doc_type} />
-              <span className="text-xs text-muted-foreground">
-                {document.section_count} section{document.section_count !== 1 ? 's' : ''}
-              </span>
-            </div>
-            <span className="text-[11px] text-muted-foreground">
-              {new Date(document.updated_at).toLocaleDateString()}
-            </span>
-          </div>
-        </div>
-      </div>
-    </Link>
-  )
-}
+const NEW_DOC_TYPES = [
+  { code: 'REQ', label: 'Requirement' },
+  { code: 'TC', label: 'Test Case' },
+  { code: 'DES', label: 'Design' },
+  { code: 'RSK', label: 'Risk' },
+  { code: 'CHG', label: 'Change Request' },
+  { code: 'TCO', label: 'Test Concept' },
+  { code: 'DOC', label: 'Document' },
+]
 
 export default function Documents() {
-  const { id } = useParams<{ id: string }>()
-  const projectId = Number(id)
+  const { prefix } = useParams<{ prefix: string }>()
   const navigate = useNavigate()
+  const { data: project } = useProjectByPrefix(prefix)
   const [search, setSearch] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
+  const [newDocOpen, setNewDocOpen] = useState(false)
 
-  const { data: documents, isLoading } = useQuery({
-    queryKey: ['documents', projectId],
-    queryFn: () => documentsApi.list(projectId),
-    enabled: !!projectId,
+  const { data: docs, isLoading } = useQuery({
+    queryKey: ['all-docs', prefix, typeFilter],
+    queryFn: () => docsApi.list(prefix!, {
+      type: typeFilter ? [typeFilter] : undefined,
+      q: undefined,
+    }),
+    enabled: !!prefix,
   })
 
-  const filteredDocuments = search
-    ? documents?.filter(d =>
+  const filtered = search
+    ? docs?.filter(d =>
         d.title.toLowerCase().includes(search.toLowerCase()) ||
-        d.doc_type.toLowerCase().includes(search.toLowerCase()) ||
-        d.status.toLowerCase().includes(search.toLowerCase())
+        d.doc_id.toLowerCase().includes(search.toLowerCase()) ||
+        d.doc_type.toLowerCase().includes(search.toLowerCase())
       )
-    : documents
+    : docs
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
         <div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-            <Link to={`/projects/${projectId}`} className="hover:text-primary transition-colors">
-              Project
+            <Link to={`/projects/${prefix}`} className="hover:text-primary transition-colors">
+              {project?.name || prefix}
             </Link>
             <span>/</span>
             <span className="text-foreground">Documents</span>
           </div>
           <h2 className="text-xl font-bold text-foreground">Documents</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {documents?.length || 0} document{documents?.length !== 1 ? 's' : ''}
+            {filtered?.length || 0} document{(filtered?.length || 0) !== 1 ? 's' : ''}
           </p>
         </div>
-        <button
-          onClick={() => navigate(`/projects/${projectId}/docs/new?type=DOC`)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 hover:shadow-glow transition-all duration-200"
-        >
-          <Plus className="h-4 w-4" />
-          New Document
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setNewDocOpen(!newDocOpen)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-all"
+          >
+            <Plus className="h-4 w-4" />
+            New Document
+            <ChevronDown className="h-3 w-3" />
+          </button>
+          {newDocOpen && (
+            <div className="absolute right-0 top-full mt-1 w-48 bg-card border border-border rounded-lg shadow-elegant overflow-hidden z-50">
+              {NEW_DOC_TYPES.map((t) => (
+                <button
+                  key={t.code}
+                  onClick={() => { setNewDocOpen(false); navigate(`/projects/${prefix}/docs/new?type=${t.code}`) }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors"
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <input
-          type="text"
-          placeholder="Search documents..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2.5 bg-card border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:border-ring transition-colors shadow-elegant"
-        />
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search documents..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2.5 bg-card border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:border-ring transition-colors shadow-elegant"
+          />
+        </div>
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="px-3 py-2.5 bg-card border border-border rounded-lg text-sm"
+        >
+          {DOC_TYPES.map((t) => (
+            <option key={t.code} value={t.code}>{t.label}</option>
+          ))}
+        </select>
       </div>
 
       {isLoading ? (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-8 text-center text-muted-foreground">
           Loading...
         </div>
-      ) : !filteredDocuments || filteredDocuments.length === 0 ? (
+      ) : !filtered || filtered.length === 0 ? (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-16 text-center">
           <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/10 to-cyan-500/10 flex items-center justify-center mx-auto mb-5">
             <BookOpen className="h-10 w-10 text-primary/40" />
           </div>
           <h3 className="text-lg font-semibold text-foreground mb-2">
-            {search ? 'No documents found' : 'No Documents Yet'}
+            {search || typeFilter ? 'No documents found' : 'No Documents Yet'}
           </h3>
           <p className="text-sm text-muted-foreground mb-5 max-w-md mx-auto">
-            {search
-              ? 'Try a different search term.'
-              : 'Create your first document to start building structured specifications and reports.'}
+            {search || typeFilter
+              ? 'Try a different search or filter.'
+              : 'Create your first document to get started.'}
           </p>
-          {!search && (
-            <button
-              onClick={() => navigate(`/projects/${projectId}/docs/new?type=DOC`)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              New Document
-            </button>
-          )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredDocuments.map((doc) => (
-            <DocumentCard key={doc.id} document={doc} projectId={projectId} />
-          ))}
+        <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-muted/50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Title</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Updated</th>
+              </tr>
+            </thead>
+            <tbody className="bg-card divide-y divide-border">
+              {filtered.map((doc: DocShell) => (
+                <tr key={`${doc.doc_type}-${doc.id}`} className="hover:bg-accent/50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <Link to={`/projects/${prefix}/docs/${doc.doc_id}`} className="text-primary font-mono text-sm font-medium">
+                      {doc.doc_id}
+                    </Link>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <TypeBadge type={doc.doc_type} />
+                  </td>
+                  <td className="px-6 py-4">
+                    <Link to={`/projects/${prefix}/docs/${doc.doc_id}`} className="text-foreground hover:text-primary/80 font-medium">
+                      {doc.title}
+                    </Link>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <StatusBadge status={doc.status} />
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-xs text-muted-foreground">
+                    {new Date(doc.updated_at).toLocaleDateString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

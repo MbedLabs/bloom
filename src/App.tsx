@@ -6,8 +6,6 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Projects from './pages/Projects'
 import ProjectDetail from './pages/ProjectDetail'
-import RequirementDetail from './pages/RequirementDetail'
-import TestCaseDetail from './pages/TestCaseDetail'
 import TraceabilityMatrix from './pages/TraceabilityMatrix'
 import ImpactAnalysis from './pages/ImpactAnalysis'
 import TestCampaigns from './pages/TestCampaigns'
@@ -17,13 +15,12 @@ import Reports from './pages/Reports'
 import Baselines from './pages/Baselines'
 import Users from './pages/Users'
 import Documents from './pages/Documents'
-import DocumentDetail from './pages/DocumentDetail'
-import ArtefactDetail from './pages/ArtefactDetail'
 import Settings from './pages/Settings'
 import ProjectParameters from './pages/ProjectParameters'
 import DocCreate from './pages/DocCreate'
 import ImportWizard from './pages/ImportWizard'
-import { requirementsApi, testCasesApi, designsApi, risksApi, changesApi, testConceptsApi, documentsApi } from './api/client'
+import UnifiedDocDetail from './pages/UnifiedDocDetail'
+import { requirementsApi, testCasesApi, designsApi, risksApi, changesApi, testConceptsApi, documentsApi, projectsApi } from './api/client'
 
 function RedirectResolver({ type }: { type: 'requirement' | 'test-case' | 'document' | 'design' | 'risk' | 'change' | 'test-concept' }) {
   const { id } = useParams<{ id: string }>()
@@ -39,14 +36,14 @@ function RedirectResolver({ type }: { type: 'requirement' | 'test-case' | 'docum
     'test-concept': testConceptsApi.get,
   }
 
-  const routeMap: Record<string, string> = {
-    requirement: 'requirements',
-    'test-case': 'test-cases',
-    document: 'documents',
-    design: 'designs',
-    risk: 'risks',
-    change: 'changes',
-    'test-concept': 'test-concepts',
+  const docIdFieldMap: Record<string, string> = {
+    requirement: 'req_id',
+    'test-case': 'tc_id',
+    document: 'doc_id',
+    design: 'design_id',
+    risk: 'risk_id',
+    change: 'change_id',
+    'test-concept': 'concept_id',
   }
 
   const { data } = useQuery({
@@ -55,8 +52,18 @@ function RedirectResolver({ type }: { type: 'requirement' | 'test-case' | 'docum
     enabled: !!numId,
   })
 
-  if (data && 'project_id' in (data as Record<string, unknown>)) {
-    return <Navigate to={`/projects/${data.project_id}/${routeMap[type]}/${id}`} replace />
+  const { data: projects } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => projectsApi.list(),
+    enabled: !!data,
+  })
+
+  if (data && projects && 'project_id' in data) {
+    const project = projects.find(p => p.id === Number(data.project_id))
+    if (project) {
+      const docId = data[docIdFieldMap[type]] as string
+      return <Navigate to={`/projects/${project.prefix}/docs/${docId}`} replace />
+    }
   }
 
   return (
@@ -64,6 +71,49 @@ function RedirectResolver({ type }: { type: 'requirement' | 'test-case' | 'docum
       <div className="text-muted-foreground">Redirecting...</div>
     </div>
   )
+}
+
+function TraceabilityRedirect() {
+  const { projectId } = useParams<{ projectId: string }>()
+  const numId = Number(projectId)
+
+  const { data: project } = useQuery({
+    queryKey: ['project', numId],
+    queryFn: () => projectsApi.get(numId),
+    enabled: !!numId,
+  })
+
+  if (project) {
+    return <Navigate to={`/projects/${project.prefix}/traceability`} replace />
+  }
+
+  return <div className="flex items-center justify-center h-64"><div className="text-muted-foreground">Redirecting...</div></div>
+}
+
+function ImpactRedirect() {
+  const { requirementId } = useParams<{ requirementId: string }>()
+  const numId = Number(requirementId)
+
+  const { data: req } = useQuery({
+    queryKey: ['requirement', numId],
+    queryFn: () => requirementsApi.get(numId),
+    enabled: !!numId,
+  })
+
+  const { data: projects } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => projectsApi.list(),
+    enabled: !!req,
+  })
+
+  if (req && projects) {
+    const project = projects.find(p => p.id === req.project_id)
+    if (project) {
+      return <Navigate to={`/projects/${project.prefix}/impact-analysis/${req.req_id}`} replace />
+    }
+  }
+
+  return <div className="flex items-center justify-center h-64"><div className="text-muted-foreground">Redirecting...</div></div>
 }
 
 function NotFound() {
@@ -88,31 +138,21 @@ function App() {
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
         <Route path="projects" element={<Projects />} />
-        <Route path="projects/:id" element={<ProjectDetail />} />
-        <Route path="projects/:id/documents" element={<Documents />} />
-        <Route path="projects/:id/parameters" element={<ProjectParameters />} />
-        <Route path="projects/:id/campaigns" element={<TestCampaigns />} />
-        <Route path="projects/:id/suites/:suiteId" element={<SuiteDetail />} />
-        <Route path="projects/:id/campaigns/:campaignId" element={<CampaignDetail />} />
+        <Route path="projects/:prefix" element={<ProjectDetail />} />
+        <Route path="projects/:prefix/docs" element={<Documents />} />
+        <Route path="projects/:prefix/docs/new" element={<DocCreate />} />
+        <Route path="projects/:prefix/docs/:docId/edit" element={<DocCreate editMode />} />
+        <Route path="projects/:prefix/docs/:docId" element={<UnifiedDocDetail />} />
+        <Route path="projects/:prefix/parameters" element={<ProjectParameters />} />
+        <Route path="projects/:prefix/campaigns" element={<TestCampaigns />} />
+        <Route path="projects/:prefix/suites/:suiteId" element={<SuiteDetail />} />
+        <Route path="projects/:prefix/campaigns/:campaignId" element={<CampaignDetail />} />
+        <Route path="projects/:prefix/traceability" element={<TraceabilityMatrix />} />
+        <Route path="projects/:prefix/impact-analysis/:requirementId" element={<ImpactAnalysis />} />
+        <Route path="projects/:prefix/baselines" element={<Baselines />} />
+        <Route path="projects/:prefix/import" element={<ImportWizard />} />
 
-        {/* Immersive doc creation and editing */}
-        <Route path="projects/:id/docs/new" element={<DocCreate />} />
-        <Route path="projects/:id/docs/:docId/edit" element={<DocCreate editMode />} />
-
-        {/* Project-scoped doc detail routes */}
-        <Route path="projects/:id/requirements/:itemId" element={<RequirementDetail />} />
-        <Route path="projects/:id/test-cases/:itemId" element={<TestCaseDetail />} />
-        <Route path="projects/:id/documents/:docId" element={<DocumentDetail />} />
-        <Route path="projects/:id/designs/:itemId" element={<ArtefactDetail kind="design" />} />
-        <Route path="projects/:id/risks/:itemId" element={<ArtefactDetail kind="risk" />} />
-        <Route path="projects/:id/changes/:itemId" element={<ArtefactDetail kind="change" />} />
-        <Route path="projects/:id/test-concepts/:itemId" element={<ArtefactDetail kind="test-concept" />} />
-        <Route path="projects/:id/import" element={<ImportWizard />} />
-        <Route path="projects/:id/traceability" element={<TraceabilityMatrix />} />
-        <Route path="projects/:id/impact-analysis/:requirementId" element={<ImpactAnalysis />} />
-        <Route path="projects/:id/baselines" element={<Baselines />} />
-
-        {/* Legacy global routes redirect to project-scoped */}
+        {/* Legacy global routes redirect to project-scoped Polarion URLs */}
         <Route path="requirements/:id" element={<RedirectResolver type="requirement" />} />
         <Route path="test-cases/:id" element={<RedirectResolver type="test-case" />} />
         <Route path="documents/:id" element={<RedirectResolver type="document" />} />
@@ -120,8 +160,17 @@ function App() {
         <Route path="risks/:id" element={<RedirectResolver type="risk" />} />
         <Route path="changes/:id" element={<RedirectResolver type="change" />} />
         <Route path="test-concepts/:id" element={<RedirectResolver type="test-concept" />} />
-        <Route path="traceability/:projectId" element={<RedirectResolver type="requirement" />} />
-        <Route path="impact-analysis/:requirementId" element={<RedirectResolver type="requirement" />} />
+        <Route path="traceability/:projectId" element={<TraceabilityRedirect />} />
+        <Route path="impact-analysis/:requirementId" element={<ImpactRedirect />} />
+
+        {/* Legacy numeric project routes redirect */}
+        <Route path="projects/:prefix/requirements/:itemId" element={<UnifiedDocDetail />} />
+        <Route path="projects/:prefix/test-cases/:itemId" element={<UnifiedDocDetail />} />
+        <Route path="projects/:prefix/documents/:docId" element={<UnifiedDocDetail />} />
+        <Route path="projects/:prefix/designs/:itemId" element={<UnifiedDocDetail />} />
+        <Route path="projects/:prefix/risks/:itemId" element={<UnifiedDocDetail />} />
+        <Route path="projects/:prefix/changes/:itemId" element={<UnifiedDocDetail />} />
+        <Route path="projects/:prefix/test-concepts/:itemId" element={<UnifiedDocDetail />} />
 
         <Route path="reports" element={<Reports />} />
         <Route path="baselines" element={<Baselines />} />

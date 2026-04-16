@@ -447,6 +447,11 @@ export const projectsApi = {
     return response.data
   },
 
+  getByPrefix: async (prefix: string) => {
+    const response = await api.get<Project>(`/projects/by-prefix/${prefix}`)
+    return response.data
+  },
+
   create: async (data: { name: string; prefix: string; description?: string }) => {
     const response = await api.post<Project>('/projects', data)
     return response.data
@@ -459,6 +464,40 @@ export const projectsApi = {
 
   delete: async (id: number) => {
     await api.delete(`/projects/${id}`)
+  },
+}
+
+export interface DocShell {
+  id: number
+  doc_id: string
+  doc_type: string
+  title: string
+  status: string
+  priority: string | null
+  project_id: number
+  created_at: string
+  updated_at: string
+}
+
+export interface DocDetailFacade extends DocShell {
+  description: string | null
+  content_json: Record<string, unknown> | null
+  content_html: string | null
+}
+
+export const docsApi = {
+  list: async (projectRef: string, params?: { type?: string[]; status?: string; q?: string }) => {
+    const query = new URLSearchParams()
+    if (params?.type) params.type.forEach(t => query.append('type', t))
+    if (params?.status) query.set('status', params.status)
+    if (params?.q) query.set('q', params.q)
+    const qs = query.toString()
+    const response = await api.get<DocShell[]>(`/projects/${projectRef}/docs${qs ? '?' + qs : ''}`)
+    return response.data
+  },
+  get: async (projectRef: string, docId: string) => {
+    const response = await api.get<DocDetailFacade>(`/projects/${projectRef}/docs/${docId}`)
+    return response.data
   },
 }
 
@@ -632,11 +671,14 @@ export const traceabilityApi = {
 export interface Document {
   id: number
   project_id: number
+  doc_id?: string | null
   title: string
   doc_type: string
   status: string
   version: string
   description: string | null
+  content_json?: Record<string, unknown> | null
+  content_html?: string | null
   created_at: string
   updated_at: string
   section_count: number
@@ -656,6 +698,8 @@ export interface DocumentSection {
 }
 
 export interface DocumentDetail extends Omit<Document, 'section_count'> {
+  content_json?: Record<string, unknown> | null
+  content_html?: string | null
   sections: DocumentSection[]
 }
 
@@ -668,7 +712,7 @@ export const documentsApi = {
     const response = await api.get<DocumentDetail>(`/documents/${documentId}`)
     return response.data
   },
-  create: async (data: { project_id: number; title: string; doc_type?: string; description?: string }) => {
+  create: async (data: { project_id: number; title: string; doc_type?: string; description?: string; content_json?: Record<string, unknown> | null; content_html?: string | null }) => {
     const response = await api.post<Document>('/projects/' + data.project_id + '/documents', data)
     return response.data
   },
