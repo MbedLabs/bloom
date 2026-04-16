@@ -46,11 +46,14 @@ async def list_documents(
         response.append(DocumentResponse(
             id=doc.id,
             project_id=doc.project_id,
+            doc_id=doc.doc_id,
             title=doc.title,
             doc_type=doc.doc_type,
             status=doc.status,
             version=doc.version,
             description=doc.description,
+            content_json=doc.content_json,
+            content_html=doc.content_html,
             created_at=doc.created_at,
             updated_at=doc.updated_at,
             section_count=section_count,
@@ -78,6 +81,8 @@ async def create_document(
         title=data.title,
         doc_type=data.doc_type,
         description=data.description,
+        content_json=data.content_json,
+        content_html=data.content_html,
     )
 
     db.add(document)
@@ -87,11 +92,14 @@ async def create_document(
     return DocumentResponse(
         id=document.id,
         project_id=document.project_id,
+        doc_id=document.doc_id,
         title=document.title,
         doc_type=document.doc_type,
         status=document.status,
         version=document.version,
         description=document.description,
+        content_json=document.content_json,
+        content_html=document.content_html,
         created_at=document.created_at,
         updated_at=document.updated_at,
         section_count=0,
@@ -151,11 +159,14 @@ async def get_document(
     return DocumentDetailResponse(
         id=document.id,
         project_id=document.project_id,
+        doc_id=document.doc_id,
         title=document.title,
         doc_type=document.doc_type,
         status=document.status,
         version=document.version,
         description=document.description,
+        content_json=document.content_json,
+        content_html=document.content_html,
         created_at=document.created_at,
         updated_at=document.updated_at,
         sections=section_responses,
@@ -187,6 +198,10 @@ async def update_document(
         document.version = data.version
     if data.description is not None:
         document.description = data.description
+    if data.content_json is not None:
+        document.content_json = data.content_json
+    if data.content_html is not None:
+        document.content_html = data.content_html
 
     await db.flush()
     await db.refresh(document)
@@ -199,11 +214,14 @@ async def update_document(
     return DocumentResponse(
         id=document.id,
         project_id=document.project_id,
+        doc_id=document.doc_id,
         title=document.title,
         doc_type=document.doc_type,
         status=document.status,
         version=document.version,
         description=document.description,
+        content_json=document.content_json,
+        content_html=document.content_html,
         created_at=document.created_at,
         updated_at=document.updated_at,
         section_count=section_count,

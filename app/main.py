@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from sqlalchemy import select
 
-from app.api import health, projects, requirements, test_cases, traceability, documents, campaigns, dashboard, designs, risks, changes, baselines, test_concepts, artefacts, test_suites, links, project_variables, import_service
+from app.api import health, projects, requirements, test_cases, traceability, documents, campaigns, dashboard, designs, risks, changes, baselines, test_concepts, artefacts, test_suites, links, project_variables, import_service, docs_facade
 from app.api import auth as auth_api
 from app.api import users as users_api
 from app.core.config import settings
@@ -81,6 +81,7 @@ app.include_router(test_concepts.router, prefix="/api/test-concepts", tags=["Tes
 app.include_router(artefacts.router, prefix="/api/artefacts", tags=["Artefacts"])
 app.include_router(links.router, prefix="/api/links", tags=["Links"])
 app.include_router(import_service.router, prefix="/api", tags=["Import"])
+app.include_router(docs_facade.router, prefix="/api", tags=["Docs Facade"])
 
 
 @app.get("/")

@@ -362,6 +362,8 @@ class DocumentCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=500)
     doc_type: str = "Specification"
     description: Optional[str] = None
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
 
 class DocumentUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
@@ -369,6 +371,8 @@ class DocumentUpdate(BaseModel):
     status: Optional[str] = None
     version: Optional[str] = None
     description: Optional[str] = None
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
 
 class DocumentSectionCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=500)
@@ -401,11 +405,14 @@ class DocumentSectionResponse(BaseModel):
 class DocumentResponse(BaseModel):
     id: int
     project_id: int
+    doc_id: Optional[str] = None
     title: str
     doc_type: str
     status: str
     version: str
     description: Optional[str]
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     section_count: int = 0
@@ -415,11 +422,14 @@ class DocumentResponse(BaseModel):
 class DocumentDetailResponse(BaseModel):
     id: int
     project_id: int
+    doc_id: Optional[str] = None
     title: str
     doc_type: str
     status: str
     version: str
     description: Optional[str]
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     sections: List[DocumentSectionResponse] = []
