@@ -4,7 +4,6 @@ Application configuration.
 Loads settings from environment variables with sensible defaults.
 """
 
-import secrets
 from pydantic_settings import BaseSettings
 from pydantic import field_validator
 from typing import List
@@ -24,18 +23,22 @@ class Settings(BaseSettings):
 
     TESTSTATION_APP_URL: str = "http://localhost:5173"
 
+    # M1: Restrict CORS to explicit origins only (no wildcard)
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:5173",
         "http://localhost:5174",
+        "https://bloom.embedlabs.de",
     ]
 
-    ENABLE_DOCS: bool = True
+    # L1: Disable API docs in production by default
+    ENABLE_DOCS: bool = False
 
     ADMIN_EMAIL: str = "admin@embedlabs.de"
     ADMIN_PASSWORD: str = "changeme123"
     ADMIN_FULL_NAME: str = "Admin"
 
+    # C1: SECRET_KEY must be set explicitly — no insecure fallback in production
     @field_validator("SECRET_KEY")
     @classmethod
     def secret_key_must_be_set(cls, v: str) -> str:
@@ -46,7 +49,10 @@ class Settings(BaseSettings):
             "secret",
         }
         if v in insecure_placeholders:
-            v = secrets.token_hex(32)
+            raise ValueError(
+                "SECRET_KEY must be set to a strong random value. "
+                "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+            )
         if len(v) < 32:
             raise ValueError("SECRET_KEY must be at least 32 characters long.")
         return v
