@@ -29,7 +29,7 @@ from app.schemas import (
 
 router = APIRouter()
 
-VALID_TC_LINK_TYPES = {"verifies", "traces_to", "validates", "exercises"}
+VALID_TC_LINK_TYPES = {"verifies", "traces_to", "exercises"}
 VALID_REQ_LINK_TYPES = {"depends_on", "derived_from", "refines", "copies", "satisfies"}
 
 
@@ -308,7 +308,7 @@ async def get_coverage_gaps(
     covered = 0
     partial = 0
     uncovered = 0
-    required_link_types = {"verifies", "validates"}
+    required_link_types = {"verifies"}
 
     for req in requirements:
         linked_tcs = await _get_linked_test_cases(req.id, db)

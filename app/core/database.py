@@ -74,6 +74,8 @@ async def create_tables():
         await conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS doc_id VARCHAR(50)"))
         await conn.execute(text("ALTER TABLE baselines ADD COLUMN IF NOT EXISTS baseline_id VARCHAR(50)"))
 
+        await conn.execute(text("UPDATE requirement_test_cases SET link_type = 'verifies' WHERE link_type = 'validates'"))
+
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """

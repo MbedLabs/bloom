@@ -24,17 +24,31 @@ class Project(Base):
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    requirements: Mapped[List["Requirement"]] = relationship(back_populates="project")
-    test_cases: Mapped[List["TestCase"]] = relationship(back_populates="project")
-    documents: Mapped[List["Document"]] = relationship(back_populates="project")
+    requirements: Mapped[List["Requirement"]] = relationship(
+        back_populates="project", foreign_keys="Requirement.project_id"
+    )
+    test_cases: Mapped[List["TestCase"]] = relationship(
+        back_populates="project", foreign_keys="TestCase.project_id"
+    )
+    documents: Mapped[List["Document"]] = relationship(
+        back_populates="project", foreign_keys="Document.project_id"
+    )
     test_configurations: Mapped[List["TestConfiguration"]] = relationship(back_populates="project")
     test_suites: Mapped[List["TestSuite"]] = relationship(back_populates="project")
     test_campaigns: Mapped[List["TestCampaign"]] = relationship(back_populates="project")
-    design_items: Mapped[List["DesignItem"]] = relationship(back_populates="project")
-    risk_items: Mapped[List["RiskItem"]] = relationship(back_populates="project")
-    change_requests: Mapped[List["ChangeRequest"]] = relationship(back_populates="project")
+    design_items: Mapped[List["DesignItem"]] = relationship(
+        back_populates="project", foreign_keys="DesignItem.project_id"
+    )
+    risk_items: Mapped[List["RiskItem"]] = relationship(
+        back_populates="project", foreign_keys="RiskItem.project_id"
+    )
+    change_requests: Mapped[List["ChangeRequest"]] = relationship(
+        back_populates="project", foreign_keys="ChangeRequest.project_id"
+    )
     baselines: Mapped[List["Baseline"]] = relationship(back_populates="project")
-    test_concepts: Mapped[List["TestConcept"]] = relationship(back_populates="project")
+    test_concepts: Mapped[List["TestConcept"]] = relationship(
+        back_populates="project", foreign_keys="TestConcept.project_id"
+    )
     variables: Mapped[List["ProjectVariable"]] = relationship(back_populates="project", cascade="all, delete-orphan")
 
 
@@ -85,7 +99,7 @@ class Requirement(Base):
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    project: Mapped["Project"] = relationship(back_populates="requirements")
+    project: Mapped["Project"] = relationship(back_populates="requirements", foreign_keys=[project_id])
     parent: Mapped[Optional["Requirement"]] = relationship(
         remote_side=[id], back_populates="children"
     )
@@ -123,7 +137,7 @@ class TestCase(Base):
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    project: Mapped["Project"] = relationship(back_populates="test_cases")
+    project: Mapped["Project"] = relationship(back_populates="test_cases", foreign_keys=[project_id])
     requirement_links: Mapped[List["RequirementTestCase"]] = relationship(back_populates="test_case")
     suite_items: Mapped[List["TestSuiteItem"]] = relationship(back_populates="test_case")
     campaign_items: Mapped[List["TestCampaignItem"]] = relationship(back_populates="test_case")
@@ -196,7 +210,7 @@ class Document(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    project: Mapped["Project"] = relationship()
+    project: Mapped["Project"] = relationship(back_populates="documents", foreign_keys=[project_id])
     sections: Mapped[List["DocumentSection"]] = relationship(back_populates="document", cascade="all, delete-orphan", order_by="DocumentSection.order")
 
 
@@ -350,7 +364,7 @@ class DesignItem(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    project: Mapped["Project"] = relationship(back_populates="design_items")
+    project: Mapped["Project"] = relationship(back_populates="design_items", foreign_keys=[project_id])
     linked_requirement: Mapped[Optional["Requirement"]] = relationship()
 
 
@@ -375,7 +389,7 @@ class RiskItem(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    project: Mapped["Project"] = relationship(back_populates="risk_items")
+    project: Mapped["Project"] = relationship(back_populates="risk_items", foreign_keys=[project_id])
     linked_requirement: Mapped[Optional["Requirement"]] = relationship()
 
 
@@ -399,7 +413,7 @@ class ChangeRequest(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    project: Mapped["Project"] = relationship(back_populates="change_requests")
+    project: Mapped["Project"] = relationship(back_populates="change_requests", foreign_keys=[project_id])
 
 
 class Baseline(Base):
@@ -437,7 +451,7 @@ class TestConcept(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    project: Mapped["Project"] = relationship(back_populates="test_concepts")
+    project: Mapped["Project"] = relationship(back_populates="test_concepts", foreign_keys=[project_id])
 
 
 class ArtefactComment(Base):
