@@ -614,7 +614,6 @@ export default function RequirementDetail() {
                   className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm text-foreground"
                 >
                   <option value="verifies">verifies</option>
-                  <option value="validates">validates</option>
                 </select>
               </div>
               <div className="mb-4 flex items-center gap-2">
@@ -771,7 +770,6 @@ function RunStatusBadge({ status }: { status: string }) {
 
 function friendlyVerificationLabel(linkType: string, direction: 'incoming' | 'outgoing') {
   if (linkType === 'verifies') return direction === 'incoming' ? 'verified by' : 'verifies'
-  if (linkType === 'validates') return direction === 'incoming' ? 'validated by' : 'validates'
   return linkType.split('_').join(' ')
 }
 

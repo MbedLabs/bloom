@@ -210,7 +210,6 @@ function LinkTypeBadge({ linkType }: { linkType: string }) {
   const config: Record<string, { colors: string; label: string }> = {
     verifies: { colors: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400', label: 'verifies' },
     traces_to: { colors: 'bg-blue-500/10 text-blue-700 dark:text-blue-400', label: 'traces to' },
-    validates: { colors: 'bg-purple-500/10 text-purple-700 dark:text-purple-400', label: 'validates' },
     exercises: { colors: 'bg-teal-500/10 text-teal-700 dark:text-teal-400', label: 'exercises' },
     depends_on: { colors: 'bg-amber-500/10 text-amber-700 dark:text-amber-400', label: 'depends on' },
     derived_from: { colors: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400', label: 'derived from' },
