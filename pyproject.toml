@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bloom-app"
-version = "0.1.0"
+version = "0.2.0"
 description = "Backend API for EmbedLabs Bloom - Application Lifecycle Management"
 readme = "README.md"
 license = {text = "MIT"}
@@ -17,10 +17,12 @@ dependencies = [
     "uvicorn[standard]>=0.24.0",
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
+    "pydantic[email]>=2.5.0",
     "sqlalchemy>=2.0.0",
     "asyncpg>=0.29.0",
     "python-jose[cryptography]>=3.3.0",
     "passlib[bcrypt]>=1.7.4",
+    "bcrypt<4",
     "python-multipart>=0.0.6",
     "aiofiles>=23.2.0",
     "httpx>=0.25.0",
