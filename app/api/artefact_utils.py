@@ -10,14 +10,14 @@ from app.models import (
     ArtefactActivity,
     ChangeRequest,
     DesignItem,
+    Document,
+    DocumentSection,
     Project,
     Requirement,
     RequirementTestCase,
     RiskItem,
     TestCase,
     TestConcept,
-    Document,
-    DocumentSection,
 )
 from app.models.user import User
 from app.schemas import (
@@ -100,9 +100,13 @@ def get_allowed_transitions(artefact_type: str, current_status: str) -> list[str
     return WORKFLOW_TRANSITIONS.get(artefact_type, {}).get(current_status, [])
 
 
-async def build_related_response(db: AsyncSession, artefact_type: str, artefact_id: int) -> ArtefactRelatedResponse:
+async def build_related_response(
+    db: AsyncSession, artefact_type: str, artefact_id: int
+) -> ArtefactRelatedResponse:
     artefact = await get_artefact_or_404(db, artefact_type, artefact_id)
-    project = (await db.execute(select(Project).where(Project.id == artefact.project_id))).scalar_one()
+    project = (
+        await db.execute(select(Project).where(Project.id == artefact.project_id))
+    ).scalar_one()
 
     requirement_ids: list[int] = []
     if artefact_type in {"design", "risk"}:
@@ -115,32 +119,64 @@ async def build_related_response(db: AsyncSession, artefact_type: str, artefact_
     requirements = []
     if requirement_ids:
         requirements = (
-            await db.execute(select(Requirement).where(Requirement.id.in_(requirement_ids)).order_by(Requirement.req_id))
-        ).scalars().all()
+            (
+                await db.execute(
+                    select(Requirement)
+                    .where(Requirement.id.in_(requirement_ids))
+                    .order_by(Requirement.req_id)
+                )
+            )
+            .scalars()
+            .all()
+        )
 
     rtc_links = []
     if requirement_ids:
         rtc_links = (
-            await db.execute(select(RequirementTestCase).where(RequirementTestCase.requirement_id.in_(requirement_ids)))
-        ).scalars().all()
+            (
+                await db.execute(
+                    select(RequirementTestCase).where(
+                        RequirementTestCase.requirement_id.in_(requirement_ids)
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
 
     test_case_ids = sorted({link.test_case_id for link in rtc_links})
     test_cases = []
     if test_case_ids:
         test_cases = (
-            await db.execute(select(TestCase).where(TestCase.id.in_(test_case_ids)).order_by(TestCase.tc_id))
-        ).scalars().all()
+            (
+                await db.execute(
+                    select(TestCase).where(TestCase.id.in_(test_case_ids)).order_by(TestCase.tc_id)
+                )
+            )
+            .scalars()
+            .all()
+        )
 
     sections = []
     if requirement_ids:
         sections = (
-            await db.execute(select(DocumentSection).where(DocumentSection.linked_requirement_id.in_(requirement_ids)))
-        ).scalars().all()
+            (
+                await db.execute(
+                    select(DocumentSection).where(
+                        DocumentSection.linked_requirement_id.in_(requirement_ids)
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
 
     documents_by_id: dict[int, dict[str, Any]] = {}
     for section in sections:
         if section.document_id not in documents_by_id:
-            document = (await db.execute(select(Document).where(Document.id == section.document_id))).scalar_one_or_none()
+            document = (
+                await db.execute(select(Document).where(Document.id == section.document_id))
+            ).scalar_one_or_none()
             if document:
                 documents_by_id[section.document_id] = {
                     "document": document,
@@ -157,7 +193,9 @@ async def build_related_response(db: AsyncSession, artefact_type: str, artefact_
             status=project.status,
         ),
         linked_requirements=[
-            RelatedRequirementSummary(id=req.id, req_id=req.req_id, title=req.title, status=req.status)
+            RelatedRequirementSummary(
+                id=req.id, req_id=req.req_id, title=req.title, status=req.status
+            )
             for req in requirements
         ],
         related_test_cases=[

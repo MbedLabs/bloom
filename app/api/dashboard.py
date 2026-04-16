@@ -3,14 +3,19 @@ Dashboard statistics API.
 """
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models import (
-    Project, Requirement, TestCase, RequirementTestCase,
-    TestCampaign, TestCampaignItem, Document,
+    Document,
+    Project,
+    Requirement,
+    RequirementTestCase,
+    TestCampaign,
+    TestCampaignItem,
+    TestCase,
 )
 from app.models.user import User
 
@@ -31,14 +36,12 @@ async def get_dashboard_stats(
     total_documents = await db.scalar(select(func.count(Document.id)))
 
     req_status_result = await db.execute(
-        select(Requirement.status, func.count(Requirement.id))
-        .group_by(Requirement.status)
+        select(Requirement.status, func.count(Requirement.id)).group_by(Requirement.status)
     )
     req_status_dist = {row[0]: row[1] for row in req_status_result}
 
     tc_status_result = await db.execute(
-        select(TestCase.status, func.count(TestCase.id))
-        .group_by(TestCase.status)
+        select(TestCase.status, func.count(TestCase.id)).group_by(TestCase.status)
     )
     tc_status_dist = {row[0]: row[1] for row in tc_status_result}
 
@@ -47,9 +50,7 @@ async def get_dashboard_stats(
 
     uncovered_reqs = await db.scalar(
         select(func.count(Requirement.id)).where(
-            ~Requirement.id.in_(
-                select(RequirementTestCase.requirement_id).distinct()
-            )
+            ~Requirement.id.in_(select(RequirementTestCase.requirement_id).distinct())
         )
     )
 
@@ -67,7 +68,10 @@ async def get_dashboard_stats(
 
     project_stats_result = await db.execute(
         select(
-            Project.id, Project.name, Project.prefix, Project.status,
+            Project.id,
+            Project.name,
+            Project.prefix,
+            Project.status,
             func.count(func.distinct(Requirement.id)).label("req_count"),
             func.count(func.distinct(TestCase.id)).label("tc_count"),
         )
@@ -80,8 +84,12 @@ async def get_dashboard_stats(
     project_rows = project_stats_result.all()
     projects = [
         {
-            "id": r.id, "name": r.name, "prefix": r.prefix, "status": r.status,
-            "requirement_count": r.req_count, "test_case_count": r.tc_count,
+            "id": r.id,
+            "name": r.name,
+            "prefix": r.prefix,
+            "status": r.status,
+            "requirement_count": r.req_count,
+            "test_case_count": r.tc_count,
         }
         for r in project_rows
     ]

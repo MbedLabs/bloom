@@ -26,7 +26,9 @@ async def list_design_items(
     _current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(
-        select(DesignItem).where(DesignItem.project_id == project_id).order_by(DesignItem.created_at.desc())
+        select(DesignItem)
+        .where(DesignItem.project_id == project_id)
+        .order_by(DesignItem.created_at.desc())
     )
     return [_design_response(item) for item in result.scalars().all()]
 
@@ -37,11 +39,15 @@ async def create_design_item(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    project = (await db.execute(select(Project).where(Project.id == data.project_id))).scalar_one_or_none()
+    project = (
+        await db.execute(select(Project).where(Project.id == data.project_id))
+    ).scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    design_id = await next_doc_id(db, DesignItem, DesignItem.design_id, data.project_id, project.prefix, "DES")
+    design_id = await next_doc_id(
+        db, DesignItem, DesignItem.design_id, data.project_id, project.prefix, "DES"
+    )
     item = DesignItem(
         project_id=data.project_id,
         design_id=design_id,
@@ -55,7 +61,13 @@ async def create_design_item(
     db.add(item)
     await db.flush()
     await db.refresh(item)
-    await log_artefact_activity(db, "design", item.id, "created", f"{current_user.full_name} created design item {item.design_id}")
+    await log_artefact_activity(
+        db,
+        "design",
+        item.id,
+        "created",
+        f"{current_user.full_name} created design item {item.design_id}",
+    )
     return _design_response(item)
 
 
@@ -65,7 +77,9 @@ async def get_design_item(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
-    item = (await db.execute(select(DesignItem).where(DesignItem.id == design_id))).scalar_one_or_none()
+    item = (
+        await db.execute(select(DesignItem).where(DesignItem.id == design_id))
+    ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Design item not found")
     return _design_response(item)
@@ -78,7 +92,9 @@ async def update_design_item(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    item = (await db.execute(select(DesignItem).where(DesignItem.id == design_id))).scalar_one_or_none()
+    item = (
+        await db.execute(select(DesignItem).where(DesignItem.id == design_id))
+    ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Design item not found")
 
@@ -87,7 +103,13 @@ async def update_design_item(
 
     await db.flush()
     await db.refresh(item)
-    await log_artefact_activity(db, "design", item.id, "updated", f"{current_user.full_name} updated design item {item.design_id}")
+    await log_artefact_activity(
+        db,
+        "design",
+        item.id,
+        "updated",
+        f"{current_user.full_name} updated design item {item.design_id}",
+    )
     return _design_response(item)
 
 
@@ -97,8 +119,16 @@ async def delete_design_item(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    item = (await db.execute(select(DesignItem).where(DesignItem.id == design_id))).scalar_one_or_none()
+    item = (
+        await db.execute(select(DesignItem).where(DesignItem.id == design_id))
+    ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Design item not found")
-    await log_artefact_activity(db, "design", item.id, "deleted", f"{current_user.full_name} deleted design item {item.design_id}")
+    await log_artefact_activity(
+        db,
+        "design",
+        item.id,
+        "deleted",
+        f"{current_user.full_name} deleted design item {item.design_id}",
+    )
     await db.delete(item)

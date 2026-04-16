@@ -3,8 +3,8 @@ Safe ID generation using MAX(numeric_suffix)+1 instead of COUNT()+1.
 Handles gaps from deletions correctly.
 """
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 def compute_next_id(existing_ids: list[str], prefix: str, type_code: str) -> str:
@@ -47,11 +47,17 @@ async def next_doc_id(
         Next ID string like "PRJ-REQ-004"
     """
     search_prefix = f"{prefix}-{type_code}-"
-    rows = (await db.execute(
-        select(id_column).where(
-            model.project_id == project_id,
-            id_column.like(f"{search_prefix}%"),
+    rows = (
+        (
+            await db.execute(
+                select(id_column).where(
+                    model.project_id == project_id,
+                    id_column.like(f"{search_prefix}%"),
+                )
+            )
         )
-    )).scalars().all()
+        .scalars()
+        .all()
+    )
 
     return compute_next_id(rows, prefix, type_code)
