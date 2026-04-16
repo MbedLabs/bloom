@@ -7,12 +7,15 @@ Main entry point for the backend API.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import select
 
 from app.api import health, projects, requirements, test_cases, traceability, documents, campaigns, dashboard, designs, risks, changes, baselines, test_concepts, artefacts, test_suites, links, project_variables, import_service, docs_facade
 from app.api import auth as auth_api
 from app.api import users as users_api
 from app.core.config import settings
+from app.core.deps import limiter
 from app.core.database import create_tables, async_session_maker
 from app.core.security import get_password_hash
 from app.models.user import User, UserRole
@@ -52,6 +55,10 @@ app = FastAPI(
     openapi_url="/api/openapi.json" if settings.ENABLE_DOCS else None,
     lifespan=lifespan,
 )
+
+# H2: Attach rate-limiter state and error handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
