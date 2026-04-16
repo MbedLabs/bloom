@@ -1,13 +1,13 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { projectsApi } from '../api/client'
+import { APP_VERSION, projectsApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, FolderKanban, FileText, CheckSquare,
   GitBranch, BarChart3, Sun, Moon,
   ExternalLink, ChevronDown, Search, Flower2,
-  BookOpen, Layers, FlaskConical, LogOut, Users
+  BookOpen, Layers, FlaskConical, LogOut, Users, PenTool, AlertTriangle, GitPullRequest, Settings, SlidersHorizontal
 } from 'lucide-react'
 
 const TESTSTATION_APP_URL = import.meta.env.VITE_TESTSTATION_APP_URL || 'http://localhost:3000'
@@ -40,8 +40,12 @@ const mainNav = [
 const projectNav = [
   { name: 'Requirements', icon: FileText, tab: 'requirements' },
   { name: 'Test Cases', icon: CheckSquare, tab: 'test-cases' },
+  { name: 'Design', icon: PenTool, tab: 'design' },
+  { name: 'Risks', icon: AlertTriangle, tab: 'risks' },
+  { name: 'Changes', icon: GitPullRequest, tab: 'changes' },
   { name: 'Test Campaigns', icon: FlaskConical, tab: '', href: 'campaigns' as const },
   { name: 'Documents', icon: BookOpen, tab: 'documents' },
+  { name: 'Parameters', icon: SlidersHorizontal, tab: '', href: 'parameters' as const },
   { name: 'Test Concepts', icon: Beaker, tab: 'test-concepts' },
   { name: 'Traceability', icon: GitBranch, tab: 'traceability' },
 ]
@@ -81,8 +85,12 @@ export default function Layout() {
   })
 
   const isInProject = location.pathname.startsWith('/projects/')
+  const currentProjectId = isInProject ? Number(location.pathname.split('/')[2]) : null
+  const currentProjectName = currentProjectId && Number.isFinite(currentProjectId)
+    ? projects?.find((p) => p.id === currentProjectId)?.name || `Project #${currentProjectId}`
+    : null
 
-  const breadcrumbs = getBreadcrumbs(location)
+  const breadcrumbs = useMemo(() => getBreadcrumbs(location, projects || []), [location, projects])
 
   const roleBadgeColor = user?.role === 'admin'
     ? 'bg-red-500/10 text-red-400'
@@ -102,7 +110,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen flex">
       {/* Sidebar */}
-      <aside className="w-64 bg-gradient-sidebar text-white flex flex-col fixed inset-y-0 left-0 z-30">
+      <aside className="w-64 bg-gradient-sidebar text-white flex flex-col fixed inset-y-0 left-0 z-30 overflow-y-auto">
         {/* Logo */}
         <div className="px-5 pt-6 pb-4">
           <div className="flex items-center gap-3">
@@ -110,8 +118,7 @@ export default function Layout() {
               <Flower2 className="h-5 w-5 text-teal-200" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-teal-100 tracking-tight">Bloom</h1>
-              <p className="text-[10px] text-teal-300/60 font-medium uppercase tracking-widest">ALM</p>
+              <h1 className="text-xl font-bold text-teal-100 tracking-tight">Bloom ALM</h1>
             </div>
           </div>
         </div>
@@ -165,7 +172,7 @@ export default function Layout() {
                 className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm text-teal-100 transition-colors"
               >
                 <span className="truncate">
-                  {isInProject ? 'Current Project' : 'Select Project'}
+                  {isInProject ? currentProjectName : 'Select Project'}
                 </span>
                 <ChevronDown className={`h-4 w-4 text-teal-400/50 transition-transform ${projectDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
@@ -229,7 +236,7 @@ export default function Layout() {
         </div>
 
         {/* Bottom section */}
-        <div className="mt-auto px-3 pb-4 space-y-1">
+        <div className="mt-auto px-3 pb-6 pt-2 space-y-1" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
           <div className="h-px bg-white/10 mx-2 mb-3" />
           <a
             href={TESTSTATION_APP_URL}
@@ -240,15 +247,18 @@ export default function Layout() {
             <ExternalLink className="h-[18px] w-[18px] text-teal-400/50 group-hover:text-teal-300" />
             Bud Test Platform
           </a>
-          <button
-            onClick={() => setDark(!dark)}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium text-teal-100/70 hover:bg-[var(--sidebar-hover)] hover:text-white transition-all duration-200 w-full group"
+          <Link
+            to="/settings"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium text-teal-100/70 hover:bg-[var(--sidebar-hover)] hover:text-white transition-all duration-200 group"
           >
-            {dark ? <Sun className="h-[18px] w-[18px] text-teal-400/50 group-hover:text-teal-300" /> : <Moon className="h-[18px] w-[18px] text-teal-400/50 group-hover:text-teal-300" />}
-            {dark ? 'Light Mode' : 'Dark Mode'}
-          </button>
+            <Settings className="h-[18px] w-[18px] text-teal-400/50 group-hover:text-teal-300" />
+            Settings
+          </Link>
           <div className="pt-2 pb-1 px-3 text-center">
-            <p className="text-[10px] text-teal-300/30">by Embedlabs</p>
+            <a href="https://www.embedlabs.de/en" target="_blank" rel="noopener noreferrer" className="text-[10px] text-teal-300/50 hover:text-teal-200 transition-colors">
+              by EmbedLabs
+            </a>
+            <p className="text-[10px] text-teal-300/30 mt-1">v{APP_VERSION}</p>
           </div>
         </div>
       </aside>
@@ -354,25 +364,68 @@ export default function Layout() {
   )
 }
 
-function getBreadcrumbs(location: ReturnType<typeof useLocation>) {
+function getBreadcrumbs(location: ReturnType<typeof useLocation>, projects: Array<{ id: number; name: string }>) {
   const path = location.pathname
   const crumbs: { label: string; href?: string }[] = [{ label: 'Home', href: '/' }]
+
+  const parts = path.split('/')
+  const projectId = Number(parts[2])
+  const projectName = Number.isFinite(projectId)
+    ? (projects.find((p) => p.id === projectId)?.name || `Project #${parts[2]}`)
+    : undefined
 
   if (path.startsWith('/projects')) {
     crumbs.push({ label: 'Projects', href: '/projects' })
 
-    const parts = path.split('/')
     if (parts[2]) {
       if (parts[3] === 'campaigns') {
-        crumbs.push({ label: `Project #${parts[2]}`, href: `/projects/${parts[2]}` })
+        crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}` })
         crumbs.push({ label: 'Campaigns' })
         if (parts[4]) crumbs.push({ label: 'Campaign Detail' })
+      } else if (parts[3] === 'suites') {
+        crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}` })
+        crumbs.push({ label: 'Suite Detail' })
       } else if (parts[3] === 'documents') {
-        crumbs.push({ label: `Project #${parts[2]}`, href: `/projects/${parts[2]}` })
+        crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}` })
         crumbs.push({ label: 'Documents' })
+      } else if (parts[3] === 'parameters') {
+        crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}` })
+        crumbs.push({ label: 'Parameters' })
       } else {
-        crumbs.push({ label: `Project #${parts[2]}` })
+        crumbs.push({ label: projectName || `Project #${parts[2]}` })
       }
+    }
+  }
+
+  if (path.startsWith('/projects') && parts.length >= 4) {
+    const subRoute = parts[3]
+    if (subRoute === 'requirements' && parts[4]) {
+      crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}?tab=requirements` })
+      crumbs.push({ label: 'Requirement' })
+    } else if (subRoute === 'test-cases' && parts[4]) {
+      crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}?tab=test-cases` })
+      crumbs.push({ label: 'Test Case' })
+    } else if (subRoute === 'designs' && parts[4]) {
+      crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}?tab=design` })
+      crumbs.push({ label: 'Design' })
+    } else if (subRoute === 'risks' && parts[4]) {
+      crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}?tab=risks` })
+      crumbs.push({ label: 'Risk' })
+    } else if (subRoute === 'changes' && parts[4]) {
+      crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}?tab=changes` })
+      crumbs.push({ label: 'Change Request' })
+    } else if (subRoute === 'test-concepts' && parts[4]) {
+      crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}?tab=test-concepts` })
+      crumbs.push({ label: 'Test Concept' })
+    } else if (subRoute === 'traceability') {
+      crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}` })
+      crumbs.push({ label: 'Traceability Matrix' })
+    } else if (subRoute === 'impact-analysis') {
+      crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}` })
+      crumbs.push({ label: 'Impact Analysis' })
+    } else if (subRoute === 'baselines') {
+      crumbs.push({ label: projectName || `Project #${parts[2]}`, href: `/projects/${parts[2]}` })
+      crumbs.push({ label: 'Baselines' })
     }
   }
 
@@ -384,7 +437,7 @@ function getBreadcrumbs(location: ReturnType<typeof useLocation>) {
     crumbs.push({ label: 'Test Case' })
   }
 
-  if (path.startsWith('/documents/')) {
+  if (path.startsWith('/documents/') && !path.startsWith('/documents/new')) {
     crumbs.push({ label: 'Document' })
   }
 
@@ -402,6 +455,10 @@ function getBreadcrumbs(location: ReturnType<typeof useLocation>) {
 
   if (path === '/baselines') {
     return [{ label: 'Home', href: '/' }, { label: 'Baselines' }]
+  }
+
+  if (path === '/settings') {
+    return [{ label: 'Home', href: '/' }, { label: 'Settings' }]
   }
 
   if (path === '/') {
