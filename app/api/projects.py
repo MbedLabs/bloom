@@ -116,6 +116,37 @@ async def create_project(
     )
 
 
+@router.get("/by-prefix/{prefix}", response_model=ProjectResponse)
+async def get_project_by_prefix(
+    prefix: str,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
+):
+    """
+    Get a project by its unique prefix.
+    """
+    result = await db.execute(
+        select(Project).where(Project.prefix == prefix.upper())
+    )
+    project = result.scalar_one_or_none()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    counts = await _project_counts(db, project.id)
+
+    return ProjectResponse(
+        id=project.id,
+        name=project.name,
+        prefix=project.prefix,
+        description=project.description,
+        status=project.status,
+        created_at=project.created_at,
+        updated_at=project.updated_at,
+        **counts,
+    )
+
+
 @router.get("/{project_id}", response_model=ProjectResponse)
 async def get_project(
     project_id: int,
