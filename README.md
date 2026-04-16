@@ -55,3 +55,11 @@ docker run -p 8000:8000 -e DATABASE_URL=... -e SECRET_KEY=... bloom-backend
 
 - **[Bud](https://github.com/MbedLabs/bud-app-backend)** - Test Station Manager (test execution platform)
 - **[Bloom](https://github.com/MbedLabs/bloom-app-backend)** - Lifecycle Manager (this repo)
+
+## License
+
+This project is licensed under the **GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)**. See the [LICENSE](LICENSE) file for the full text.
+
+Copyright (C) 2024-2026 EmbedLabs.
+
+For commercial licensing options that do not require AGPL compliance, contact dev@embedlabs.de. Contributions are accepted under the [CLA](CLA.md) — see [CONTRIBUTING.md](CONTRIBUTING.md).
