@@ -4,7 +4,7 @@ Database models for the requirements management application.
 
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import String, Integer, DateTime, ForeignKey, Text, JSON, UniqueConstraint
+from sqlalchemy import String, Integer, Float, DateTime, ForeignKey, Text, JSON, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -26,6 +26,32 @@ class Project(Base):
 
     requirements: Mapped[List["Requirement"]] = relationship(back_populates="project")
     test_cases: Mapped[List["TestCase"]] = relationship(back_populates="project")
+    documents: Mapped[List["Document"]] = relationship(back_populates="project")
+    test_configurations: Mapped[List["TestConfiguration"]] = relationship(back_populates="project")
+    test_suites: Mapped[List["TestSuite"]] = relationship(back_populates="project")
+    test_campaigns: Mapped[List["TestCampaign"]] = relationship(back_populates="project")
+    design_items: Mapped[List["DesignItem"]] = relationship(back_populates="project")
+    risk_items: Mapped[List["RiskItem"]] = relationship(back_populates="project")
+    change_requests: Mapped[List["ChangeRequest"]] = relationship(back_populates="project")
+    baselines: Mapped[List["Baseline"]] = relationship(back_populates="project")
+    test_concepts: Mapped[List["TestConcept"]] = relationship(back_populates="project")
+    variables: Mapped[List["ProjectVariable"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+
+
+class ProjectVariable(Base):
+    """Project-scoped parameters and variables for document authoring."""
+    __tablename__ = "project_variables"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(20), default="variable")
+    key: Mapped[str] = mapped_column(String(100), nullable=False)
+    value: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    project: Mapped["Project"] = relationship(back_populates="variables")
 
 
 class Requirement(Base):
@@ -40,9 +66,20 @@ class Requirement(Base):
     req_id: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    content_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Draft")
     priority: Mapped[str] = mapped_column(String(20), default="Medium")
     req_type: Mapped[str] = mapped_column(String(30), default="Functional")
+    req_origin: Mapped[str] = mapped_column(String(50), default="Internal")
+    reviewer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    approver_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    reviewed_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    approved_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
@@ -55,6 +92,8 @@ class Requirement(Base):
     children: Mapped[List["Requirement"]] = relationship(back_populates="parent")
     test_case_links: Mapped[List["RequirementTestCase"]] = relationship(back_populates="requirement")
     test_run_links: Mapped[List["TestRunLink"]] = relationship(back_populates="requirement")
+    outgoing_links: Mapped[List["RequirementLink"]] = relationship(foreign_keys="RequirementLink.source_id", back_populates="source")
+    incoming_links: Mapped[List["RequirementLink"]] = relationship(foreign_keys="RequirementLink.target_id", back_populates="target")
 
 
 class TestCase(Base):
@@ -66,9 +105,19 @@ class TestCase(Base):
     tc_id: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    content_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     preconditions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     steps: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Draft")
+    reviewer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    approver_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    reviewed_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    approved_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
@@ -76,10 +125,12 @@ class TestCase(Base):
 
     project: Mapped["Project"] = relationship(back_populates="test_cases")
     requirement_links: Mapped[List["RequirementTestCase"]] = relationship(back_populates="test_case")
+    suite_items: Mapped[List["TestSuiteItem"]] = relationship(back_populates="test_case")
+    campaign_items: Mapped[List["TestCampaignItem"]] = relationship(back_populates="test_case")
 
 
 class RequirementTestCase(Base):
-    """Junction table linking requirements to test cases."""
+    """Junction table linking requirements to test cases with link semantics."""
     __tablename__ = "requirement_test_cases"
     __table_args__ = (
         UniqueConstraint("requirement_id", "test_case_id", name="uq_req_tc"),
@@ -88,10 +139,28 @@ class RequirementTestCase(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     requirement_id: Mapped[int] = mapped_column(ForeignKey("requirements.id"), nullable=False)
     test_case_id: Mapped[int] = mapped_column(ForeignKey("test_cases.id"), nullable=False)
+    link_type: Mapped[str] = mapped_column(String(30), default="verifies")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     requirement: Mapped["Requirement"] = relationship(back_populates="test_case_links")
     test_case: Mapped["TestCase"] = relationship(back_populates="requirement_links")
+
+
+class RequirementLink(Base):
+    """Links between requirements for traceability (derived_from, refines, depends_on)."""
+    __tablename__ = "requirement_links"
+    __table_args__ = (
+        UniqueConstraint("source_id", "target_id", "link_type", name="uq_req_link"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_id: Mapped[int] = mapped_column(ForeignKey("requirements.id"), nullable=False)
+    target_id: Mapped[int] = mapped_column(ForeignKey("requirements.id"), nullable=False)
+    link_type: Mapped[str] = mapped_column(String(30), default="depends_on")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    source: Mapped["Requirement"] = relationship(foreign_keys=[source_id], back_populates="outgoing_links")
+    target: Mapped["Requirement"] = relationship(foreign_keys=[target_id], back_populates="incoming_links")
 
 
 class TestRunLink(Base):
@@ -107,3 +176,287 @@ class TestRunLink(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     requirement: Mapped["Requirement"] = relationship(back_populates="test_run_links")
+
+
+class Document(Base):
+    __tablename__ = "documents"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    doc_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    doc_type: Mapped[str] = mapped_column(String(30), default="Specification")
+    status: Mapped[str] = mapped_column(String(20), default="Draft")
+    version: Mapped[str] = mapped_column(String(20), default="1.0")
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    content_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    project: Mapped["Project"] = relationship()
+    sections: Mapped[List["DocumentSection"]] = relationship(back_populates="document", cascade="all, delete-orphan", order_by="DocumentSection.order")
+
+
+class DocumentSection(Base):
+    __tablename__ = "document_sections"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id"), nullable=False)
+    parent_section_id: Mapped[Optional[int]] = mapped_column(ForeignKey("document_sections.id"), nullable=True)
+    order: Mapped[int] = mapped_column(Integer, default=0)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    section_type: Mapped[str] = mapped_column(String(30), default="text")
+    linked_requirement_id: Mapped[Optional[int]] = mapped_column(ForeignKey("requirements.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    document: Mapped["Document"] = relationship(back_populates="sections")
+    parent_section: Mapped[Optional["DocumentSection"]] = relationship(remote_side=[id], back_populates="child_sections")
+    child_sections: Mapped[List["DocumentSection"]] = relationship(back_populates="parent_section")
+    linked_requirement: Mapped[Optional["Requirement"]] = relationship()
+
+
+class TestConfiguration(Base):
+    """Reusable test configuration (environment, parameters)."""
+    __tablename__ = "test_configurations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    environment: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    parameters: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    project: Mapped["Project"] = relationship(back_populates="test_configurations")
+
+
+class TestSuite(Base):
+    """Reusable suite of test cases."""
+    __tablename__ = "test_suites"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    suite_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="Draft")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    project: Mapped["Project"] = relationship(back_populates="test_suites")
+    items: Mapped[List["TestSuiteItem"]] = relationship(back_populates="suite", cascade="all, delete-orphan")
+    campaigns: Mapped[List["TestCampaign"]] = relationship(back_populates="suite")
+
+
+class TestSuiteItem(Base):
+    """Ordered membership of a test case in a reusable suite."""
+    __tablename__ = "test_suite_items"
+    __table_args__ = (
+        UniqueConstraint("suite_id", "test_case_id", name="uq_suite_tc"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    suite_id: Mapped[int] = mapped_column(ForeignKey("test_suites.id"), nullable=False)
+    test_case_id: Mapped[int] = mapped_column(ForeignKey("test_cases.id"), nullable=False)
+    order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    suite: Mapped["TestSuite"] = relationship(back_populates="items")
+    test_case: Mapped["TestCase"] = relationship(back_populates="suite_items")
+
+
+class TestCampaign(Base):
+    """A test campaign: a collection of test cases to execute with a configuration."""
+    __tablename__ = "test_campaigns"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    configuration_id: Mapped[Optional[int]] = mapped_column(ForeignKey("test_configurations.id"), nullable=True)
+    suite_id: Mapped[Optional[int]] = mapped_column(ForeignKey("test_suites.id"), nullable=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="Planned")
+    bud_run_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    bud_run_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    bud_run_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    project: Mapped["Project"] = relationship(back_populates="test_campaigns")
+    configuration: Mapped[Optional["TestConfiguration"]] = relationship()
+    suite: Mapped[Optional["TestSuite"]] = relationship(back_populates="campaigns")
+    items: Mapped[List["TestCampaignItem"]] = relationship(back_populates="campaign", cascade="all, delete-orphan")
+
+
+class TestCampaignItem(Base):
+    """Individual test case execution within a campaign."""
+    __tablename__ = "test_campaign_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    campaign_id: Mapped[int] = mapped_column(ForeignKey("test_campaigns.id"), nullable=False)
+    test_case_id: Mapped[int] = mapped_column(ForeignKey("test_cases.id"), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="Pending")
+    result: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    executed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    campaign: Mapped["TestCampaign"] = relationship(back_populates="items")
+    test_case: Mapped["TestCase"] = relationship(back_populates="campaign_items")
+
+
+class ArtefactLink(Base):
+    """Generic typed cross-artifact link foundation."""
+    __tablename__ = "artefact_links"
+    __table_args__ = (
+        UniqueConstraint("source_type", "source_id", "target_type", "target_id", "role", name="uq_artefact_link"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    source_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    target_type: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    target_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(50), nullable=False)
+    suspect: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class DesignItem(Base):
+    __tablename__ = "design_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    design_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    content_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="Draft")
+    priority: Mapped[str] = mapped_column(String(20), default="Medium")
+    design_type: Mapped[str] = mapped_column(String(30), default="Architecture")
+    linked_requirement_id: Mapped[Optional[int]] = mapped_column(ForeignKey("requirements.id"), nullable=True)
+    source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    project: Mapped["Project"] = relationship(back_populates="design_items")
+    linked_requirement: Mapped[Optional["Requirement"]] = relationship()
+
+
+class RiskItem(Base):
+    __tablename__ = "risk_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    risk_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    content_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="Open")
+    severity: Mapped[str] = mapped_column(String(20), default="Medium")
+    probability: Mapped[str] = mapped_column(String(20), default="Medium")
+    mitigation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    risk_category: Mapped[str] = mapped_column(String(30), default="Technical")
+    linked_requirement_id: Mapped[Optional[int]] = mapped_column(ForeignKey("requirements.id"), nullable=True)
+    source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    project: Mapped["Project"] = relationship(back_populates="risk_items")
+    linked_requirement: Mapped[Optional["Requirement"]] = relationship()
+
+
+class ChangeRequest(Base):
+    __tablename__ = "change_requests"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    change_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    content_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="Submitted")
+    priority: Mapped[str] = mapped_column(String(20), default="Medium")
+    change_type: Mapped[str] = mapped_column(String(30), default="Enhancement")
+    impact_assessment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    justification: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    project: Mapped["Project"] = relationship(back_populates="change_requests")
+
+
+class Baseline(Base):
+    __tablename__ = "baselines"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    baseline_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="Open")
+    baseline_type: Mapped[str] = mapped_column(String(30), default="Milestone")
+    snapshot: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    project: Mapped["Project"] = relationship(back_populates="baselines")
+
+
+class TestConcept(Base):
+    __tablename__ = "test_concepts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    concept_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    content_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="Draft")
+    linked_requirement_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    coverage: Mapped[float] = mapped_column(Float, default=0)
+    source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    project: Mapped["Project"] = relationship(back_populates="test_concepts")
+
+
+class ArtefactComment(Base):
+    __tablename__ = "artefact_comments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    artefact_type: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    artefact_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    author_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ArtefactActivity(Base):
+    __tablename__ = "artefact_activities"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    artefact_type: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    artefact_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    event_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

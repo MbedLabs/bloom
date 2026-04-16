@@ -7,15 +7,38 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.core.database import get_db
-from app.models import Project, Requirement, TestCase
+from app.core.security import get_current_user, require_role
+from app.models import Project, Requirement, TestCase, DesignItem, RiskItem, ChangeRequest, TestConcept, TestSuite
+from app.models.user import User, UserRole
 from app.schemas import ProjectCreate, ProjectUpdate, ProjectResponse
 
 router = APIRouter()
 
 
+async def _project_counts(db: AsyncSession, project_id: int) -> dict[str, int]:
+    req_count = (await db.execute(select(func.count(Requirement.id)).where(Requirement.project_id == project_id))).scalar()
+    tc_count = (await db.execute(select(func.count(TestCase.id)).where(TestCase.project_id == project_id))).scalar()
+    design_count = (await db.execute(select(func.count(DesignItem.id)).where(DesignItem.project_id == project_id))).scalar()
+    risk_count = (await db.execute(select(func.count(RiskItem.id)).where(RiskItem.project_id == project_id))).scalar()
+    change_count = (await db.execute(select(func.count(ChangeRequest.id)).where(ChangeRequest.project_id == project_id))).scalar()
+    test_concept_count = (await db.execute(select(func.count(TestConcept.id)).where(TestConcept.project_id == project_id))).scalar()
+    test_suite_count = (await db.execute(select(func.count(TestSuite.id)).where(TestSuite.project_id == project_id))).scalar()
+
+    return {
+        "requirement_count": req_count,
+        "test_case_count": tc_count,
+        "design_count": design_count,
+        "risk_count": risk_count,
+        "change_count": change_count,
+        "test_concept_count": test_concept_count,
+        "test_suite_count": test_suite_count,
+    }
+
+
 @router.get("", response_model=list[ProjectResponse])
 async def list_projects(
     db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
 ):
     """
     List all projects with requirement and test case counts.
@@ -27,15 +50,7 @@ async def list_projects(
 
     response = []
     for project in projects:
-        req_count_result = await db.execute(
-            select(func.count(Requirement.id)).where(Requirement.project_id == project.id)
-        )
-        req_count = req_count_result.scalar()
-
-        tc_count_result = await db.execute(
-            select(func.count(TestCase.id)).where(TestCase.project_id == project.id)
-        )
-        tc_count = tc_count_result.scalar()
+        counts = await _project_counts(db, project.id)
 
         response.append(ProjectResponse(
             id=project.id,
@@ -45,8 +60,7 @@ async def list_projects(
             status=project.status,
             created_at=project.created_at,
             updated_at=project.updated_at,
-            requirement_count=req_count,
-            test_case_count=tc_count,
+            **counts,
         ))
 
     return response
@@ -56,6 +70,7 @@ async def list_projects(
 async def create_project(
     data: ProjectCreate,
     db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     """
     Create a new project.
@@ -93,6 +108,11 @@ async def create_project(
         updated_at=project.updated_at,
         requirement_count=0,
         test_case_count=0,
+        design_count=0,
+        risk_count=0,
+        change_count=0,
+        test_concept_count=0,
+        test_suite_count=0,
     )
 
 
@@ -100,6 +120,7 @@ async def create_project(
 async def get_project(
     project_id: int,
     db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
 ):
     """
     Get a project by ID.
@@ -112,15 +133,7 @@ async def get_project(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    req_count_result = await db.execute(
-        select(func.count(Requirement.id)).where(Requirement.project_id == project.id)
-    )
-    req_count = req_count_result.scalar()
-
-    tc_count_result = await db.execute(
-        select(func.count(TestCase.id)).where(TestCase.project_id == project.id)
-    )
-    tc_count = tc_count_result.scalar()
+    counts = await _project_counts(db, project.id)
 
     return ProjectResponse(
         id=project.id,
@@ -130,8 +143,7 @@ async def get_project(
         status=project.status,
         created_at=project.created_at,
         updated_at=project.updated_at,
-        requirement_count=req_count,
-        test_case_count=tc_count,
+        **counts,
     )
 
 
@@ -140,6 +152,7 @@ async def update_project(
     project_id: int,
     data: ProjectUpdate,
     db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     """
     Update a project.
@@ -176,15 +189,7 @@ async def update_project(
     await db.flush()
     await db.refresh(project)
 
-    req_count_result = await db.execute(
-        select(func.count(Requirement.id)).where(Requirement.project_id == project.id)
-    )
-    req_count = req_count_result.scalar()
-
-    tc_count_result = await db.execute(
-        select(func.count(TestCase.id)).where(TestCase.project_id == project.id)
-    )
-    tc_count = tc_count_result.scalar()
+    counts = await _project_counts(db, project.id)
 
     return ProjectResponse(
         id=project.id,
@@ -194,8 +199,7 @@ async def update_project(
         status=project.status,
         created_at=project.created_at,
         updated_at=project.updated_at,
-        requirement_count=req_count,
-        test_case_count=tc_count,
+        **counts,
     )
 
 
@@ -203,6 +207,7 @@ async def update_project(
 async def delete_project(
     project_id: int,
     db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(require_role(UserRole.admin)),
 ):
     """
     Delete a project.

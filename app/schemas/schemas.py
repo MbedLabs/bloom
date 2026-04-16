@@ -36,9 +36,84 @@ class ProjectResponse(BaseModel):
     updated_at: datetime
     requirement_count: int = 0
     test_case_count: int = 0
+    design_count: int = 0
+    risk_count: int = 0
+    change_count: int = 0
+    test_concept_count: int = 0
+    test_suite_count: int = 0
 
     class Config:
         from_attributes = True
+
+
+class ProjectVariableCreate(BaseModel):
+    project_id: int
+    kind: str = Field(default="variable", pattern="^(parameter|variable)$")
+    key: str = Field(..., min_length=1, max_length=100)
+    value: str = Field(..., min_length=1)
+    description: Optional[str] = None
+
+
+class ProjectVariableUpdate(BaseModel):
+    kind: Optional[str] = Field(default=None, pattern="^(parameter|variable)$")
+    key: Optional[str] = Field(None, min_length=1, max_length=100)
+    value: Optional[str] = Field(None, min_length=1)
+    description: Optional[str] = None
+
+
+class ProjectVariableResponse(BaseModel):
+    id: int
+    project_id: int
+    kind: str
+    key: str
+    value: str
+    description: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class RequirementSummary(BaseModel):
+    id: int
+    req_id: str
+    title: str
+    status: str
+
+
+class TestCaseSummary(BaseModel):
+    id: int
+    tc_id: str
+    title: str
+    status: str
+
+
+class TestSuiteSummary(BaseModel):
+    id: int
+    suite_id: str
+    name: str
+    status: str
+
+
+class TestCampaignSummary(BaseModel):
+    id: int
+    name: str
+    status: str
+
+
+class RequirementVerifiedByLinkResponse(BaseModel):
+    id: int
+    link_type: str
+    created_at: datetime
+    test_case: TestCaseSummary
+
+
+class TestCaseVerifiesLinkResponse(BaseModel):
+    id: int
+    link_type: str
+    created_at: datetime
+    requirement: RequirementSummary
 
 
 # ==================== Requirement Schemas ====================
@@ -52,6 +127,9 @@ class RequirementCreate(BaseModel):
     status: str = "Draft"
     priority: str = "Medium"
     req_type: str = "Functional"
+    req_origin: str = "Internal"
+    reviewer_id: Optional[int] = None
+    approver_id: Optional[int] = None
 
 
 class RequirementUpdate(BaseModel):
@@ -61,6 +139,13 @@ class RequirementUpdate(BaseModel):
     status: Optional[str] = None
     priority: Optional[str] = None
     req_type: Optional[str] = None
+    req_origin: Optional[str] = None
+    reviewer_id: Optional[int] = None
+    approver_id: Optional[int] = None
+    reviewed_by_id: Optional[int] = None
+    approved_by_id: Optional[int] = None
+    reviewed_at: Optional[datetime] = None
+    approved_at: Optional[datetime] = None
     parent_id: Optional[int] = None
 
 
@@ -75,10 +160,22 @@ class RequirementResponse(BaseModel):
     status: str
     priority: str
     req_type: str
+    req_origin: str
+    reviewer_id: Optional[int]
+    approver_id: Optional[int]
+    reviewed_by_id: Optional[int]
+    approved_by_id: Optional[int]
+    reviewed_at: Optional[datetime]
+    approved_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime
     children: List["RequirementResponse"] = []
     test_case_count: int = 0
+    linked_test_cases: List[TestCaseSummary] = []
+    verified_by: List[RequirementVerifiedByLinkResponse] = []
+    linked_test_runs: List["TestRunLinkResponse"] = []
+    suite_backlinks: List[TestSuiteSummary] = []
+    campaign_backlinks: List[TestCampaignSummary] = []
 
     class Config:
         from_attributes = True
@@ -94,6 +191,8 @@ class TestCaseCreate(BaseModel):
     preconditions: Optional[str] = None
     steps: Optional[List[Dict[str, Any]]] = None
     status: str = "Draft"
+    reviewer_id: Optional[int] = None
+    approver_id: Optional[int] = None
 
 
 class TestCaseUpdate(BaseModel):
@@ -103,6 +202,12 @@ class TestCaseUpdate(BaseModel):
     preconditions: Optional[str] = None
     steps: Optional[List[Dict[str, Any]]] = None
     status: Optional[str] = None
+    reviewer_id: Optional[int] = None
+    approver_id: Optional[int] = None
+    reviewed_by_id: Optional[int] = None
+    approved_by_id: Optional[int] = None
+    reviewed_at: Optional[datetime] = None
+    approved_at: Optional[datetime] = None
 
 
 class TestCaseResponse(BaseModel):
@@ -115,9 +220,19 @@ class TestCaseResponse(BaseModel):
     preconditions: Optional[str]
     steps: Optional[List[Dict[str, Any]]]
     status: str
+    reviewer_id: Optional[int]
+    approver_id: Optional[int]
+    reviewed_by_id: Optional[int]
+    approved_by_id: Optional[int]
+    reviewed_at: Optional[datetime]
+    approved_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime
     requirement_count: int = 0
+    linked_requirements: List[RequirementSummary] = []
+    verifies: List[TestCaseVerifiesLinkResponse] = []
+    suite_memberships: List[TestSuiteSummary] = []
+    campaign_memberships: List[TestCampaignSummary] = []
 
     class Config:
         from_attributes = True
@@ -126,15 +241,36 @@ class TestCaseResponse(BaseModel):
 # ==================== RequirementTestCase Schemas ====================
 
 class RequirementTestCaseCreate(BaseModel):
-    """Schema for linking a test case to a requirement."""
     test_case_id: int
+    link_type: str = "verifies"
+
+
+class TestCaseRequirementLinkCreate(BaseModel):
+    requirement_id: int
+    link_type: str = "verifies"
 
 
 class RequirementTestCaseResponse(BaseModel):
-    """Schema for requirement-test case link response."""
     id: int
     requirement_id: int
     test_case_id: int
+    link_type: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class RequirementLinkCreate(BaseModel):
+    target_id: int
+    link_type: str = "depends_on"
+
+
+class RequirementLinkResponse(BaseModel):
+    id: int
+    source_id: int
+    target_id: int
+    link_type: str
     created_at: datetime
 
     class Config:
@@ -168,11 +304,42 @@ class TestRunLinkResponse(BaseModel):
 # ==================== Traceability Schemas ====================
 
 class TraceabilityItem(BaseModel):
-    """Schema for a single item in the traceability matrix."""
     requirement: RequirementResponse
     linked_test_cases: List[TestCaseResponse]
     linked_test_runs: List[TestRunLinkResponse]
     coverage_status: str
+
+
+class ImpactNode(BaseModel):
+    requirement: RequirementResponse
+    link_type: str
+    direction: str
+    depth: int
+    children: List["ImpactNode"] = []
+
+
+class ImpactAnalysisResponse(BaseModel):
+    root_requirement: RequirementResponse
+    upstream: List[ImpactNode]
+    downstream: List[ImpactNode]
+
+
+class CoverageGap(BaseModel):
+    requirement: RequirementResponse
+    gap_type: str
+    linked_test_cases: List[TestCaseResponse]
+    all_test_cases_draft: bool
+    missing_link_types: List[str]
+
+
+class CoverageGapReport(BaseModel):
+    project_id: int
+    total_requirements: int
+    covered: int
+    partial: int
+    uncovered: int
+    coverage_percent: float
+    gaps: List[CoverageGap]
 
 
 # ==================== Health Schemas ====================
@@ -190,5 +357,494 @@ class VersionResponse(BaseModel):
     api_version: str = "v1"
 
 
+class DocumentCreate(BaseModel):
+    project_id: int
+    title: str = Field(..., min_length=1, max_length=500)
+    doc_type: str = "Specification"
+    description: Optional[str] = None
+
+class DocumentUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=500)
+    doc_type: Optional[str] = None
+    status: Optional[str] = None
+    version: Optional[str] = None
+    description: Optional[str] = None
+
+class DocumentSectionCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=500)
+    content: Optional[str] = None
+    section_type: str = "text"
+    order: int = 0
+    parent_section_id: Optional[int] = None
+
+class DocumentSectionUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=500)
+    content: Optional[str] = None
+    section_type: Optional[str] = None
+    order: Optional[int] = None
+    parent_section_id: Optional[int] = None
+
+class DocumentSectionResponse(BaseModel):
+    id: int
+    document_id: int
+    parent_section_id: Optional[int]
+    order: int
+    title: str
+    content: Optional[str]
+    section_type: str
+    created_at: datetime
+    updated_at: datetime
+    child_sections: List["DocumentSectionResponse"] = []
+    class Config:
+        from_attributes = True
+
+class DocumentResponse(BaseModel):
+    id: int
+    project_id: int
+    title: str
+    doc_type: str
+    status: str
+    version: str
+    description: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    section_count: int = 0
+    class Config:
+        from_attributes = True
+
+class DocumentDetailResponse(BaseModel):
+    id: int
+    project_id: int
+    title: str
+    doc_type: str
+    status: str
+    version: str
+    description: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    sections: List[DocumentSectionResponse] = []
+    class Config:
+        from_attributes = True
+
+class SectionReorder(BaseModel):
+    section_orders: List[dict]
+
+
+# ==================== Test Campaign Schemas ====================
+
+class TestConfigurationCreate(BaseModel):
+    project_id: int
+    name: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = None
+    environment: Optional[str] = None
+    parameters: Optional[Dict[str, Any]] = None
+
+class TestConfigurationUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = None
+    environment: Optional[str] = None
+    parameters: Optional[Dict[str, Any]] = None
+
+class TestConfigurationResponse(BaseModel):
+    id: int
+    project_id: int
+    name: str
+    description: Optional[str]
+    environment: Optional[str]
+    parameters: Optional[Dict[str, Any]]
+    created_at: datetime
+    updated_at: datetime
+    class Config:
+        from_attributes = True
+
+
+class TestSuiteCreate(BaseModel):
+    project_id: int
+    name: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = None
+    status: str = "Draft"
+    test_case_ids: List[int] = []
+
+
+class TestSuiteUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = None
+    status: Optional[str] = None
+
+
+class TestSuiteItemResponse(BaseModel):
+    id: int
+    suite_id: int
+    test_case_id: int
+    order: int
+    created_at: datetime
+    test_case: Optional[TestCaseSummary] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TestSuiteResponse(BaseModel):
+    id: int
+    project_id: int
+    suite_id: str
+    name: str
+    description: Optional[str]
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    total_items: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class TestSuiteDetailResponse(TestSuiteResponse):
+    items: List[TestSuiteItemResponse] = []
+    related_requirements: List[RequirementSummary] = []
+    linked_campaigns: List[TestCampaignSummary] = []
+
+
+class TestCampaignCreate(BaseModel):
+    project_id: int
+    name: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = None
+    configuration_id: Optional[int] = None
+    suite_id: Optional[int] = None
+    bud_run_id: Optional[int] = None
+    bud_run_url: Optional[str] = None
+    bud_run_status: Optional[str] = None
+    test_case_ids: List[int] = []
+
+class TestCampaignUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = None
+    configuration_id: Optional[int] = None
+    suite_id: Optional[int] = None
+    bud_run_id: Optional[int] = None
+    bud_run_url: Optional[str] = None
+    bud_run_status: Optional[str] = None
+    status: Optional[str] = None
+
+class TestCampaignItemResponse(BaseModel):
+    id: int
+    campaign_id: int
+    test_case_id: int
+    status: str
+    result: Optional[str]
+    comment: Optional[str]
+    executed_at: Optional[datetime]
+    created_at: datetime
+    test_case: Optional[TestCaseResponse] = None
+    class Config:
+        from_attributes = True
+
+class TestCampaignResponse(BaseModel):
+    id: int
+    project_id: int
+    configuration_id: Optional[int]
+    suite_id: Optional[int]
+    bud_run_id: Optional[int]
+    bud_run_url: Optional[str]
+    bud_run_status: Optional[str]
+    name: str
+    description: Optional[str]
+    status: str
+    started_at: Optional[datetime]
+    completed_at: Optional[datetime]
+    created_at: datetime
+    updated_at: datetime
+    total_items: int = 0
+    passed: int = 0
+    failed: int = 0
+    blocked: int = 0
+    pending: int = 0
+    configuration: Optional[TestConfigurationResponse] = None
+    suite: Optional[TestSuiteSummary] = None
+    class Config:
+        from_attributes = True
+
+class TestCampaignDetailResponse(TestCampaignResponse):
+    items: List[TestCampaignItemResponse] = []
+    related_requirements: List[RequirementSummary] = []
+
+class TestCampaignItemUpdate(BaseModel):
+    comment: Optional[str] = None
+
+
+class ArtefactLinkCreate(BaseModel):
+    project_id: int
+    source_type: str
+    source_id: int
+    target_type: str
+    target_id: int
+    role: str = Field(..., min_length=1, max_length=50)
+    suspect: bool = False
+
+
+class ArtefactLinkResponse(BaseModel):
+    id: int
+    project_id: int
+    source_type: str
+    source_id: int
+    target_type: str
+    target_id: int
+    role: str
+    suspect: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ==================== Design Schemas ====================
+
+class DesignItemCreate(BaseModel):
+    project_id: int
+    title: str = Field(..., min_length=1, max_length=500)
+    description: Optional[str] = None
+    status: str = "Draft"
+    priority: str = "Medium"
+    design_type: str = "Architecture"
+    linked_requirement_id: Optional[int] = None
+
+class DesignItemUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=500)
+    description: Optional[str] = None
+    status: Optional[str] = None
+    priority: Optional[str] = None
+    design_type: Optional[str] = None
+    linked_requirement_id: Optional[int] = None
+
+class DesignItemResponse(BaseModel):
+    id: int
+    project_id: int
+    design_id: str
+    title: str
+    description: Optional[str]
+    status: str
+    priority: str
+    design_type: str
+    linked_requirement_id: Optional[int]
+    created_at: datetime
+    updated_at: datetime
+    class Config:
+        from_attributes = True
+
+
+# ==================== Risk Schemas ====================
+
+class RiskItemCreate(BaseModel):
+    project_id: int
+    title: str = Field(..., min_length=1, max_length=500)
+    description: Optional[str] = None
+    status: str = "Open"
+    severity: str = "Medium"
+    probability: str = "Medium"
+    mitigation: Optional[str] = None
+    risk_category: str = "Technical"
+    linked_requirement_id: Optional[int] = None
+
+class RiskItemUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=500)
+    description: Optional[str] = None
+    status: Optional[str] = None
+    severity: Optional[str] = None
+    probability: Optional[str] = None
+    mitigation: Optional[str] = None
+    risk_category: Optional[str] = None
+    linked_requirement_id: Optional[int] = None
+
+class RiskItemResponse(BaseModel):
+    id: int
+    project_id: int
+    risk_id: str
+    title: str
+    description: Optional[str]
+    status: str
+    severity: str
+    probability: str
+    mitigation: Optional[str]
+    risk_category: str
+    linked_requirement_id: Optional[int]
+    created_at: datetime
+    updated_at: datetime
+    class Config:
+        from_attributes = True
+
+
+# ==================== Change Request Schemas ====================
+
+class ChangeRequestCreate(BaseModel):
+    project_id: int
+    title: str = Field(..., min_length=1, max_length=500)
+    description: Optional[str] = None
+    status: str = "Submitted"
+    priority: str = "Medium"
+    change_type: str = "Enhancement"
+    impact_assessment: Optional[str] = None
+    justification: Optional[str] = None
+
+class ChangeRequestUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=500)
+    description: Optional[str] = None
+    status: Optional[str] = None
+    priority: Optional[str] = None
+    change_type: Optional[str] = None
+    impact_assessment: Optional[str] = None
+    justification: Optional[str] = None
+
+class ChangeRequestResponse(BaseModel):
+    id: int
+    project_id: int
+    change_id: str
+    title: str
+    description: Optional[str]
+    status: str
+    priority: str
+    change_type: str
+    impact_assessment: Optional[str]
+    justification: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    class Config:
+        from_attributes = True
+
+
+# ==================== Baseline Schemas ====================
+
+class BaselineCreate(BaseModel):
+    project_id: int
+    name: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = None
+    baseline_type: str = "Milestone"
+
+class BaselineUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = None
+    status: Optional[str] = None
+    baseline_type: Optional[str] = None
+
+class BaselineResponse(BaseModel):
+    id: int
+    project_id: int
+    name: str
+    description: Optional[str]
+    status: str
+    baseline_type: str
+    snapshot: Optional[Dict[str, Any]] = None
+    created_at: datetime
+    updated_at: datetime
+    class Config:
+        from_attributes = True
+
+
+# ==================== Test Concept Schemas ====================
+
+class TestConceptCreate(BaseModel):
+    project_id: int
+    name: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = None
+    status: str = "Draft"
+    linked_requirement_ids: List[int] = []
+    coverage: float = 0
+
+
+class TestConceptUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = None
+    status: Optional[str] = None
+    linked_requirement_ids: Optional[List[int]] = None
+    coverage: Optional[float] = None
+
+
+class TestConceptResponse(BaseModel):
+    id: int
+    project_id: int
+    concept_id: str
+    name: str
+    description: Optional[str]
+    status: str
+    linked_requirement_ids: List[int] = []
+    coverage: float
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ==================== Artefact Detail Schemas ====================
+
+class ArtefactCommentCreate(BaseModel):
+    body: str = Field(..., min_length=1)
+
+
+class ArtefactCommentResponse(BaseModel):
+    id: int
+    artefact_type: str
+    artefact_id: int
+    author_name: str
+    body: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ArtefactActivityResponse(BaseModel):
+    id: int
+    artefact_type: str
+    artefact_id: int
+    event_type: str
+    summary: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ArtefactTransitionRequest(BaseModel):
+    status: str = Field(..., min_length=1)
+
+
+class RelatedRequirementSummary(BaseModel):
+    id: int
+    req_id: str
+    title: str
+    status: str
+
+
+class RelatedTestCaseSummary(BaseModel):
+    id: int
+    tc_id: str
+    title: str
+    status: str
+
+
+class RelatedDocumentSummary(BaseModel):
+    id: int
+    title: str
+    doc_type: str
+    status: str
+    matched_sections: List[str] = []
+
+
+class RelatedProjectSummary(BaseModel):
+    id: int
+    name: str
+    prefix: str
+    status: str
+
+
+class ArtefactRelatedResponse(BaseModel):
+    project: RelatedProjectSummary
+    linked_requirements: List[RelatedRequirementSummary] = []
+    related_test_cases: List[RelatedTestCaseSummary] = []
+    related_documents: List[RelatedDocumentSummary] = []
+
+
 # Resolve forward references
 RequirementResponse.model_rebuild()
+DocumentSectionResponse.model_rebuild()
+ImpactNode.model_rebuild()

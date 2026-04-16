@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
 
     BLOOM_APP_NAME: str = "EmbedLabs Bloom"
-    BLOOM_APP_VERSION: str = "0.1.0"
+    BLOOM_APP_VERSION: str = "0.1.4"
 
     TESTSTATION_APP_URL: str = "http://localhost:5173"
 
@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     ]
 
     ENABLE_DOCS: bool = True
+
+    ADMIN_EMAIL: str = "admin@embedlabs.de"
+    ADMIN_PASSWORD: str = "changeme123"
+    ADMIN_FULL_NAME: str = "Admin"
 
     @field_validator("SECRET_KEY")
     @classmethod
