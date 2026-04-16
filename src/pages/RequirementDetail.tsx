@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { requirementsApi, testCasesApi } from '../api/client'
-import { ArrowLeft, Pencil, Link2, ExternalLink, ChevronRight, CheckCircle } from 'lucide-react'
+import { requirementsApi, testCasesApi, usersApi } from '../api/client'
+import { ArrowLeft, Pencil, Link2, ExternalLink, ChevronRight, CheckCircle, UserCheck, UserCog, X, Search } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
 export default function RequirementDetail() {
-  const { id } = useParams<{ id: string }>()
-  const reqId = parseInt(id || '0')
+  const { itemId } = useParams<{ id: string; itemId: string }>()
+  const reqId = parseInt(itemId || '0')
   const queryClient = useQueryClient()
 
   const { data: requirement, isLoading, error } = useQuery({
@@ -24,8 +24,20 @@ export default function RequirementDetail() {
     priority: '',
     req_type: '',
     req_origin: '',
+    reviewer_id: '',
+    approver_id: '',
   })
   const [showLinkModal, setShowLinkModal] = useState(false)
+  const [linkType, setLinkType] = useState('verifies')
+  const [tcSearch, setTcSearch] = useState('')
+  const [linkedTcSearch, setLinkedTcSearch] = useState('')
+  const [selectedUnlinkedTcIds, setSelectedUnlinkedTcIds] = useState<number[]>([])
+  const [selectedLinkedTcIds, setSelectedLinkedTcIds] = useState<number[]>([])
+
+  const { data: users } = useQuery({
+    queryKey: ['users'],
+    queryFn: usersApi.list,
+  })
 
   const { data: availableTestCases } = useQuery({
     queryKey: ['projectTestCases', requirement?.project_id],
@@ -42,6 +54,8 @@ export default function RequirementDetail() {
         priority: requirement.priority,
         req_type: requirement.req_type,
         req_origin: requirement.req_origin,
+        reviewer_id: requirement.reviewer_id ? String(requirement.reviewer_id) : '',
+        approver_id: requirement.approver_id ? String(requirement.approver_id) : '',
       })
     }
   }, [requirement, isEditing])
@@ -55,10 +69,51 @@ export default function RequirementDetail() {
   })
 
   const linkTcMutation = useMutation({
-    mutationFn: (testCaseId: number) => requirementsApi.linkTestCase(reqId, testCaseId),
+    mutationFn: (testCaseId: number) => requirementsApi.linkTestCase(reqId, testCaseId, linkType),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['requirement', reqId] })
       setShowLinkModal(false)
+    },
+  })
+
+  const unlinkTcMutation = useMutation({
+    mutationFn: (testCaseId: number) => requirementsApi.unlinkTestCase(reqId, testCaseId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['requirement', reqId] })
+    },
+  })
+
+  const bulkLinkTcMutation = useMutation({
+    mutationFn: async (testCaseIds: number[]) => {
+      await Promise.all(testCaseIds.map((testCaseId) => requirementsApi.linkTestCase(reqId, testCaseId, linkType)))
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['requirement', reqId] })
+      setSelectedUnlinkedTcIds([])
+    },
+  })
+
+  const bulkUnlinkTcMutation = useMutation({
+    mutationFn: async (testCaseIds: number[]) => {
+      await Promise.all(testCaseIds.map((testCaseId) => requirementsApi.unlinkTestCase(reqId, testCaseId)))
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['requirement', reqId] })
+      setSelectedLinkedTcIds([])
+    },
+  })
+
+  const markReviewedMutation = useMutation({
+    mutationFn: (reviewedById: number) => requirementsApi.setReviewed(reqId, reviewedById),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['requirement', reqId] })
+    },
+  })
+
+  const markApprovedMutation = useMutation({
+    mutationFn: (approvedById: number) => requirementsApi.setApproved(reqId, approvedById),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['requirement', reqId] })
     },
   })
 
@@ -71,7 +126,10 @@ export default function RequirementDetail() {
       priority: editForm.priority,
       req_type: editForm.req_type,
       req_origin: editForm.req_origin,
+      reviewer_id: editForm.reviewer_id ? Number(editForm.reviewer_id) : null,
+      approver_id: editForm.approver_id ? Number(editForm.approver_id) : null,
     })
+  }
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
@@ -90,6 +148,16 @@ export default function RequirementDetail() {
 
   const linkedTcIds = new Set(requirement.linked_test_cases?.map(tc => tc.id) || [])
   const unlinkedTestCases = availableTestCases?.filter(tc => !linkedTcIds.has(tc.id)) || []
+  const filteredUnlinkedTestCases = unlinkedTestCases.filter((tc) => {
+    const q = tcSearch.trim().toLowerCase()
+    if (!q) return true
+    return tc.tc_id.toLowerCase().includes(q) || tc.title.toLowerCase().includes(q)
+  })
+  const filteredLinkedTestCases = (requirement.verified_by || []).filter((link) => {
+    const q = linkedTcSearch.trim().toLowerCase()
+    if (!q) return true
+    return link.test_case.tc_id.toLowerCase().includes(q) || link.test_case.title.toLowerCase().includes(q)
+  })
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -158,7 +226,7 @@ export default function RequirementDetail() {
                 rows={4}
               />
             </div>
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Status</label>
                 <select
@@ -217,6 +285,32 @@ export default function RequirementDetail() {
                   <option>Technical</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Reviewer</label>
+                <select
+                  value={editForm.reviewer_id}
+                  onChange={(e) => setEditForm({ ...editForm, reviewer_id: e.target.value })}
+                  className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
+                >
+                  <option value="">Unassigned</option>
+                  {(users || []).map((u) => (
+                    <option key={u.id} value={u.id}>{u.full_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Approver</label>
+                <select
+                  value={editForm.approver_id}
+                  onChange={(e) => setEditForm({ ...editForm, approver_id: e.target.value })}
+                  className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
+                >
+                  <option value="">Unassigned</option>
+                  {(users || []).map((u) => (
+                    <option key={u.id} value={u.id}>{u.full_name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="flex justify-end space-x-3">
               <button
@@ -245,6 +339,40 @@ export default function RequirementDetail() {
           <div className="mt-4 pt-4 border-t border-border flex items-center space-x-6 text-sm text-muted-foreground">
             <span>Created {formatDistanceToNow(new Date(requirement.created_at))} ago</span>
             <span>Updated {formatDistanceToNow(new Date(requirement.updated_at))} ago</span>
+          </div>
+          <div className="mt-4 pt-4 border-t border-border grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="rounded-md border border-border p-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Review</p>
+              <p className="text-sm text-foreground">Assigned reviewer: {resolveUserName(users, requirement.reviewer_id)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Reviewed by: {resolveUserName(users, requirement.reviewed_by_id)}</p>
+              {requirement.reviewed_at && (
+                <p className="text-xs text-muted-foreground mt-1">At {new Date(requirement.reviewed_at).toLocaleString()}</p>
+              )}
+              <button
+                disabled={!requirement.reviewer_id || markReviewedMutation.isPending}
+                onClick={() => requirement.reviewer_id && markReviewedMutation.mutate(requirement.reviewer_id)}
+                className="mt-3 inline-flex items-center px-3 py-1.5 rounded-md bg-amber-500/90 text-white text-xs font-medium hover:bg-amber-500 disabled:opacity-50"
+              >
+                <UserCheck className="h-3.5 w-3.5 mr-1" />
+                Mark Reviewed
+              </button>
+            </div>
+            <div className="rounded-md border border-border p-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Approval</p>
+              <p className="text-sm text-foreground">Assigned approver: {resolveUserName(users, requirement.approver_id)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Approved by: {resolveUserName(users, requirement.approved_by_id)}</p>
+              {requirement.approved_at && (
+                <p className="text-xs text-muted-foreground mt-1">At {new Date(requirement.approved_at).toLocaleString()}</p>
+              )}
+              <button
+                disabled={!requirement.approver_id || markApprovedMutation.isPending}
+                onClick={() => requirement.approver_id && markApprovedMutation.mutate(requirement.approver_id)}
+                className="mt-3 inline-flex items-center px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-500 disabled:opacity-50"
+              >
+                <UserCog className="h-3.5 w-3.5 mr-1" />
+                Mark Approved
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -277,25 +405,85 @@ export default function RequirementDetail() {
 
       <div className="bg-card rounded-lg shadow-elegant">
         <div className="px-6 py-4 border-b border-border flex justify-between items-center">
-          <h3 className="text-lg font-semibold">Linked Test Cases</h3>
-          <span className="text-sm text-muted-foreground">{requirement.linked_test_cases?.length || 0} linked</span>
+          <h3 className="text-lg font-semibold">Verified By</h3>
+          <span className="text-sm text-muted-foreground">{requirement.verified_by?.length || 0} verification link{(requirement.verified_by?.length || 0) !== 1 ? 's' : ''}</span>
         </div>
-        {requirement.linked_test_cases && requirement.linked_test_cases.length > 0 ? (
+        <div className="px-6 py-3 border-b border-border flex flex-col md:flex-row md:items-center gap-3">
+          <div className="relative flex-1">
+            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={linkedTcSearch}
+              onChange={(e) => setLinkedTcSearch(e.target.value)}
+              placeholder="Filter linked test cases"
+              className="w-full pl-9 pr-3 py-2 bg-background border border-input rounded-md text-sm"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                if (selectedLinkedTcIds.length === filteredLinkedTestCases.length) {
+                  setSelectedLinkedTcIds([])
+                } else {
+                  setSelectedLinkedTcIds(filteredLinkedTestCases.map((l) => l.test_case.id))
+                }
+              }}
+              className="px-3 py-2 border border-input rounded-md text-xs font-medium hover:bg-accent/50"
+            >
+              {selectedLinkedTcIds.length === filteredLinkedTestCases.length && filteredLinkedTestCases.length > 0 ? 'Clear' : 'Select all'}
+            </button>
+            <button
+              onClick={() => bulkUnlinkTcMutation.mutate(selectedLinkedTcIds)}
+              disabled={selectedLinkedTcIds.length === 0 || bulkUnlinkTcMutation.isPending}
+              className="px-3 py-2 border border-red-500/50 text-red-600 rounded-md text-xs font-medium hover:bg-red-500/10 disabled:opacity-50"
+            >
+              {bulkUnlinkTcMutation.isPending ? 'Unlinking...' : `Unlink selected (${selectedLinkedTcIds.length})`}
+            </button>
+          </div>
+        </div>
+        {requirement.verified_by && requirement.verified_by.length > 0 ? (
           <div className="divide-y divide-border">
-            {requirement.linked_test_cases.map((tc) => (
+            {filteredLinkedTestCases.map((link) => (
               <Link
-                key={tc.id}
-                to={`/test-cases/${tc.id}`}
+                key={link.id}
+                to={`/test-cases/${link.test_case.id}`}
                 className="flex items-center justify-between px-6 py-4 hover:bg-accent/50 transition-colors"
               >
                 <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={selectedLinkedTcIds.includes(link.test_case.id)}
+                    onChange={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setSelectedLinkedTcIds((prev) =>
+                        prev.includes(link.test_case.id)
+                          ? prev.filter((id) => id !== link.test_case.id)
+                          : [...prev, link.test_case.id]
+                      )
+                    }}
+                    className="mr-3"
+                  />
                   <CheckCircle className="h-5 w-5 text-primary mr-3" />
                   <div>
-                    <span className="font-mono text-sm text-primary mr-2">{tc.tc_id}</span>
-                    <span className="text-foreground">{tc.title}</span>
+                    <span className="font-mono text-sm text-primary mr-2">{link.test_case.tc_id}</span>
+                    <span className="text-foreground">{link.test_case.title}</span>
+                    <span className="ml-2 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">{friendlyVerificationLabel(link.link_type, 'incoming')}</span>
                   </div>
                 </div>
-                <TcStatusBadge status={tc.status} />
+                <div className="text-right">
+                  <TcStatusBadge status={link.test_case.status} />
+                  <div className="text-xs text-muted-foreground mt-1">{formatDistanceToNow(new Date(link.created_at))} ago</div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault()
+                    unlinkTcMutation.mutate(link.test_case.id)
+                  }}
+                  className="ml-3 p-1.5 rounded text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                  title="Unlink"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </Link>
             ))}
           </div>
@@ -356,6 +544,49 @@ export default function RequirementDetail() {
         </div>
       )}
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-card rounded-lg shadow-elegant">
+          <div className="px-6 py-4 border-b border-border flex justify-between items-center">
+            <h3 className="text-lg font-semibold">Appears In Suites</h3>
+            <span className="text-sm text-muted-foreground">{requirement.suite_backlinks?.length || 0}</span>
+          </div>
+          {requirement.suite_backlinks && requirement.suite_backlinks.length > 0 ? (
+            <div className="divide-y divide-border">
+              {requirement.suite_backlinks.map((suite) => (
+                <div key={suite.id} className="px-6 py-4 flex items-center justify-between">
+                  <div>
+                    <div className="font-mono text-sm text-primary">{suite.suite_id}</div>
+                    <div className="text-foreground mt-1">{suite.name}</div>
+                  </div>
+                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">{suite.status}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-6 text-center text-muted-foreground">No suites include verification test cases for this requirement.</div>
+          )}
+        </div>
+
+        <div className="bg-card rounded-lg shadow-elegant">
+          <div className="px-6 py-4 border-b border-border flex justify-between items-center">
+            <h3 className="text-lg font-semibold">Covered By Campaign Scopes</h3>
+            <span className="text-sm text-muted-foreground">{requirement.campaign_backlinks?.length || 0}</span>
+          </div>
+          {requirement.campaign_backlinks && requirement.campaign_backlinks.length > 0 ? (
+            <div className="divide-y divide-border">
+              {requirement.campaign_backlinks.map((campaign) => (
+                <div key={campaign.id} className="px-6 py-4 flex items-center justify-between">
+                  <div className="text-foreground">{campaign.name}</div>
+                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">{campaign.status}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-6 text-center text-muted-foreground">No campaign scopes reference this requirement yet.</div>
+          )}
+        </div>
+      </div>
+
       {showLinkModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-card rounded-lg shadow-elegant max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
@@ -366,26 +597,85 @@ export default function RequirementDetail() {
               </button>
             </div>
             <div className="overflow-y-auto p-6">
-              {unlinkedTestCases.length === 0 ? (
+              <div className="mb-4 relative">
+                <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={tcSearch}
+                  onChange={(e) => setTcSearch(e.target.value)}
+                  placeholder="Filter available test cases"
+                  className="w-full pl-9 pr-3 py-2 bg-background border border-input rounded-md text-sm"
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Link Type</label>
+                <select
+                  value={linkType}
+                  onChange={(e) => setLinkType(e.target.value)}
+                  className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm text-foreground"
+                >
+                  <option value="verifies">verifies</option>
+                  <option value="validates">validates</option>
+                </select>
+              </div>
+              <div className="mb-4 flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (selectedUnlinkedTcIds.length === filteredUnlinkedTestCases.length) {
+                      setSelectedUnlinkedTcIds([])
+                    } else {
+                      setSelectedUnlinkedTcIds(filteredUnlinkedTestCases.map((tc) => tc.id))
+                    }
+                  }}
+                  className="px-3 py-2 border border-input rounded-md text-xs font-medium hover:bg-accent/50"
+                >
+                  {selectedUnlinkedTcIds.length === filteredUnlinkedTestCases.length && filteredUnlinkedTestCases.length > 0 ? 'Clear' : 'Select all'}
+                </button>
+                <button
+                  onClick={() => bulkLinkTcMutation.mutate(selectedUnlinkedTcIds)}
+                  disabled={selectedUnlinkedTcIds.length === 0 || bulkLinkTcMutation.isPending}
+                  className="px-3 py-2 bg-primary text-primary-foreground rounded-md text-xs font-medium hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {bulkLinkTcMutation.isPending ? 'Linking...' : `Link selected (${selectedUnlinkedTcIds.length})`}
+                </button>
+              </div>
+              {filteredUnlinkedTestCases.length === 0 ? (
                 <div className="text-center text-muted-foreground py-8">
                   <CheckCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                  <p>All test cases are already linked.</p>
+                  <p>No matching test cases available.</p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {unlinkedTestCases.map((tc) => (
-                    <button
+                  {filteredUnlinkedTestCases.map((tc) => (
+                    <div
                       key={tc.id}
-                      onClick={() => linkTcMutation.mutate(tc.id)}
-                      disabled={linkTcMutation.isPending}
+                      onClick={() => {
+                        setSelectedUnlinkedTcIds((prev) =>
+                          prev.includes(tc.id) ? prev.filter((id) => id !== tc.id) : [...prev, tc.id]
+                        )
+                      }}
                       className="w-full flex items-center justify-between px-4 py-3 rounded-md border border-border hover:border-primary/50 hover:bg-primary/10 transition-colors text-left disabled:opacity-50"
                     >
                       <div>
+                        <input
+                          type="checkbox"
+                          checked={selectedUnlinkedTcIds.includes(tc.id)}
+                          readOnly
+                          className="mr-3"
+                        />
                         <span className="font-mono text-sm text-primary mr-2">{tc.tc_id}</span>
                         <span className="text-foreground">{tc.title}</span>
                       </div>
-                      <Link2 className="h-4 w-4 text-muted-foreground" />
-                    </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          linkTcMutation.mutate(tc.id)
+                        }}
+                        disabled={linkTcMutation.isPending}
+                        className="px-2 py-1 border border-input rounded text-xs hover:bg-accent/50"
+                      >
+                        Link
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -477,4 +767,15 @@ function RunStatusBadge({ status }: { status: string }) {
       {status}
     </span>
   )
+}
+
+function friendlyVerificationLabel(linkType: string, direction: 'incoming' | 'outgoing') {
+  if (linkType === 'verifies') return direction === 'incoming' ? 'verified by' : 'verifies'
+  if (linkType === 'validates') return direction === 'incoming' ? 'validated by' : 'validates'
+  return linkType.split('_').join(' ')
+}
+
+function resolveUserName(users: Array<{ id: number; full_name: string }> | undefined, userId: number | null) {
+  if (!userId) return 'Unassigned'
+  return users?.find((u) => u.id === userId)?.full_name || `User #${userId}`
 }
