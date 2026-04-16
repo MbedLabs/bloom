@@ -2,12 +2,13 @@
 Auth API endpoints: login, get current user, update profile.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
 from app.core.security import verify_password, get_password_hash, create_access_token, get_current_user
+from app.core.deps import limiter
 from app.models.user import User, UserRole
 from app.schemas.auth import LoginRequest, TokenResponse, UserResponse, UserUpdate, PasswordChange
 
@@ -15,7 +16,8 @@ router = APIRouter()
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")  # H2: prevent brute-force login attempts
+async def login(request: Request, data: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == data.email))
     user = result.scalar_one_or_none()
 
