@@ -4,10 +4,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Layers3, Plus, Trash2 } from 'lucide-react'
 
 import { campaignsApi, testCasesApi, testSuitesApi } from '../api/client'
+import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 
 export default function SuiteDetail() {
-  const { id, suiteId } = useParams<{ id: string; suiteId: string }>()
-  const projectId = Number(id)
+  const { prefix, suiteId } = useParams<{ prefix: string; suiteId: string }>()
+  const { data: project } = useProjectByPrefix(prefix)
+  const projectId = project?.id || 0
   const parsedSuiteId = Number(suiteId)
   const queryClient = useQueryClient()
   const [showAddCase, setShowAddCase] = useState(false)
@@ -57,7 +59,7 @@ export default function SuiteDetail() {
     onSuccess: (campaign) => {
       queryClient.invalidateQueries({ queryKey: ['campaigns', projectId] })
       queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
-      window.location.href = `/projects/${projectId}/campaigns/${campaign.id}`
+      window.location.href = `/projects/${prefix}/campaigns/${campaign.id}`
     },
   })
 
@@ -69,7 +71,7 @@ export default function SuiteDetail() {
     return (
       <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6 text-center">
         <h3 className="text-lg font-medium text-destructive">Suite Not Found</h3>
-        <Link to={`/projects/${projectId}/campaigns`} className="mt-4 inline-block text-primary hover:text-primary/80">
+        <Link to={`/projects/${prefix}/campaigns`} className="mt-4 inline-block text-primary hover:text-primary/80">
           &larr; Back to Campaigns
         </Link>
       </div>
@@ -83,7 +85,7 @@ export default function SuiteDetail() {
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Link to={`/projects/${projectId}/campaigns`} className="p-2 hover:bg-accent/50 rounded-md">
+          <Link to={`/projects/${prefix}/campaigns`} className="p-2 hover:bg-accent/50 rounded-md">
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
           <div>
@@ -131,7 +133,7 @@ export default function SuiteDetail() {
                   <div className="text-xs text-muted-foreground">#{item.order + 1}</div>
                   {item.test_case && (
                     <>
-                      <Link to={`/test-cases/${item.test_case.id}`} className="font-mono text-sm text-primary hover:text-primary/80">
+                      <Link to={`/projects/${prefix}/docs/${item.test_case.tc_id}`} className="font-mono text-sm text-primary hover:text-primary/80">
                         {item.test_case.tc_id}
                       </Link>
                       <div className="text-foreground mt-1">{item.test_case.title}</div>
@@ -162,7 +164,7 @@ export default function SuiteDetail() {
           ) : (
             <div className="divide-y divide-border">
               {suite.related_requirements.map((req) => (
-                <Link key={req.id} to={`/requirements/${req.id}`} className="block px-6 py-4 hover:bg-accent/40">
+                <Link key={req.id} to={`/projects/${prefix}/docs/${req.req_id}`} className="block px-6 py-4 hover:bg-accent/40">
                   <div className="font-mono text-sm text-primary">{req.req_id}</div>
                   <div className="text-foreground mt-1">{req.title}</div>
                 </Link>
@@ -180,7 +182,7 @@ export default function SuiteDetail() {
           ) : (
             <div className="divide-y divide-border">
               {suite.linked_campaigns.map((campaign) => (
-                <Link key={campaign.id} to={`/projects/${projectId}/campaigns/${campaign.id}`} className="block px-6 py-4 hover:bg-accent/40">
+                <Link key={campaign.id} to={`/projects/${prefix}/campaigns/${campaign.id}`} className="block px-6 py-4 hover:bg-accent/40">
                   <div className="font-medium text-foreground">{campaign.name}</div>
                   <div className="text-xs text-muted-foreground mt-1">{campaign.status}</div>
                 </Link>

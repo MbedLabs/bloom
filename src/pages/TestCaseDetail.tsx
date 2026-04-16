@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { testCasesApi, requirementsApi, usersApi, TcsRow } from '../api/client'
+import { testCasesApi, requirementsApi, usersApi, projectsApi, TcsRow } from '../api/client'
 import { TcsArteTable, migrateOldSteps } from '../components/TcsArteTable'
 import { ArrowLeft, Pencil, FileText, Link2, X, UserCheck, UserCog, Search } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
@@ -16,9 +16,9 @@ function normalizeSteps(steps: unknown): TcsRow[] {
   return migrateOldSteps(steps as Array<{ step_number: number; action: string; expected_result: string }>)
 }
 
-export default function TestCaseDetail() {
-  const { itemId } = useParams<{ id: string; itemId: string }>()
-  const tcId = parseInt(itemId || '0')
+export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } = {}) {
+  const { itemId } = useParams<{ prefix: string; itemId: string }>()
+  const tcId = resolvedId || parseInt(itemId || '0')
   const queryClient = useQueryClient()
 
   const { data: testCase, isLoading, error } = useQuery({
@@ -26,6 +26,14 @@ export default function TestCaseDetail() {
     queryFn: () => testCasesApi.get(tcId),
     enabled: !!tcId,
   })
+
+  const { data: project } = useQuery({
+    queryKey: ['project', testCase?.project_id],
+    queryFn: () => projectsApi.get(testCase!.project_id),
+    enabled: !!testCase?.project_id,
+  })
+
+  const projectPrefix = project?.prefix || ''
 
   const [isEditing, setIsEditing] = useState(false)
   const [editForm, setEditForm] = useState({
@@ -172,7 +180,7 @@ export default function TestCaseDetail() {
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <Link to={`/projects/${testCase.project_id}`} className="p-2 hover:bg-accent/50 rounded-md">
+          <Link to={`/projects/${projectPrefix}`} className="p-2 hover:bg-accent/50 rounded-md">
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
           <div>
@@ -362,7 +370,7 @@ export default function TestCaseDetail() {
                 {filteredLinkedRequirements.map((link) => (
                   <Link
                     key={link.id}
-                    to={`/requirements/${link.requirement.id}`}
+                    to={`/projects/${projectPrefix}/docs/${link.requirement.req_id}`}
                     className="flex items-center justify-between px-6 py-4 hover:bg-accent/50 transition-colors"
                   >
                     <div className="flex items-center">

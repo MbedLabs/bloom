@@ -3,10 +3,12 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignsApi, testCasesApi, testSuitesApi } from '../api/client'
 import { ArrowLeft, Plus, Clock, FlaskConical, Layers3 } from 'lucide-react'
+import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 
 export default function TestCampaigns() {
-  const { id } = useParams<{ id: string }>()
-  const projectId = parseInt(id || '0')
+  const { prefix } = useParams<{ prefix: string }>()
+  const { data: project } = useProjectByPrefix(prefix)
+  const projectId = project?.id || 0
   const queryClient = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
   const [showCreateSuite, setShowCreateSuite] = useState(false)
@@ -90,7 +92,7 @@ export default function TestCampaigns() {
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <Link to={`/projects/${projectId}`} className="p-2 hover:bg-accent/50 rounded-md">
+          <Link to={`/projects/${prefix}`} className="p-2 hover:bg-accent/50 rounded-md">
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
           <div>
@@ -130,7 +132,7 @@ export default function TestCampaigns() {
           ) : (
             <div className="divide-y divide-border">
               {suites.map((suite) => (
-                <Link key={suite.id} to={`/projects/${projectId}/suites/${suite.id}`} className="block px-6 py-4 hover:bg-accent/40">
+                <Link key={suite.id} to={`/projects/${prefix}/suites/${suite.id}`} className="block px-6 py-4 hover:bg-accent/40">
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <div className="font-mono text-xs text-primary">{suite.suite_id}</div>
@@ -169,7 +171,7 @@ export default function TestCampaigns() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {campaigns.map((campaign) => (
-                <CampaignCard key={campaign.id} campaign={campaign} projectId={projectId} />
+                <CampaignCard key={campaign.id} campaign={campaign} prefix={prefix!} />
               ))}
             </div>
           )}
@@ -328,13 +330,13 @@ export default function TestCampaigns() {
   )
 }
 
-function CampaignCard({ campaign, projectId }: { campaign: import('../api/client').TestCampaign; projectId: number }) {
+function CampaignCard({ campaign, prefix }: { campaign: import('../api/client').TestCampaign; prefix: string }) {
   const total = campaign.total_items
   const progress = 0
 
   return (
     <Link
-      to={`/projects/${projectId}/campaigns/${campaign.id}`}
+      to={`/projects/${prefix}/campaigns/${campaign.id}`}
       className="bg-card rounded-lg shadow-elegant p-5 hover:shadow-glow hover:border-primary/20 border border-transparent transition-all duration-200 group"
     >
       <div className="flex items-start justify-between mb-3">

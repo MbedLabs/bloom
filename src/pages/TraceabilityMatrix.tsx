@@ -5,18 +5,19 @@ import { traceabilityApi, projectsApi } from '../api/client'
 import { ArrowLeft, CheckCircle, AlertCircle, XCircle, ExternalLink, Shield, Filter, ArrowUpDown, GitBranch, AlertTriangle } from 'lucide-react'
 
 export default function TraceabilityMatrix() {
-  const { projectId } = useParams<{ projectId: string }>()
-  const projId = parseInt(projectId || '0')
+  const { prefix } = useParams<{ prefix: string }>()
   const [coverageFilter, setCoverageFilter] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('')
   const [sortBy, setSortBy] = useState('req_id')
   const [showGaps, setShowGaps] = useState(false)
 
   const { data: project } = useQuery({
-    queryKey: ['project', projId],
-    queryFn: () => projectsApi.get(projId),
-    enabled: !!projId,
+    queryKey: ['project-by-prefix', prefix],
+    queryFn: () => projectsApi.getByPrefix(prefix!),
+    enabled: !!prefix,
   })
+
+  const projId = project?.id || 0
 
   const { data: matrix, isLoading, error } = useQuery({
     queryKey: ['traceability', projId, coverageFilter, priorityFilter, sortBy],
@@ -62,7 +63,7 @@ export default function TraceabilityMatrix() {
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <Link to={`/projects/${projId}`} className="p-2 hover:bg-accent/50 rounded-md">
+          <Link to={`/projects/${prefix}`} className="p-2 hover:bg-accent/50 rounded-md">
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
           <div>
@@ -130,12 +131,12 @@ export default function TraceabilityMatrix() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <Link
-                        to={`/requirements/${gap.requirement.id}`}
+                        to={`/projects/${prefix}/docs/${gap.requirement.req_id}`}
                         className="font-mono text-sm text-primary hover:text-primary/80 font-medium"
                       >
                         {gap.requirement.req_id}
                       </Link>
-                      <Link to={`/requirements/${gap.requirement.id}`} className="text-foreground hover:text-primary/80">
+                      <Link to={`/projects/${prefix}/docs/${gap.requirement.req_id}`} className="text-foreground hover:text-primary/80">
                         {gap.requirement.title}
                       </Link>
                     </div>
@@ -150,7 +151,7 @@ export default function TraceabilityMatrix() {
                           ))}
                         </div>
                       )}
-                      <ImpactLink requirementId={gap.requirement.id} />
+                      <ImpactLink prefix={prefix!} reqId={gap.requirement.req_id} />
                     </div>
                   </div>
                   {gap.linked_test_cases.length > 0 && (
@@ -159,7 +160,7 @@ export default function TraceabilityMatrix() {
                       {gap.linked_test_cases.map((tc) => (
                         <Link
                           key={tc.id}
-                          to={`/test-cases/${tc.id}`}
+                          to={`/projects/${prefix}/docs/${tc.tc_id}`}
                           className="inline-flex items-center px-1.5 py-0.5 bg-muted rounded text-xs font-mono text-muted-foreground hover:text-primary"
                         >
                           {tc.tc_id}
@@ -258,14 +259,14 @@ export default function TraceabilityMatrix() {
                 <tr key={item.requirement.id} className="hover:bg-accent/50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <Link
-                      to={`/requirements/${item.requirement.id}`}
+                      to={`/projects/${prefix}/docs/${item.requirement.req_id}`}
                       className="font-mono text-sm text-primary hover:text-primary/80 font-medium"
                     >
                       {item.requirement.req_id}
                     </Link>
                   </td>
                   <td className="px-6 py-4">
-                    <Link to={`/requirements/${item.requirement.id}`} className="text-foreground hover:text-primary/80">
+                    <Link to={`/projects/${prefix}/docs/${item.requirement.req_id}`} className="text-foreground hover:text-primary/80">
                       {item.requirement.title}
                     </Link>
                   </td>
@@ -284,7 +285,7 @@ export default function TraceabilityMatrix() {
                         {item.linked_test_cases.map((tc) => (
                           <Link
                             key={tc.id}
-                            to={`/test-cases/${tc.id}`}
+                            to={`/projects/${prefix}/docs/${tc.tc_id}`}
                             className="inline-flex items-center px-2 py-0.5 bg-primary/10 text-primary rounded text-xs font-mono hover:bg-primary/20"
                           >
                             {tc.tc_id}
@@ -321,7 +322,7 @@ export default function TraceabilityMatrix() {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <ImpactLink requirementId={item.requirement.id} />
+                    <ImpactLink prefix={prefix!} reqId={item.requirement.req_id} />
                   </td>
                 </tr>
               ))}
@@ -382,10 +383,10 @@ function GapTypeBadge({ gapType }: { gapType: string }) {
   )
 }
 
-function ImpactLink({ requirementId }: { requirementId: number }) {
+function ImpactLink({ prefix, reqId }: { prefix: string; reqId: string }) {
   return (
     <Link
-      to={`/impact-analysis/${requirementId}`}
+      to={`/projects/${prefix}/impact-analysis/${reqId}`}
       className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
     >
       <GitBranch className="h-3.5 w-3.5 mr-1" />

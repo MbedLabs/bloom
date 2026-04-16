@@ -177,7 +177,7 @@ function ProjectCard({ project }: { project: Project }) {
     : 0
 
   return (
-    <Link to={`/projects/${project.id}`} className="block group">
+    <Link to={`/projects/${project.prefix}`} className="block group">
       <div className="bg-card rounded-lg border border-border shadow-elegant hover:shadow-glow hover:border-primary/20 transition-all duration-300 overflow-hidden">
         {/* Top accent */}
         <div className={`h-1 ${

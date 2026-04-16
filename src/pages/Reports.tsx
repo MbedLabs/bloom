@@ -150,7 +150,7 @@ export default function Reports() {
                   return (
                     <tr key={p.id} className="hover:bg-accent/30">
                       <td className="px-5 py-3.5">
-                        <Link to={`/projects/${p.id}`} className="text-foreground font-medium text-sm hover:text-primary">{p.name}</Link>
+                        <Link to={`/projects/${p.prefix}`} className="text-foreground font-medium text-sm hover:text-primary">{p.name}</Link>
                         <p className="text-xs text-muted-foreground">{p.prefix}</p>
                       </td>
                       <td className="px-5 py-3.5">
@@ -173,7 +173,7 @@ export default function Reports() {
                         <HealthBadge level={health} />
                       </td>
                       <td className="px-5 py-3.5 text-right">
-                        <Link to={`/traceability/${p.id}`} className="text-xs text-primary hover:text-primary/80 inline-flex items-center gap-1">
+                        <Link to={`/projects/${p.prefix}/traceability`} className="text-xs text-primary hover:text-primary/80 inline-flex items-center gap-1">
                           Traceability <ArrowRight className="h-3 w-3" />
                         </Link>
                       </td>

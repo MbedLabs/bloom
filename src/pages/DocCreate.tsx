@@ -15,12 +15,11 @@ interface DocCreateProps {
 }
 
 export default function DocCreate({ editMode = false }: DocCreateProps) {
-  const { id: projectIdStr, docId: docIdStr } = useParams<{ id: string; docId: string }>()
+  const { prefix, docId: docIdStr } = useParams<{ prefix: string; docId: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const projectId = Number(projectIdStr)
   const docType = (searchParams.get('type') || 'REQ') as DocType
   const config = DOC_CONFIGS[docType]
   const docId = docIdStr ? Number(docIdStr) : undefined
@@ -32,10 +31,12 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const [metadata, setMetadata] = useState<Record<string, string>>({})
 
   const { data: project } = useQuery({
-    queryKey: ['project', projectId],
-    queryFn: () => projectsApi.get(projectId),
-    enabled: !!projectId,
+    queryKey: ['project-by-prefix', prefix],
+    queryFn: () => projectsApi.getByPrefix(prefix!),
+    enabled: !!prefix,
   })
+
+  const projectId = project?.id || 0
 
   const { data: users } = useQuery({
     queryKey: ['users'],
@@ -84,6 +85,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           title,
           doc_type: metadata.doc_type || 'Specification',
           description: metadata.description,
+          content_json: contentJson,
+          content_html: contentHtml,
         })
       }
       return (api as unknown as { create: (data: Record<string, unknown>) => Promise<Record<string, unknown>> }).create(payload)
@@ -96,14 +99,15 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       queryClient.invalidateQueries({ queryKey: ['changes', projectId] })
       queryClient.invalidateQueries({ queryKey: ['test-concepts', projectId] })
       queryClient.invalidateQueries({ queryKey: ['documents', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['project-by-prefix', prefix] })
 
-      const routeMap: Record<string, string> = {
-        REQ: 'requirements', TC: 'test-cases', DES: 'designs',
-        RSK: 'risks', CHG: 'changes', TCO: 'test-concepts', DOC: 'documents',
-      }
       const record = data as Record<string, unknown>
-      navigate(`/projects/${projectId}/${routeMap[docType]}/${record.id}`)
+      const docIdFieldMap: Record<string, string> = {
+        REQ: 'req_id', TC: 'tc_id', DES: 'design_id',
+        RSK: 'risk_id', CHG: 'change_id', TCO: 'concept_id', DOC: 'doc_id',
+      }
+      const newDocId = record[docIdFieldMap[docType]] || record.id
+      navigate(`/projects/${prefix}/docs/${newDocId}`)
     },
   })
 
@@ -120,11 +124,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       return api.update(docId, payload)
     },
     onSuccess: () => {
-      const routeMap: Record<string, string> = {
-        REQ: 'requirements', TC: 'test-cases', DES: 'designs',
-        RSK: 'risks', CHG: 'changes', TCO: 'test-concepts', DOC: 'documents',
-      }
-      navigate(`/projects/${projectId}/${routeMap[docType]}/${docId}`)
+      navigate(`/projects/${prefix}/docs/${docIdStr}`)
     },
   })
 
@@ -149,7 +149,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-card shrink-0">
         <div className="flex items-center gap-3">
           <Link
-            to={`/projects/${projectId}`}
+            to={`/projects/${prefix}`}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -173,7 +173,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
             {sidebarOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
           </button>
           <button
-            onClick={() => navigate(`/projects/${projectId}`)}
+            onClick={() => navigate(`/projects/${prefix}`)}
             className="px-3 py-1.5 text-sm text-muted-foreground border border-border rounded-md hover:bg-accent transition-colors"
           >
             Discard

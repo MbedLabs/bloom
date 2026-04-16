@@ -125,7 +125,7 @@ export default function Dashboard() {
         ) : (
           <div className="divide-y divide-border">
             {s.projects.slice(0, 5).map((project) => (
-              <Link key={project.id} to={`/projects/${project.id}`} className="block px-5 py-3.5 hover:bg-accent/50 transition-colors group">
+              <Link key={project.id} to={`/projects/${project.prefix}`} className="block px-5 py-3.5 hover:bg-accent/50 transition-colors group">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">

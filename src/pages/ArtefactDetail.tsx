@@ -15,6 +15,7 @@ import {
   risksApi,
   TestConcept,
   testConceptsApi,
+  projectsApi,
 } from '../api/client'
 
 type ArtefactKind = 'design' | 'risk' | 'change' | 'test-concept'
@@ -121,9 +122,9 @@ const workflowTransitions: Record<ArtefactKind, Record<string, string[]>> = {
   'test-concept': { Draft: ['Review'], Review: ['Approved', 'Draft'], Approved: ['Review'] },
 }
 
-export default function ArtefactDetail({ kind }: { kind: ArtefactKind }) {
-  const { itemId } = useParams<{ id: string; itemId: string }>()
-  const recordId = Number(itemId)
+export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKind; resolvedId?: number }) {
+  const { itemId, prefix } = useParams<{ prefix: string; itemId: string }>()
+  const recordId = resolvedId || Number(itemId)
   const config = configs[kind]
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -138,6 +139,14 @@ export default function ArtefactDetail({ kind }: { kind: ArtefactKind }) {
     queryFn: () => config.get(recordId) as Promise<ArtefactRecord>,
     enabled: !!recordId,
   })
+
+  const projectId = artefact ? (artefact as unknown as Record<string, unknown>).project_id as number : undefined
+  const { data: projectData } = useQuery({
+    queryKey: ['project', projectId],
+    queryFn: () => projectsApi.get(projectId!),
+    enabled: !!projectId,
+  })
+  const projectPrefix = prefix || projectData?.prefix || ''
 
   const { data: comments } = useQuery({
     queryKey: ['artefactComments', kind, recordId],
@@ -183,7 +192,7 @@ export default function ArtefactDetail({ kind }: { kind: ArtefactKind }) {
       if (!artefact) return
       queryClient.invalidateQueries({ queryKey: [config.listKey, artefact.project_id] })
       queryClient.invalidateQueries({ queryKey: ['project', artefact.project_id] })
-      navigate(`/projects/${artefact.project_id}?tab=${config.tabKey}`)
+      navigate(`/projects/${projectPrefix}?tab=${config.tabKey}`)
     },
   })
 
@@ -239,7 +248,7 @@ export default function ArtefactDetail({ kind }: { kind: ArtefactKind }) {
     <div className="animate-fade-in space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
-          <Link to={`/projects/${artefact.project_id}?tab=${config.tabKey}`} className="p-2 hover:bg-accent/50 rounded-md">
+          <Link to={`/projects/${projectPrefix}?tab=${config.tabKey}`} className="p-2 hover:bg-accent/50 rounded-md">
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
           <div>
@@ -261,7 +270,7 @@ export default function ArtefactDetail({ kind }: { kind: ArtefactKind }) {
             <button
               onClick={() => {
                 const typeMap: Record<ArtefactKind, string> = { design: 'DES', risk: 'RSK', change: 'CHG', 'test-concept': 'TCO' }
-                navigate(`/projects/${artefact.project_id}/docs/${recordId}/edit?type=${typeMap[kind]}`)
+                navigate(`/projects/${projectPrefix}/docs/${code}/edit?type=${typeMap[kind]}`)
               }}
               className="inline-flex items-center px-4 py-2 border border-primary text-primary rounded-md hover:bg-primary/10 text-sm"
             >
@@ -402,7 +411,7 @@ export default function ArtefactDetail({ kind }: { kind: ArtefactKind }) {
                 {!related || related.linked_requirements.length === 0 ? <p className="text-muted-foreground">No linked requirements.</p> : (
                   <div className="space-y-3">
                     {related.linked_requirements.map((item) => (
-                      <Link key={item.id} to={`/projects/${artefact.project_id}/requirements/${item.id}`} className="block rounded-lg border border-border p-3 hover:bg-accent/40 transition-colors">
+                      <Link key={item.id} to={`/projects/${projectPrefix}/docs/${item.req_id}`} className="block rounded-lg border border-border p-3 hover:bg-accent/40 transition-colors">
                         <div className="font-mono text-xs text-primary">{item.req_id}</div>
                         <div className="font-medium text-foreground mt-1">{item.title}</div>
                         <div className="text-xs text-muted-foreground mt-1">{item.status}</div>
@@ -415,7 +424,7 @@ export default function ArtefactDetail({ kind }: { kind: ArtefactKind }) {
                 {!related || related.related_test_cases.length === 0 ? <p className="text-muted-foreground">No related test cases.</p> : (
                   <div className="space-y-3">
                     {related.related_test_cases.map((item) => (
-                      <Link key={item.id} to={`/projects/${artefact.project_id}/test-cases/${item.id}`} className="block rounded-lg border border-border p-3 hover:bg-accent/40 transition-colors">
+                      <Link key={item.id} to={`/projects/${projectPrefix}/docs/${item.tc_id}`} className="block rounded-lg border border-border p-3 hover:bg-accent/40 transition-colors">
                         <div className="font-mono text-xs text-primary">{item.tc_id}</div>
                         <div className="font-medium text-foreground mt-1">{item.title}</div>
                         <div className="text-xs text-muted-foreground mt-1">{item.status}</div>
@@ -428,7 +437,7 @@ export default function ArtefactDetail({ kind }: { kind: ArtefactKind }) {
                 {!related || related.related_documents.length === 0 ? <p className="text-muted-foreground">No related documents.</p> : (
                   <div className="space-y-3">
                     {related.related_documents.map((item) => (
-                      <Link key={item.id} to={`/projects/${artefact.project_id}/documents/${item.id}`} className="block rounded-lg border border-border p-3 hover:bg-accent/40 transition-colors">
+                      <Link key={item.id} to={`/documents/${item.id}`} className="block rounded-lg border border-border p-3 hover:bg-accent/40 transition-colors">
                         <div className="font-medium text-foreground">{item.title}</div>
                         <div className="text-xs text-muted-foreground mt-1">{item.doc_type} · {item.status}</div>
                         {item.matched_sections.length > 0 && <div className="text-xs text-primary mt-2">Sections: {item.matched_sections.join(', ')}</div>}
@@ -476,8 +485,8 @@ export default function ArtefactDetail({ kind }: { kind: ArtefactKind }) {
 
           <SectionCard title="Quick Links">
             <div className="space-y-3 text-sm">
-              <Link to={`/projects/${artefact.project_id}?tab=${config.tabKey}`} className="block text-primary hover:text-primary/80">Back to project {config.singular.toLowerCase()} list</Link>
-              {related?.project && <Link to={`/projects/${related.project.id}`} className="block text-primary hover:text-primary/80">Open project workspace</Link>}
+              <Link to={`/projects/${projectPrefix}?tab=${config.tabKey}`} className="block text-primary hover:text-primary/80">Back to project {config.singular.toLowerCase()} list</Link>
+              {related?.project && <Link to={`/projects/${related.project.prefix}`} className="block text-primary hover:text-primary/80">Open project workspace</Link>}
             </div>
           </SectionCard>
         </div>
