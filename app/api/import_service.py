@@ -2,15 +2,16 @@
 Cross-project import service for docs (REQ/TC).
 """
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from typing import Optional
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import require_role
-from app.models import Requirement, TestCase, Project
+from app.models import Project, Requirement, TestCase
 from app.models.user import UserRole
 
 router = APIRouter()
@@ -44,11 +45,15 @@ async def import_docs(
     db: AsyncSession = Depends(get_db),
     _current_user=Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    target_project = (await db.execute(select(Project).where(Project.id == project_id))).scalar_one_or_none()
+    target_project = (
+        await db.execute(select(Project).where(Project.id == project_id))
+    ).scalar_one_or_none()
     if not target_project:
         raise HTTPException(status_code=404, detail="Target project not found")
 
-    source_project = (await db.execute(select(Project).where(Project.id == data.source_project_id))).scalar_one_or_none()
+    source_project = (
+        await db.execute(select(Project).where(Project.id == data.source_project_id))
+    ).scalar_one_or_none()
     if not source_project:
         raise HTTPException(status_code=404, detail="Source project not found")
 
@@ -62,19 +67,28 @@ async def import_docs(
     elif data.doc_type == "TC":
         await _import_test_cases(db, data.doc_ids, source_project, target_project, result)
     else:
-        raise HTTPException(status_code=400, detail=f"Unsupported doc_type: {data.doc_type}. Supported: REQ, TC")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported doc_type: {data.doc_type}. Supported: REQ, TC",
+        )
 
     return result
 
 
 async def _get_next_req_num(db: AsyncSession, project_id: int, prefix: str) -> int:
     search_prefix = f"{prefix}-REQ-"
-    rows = (await db.execute(
-        select(Requirement.req_id).where(
-            Requirement.project_id == project_id,
-            Requirement.req_id.like(f"{search_prefix}%"),
+    rows = (
+        (
+            await db.execute(
+                select(Requirement.req_id).where(
+                    Requirement.project_id == project_id,
+                    Requirement.req_id.like(f"{search_prefix}%"),
+                )
+            )
         )
-    )).scalars().all()
+        .scalars()
+        .all()
+    )
     max_num = 0
     for rid in rows:
         num = _extract_numeric_suffix(rid, len(search_prefix))
@@ -85,12 +99,18 @@ async def _get_next_req_num(db: AsyncSession, project_id: int, prefix: str) -> i
 
 async def _get_next_tc_num(db: AsyncSession, project_id: int, prefix: str) -> int:
     search_prefix = f"{prefix}-TC-"
-    rows = (await db.execute(
-        select(TestCase.tc_id).where(
-            TestCase.project_id == project_id,
-            TestCase.tc_id.like(f"{search_prefix}%"),
+    rows = (
+        (
+            await db.execute(
+                select(TestCase.tc_id).where(
+                    TestCase.project_id == project_id,
+                    TestCase.tc_id.like(f"{search_prefix}%"),
+                )
+            )
         )
-    )).scalars().all()
+        .scalars()
+        .all()
+    )
     max_num = 0
     for rid in rows:
         num = _extract_numeric_suffix(rid, len(search_prefix))
@@ -109,7 +129,14 @@ async def _import_requirements(
     next_num = await _get_next_req_num(db, target_project.id, target_project.prefix)
 
     for src_id in doc_ids:
-        src = (await db.execute(select(Requirement).where(Requirement.id == src_id, Requirement.project_id == source_project.id))).scalar_one_or_none()
+        src = (
+            await db.execute(
+                select(Requirement).where(
+                    Requirement.id == src_id,
+                    Requirement.project_id == source_project.id,
+                )
+            )
+        ).scalar_one_or_none()
         if not src:
             result.errors.append(f"Requirement {src_id} not found in source project")
             result.skipped += 1
@@ -148,7 +175,13 @@ async def _import_test_cases(
     next_num = await _get_next_tc_num(db, target_project.id, target_project.prefix)
 
     for src_id in doc_ids:
-        src = (await db.execute(select(TestCase).where(TestCase.id == src_id, TestCase.project_id == source_project.id))).scalar_one_or_none()
+        src = (
+            await db.execute(
+                select(TestCase).where(
+                    TestCase.id == src_id, TestCase.project_id == source_project.id
+                )
+            )
+        ).scalar_one_or_none()
         if not src:
             result.errors.append(f"TestCase {src_id} not found in source project")
             result.skipped += 1

@@ -27,7 +27,10 @@ from app.schemas import (
 router = APIRouter()
 
 
-@router.get("/{artefact_type}/{artefact_id}/comments", response_model=list[ArtefactCommentResponse])
+@router.get(
+    "/{artefact_type}/{artefact_id}/comments",
+    response_model=list[ArtefactCommentResponse],
+)
 async def list_comments(
     artefact_type: str,
     artefact_id: int,
@@ -36,16 +39,27 @@ async def list_comments(
 ):
     await get_artefact_or_404(db, artefact_type, artefact_id)
     comments = (
-        await db.execute(
-            select(ArtefactComment)
-            .where(ArtefactComment.artefact_type == artefact_type, ArtefactComment.artefact_id == artefact_id)
-            .order_by(ArtefactComment.created_at.desc())
+        (
+            await db.execute(
+                select(ArtefactComment)
+                .where(
+                    ArtefactComment.artefact_type == artefact_type,
+                    ArtefactComment.artefact_id == artefact_id,
+                )
+                .order_by(ArtefactComment.created_at.desc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [ArtefactCommentResponse.model_validate(comment) for comment in comments]
 
 
-@router.post("/{artefact_type}/{artefact_id}/comments", response_model=ArtefactCommentResponse, status_code=201)
+@router.post(
+    "/{artefact_type}/{artefact_id}/comments",
+    response_model=ArtefactCommentResponse,
+    status_code=201,
+)
 async def create_comment(
     artefact_type: str,
     artefact_id: int,
@@ -63,11 +77,20 @@ async def create_comment(
     db.add(comment)
     await db.flush()
     await db.refresh(comment)
-    await log_artefact_activity(db, artefact_type, artefact_id, "comment_added", f"{current_user.full_name} added a comment")
+    await log_artefact_activity(
+        db,
+        artefact_type,
+        artefact_id,
+        "comment_added",
+        f"{current_user.full_name} added a comment",
+    )
     return ArtefactCommentResponse.model_validate(comment)
 
 
-@router.get("/{artefact_type}/{artefact_id}/activity", response_model=list[ArtefactActivityResponse])
+@router.get(
+    "/{artefact_type}/{artefact_id}/activity",
+    response_model=list[ArtefactActivityResponse],
+)
 async def list_activity(
     artefact_type: str,
     artefact_id: int,
@@ -76,12 +99,19 @@ async def list_activity(
 ):
     await get_artefact_or_404(db, artefact_type, artefact_id)
     rows = (
-        await db.execute(
-            select(ArtefactActivity)
-            .where(ArtefactActivity.artefact_type == artefact_type, ArtefactActivity.artefact_id == artefact_id)
-            .order_by(ArtefactActivity.created_at.desc())
+        (
+            await db.execute(
+                select(ArtefactActivity)
+                .where(
+                    ArtefactActivity.artefact_type == artefact_type,
+                    ArtefactActivity.artefact_id == artefact_id,
+                )
+                .order_by(ArtefactActivity.created_at.desc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [build_activity_response(row) for row in rows]
 
 
@@ -106,10 +136,22 @@ async def transition_status(
     artefact = await get_artefact_or_404(db, artefact_type, artefact_id)
     allowed = get_allowed_transitions(artefact_type, artefact.status)
     if data.status not in allowed:
-        raise HTTPException(status_code=400, detail=f"Invalid transition from {artefact.status} to {data.status}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid transition from {artefact.status} to {data.status}",
+        )
 
     current_status = artefact.status
     artefact.status = data.status
     await db.flush()
-    await log_artefact_activity(db, artefact_type, artefact_id, "status_changed", build_status_summary(current_user, current_status, data.status))
-    return {"status": artefact.status, "allowed_transitions": get_allowed_transitions(artefact_type, artefact.status)}
+    await log_artefact_activity(
+        db,
+        artefact_type,
+        artefact_id,
+        "status_changed",
+        build_status_summary(current_user, current_status, data.status),
+    )
+    return {
+        "status": artefact.status,
+        "allowed_transitions": get_allowed_transitions(artefact_type, artefact.status),
+    }

@@ -3,26 +3,57 @@ Projects API endpoints.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
-from app.models import Project, Requirement, TestCase, DesignItem, RiskItem, ChangeRequest, TestConcept, TestSuite
+from app.models import (
+    ChangeRequest,
+    DesignItem,
+    Project,
+    Requirement,
+    RiskItem,
+    TestCase,
+    TestConcept,
+    TestSuite,
+)
 from app.models.user import User, UserRole
-from app.schemas import ProjectCreate, ProjectUpdate, ProjectResponse
+from app.schemas import ProjectCreate, ProjectResponse, ProjectUpdate
 
 router = APIRouter()
 
 
 async def _project_counts(db: AsyncSession, project_id: int) -> dict[str, int]:
-    req_count = (await db.execute(select(func.count(Requirement.id)).where(Requirement.project_id == project_id))).scalar()
-    tc_count = (await db.execute(select(func.count(TestCase.id)).where(TestCase.project_id == project_id))).scalar()
-    design_count = (await db.execute(select(func.count(DesignItem.id)).where(DesignItem.project_id == project_id))).scalar()
-    risk_count = (await db.execute(select(func.count(RiskItem.id)).where(RiskItem.project_id == project_id))).scalar()
-    change_count = (await db.execute(select(func.count(ChangeRequest.id)).where(ChangeRequest.project_id == project_id))).scalar()
-    test_concept_count = (await db.execute(select(func.count(TestConcept.id)).where(TestConcept.project_id == project_id))).scalar()
-    test_suite_count = (await db.execute(select(func.count(TestSuite.id)).where(TestSuite.project_id == project_id))).scalar()
+    req_count = (
+        await db.execute(
+            select(func.count(Requirement.id)).where(Requirement.project_id == project_id)
+        )
+    ).scalar()
+    tc_count = (
+        await db.execute(select(func.count(TestCase.id)).where(TestCase.project_id == project_id))
+    ).scalar()
+    design_count = (
+        await db.execute(
+            select(func.count(DesignItem.id)).where(DesignItem.project_id == project_id)
+        )
+    ).scalar()
+    risk_count = (
+        await db.execute(select(func.count(RiskItem.id)).where(RiskItem.project_id == project_id))
+    ).scalar()
+    change_count = (
+        await db.execute(
+            select(func.count(ChangeRequest.id)).where(ChangeRequest.project_id == project_id)
+        )
+    ).scalar()
+    test_concept_count = (
+        await db.execute(
+            select(func.count(TestConcept.id)).where(TestConcept.project_id == project_id)
+        )
+    ).scalar()
+    test_suite_count = (
+        await db.execute(select(func.count(TestSuite.id)).where(TestSuite.project_id == project_id))
+    ).scalar()
 
     return {
         "requirement_count": req_count,
@@ -43,25 +74,25 @@ async def list_projects(
     """
     List all projects with requirement and test case counts.
     """
-    result = await db.execute(
-        select(Project).order_by(Project.created_at.desc())
-    )
+    result = await db.execute(select(Project).order_by(Project.created_at.desc()))
     projects = result.scalars().all()
 
     response = []
     for project in projects:
         counts = await _project_counts(db, project.id)
 
-        response.append(ProjectResponse(
-            id=project.id,
-            name=project.name,
-            prefix=project.prefix,
-            description=project.description,
-            status=project.status,
-            created_at=project.created_at,
-            updated_at=project.updated_at,
-            **counts,
-        ))
+        response.append(
+            ProjectResponse(
+                id=project.id,
+                name=project.name,
+                prefix=project.prefix,
+                description=project.description,
+                status=project.status,
+                created_at=project.created_at,
+                updated_at=project.updated_at,
+                **counts,
+            )
+        )
 
     return response
 
@@ -75,15 +106,11 @@ async def create_project(
     """
     Create a new project.
     """
-    existing = await db.execute(
-        select(Project).where(Project.name == data.name)
-    )
+    existing = await db.execute(select(Project).where(Project.name == data.name))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Project with this name already exists")
 
-    existing_prefix = await db.execute(
-        select(Project).where(Project.prefix == data.prefix)
-    )
+    existing_prefix = await db.execute(select(Project).where(Project.prefix == data.prefix))
     if existing_prefix.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Project with this prefix already exists")
 
@@ -125,9 +152,7 @@ async def get_project_by_prefix(
     """
     Get a project by its unique prefix.
     """
-    result = await db.execute(
-        select(Project).where(Project.prefix == prefix.upper())
-    )
+    result = await db.execute(select(Project).where(Project.prefix == prefix.upper()))
     project = result.scalar_one_or_none()
 
     if not project:
@@ -156,9 +181,7 @@ async def get_project(
     """
     Get a project by ID.
     """
-    result = await db.execute(
-        select(Project).where(Project.id == project_id)
-    )
+    result = await db.execute(select(Project).where(Project.id == project_id))
     project = result.scalar_one_or_none()
 
     if not project:
@@ -188,9 +211,7 @@ async def update_project(
     """
     Update a project.
     """
-    result = await db.execute(
-        select(Project).where(Project.id == project_id)
-    )
+    result = await db.execute(select(Project).where(Project.id == project_id))
     project = result.scalar_one_or_none()
 
     if not project:
@@ -243,9 +264,7 @@ async def delete_project(
     """
     Delete a project.
     """
-    result = await db.execute(
-        select(Project).where(Project.id == project_id)
-    )
+    result = await db.execute(select(Project).where(Project.id == project_id))
     project = result.scalar_one_or_none()
 
     if not project:

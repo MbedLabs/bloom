@@ -42,7 +42,9 @@ async def create_link(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    project = (await db.execute(select(Project).where(Project.id == data.project_id))).scalar_one_or_none()
+    project = (
+        await db.execute(select(Project).where(Project.id == data.project_id))
+    ).scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     existing = (
@@ -72,7 +74,9 @@ async def delete_link(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    link = (await db.execute(select(ArtefactLink).where(ArtefactLink.id == link_id))).scalar_one_or_none()
+    link = (
+        await db.execute(select(ArtefactLink).where(ArtefactLink.id == link_id))
+    ).scalar_one_or_none()
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
     await db.delete(link)

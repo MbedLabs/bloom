@@ -3,20 +3,27 @@ Unified docs facade: Polarion-style lookup by string doc_id across all type tabl
 and a unified list endpoint for all doc types within a project.
 """
 
+from datetime import datetime
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import String, cast, literal_column, or_, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, union_all, literal_column, String, cast, or_
-from typing import Optional, List
 
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models import (
-    Project, Requirement, TestCase, Document, DesignItem,
-    RiskItem, ChangeRequest, TestConcept,
+    ChangeRequest,
+    DesignItem,
+    Document,
+    Project,
+    Requirement,
+    RiskItem,
+    TestCase,
+    TestConcept,
 )
 from app.models.user import User
-from pydantic import BaseModel
-from datetime import datetime
 
 router = APIRouter()
 
@@ -44,9 +51,7 @@ async def resolve_project(db: AsyncSession, identifier: str) -> Project:
     if identifier.isdigit():
         result = await db.execute(select(Project).where(Project.id == int(identifier)))
     else:
-        result = await db.execute(
-            select(Project).where(Project.prefix == identifier.upper())
-        )
+        result = await db.execute(select(Project).where(Project.prefix == identifier.upper()))
     project = result.scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -66,9 +71,9 @@ TYPE_MAP = {
 
 def _get_priority(model, row):
     """Extract priority from a model row, handling models without a priority column."""
-    if hasattr(model, 'priority'):
+    if hasattr(model, "priority"):
         return row.priority
-    if hasattr(model, 'severity'):
+    if hasattr(model, "severity"):
         return row.severity
     return None
 
@@ -93,7 +98,7 @@ async def list_all_docs(
             continue
 
         id_col = getattr(model, id_col_name)
-        title_col = model.title if hasattr(model, 'title') else model.name
+        title_col = model.title if hasattr(model, "title") else model.name
 
         query = select(model).where(model.project_id == project.id)
 
@@ -111,18 +116,20 @@ async def list_all_docs(
 
         for row in rows:
             doc_id_val = getattr(row, id_col_name)
-            title_val = row.title if hasattr(row, 'title') else row.name
-            results.append(DocShellResponse(
-                id=row.id,
-                doc_id=doc_id_val or f"{type_code}-{row.id}",
-                doc_type=type_code,
-                title=title_val,
-                status=row.status,
-                priority=_get_priority(model, row),
-                project_id=project.id,
-                created_at=row.created_at,
-                updated_at=row.updated_at,
-            ))
+            title_val = row.title if hasattr(row, "title") else row.name
+            results.append(
+                DocShellResponse(
+                    id=row.id,
+                    doc_id=doc_id_val or f"{type_code}-{row.id}",
+                    doc_type=type_code,
+                    title=title_val,
+                    status=row.status,
+                    priority=_get_priority(model, row),
+                    project_id=project.id,
+                    created_at=row.created_at,
+                    updated_at=row.updated_at,
+                )
+            )
 
     results.sort(key=lambda r: r.updated_at, reverse=True)
     return results
@@ -149,10 +156,10 @@ async def get_doc_by_string_id(
         row = result.scalar_one_or_none()
         if row:
             doc_id_val = getattr(row, id_col_name)
-            title_val = row.title if hasattr(row, 'title') else row.name
-            desc_val = row.description if hasattr(row, 'description') else None
-            cj = row.content_json if hasattr(row, 'content_json') else None
-            ch = row.content_html if hasattr(row, 'content_html') else None
+            title_val = row.title if hasattr(row, "title") else row.name
+            desc_val = row.description if hasattr(row, "description") else None
+            cj = row.content_json if hasattr(row, "content_json") else None
+            ch = row.content_html if hasattr(row, "content_html") else None
 
             return DocDetailFacadeResponse(
                 id=row.id,
@@ -169,4 +176,7 @@ async def get_doc_by_string_id(
                 updated_at=row.updated_at,
             )
 
-    raise HTTPException(status_code=404, detail=f"Document '{doc_id_str}' not found in project '{project.prefix}'")
+    raise HTTPException(
+        status_code=404,
+        detail=f"Document '{doc_id_str}' not found in project '{project.prefix}'",
+    )

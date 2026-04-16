@@ -3,14 +3,25 @@ Auth API endpoints: login, get current user, update profile.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import verify_password, get_password_hash, create_access_token, get_current_user
 from app.core.deps import limiter
+from app.core.security import (
+    create_access_token,
+    get_current_user,
+    get_password_hash,
+    verify_password,
+)
 from app.models.user import User, UserRole
-from app.schemas.auth import LoginRequest, TokenResponse, UserResponse, UserUpdate, PasswordChange
+from app.schemas.auth import (
+    LoginRequest,
+    PasswordChange,
+    TokenResponse,
+    UserResponse,
+    UserUpdate,
+)
 
 router = APIRouter()
 
@@ -54,7 +65,9 @@ async def update_me(
     if data.full_name is not None:
         current_user.full_name = data.full_name
     if data.email is not None:
-        existing = await db.execute(select(User).where(User.email == data.email, User.id != current_user.id))
+        existing = await db.execute(
+            select(User).where(User.email == data.email, User.id != current_user.id)
+        )
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="Email already in use")
         current_user.email = data.email

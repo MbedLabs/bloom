@@ -8,7 +8,11 @@ from app.core.database import get_db
 from app.core.security import get_current_user, require_role
 from app.models import Project, ProjectVariable
 from app.models.user import User, UserRole
-from app.schemas import ProjectVariableCreate, ProjectVariableUpdate, ProjectVariableResponse
+from app.schemas import (
+    ProjectVariableCreate,
+    ProjectVariableResponse,
+    ProjectVariableUpdate,
+)
 
 router = APIRouter()
 
@@ -19,7 +23,9 @@ async def list_project_variables(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
-    project = (await db.execute(select(Project).where(Project.id == project_id))).scalar_one_or_none()
+    project = (
+        await db.execute(select(Project).where(Project.id == project_id))
+    ).scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
@@ -37,7 +43,9 @@ async def create_project_variable(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    project = (await db.execute(select(Project).where(Project.id == data.project_id))).scalar_one_or_none()
+    project = (
+        await db.execute(select(Project).where(Project.id == data.project_id))
+    ).scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
@@ -73,7 +81,9 @@ async def update_project_variable(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    item = (await db.execute(select(ProjectVariable).where(ProjectVariable.id == item_id))).scalar_one_or_none()
+    item = (
+        await db.execute(select(ProjectVariable).where(ProjectVariable.id == item_id))
+    ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Variable not found")
 
@@ -98,7 +108,9 @@ async def delete_project_variable(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    item = (await db.execute(select(ProjectVariable).where(ProjectVariable.id == item_id))).scalar_one_or_none()
+    item = (
+        await db.execute(select(ProjectVariable).where(ProjectVariable.id == item_id))
+    ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Variable not found")
     await db.delete(item)

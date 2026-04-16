@@ -3,8 +3,8 @@ Documents API endpoints.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
@@ -13,12 +13,12 @@ from app.models import Document, DocumentSection
 from app.models.user import User, UserRole
 from app.schemas import (
     DocumentCreate,
-    DocumentUpdate,
-    DocumentResponse,
     DocumentDetailResponse,
+    DocumentResponse,
     DocumentSectionCreate,
-    DocumentSectionUpdate,
     DocumentSectionResponse,
+    DocumentSectionUpdate,
+    DocumentUpdate,
     SectionReorder,
 )
 
@@ -32,7 +32,9 @@ async def list_documents(
     _current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(
-        select(Document).where(Document.project_id == project_id).order_by(Document.created_at.desc())
+        select(Document)
+        .where(Document.project_id == project_id)
+        .order_by(Document.created_at.desc())
     )
     documents = result.scalars().all()
 
@@ -43,21 +45,23 @@ async def list_documents(
         )
         section_count = section_count_result.scalar()
 
-        response.append(DocumentResponse(
-            id=doc.id,
-            project_id=doc.project_id,
-            doc_id=doc.doc_id,
-            title=doc.title,
-            doc_type=doc.doc_type,
-            status=doc.status,
-            version=doc.version,
-            description=doc.description,
-            content_json=doc.content_json,
-            content_html=doc.content_html,
-            created_at=doc.created_at,
-            updated_at=doc.updated_at,
-            section_count=section_count,
-        ))
+        response.append(
+            DocumentResponse(
+                id=doc.id,
+                project_id=doc.project_id,
+                doc_id=doc.doc_id,
+                title=doc.title,
+                doc_type=doc.doc_type,
+                status=doc.status,
+                version=doc.version,
+                description=doc.description,
+                content_json=doc.content_json,
+                content_html=doc.content_html,
+                created_at=doc.created_at,
+                updated_at=doc.updated_at,
+                section_count=section_count,
+            )
+        )
 
     return response
 
@@ -70,7 +74,10 @@ async def create_document(
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     from app.models import Project
-    project = (await db.execute(select(Project).where(Project.id == project_id))).scalar_one_or_none()
+
+    project = (
+        await db.execute(select(Project).where(Project.id == project_id))
+    ).scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
@@ -112,9 +119,7 @@ async def get_document(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(
-        select(Document).where(Document.id == document_id)
-    )
+    result = await db.execute(select(Document).where(Document.id == document_id))
     document = result.scalar_one_or_none()
 
     if not document:
@@ -122,7 +127,10 @@ async def get_document(
 
     sections_result = await db.execute(
         select(DocumentSection)
-        .where(DocumentSection.document_id == document_id, DocumentSection.parent_section_id.is_(None))
+        .where(
+            DocumentSection.document_id == document_id,
+            DocumentSection.parent_section_id.is_(None),
+        )
         .order_by(DocumentSection.order)
     )
     root_sections = sections_result.scalars().all()
@@ -180,9 +188,7 @@ async def update_document(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    result = await db.execute(
-        select(Document).where(Document.id == document_id)
-    )
+    result = await db.execute(select(Document).where(Document.id == document_id))
     document = result.scalar_one_or_none()
 
     if not document:
@@ -234,9 +240,7 @@ async def delete_document(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    result = await db.execute(
-        select(Document).where(Document.id == document_id)
-    )
+    result = await db.execute(select(Document).where(Document.id == document_id))
     document = result.scalar_one_or_none()
 
     if not document:
@@ -245,16 +249,18 @@ async def delete_document(
     await db.delete(document)
 
 
-@router.post("/documents/{document_id}/sections", response_model=DocumentSectionResponse, status_code=201)
+@router.post(
+    "/documents/{document_id}/sections",
+    response_model=DocumentSectionResponse,
+    status_code=201,
+)
 async def create_section(
     document_id: int,
     data: DocumentSectionCreate,
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    result = await db.execute(
-        select(Document).where(Document.id == document_id)
-    )
+    result = await db.execute(select(Document).where(Document.id == document_id))
     document = result.scalar_one_or_none()
 
     if not document:
@@ -294,9 +300,7 @@ async def update_section(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    result = await db.execute(
-        select(DocumentSection).where(DocumentSection.id == section_id)
-    )
+    result = await db.execute(select(DocumentSection).where(DocumentSection.id == section_id))
     section = result.scalar_one_or_none()
 
     if not section:
@@ -356,9 +360,7 @@ async def delete_section(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    result = await db.execute(
-        select(DocumentSection).where(DocumentSection.id == section_id)
-    )
+    result = await db.execute(select(DocumentSection).where(DocumentSection.id == section_id))
     section = result.scalar_one_or_none()
 
     if not section:
@@ -374,9 +376,7 @@ async def reorder_sections(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    result = await db.execute(
-        select(Document).where(Document.id == document_id)
-    )
+    result = await db.execute(select(Document).where(Document.id == document_id))
     document = result.scalar_one_or_none()
 
     if not document:

@@ -3,8 +3,18 @@ Database models for the requirements management application.
 """
 
 from datetime import datetime
-from typing import Optional, List
-from sqlalchemy import String, Integer, Float, DateTime, ForeignKey, Text, JSON, UniqueConstraint
+from typing import List, Optional
+
+from sqlalchemy import (
+    JSON,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -12,6 +22,7 @@ from app.core.database import Base
 
 class Project(Base):
     """Project for organizing requirements and test cases."""
+
     __tablename__ = "projects"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -49,11 +60,14 @@ class Project(Base):
     test_concepts: Mapped[List["TestConcept"]] = relationship(
         back_populates="project", foreign_keys="TestConcept.project_id"
     )
-    variables: Mapped[List["ProjectVariable"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    variables: Mapped[List["ProjectVariable"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
 
 
 class ProjectVariable(Base):
     """Project-scoped parameters and variables for document authoring."""
+
     __tablename__ = "project_variables"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -63,20 +77,21 @@ class ProjectVariable(Base):
     value: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     project: Mapped["Project"] = relationship(back_populates="variables")
 
 
 class Requirement(Base):
     """A requirement within a project."""
+
     __tablename__ = "requirements"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
-    parent_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("requirements.id"), nullable=True
-    )
+    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("requirements.id"), nullable=True)
     req_id: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -93,25 +108,36 @@ class Requirement(Base):
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True)
+    source_project_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("projects.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    project: Mapped["Project"] = relationship(back_populates="requirements", foreign_keys=[project_id])
+    project: Mapped["Project"] = relationship(
+        back_populates="requirements", foreign_keys=[project_id]
+    )
     parent: Mapped[Optional["Requirement"]] = relationship(
         remote_side=[id], back_populates="children"
     )
     children: Mapped[List["Requirement"]] = relationship(back_populates="parent")
-    test_case_links: Mapped[List["RequirementTestCase"]] = relationship(back_populates="requirement")
+    test_case_links: Mapped[List["RequirementTestCase"]] = relationship(
+        back_populates="requirement"
+    )
     test_run_links: Mapped[List["TestRunLink"]] = relationship(back_populates="requirement")
-    outgoing_links: Mapped[List["RequirementLink"]] = relationship(foreign_keys="RequirementLink.source_id", back_populates="source")
-    incoming_links: Mapped[List["RequirementLink"]] = relationship(foreign_keys="RequirementLink.target_id", back_populates="target")
+    outgoing_links: Mapped[List["RequirementLink"]] = relationship(
+        foreign_keys="RequirementLink.source_id", back_populates="source"
+    )
+    incoming_links: Mapped[List["RequirementLink"]] = relationship(
+        foreign_keys="RequirementLink.target_id", back_populates="target"
+    )
 
 
 class TestCase(Base):
     """A test case that can be linked to requirements."""
+
     __tablename__ = "test_cases"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -131,24 +157,29 @@ class TestCase(Base):
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True)
+    source_project_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("projects.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    project: Mapped["Project"] = relationship(back_populates="test_cases", foreign_keys=[project_id])
-    requirement_links: Mapped[List["RequirementTestCase"]] = relationship(back_populates="test_case")
+    project: Mapped["Project"] = relationship(
+        back_populates="test_cases", foreign_keys=[project_id]
+    )
+    requirement_links: Mapped[List["RequirementTestCase"]] = relationship(
+        back_populates="test_case"
+    )
     suite_items: Mapped[List["TestSuiteItem"]] = relationship(back_populates="test_case")
     campaign_items: Mapped[List["TestCampaignItem"]] = relationship(back_populates="test_case")
 
 
 class RequirementTestCase(Base):
     """Junction table linking requirements to test cases with link semantics."""
+
     __tablename__ = "requirement_test_cases"
-    __table_args__ = (
-        UniqueConstraint("requirement_id", "test_case_id", name="uq_req_tc"),
-    )
+    __table_args__ = (UniqueConstraint("requirement_id", "test_case_id", name="uq_req_tc"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     requirement_id: Mapped[int] = mapped_column(ForeignKey("requirements.id"), nullable=False)
@@ -162,10 +193,9 @@ class RequirementTestCase(Base):
 
 class RequirementLink(Base):
     """Links between requirements for traceability (derived_from, refines, depends_on)."""
+
     __tablename__ = "requirement_links"
-    __table_args__ = (
-        UniqueConstraint("source_id", "target_id", "link_type", name="uq_req_link"),
-    )
+    __table_args__ = (UniqueConstraint("source_id", "target_id", "link_type", name="uq_req_link"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     source_id: Mapped[int] = mapped_column(ForeignKey("requirements.id"), nullable=False)
@@ -173,12 +203,17 @@ class RequirementLink(Base):
     link_type: Mapped[str] = mapped_column(String(30), default="depends_on")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    source: Mapped["Requirement"] = relationship(foreign_keys=[source_id], back_populates="outgoing_links")
-    target: Mapped["Requirement"] = relationship(foreign_keys=[target_id], back_populates="incoming_links")
+    source: Mapped["Requirement"] = relationship(
+        foreign_keys=[source_id], back_populates="outgoing_links"
+    )
+    target: Mapped["Requirement"] = relationship(
+        foreign_keys=[target_id], back_populates="incoming_links"
+    )
 
 
 class TestRunLink(Base):
     """Link from a requirement to a test run in the external test management app."""
+
     __tablename__ = "test_run_links"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -206,12 +241,20 @@ class Document(Base):
     content_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True)
+    source_project_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("projects.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     project: Mapped["Project"] = relationship(back_populates="documents", foreign_keys=[project_id])
-    sections: Mapped[List["DocumentSection"]] = relationship(back_populates="document", cascade="all, delete-orphan", order_by="DocumentSection.order")
+    sections: Mapped[List["DocumentSection"]] = relationship(
+        back_populates="document",
+        cascade="all, delete-orphan",
+        order_by="DocumentSection.order",
+    )
 
 
 class DocumentSection(Base):
@@ -219,23 +262,32 @@ class DocumentSection(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     document_id: Mapped[int] = mapped_column(ForeignKey("documents.id"), nullable=False)
-    parent_section_id: Mapped[Optional[int]] = mapped_column(ForeignKey("document_sections.id"), nullable=True)
+    parent_section_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("document_sections.id"), nullable=True
+    )
     order: Mapped[int] = mapped_column(Integer, default=0)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     section_type: Mapped[str] = mapped_column(String(30), default="text")
-    linked_requirement_id: Mapped[Optional[int]] = mapped_column(ForeignKey("requirements.id"), nullable=True)
+    linked_requirement_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("requirements.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     document: Mapped["Document"] = relationship(back_populates="sections")
-    parent_section: Mapped[Optional["DocumentSection"]] = relationship(remote_side=[id], back_populates="child_sections")
+    parent_section: Mapped[Optional["DocumentSection"]] = relationship(
+        remote_side=[id], back_populates="child_sections"
+    )
     child_sections: Mapped[List["DocumentSection"]] = relationship(back_populates="parent_section")
     linked_requirement: Mapped[Optional["Requirement"]] = relationship()
 
 
 class TestConfiguration(Base):
     """Reusable test configuration (environment, parameters)."""
+
     __tablename__ = "test_configurations"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -245,13 +297,16 @@ class TestConfiguration(Base):
     environment: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     parameters: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     project: Mapped["Project"] = relationship(back_populates="test_configurations")
 
 
 class TestSuite(Base):
     """Reusable suite of test cases."""
+
     __tablename__ = "test_suites"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -261,19 +316,22 @@ class TestSuite(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Draft")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     project: Mapped["Project"] = relationship(back_populates="test_suites")
-    items: Mapped[List["TestSuiteItem"]] = relationship(back_populates="suite", cascade="all, delete-orphan")
+    items: Mapped[List["TestSuiteItem"]] = relationship(
+        back_populates="suite", cascade="all, delete-orphan"
+    )
     campaigns: Mapped[List["TestCampaign"]] = relationship(back_populates="suite")
 
 
 class TestSuiteItem(Base):
     """Ordered membership of a test case in a reusable suite."""
+
     __tablename__ = "test_suite_items"
-    __table_args__ = (
-        UniqueConstraint("suite_id", "test_case_id", name="uq_suite_tc"),
-    )
+    __table_args__ = (UniqueConstraint("suite_id", "test_case_id", name="uq_suite_tc"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     suite_id: Mapped[int] = mapped_column(ForeignKey("test_suites.id"), nullable=False)
@@ -287,11 +345,14 @@ class TestSuiteItem(Base):
 
 class TestCampaign(Base):
     """A test campaign: a collection of test cases to execute with a configuration."""
+
     __tablename__ = "test_campaigns"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
-    configuration_id: Mapped[Optional[int]] = mapped_column(ForeignKey("test_configurations.id"), nullable=True)
+    configuration_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("test_configurations.id"), nullable=True
+    )
     suite_id: Mapped[Optional[int]] = mapped_column(ForeignKey("test_suites.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -302,16 +363,21 @@ class TestCampaign(Base):
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     project: Mapped["Project"] = relationship(back_populates="test_campaigns")
     configuration: Mapped[Optional["TestConfiguration"]] = relationship()
     suite: Mapped[Optional["TestSuite"]] = relationship(back_populates="campaigns")
-    items: Mapped[List["TestCampaignItem"]] = relationship(back_populates="campaign", cascade="all, delete-orphan")
+    items: Mapped[List["TestCampaignItem"]] = relationship(
+        back_populates="campaign", cascade="all, delete-orphan"
+    )
 
 
 class TestCampaignItem(Base):
     """Individual test case execution within a campaign."""
+
     __tablename__ = "test_campaign_items"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -329,9 +395,17 @@ class TestCampaignItem(Base):
 
 class ArtefactLink(Base):
     """Generic typed cross-artifact link foundation."""
+
     __tablename__ = "artefact_links"
     __table_args__ = (
-        UniqueConstraint("source_type", "source_id", "target_type", "target_id", "role", name="uq_artefact_link"),
+        UniqueConstraint(
+            "source_type",
+            "source_id",
+            "target_type",
+            "target_id",
+            "role",
+            name="uq_artefact_link",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -358,13 +432,21 @@ class DesignItem(Base):
     status: Mapped[str] = mapped_column(String(20), default="Draft")
     priority: Mapped[str] = mapped_column(String(20), default="Medium")
     design_type: Mapped[str] = mapped_column(String(30), default="Architecture")
-    linked_requirement_id: Mapped[Optional[int]] = mapped_column(ForeignKey("requirements.id"), nullable=True)
+    linked_requirement_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("requirements.id"), nullable=True
+    )
     source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True)
+    source_project_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("projects.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
-    project: Mapped["Project"] = relationship(back_populates="design_items", foreign_keys=[project_id])
+    project: Mapped["Project"] = relationship(
+        back_populates="design_items", foreign_keys=[project_id]
+    )
     linked_requirement: Mapped[Optional["Requirement"]] = relationship()
 
 
@@ -383,13 +465,21 @@ class RiskItem(Base):
     probability: Mapped[str] = mapped_column(String(20), default="Medium")
     mitigation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     risk_category: Mapped[str] = mapped_column(String(30), default="Technical")
-    linked_requirement_id: Mapped[Optional[int]] = mapped_column(ForeignKey("requirements.id"), nullable=True)
+    linked_requirement_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("requirements.id"), nullable=True
+    )
     source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True)
+    source_project_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("projects.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
-    project: Mapped["Project"] = relationship(back_populates="risk_items", foreign_keys=[project_id])
+    project: Mapped["Project"] = relationship(
+        back_populates="risk_items", foreign_keys=[project_id]
+    )
     linked_requirement: Mapped[Optional["Requirement"]] = relationship()
 
 
@@ -409,11 +499,17 @@ class ChangeRequest(Base):
     impact_assessment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     justification: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True)
+    source_project_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("projects.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
-    project: Mapped["Project"] = relationship(back_populates="change_requests", foreign_keys=[project_id])
+    project: Mapped["Project"] = relationship(
+        back_populates="change_requests", foreign_keys=[project_id]
+    )
 
 
 class Baseline(Base):
@@ -428,7 +524,9 @@ class Baseline(Base):
     baseline_type: Mapped[str] = mapped_column(String(30), default="Milestone")
     snapshot: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     project: Mapped["Project"] = relationship(back_populates="baselines")
 
@@ -447,11 +545,17 @@ class TestConcept(Base):
     linked_requirement_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     coverage: Mapped[float] = mapped_column(Float, default=0)
     source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True)
+    source_project_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("projects.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
-    project: Mapped["Project"] = relationship(back_populates="test_concepts", foreign_keys=[project_id])
+    project: Mapped["Project"] = relationship(
+        back_populates="test_concepts", foreign_keys=[project_id]
+    )
 
 
 class ArtefactComment(Base):

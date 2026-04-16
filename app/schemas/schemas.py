@@ -2,15 +2,17 @@
 Pydantic schemas for API request/response validation.
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
+from pydantic import BaseModel, Field
 
 # ==================== Project Schemas ====================
 
+
 class ProjectCreate(BaseModel):
     """Schema for creating a project."""
+
     name: str = Field(..., min_length=1, max_length=255)
     prefix: str = Field(..., min_length=1, max_length=10)
     description: Optional[str] = None
@@ -19,6 +21,7 @@ class ProjectCreate(BaseModel):
 
 class ProjectUpdate(BaseModel):
     """Schema for updating a project."""
+
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     prefix: Optional[str] = Field(None, min_length=1, max_length=10)
     description: Optional[str] = None
@@ -27,6 +30,7 @@ class ProjectUpdate(BaseModel):
 
 class ProjectResponse(BaseModel):
     """Schema for project response."""
+
     id: int
     name: str
     prefix: str
@@ -118,8 +122,10 @@ class TestCaseVerifiesLinkResponse(BaseModel):
 
 # ==================== Requirement Schemas ====================
 
+
 class RequirementCreate(BaseModel):
     """Schema for creating a requirement."""
+
     project_id: int
     parent_id: Optional[int] = None
     title: str = Field(..., min_length=1, max_length=500)
@@ -134,6 +140,7 @@ class RequirementCreate(BaseModel):
 
 class RequirementUpdate(BaseModel):
     """Schema for updating a requirement."""
+
     title: Optional[str] = Field(None, min_length=1, max_length=500)
     description: Optional[str] = None
     status: Optional[str] = None
@@ -151,6 +158,7 @@ class RequirementUpdate(BaseModel):
 
 class RequirementResponse(BaseModel):
     """Schema for requirement response."""
+
     id: int
     project_id: int
     parent_id: Optional[int]
@@ -183,8 +191,10 @@ class RequirementResponse(BaseModel):
 
 # ==================== TestCase Schemas ====================
 
+
 class TestCaseCreate(BaseModel):
     """Schema for creating a test case."""
+
     project_id: int
     title: str = Field(..., min_length=1, max_length=500)
     description: Optional[str] = None
@@ -197,6 +207,7 @@ class TestCaseCreate(BaseModel):
 
 class TestCaseUpdate(BaseModel):
     """Schema for updating a test case."""
+
     title: Optional[str] = Field(None, min_length=1, max_length=500)
     description: Optional[str] = None
     preconditions: Optional[str] = None
@@ -212,6 +223,7 @@ class TestCaseUpdate(BaseModel):
 
 class TestCaseResponse(BaseModel):
     """Schema for test case response."""
+
     id: int
     project_id: int
     tc_id: str
@@ -239,6 +251,7 @@ class TestCaseResponse(BaseModel):
 
 
 # ==================== RequirementTestCase Schemas ====================
+
 
 class RequirementTestCaseCreate(BaseModel):
     test_case_id: int
@@ -279,8 +292,10 @@ class RequirementLinkResponse(BaseModel):
 
 # ==================== TestRunLink Schemas ====================
 
+
 class TestRunLinkCreate(BaseModel):
     """Schema for linking a test run to a requirement."""
+
     test_run_id: int
     test_run_name: Optional[str] = None
     teststation_url: Optional[str] = None
@@ -289,6 +304,7 @@ class TestRunLinkCreate(BaseModel):
 
 class TestRunLinkResponse(BaseModel):
     """Schema for test run link response."""
+
     id: int
     requirement_id: int
     test_run_id: int
@@ -302,6 +318,7 @@ class TestRunLinkResponse(BaseModel):
 
 
 # ==================== Traceability Schemas ====================
+
 
 class TraceabilityItem(BaseModel):
     requirement: RequirementResponse
@@ -344,8 +361,10 @@ class CoverageGapReport(BaseModel):
 
 # ==================== Health Schemas ====================
 
+
 class HealthResponse(BaseModel):
     """Schema for health check response."""
+
     status: str = "healthy"
     version: str
     database: str = "connected"
@@ -353,6 +372,7 @@ class HealthResponse(BaseModel):
 
 class VersionResponse(BaseModel):
     """Schema for version response."""
+
     version: str
     api_version: str = "v1"
 
@@ -365,6 +385,7 @@ class DocumentCreate(BaseModel):
     content_json: Optional[Dict[str, Any]] = None
     content_html: Optional[str] = None
 
+
 class DocumentUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
     doc_type: Optional[str] = None
@@ -374,6 +395,7 @@ class DocumentUpdate(BaseModel):
     content_json: Optional[Dict[str, Any]] = None
     content_html: Optional[str] = None
 
+
 class DocumentSectionCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=500)
     content: Optional[str] = None
@@ -381,12 +403,14 @@ class DocumentSectionCreate(BaseModel):
     order: int = 0
     parent_section_id: Optional[int] = None
 
+
 class DocumentSectionUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
     content: Optional[str] = None
     section_type: Optional[str] = None
     order: Optional[int] = None
     parent_section_id: Optional[int] = None
+
 
 class DocumentSectionResponse(BaseModel):
     id: int
@@ -399,8 +423,10 @@ class DocumentSectionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     child_sections: List["DocumentSectionResponse"] = []
+
     class Config:
         from_attributes = True
+
 
 class DocumentResponse(BaseModel):
     id: int
@@ -416,8 +442,10 @@ class DocumentResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     section_count: int = 0
+
     class Config:
         from_attributes = True
+
 
 class DocumentDetailResponse(BaseModel):
     id: int
@@ -433,14 +461,17 @@ class DocumentDetailResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     sections: List[DocumentSectionResponse] = []
+
     class Config:
         from_attributes = True
+
 
 class SectionReorder(BaseModel):
     section_orders: List[dict]
 
 
 # ==================== Test Campaign Schemas ====================
+
 
 class TestConfigurationCreate(BaseModel):
     project_id: int
@@ -449,11 +480,13 @@ class TestConfigurationCreate(BaseModel):
     environment: Optional[str] = None
     parameters: Optional[Dict[str, Any]] = None
 
+
 class TestConfigurationUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     environment: Optional[str] = None
     parameters: Optional[Dict[str, Any]] = None
+
 
 class TestConfigurationResponse(BaseModel):
     id: int
@@ -464,6 +497,7 @@ class TestConfigurationResponse(BaseModel):
     parameters: Optional[Dict[str, Any]]
     created_at: datetime
     updated_at: datetime
+
     class Config:
         from_attributes = True
 
@@ -526,6 +560,7 @@ class TestCampaignCreate(BaseModel):
     bud_run_status: Optional[str] = None
     test_case_ids: List[int] = []
 
+
 class TestCampaignUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
@@ -535,6 +570,7 @@ class TestCampaignUpdate(BaseModel):
     bud_run_url: Optional[str] = None
     bud_run_status: Optional[str] = None
     status: Optional[str] = None
+
 
 class TestCampaignItemResponse(BaseModel):
     id: int
@@ -546,8 +582,10 @@ class TestCampaignItemResponse(BaseModel):
     executed_at: Optional[datetime]
     created_at: datetime
     test_case: Optional[TestCaseResponse] = None
+
     class Config:
         from_attributes = True
+
 
 class TestCampaignResponse(BaseModel):
     id: int
@@ -571,12 +609,15 @@ class TestCampaignResponse(BaseModel):
     pending: int = 0
     configuration: Optional[TestConfigurationResponse] = None
     suite: Optional[TestSuiteSummary] = None
+
     class Config:
         from_attributes = True
+
 
 class TestCampaignDetailResponse(TestCampaignResponse):
     items: List[TestCampaignItemResponse] = []
     related_requirements: List[RequirementSummary] = []
+
 
 class TestCampaignItemUpdate(BaseModel):
     comment: Optional[str] = None
@@ -609,6 +650,7 @@ class ArtefactLinkResponse(BaseModel):
 
 # ==================== Design Schemas ====================
 
+
 class DesignItemCreate(BaseModel):
     project_id: int
     title: str = Field(..., min_length=1, max_length=500)
@@ -618,6 +660,7 @@ class DesignItemCreate(BaseModel):
     design_type: str = "Architecture"
     linked_requirement_id: Optional[int] = None
 
+
 class DesignItemUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
     description: Optional[str] = None
@@ -625,6 +668,7 @@ class DesignItemUpdate(BaseModel):
     priority: Optional[str] = None
     design_type: Optional[str] = None
     linked_requirement_id: Optional[int] = None
+
 
 class DesignItemResponse(BaseModel):
     id: int
@@ -638,11 +682,13 @@ class DesignItemResponse(BaseModel):
     linked_requirement_id: Optional[int]
     created_at: datetime
     updated_at: datetime
+
     class Config:
         from_attributes = True
 
 
 # ==================== Risk Schemas ====================
+
 
 class RiskItemCreate(BaseModel):
     project_id: int
@@ -655,6 +701,7 @@ class RiskItemCreate(BaseModel):
     risk_category: str = "Technical"
     linked_requirement_id: Optional[int] = None
 
+
 class RiskItemUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
     description: Optional[str] = None
@@ -664,6 +711,7 @@ class RiskItemUpdate(BaseModel):
     mitigation: Optional[str] = None
     risk_category: Optional[str] = None
     linked_requirement_id: Optional[int] = None
+
 
 class RiskItemResponse(BaseModel):
     id: int
@@ -679,11 +727,13 @@ class RiskItemResponse(BaseModel):
     linked_requirement_id: Optional[int]
     created_at: datetime
     updated_at: datetime
+
     class Config:
         from_attributes = True
 
 
 # ==================== Change Request Schemas ====================
+
 
 class ChangeRequestCreate(BaseModel):
     project_id: int
@@ -695,6 +745,7 @@ class ChangeRequestCreate(BaseModel):
     impact_assessment: Optional[str] = None
     justification: Optional[str] = None
 
+
 class ChangeRequestUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
     description: Optional[str] = None
@@ -703,6 +754,7 @@ class ChangeRequestUpdate(BaseModel):
     change_type: Optional[str] = None
     impact_assessment: Optional[str] = None
     justification: Optional[str] = None
+
 
 class ChangeRequestResponse(BaseModel):
     id: int
@@ -717,11 +769,13 @@ class ChangeRequestResponse(BaseModel):
     justification: Optional[str]
     created_at: datetime
     updated_at: datetime
+
     class Config:
         from_attributes = True
 
 
 # ==================== Baseline Schemas ====================
+
 
 class BaselineCreate(BaseModel):
     project_id: int
@@ -729,11 +783,13 @@ class BaselineCreate(BaseModel):
     description: Optional[str] = None
     baseline_type: str = "Milestone"
 
+
 class BaselineUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     status: Optional[str] = None
     baseline_type: Optional[str] = None
+
 
 class BaselineResponse(BaseModel):
     id: int
@@ -745,11 +801,13 @@ class BaselineResponse(BaseModel):
     snapshot: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: datetime
+
     class Config:
         from_attributes = True
 
 
 # ==================== Test Concept Schemas ====================
+
 
 class TestConceptCreate(BaseModel):
     project_id: int
@@ -785,6 +843,7 @@ class TestConceptResponse(BaseModel):
 
 
 # ==================== Artefact Detail Schemas ====================
+
 
 class ArtefactCommentCreate(BaseModel):
     body: str = Field(..., min_length=1)

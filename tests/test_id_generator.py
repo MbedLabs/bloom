@@ -4,6 +4,7 @@ Tests the pure compute_next_id function directly -- no DB mocking needed.
 """
 
 import pytest
+
 from app.core.id_generator import compute_next_id
 
 

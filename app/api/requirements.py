@@ -2,30 +2,42 @@
 Requirements API endpoints.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from typing import Optional
 from datetime import timezone
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_role
 from app.core.id_generator import next_doc_id
-from app.models import Requirement, Project, RequirementTestCase, TestCase, TestRunLink, TestSuite, TestSuiteItem, TestCampaign, TestCampaignItem
+from app.core.security import get_current_user, require_role
+from app.models import (
+    Project,
+    Requirement,
+    RequirementTestCase,
+    TestCampaign,
+    TestCampaignItem,
+    TestCase,
+    TestRunLink,
+    TestSuite,
+    TestSuiteItem,
+)
+from app.models.user import User
 from app.models.user import User as UserModel
-from app.models.user import User, UserRole
+from app.models.user import UserRole
 from app.schemas import (
     RequirementCreate,
-    RequirementUpdate,
     RequirementResponse,
     RequirementTestCaseCreate,
     RequirementTestCaseResponse,
+    RequirementUpdate,
     RequirementVerifiedByLinkResponse,
     TestCampaignSummary,
-    TestSuiteSummary,
     TestCaseSummary,
     TestRunLinkCreate,
     TestRunLinkResponse,
+    TestSuiteSummary,
 )
 
 router = APIRouter()
@@ -43,18 +55,26 @@ def _build_test_case_summary(tc: TestCase) -> TestCaseSummary:
     return TestCaseSummary(id=tc.id, tc_id=tc.tc_id, title=tc.title, status=tc.status)
 
 
-async def _get_verified_by(req_id: int, db: AsyncSession) -> list[RequirementVerifiedByLinkResponse]:
+async def _get_verified_by(
+    req_id: int, db: AsyncSession
+) -> list[RequirementVerifiedByLinkResponse]:
     tc_links = (
-        await db.execute(
-            select(RequirementTestCase)
-            .where(RequirementTestCase.requirement_id == req_id)
-            .order_by(RequirementTestCase.created_at.desc())
+        (
+            await db.execute(
+                select(RequirementTestCase)
+                .where(RequirementTestCase.requirement_id == req_id)
+                .order_by(RequirementTestCase.created_at.desc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     linked = []
     for link in tc_links:
-        tc = (await db.execute(select(TestCase).where(TestCase.id == link.test_case_id))).scalar_one_or_none()
+        tc = (
+            await db.execute(select(TestCase).where(TestCase.id == link.test_case_id))
+        ).scalar_one_or_none()
         if tc:
             linked.append(
                 RequirementVerifiedByLinkResponse(
@@ -71,9 +91,7 @@ async def _build_requirement_response(req: Requirement, db: AsyncSession) -> Req
     verified_by = await _get_verified_by(req.id, db)
     tc_count = len(verified_by)
 
-    children_result = await db.execute(
-        select(Requirement).where(Requirement.parent_id == req.id)
-    )
+    children_result = await db.execute(select(Requirement).where(Requirement.parent_id == req.id))
     children = children_result.scalars().all()
 
     children_responses = []
@@ -82,10 +100,16 @@ async def _build_requirement_response(req: Requirement, db: AsyncSession) -> Req
         children_responses.append(child_resp)
 
     linked_test_runs = (
-        await db.execute(
-            select(TestRunLink).where(TestRunLink.requirement_id == req.id).order_by(TestRunLink.created_at.desc())
+        (
+            await db.execute(
+                select(TestRunLink)
+                .where(TestRunLink.requirement_id == req.id)
+                .order_by(TestRunLink.created_at.desc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     linked_tc_ids = [link.test_case.id for link in verified_by]
     suite_backlinks = []
@@ -93,19 +117,48 @@ async def _build_requirement_response(req: Requirement, db: AsyncSession) -> Req
     seen_suite_ids = set()
     seen_campaign_ids = set()
     if linked_tc_ids:
-        suite_items = (await db.execute(select(TestSuiteItem).where(TestSuiteItem.test_case_id.in_(linked_tc_ids)))).scalars().all()
+        suite_items = (
+            (
+                await db.execute(
+                    select(TestSuiteItem).where(TestSuiteItem.test_case_id.in_(linked_tc_ids))
+                )
+            )
+            .scalars()
+            .all()
+        )
         for item in suite_items:
-            suite = (await db.execute(select(TestSuite).where(TestSuite.id == item.suite_id))).scalar_one_or_none()
+            suite = (
+                await db.execute(select(TestSuite).where(TestSuite.id == item.suite_id))
+            ).scalar_one_or_none()
             if suite and suite.id not in seen_suite_ids:
                 seen_suite_ids.add(suite.id)
-                suite_backlinks.append(TestSuiteSummary(id=suite.id, suite_id=suite.suite_id, name=suite.name, status=suite.status))
+                suite_backlinks.append(
+                    TestSuiteSummary(
+                        id=suite.id,
+                        suite_id=suite.suite_id,
+                        name=suite.name,
+                        status=suite.status,
+                    )
+                )
 
-        campaign_items = (await db.execute(select(TestCampaignItem).where(TestCampaignItem.test_case_id.in_(linked_tc_ids)))).scalars().all()
+        campaign_items = (
+            (
+                await db.execute(
+                    select(TestCampaignItem).where(TestCampaignItem.test_case_id.in_(linked_tc_ids))
+                )
+            )
+            .scalars()
+            .all()
+        )
         for item in campaign_items:
-            campaign = (await db.execute(select(TestCampaign).where(TestCampaign.id == item.campaign_id))).scalar_one_or_none()
+            campaign = (
+                await db.execute(select(TestCampaign).where(TestCampaign.id == item.campaign_id))
+            ).scalar_one_or_none()
             if campaign and campaign.id not in seen_campaign_ids:
                 seen_campaign_ids.add(campaign.id)
-                campaign_backlinks.append(TestCampaignSummary(id=campaign.id, name=campaign.name, status=campaign.status))
+                campaign_backlinks.append(
+                    TestCampaignSummary(id=campaign.id, name=campaign.name, status=campaign.status)
+                )
 
     return RequirementResponse(
         id=req.id,
@@ -172,9 +225,7 @@ async def create_requirement(
     """
     Create a new requirement. Auto-generates req_id based on project prefix.
     """
-    project_result = await db.execute(
-        select(Project).where(Project.id == data.project_id)
-    )
+    project_result = await db.execute(select(Project).where(Project.id == data.project_id))
     project = project_result.scalar_one_or_none()
 
     if not project:
@@ -189,16 +240,22 @@ async def create_requirement(
             raise HTTPException(status_code=404, detail="Parent requirement not found")
 
     if data.reviewer_id is not None:
-        reviewer = (await db.execute(select(UserModel).where(UserModel.id == data.reviewer_id))).scalar_one_or_none()
+        reviewer = (
+            await db.execute(select(UserModel).where(UserModel.id == data.reviewer_id))
+        ).scalar_one_or_none()
         if not reviewer:
             raise HTTPException(status_code=404, detail="Reviewer not found")
 
     if data.approver_id is not None:
-        approver = (await db.execute(select(UserModel).where(UserModel.id == data.approver_id))).scalar_one_or_none()
+        approver = (
+            await db.execute(select(UserModel).where(UserModel.id == data.approver_id))
+        ).scalar_one_or_none()
         if not approver:
             raise HTTPException(status_code=404, detail="Approver not found")
 
-    req_id = await next_doc_id(db, Requirement, Requirement.req_id, data.project_id, project.prefix, "REQ")
+    req_id = await next_doc_id(
+        db, Requirement, Requirement.req_id, data.project_id, project.prefix, "REQ"
+    )
 
     requirement = Requirement(
         project_id=data.project_id,
@@ -230,9 +287,7 @@ async def get_requirement(
     """
     Get a requirement by ID, including children and linked test cases.
     """
-    result = await db.execute(
-        select(Requirement).where(Requirement.id == requirement_id)
-    )
+    result = await db.execute(select(Requirement).where(Requirement.id == requirement_id))
     requirement = result.scalar_one_or_none()
 
     if not requirement:
@@ -251,9 +306,7 @@ async def update_requirement(
     """
     Update a requirement.
     """
-    result = await db.execute(
-        select(Requirement).where(Requirement.id == requirement_id)
-    )
+    result = await db.execute(select(Requirement).where(Requirement.id == requirement_id))
     requirement = result.scalar_one_or_none()
 
     if not requirement:
@@ -290,7 +343,9 @@ async def update_requirement(
         if data.reviewer_id is None:
             requirement.reviewer_id = None
         else:
-            reviewer = (await db.execute(select(UserModel).where(UserModel.id == data.reviewer_id))).scalar_one_or_none()
+            reviewer = (
+                await db.execute(select(UserModel).where(UserModel.id == data.reviewer_id))
+            ).scalar_one_or_none()
             if not reviewer:
                 raise HTTPException(status_code=404, detail="Reviewer not found")
             requirement.reviewer_id = data.reviewer_id
@@ -298,7 +353,9 @@ async def update_requirement(
         if data.approver_id is None:
             requirement.approver_id = None
         else:
-            approver = (await db.execute(select(UserModel).where(UserModel.id == data.approver_id))).scalar_one_or_none()
+            approver = (
+                await db.execute(select(UserModel).where(UserModel.id == data.approver_id))
+            ).scalar_one_or_none()
             if not approver:
                 raise HTTPException(status_code=404, detail="Approver not found")
             requirement.approver_id = data.approver_id
@@ -306,7 +363,9 @@ async def update_requirement(
         if data.reviewed_by_id is None:
             requirement.reviewed_by_id = None
         else:
-            reviewed_by = (await db.execute(select(UserModel).where(UserModel.id == data.reviewed_by_id))).scalar_one_or_none()
+            reviewed_by = (
+                await db.execute(select(UserModel).where(UserModel.id == data.reviewed_by_id))
+            ).scalar_one_or_none()
             if not reviewed_by:
                 raise HTTPException(status_code=404, detail="Reviewed-by user not found")
             requirement.reviewed_by_id = data.reviewed_by_id
@@ -314,7 +373,9 @@ async def update_requirement(
         if data.approved_by_id is None:
             requirement.approved_by_id = None
         else:
-            approved_by = (await db.execute(select(UserModel).where(UserModel.id == data.approved_by_id))).scalar_one_or_none()
+            approved_by = (
+                await db.execute(select(UserModel).where(UserModel.id == data.approved_by_id))
+            ).scalar_one_or_none()
             if not approved_by:
                 raise HTTPException(status_code=404, detail="Approved-by user not found")
             requirement.approved_by_id = data.approved_by_id
@@ -338,9 +399,7 @@ async def delete_requirement(
     """
     Delete a requirement.
     """
-    result = await db.execute(
-        select(Requirement).where(Requirement.id == requirement_id)
-    )
+    result = await db.execute(select(Requirement).where(Requirement.id == requirement_id))
     requirement = result.scalar_one_or_none()
 
     if not requirement:
@@ -363,16 +422,12 @@ async def link_test_case(
     """
     Link a test case to a requirement.
     """
-    req_result = await db.execute(
-        select(Requirement).where(Requirement.id == requirement_id)
-    )
+    req_result = await db.execute(select(Requirement).where(Requirement.id == requirement_id))
     requirement = req_result.scalar_one_or_none()
     if not requirement:
         raise HTTPException(status_code=404, detail="Requirement not found")
 
-    tc_result = await db.execute(
-        select(TestCase).where(TestCase.id == data.test_case_id)
-    )
+    tc_result = await db.execute(select(TestCase).where(TestCase.id == data.test_case_id))
     test_case = tc_result.scalar_one_or_none()
     if not test_case:
         raise HTTPException(status_code=404, detail="Test case not found")
@@ -439,9 +494,7 @@ async def link_test_run(
     """
     Link a test run (from the teststation app) to a requirement.
     """
-    req_result = await db.execute(
-        select(Requirement).where(Requirement.id == requirement_id)
-    )
+    req_result = await db.execute(select(Requirement).where(Requirement.id == requirement_id))
     requirement = req_result.scalar_one_or_none()
     if not requirement:
         raise HTTPException(status_code=404, detail="Requirement not found")
@@ -473,9 +526,7 @@ async def get_linked_test_runs(
     """
     Get all test runs linked to a requirement.
     """
-    req_result = await db.execute(
-        select(Requirement).where(Requirement.id == requirement_id)
-    )
+    req_result = await db.execute(select(Requirement).where(Requirement.id == requirement_id))
     requirement = req_result.scalar_one_or_none()
     if not requirement:
         raise HTTPException(status_code=404, detail="Requirement not found")

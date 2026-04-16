@@ -3,13 +3,13 @@ Users API endpoints (admin only): CRUD for user management.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import get_password_hash, get_current_user, require_role
+from app.core.security import get_current_user, get_password_hash, require_role
 from app.models.user import User, UserRole
-from app.schemas.auth import UserCreate, UserUpdate, UserResponse
+from app.schemas.auth import UserCreate, UserResponse, UserUpdate
 
 router = APIRouter()
 
@@ -73,7 +73,9 @@ async def update_user(
         raise HTTPException(status_code=404, detail="User not found")
 
     if data.email is not None:
-        existing = await db.execute(select(User).where(User.email == data.email, User.id != user_id))
+        existing = await db.execute(
+            select(User).where(User.email == data.email, User.id != user_id)
+        )
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="Email already in use")
         user.email = data.email

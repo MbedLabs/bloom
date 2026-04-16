@@ -2,29 +2,33 @@
 Traceability API endpoints: matrix, impact analysis, coverage gaps, requirement links.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
 from app.models import (
-    Requirement, RequirementTestCase, RequirementLink,
-    TestCase, TestRunLink,
+    Requirement,
+    RequirementLink,
+    RequirementTestCase,
+    TestCase,
+    TestRunLink,
 )
 from app.models.user import User, UserRole
 from app.schemas import (
-    TraceabilityItem,
+    CoverageGap,
+    CoverageGapReport,
+    ImpactAnalysisResponse,
+    ImpactNode,
+    RequirementLinkCreate,
+    RequirementLinkResponse,
     RequirementResponse,
     TestCaseResponse,
     TestRunLinkResponse,
-    RequirementLinkCreate,
-    RequirementLinkResponse,
-    ImpactNode,
-    ImpactAnalysisResponse,
-    CoverageGap,
-    CoverageGapReport,
+    TraceabilityItem,
 )
 
 router = APIRouter()
@@ -35,6 +39,7 @@ VALID_REQ_LINK_TYPES = {"depends_on", "derived_from", "refines", "copies", "sati
 
 async def _build_req_response(req: Requirement, db: AsyncSession) -> RequirementResponse:
     from sqlalchemy import func
+
     from app.models import RequirementTestCase as RtcModel
 
     tc_count_result = await db.execute(
@@ -42,9 +47,7 @@ async def _build_req_response(req: Requirement, db: AsyncSession) -> Requirement
     )
     tc_count = tc_count_result.scalar()
 
-    children_result = await db.execute(
-        select(Requirement).where(Requirement.parent_id == req.id)
-    )
+    children_result = await db.execute(select(Requirement).where(Requirement.parent_id == req.id))
     children = children_result.scalars().all()
 
     children_responses = []
@@ -93,9 +96,7 @@ async def _get_linked_test_cases(req_id: int, db: AsyncSession):
 
     linked = []
     for link in tc_links:
-        tc_result = await db.execute(
-            select(TestCase).where(TestCase.id == link.test_case_id)
-        )
+        tc_result = await db.execute(select(TestCase).where(TestCase.id == link.test_case_id))
         tc = tc_result.scalar_one_or_none()
         if tc:
             linked.append(await _build_tc_response(tc))
@@ -139,9 +140,7 @@ async def get_traceability_matrix(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(
-        select(Requirement).where(Requirement.project_id == project_id)
-    )
+    result = await db.execute(select(Requirement).where(Requirement.project_id == project_id))
     requirements = result.scalars().all()
 
     items = []
@@ -151,12 +150,14 @@ async def get_traceability_matrix(
         coverage_status = _compute_coverage(linked_tcs)
         req_resp = await _build_req_response(req, db)
 
-        items.append(TraceabilityItem(
-            requirement=req_resp,
-            linked_test_cases=linked_tcs,
-            linked_test_runs=linked_trs,
-            coverage_status=coverage_status,
-        ))
+        items.append(
+            TraceabilityItem(
+                requirement=req_resp,
+                linked_test_cases=linked_tcs,
+                linked_test_runs=linked_trs,
+                coverage_status=coverage_status,
+            )
+        )
 
     if coverage_filter:
         items = [i for i in items if i.coverage_status == coverage_filter]
@@ -183,9 +184,7 @@ async def get_impact_analysis(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(
-        select(Requirement).where(Requirement.id == requirement_id)
-    )
+    result = await db.execute(select(Requirement).where(Requirement.id == requirement_id))
     root = result.scalar_one_or_none()
     if not root:
         raise HTTPException(status_code=404, detail="Requirement not found")
@@ -211,13 +210,15 @@ async def get_impact_analysis(
             if src and src.id not in visited:
                 src_resp = await _build_req_response(src, db)
                 children = await _build_upstream(src.id, current_depth + 1, visited.copy())
-                nodes.append(ImpactNode(
-                    requirement=src_resp,
-                    link_type=link.link_type,
-                    direction="upstream",
-                    depth=current_depth,
-                    children=children,
-                ))
+                nodes.append(
+                    ImpactNode(
+                        requirement=src_resp,
+                        link_type=link.link_type,
+                        direction="upstream",
+                        depth=current_depth,
+                        children=children,
+                    )
+                )
         return nodes
 
     async def _build_downstream(req_id: int, current_depth: int, visited: set) -> list:
@@ -244,13 +245,15 @@ async def get_impact_analysis(
             if tgt and tgt.id not in visited:
                 tgt_resp = await _build_req_response(tgt, db)
                 children = await _build_downstream(tgt.id, current_depth + 1, visited.copy())
-                nodes.append(ImpactNode(
-                    requirement=tgt_resp,
-                    link_type=link.link_type,
-                    direction="downstream",
-                    depth=current_depth,
-                    children=children,
-                ))
+                nodes.append(
+                    ImpactNode(
+                        requirement=tgt_resp,
+                        link_type=link.link_type,
+                        direction="downstream",
+                        depth=current_depth,
+                        children=children,
+                    )
+                )
 
         for tc_link in tc_links:
             tc_result = await db.execute(
@@ -259,28 +262,30 @@ async def get_impact_analysis(
             tc = tc_result.scalar_one_or_none()
             if tc:
                 tc_resp = await _build_tc_response(tc)
-                nodes.append(ImpactNode(
-                    requirement=RequirementResponse(
-                        id=tc.id,
-                        project_id=tc.project_id,
-                        parent_id=None,
-                        req_id=tc.tc_id,
-                        title=tc.title,
-                        description=tc.description,
-                        status=tc.status,
-                        priority="N/A",
-                        req_type="test_case",
-                        req_origin="N/A",
-                        created_at=tc.created_at,
-                        updated_at=tc.updated_at,
+                nodes.append(
+                    ImpactNode(
+                        requirement=RequirementResponse(
+                            id=tc.id,
+                            project_id=tc.project_id,
+                            parent_id=None,
+                            req_id=tc.tc_id,
+                            title=tc.title,
+                            description=tc.description,
+                            status=tc.status,
+                            priority="N/A",
+                            req_type="test_case",
+                            req_origin="N/A",
+                            created_at=tc.created_at,
+                            updated_at=tc.updated_at,
+                            children=[],
+                            test_case_count=0,
+                        ),
+                        link_type=tc_link.link_type,
+                        direction="downstream",
+                        depth=current_depth,
                         children=[],
-                        test_case_count=0,
-                    ),
-                    link_type=tc_link.link_type,
-                    direction="downstream",
-                    depth=current_depth,
-                    children=[],
-                ))
+                    )
+                )
         return nodes
 
     upstream = await _build_upstream(requirement_id, 1, set())
@@ -299,9 +304,7 @@ async def get_coverage_gaps(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(
-        select(Requirement).where(Requirement.project_id == project_id)
-    )
+    result = await db.execute(select(Requirement).where(Requirement.project_id == project_id))
     requirements = result.scalars().all()
 
     gaps = []
@@ -341,13 +344,15 @@ async def get_coverage_gaps(
 
         if gap_type != "none":
             req_resp = await _build_req_response(req, db)
-            gaps.append(CoverageGap(
-                requirement=req_resp,
-                gap_type=gap_type,
-                linked_test_cases=linked_tcs,
-                all_test_cases_draft=all_draft,
-                missing_link_types=missing,
-            ))
+            gaps.append(
+                CoverageGap(
+                    requirement=req_resp,
+                    gap_type=gap_type,
+                    linked_test_cases=linked_tcs,
+                    all_test_cases_draft=all_draft,
+                    missing_link_types=missing,
+                )
+            )
 
     total = len(requirements)
     coverage_pct = round((covered / total * 100) if total > 0 else 0, 1)
@@ -371,7 +376,10 @@ async def create_requirement_link(
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     if data.link_type not in VALID_REQ_LINK_TYPES:
-        raise HTTPException(status_code=400, detail=f"Invalid link_type. Must be one of: {VALID_REQ_LINK_TYPES}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid link_type. Must be one of: {VALID_REQ_LINK_TYPES}",
+        )
 
     if source_id == data.target_id:
         raise HTTPException(status_code=400, detail="Cannot link requirement to itself")
@@ -411,9 +419,7 @@ async def delete_requirement_link(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    result = await db.execute(
-        select(RequirementLink).where(RequirementLink.id == link_id)
-    )
+    result = await db.execute(select(RequirementLink).where(RequirementLink.id == link_id))
     link = result.scalar_one_or_none()
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")

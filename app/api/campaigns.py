@@ -1,27 +1,45 @@
 """Test Campaign API endpoints: configurations and traceability scopes."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
 from app.models import (
-    Project, Requirement, RequirementTestCase, TestCase, TestConfiguration, TestSuite, TestSuiteItem, TestCampaign, TestCampaignItem,
+    Project,
+    Requirement,
+    RequirementTestCase,
+    TestCampaign,
+    TestCampaignItem,
+    TestCase,
+    TestConfiguration,
+    TestSuite,
+    TestSuiteItem,
 )
 from app.models.user import User, UserRole
 from app.schemas import (
-    TestConfigurationCreate, TestConfigurationUpdate, TestConfigurationResponse,
-    TestCampaignCreate, TestCampaignUpdate, TestCampaignResponse,
-    TestCampaignDetailResponse, TestCampaignItemResponse,
-    TestCaseResponse, RequirementSummary, TestSuiteSummary, TestCampaignItemUpdate,
+    RequirementSummary,
+    TestCampaignCreate,
+    TestCampaignDetailResponse,
+    TestCampaignItemResponse,
+    TestCampaignItemUpdate,
+    TestCampaignResponse,
+    TestCampaignUpdate,
+    TestCaseResponse,
+    TestConfigurationCreate,
+    TestConfigurationResponse,
+    TestConfigurationUpdate,
+    TestSuiteSummary,
 )
 
 router = APIRouter()
 
 
 # ==================== Configurations ====================
+
 
 @router.get("/configurations", response_model=list[TestConfigurationResponse])
 async def list_configurations(
@@ -94,6 +112,7 @@ async def delete_configuration(
 
 # ==================== Campaigns ====================
 
+
 @router.get("", response_model=list[TestCampaignResponse])
 async def list_campaigns(
     project_id: int = Query(...),
@@ -127,12 +146,18 @@ async def create_campaign(
 
     suite = None
     if data.suite_id is not None:
-        suite = (await db.execute(select(TestSuite).where(TestSuite.id == data.suite_id))).scalar_one_or_none()
+        suite = (
+            await db.execute(select(TestSuite).where(TestSuite.id == data.suite_id))
+        ).scalar_one_or_none()
         if not suite or suite.project_id != data.project_id:
             raise HTTPException(404, "Suite not found")
 
     if data.configuration_id is not None:
-        config = (await db.execute(select(TestConfiguration).where(TestConfiguration.id == data.configuration_id))).scalar_one_or_none()
+        config = (
+            await db.execute(
+                select(TestConfiguration).where(TestConfiguration.id == data.configuration_id)
+            )
+        ).scalar_one_or_none()
         if not config or config.project_id != data.project_id:
             raise HTTPException(404, "Configuration not found")
 
@@ -153,7 +178,17 @@ async def create_campaign(
 
     selected_test_case_ids = list(data.test_case_ids)
     if suite is not None:
-        suite_items = (await db.execute(select(TestSuiteItem).where(TestSuiteItem.suite_id == suite.id).order_by(TestSuiteItem.order, TestSuiteItem.created_at))).scalars().all()
+        suite_items = (
+            (
+                await db.execute(
+                    select(TestSuiteItem)
+                    .where(TestSuiteItem.suite_id == suite.id)
+                    .order_by(TestSuiteItem.order, TestSuiteItem.created_at)
+                )
+            )
+            .scalars()
+            .all()
+        )
         selected_test_case_ids = [item.test_case_id for item in suite_items]
 
     for tc_id in selected_test_case_ids:
@@ -203,12 +238,18 @@ async def update_campaign(
         campaign.description = data.description
     if data.configuration_id is not None:
         if data.configuration_id:
-            config = (await db.execute(select(TestConfiguration).where(TestConfiguration.id == data.configuration_id))).scalar_one_or_none()
+            config = (
+                await db.execute(
+                    select(TestConfiguration).where(TestConfiguration.id == data.configuration_id)
+                )
+            ).scalar_one_or_none()
             if not config or config.project_id != campaign.project_id:
                 raise HTTPException(404, "Configuration not found")
         campaign.configuration_id = data.configuration_id
     if data.suite_id is not None:
-        suite = (await db.execute(select(TestSuite).where(TestSuite.id == data.suite_id))).scalar_one_or_none()
+        suite = (
+            await db.execute(select(TestSuite).where(TestSuite.id == data.suite_id))
+        ).scalar_one_or_none()
         if not suite or suite.project_id != campaign.project_id:
             raise HTTPException(404, "Suite not found")
         campaign.suite_id = data.suite_id
@@ -236,6 +277,7 @@ async def delete_campaign(
     if not campaign:
         raise HTTPException(404, "Campaign not found")
     await db.delete(campaign)
+
 
 @router.post("/{campaign_id}/items", response_model=TestCampaignItemResponse, status_code=201)
 async def add_campaign_item(
@@ -316,7 +358,9 @@ async def update_campaign_item(
     await db.flush()
     await db.refresh(item)
 
-    tc = (await db.execute(select(TestCase).where(TestCase.id == item.test_case_id))).scalar_one_or_none()
+    tc = (
+        await db.execute(select(TestCase).where(TestCase.id == item.test_case_id))
+    ).scalar_one_or_none()
     tc_resp = await _build_test_case_response(tc, db) if tc else None
     return TestCampaignItemResponse(
         id=item.id,
@@ -333,8 +377,17 @@ async def update_campaign_item(
 
 # ==================== Helpers ====================
 
-async def _build_campaign_response(campaign: TestCampaign, db: AsyncSession) -> TestCampaignResponse:
-    total = (await db.execute(select(func.count(TestCampaignItem.id)).where(TestCampaignItem.campaign_id == campaign.id))).scalar() or 0
+
+async def _build_campaign_response(
+    campaign: TestCampaign, db: AsyncSession
+) -> TestCampaignResponse:
+    total = (
+        await db.execute(
+            select(func.count(TestCampaignItem.id)).where(
+                TestCampaignItem.campaign_id == campaign.id
+            )
+        )
+    ).scalar() or 0
 
     config_resp = None
     suite_resp = None
@@ -345,26 +398,42 @@ async def _build_campaign_response(campaign: TestCampaign, db: AsyncSession) -> 
         cfg = cfg_result.scalar_one_or_none()
         if cfg:
             config_resp = TestConfigurationResponse(
-                id=cfg.id, project_id=cfg.project_id, name=cfg.name,
-                description=cfg.description, environment=cfg.environment,
-                parameters=cfg.parameters, created_at=cfg.created_at, updated_at=cfg.updated_at,
+                id=cfg.id,
+                project_id=cfg.project_id,
+                name=cfg.name,
+                description=cfg.description,
+                environment=cfg.environment,
+                parameters=cfg.parameters,
+                created_at=cfg.created_at,
+                updated_at=cfg.updated_at,
             )
     if campaign.suite_id:
-        suite = (await db.execute(select(TestSuite).where(TestSuite.id == campaign.suite_id))).scalar_one_or_none()
+        suite = (
+            await db.execute(select(TestSuite).where(TestSuite.id == campaign.suite_id))
+        ).scalar_one_or_none()
         if suite:
-            suite_resp = TestSuiteSummary(id=suite.id, suite_id=suite.suite_id, name=suite.name, status=suite.status)
+            suite_resp = TestSuiteSummary(
+                id=suite.id,
+                suite_id=suite.suite_id,
+                name=suite.name,
+                status=suite.status,
+            )
 
     return TestCampaignResponse(
-        id=campaign.id, project_id=campaign.project_id,
+        id=campaign.id,
+        project_id=campaign.project_id,
         configuration_id=campaign.configuration_id,
         suite_id=campaign.suite_id,
         bud_run_id=campaign.bud_run_id,
         bud_run_url=campaign.bud_run_url,
         bud_run_status=campaign.bud_run_status,
-        name=campaign.name, description=campaign.description,
-        status=campaign.status, started_at=campaign.started_at,
+        name=campaign.name,
+        description=campaign.description,
+        status=campaign.status,
+        started_at=campaign.started_at,
         completed_at=campaign.completed_at,
-        created_at=campaign.created_at, updated_at=campaign.updated_at,
+        created_at=campaign.created_at,
+        updated_at=campaign.updated_at,
         total_items=total,
         passed=0,
         failed=0,
@@ -375,7 +444,9 @@ async def _build_campaign_response(campaign: TestCampaign, db: AsyncSession) -> 
     )
 
 
-async def _build_campaign_detail(campaign: TestCampaign, db: AsyncSession) -> TestCampaignDetailResponse:
+async def _build_campaign_detail(
+    campaign: TestCampaign, db: AsyncSession
+) -> TestCampaignDetailResponse:
     base = await _build_campaign_response(campaign, db)
 
     items_result = await db.execute(
@@ -392,18 +463,37 @@ async def _build_campaign_detail(campaign: TestCampaign, db: AsyncSession) -> Te
         if tc:
             tc_resp = await _build_test_case_response(tc, db)
             requirement_ids.update(req.id for req in tc_resp.linked_requirements)
-        item_responses.append(TestCampaignItemResponse(
-            id=item.id, campaign_id=item.campaign_id,
-            test_case_id=item.test_case_id, status=item.status,
-            result=item.result, comment=item.comment,
-            executed_at=item.executed_at, created_at=item.created_at,
-            test_case=tc_resp,
-        ))
+        item_responses.append(
+            TestCampaignItemResponse(
+                id=item.id,
+                campaign_id=item.campaign_id,
+                test_case_id=item.test_case_id,
+                status=item.status,
+                result=item.result,
+                comment=item.comment,
+                executed_at=item.executed_at,
+                created_at=item.created_at,
+                test_case=tc_resp,
+            )
+        )
 
     related_requirements = []
     if requirement_ids:
-        reqs = (await db.execute(select(Requirement).where(Requirement.id.in_(requirement_ids)).order_by(Requirement.req_id))).scalars().all()
-        related_requirements = [RequirementSummary(id=req.id, req_id=req.req_id, title=req.title, status=req.status) for req in reqs]
+        reqs = (
+            (
+                await db.execute(
+                    select(Requirement)
+                    .where(Requirement.id.in_(requirement_ids))
+                    .order_by(Requirement.req_id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        related_requirements = [
+            RequirementSummary(id=req.id, req_id=req.req_id, title=req.title, status=req.status)
+            for req in reqs
+        ]
 
     return TestCampaignDetailResponse(
         **base.model_dump(),
@@ -413,12 +503,24 @@ async def _build_campaign_detail(campaign: TestCampaign, db: AsyncSession) -> Te
 
 
 async def _build_test_case_response(tc: TestCase, db: AsyncSession) -> TestCaseResponse:
-    req_links = (await db.execute(select(RequirementTestCase).where(RequirementTestCase.test_case_id == tc.id))).scalars().all()
+    req_links = (
+        (
+            await db.execute(
+                select(RequirementTestCase).where(RequirementTestCase.test_case_id == tc.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
     linked_requirements = []
     for link in req_links:
-        req = (await db.execute(select(Requirement).where(Requirement.id == link.requirement_id))).scalar_one_or_none()
+        req = (
+            await db.execute(select(Requirement).where(Requirement.id == link.requirement_id))
+        ).scalar_one_or_none()
         if req:
-            linked_requirements.append(RequirementSummary(id=req.id, req_id=req.req_id, title=req.title, status=req.status))
+            linked_requirements.append(
+                RequirementSummary(id=req.id, req_id=req.req_id, title=req.title, status=req.status)
+            )
     return TestCaseResponse(
         id=tc.id,
         project_id=tc.project_id,

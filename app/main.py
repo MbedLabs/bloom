@@ -4,28 +4,47 @@ FastAPI application for EmbedLabs Bloom - Application Lifecycle Management.
 Main entry point for the backend API.
 """
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import select
 
-from app.api import health, projects, requirements, test_cases, traceability, documents, campaigns, dashboard, designs, risks, changes, baselines, test_concepts, artefacts, test_suites, links, project_variables, import_service, docs_facade
+from app.api import artefacts
 from app.api import auth as auth_api
+from app.api import (
+    baselines,
+    campaigns,
+    changes,
+    dashboard,
+    designs,
+    docs_facade,
+    documents,
+    health,
+    import_service,
+    links,
+    project_variables,
+    projects,
+    requirements,
+    risks,
+    test_cases,
+    test_concepts,
+    test_suites,
+    traceability,
+)
 from app.api import users as users_api
 from app.core.config import settings
+from app.core.database import async_session_maker, create_tables
 from app.core.deps import limiter
-from app.core.database import create_tables, async_session_maker
 from app.core.security import get_password_hash
 from app.models.user import User, UserRole
 
 
 async def seed_admin_user():
     async with async_session_maker() as session:
-        result = await session.execute(
-            select(User).where(User.email == settings.ADMIN_EMAIL)
-        )
+        result = await session.execute(select(User).where(User.email == settings.ADMIN_EMAIL))
         if not result.scalar_one_or_none():
             admin = User(
                 email=settings.ADMIN_EMAIL,
@@ -73,7 +92,11 @@ app.include_router(auth_api.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(users_api.router, prefix="/api/users", tags=["Users"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
-app.include_router(project_variables.router, prefix="/api/project-variables", tags=["Project Variables"])
+app.include_router(
+    project_variables.router,
+    prefix="/api/project-variables",
+    tags=["Project Variables"],
+)
 app.include_router(requirements.router, prefix="/api/requirements", tags=["Requirements"])
 app.include_router(test_cases.router, prefix="/api/test-cases", tags=["Test Cases"])
 app.include_router(traceability.router, prefix="/api/traceability", tags=["Traceability"])
