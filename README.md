@@ -31,6 +31,38 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 API docs available at `http://localhost:8000/api/docs`
 
+## Invitation and SMTP configuration
+
+Bloom now supports admin-only invitations with separate password setup and email verification.
+Configure runtime values via environment variables or `.env`:
+
+- `APP_BASE_URL`
+- `FRONTEND_BASE_URL`
+- `SMTP_ENABLED`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USERNAME`
+- `SMTP_PASSWORD`
+- `SMTP_FROM_EMAIL`
+- `SMTP_FROM_NAME`
+- `SMTP_REPLY_TO`
+- `SMTP_STARTTLS`
+- `SMTP_SSL`
+- `SMTP_TIMEOUT_SECONDS`
+- `INVITE_TOKEN_TTL_HOURS`
+- `EMAIL_VERIFICATION_TOKEN_TTL_HOURS`
+- `PASSWORD_RESET_TOKEN_TTL_HOURS`
+
+New auth endpoints:
+
+- `POST /api/users/invite`
+- `POST /api/users/{id}/resend-invite`
+- `POST /api/users/{id}/revoke-invite`
+- `GET /api/auth/invite-info?token=...`
+- `POST /api/auth/accept-invite`
+- `POST /api/auth/verify-email`
+- `POST /api/auth/resend-verification`
+
 ## API Endpoints
 
 | Path | Description |

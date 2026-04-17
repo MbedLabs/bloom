@@ -2,14 +2,20 @@
 Users API endpoints (admin only): CRUD for user management.
 """
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user, get_password_hash, require_role
 from app.models.user import User, UserRole
-from app.schemas.auth import UserCreate, UserResponse, UserUpdate
+from app.models.user_token import UserTokenPurpose
+from app.schemas.auth import InviteCreateRequest, InviteResponse, UserCreate, UserResponse, UserUpdate
+from app.services.mail_service import MailConfigurationError, send_invite_email
+from app.services.token_service import create_user_token
 
 router = APIRouter()
 
@@ -45,6 +51,117 @@ async def create_user(
     await db.flush()
     await db.refresh(user)
     return UserResponse.model_validate(user)
+
+
+@router.post("/invite", response_model=InviteResponse, status_code=201)
+async def invite_user(
+    data: InviteCreateRequest,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    existing = await db.execute(select(User).where(User.email == data.email))
+    user = existing.scalar_one_or_none()
+
+    if user and user.password_set_at is not None:
+        raise HTTPException(status_code=400, detail="Email already belongs to an active user")
+
+    if user is None:
+        user = User(
+            email=data.email,
+            full_name=data.full_name,
+            hashed_password=get_password_hash(datetime.utcnow().isoformat()),
+            role=data.role,
+            is_active=True,
+            invited_at=datetime.utcnow(),
+            invited_by_user_id=admin.id,
+            last_invite_sent_at=datetime.utcnow(),
+        )
+        db.add(user)
+        await db.flush()
+    else:
+        user.full_name = data.full_name
+        user.role = data.role
+        user.invited_at = user.invited_at or datetime.utcnow()
+        user.invited_by_user_id = admin.id
+        user.last_invite_sent_at = datetime.utcnow()
+
+    invite_token = await create_user_token(
+        db,
+        user_id=user.id,
+        purpose=UserTokenPurpose.invite,
+        ttl_hours=settings.INVITE_TOKEN_TTL_HOURS,
+        created_by_user_id=admin.id,
+    )
+    invite_link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/accept-invite?token={invite_token}"
+
+    try:
+        send_invite_email(
+            to_email=user.email,
+            full_name=user.full_name,
+            invite_link=invite_link,
+        )
+    except MailConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    await db.flush()
+    await db.refresh(user)
+    return InviteResponse(message="Invitation sent", user=UserResponse.model_validate(user))
+
+
+@router.post("/{user_id}/resend-invite", response_model=InviteResponse)
+async def resend_invite(
+    user_id: int,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.password_set_at is not None:
+        raise HTTPException(status_code=400, detail="Invite already accepted")
+
+    user.last_invite_sent_at = datetime.utcnow()
+    invite_token = await create_user_token(
+        db,
+        user_id=user.id,
+        purpose=UserTokenPurpose.invite,
+        ttl_hours=settings.INVITE_TOKEN_TTL_HOURS,
+        created_by_user_id=admin.id,
+    )
+    invite_link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/accept-invite?token={invite_token}"
+
+    try:
+        send_invite_email(
+            to_email=user.email,
+            full_name=user.full_name,
+            invite_link=invite_link,
+        )
+    except MailConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    await db.flush()
+    await db.refresh(user)
+    return InviteResponse(message="Invitation resent", user=UserResponse.model_validate(user))
+
+
+@router.post("/{user_id}/revoke-invite", response_model=InviteResponse)
+async def revoke_invite(
+    user_id: int,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.password_set_at is not None:
+        raise HTTPException(status_code=400, detail="Invite already accepted")
+
+    user.is_active = False
+    await db.flush()
+    await db.refresh(user)
+    return InviteResponse(message="Invitation revoked", user=UserResponse.model_validate(user))
 
 
 @router.get("/{user_id}", response_model=UserResponse)

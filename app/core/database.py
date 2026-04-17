@@ -9,6 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import settings
+from app.models import models  # noqa: F401
+from app.models import user  # noqa: F401
+from app.models import user_token  # noqa: F401
 
 DATABASE_URL = settings.DATABASE_URL
 
@@ -149,6 +152,39 @@ async def create_tables():
             text(
                 "UPDATE requirement_test_cases SET link_type = 'verifies' WHERE link_type = 'validates'"
             )
+        )
+
+        await conn.execute(
+            text("ALTER TABLE users ADD COLUMN IF NOT EXISTS invited_at TIMESTAMP")
+        )
+        await conn.execute(
+            text("ALTER TABLE users ADD COLUMN IF NOT EXISTS invited_by_user_id INTEGER")
+        )
+        await conn.execute(
+            text("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_invite_sent_at TIMESTAMP")
+        )
+        await conn.execute(
+            text("ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_accepted_at TIMESTAMP")
+        )
+        await conn.execute(
+            text("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_set_at TIMESTAMP")
+        )
+        await conn.execute(
+            text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP")
+        )
+        await conn.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS user_tokens (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), purpose VARCHAR(32) NOT NULL, token_hash VARCHAR(128) NOT NULL UNIQUE, expires_at TIMESTAMP NOT NULL, used_at TIMESTAMP NULL, created_at TIMESTAMP NOT NULL DEFAULT NOW(), created_by_user_id INTEGER NULL REFERENCES users(id))"
+            )
+        )
+        await conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_user_tokens_user_id ON user_tokens(user_id)")
+        )
+        await conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_user_tokens_expires_at ON user_tokens(expires_at)")
+        )
+        await conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_user_tokens_used_at ON user_tokens(used_at)")
         )
 
 
