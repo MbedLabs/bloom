@@ -25,6 +25,7 @@ from app.models.models import (
     TestSuiteItem,
 )
 from app.models.user import User, UserRole
+from app.models.user_token import UserToken, UserTokenPurpose
 
 __all__ = [
     "Project",
@@ -43,6 +44,8 @@ __all__ = [
     "ProjectVariable",
     "User",
     "UserRole",
+    "UserToken",
+    "UserTokenPurpose",
     "DesignItem",
     "RiskItem",
     "ChangeRequest",

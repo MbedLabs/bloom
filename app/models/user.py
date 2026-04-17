@@ -6,9 +6,9 @@ import enum
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey
+from sqlalchemy import Boolean, DateTime
 from sqlalchemy import Enum as SaEnum
-from sqlalchemy import String
+from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base

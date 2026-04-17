@@ -10,10 +10,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import get_current_user, get_password_hash, require_role
+from app.core.security import get_password_hash, require_role
 from app.models.user import User, UserRole
 from app.models.user_token import UserTokenPurpose
-from app.schemas.auth import InviteCreateRequest, InviteResponse, UserCreate, UserResponse, UserUpdate
+from app.schemas.auth import (
+    InviteCreateRequest,
+    InviteResponse,
+    UserCreate,
+    UserResponse,
+    UserUpdate,
+)
 from app.services.mail_service import MailConfigurationError, send_invite_email
 from app.services.token_service import create_user_token
 

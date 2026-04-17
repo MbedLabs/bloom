@@ -21,7 +21,9 @@ def render_template(template_name: str, context: dict[str, str]) -> str:
     return Template(content).safe_substitute(context)
 
 
-def send_email(*, to_email: str, subject: str, text_body: str, html_body: str | None = None) -> None:
+def send_email(
+    *, to_email: str, subject: str, text_body: str, html_body: str | None = None
+) -> None:
     if not settings.SMTP_ENABLED:
         raise MailConfigurationError("SMTP is disabled")
     if not settings.SMTP_HOST or not settings.SMTP_FROM_EMAIL:
@@ -42,7 +44,9 @@ def send_email(*, to_email: str, subject: str, text_body: str, html_body: str | 
         message.add_alternative(html_body, subtype="html")
 
     smtp_class = smtplib.SMTP_SSL if settings.SMTP_SSL else smtplib.SMTP
-    with smtp_class(settings.SMTP_HOST, settings.SMTP_PORT, timeout=settings.SMTP_TIMEOUT_SECONDS) as smtp:
+    with smtp_class(
+        settings.SMTP_HOST, settings.SMTP_PORT, timeout=settings.SMTP_TIMEOUT_SECONDS
+    ) as smtp:
         if settings.SMTP_STARTTLS and not settings.SMTP_SSL:
             smtp.starttls()
         if settings.SMTP_USERNAME:
