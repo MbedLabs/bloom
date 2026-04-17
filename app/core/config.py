@@ -7,14 +7,19 @@ Loads settings from environment variables with sensible defaults.
 from functools import lru_cache
 from typing import List
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/bloom_db"
+    DATABASE_URL: str = ""
+    DB_USER: str = "postgres"
+    DB_PASSWORD: str = "postgres"
+    DB_NAME: str = "bloom_db"
+    DB_HOST: str = "localhost"
+    DB_PORT: int = 5432
 
     SECRET_KEY: str = ""
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
@@ -38,6 +43,15 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = "admin@embedlabs.de"
     ADMIN_PASSWORD: str = "changeme123"
     ADMIN_FULL_NAME: str = "Admin"
+
+    @model_validator(mode="after")
+    def populate_database_url(self):
+        if not self.DATABASE_URL:
+            self.DATABASE_URL = (
+                f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}"
+                f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+            )
+        return self
 
     # C1: SECRET_KEY must be set explicitly — no insecure fallback in production
     @field_validator("SECRET_KEY")
