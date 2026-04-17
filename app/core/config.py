@@ -5,9 +5,9 @@ Loads settings from environment variables with sensible defaults.
 """
 
 from functools import lru_cache
-from typing import List
+from typing import List, Optional
 
-from pydantic import field_validator, model_validator
+from pydantic import EmailStr, field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     BLOOM_APP_NAME: str = "EmbedLabs Bloom"
     BLOOM_APP_VERSION: str = "0.1.4"
 
+    APP_BASE_URL: str = "http://localhost:8000"
+    FRONTEND_BASE_URL: str = "http://localhost:5173"
+
     TESTSTATION_APP_URL: str = "http://localhost:5173"
 
     # M1: Restrict CORS to explicit origins only (no wildcard)
@@ -40,9 +43,25 @@ class Settings(BaseSettings):
     # L1: Disable API docs in production by default
     ENABLE_DOCS: bool = False
 
-    ADMIN_EMAIL: str = "admin@embedlabs.de"
+    ADMIN_EMAIL: str = "admin@example.com"
     ADMIN_PASSWORD: str = "changeme123"
     ADMIN_FULL_NAME: str = "Admin"
+
+    SMTP_ENABLED: bool = False
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: Optional[EmailStr] = None
+    SMTP_FROM_NAME: str = ""
+    SMTP_REPLY_TO: Optional[EmailStr] = None
+    SMTP_STARTTLS: bool = True
+    SMTP_SSL: bool = False
+    SMTP_TIMEOUT_SECONDS: int = 30
+
+    INVITE_TOKEN_TTL_HOURS: int = 72
+    EMAIL_VERIFICATION_TOKEN_TTL_HOURS: int = 24
+    PASSWORD_RESET_TOKEN_TTL_HOURS: int = 2
 
     @model_validator(mode="after")
     def populate_database_url(self):

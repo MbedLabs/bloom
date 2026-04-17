@@ -6,7 +6,7 @@ import enum
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime
+from sqlalchemy import Boolean, DateTime, ForeignKey
 from sqlalchemy import Enum as SaEnum
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -31,6 +31,12 @@ class User(Base):
         SaEnum(UserRole), default=UserRole.reviewer, nullable=False
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    invited_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    invited_by_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    last_invite_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    invite_accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    password_set_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    email_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

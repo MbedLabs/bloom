@@ -2,10 +2,13 @@
 Auth API endpoints: login, get current user, update profile.
 """
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import limiter
 from app.core.security import (
@@ -14,20 +17,28 @@ from app.core.security import (
     get_password_hash,
     verify_password,
 )
-from app.models.user import User, UserRole
+from app.models.user import User
+from app.models.user_token import UserTokenPurpose
 from app.schemas.auth import (
+    AcceptInviteRequest,
+    AcceptInviteResponse,
+    GenericMessageResponse,
+    InviteInfoResponse,
     LoginRequest,
     PasswordChange,
     TokenResponse,
     UserResponse,
     UserUpdate,
+    VerifyEmailRequest,
 )
+from app.services.mail_service import MailConfigurationError, send_verification_email
+from app.services.token_service import TokenValidationError, find_token, create_user_token, get_valid_token, mark_token_used
 
 router = APIRouter()
 
 
 @router.post("/login", response_model=TokenResponse)
-@limiter.limit("10/minute")  # H2: prevent brute-force login attempts
+@limiter.limit("10/minute")
 async def login(request: Request, data: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == data.email))
     user = result.scalar_one_or_none()
@@ -86,6 +97,128 @@ async def change_password(
     if not verify_password(data.current_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
     current_user.hashed_password = get_password_hash(data.new_password)
+    current_user.password_set_at = datetime.utcnow()
     await db.flush()
     await db.refresh(current_user)
     return UserResponse.model_validate(current_user)
+
+
+@router.get("/invite-info", response_model=InviteInfoResponse)
+async def get_invite_info(token: str, db: AsyncSession = Depends(get_db)):
+    user_token = await find_token(db, token=token, purpose=UserTokenPurpose.invite)
+    if user_token is None:
+        raise HTTPException(status_code=400, detail="Invalid token")
+
+    user = await db.get(User, user_token.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    expired = user_token.expires_at < datetime.utcnow()
+    used = user_token.used_at is not None
+    return InviteInfoResponse(
+        email=user.email,
+        full_name=user.full_name,
+        valid=not expired and not used,
+        expired=expired,
+    )
+
+
+@router.post("/accept-invite", response_model=AcceptInviteResponse)
+async def accept_invite(data: AcceptInviteRequest, db: AsyncSession = Depends(get_db)):
+    try:
+        user_token = await get_valid_token(db, token=data.token, purpose=UserTokenPurpose.invite)
+    except TokenValidationError as exc:
+        raise HTTPException(status_code=400, detail=exc.detail) from exc
+
+    user = await db.get(User, user_token.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.invite_accepted_at is not None:
+        raise HTTPException(status_code=400, detail="Invite already accepted")
+
+    user.hashed_password = get_password_hash(data.password)
+    now = datetime.utcnow()
+    user.invite_accepted_at = now
+    user.password_set_at = now
+    await mark_token_used(db, user_token)
+
+    verification_token = await create_user_token(
+        db,
+        user_id=user.id,
+        purpose=UserTokenPurpose.email_verification,
+        ttl_hours=settings.EMAIL_VERIFICATION_TOKEN_TTL_HOURS,
+    )
+    verification_link = (
+        f"{settings.FRONTEND_BASE_URL.rstrip('/')}/verify-email?token={verification_token}"
+    )
+
+    try:
+        send_verification_email(
+            to_email=user.email,
+            full_name=user.full_name,
+            verification_link=verification_link,
+        )
+    except MailConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    await db.flush()
+    return AcceptInviteResponse(
+        email=user.email,
+        message="Invite accepted. Verification email sent.",
+    )
+
+
+@router.post("/verify-email", response_model=GenericMessageResponse)
+async def verify_email(data: VerifyEmailRequest, db: AsyncSession = Depends(get_db)):
+    try:
+        user_token = await get_valid_token(
+            db,
+            token=data.token,
+            purpose=UserTokenPurpose.email_verification,
+        )
+    except TokenValidationError as exc:
+        raise HTTPException(status_code=400, detail=exc.detail) from exc
+
+    user = await db.get(User, user_token.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.email_verified_at is not None:
+        raise HTTPException(status_code=400, detail="Email already verified")
+
+    user.email_verified_at = datetime.utcnow()
+    await mark_token_used(db, user_token)
+    await db.flush()
+    return GenericMessageResponse(message="Email verified successfully")
+
+
+@router.post("/resend-verification", response_model=GenericMessageResponse)
+@limiter.limit("5/hour")
+async def resend_verification(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.email_verified_at is not None:
+        raise HTTPException(status_code=400, detail="Email already verified")
+
+    verification_token = await create_user_token(
+        db,
+        user_id=current_user.id,
+        purpose=UserTokenPurpose.email_verification,
+        ttl_hours=settings.EMAIL_VERIFICATION_TOKEN_TTL_HOURS,
+    )
+    verification_link = (
+        f"{settings.FRONTEND_BASE_URL.rstrip('/')}/verify-email?token={verification_token}"
+    )
+
+    try:
+        send_verification_email(
+            to_email=current_user.email,
+            full_name=current_user.full_name,
+            verification_link=verification_link,
+        )
+    except MailConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    await db.flush()
+    return GenericMessageResponse(message="Verification email sent")
