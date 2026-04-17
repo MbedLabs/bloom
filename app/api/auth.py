@@ -32,7 +32,13 @@ from app.schemas.auth import (
     VerifyEmailRequest,
 )
 from app.services.mail_service import MailConfigurationError, send_verification_email
-from app.services.token_service import TokenValidationError, find_token, create_user_token, get_valid_token, mark_token_used
+from app.services.token_service import (
+    TokenValidationError,
+    create_user_token,
+    find_token,
+    get_valid_token,
+    mark_token_used,
+)
 
 router = APIRouter()
 

@@ -9,9 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import settings
-from app.models import models  # noqa: F401
-from app.models import user  # noqa: F401
-from app.models import user_token  # noqa: F401
 
 DATABASE_URL = settings.DATABASE_URL
 
@@ -39,6 +36,8 @@ class Base(DeclarativeBase):
 
 async def create_tables():
     """Create all database tables."""
+    from app import models  # noqa: F401
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await conn.execute(
@@ -154,9 +153,7 @@ async def create_tables():
             )
         )
 
-        await conn.execute(
-            text("ALTER TABLE users ADD COLUMN IF NOT EXISTS invited_at TIMESTAMP")
-        )
+        await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS invited_at TIMESTAMP"))
         await conn.execute(
             text("ALTER TABLE users ADD COLUMN IF NOT EXISTS invited_by_user_id INTEGER")
         )
