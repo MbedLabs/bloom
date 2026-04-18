@@ -1,6 +1,9 @@
+import os
 from datetime import datetime, timedelta
 
 import pytest
+
+os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characters-long")
 
 from app.models.user_token import UserToken, UserTokenPurpose
 from app.services.token_service import hash_token
