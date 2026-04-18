@@ -2,9 +2,9 @@
 Users API endpoints (admin only): CRUD for user management.
 """
 
-from datetime import datetime
 import secrets
 import string
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
