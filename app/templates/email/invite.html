@@ -8,6 +8,7 @@
         .content { padding: 30px; }
         .button { display: inline-block; padding: 12px 24px; background: #1a73e8; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; }
         .footer { font-size: 0.8em; color: #777; margin-top: 20px; text-align: center; }
+        .password { display: inline-block; padding: 8px 12px; background: #f0f4f8; border: 1px solid #d0e1f0; border-radius: 4px; font-family: monospace; font-size: 16px; margin: 10px 0; }
     </style>
 </head>
 <body>
@@ -17,11 +18,12 @@
         </div>
         <div class="content">
             <p>Hello ${full_name},</p>
-            <p>You have been invited to join the <strong>${app_name}</strong> platform. To get started, please click the button below to accept your invitation and set up your secure password.</p>
+            <p>You have been invited to join the <strong>${app_name}</strong> platform.</p>
+            <p>Your temporary password is: <br><strong class="password">${temp_password}</strong></p>
             <p style="text-align: center; margin: 30px 0;">
-                <a href="${invite_link}" class="button" style="color: white;">Accept Invitation</a>
+                <a href="${invite_link}" class="button" style="color: white;">Log In</a>
             </p>
-            <p>Once you've set your password, you'll be able to access all the features of the platform.</p>
+            <p>Please log in using your email and this temporary password. Once you have logged in, navigate to your profile settings in the GUI to change your password.</p>
             <p>If you didn't expect this invitation, you can safely ignore this email.</p>
         </div>
         <div class="footer">
