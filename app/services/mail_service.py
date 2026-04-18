@@ -56,10 +56,11 @@ def send_email(
     logger.info("Sent email '%s' to %s", subject, to_email)
 
 
-def send_invite_email(*, to_email: str, full_name: str, invite_link: str) -> None:
+def send_invite_email(*, to_email: str, full_name: str, invite_link: str, temp_password: str) -> None:
     context = {
         "full_name": full_name,
         "invite_link": invite_link,
+        "temp_password": temp_password,
         "app_name": settings.BLOOM_APP_NAME,
     }
     send_email(
