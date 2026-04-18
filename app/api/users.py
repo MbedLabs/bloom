@@ -74,7 +74,7 @@ async def invite_user(
         raise HTTPException(status_code=400, detail="Email already belongs to an active user")
 
     alphabet = string.ascii_letters + string.digits
-    temp_password = ''.join(secrets.choice(alphabet) for _ in range(12))
+    temp_password = "".join(secrets.choice(alphabet) for _ in range(12))
 
     if user is None:
         user = User(
@@ -136,7 +136,7 @@ async def resend_invite(
 
     user.last_invite_sent_at = datetime.utcnow()
     alphabet = string.ascii_letters + string.digits
-    temp_password = ''.join(secrets.choice(alphabet) for _ in range(12))
+    temp_password = "".join(secrets.choice(alphabet) for _ in range(12))
     user.hashed_password = get_password_hash(temp_password)
     invite_token = await create_user_token(
         db,
