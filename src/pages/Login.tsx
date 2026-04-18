@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Flower2 } from 'lucide-react'
+import { APP_VERSION } from '../api/client'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -84,6 +85,7 @@ export default function Login() {
           <p className="text-sm text-teal-200/60">
             Bloom ALM
           </p>
+          <p className="text-xs text-teal-300/50 mt-1">v{APP_VERSION}</p>
           <a
             href="https://www.embedlabs.de/en"
             target="_blank"
