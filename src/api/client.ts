@@ -1,4 +1,5 @@
 import axios from 'axios'
+import packageJson from '../../package.json'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api'
 
@@ -38,7 +39,7 @@ export interface User {
   updated_at: string
 }
 
-export const APP_VERSION = '0.1.4'
+export const APP_VERSION = packageJson.version
 
 export interface LoginResponse {
   access_token: string
