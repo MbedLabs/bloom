@@ -3,6 +3,8 @@ Users API endpoints (admin only): CRUD for user management.
 """
 
 from datetime import datetime
+import secrets
+import string
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -71,11 +73,14 @@ async def invite_user(
     if user and user.password_set_at is not None:
         raise HTTPException(status_code=400, detail="Email already belongs to an active user")
 
+    alphabet = string.ascii_letters + string.digits
+    temp_password = ''.join(secrets.choice(alphabet) for _ in range(12))
+
     if user is None:
         user = User(
             email=data.email,
             full_name=data.full_name,
-            hashed_password=get_password_hash(datetime.utcnow().isoformat()),
+            hashed_password=get_password_hash(temp_password),
             role=data.role,
             is_active=True,
             invited_at=datetime.utcnow(),
@@ -87,6 +92,7 @@ async def invite_user(
     else:
         user.full_name = data.full_name
         user.role = data.role
+        user.hashed_password = get_password_hash(temp_password)
         user.invited_at = user.invited_at or datetime.utcnow()
         user.invited_by_user_id = admin.id
         user.last_invite_sent_at = datetime.utcnow()
@@ -98,13 +104,14 @@ async def invite_user(
         ttl_hours=settings.INVITE_TOKEN_TTL_HOURS,
         created_by_user_id=admin.id,
     )
-    invite_link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/accept-invite?token={invite_token}"
+    invite_link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/login"
 
     try:
         send_invite_email(
             to_email=user.email,
             full_name=user.full_name,
             invite_link=invite_link,
+            temp_password=temp_password,
         )
     except MailConfigurationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -128,6 +135,9 @@ async def resend_invite(
         raise HTTPException(status_code=400, detail="Invite already accepted")
 
     user.last_invite_sent_at = datetime.utcnow()
+    alphabet = string.ascii_letters + string.digits
+    temp_password = ''.join(secrets.choice(alphabet) for _ in range(12))
+    user.hashed_password = get_password_hash(temp_password)
     invite_token = await create_user_token(
         db,
         user_id=user.id,
@@ -135,13 +145,14 @@ async def resend_invite(
         ttl_hours=settings.INVITE_TOKEN_TTL_HOURS,
         created_by_user_id=admin.id,
     )
-    invite_link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/accept-invite?token={invite_token}"
+    invite_link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/login"
 
     try:
         send_invite_email(
             to_email=user.email,
             full_name=user.full_name,
             invite_link=invite_link,
+            temp_password=temp_password,
         )
     except MailConfigurationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
