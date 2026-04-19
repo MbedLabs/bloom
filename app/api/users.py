@@ -4,7 +4,7 @@ Users API endpoints (admin only): CRUD for user management.
 
 import secrets
 import string
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import delete, select, update
@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.models import Requirement, TestCase
 from app.core.security import get_password_hash, require_role
+from app.models.models import Requirement, TestCase
 from app.models.user import User, UserRole
 from app.models.user_token import UserToken, UserTokenPurpose
 from app.schemas.auth import (
@@ -85,9 +85,9 @@ async def invite_user(
             hashed_password=get_password_hash(temp_password),
             role=data.role,
             is_active=True,
-            invited_at=datetime.utcnow(),
+            invited_at=datetime.now(timezone.utc),
             invited_by_user_id=admin.id,
-            last_invite_sent_at=datetime.utcnow(),
+            last_invite_sent_at=datetime.now(timezone.utc),
         )
         db.add(user)
         await db.flush()
@@ -95,9 +95,9 @@ async def invite_user(
         user.full_name = data.full_name
         user.role = data.role
         user.hashed_password = get_password_hash(temp_password)
-        user.invited_at = user.invited_at or datetime.utcnow()
+        user.invited_at = user.invited_at or datetime.now(timezone.utc)
         user.invited_by_user_id = admin.id
-        user.last_invite_sent_at = datetime.utcnow()
+        user.last_invite_sent_at = datetime.now(timezone.utc)
 
     invite_token = await create_user_token(
         db,
@@ -106,9 +106,7 @@ async def invite_user(
         ttl_hours=settings.INVITE_TOKEN_TTL_HOURS,
         created_by_user_id=admin.id,
     )
-    invite_link = (
-        f"{settings.FRONTEND_BASE_URL.rstrip('/')}/accept-invite?token={invite_token}"
-    )
+    invite_link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/accept-invite?token={invite_token}"
 
     try:
         send_invite_email(
@@ -141,7 +139,7 @@ async def resend_invite(
     if user.password_set_at is not None:
         raise HTTPException(status_code=400, detail="Invite already accepted")
 
-    user.last_invite_sent_at = datetime.utcnow()
+    user.last_invite_sent_at = datetime.now(timezone.utc)
     alphabet = string.ascii_letters + string.digits
     temp_password = "".join(secrets.choice(alphabet) for _ in range(12))
     user.hashed_password = get_password_hash(temp_password)
@@ -152,9 +150,7 @@ async def resend_invite(
         ttl_hours=settings.INVITE_TOKEN_TTL_HOURS,
         created_by_user_id=admin.id,
     )
-    invite_link = (
-        f"{settings.FRONTEND_BASE_URL.rstrip('/')}/accept-invite?token={invite_token}"
-    )
+    invite_link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/accept-invite?token={invite_token}"
 
     try:
         send_invite_email(
@@ -259,29 +255,21 @@ async def delete_user(
         )
 
     try:
-        await db.execute(
-            delete(UserToken).where(UserToken.user_id == user_id)
-        )
+        await db.execute(delete(UserToken).where(UserToken.user_id == user_id))
         await db.execute(
             update(UserToken)
             .where(UserToken.created_by_user_id == user_id)
             .values(created_by_user_id=None)
         )
         await db.execute(
-            update(User)
-            .where(User.invited_by_user_id == user_id)
-            .values(invited_by_user_id=None)
+            update(User).where(User.invited_by_user_id == user_id).values(invited_by_user_id=None)
         )
 
         await db.execute(
-            update(Requirement)
-            .where(Requirement.reviewer_id == user_id)
-            .values(reviewer_id=None)
+            update(Requirement).where(Requirement.reviewer_id == user_id).values(reviewer_id=None)
         )
         await db.execute(
-            update(Requirement)
-            .where(Requirement.approver_id == user_id)
-            .values(approver_id=None)
+            update(Requirement).where(Requirement.approver_id == user_id).values(approver_id=None)
         )
         await db.execute(
             update(Requirement)
@@ -295,14 +283,10 @@ async def delete_user(
         )
 
         await db.execute(
-            update(TestCase)
-            .where(TestCase.reviewer_id == user_id)
-            .values(reviewer_id=None)
+            update(TestCase).where(TestCase.reviewer_id == user_id).values(reviewer_id=None)
         )
         await db.execute(
-            update(TestCase)
-            .where(TestCase.approver_id == user_id)
-            .values(approver_id=None)
+            update(TestCase).where(TestCase.approver_id == user_id).values(approver_id=None)
         )
         await db.execute(
             update(TestCase)
