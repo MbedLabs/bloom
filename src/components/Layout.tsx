@@ -10,7 +10,15 @@ import {
   BookOpen, Layers, FlaskConical, LogOut, Users, PenTool, AlertTriangle, GitPullRequest, Settings, SlidersHorizontal
 } from 'lucide-react'
 
-const TESTSTATION_APP_URL = import.meta.env.VITE_TESTSTATION_APP_URL || 'http://localhost:3000'
+const getBudUrl = () => {
+  const runtimeUrl = window.runtimeConfig?.BUD_APP_URL
+  const buildTimeUrl = import.meta.env.VITE_TESTSTATION_APP_URL
+  const rawUrl = runtimeUrl || buildTimeUrl || 'http://localhost:3000'
+  // Strip trailing /api if present in the URL for navigation purposes
+  return rawUrl.replace(/\/api\/?$/, '')
+}
+
+const TESTSTATION_APP_URL = getBudUrl()
 
 function useDarkMode() {
   const [dark, setDark] = useState(() => {

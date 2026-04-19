@@ -28,11 +28,28 @@ npm run dev
 
 App runs at `http://localhost:3000` with API proxy to `localhost:8000`.
 
-## Docker
+## Deployment
+
+This frontend is designed to be environment-agnostic using runtime configuration injection.
+
+### Environment Variables
+
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `BACKEND_UPSTREAM` | Nginx upstream for the API proxy (`/api`) | `bloom-backend.bloom.svc.cluster.local:8000` |
+| `BUD_APP_URL` | URL of the Bud Test Platform (for sidebar links) | `http://localhost:3000` |
+| `BLOOM_APP_URL` | Public URL of this Bloom instance (for self-referencing) | `http://localhost:3001` |
+
+### Docker
 
 ```bash
-docker build -t bloom-frontend .
-docker run -p 3000:80 bloom-frontend
+docker build -t bloom-app-frontend .
+
+# Run with custom upstream and cross-links
+docker run -p 8081:80 \
+  -e BACKEND_UPSTREAM=backend:8000 \
+  -e BUD_APP_URL=https://bud.example.com \
+  bloom-app-frontend
 ```
 
 ## Part of EmbedLabs Suite
