@@ -23,7 +23,10 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('bloom_token')
-      window.location.href = '/login'
+      const publicPaths = ['/login', '/accept-invite', '/verify-email', '/forgot-password', '/reset-password']
+      if (!publicPaths.includes(window.location.pathname)) {
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }
@@ -39,12 +42,48 @@ export interface User {
   updated_at: string
 }
 
+export interface InviteUserResponse {
+  message: string
+  user: User
+  invite_link?: string | null
+}
+
 export const APP_VERSION = packageJson.version
 
 export interface LoginResponse {
   access_token: string
   token_type: string
   user: User
+}
+
+export interface InviteInfoResponse {
+  email: string
+  full_name: string
+  valid: boolean
+  expired: boolean
+}
+
+export interface AcceptInviteResponse {
+  requires_email_verification: boolean
+  email: string
+  message: string
+}
+
+export interface GenericMessageResponse {
+  message: string
+}
+
+export function extractApiErrorMessage(error: unknown, fallback = 'Request failed'): string {
+  if (axios.isAxiosError<{ detail?: string }>(error)) {
+    const detail = error.response?.data?.detail
+    if (typeof detail === 'string' && detail.trim().length > 0) {
+      return detail
+    }
+  }
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+  return fallback
 }
 
 export const authApi = {
@@ -64,6 +103,26 @@ export const authApi = {
     const response = await api.put<User>('/auth/me/password', { current_password: currentPassword, new_password: newPassword })
     return response.data
   },
+  getInviteInfo: async (token: string): Promise<InviteInfoResponse> => {
+    const response = await api.get<InviteInfoResponse>('/auth/invite-info', { params: { token } })
+    return response.data
+  },
+  acceptInvite: async (token: string, password: string): Promise<AcceptInviteResponse> => {
+    const response = await api.post<AcceptInviteResponse>('/auth/accept-invite', { token, password })
+    return response.data
+  },
+  verifyEmail: async (token: string): Promise<GenericMessageResponse> => {
+    const response = await api.post<GenericMessageResponse>('/auth/verify-email', { token })
+    return response.data
+  },
+  forgotPassword: async (email: string): Promise<GenericMessageResponse> => {
+    const response = await api.post<GenericMessageResponse>('/auth/forgot-password', { email })
+    return response.data
+  },
+  resetPassword: async (token: string, newPassword: string): Promise<GenericMessageResponse> => {
+    const response = await api.post<GenericMessageResponse>('/auth/reset-password', { token, new_password: newPassword })
+    return response.data
+  },
 }
 
 export const usersApi = {
@@ -77,6 +136,10 @@ export const usersApi = {
   },
   create: async (data: { email: string; full_name: string; password: string; role?: string }): Promise<User> => {
     const response = await api.post<User>('/users', data)
+    return response.data
+  },
+  invite: async (data: { email: string; full_name: string; role?: string }): Promise<InviteUserResponse> => {
+    const response = await api.post<InviteUserResponse>('/users/invite', data)
     return response.data
   },
   update: async (id: number, data: { full_name?: string; email?: string; role?: string; is_active?: boolean }): Promise<User> => {
