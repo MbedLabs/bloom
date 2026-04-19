@@ -3,13 +3,16 @@ import { useQuery } from '@tanstack/react-query'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
+import AcceptInvite from './pages/AcceptInvite'
 import Dashboard from './pages/Dashboard'
+import ForgotPassword from './pages/ForgotPassword'
 import Projects from './pages/Projects'
 import ProjectDetail from './pages/ProjectDetail'
 import TraceabilityMatrix from './pages/TraceabilityMatrix'
 import ImpactAnalysis from './pages/ImpactAnalysis'
 import TestCampaigns from './pages/TestCampaigns'
 import CampaignDetail from './pages/CampaignDetail'
+import ResetPassword from './pages/ResetPassword'
 import SuiteDetail from './pages/SuiteDetail'
 import Reports from './pages/Reports'
 import Baselines from './pages/Baselines'
@@ -20,6 +23,7 @@ import ProjectParameters from './pages/ProjectParameters'
 import DocCreate from './pages/DocCreate'
 import ImportWizard from './pages/ImportWizard'
 import UnifiedDocDetail from './pages/UnifiedDocDetail'
+import VerifyEmail from './pages/VerifyEmail'
 import { requirementsApi, testCasesApi, designsApi, risksApi, changesApi, testConceptsApi, documentsApi, projectsApi } from './api/client'
 
 function RedirectResolver({ type }: { type: 'requirement' | 'test-case' | 'document' | 'design' | 'risk' | 'change' | 'test-concept' }) {
@@ -135,6 +139,10 @@ function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/accept-invite" element={<AcceptInvite />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
         <Route path="projects" element={<Projects />} />

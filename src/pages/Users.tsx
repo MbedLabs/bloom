@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { usersApi } from '../api/client'
+import { extractApiErrorMessage, InviteUserResponse, usersApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
-import { UserPlus, Edit2, Trash2, X, Shield, Wrench, Eye } from 'lucide-react'
+import { UserPlus, Edit2, Trash2, X, Shield, Wrench, Eye, Copy, Check } from 'lucide-react'
 
 const ROLE_CONFIG = {
   admin: { label: 'Admin', color: 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400', icon: Shield },
@@ -13,19 +13,20 @@ const ROLE_CONFIG = {
 export default function UsersPage() {
   const { user: currentUser } = useAuth()
   const queryClient = useQueryClient()
-  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showInviteModal, setShowInviteModal] = useState(false)
   const [editingUser, setEditingUser] = useState<number | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [pendingDeleteUserId, setPendingDeleteUserId] = useState<number | null>(null)
 
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: usersApi.list,
   })
 
-  const createMutation = useMutation({
-    mutationFn: usersApi.create,
+  const inviteMutation = useMutation({
+    mutationFn: usersApi.invite,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
-      setShowCreateModal(false)
     },
   })
 
@@ -40,7 +41,17 @@ export default function UsersPage() {
 
   const deleteMutation = useMutation({
     mutationFn: usersApi.delete,
+    onMutate: async (id: number) => {
+      setDeleteError(null)
+      setPendingDeleteUserId(id)
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+    onError: (error: unknown) => {
+      setDeleteError(extractApiErrorMessage(error, 'Failed to delete user'))
+    },
+    onSettled: () => {
+      setPendingDeleteUserId(null)
+    },
   })
 
   if (isLoading) {
@@ -55,13 +66,19 @@ export default function UsersPage() {
           <p className="text-sm text-muted-foreground mt-1">Manage users and their roles</p>
         </div>
         <button
-          onClick={() => setShowCreateModal(true)}
+          onClick={() => setShowInviteModal(true)}
           className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary to-teal-700 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity"
         >
           <UserPlus className="h-4 w-4" />
-          Add User
+          Invite User
         </button>
       </div>
+
+      {deleteError && (
+        <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+          {deleteError}
+        </div>
+      )}
 
       <div className="bg-card border border-border rounded-xl overflow-hidden">
         <table className="w-full">
@@ -78,6 +95,7 @@ export default function UsersPage() {
             {users?.map((u) => {
               const roleConf = ROLE_CONFIG[u.role as keyof typeof ROLE_CONFIG]
               const isSelf = u.id === currentUser?.id
+              const canEditRole = !isSelf && u.role !== 'admin'
               return (
                 <tr key={u.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
                   <td className="px-4 py-3">
@@ -95,11 +113,11 @@ export default function UsersPage() {
                     {editingUser === u.id ? (
                       <select
                         defaultValue={u.role}
-                        onChange={(e) => updateMutation.mutate({ id: u.id, data: { role: e.target.value as 'admin' | 'maintainer' | 'reviewer' } })}
+                        onChange={(e) => updateMutation.mutate({ id: u.id, data: { role: e.target.value as 'maintainer' | 'reviewer' } })}
                         className="px-2 py-1 text-xs border border-input rounded bg-background text-foreground"
+                        title="Select role"
                         autoFocus
                       >
-                        <option value="admin">Admin</option>
                         <option value="maintainer">Maintainer</option>
                         <option value="reviewer">Reviewer</option>
                       </select>
@@ -122,13 +140,15 @@ export default function UsersPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => setEditingUser(editingUser === u.id ? null : u.id)}
-                        className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                        title="Edit role"
-                      >
-                        <Edit2 className="h-3.5 w-3.5" />
-                      </button>
+                      {canEditRole && (
+                        <button
+                          onClick={() => setEditingUser(editingUser === u.id ? null : u.id)}
+                          className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                          title="Edit role"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                       {!isSelf && (
                         <>
                           <button
@@ -139,11 +159,20 @@ export default function UsersPage() {
                             <Eye className="h-3.5 w-3.5" />
                           </button>
                           <button
-                            onClick={() => { if (confirm('Delete this user?')) deleteMutation.mutate(u.id) }}
+                            onClick={() => {
+                              if (pendingDeleteUserId !== u.id && confirm('Delete this user?')) {
+                                deleteMutation.mutate(u.id)
+                              }
+                            }}
+                            disabled={pendingDeleteUserId === u.id}
                             className="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                             title="Delete user"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            {pendingDeleteUserId === u.id ? (
+                              <span className="inline-block h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Trash2 className="h-3.5 w-3.5" />
+                            )}
                           </button>
                         </>
                       )}
@@ -156,65 +185,109 @@ export default function UsersPage() {
         </table>
       </div>
 
-      {showCreateModal && (
-        <CreateUserModal
-          onClose={() => setShowCreateModal(false)}
-          onSubmit={(data) => createMutation.mutate(data)}
-          isLoading={createMutation.isPending}
-          error={createMutation.error ? String(createMutation.error) : null}
+      {showInviteModal && (
+        <InviteUserModal
+          onClose={() => {
+            setShowInviteModal(false)
+            inviteMutation.reset()
+          }}
+          onSubmit={(data) => inviteMutation.mutateAsync(data)}
+          isLoading={inviteMutation.isPending}
+          error={inviteMutation.error ? extractApiErrorMessage(inviteMutation.error, 'Failed to send invitation') : null}
         />
       )}
     </div>
   )
 }
 
-function CreateUserModal({ onClose, onSubmit, isLoading, error }: {
+function InviteUserModal({ onClose, onSubmit, isLoading, error }: {
   onClose: () => void
-  onSubmit: (data: { email: string; full_name: string; password: string; role?: string }) => void
+  onSubmit: (data: { email: string; full_name: string; role?: string }) => Promise<InviteUserResponse>
   isLoading: boolean
   error: string | null
 }) {
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
-  const [password, setPassword] = useState('')
   const [role, setRole] = useState('reviewer')
+  const [inviteLink, setInviteLink] = useState<string | null>(null)
+  const [invitedEmail, setInvitedEmail] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit({ email, full_name: fullName, password, role })
+    setCopied(false)
+    try {
+      const response = await onSubmit({ email, full_name: fullName, role })
+      setInviteLink(response.invite_link ?? null)
+      setInvitedEmail(response.user.email)
+    } catch {
+      // Error is shown via mutation state in parent.
+    }
+  }
+
+  const handleCopyLink = async () => {
+    if (!inviteLink) {
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(inviteLink)
+      setCopied(true)
+    } catch {
+      window.prompt('Copy invite link:', inviteLink)
+    }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div className="bg-card border border-border rounded-xl shadow-elegant p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-foreground">Add User</h2>
-          <button onClick={onClose} className="p-1 rounded text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+          <h2 className="text-lg font-semibold text-foreground">Invite User</h2>
+          <button onClick={onClose} title="Close invite modal" className="p-1 rounded text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
         </div>
         {error && <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">{error}</div>}
+        {inviteLink && (
+          <div className="mb-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-sm">
+            <p className="text-green-700 dark:text-green-400 font-medium">Invitation sent to {invitedEmail}</p>
+            <div className="mt-2 flex gap-2">
+              <input
+                value={inviteLink}
+                readOnly
+                title="Generated invitation link"
+                aria-label="Generated invitation link"
+                placeholder="Generated invitation link"
+                className="flex-1 px-2 py-1 bg-background border border-input rounded text-xs text-foreground"
+              />
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded bg-primary text-white text-xs font-medium hover:bg-primary/90"
+              >
+                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? 'Copied' : 'Copy Link'}
+              </button>
+            </div>
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Full Name</label>
-            <input value={fullName} onChange={(e) => setFullName(e.target.value)} required className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground" />
+            <input value={fullName} onChange={(e) => setFullName(e.target.value)} required title="Full name" placeholder="Jane Doe" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground" />
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground" />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required title="Email address" placeholder="name@company.com" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground" />
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Role</label>
-            <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground">
+            <select value={role} onChange={(e) => setRole(e.target.value)} title="Role" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground">
               <option value="reviewer">Reviewer</option>
               <option value="maintainer">Maintainer</option>
               <option value="admin">Admin</option>
             </select>
           </div>
           <button type="submit" disabled={isLoading} className="w-full py-2 bg-gradient-to-r from-primary to-teal-700 text-white text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50">
-            {isLoading ? 'Creating...' : 'Create User'}
+            {isLoading ? 'Sending Invite...' : 'Send Invite'}
           </button>
         </form>
       </div>

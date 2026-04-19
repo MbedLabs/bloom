@@ -1,8 +1,9 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Flower2 } from 'lucide-react'
-import { APP_VERSION } from '../api/client'
+import { APP_VERSION, extractApiErrorMessage } from '../api/client'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -20,7 +21,7 @@ export default function Login() {
       await login(email, password)
       navigate('/', { replace: true })
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Login failed'
+      const message = extractApiErrorMessage(err, 'Login failed')
       setError(message)
     } finally {
       setLoading(false)
@@ -69,6 +70,12 @@ export default function Login() {
                 className="w-full px-3 py-2.5 bg-background border border-input rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
                 placeholder="Enter your password"
               />
+            </div>
+
+            <div className="text-right">
+              <Link to="/forgot-password" className="text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+                Forgot password?
+              </Link>
             </div>
 
             <button
