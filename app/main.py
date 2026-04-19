@@ -54,7 +54,8 @@ logging.basicConfig(
 async def seed_admin_user():
     async with async_session_maker() as session:
         result = await session.execute(select(User).where(User.email == settings.ADMIN_EMAIL))
-        if not result.scalar_one_or_none():
+        admin = result.scalar_one_or_none()
+        if admin is None:
             admin = User(
                 email=settings.ADMIN_EMAIL,
                 full_name=settings.ADMIN_FULL_NAME,
@@ -63,7 +64,11 @@ async def seed_admin_user():
                 is_active=True,
             )
             session.add(admin)
-            await session.commit()
+        else:
+            admin.role = UserRole.admin
+            admin.is_active = True
+
+        await session.commit()
 
 
 @asynccontextmanager

@@ -56,13 +56,10 @@ def send_email(
     logger.info("Sent email '%s' to %s", subject, to_email)
 
 
-def send_invite_email(
-    *, to_email: str, full_name: str, invite_link: str, temp_password: str
-) -> None:
+def send_invite_email(*, to_email: str, full_name: str, invite_link: str) -> None:
     context = {
         "full_name": full_name,
         "invite_link": invite_link,
-        "temp_password": temp_password,
         "app_name": settings.BLOOM_APP_NAME,
     }
     send_email(
@@ -84,4 +81,18 @@ def send_verification_email(*, to_email: str, full_name: str, verification_link:
         subject=f"Verify your email for {settings.BLOOM_APP_NAME}",
         text_body=render_template("verify_email.txt", context),
         html_body=render_template("verify_email.html", context),
+    )
+
+
+def send_password_reset_email(*, to_email: str, full_name: str, reset_link: str) -> None:
+    context = {
+        "full_name": full_name,
+        "reset_link": reset_link,
+        "app_name": settings.BLOOM_APP_NAME,
+    }
+    send_email(
+        to_email=to_email,
+        subject=f"Reset your password for {settings.BLOOM_APP_NAME}",
+        text_body=render_template("reset_password.txt", context),
+        html_body=render_template("reset_password.html", context),
     )

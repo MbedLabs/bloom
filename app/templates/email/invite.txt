@@ -2,12 +2,8 @@ Hello ${full_name},
 
 You have been invited to join the ${app_name} platform.
 
-Your temporary password is: ${temp_password}
-
-Please log in using your email and this temporary password at the following link:
+Use the invitation link below to set your password and activate your account:
 ${invite_link}
-
-Once you have logged in, navigate to your profile settings in the GUI to change your password.
 
 If you didn't expect this invitation, you can safely ignore this email.
 

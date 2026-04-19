@@ -7,14 +7,16 @@ import string
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.models.models import Requirement, TestCase
 from app.core.security import get_password_hash, require_role
 from app.models.user import User, UserRole
-from app.models.user_token import UserTokenPurpose
+from app.models.user_token import UserToken, UserTokenPurpose
 from app.schemas.auth import (
     InviteCreateRequest,
     InviteResponse,
@@ -104,21 +106,26 @@ async def invite_user(
         ttl_hours=settings.INVITE_TOKEN_TTL_HOURS,
         created_by_user_id=admin.id,
     )
-    invite_link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/login"
+    invite_link = (
+        f"{settings.FRONTEND_BASE_URL.rstrip('/')}/accept-invite?token={invite_token}"
+    )
 
     try:
         send_invite_email(
             to_email=user.email,
             full_name=user.full_name,
             invite_link=invite_link,
-            temp_password=temp_password,
         )
     except MailConfigurationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     await db.flush()
     await db.refresh(user)
-    return InviteResponse(message="Invitation sent", user=UserResponse.model_validate(user))
+    return InviteResponse(
+        message="Invitation sent",
+        user=UserResponse.model_validate(user),
+        invite_link=invite_link,
+    )
 
 
 @router.post("/{user_id}/resend-invite", response_model=InviteResponse)
@@ -145,21 +152,26 @@ async def resend_invite(
         ttl_hours=settings.INVITE_TOKEN_TTL_HOURS,
         created_by_user_id=admin.id,
     )
-    invite_link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/login"
+    invite_link = (
+        f"{settings.FRONTEND_BASE_URL.rstrip('/')}/accept-invite?token={invite_token}"
+    )
 
     try:
         send_invite_email(
             to_email=user.email,
             full_name=user.full_name,
             invite_link=invite_link,
-            temp_password=temp_password,
         )
     except MailConfigurationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     await db.flush()
     await db.refresh(user)
-    return InviteResponse(message="Invitation resent", user=UserResponse.model_validate(user))
+    return InviteResponse(
+        message="Invitation resent",
+        user=UserResponse.model_validate(user),
+        invite_link=invite_link,
+    )
 
 
 @router.post("/{user_id}/revoke-invite", response_model=InviteResponse)
@@ -216,6 +228,10 @@ async def update_user(
     if data.full_name is not None:
         user.full_name = data.full_name
     if data.role is not None:
+        if user.role == UserRole.admin and data.role != UserRole.admin:
+            raise HTTPException(status_code=400, detail="Admin role cannot be changed")
+        if user.role != UserRole.admin and data.role == UserRole.admin:
+            raise HTTPException(status_code=400, detail="Promoting users to admin is not allowed")
         user.role = data.role
     if data.is_active is not None:
         user.is_active = data.is_active
@@ -228,11 +244,80 @@ async def update_user(
 @router.delete("/{user_id}", status_code=204)
 async def delete_user(
     user_id: int,
-    _admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    await db.delete(user)
+
+    if admin.id == user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Admin users cannot delete their own account",
+        )
+
+    try:
+        await db.execute(
+            delete(UserToken).where(UserToken.user_id == user_id)
+        )
+        await db.execute(
+            update(UserToken)
+            .where(UserToken.created_by_user_id == user_id)
+            .values(created_by_user_id=None)
+        )
+        await db.execute(
+            update(User)
+            .where(User.invited_by_user_id == user_id)
+            .values(invited_by_user_id=None)
+        )
+
+        await db.execute(
+            update(Requirement)
+            .where(Requirement.reviewer_id == user_id)
+            .values(reviewer_id=None)
+        )
+        await db.execute(
+            update(Requirement)
+            .where(Requirement.approver_id == user_id)
+            .values(approver_id=None)
+        )
+        await db.execute(
+            update(Requirement)
+            .where(Requirement.reviewed_by_id == user_id)
+            .values(reviewed_by_id=None, reviewed_at=None)
+        )
+        await db.execute(
+            update(Requirement)
+            .where(Requirement.approved_by_id == user_id)
+            .values(approved_by_id=None, approved_at=None)
+        )
+
+        await db.execute(
+            update(TestCase)
+            .where(TestCase.reviewer_id == user_id)
+            .values(reviewer_id=None)
+        )
+        await db.execute(
+            update(TestCase)
+            .where(TestCase.approver_id == user_id)
+            .values(approver_id=None)
+        )
+        await db.execute(
+            update(TestCase)
+            .where(TestCase.reviewed_by_id == user_id)
+            .values(reviewed_by_id=None, reviewed_at=None)
+        )
+        await db.execute(
+            update(TestCase)
+            .where(TestCase.approved_by_id == user_id)
+            .values(approved_by_id=None, approved_at=None)
+        )
+
+        await db.delete(user)
+    except IntegrityError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="User could not be deleted because related records still reference this account",
+        ) from exc
