@@ -85,9 +85,9 @@ async def invite_user(
             hashed_password=get_password_hash(temp_password),
             role=data.role,
             is_active=True,
-            invited_at=datetime.now(timezone.utc),
+            invited_at=datetime.utcnow(),
             invited_by_user_id=admin.id,
-            last_invite_sent_at=datetime.now(timezone.utc),
+            last_invite_sent_at=datetime.utcnow(),
         )
         db.add(user)
         await db.flush()
@@ -95,9 +95,9 @@ async def invite_user(
         user.full_name = data.full_name
         user.role = data.role
         user.hashed_password = get_password_hash(temp_password)
-        user.invited_at = user.invited_at or datetime.now(timezone.utc)
+        user.invited_at = user.invited_at or datetime.utcnow()
         user.invited_by_user_id = admin.id
-        user.last_invite_sent_at = datetime.now(timezone.utc)
+        user.last_invite_sent_at = datetime.utcnow()
 
     invite_token = await create_user_token(
         db,
@@ -139,7 +139,7 @@ async def resend_invite(
     if user.password_set_at is not None:
         raise HTTPException(status_code=400, detail="Invite already accepted")
 
-    user.last_invite_sent_at = datetime.now(timezone.utc)
+    user.last_invite_sent_at = datetime.utcnow()
     alphabet = string.ascii_letters + string.digits
     temp_password = "".join(secrets.choice(alphabet) for _ in range(12))
     user.hashed_password = get_password_hash(temp_password)
