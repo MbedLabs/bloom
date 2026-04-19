@@ -111,7 +111,7 @@ async def change_password(
     if not verify_password(data.current_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
     current_user.hashed_password = get_password_hash(data.new_password)
-    current_user.password_set_at = datetime.now(timezone.utc)
+    current_user.password_set_at = datetime.utcnow()
     await db.flush()
     await db.refresh(current_user)
     return UserResponse.model_validate(current_user)
@@ -127,7 +127,7 @@ async def get_invite_info(token: str, db: AsyncSession = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    expired = user_token.expires_at < datetime.now(timezone.utc)
+    expired = user_token.expires_at < datetime.utcnow()
     used = user_token.used_at is not None
     return InviteInfoResponse(
         email=user.email,
@@ -151,7 +151,7 @@ async def accept_invite(data: AcceptInviteRequest, db: AsyncSession = Depends(ge
         raise HTTPException(status_code=400, detail="Invite already accepted")
 
     user.hashed_password = get_password_hash(data.password)
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     user.invite_accepted_at = now
     user.password_set_at = now
     await mark_token_used(db, user_token)
@@ -199,7 +199,7 @@ async def verify_email(data: VerifyEmailRequest, db: AsyncSession = Depends(get_
     if user.email_verified_at is not None:
         raise HTTPException(status_code=400, detail="Email already verified")
 
-    user.email_verified_at = datetime.now(timezone.utc)
+    user.email_verified_at = datetime.utcnow()
     await mark_token_used(db, user_token)
     await db.flush()
     return GenericMessageResponse(message="Email verified successfully")
@@ -291,7 +291,7 @@ async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(
         raise HTTPException(status_code=404, detail="User not found")
 
     user.hashed_password = get_password_hash(data.new_password)
-    user.password_set_at = datetime.now(timezone.utc)
+    user.password_set_at = datetime.utcnow()
     await mark_token_used(db, user_token)
     await db.flush()
     return GenericMessageResponse(message="Password reset successfully")
