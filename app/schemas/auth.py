@@ -37,6 +37,7 @@ class InviteCreateRequest(BaseModel):
 class InviteResponse(BaseModel):
     message: str
     user: "UserResponse"
+    invite_link: str | None = None
 
 
 class UserUpdate(BaseModel):
@@ -89,6 +90,15 @@ class AcceptInviteResponse(BaseModel):
 
 class VerifyEmailRequest(BaseModel):
     token: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=6)
 
 
 class GenericMessageResponse(BaseModel):

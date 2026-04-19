@@ -62,6 +62,14 @@ New auth endpoints:
 - `POST /api/auth/accept-invite`
 - `POST /api/auth/verify-email`
 - `POST /api/auth/resend-verification`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
+
+Frontend public routes expected by email links:
+
+- `/accept-invite?token=...`
+- `/verify-email?token=...`
+- `/reset-password?token=...`
 
 ## API Endpoints
 

@@ -2,6 +2,7 @@
 Auth API endpoints: login, get current user, update profile.
 """
 
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -22,16 +23,22 @@ from app.models.user_token import UserTokenPurpose
 from app.schemas.auth import (
     AcceptInviteRequest,
     AcceptInviteResponse,
+    ForgotPasswordRequest,
     GenericMessageResponse,
     InviteInfoResponse,
     LoginRequest,
     PasswordChange,
+    ResetPasswordRequest,
     TokenResponse,
     UserResponse,
     UserUpdate,
     VerifyEmailRequest,
 )
-from app.services.mail_service import MailConfigurationError, send_verification_email
+from app.services.mail_service import (
+    MailConfigurationError,
+    send_password_reset_email,
+    send_verification_email,
+)
 from app.services.token_service import (
     TokenValidationError,
     create_user_token,
@@ -41,6 +48,7 @@ from app.services.token_service import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -228,3 +236,62 @@ async def resend_verification(
 
     await db.flush()
     return GenericMessageResponse(message="Verification email sent")
+
+
+@router.post("/forgot-password", response_model=GenericMessageResponse)
+@limiter.limit("5/hour")
+async def forgot_password(
+    request: Request,
+    data: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    response = GenericMessageResponse(
+        message="If the account exists, a password reset email has been sent"
+    )
+
+    result = await db.execute(select(User).where(User.email == data.email))
+    user = result.scalar_one_or_none()
+    if not user or not user.is_active:
+        return response
+
+    reset_token = await create_user_token(
+        db,
+        user_id=user.id,
+        purpose=UserTokenPurpose.password_reset,
+        ttl_hours=settings.PASSWORD_RESET_TOKEN_TTL_HOURS,
+    )
+    reset_link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/reset-password?token={reset_token}"
+
+    try:
+        send_password_reset_email(
+            to_email=user.email,
+            full_name=user.full_name,
+            reset_link=reset_link,
+        )
+    except MailConfigurationError:
+        logger.exception("Password reset email could not be sent for user_id=%s", user.id)
+
+    await db.flush()
+    return response
+
+
+@router.post("/reset-password", response_model=GenericMessageResponse)
+async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    try:
+        user_token = await get_valid_token(
+            db,
+            token=data.token,
+            purpose=UserTokenPurpose.password_reset,
+        )
+    except TokenValidationError as exc:
+        raise HTTPException(status_code=400, detail=exc.detail) from exc
+
+    user = await db.get(User, user_token.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.hashed_password = get_password_hash(data.new_password)
+    user.password_set_at = datetime.utcnow()
+    await mark_token_used(db, user_token)
+    await db.flush()
+    return GenericMessageResponse(message="Password reset successfully")
