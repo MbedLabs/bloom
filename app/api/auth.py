@@ -304,14 +304,36 @@ async def generate_api_token(
 ):
     """
     Generate a long-lived API token for the current admin.
+    Invalidates any previous API tokens for this user.
     """
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admins can generate API tokens")
 
+    import secrets
+
+    new_jti = secrets.token_hex(16)
+
     # Generate a token with a long expiry (e.g., 1 year)
     access_token = create_access_token(
-        data={"sub": str(current_user.id), "type": "api_token"}, expires_delta=timedelta(days=365)
+        data={"sub": str(current_user.id), "type": "api_token", "jti": new_jti},
+        expires_delta=timedelta(days=365),
     )
+
+    # Invalidate previous tokens by updating JTI
+    current_user.api_token_jti = new_jti
+    await db.flush()
+
+    # Notify admin via email
+    try:
+        from app.services.mail_service import send_email
+
+        send_email(
+            to_email=current_user.email,
+            subject="New Bloom API Token Generated",
+            html_content=f"<p>Hello {current_user.full_name},</p><p>A new API token has been generated for your account. Any previous API tokens have been invalidated.</p><p>If you did not perform this action, please secure your account immediately.</p>",
+        )
+    except Exception:
+        logger.exception("Could not send token generation notification")
 
     return TokenResponse(
         access_token=access_token,

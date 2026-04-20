@@ -37,6 +37,7 @@ class User(Base):
     invite_accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     password_set_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     email_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    api_token_jti: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
