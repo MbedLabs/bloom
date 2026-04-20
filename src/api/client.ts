@@ -123,6 +123,10 @@ export const authApi = {
     const response = await api.post<GenericMessageResponse>('/auth/reset-password', { token, new_password: newPassword })
     return response.data
   },
+  generateToken: async (): Promise<{ access_token: string }> => {
+    const response = await api.post<{ access_token: string }>('/auth/token/generate')
+    return response.data
+  },
 }
 
 export const usersApi = {
