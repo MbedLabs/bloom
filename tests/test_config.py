@@ -4,7 +4,6 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characte
 
 from app.core.config import Settings
 
-
 CONFIG_ENV_KEYS = [
     "ACCESS_TOKEN_EXPIRE_MINUTES",
     "ADMIN_EMAIL",
