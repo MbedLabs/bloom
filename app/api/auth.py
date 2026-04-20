@@ -330,8 +330,10 @@ async def generate_api_token(
         send_email(
             to_email=current_user.email,
             subject="New Bloom API Token Generated",
-            html_content=f"<p>Hello {current_user.full_name},</p><p>A new API token has been generated for your account. Any previous API tokens have been invalidated.</p><p>If you did not perform this action, please secure your account immediately.</p>",
+            text_body="A new API token has been generated for your account. Any previous API tokens have been invalidated.",
+            html_body=f"<p>Hello {current_user.full_name},</p><p>A new API token has been generated for your account. Any previous API tokens have been invalidated.</p><p>If you did not perform this action, please secure your account immediately.</p>",
         )
+
     except Exception:
         logger.exception("Could not send token generation notification")
 

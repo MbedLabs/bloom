@@ -1,6 +1,7 @@
 """Schemas package initialization."""
 
 from app.schemas.schemas import (
+    ALMIntegrationSettings,
     ArtefactActivityResponse,
     ArtefactCommentCreate,
     ArtefactCommentResponse,
@@ -8,6 +9,7 @@ from app.schemas.schemas import (
     ArtefactLinkResponse,
     ArtefactRelatedResponse,
     ArtefactTransitionRequest,
+    AutomatedResult,
     BaselineCreate,
     BaselineResponse,
     BaselineUpdate,
@@ -52,6 +54,8 @@ from app.schemas.schemas import (
     RiskItemResponse,
     RiskItemUpdate,
     SectionReorder,
+    SyncResultsRequest,
+    SyncResultsResponse,
     TestCampaignCreate,
     TestCampaignDetailResponse,
     TestCampaignItemResponse,
@@ -164,4 +168,8 @@ __all__ = [
     "ArtefactRelatedResponse",
     "ArtefactLinkCreate",
     "ArtefactLinkResponse",
+    "SyncResultsRequest",
+    "SyncResultsResponse",
+    "AutomatedResult",
+    "ALMIntegrationSettings",
 ]

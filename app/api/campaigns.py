@@ -22,6 +22,8 @@ from app.models import (
 from app.models.user import User, UserRole
 from app.schemas import (
     RequirementSummary,
+    SyncResultsRequest,
+    SyncResultsResponse,
     TestCampaignCreate,
     TestCampaignDetailResponse,
     TestCampaignItemResponse,
@@ -36,6 +38,54 @@ from app.schemas import (
 )
 
 router = APIRouter()
+...
+
+
+@router.post("/{campaign_id}/sync-results", response_model=SyncResultsResponse)
+async def sync_results(
+    campaign_id: int,
+    data: SyncResultsRequest,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+):
+    """
+    Ingest automated test results for a campaign in bulk.
+    Matches results to campaign items using the test case ID (tc_id).
+    """
+    campaign = (
+        await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
+    ).scalar_one_or_none()
+
+    if not campaign:
+        raise HTTPException(404, "Campaign not found")
+
+    # Get all items in this campaign joined with their test cases
+    items_result = await db.execute(
+        select(TestCampaignItem, TestCase)
+        .join(TestCase, TestCampaignItem.test_case_id == TestCase.id)
+        .where(TestCampaignItem.campaign_id == campaign_id)
+    )
+
+    # Map tc_id to campaign item
+    tc_id_to_item = {tc.tc_id: item for item, tc in items_result.all()}
+
+    updated_count = 0
+    not_found = []
+
+    for res in data.results:
+        item = tc_id_to_item.get(res.tc_id)
+        if item:
+            item.status = "Executed"
+            item.result = res.status
+            item.comment = res.comment
+            item.executed_at = res.executed_at or datetime.utcnow()
+            updated_count += 1
+        else:
+            not_found.append(res.tc_id)
+
+    await db.commit()
+
+    return SyncResultsResponse(updated=updated_count, not_found=not_found)
 
 
 # ==================== Configurations ====================
