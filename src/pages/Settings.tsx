@@ -5,14 +5,32 @@ import { useAuth } from '../contexts/AuthContext'
 
 const COMMON_TIMEZONES = [
   { label: 'Auto (Browser)', value: 'auto' },
-  { label: 'UTC', value: 'UTC' },
-  ...Array.from({ length: 25 }, (_, i) => {
-    const offset = i - 12
-    const label = offset >= 0 ? `UTC+${offset}` : `UTC${offset}`
-    return { label, value: label }
-  }),
-  { label: 'UTC+13', value: 'UTC+13' },
-  { label: 'UTC+14', value: 'UTC+14' },
+  { label: 'UTC+0', value: 'UTC' },
+  { label: 'UTC+1', value: 'Etc/GMT-1' },
+  { label: 'UTC+2', value: 'Etc/GMT-2' },
+  { label: 'UTC+3', value: 'Etc/GMT-3' },
+  { label: 'UTC+4', value: 'Etc/GMT-4' },
+  { label: 'UTC+5', value: 'Etc/GMT-5' },
+  { label: 'UTC+5.5', value: 'Asia/Kolkata' },
+  { label: 'UTC+6', value: 'Etc/GMT-6' },
+  { label: 'UTC+7', value: 'Etc/GMT-7' },
+  { label: 'UTC+8', value: 'Etc/GMT-8' },
+  { label: 'UTC+9', value: 'Etc/GMT-9' },
+  { label: 'UTC+10', value: 'Etc/GMT-10' },
+  { label: 'UTC+11', value: 'Etc/GMT-11' },
+  { label: 'UTC+12', value: 'Etc/GMT-12' },
+  { label: 'UTC-1', value: 'Etc/GMT+1' },
+  { label: 'UTC-2', value: 'Etc/GMT+2' },
+  { label: 'UTC-3', value: 'Etc/GMT+3' },
+  { label: 'UTC-4', value: 'Etc/GMT+4' },
+  { label: 'UTC-5', value: 'Etc/GMT+5' },
+  { label: 'UTC-6', value: 'Etc/GMT+6' },
+  { label: 'UTC-7', value: 'Etc/GMT+7' },
+  { label: 'UTC-8', value: 'Etc/GMT+8' },
+  { label: 'UTC-9', value: 'Etc/GMT+9' },
+  { label: 'UTC-10', value: 'Etc/GMT+10' },
+  { label: 'UTC-11', value: 'Etc/GMT+11' },
+  { label: 'UTC-12', value: 'Etc/GMT+12' },
 ]
 
 function useDarkMode() {
@@ -58,7 +76,6 @@ export default function Settings() {
   const handleGenerateToken = async () => {
     setIsGenerating(true)
     try {
-      // Note: This endpoint will be added to backend in the next step
       const response = await authApi.generateToken()
       setGeneratedToken(response.access_token)
     } catch (error) {
@@ -113,7 +130,6 @@ export default function Settings() {
         <div className="p-5 space-y-4">
           <div className="space-y-2">
             <p className="text-sm font-medium text-foreground">Display Timezone</p>
-            <p className="text-xs text-muted-foreground">Choose your preferred timezone for date and time displays.</p>
             <div className="max-w-sm mt-3">
               <select
                 value={timezone}
@@ -129,12 +145,12 @@ export default function Settings() {
             </div>
           </div>
           <p className="text-[10px] text-muted-foreground italic">
-            * Page will reload to apply timezone changes.
+            * Page will reload to apply changes.
           </p>
         </div>
       </div>
 
-      {/* User Token Management (Admin Only) */}
+      {/* ALM Integration Token Management (Admin Only) */}
       {isAdmin && (
         <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden border-primary/20">
           <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-primary/5">
@@ -191,7 +207,7 @@ export default function Settings() {
 
       {/* About */}
       <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden">
-        <div className="px-5 py-4 border-b border-border flex items-center gap-2">
+        <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-muted/30">
           <Info className="h-4 w-4 text-primary" />
           <h3 className="text-sm font-semibold text-foreground">About</h3>
         </div>

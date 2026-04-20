@@ -2,6 +2,10 @@
  * Date and time utilities for the Bloom ALM.
  */
 
+/**
+ * Format an ISO date string to a human-readable format, 
+ * respecting the user's preferred timezone setting.
+ */
 export function formatDateTime(
   dateString: string | null | undefined, 
   options: Intl.DateTimeFormatOptions = {
@@ -17,12 +21,9 @@ export function formatDateTime(
   
   try {
     const date = new Date(dateString)
-    let preferredTz = localStorage.getItem('bloom-timezone') || 'auto'
-    
-    // Normalize UTC selection
-    if (preferredTz.toLowerCase() === 'utc') {
-      preferredTz = 'UTC'
-    }
+    if (isNaN(date.getTime())) return dateString
+
+    const preferredTz = localStorage.getItem('bloom-timezone') || 'auto'
     
     const finalOptions: Intl.DateTimeFormatOptions = { ...options }
     if (preferredTz !== 'auto') {
@@ -32,6 +33,10 @@ export function formatDateTime(
     return new Intl.DateTimeFormat(undefined, finalOptions).format(date)
   } catch (e) {
     console.error('Error formatting date:', e)
-    return dateString
+    try {
+        return new Date(dateString).toLocaleString()
+    } catch {
+        return dateString
+    }
   }
 }
