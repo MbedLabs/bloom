@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from app.api import artefacts
 from app.api import auth as auth_api
@@ -38,7 +38,7 @@ from app.api import (
 )
 from app.api import users as users_api
 from app.core.config import settings
-from app.core.database import async_session_maker, create_tables
+from app.core.database import async_session_maker, create_tables, engine
 from app.core.deps import limiter
 from app.core.security import get_password_hash
 from app.models.user import User, UserRole
@@ -71,10 +71,22 @@ async def seed_admin_user():
         await session.commit()
 
 
+async def migrate_user_columns() -> None:
+    """Ensure newer user columns exist on legacy databases."""
+    if engine.dialect.name != "postgresql":
+        return
+
+    async with engine.begin() as conn:
+        await conn.execute(
+            text("ALTER TABLE users ADD COLUMN IF NOT EXISTS api_token_jti VARCHAR(255) NULL")
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     await create_tables()
+    await migrate_user_columns()
     await seed_admin_user()
     yield
 
