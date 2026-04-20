@@ -1,6 +1,19 @@
-import { useEffect, useState } from 'react'
-import { Monitor, Sun, Moon, Key, Info, ExternalLink } from 'lucide-react'
-import { APP_VERSION } from '../api/client'
+import { useState, useEffect } from 'react'
+import { Sun, Moon, Monitor, Key, Info, ExternalLink, Globe, ShieldCheck, Copy, Check, Loader2, RefreshCw } from 'lucide-react'
+import { APP_VERSION, authApi, extractApiErrorMessage } from '../api/client'
+import { useAuth } from '../contexts/AuthContext'
+
+const COMMON_TIMEZONES = [
+  { label: 'Auto (Browser)', value: 'auto' },
+  { label: 'UTC', value: 'UTC' },
+  ...Array.from({ length: 25 }, (_, i) => {
+    const offset = i - 12
+    const label = offset >= 0 ? `UTC+${offset}` : `UTC${offset}`
+    return { label, value: label }
+  }),
+  { label: 'UTC+13', value: 'UTC+13' },
+  { label: 'UTC+14', value: 'UTC+14' },
+]
 
 function useDarkMode() {
   const [dark, setDark] = useState(() => {
@@ -11,8 +24,11 @@ function useDarkMode() {
 
   useEffect(() => {
     const root = document.documentElement
-    if (dark) root.classList.add('dark')
-    else root.classList.remove('dark')
+    if (dark) {
+      root.classList.add('dark')
+    } else {
+      root.classList.remove('dark')
+    }
     localStorage.setItem('bloom-theme', dark ? 'dark' : 'light')
   }, [dark])
 
@@ -20,9 +36,20 @@ function useDarkMode() {
 }
 
 export default function Settings() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
+  
   const [dark, setDark] = useDarkMode()
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('bloom-api-key') || '')
   const [saved, setSaved] = useState(false)
+
+  // Timezone state
+  const [timezone, setTimezone] = useState(() => localStorage.getItem('bloom-timezone') || 'auto')
+
+  // Token Generation state
+  const [generatedToken, setGeneratedToken] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const handleSaveKey = () => {
     localStorage.setItem('bloom-api-key', apiKey)
@@ -30,17 +57,43 @@ export default function Settings() {
     setTimeout(() => setSaved(false), 2000)
   }
 
+  const handleTimezoneChange = (newTz: string) => {
+    setTimezone(newTz)
+    localStorage.setItem('bloom-timezone', newTz)
+    window.location.reload()
+  }
+
+  const handleGenerateToken = async () => {
+    setIsGenerating(true)
+    try {
+      // Note: This endpoint will be added to backend in the next step
+      const response = await authApi.generateToken()
+      setGeneratedToken(response.access_token)
+    } catch (error) {
+      alert(`Error generating token: ${extractApiErrorMessage(error)}`)
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(generatedToken)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   return (
-    <div className="max-w-2xl space-y-6 animate-fade-in">
+    <div className="max-w-2xl space-y-6 animate-fade-in pb-20">
+      {/* Appearance */}
       <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden">
-        <div className="px-5 py-4 border-b border-border flex items-center gap-2">
+        <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-muted/30">
           <Monitor className="h-4 w-4 text-primary" />
           <h3 className="text-sm font-semibold text-foreground">Appearance</h3>
         </div>
-        <div className="p-5">
+        <div className="p-5 space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-foreground">Theme</p>
+              <p className="text-sm font-medium text-foreground">Theme Mode</p>
               <p className="text-xs text-muted-foreground mt-0.5">Toggle between light and dark mode</p>
             </div>
             <button
@@ -59,8 +112,94 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* Regional Settings */}
       <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden">
-        <div className="px-5 py-4 border-b border-border flex items-center gap-2">
+        <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-muted/30">
+          <Globe className="h-4 w-4 text-emerald-500" />
+          <h3 className="text-sm font-semibold text-foreground">Regional Settings</h3>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-foreground">Display Timezone</p>
+            <p className="text-xs text-muted-foreground">Choose your preferred timezone for date and time displays.</p>
+            <div className="max-w-sm mt-3">
+              <select
+                value={timezone}
+                onChange={(e) => handleTimezoneChange(e.target.value)}
+                className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                {COMMON_TIMEZONES.map((tz) => (
+                  <option key={tz.value} value={tz.value}>
+                    {tz.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground italic">
+            * Page will reload to apply timezone changes.
+          </p>
+        </div>
+      </div>
+
+      {/* User Token Management (Admin Only) */}
+      {isAdmin && (
+        <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden border-primary/20">
+          <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-primary/5">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold text-foreground">User Token Management</h3>
+          </div>
+          <div className="p-5 space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground">Generate API Token</p>
+              <p className="text-xs text-muted-foreground">Generate a long-lived JWT token for external integrations (e.g., Bud Platform).</p>
+            </div>
+
+            {generatedToken ? (
+              <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="relative">
+                  <textarea
+                    readOnly
+                    value={generatedToken}
+                    className="w-full h-24 px-3 py-2 bg-muted/50 border border-border rounded-md text-[11px] font-mono text-foreground resize-none focus:outline-none"
+                  />
+                  <button
+                    onClick={copyToClipboard}
+                    className="absolute right-2 top-2 p-1.5 bg-background border border-border rounded-md hover:bg-accent transition-colors"
+                    title="Copy to clipboard"
+                  >
+                    {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
+                  </button>
+                </div>
+                <div className="flex justify-between items-center">
+                  <p className="text-[10px] text-amber-600 font-medium">⚠️ Copy this token now. It will not be shown again.</p>
+                  <button
+                    onClick={() => setGeneratedToken('')}
+                    className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-start">
+                <button
+                  onClick={handleGenerateToken}
+                  disabled={isGenerating}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  Generate New Token
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* API Configuration */}
+      <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden">
+        <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-muted/30">
           <Key className="h-4 w-4 text-primary" />
           <h3 className="text-sm font-semibold text-foreground">API Configuration</h3>
         </div>
@@ -75,7 +214,7 @@ export default function Settings() {
           </div>
           <div>
             <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
-              API Key
+              Local API Key (Browser)
             </label>
             <div className="flex gap-2">
               <input
@@ -96,6 +235,7 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* About */}
       <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center gap-2">
           <Info className="h-4 w-4 text-primary" />
