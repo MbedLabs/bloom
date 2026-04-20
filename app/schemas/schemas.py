@@ -5,7 +5,7 @@ Pydantic schemas for API request/response validation.
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 # ==================== Project Schemas ====================
 
@@ -46,6 +46,10 @@ class ProjectResponse(BaseModel):
     test_concept_count: int = 0
     test_suite_count: int = 0
 
+    @field_serializer("created_at", "updated_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
+
     class Config:
         from_attributes = True
 
@@ -74,6 +78,10 @@ class ProjectVariableResponse(BaseModel):
     description: Optional[str]
     created_at: datetime
     updated_at: datetime
+
+    @field_serializer("created_at", "updated_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
 
     class Config:
         from_attributes = True
@@ -112,12 +120,20 @@ class RequirementVerifiedByLinkResponse(BaseModel):
     created_at: datetime
     test_case: TestCaseSummary
 
+    @field_serializer("created_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
+
 
 class TestCaseVerifiesLinkResponse(BaseModel):
     id: int
     link_type: str
     created_at: datetime
     requirement: RequirementSummary
+
+    @field_serializer("created_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
 
 
 # ==================== Requirement Schemas ====================
@@ -173,8 +189,8 @@ class RequirementResponse(BaseModel):
     approver_id: Optional[int]
     reviewed_by_id: Optional[int]
     approved_by_id: Optional[int]
-    reviewed_at: Optional[datetime]
-    approved_at: Optional[datetime]
+    reviewed_at: Optional[datetime] = None
+    approved_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
     children: List["RequirementResponse"] = []
@@ -184,6 +200,10 @@ class RequirementResponse(BaseModel):
     linked_test_runs: List["TestRunLinkResponse"] = []
     suite_backlinks: List[TestSuiteSummary] = []
     campaign_backlinks: List[TestCampaignSummary] = []
+
+    @field_serializer("created_at", "updated_at", "reviewed_at", "approved_at")
+    def serialize_dt(self, dt: Optional[datetime], _info):
+        return f"{dt.isoformat()}Z" if dt else None
 
     class Config:
         from_attributes = True
@@ -246,6 +266,10 @@ class TestCaseResponse(BaseModel):
     suite_memberships: List[TestSuiteSummary] = []
     campaign_memberships: List[TestCampaignSummary] = []
 
+    @field_serializer("created_at", "updated_at", "reviewed_at", "approved_at")
+    def serialize_dt(self, dt: Optional[datetime], _info):
+        return f"{dt.isoformat()}Z" if dt else None
+
     class Config:
         from_attributes = True
 
@@ -270,6 +294,10 @@ class RequirementTestCaseResponse(BaseModel):
     link_type: str
     created_at: datetime
 
+    @field_serializer("created_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
+
     class Config:
         from_attributes = True
 
@@ -285,6 +313,10 @@ class RequirementLinkResponse(BaseModel):
     target_id: int
     link_type: str
     created_at: datetime
+
+    @field_serializer("created_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
 
     class Config:
         from_attributes = True
@@ -312,6 +344,10 @@ class TestRunLinkResponse(BaseModel):
     teststation_url: Optional[str]
     status: Optional[str]
     created_at: datetime
+
+    @field_serializer("created_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
 
     class Config:
         from_attributes = True
@@ -424,6 +460,10 @@ class DocumentSectionResponse(BaseModel):
     updated_at: datetime
     child_sections: List["DocumentSectionResponse"] = []
 
+    @field_serializer("created_at", "updated_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
+
     class Config:
         from_attributes = True
 
@@ -443,6 +483,10 @@ class DocumentResponse(BaseModel):
     updated_at: datetime
     section_count: int = 0
 
+    @field_serializer("created_at", "updated_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
+
     class Config:
         from_attributes = True
 
@@ -461,6 +505,10 @@ class DocumentDetailResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     sections: List[DocumentSectionResponse] = []
+
+    @field_serializer("created_at", "updated_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
 
     class Config:
         from_attributes = True
@@ -498,6 +546,10 @@ class TestConfigurationResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    @field_serializer("created_at", "updated_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
+
     class Config:
         from_attributes = True
 
@@ -524,6 +576,10 @@ class TestSuiteItemResponse(BaseModel):
     created_at: datetime
     test_case: Optional[TestCaseSummary] = None
 
+    @field_serializer("created_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
+
     class Config:
         from_attributes = True
 
@@ -538,6 +594,10 @@ class TestSuiteResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     total_items: int = 0
+
+    @field_serializer("created_at", "updated_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
 
     class Config:
         from_attributes = True
@@ -583,6 +643,10 @@ class TestCampaignItemResponse(BaseModel):
     created_at: datetime
     test_case: Optional[TestCaseResponse] = None
 
+    @field_serializer("executed_at", "created_at")
+    def serialize_dt(self, dt: Optional[datetime], _info):
+        return f"{dt.isoformat()}Z" if dt else None
+
     class Config:
         from_attributes = True
 
@@ -609,6 +673,10 @@ class TestCampaignResponse(BaseModel):
     pending: int = 0
     configuration: Optional[TestConfigurationResponse] = None
     suite: Optional[TestSuiteSummary] = None
+
+    @field_serializer("started_at", "completed_at", "created_at", "updated_at")
+    def serialize_dt(self, dt: Optional[datetime], _info):
+        return f"{dt.isoformat()}Z" if dt else None
 
     class Config:
         from_attributes = True
@@ -643,6 +711,10 @@ class ArtefactLinkResponse(BaseModel):
     role: str
     suspect: bool
     created_at: datetime
+
+    @field_serializer("created_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
 
     class Config:
         from_attributes = True
@@ -682,6 +754,10 @@ class DesignItemResponse(BaseModel):
     linked_requirement_id: Optional[int]
     created_at: datetime
     updated_at: datetime
+
+    @field_serializer("created_at", "updated_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
 
     class Config:
         from_attributes = True
@@ -728,6 +804,10 @@ class RiskItemResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    @field_serializer("created_at", "updated_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
+
     class Config:
         from_attributes = True
 
@@ -770,6 +850,10 @@ class ChangeRequestResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    @field_serializer("created_at", "updated_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
+
     class Config:
         from_attributes = True
 
@@ -801,6 +885,10 @@ class BaselineResponse(BaseModel):
     snapshot: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: datetime
+
+    @field_serializer("created_at", "updated_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
 
     class Config:
         from_attributes = True
@@ -838,6 +926,10 @@ class TestConceptResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    @field_serializer("created_at", "updated_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
+
     class Config:
         from_attributes = True
 
@@ -857,6 +949,10 @@ class ArtefactCommentResponse(BaseModel):
     body: str
     created_at: datetime
 
+    @field_serializer("created_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
+
     class Config:
         from_attributes = True
 
@@ -868,6 +964,10 @@ class ArtefactActivityResponse(BaseModel):
     event_type: str
     summary: str
     created_at: datetime
+
+    @field_serializer("created_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
 
     class Config:
         from_attributes = True
