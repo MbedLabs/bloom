@@ -1017,3 +1017,26 @@ class ArtefactRelatedResponse(BaseModel):
 RequirementResponse.model_rebuild()
 DocumentSectionResponse.model_rebuild()
 ImpactNode.model_rebuild()
+
+
+class AutomatedResult(BaseModel):
+    tc_id: str  # e.g., "PRJ-TC-001"
+    status: str  # "Passed", "Failed", "Skipped"
+    comment: Optional[str] = None
+    executed_at: Optional[datetime] = None
+
+
+class SyncResultsRequest(BaseModel):
+    results: List[AutomatedResult]
+
+
+class SyncResultsResponse(BaseModel):
+    updated: int
+    not_found: List[str]
+
+
+class ALMIntegrationSettings(BaseModel):
+    """Schema for ALM integration settings (Bloom)."""
+
+    bloom_url: str
+    bloom_token: str
