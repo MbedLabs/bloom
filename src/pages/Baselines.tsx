@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Layers, Plus, GitCompareArrows } from 'lucide-react'
 
 import { baselinesApi, projectsApi } from '../api/client'
+import { formatDateTime } from '../test/date-utils'
 
 export default function Baselines() {
   const queryClient = useQueryClient()
@@ -100,7 +101,7 @@ export default function Baselines() {
                   </div>
                   <div className="text-right text-sm text-muted-foreground">
                     <div>{selectedBaseline.baseline_type}</div>
-                    <div>{new Date(selectedBaseline.created_at).toLocaleString()}</div>
+                    <div>{formatDateTime(selectedBaseline.created_at)}</div>
                   </div>
                 </div>
 

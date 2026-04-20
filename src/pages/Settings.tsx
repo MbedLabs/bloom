@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Sun, Moon, Monitor, Key, Info, ExternalLink, Globe, ShieldCheck, Copy, Check, Loader2, RefreshCw } from 'lucide-react'
+import { Sun, Moon, Monitor, Info, ExternalLink, Globe, ShieldCheck, Copy, Check, Loader2, RefreshCw } from 'lucide-react'
 import { APP_VERSION, authApi, extractApiErrorMessage } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -40,8 +40,6 @@ export default function Settings() {
   const isAdmin = user?.role === 'admin'
   
   const [dark, setDark] = useDarkMode()
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('bloom-api-key') || '')
-  const [saved, setSaved] = useState(false)
 
   // Timezone state
   const [timezone, setTimezone] = useState(() => localStorage.getItem('bloom-timezone') || 'auto')
@@ -50,12 +48,6 @@ export default function Settings() {
   const [generatedToken, setGeneratedToken] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
-
-  const handleSaveKey = () => {
-    localStorage.setItem('bloom-api-key', apiKey)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
-  }
 
   const handleTimezoneChange = (newTz: string) => {
     setTimezone(newTz)
@@ -147,7 +139,7 @@ export default function Settings() {
         <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden border-primary/20">
           <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-primary/5">
             <ShieldCheck className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">User Token Management</h3>
+            <h3 className="text-sm font-semibold text-foreground">ALM Integration Token Management</h3>
           </div>
           <div className="p-5 space-y-4">
             <div className="space-y-2">
@@ -196,44 +188,6 @@ export default function Settings() {
           </div>
         </div>
       )}
-
-      {/* API Configuration */}
-      <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden">
-        <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-muted/30">
-          <Key className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-semibold text-foreground">API Configuration</h3>
-        </div>
-        <div className="p-5 space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
-              API URL
-            </label>
-            <div className="px-3 py-2 bg-muted rounded-md text-sm text-muted-foreground font-mono">
-              {window.location.origin}/api
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
-              Local API Key (Browser)
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="Enter your API key..."
-                className="flex-1 px-3 py-2 bg-background border border-input rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
-              />
-              <button
-                onClick={handleSaveKey}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
-              >
-                {saved ? 'Saved!' : 'Save'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* About */}
       <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden">
