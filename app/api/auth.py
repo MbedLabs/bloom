@@ -3,7 +3,7 @@ Auth API endpoints: login, get current user, update profile.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
@@ -295,3 +295,25 @@ async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(
     await mark_token_used(db, user_token)
     await db.flush()
     return GenericMessageResponse(message="Password reset successfully")
+
+
+@router.post("/token/generate", response_model=TokenResponse)
+async def generate_api_token(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Generate a long-lived API token for the current admin.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can generate API tokens")
+
+    # Generate a token with a long expiry (e.g., 1 year)
+    access_token = create_access_token(
+        data={"sub": str(current_user.id), "type": "api_token"}, expires_delta=timedelta(days=365)
+    )
+
+    return TokenResponse(
+        access_token=access_token,
+        user=UserResponse.model_validate(current_user),
+    )
