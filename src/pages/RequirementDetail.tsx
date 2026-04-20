@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { requirementsApi, testCasesApi, usersApi, projectsApi } from '../api/client'
 import { ArrowLeft, Pencil, Link2, ExternalLink, ChevronRight, CheckCircle, UserCheck, UserCog, X, Search } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDateTime } from '../test/date-utils'
 
 export default function RequirementDetail({ resolvedId }: { resolvedId?: number } = {}) {
   const { itemId } = useParams<{ prefix: string; itemId: string }>()
@@ -351,8 +351,8 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
             {requirement.description || 'No description provided.'}
           </p>
           <div className="mt-4 pt-4 border-t border-border flex items-center space-x-6 text-sm text-muted-foreground">
-            <span>Created {formatDistanceToNow(new Date(requirement.created_at))} ago</span>
-            <span>Updated {formatDistanceToNow(new Date(requirement.updated_at))} ago</span>
+            <span>Created {formatDateTime(requirement.created_at)} ago</span>
+            <span>Updated {formatDateTime(requirement.updated_at)} ago</span>
           </div>
           <div className="mt-4 pt-4 border-t border-border grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="rounded-md border border-border p-3">
@@ -360,7 +360,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
               <p className="text-sm text-foreground">Assigned reviewer: {resolveUserName(users, requirement.reviewer_id)}</p>
               <p className="text-xs text-muted-foreground mt-1">Reviewed by: {resolveUserName(users, requirement.reviewed_by_id)}</p>
               {requirement.reviewed_at && (
-                <p className="text-xs text-muted-foreground mt-1">At {new Date(requirement.reviewed_at).toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground mt-1">At {formatDateTime(requirement.reviewed_at)}</p>
               )}
               <button
                 disabled={!requirement.reviewer_id || markReviewedMutation.isPending}
@@ -376,7 +376,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
               <p className="text-sm text-foreground">Assigned approver: {resolveUserName(users, requirement.approver_id)}</p>
               <p className="text-xs text-muted-foreground mt-1">Approved by: {resolveUserName(users, requirement.approved_by_id)}</p>
               {requirement.approved_at && (
-                <p className="text-xs text-muted-foreground mt-1">At {new Date(requirement.approved_at).toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground mt-1">At {formatDateTime(requirement.approved_at)}</p>
               )}
               <button
                 disabled={!requirement.approver_id || markApprovedMutation.isPending}
@@ -486,7 +486,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
                 </div>
                 <div className="text-right">
                   <TcStatusBadge status={link.test_case.status} />
-                  <div className="text-xs text-muted-foreground mt-1">{formatDistanceToNow(new Date(link.created_at))} ago</div>
+                  <div className="text-xs text-muted-foreground mt-1">{formatDateTime(link.created_at)} ago</div>
                 </div>
                 <button
                   onClick={(e) => {
@@ -533,7 +533,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
                       {tr.status ? <RunStatusBadge status={tr.status} /> : '-'}
                     </td>
                     <td className="px-6 py-4 text-sm text-muted-foreground">
-                      {formatDistanceToNow(new Date(tr.created_at))} ago
+                      {formatDateTime(tr.created_at)} ago
                     </td>
                     <td className="px-6 py-4 text-sm">
                       {tr.teststation_url ? (

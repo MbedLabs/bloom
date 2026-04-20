@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { testCasesApi, requirementsApi, usersApi, projectsApi, TcsRow } from '../api/client'
 import { TcsArteTable, migrateOldSteps } from '../components/TcsArteTable'
 import { ArrowLeft, Pencil, FileText, Link2, X, UserCheck, UserCog, Search } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDateTime } from '../test/date-utils'
 
 function isTcsRow(row: unknown): row is TcsRow {
   return typeof row === 'object' && row !== null && 'row_type' in row
@@ -397,7 +397,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
                     </div>
                     <div className="text-right">
                       <RequirementStatusBadge status={link.requirement.status} />
-                      <div className="text-xs text-muted-foreground mt-1">{formatDistanceToNow(new Date(link.created_at))} ago</div>
+                      <div className="text-xs text-muted-foreground mt-1">{formatDateTime(link.created_at)} ago</div>
                     </div>
                     <button
                       onClick={(e) => {
@@ -424,7 +424,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Review</p>
               <p className="text-sm text-foreground">Assigned reviewer: {resolveUserName(users, testCase.reviewer_id)}</p>
               <p className="text-xs text-muted-foreground mt-1">Reviewed by: {resolveUserName(users, testCase.reviewed_by_id)}</p>
-              {testCase.reviewed_at && <p className="text-xs text-muted-foreground mt-1">At {new Date(testCase.reviewed_at).toLocaleString()}</p>}
+              {testCase.reviewed_at && <p className="text-xs text-muted-foreground mt-1">At {formatDateTime(testCase.reviewed_at)}</p>}
               <button
                 disabled={!testCase.reviewer_id || markReviewedMutation.isPending}
                 onClick={() => testCase.reviewer_id && markReviewedMutation.mutate(testCase.reviewer_id)}
@@ -438,7 +438,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Approval</p>
               <p className="text-sm text-foreground">Assigned approver: {resolveUserName(users, testCase.approver_id)}</p>
               <p className="text-xs text-muted-foreground mt-1">Approved by: {resolveUserName(users, testCase.approved_by_id)}</p>
-              {testCase.approved_at && <p className="text-xs text-muted-foreground mt-1">At {new Date(testCase.approved_at).toLocaleString()}</p>}
+              {testCase.approved_at && <p className="text-xs text-muted-foreground mt-1">At {formatDateTime(testCase.approved_at)}</p>}
               <button
                 disabled={!testCase.approver_id || markApprovedMutation.isPending}
                 onClick={() => testCase.approver_id && markApprovedMutation.mutate(testCase.approver_id)}
@@ -492,8 +492,8 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
           </div>
 
           <div className="text-sm text-muted-foreground flex items-center space-x-6">
-            <span>Created {formatDistanceToNow(new Date(testCase.created_at))} ago</span>
-            <span>Updated {formatDistanceToNow(new Date(testCase.updated_at))} ago</span>
+            <span>Created {formatDateTime(testCase.created_at)} ago</span>
+            <span>Updated {formatDateTime(testCase.updated_at)} ago</span>
           </div>
         </>
       )}

@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, GitBranch, History, MessageSquare, Pencil, Trash2, FileEdit } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDateTime } from '../test/date-utils'
 import { DocEditor } from '../components/editor'
 
 import {
@@ -374,7 +374,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
                       <div key={comment.id} className="rounded-lg border border-border p-4 bg-background/60">
                         <div className="flex items-center justify-between gap-4">
                           <div className="font-medium text-foreground">{comment.author_name}</div>
-                          <div className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(comment.created_at))} ago</div>
+                          <div className="text-xs text-muted-foreground">{formatDateTime(comment.created_at)} ago</div>
                         </div>
                         <p className="text-foreground mt-3 whitespace-pre-wrap leading-relaxed">{comment.body}</p>
                       </div>
@@ -396,7 +396,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
                       <div className="mt-1 h-2.5 w-2.5 rounded-full bg-primary shrink-0" />
                       <div>
                         <div className="font-medium text-foreground">{event.summary}</div>
-                        <div className="text-xs text-muted-foreground mt-1">{event.event_type} · {formatDistanceToNow(new Date(event.created_at))} ago</div>
+                        <div className="text-xs text-muted-foreground mt-1">{event.event_type} · {formatDateTime(event.created_at)} ago</div>
                       </div>
                     </div>
                   ))}
@@ -478,8 +478,8 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
             <div className="space-y-4">
               <MetaItem label="ID" value={code} mono />
               <MetaItem label="Project" value={related?.project ? `${related.project.prefix} · ${related.project.name}` : `#${artefact.project_id}`} />
-              <MetaItem label="Created" value={formatDistanceToNow(new Date(artefact.created_at)) + ' ago'} />
-              <MetaItem label="Updated" value={formatDistanceToNow(new Date(artefact.updated_at)) + ' ago'} />
+              <MetaItem label="Created" value={formatDateTime(artefact.created_at) + ' ago'} />
+              <MetaItem label="Updated" value={formatDateTime(artefact.updated_at) + ' ago'} />
             </div>
           </SectionCard>
 
