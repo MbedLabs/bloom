@@ -30,9 +30,7 @@ class Project(Base):
     prefix: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Active")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
@@ -80,9 +78,7 @@ class ProjectVariable(Base):
     key: Mapped[str] = mapped_column(String(100), nullable=False)
     value: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
@@ -119,9 +115,7 @@ class Requirement(Base):
     source_project_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("projects.id"), nullable=True
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
@@ -172,9 +166,7 @@ class TestCase(Base):
     source_project_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("projects.id"), nullable=True
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
@@ -201,9 +193,7 @@ class RequirementTestCase(Base):
     requirement_id: Mapped[int] = mapped_column(ForeignKey("requirements.id"), nullable=False)
     test_case_id: Mapped[int] = mapped_column(ForeignKey("test_cases.id"), nullable=False)
     link_type: Mapped[str] = mapped_column(String(30), default="verifies")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     requirement: Mapped["Requirement"] = relationship(back_populates="test_case_links")
     test_case: Mapped["TestCase"] = relationship(back_populates="requirement_links")
@@ -219,9 +209,7 @@ class RequirementLink(Base):
     source_id: Mapped[int] = mapped_column(ForeignKey("requirements.id"), nullable=False)
     target_id: Mapped[int] = mapped_column(ForeignKey("requirements.id"), nullable=False)
     link_type: Mapped[str] = mapped_column(String(30), default="depends_on")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     source: Mapped["Requirement"] = relationship(
         foreign_keys=[source_id], back_populates="outgoing_links"
@@ -242,9 +230,7 @@ class TestRunLink(Base):
     test_run_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     teststation_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     requirement: Mapped["Requirement"] = relationship(back_populates="test_run_links")
 
@@ -266,9 +252,7 @@ class Document(Base):
     source_project_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("projects.id"), nullable=True
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
@@ -298,9 +282,7 @@ class DocumentSection(Base):
     linked_requirement_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("requirements.id"), nullable=True
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
@@ -326,9 +308,7 @@ class TestConfiguration(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     environment: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     parameters: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
@@ -349,9 +329,7 @@ class TestSuite(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Draft")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
@@ -375,9 +353,7 @@ class TestSuiteItem(Base):
     suite_id: Mapped[int] = mapped_column(ForeignKey("test_suites.id"), nullable=False)
     test_case_id: Mapped[int] = mapped_column(ForeignKey("test_cases.id"), nullable=False)
     order: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     suite: Mapped["TestSuite"] = relationship(back_populates="items")
     test_case: Mapped["TestCase"] = relationship(back_populates="suite_items")
@@ -402,9 +378,7 @@ class TestCampaign(Base):
     bud_run_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
@@ -431,9 +405,7 @@ class TestCampaignItem(Base):
     result: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     executed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     campaign: Mapped["TestCampaign"] = relationship(back_populates="items")
     test_case: Mapped["TestCase"] = relationship(back_populates="campaign_items")
@@ -462,9 +434,7 @@ class ArtefactLink(Base):
     target_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     role: Mapped[str] = mapped_column(String(50), nullable=False)
     suspect: Mapped[bool] = mapped_column(default=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class DesignItem(Base):
@@ -487,9 +457,7 @@ class DesignItem(Base):
     source_project_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("projects.id"), nullable=True
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
@@ -524,9 +492,7 @@ class RiskItem(Base):
     source_project_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("projects.id"), nullable=True
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
@@ -558,9 +524,7 @@ class ChangeRequest(Base):
     source_project_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("projects.id"), nullable=True
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
@@ -583,9 +547,7 @@ class Baseline(Base):
     status: Mapped[str] = mapped_column(String(20), default="Open")
     baseline_type: Mapped[str] = mapped_column(String(30), default="Milestone")
     snapshot: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
@@ -612,9 +574,7 @@ class TestConcept(Base):
     source_project_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("projects.id"), nullable=True
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
@@ -634,9 +594,7 @@ class ArtefactComment(Base):
     artefact_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     author_name: Mapped[str] = mapped_column(String(255), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class ArtefactActivity(Base):
@@ -647,6 +605,4 @@ class ArtefactActivity(Base):
     artefact_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     event_type: Mapped[str] = mapped_column(String(30), nullable=False)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
