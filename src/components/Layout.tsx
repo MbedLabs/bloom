@@ -126,7 +126,8 @@ export default function Layout() {
               <Flower2 className="h-5 w-5 text-teal-200" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-teal-100 tracking-tight">Bloom ALM</h1>
+              <h1 className="text-xl font-bold text-teal-100 tracking-tight">Bloom</h1>
+              <p className="text-[11px] text-teal-300/60 font-medium uppercase tracking-wider">Product Lifecycle Management</p>
             </div>
           </div>
         </div>
@@ -253,7 +254,7 @@ export default function Layout() {
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium text-teal-100/70 hover:bg-[var(--sidebar-hover)] hover:text-white transition-all duration-200 group"
           >
             <ExternalLink className="h-[18px] w-[18px] text-teal-400/50 group-hover:text-teal-300" />
-            Bud Test Platform
+            Bud TMP
           </a>
           <Link
             to="/settings"

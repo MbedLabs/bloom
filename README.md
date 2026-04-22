@@ -1,6 +1,6 @@
-# EmbedLabs Bloom - Application Lifecycle Management
+# EmbedLabs Bloom - Product Lifecycle Management
 
-Frontend for **Bloom**, EmbedLabs' requirements and lifecycle management platform. An ALM interface for managing requirements, test cases, and traceability across the product lifecycle.
+Frontend for **Bloom**, EmbedLabs' requirements and lifecycle management platform. A PLM interface for managing requirements, test cases, and traceability across the product lifecycle.
 
 ## Features
 
@@ -9,7 +9,7 @@ Frontend for **Bloom**, EmbedLabs' requirements and lifecycle management platfor
 - **Requirement Editor** - Hierarchical requirements with status tracking (Draft → Verified)
 - **Test Case Editor** - Structured test cases with steps, preconditions, and requirement linking
 - **Traceability Matrix** - Visual coverage tracking across all requirements
-- **Test Station Links** - Direct links to test runs in the Bud Test Platform
+- **Test Station Links** - Direct links to test runs in the Bud TMP
 
 ## Tech Stack
 
@@ -26,7 +26,7 @@ npm install
 npm run dev
 ```
 
-App runs at `http://localhost:3000` with API proxy to `localhost:8000`.
+App runs at `http://localhost:3001` with API proxy to `localhost:8000`.
 
 ## Deployment
 
@@ -37,7 +37,7 @@ This frontend is designed to be environment-agnostic using runtime configuration
 | Variable | Description | Default |
 | :--- | :--- | :--- |
 | `BACKEND_UPSTREAM` | Nginx upstream for the API proxy (`/api`) | `bloom-backend.bloom.svc.cluster.local:8000` |
-| `BUD_APP_URL` | URL of the Bud Test Platform (for sidebar links) | `http://localhost:3000` |
+| `BUD_APP_URL` | URL of the Bud TMP (for sidebar links) | `http://localhost:3000` |
 | `BLOOM_APP_URL` | Public URL of this Bloom instance (for self-referencing) | `http://localhost:3001` |
 
 ### Docker
@@ -55,7 +55,7 @@ docker run -p 8081:80 \
 ## Part of EmbedLabs Suite
 
 - **[Bud](https://github.com/MbedLabs/bud-app-frontend)** - Test Station Manager (test execution platform)
-- **[Bloom](https://github.com/MbedLabs/bloom-app-frontend)** - ALM (this repo)
+- **[Bloom](https://github.com/MbedLabs/bloom-app-frontend)** - PLM (this repo)
 
 ## License
 
