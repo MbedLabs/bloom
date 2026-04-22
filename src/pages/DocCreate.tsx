@@ -3,8 +3,10 @@ import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, PanelRightOpen, PanelRightClose } from 'lucide-react'
 import { DocEditor } from '../components/editor'
+import { TcsArteTable } from '../components/TcsArteTable'
+import { createDefaultTcRows, normalizeTcsRows, type TcsRow } from '../utils/tcs'
 import {
-  projectsApi, requirementsApi, testCasesApi, designsApi,
+  docsApi, projectsApi, requirementsApi, testCasesApi, designsApi,
   risksApi, changesApi, testConceptsApi, documentsApi, usersApi,
 } from '../api/client'
 import type { DocType } from '../types/doc'
@@ -20,13 +22,14 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const docType = (searchParams.get('type') || 'REQ') as DocType
-  const config = DOC_CONFIGS[docType]
-  const docId = docIdStr ? Number(docIdStr) : undefined
+  const requestedDocType = (searchParams.get('type') || 'REQ') as DocType
+  const numericDocId = docIdStr ? Number(docIdStr) : undefined
+  const hasNumericDocId = typeof numericDocId === 'number' && Number.isFinite(numericDocId)
 
   const [title, setTitle] = useState('')
   const [contentJson, setContentJson] = useState<Record<string, unknown> | null>(null)
   const [contentHtml, setContentHtml] = useState('')
+  const [tcRows, setTcRows] = useState<TcsRow[]>(() => requestedDocType === 'TC' && !editMode ? createDefaultTcRows() : [])
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [metadata, setMetadata] = useState<Record<string, string>>({})
 
@@ -37,6 +40,16 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   })
 
   const projectId = project?.id || 0
+
+  const { data: editDocFacade } = useQuery({
+    queryKey: ['doc-facade', prefix, docIdStr],
+    queryFn: () => docsApi.get(prefix!, docIdStr!),
+    enabled: editMode && !!prefix && !!docIdStr,
+  })
+
+  const docType = ((editMode && editDocFacade?.doc_type) || requestedDocType) as DocType
+  const config = DOC_CONFIGS[docType]
+  const resolvedDocId = editMode ? (hasNumericDocId ? numericDocId : editDocFacade?.id) : undefined
 
   const { data: users } = useQuery({
     queryKey: ['users'],
@@ -52,12 +65,13 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   }, [])
 
   useEffect(() => {
-    if (!editMode || !docId) return
+    if (!editMode || !resolvedDocId) return
     const api = apiForType(docType) as unknown as { get: (id: number) => Promise<Record<string, unknown>> }
-    api.get(docId).then((data) => {
+    api.get(resolvedDocId).then((data) => {
       setTitle((data[config.titleField] as string) || '')
       if (data.content_json) setContentJson(data.content_json as Record<string, unknown>)
       if (data.content_html) setContentHtml(data.content_html as string)
+      if (docType === 'TC') setTcRows(normalizeTcsRows(data.steps))
       const meta: Record<string, string> = {}
       for (const field of config.fields) {
         if (field.key !== config.titleField && data[field.key] != null) {
@@ -67,11 +81,28 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       if (data.status) meta.status = data.status as string
       setMetadata(meta)
     })
-  }, [editMode, docId, docType, config, apiForType])
+  }, [editMode, resolvedDocId, docType, config, apiForType])
+
+  useEffect(() => {
+    if (!editMode && docType === 'TC' && tcRows.length === 0) {
+      setTcRows(createDefaultTcRows())
+    }
+  }, [docType, editMode, tcRows.length])
 
   const createMutation = useMutation({
     mutationFn: async () => {
       const api = apiForType(docType)
+      if (docType === 'TC') {
+        return testCasesApi.create({
+          project_id: projectId,
+          title,
+          description: metadata.description || undefined,
+          preconditions: metadata.preconditions || undefined,
+          steps: tcRows.length > 0 ? tcRows : undefined,
+          status: metadata.status || config.statusOptions[0],
+          reviewer_id: metadata.reviewer_id ? Number(metadata.reviewer_id) : undefined,
+        })
+      }
       const payload: Record<string, unknown> = {
         project_id: projectId,
         [config.titleField]: title,
@@ -94,6 +125,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['requirements', projectId] })
       queryClient.invalidateQueries({ queryKey: ['test-cases', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['testCases', projectId] })
       queryClient.invalidateQueries({ queryKey: ['designs', projectId] })
       queryClient.invalidateQueries({ queryKey: ['risks', projectId] })
       queryClient.invalidateQueries({ queryKey: ['changes', projectId] })
@@ -113,7 +145,17 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
 
   const updateMutation = useMutation({
     mutationFn: async () => {
-      if (!docId) return
+      if (!resolvedDocId) return
+      if (docType === 'TC') {
+        return testCasesApi.update(resolvedDocId, {
+          title,
+          description: metadata.description || null,
+          preconditions: metadata.preconditions || null,
+          steps: tcRows.length > 0 ? tcRows : null,
+          status: metadata.status || config.statusOptions[0],
+          reviewer_id: metadata.reviewer_id ? Number(metadata.reviewer_id) : null,
+        })
+      }
       const api = apiForType(docType) as unknown as { update: (id: number, data: Record<string, unknown>) => Promise<Record<string, unknown>> }
       const payload: Record<string, unknown> = {
         [config.titleField]: title,
@@ -121,7 +163,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
         content_html: contentHtml,
         ...metadata,
       }
-      return api.update(docId, payload)
+      return api.update(resolvedDocId, payload)
     },
     onSuccess: () => {
       navigate(`/projects/${prefix}/docs/${docIdStr}`)
@@ -142,6 +184,16 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   }
 
   const isPending = createMutation.isPending || updateMutation.isPending
+  const visibleConfigFields = config.fields.filter((field) =>
+    field.key !== config.titleField &&
+    field.key !== 'description' &&
+    !(docType === 'TC' && field.key === 'preconditions')
+  )
+  const showDescriptionMetadata = config.fields.some((field) => field.key === 'description')
+
+  if (editMode && docIdStr && !resolvedDocId) {
+    return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
+  }
 
   return (
     <div className="animate-fade-in -m-6 flex flex-col min-h-[calc(100vh-4rem)]">
@@ -192,7 +244,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       <div className="flex flex-1 overflow-hidden">
         {/* Editor area */}
         <div className="flex-1 flex flex-col overflow-y-auto">
-          <div className="max-w-4xl mx-auto w-full px-8 py-8">
+          <div className={`${docType === 'TC' ? 'max-w-none' : 'max-w-4xl mx-auto'} w-full px-8 py-8`}>
             {/* Title */}
             <input
               type="text"
@@ -204,13 +256,17 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
             />
 
             {/* Editor */}
-            <DocEditor
-              content={contentJson}
-              onChange={handleEditorChange}
-              placeholder={`Start writing your ${config.label.toLowerCase()}... Use the toolbar above for formatting.`}
-              editable={true}
-              minHeight="min-h-[60vh]"
-            />
+            {docType === 'TC' ? (
+              <TcsArteTable rows={tcRows} onChange={setTcRows} editable />
+            ) : (
+              <DocEditor
+                content={contentJson}
+                onChange={handleEditorChange}
+                placeholder={`Start writing your ${config.label.toLowerCase()}... Use the toolbar above for formatting.`}
+                editable={true}
+                minHeight="min-h-[60vh]"
+              />
+            )}
           </div>
         </div>
 
@@ -262,53 +318,67 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                 </select>
               </MetaField>
 
-              {/* Type-specific fields */}
-              <div className="h-px bg-border" />
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                {config.label} Fields
-              </h3>
-
-              {config.fields.filter((f) => f.key !== config.titleField && f.key !== 'description' && f.type !== 'textarea').map((field) => (
-                <MetaField key={field.key} label={field.label}>
-                  {field.type === 'select' && field.options ? (
-                    <select
-                      value={metadata[field.key] || field.options[0]}
-                      onChange={(e) => setMetadata({ ...metadata, [field.key]: e.target.value })}
-                      className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
-                    >
-                      {field.options.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  ) : field.type === 'number' ? (
-                    <input
-                      type="number"
-                      value={metadata[field.key] || ''}
-                      onChange={(e) => setMetadata({ ...metadata, [field.key]: e.target.value })}
-                      className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
-                    />
-                  ) : (
-                    <input
-                      type="text"
-                      value={metadata[field.key] || ''}
-                      onChange={(e) => setMetadata({ ...metadata, [field.key]: e.target.value })}
-                      className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
-                    />
-                  )}
-                </MetaField>
-              ))}
-
-              {/* Textarea fields in sidebar */}
-              {config.fields.filter((f) => f.type === 'textarea' && f.key !== config.titleField && f.key !== 'description').map((field) => (
-                <MetaField key={field.key} label={field.label}>
+              {showDescriptionMetadata && (
+                <MetaField label="Description">
                   <textarea
-                    value={metadata[field.key] || ''}
-                    onChange={(e) => setMetadata({ ...metadata, [field.key]: e.target.value })}
-                    rows={3}
-                    className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm resize-none"
+                    value={metadata.description || ''}
+                    onChange={(e) => setMetadata({ ...metadata, description: e.target.value })}
+                    rows={4}
+                    className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm resize-y"
                   />
                 </MetaField>
-              ))}
+              )}
+
+              {/* Type-specific fields */}
+              {visibleConfigFields.length > 0 && (
+                <>
+                  <div className="h-px bg-border" />
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Document Metadata
+                  </h3>
+
+                  {visibleConfigFields.filter((field) => field.type !== 'textarea').map((field) => (
+                    <MetaField key={field.key} label={field.label}>
+                      {field.type === 'select' && field.options ? (
+                        <select
+                          value={metadata[field.key] || field.options[0]}
+                          onChange={(e) => setMetadata({ ...metadata, [field.key]: e.target.value })}
+                          className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
+                        >
+                          {field.options.map((opt) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      ) : field.type === 'number' ? (
+                        <input
+                          type="number"
+                          value={metadata[field.key] || ''}
+                          onChange={(e) => setMetadata({ ...metadata, [field.key]: e.target.value })}
+                          className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={metadata[field.key] || ''}
+                          onChange={(e) => setMetadata({ ...metadata, [field.key]: e.target.value })}
+                          className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
+                        />
+                      )}
+                    </MetaField>
+                  ))}
+
+                  {visibleConfigFields.filter((field) => field.type === 'textarea').map((field) => (
+                    <MetaField key={field.key} label={field.label}>
+                      <textarea
+                        value={metadata[field.key] || ''}
+                        onChange={(e) => setMetadata({ ...metadata, [field.key]: e.target.value })}
+                        rows={3}
+                        className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm resize-none"
+                      />
+                    </MetaField>
+                  ))}
+                </>
+              )}
             </div>
           </div>
         )}

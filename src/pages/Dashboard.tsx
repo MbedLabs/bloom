@@ -31,7 +31,7 @@ export default function Dashboard() {
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-2">
             <Flower2 className="h-6 w-6 text-teal-100" />
-            <h2 className="text-xl font-bold">Bloom ALM</h2>
+            <h2 className="text-xl font-bold">Bloom PLM</h2>
           </div>
           <p className="text-teal-100/80 text-sm max-w-lg">
             Manage your requirements, test cases, and traceability across projects. Full lifecycle coverage from specification to verification.

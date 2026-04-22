@@ -29,6 +29,7 @@ import {
   TcsRow,
 } from '../api/client'
 import { TcsArteTable } from '../components/TcsArteTable'
+import { createDefaultTcRows } from '../utils/tcs'
 
 type Tab = 'requirements' | 'test-cases' | 'documents' | 'test-concepts' | 'traceability' | 'design' | 'risks' | 'changes'
 
@@ -56,7 +57,7 @@ export default function ProjectDetail() {
 
   const [reqForm, setReqForm] = useState({ title: '', description: '', priority: 'Medium', req_type: 'Functional', req_origin: 'Internal' })
   const [tcForm, setTcForm] = useState({ title: '', description: '', preconditions: '' })
-  const [tcRows, setTcRows] = useState<TcsRow[]>([])
+  const [tcRows, setTcRows] = useState<TcsRow[]>(() => createDefaultTcRows())
   const [conceptForm, setConceptForm] = useState({ name: '', description: '', status: 'Draft', coverage: '0' })
   const [designForm, setDesignForm] = useState({ title: '', description: '', status: 'Draft', priority: 'Medium', design_type: 'Architecture', linked_requirement_id: '' })
   const [riskForm, setRiskForm] = useState({ title: '', description: '', status: 'Open', severity: 'Medium', probability: 'Medium', mitigation: '', risk_category: 'Technical', linked_requirement_id: '' })
@@ -147,7 +148,7 @@ export default function ProjectDetail() {
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       setShowCreateTc(false)
       setTcForm({ title: '', description: '', preconditions: '' })
-      setTcRows([])
+      setTcRows(createDefaultTcRows())
     },
   })
 
@@ -693,10 +694,10 @@ export default function ProjectDetail() {
             <TextArea label="Description" value={tcForm.description} onChange={(value) => setTcForm({ ...tcForm, description: value })} rows={3} />
             <TextArea label="Preconditions" value={tcForm.preconditions} onChange={(value) => setTcForm({ ...tcForm, preconditions: value })} rows={2} />
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">TCS Artefact Table</label>
+              <label className="block text-sm font-medium text-foreground mb-2">Test Steps</label>
               <TcsArteTable rows={tcRows} onChange={setTcRows} editable />
             </div>
-            <ModalActions onClose={() => { setShowCreateTc(false); setTcRows([]) }} submitting={createTcMutation.isPending} />
+            <ModalActions onClose={() => { setShowCreateTc(false); setTcRows(createDefaultTcRows()) }} submitting={createTcMutation.isPending} />
           </form>
         </Modal>
       )}

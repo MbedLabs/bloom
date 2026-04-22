@@ -1,5 +1,5 @@
 /**
- * Date and time utilities for the Bloom ALM.
+ * Date and time utilities for the Bloom PLM.
  */
 
 /**

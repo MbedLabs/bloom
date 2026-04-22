@@ -150,12 +150,12 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* ALM Integration Token Management (Admin Only) */}
+      {/* PLM Integration Token Management (Admin Only) */}
       {isAdmin && (
         <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden border-primary/20">
           <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-primary/5">
             <ShieldCheck className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">ALM Integration Token Management</h3>
+            <h3 className="text-sm font-semibold text-foreground">PLM Integration Token Management</h3>
           </div>
           <div className="p-5 space-y-4">
             <div className="space-y-2">
@@ -217,7 +217,7 @@ export default function Settings() {
               <span className="text-white font-bold text-sm">B</span>
             </div>
             <div>
-              <p className="text-sm font-semibold text-foreground">Bloom ALM</p>
+              <p className="text-sm font-semibold text-foreground">Bloom PLM</p>
               <p className="text-xs text-muted-foreground">v{APP_VERSION}</p>
             </div>
           </div>

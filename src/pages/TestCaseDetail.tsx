@@ -1,25 +1,43 @@
-import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { testCasesApi, requirementsApi, usersApi, projectsApi, TcsRow } from '../api/client'
-import { TcsArteTable, migrateOldSteps } from '../components/TcsArteTable'
-import { ArrowLeft, Pencil, FileText, Link2, X, UserCheck, UserCog, Search } from 'lucide-react'
+import {
+  type ArtefactLink,
+  type DocShell,
+  type TcsRow,
+  docsApi,
+  linksApi,
+  projectsApi,
+  testCasesApi,
+  usersApi,
+} from '../api/client'
+import { TcsArteTable } from '../components/TcsArteTable'
+import { normalizeTcsRows } from '../utils/tcs'
+import { ArrowLeft, FileText, Link2, Pencil, Search, UserCheck, UserCog, X } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
 
-function isTcsRow(row: unknown): row is TcsRow {
-  return typeof row === 'object' && row !== null && 'row_type' in row
+const DOC_TYPE_LABELS: Record<string, string> = {
+  REQ: 'Requirement',
+  TC: 'Test Case',
+  DOC: 'Specification',
+  DES: 'Design',
+  RSK: 'Risk',
+  CHG: 'Change',
+  TCO: 'Test Concept',
 }
 
+const LINK_ROLES = ['verifies', 'implements', 'references', 'depends_on', 'impacts', 'blocks'] as const
+
 function normalizeSteps(steps: unknown): TcsRow[] {
-  if (!steps || !Array.isArray(steps) || steps.length === 0) return []
-  if (steps.every(isTcsRow)) return steps as TcsRow[]
-  return migrateOldSteps(steps as Array<{ step_number: number; action: string; expected_result: string }>)
+  return normalizeTcsRows(steps) as TcsRow[]
 }
 
 export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } = {}) {
   const { itemId } = useParams<{ prefix: string; itemId: string }>()
   const tcId = resolvedId || parseInt(itemId || '0')
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
 
   const { data: testCase, isLoading, error } = useQuery({
     queryKey: ['testCase', tcId],
@@ -33,91 +51,9 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
     enabled: !!testCase?.project_id,
   })
 
-  const projectPrefix = project?.prefix || ''
-
-  const [isEditing, setIsEditing] = useState(false)
-  const [editForm, setEditForm] = useState({
-    title: '',
-    description: '',
-    preconditions: '',
-    status: '',
-    reviewer_id: '',
-    approver_id: '',
-  })
-  const [editRows, setEditRows] = useState<TcsRow[]>([])
-  const [showLinkModal, setShowLinkModal] = useState(false)
-  const [linkType, setLinkType] = useState('verifies')
-  const [reqSearch, setReqSearch] = useState('')
-  const [linkedReqSearch, setLinkedReqSearch] = useState('')
-  const [selectedUnlinkedReqIds, setSelectedUnlinkedReqIds] = useState<number[]>([])
-  const [selectedLinkedReqIds, setSelectedLinkedReqIds] = useState<number[]>([])
-
   const { data: users } = useQuery({
     queryKey: ['users'],
     queryFn: usersApi.list,
-  })
-
-  const { data: availableRequirements } = useQuery({
-    queryKey: ['projectRequirements', testCase?.project_id],
-    queryFn: () => requirementsApi.list(testCase!.project_id),
-    enabled: !!testCase && showLinkModal,
-  })
-
-  useEffect(() => {
-    if (testCase && isEditing) {
-      setEditForm({
-        title: testCase.title,
-        description: testCase.description || '',
-        preconditions: testCase.preconditions || '',
-        status: testCase.status,
-        reviewer_id: testCase.reviewer_id ? String(testCase.reviewer_id) : '',
-        approver_id: testCase.approver_id ? String(testCase.approver_id) : '',
-      })
-      setEditRows(normalizeSteps(testCase.steps))
-    }
-  }, [testCase, isEditing])
-
-  const updateMutation = useMutation({
-    mutationFn: (data: Parameters<typeof testCasesApi.update>[1]) => testCasesApi.update(tcId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['testCase', tcId] })
-      setIsEditing(false)
-    },
-  })
-
-  const linkReqMutation = useMutation({
-    mutationFn: (requirementId: number) => testCasesApi.linkRequirement(tcId, requirementId, linkType),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['testCase', tcId] })
-      setShowLinkModal(false)
-    },
-  })
-
-  const unlinkReqMutation = useMutation({
-    mutationFn: (requirementId: number) => testCasesApi.unlinkRequirement(tcId, requirementId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['testCase', tcId] })
-    },
-  })
-
-  const bulkLinkReqMutation = useMutation({
-    mutationFn: async (requirementIds: number[]) => {
-      await Promise.all(requirementIds.map((requirementId) => testCasesApi.linkRequirement(tcId, requirementId, linkType)))
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['testCase', tcId] })
-      setSelectedUnlinkedReqIds([])
-    },
-  })
-
-  const bulkUnlinkReqMutation = useMutation({
-    mutationFn: async (requirementIds: number[]) => {
-      await Promise.all(requirementIds.map((requirementId) => testCasesApi.unlinkRequirement(tcId, requirementId)))
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['testCase', tcId] })
-      setSelectedLinkedReqIds([])
-    },
   })
 
   const markReviewedMutation = useMutation({
@@ -134,19 +70,6 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
     },
   })
 
-  const handleEditSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    updateMutation.mutate({
-      title: editForm.title,
-      description: editForm.description || null,
-      preconditions: editForm.preconditions || null,
-      status: editForm.status,
-      steps: editRows.length > 0 ? editRows : null,
-      reviewer_id: editForm.reviewer_id ? Number(editForm.reviewer_id) : null,
-      approver_id: editForm.approver_id ? Number(editForm.approver_id) : null,
-    })
-  }
-
   if (isLoading) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
   }
@@ -156,25 +79,14 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
       <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6 text-center">
         <h3 className="text-lg font-medium text-destructive">Test Case Not Found</h3>
         <Link to="/projects" className="mt-4 inline-block text-primary hover:text-primary/80">
-          ← Back to Projects
+          &larr; Back to Projects
         </Link>
       </div>
     )
   }
 
+  const projectPrefix = project?.prefix || ''
   const tcsRows = normalizeSteps(testCase.steps)
-  const linkedReqIds = new Set(testCase.verifies?.map((v) => v.requirement.id) || [])
-  const unlinkedRequirements = (availableRequirements || []).filter((req) => !linkedReqIds.has(req.id))
-  const filteredUnlinkedRequirements = unlinkedRequirements.filter((req) => {
-    const q = reqSearch.trim().toLowerCase()
-    if (!q) return true
-    return req.req_id.toLowerCase().includes(q) || req.title.toLowerCase().includes(q)
-  })
-  const filteredLinkedRequirements = (testCase.verifies || []).filter((link) => {
-    const q = linkedReqSearch.trim().toLowerCase()
-    if (!q) return true
-    return link.requirement.req_id.toLowerCase().includes(q) || link.requirement.title.toLowerCase().includes(q)
-  })
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -191,405 +103,357 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
             <h2 className="text-2xl font-bold text-foreground mt-1">{testCase.title}</h2>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <button
+          onClick={() => navigate(`/projects/${projectPrefix}/docs/${testCase.tc_id}/edit?type=TC`)}
+          className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
+        >
+          <Pencil className="h-4 w-4 mr-2" />
+          Edit
+        </button>
+      </div>
+
+      {testCase.description && (
+        <div className="bg-card rounded-lg shadow-elegant p-6">
+          <h3 className="text-sm font-medium text-muted-foreground mb-2">Description</h3>
+          <p className="text-foreground whitespace-pre-wrap">{testCase.description}</p>
+        </div>
+      )}
+
+      {tcsRows.length > 0 && (
+        <TcsArteTable rows={tcsRows} onChange={() => {}} editable={false} />
+      )}
+
+      {project && (
+        <DocumentLinksPanel
+          projectId={testCase.project_id}
+          projectPrefix={project.prefix}
+          sourceId={testCase.id}
+        />
+      )}
+
+      <div className="bg-card rounded-lg shadow-elegant p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="rounded-md border border-border p-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Review</p>
+          <p className="text-sm text-foreground">Assigned reviewer: {resolveUserName(users, testCase.reviewer_id)}</p>
+          <p className="text-xs text-muted-foreground mt-1">Reviewed by: {resolveUserName(users, testCase.reviewed_by_id)}</p>
+          {testCase.reviewed_at && <p className="text-xs text-muted-foreground mt-1">At {formatDateTime(testCase.reviewed_at)}</p>}
           <button
-            onClick={() => setShowLinkModal(true)}
-            className="inline-flex items-center px-4 py-2 border border-input rounded-md text-foreground hover:bg-accent/50 transition-colors text-sm"
+            disabled={!testCase.reviewer_id || markReviewedMutation.isPending}
+            onClick={() => testCase.reviewer_id && markReviewedMutation.mutate(testCase.reviewer_id)}
+            className="mt-3 inline-flex items-center px-3 py-1.5 rounded-md bg-amber-500/90 text-white text-xs font-medium hover:bg-amber-500 disabled:opacity-50"
           >
-            <Link2 className="h-4 w-4 mr-2" />
-            Link Requirement
+            <UserCheck className="h-3.5 w-3.5 mr-1" />
+            Mark Reviewed
           </button>
+        </div>
+        <div className="rounded-md border border-border p-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Approval</p>
+          <p className="text-sm text-foreground">Assigned approver: {resolveUserName(users, testCase.approver_id)}</p>
+          <p className="text-xs text-muted-foreground mt-1">Approved by: {resolveUserName(users, testCase.approved_by_id)}</p>
+          {testCase.approved_at && <p className="text-xs text-muted-foreground mt-1">At {formatDateTime(testCase.approved_at)}</p>}
           <button
-            onClick={() => setIsEditing(!isEditing)}
-            className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
+            disabled={!testCase.approver_id || markApprovedMutation.isPending}
+            onClick={() => testCase.approver_id && markApprovedMutation.mutate(testCase.approver_id)}
+            className="mt-3 inline-flex items-center px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-500 disabled:opacity-50"
           >
-            <Pencil className="h-4 w-4 mr-2" />
-            {isEditing ? 'Cancel Editing' : 'Edit'}
+            <UserCog className="h-3.5 w-3.5 mr-1" />
+            Mark Approved
           </button>
         </div>
       </div>
 
-      {isEditing ? (
-        <form onSubmit={handleEditSubmit} className="space-y-6">
-          <div className="bg-card rounded-lg shadow-elegant p-6 space-y-4">
+      <MembershipPanel
+        title="Contained In Suites"
+        countLabel={`${testCase.suite_memberships?.length || 0} suite${(testCase.suite_memberships?.length || 0) !== 1 ? 's' : ''}`}
+        emptyText="This test case is not part of any suite yet."
+      >
+        {testCase.suite_memberships?.map((suite) => (
+          <div key={suite.id} className="px-6 py-4 flex items-center justify-between">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Title</label>
-              <input
-                type="text"
-                required
-                value={editForm.title}
-                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
-              />
+              <div className="font-mono text-sm text-primary">{suite.suite_id}</div>
+              <div className="text-foreground mt-1">{suite.name}</div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Description</label>
-              <textarea
-                value={editForm.description}
-                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
-                rows={3}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Preconditions (Text)</label>
-              <textarea
-                value={editForm.preconditions}
-                onChange={(e) => setEditForm({ ...editForm, preconditions: e.target.value })}
-                className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
-                rows={2}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Status</label>
-              <select
-                value={editForm.status}
-                onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                className="px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
-              >
-                <option>Draft</option>
-                <option>Active</option>
-                <option>Deprecated</option>
-              </select>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Reviewer</label>
-                <select
-                  value={editForm.reviewer_id}
-                  onChange={(e) => setEditForm({ ...editForm, reviewer_id: e.target.value })}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
-                >
-                  <option value="">Unassigned</option>
-                  {(users || []).map((u) => (
-                    <option key={u.id} value={u.id}>{u.full_name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Approver</label>
-                <select
-                  value={editForm.approver_id}
-                  onChange={(e) => setEditForm({ ...editForm, approver_id: e.target.value })}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
-                >
-                  <option value="">Unassigned</option>
-                  {(users || []).map((u) => (
-                    <option key={u.id} value={u.id}>{u.full_name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">{suite.status}</span>
           </div>
+        ))}
+      </MembershipPanel>
 
-          <div>
-            <h3 className="text-sm font-medium text-foreground mb-2">TCS Artefact Table</h3>
-            <TcsArteTable rows={editRows} onChange={setEditRows} editable />
+      <MembershipPanel
+        title="Included In Campaign Scopes"
+        countLabel={`${testCase.campaign_memberships?.length || 0} campaign${(testCase.campaign_memberships?.length || 0) !== 1 ? 's' : ''}`}
+        emptyText="This test case is not included in any campaign scope yet."
+      >
+        {testCase.campaign_memberships?.map((campaign) => (
+          <div key={campaign.id} className="px-6 py-4 flex items-center justify-between">
+            <div className="text-foreground">{campaign.name}</div>
+            <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">{campaign.status}</span>
           </div>
+        ))}
+      </MembershipPanel>
 
-          <div className="flex justify-end space-x-3">
-            <button
-              type="button"
-              onClick={() => setIsEditing(false)}
-              className="px-4 py-2 border border-input rounded-md text-foreground hover:bg-accent/50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={updateMutation.isPending}
-              className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50"
-            >
-              {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
-            </button>
-          </div>
-        </form>
-      ) : (
-        <>
-          <div className="bg-card rounded-lg shadow-elegant p-6">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">Description</h3>
-            <p className="text-foreground whitespace-pre-wrap">
-              {testCase.description || 'No description provided.'}
-            </p>
-          </div>
+      <div className="text-sm text-muted-foreground flex items-center space-x-6">
+        <span>Created {formatDateTime(testCase.created_at)} ago</span>
+        <span>Updated {formatDateTime(testCase.updated_at)} ago</span>
+      </div>
+    </div>
+  )
+}
 
-          {testCase.preconditions && (
-            <div className="bg-card rounded-lg shadow-elegant p-6">
-              <h3 className="text-sm font-medium text-muted-foreground mb-2">Preconditions</h3>
-              <p className="text-foreground whitespace-pre-wrap">{testCase.preconditions}</p>
-            </div>
-          )}
-        </>
-      )}
+function DocumentLinksPanel({ projectId, projectPrefix, sourceId }: { projectId: number; projectPrefix: string; sourceId: number }) {
+  const queryClient = useQueryClient()
+  const [showModal, setShowModal] = useState(false)
 
-      {!isEditing && tcsRows.length > 0 && (
-        <TcsArteTable rows={tcsRows} onChange={() => {}} editable={false} />
-      )}
+  const { data: docs } = useQuery({
+    queryKey: ['all-docs', projectPrefix, 'tc-links'],
+    queryFn: () => docsApi.list(projectPrefix),
+    enabled: !!projectPrefix,
+  })
 
-      {!isEditing && (
-        <>
-          <div className="bg-card rounded-lg shadow-elegant">
-            <div className="px-6 py-4 border-b border-border flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Verifies Requirements</h3>
-              <span className="text-sm text-muted-foreground">{testCase.verifies?.length || 0} verification link{(testCase.verifies?.length || 0) !== 1 ? 's' : ''}</span>
-            </div>
-            <div className="px-6 py-3 border-b border-border flex flex-col md:flex-row md:items-center gap-3">
-              <div className="relative flex-1">
-                <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  value={linkedReqSearch}
-                  onChange={(e) => setLinkedReqSearch(e.target.value)}
-                  placeholder="Filter linked requirements"
-                  className="w-full pl-9 pr-3 py-2 bg-background border border-input rounded-md text-sm"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    if (selectedLinkedReqIds.length === filteredLinkedRequirements.length) {
-                      setSelectedLinkedReqIds([])
-                    } else {
-                      setSelectedLinkedReqIds(filteredLinkedRequirements.map((l) => l.requirement.id))
-                    }
-                  }}
-                  className="px-3 py-2 border border-input rounded-md text-xs font-medium hover:bg-accent/50"
-                >
-                  {selectedLinkedReqIds.length === filteredLinkedRequirements.length && filteredLinkedRequirements.length > 0 ? 'Clear' : 'Select all'}
-                </button>
-                <button
-                  onClick={() => bulkUnlinkReqMutation.mutate(selectedLinkedReqIds)}
-                  disabled={selectedLinkedReqIds.length === 0 || bulkUnlinkReqMutation.isPending}
-                  className="px-3 py-2 border border-red-500/50 text-red-600 rounded-md text-xs font-medium hover:bg-red-500/10 disabled:opacity-50"
-                >
-                  {bulkUnlinkReqMutation.isPending ? 'Unlinking...' : `Unlink selected (${selectedLinkedReqIds.length})`}
-                </button>
-              </div>
-            </div>
-            {testCase.verifies && testCase.verifies.length > 0 ? (
-              <div className="divide-y divide-border">
-                {filteredLinkedRequirements.map((link) => (
-                  <Link
-                    key={link.id}
-                    to={`/projects/${projectPrefix}/docs/${link.requirement.req_id}`}
-                    className="flex items-center justify-between px-6 py-4 hover:bg-accent/50 transition-colors"
-                  >
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={selectedLinkedReqIds.includes(link.requirement.id)}
-                        onChange={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          setSelectedLinkedReqIds((prev) =>
-                            prev.includes(link.requirement.id)
-                              ? prev.filter((id) => id !== link.requirement.id)
-                              : [...prev, link.requirement.id]
-                          )
-                        }}
-                        className="mr-3"
-                      />
-                      <FileText className="h-5 w-5 text-primary mr-3" />
-                      <div>
-                        <span className="font-mono text-sm text-primary mr-2">{link.requirement.req_id}</span>
-                        <span className="text-foreground">{link.requirement.title}</span>
-                        <span className="ml-2 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">{friendlyVerificationLabel(link.link_type, 'outgoing')}</span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <RequirementStatusBadge status={link.requirement.status} />
-                      <div className="text-xs text-muted-foreground mt-1">{formatDateTime(link.created_at)} ago</div>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault()
-                        unlinkReqMutation.mutate(link.requirement.id)
-                      }}
-                      className="ml-3 p-1.5 rounded text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
-                      title="Unlink"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="p-6 text-center text-muted-foreground">
-                No requirements linked to this test case.
-              </div>
-            )}
-          </div>
+  const { data: outgoingLinks } = useQuery({
+    queryKey: ['docLinks', projectId, 'TC', sourceId, 'outgoing'],
+    queryFn: () => linksApi.list({ project_id: projectId, source_type: 'TC', source_id: sourceId }),
+  })
 
-          <div className="bg-card rounded-lg shadow-elegant p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-md border border-border p-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Review</p>
-              <p className="text-sm text-foreground">Assigned reviewer: {resolveUserName(users, testCase.reviewer_id)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Reviewed by: {resolveUserName(users, testCase.reviewed_by_id)}</p>
-              {testCase.reviewed_at && <p className="text-xs text-muted-foreground mt-1">At {formatDateTime(testCase.reviewed_at)}</p>}
-              <button
-                disabled={!testCase.reviewer_id || markReviewedMutation.isPending}
-                onClick={() => testCase.reviewer_id && markReviewedMutation.mutate(testCase.reviewer_id)}
-                className="mt-3 inline-flex items-center px-3 py-1.5 rounded-md bg-amber-500/90 text-white text-xs font-medium hover:bg-amber-500 disabled:opacity-50"
-              >
-                <UserCheck className="h-3.5 w-3.5 mr-1" />
-                Mark Reviewed
-              </button>
-            </div>
-            <div className="rounded-md border border-border p-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Approval</p>
-              <p className="text-sm text-foreground">Assigned approver: {resolveUserName(users, testCase.approver_id)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Approved by: {resolveUserName(users, testCase.approved_by_id)}</p>
-              {testCase.approved_at && <p className="text-xs text-muted-foreground mt-1">At {formatDateTime(testCase.approved_at)}</p>}
-              <button
-                disabled={!testCase.approver_id || markApprovedMutation.isPending}
-                onClick={() => testCase.approver_id && markApprovedMutation.mutate(testCase.approver_id)}
-                className="mt-3 inline-flex items-center px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-500 disabled:opacity-50"
-              >
-                <UserCog className="h-3.5 w-3.5 mr-1" />
-                Mark Approved
-              </button>
-            </div>
-          </div>
+  const { data: incomingLinks } = useQuery({
+    queryKey: ['docLinks', projectId, 'TC', sourceId, 'incoming'],
+    queryFn: () => linksApi.list({ project_id: projectId, target_type: 'TC', target_id: sourceId }),
+  })
 
-          <div className="bg-card rounded-lg shadow-elegant">
-            <div className="px-6 py-4 border-b border-border flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Contained In Suites</h3>
-              <span className="text-sm text-muted-foreground">{testCase.suite_memberships?.length || 0} suite{(testCase.suite_memberships?.length || 0) !== 1 ? 's' : ''}</span>
-            </div>
-            {testCase.suite_memberships && testCase.suite_memberships.length > 0 ? (
-              <div className="divide-y divide-border">
-                {testCase.suite_memberships.map((suite) => (
-                  <div key={suite.id} className="px-6 py-4 flex items-center justify-between">
-                    <div>
-                      <div className="font-mono text-sm text-primary">{suite.suite_id}</div>
-                      <div className="text-foreground mt-1">{suite.name}</div>
-                    </div>
-                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">{suite.status}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-6 text-center text-muted-foreground">This test case is not part of any suite yet.</div>
-            )}
-          </div>
+  const deleteMutation = useMutation({
+    mutationFn: linksApi.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['docLinks', projectId] })
+    },
+  })
 
-          <div className="bg-card rounded-lg shadow-elegant">
-            <div className="px-6 py-4 border-b border-border flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Included In Campaign Scopes</h3>
-              <span className="text-sm text-muted-foreground">{testCase.campaign_memberships?.length || 0} campaign{(testCase.campaign_memberships?.length || 0) !== 1 ? 's' : ''}</span>
-            </div>
-            {testCase.campaign_memberships && testCase.campaign_memberships.length > 0 ? (
-              <div className="divide-y divide-border">
-                {testCase.campaign_memberships.map((campaign) => (
-                  <div key={campaign.id} className="px-6 py-4 flex items-center justify-between">
-                    <div className="text-foreground">{campaign.name}</div>
-                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">{campaign.status}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-6 text-center text-muted-foreground">This test case is not included in any campaign scope yet.</div>
-            )}
-          </div>
+  const docLookup = useMemo(() => {
+    const map = new Map<string, DocShell>()
+    ;(docs || []).forEach((doc) => map.set(docKey(doc.doc_type, doc.id), doc))
+    return map
+  }, [docs])
 
-          <div className="text-sm text-muted-foreground flex items-center space-x-6">
-            <span>Created {formatDateTime(testCase.created_at)} ago</span>
-            <span>Updated {formatDateTime(testCase.updated_at)} ago</span>
-          </div>
-        </>
-      )}
+  const linkCount = (outgoingLinks?.length || 0) + (incomingLinks?.length || 0)
 
-      {showLinkModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-card rounded-lg shadow-elegant max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
-            <div className="px-6 py-4 border-b border-border flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Link Requirement</h3>
-              <button onClick={() => setShowLinkModal(false)} className="text-muted-foreground hover:text-foreground">✕</button>
-            </div>
-            <div className="overflow-y-auto p-6">
-              <div className="mb-4 relative">
-                <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  value={reqSearch}
-                  onChange={(e) => setReqSearch(e.target.value)}
-                  placeholder="Filter available requirements"
-                  className="w-full pl-9 pr-3 py-2 bg-background border border-input rounded-md text-sm"
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Link Type</label>
-                <select
-                  value={linkType}
-                  onChange={(e) => setLinkType(e.target.value)}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm text-foreground"
-                >
-                  <option value="verifies">verifies</option>
-                </select>
-              </div>
-              <div className="mb-4 flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    if (selectedUnlinkedReqIds.length === filteredUnlinkedRequirements.length) {
-                      setSelectedUnlinkedReqIds([])
-                    } else {
-                      setSelectedUnlinkedReqIds(filteredUnlinkedRequirements.map((req) => req.id))
-                    }
-                  }}
-                  className="px-3 py-2 border border-input rounded-md text-xs font-medium hover:bg-accent/50"
-                >
-                  {selectedUnlinkedReqIds.length === filteredUnlinkedRequirements.length && filteredUnlinkedRequirements.length > 0 ? 'Clear' : 'Select all'}
-                </button>
-                <button
-                  onClick={() => bulkLinkReqMutation.mutate(selectedUnlinkedReqIds)}
-                  disabled={selectedUnlinkedReqIds.length === 0 || bulkLinkReqMutation.isPending}
-                  className="px-3 py-2 bg-primary text-primary-foreground rounded-md text-xs font-medium hover:bg-primary/90 disabled:opacity-50"
-                >
-                  {bulkLinkReqMutation.isPending ? 'Linking...' : `Link selected (${selectedUnlinkedReqIds.length})`}
-                </button>
-              </div>
-              {filteredUnlinkedRequirements.length === 0 ? (
-                <div className="text-center text-muted-foreground py-8">No matching requirements available.</div>
-              ) : (
-                <div className="space-y-2">
-                  {filteredUnlinkedRequirements.map((req) => (
-                    <div
-                      key={req.id}
-                      onClick={() => {
-                        setSelectedUnlinkedReqIds((prev) =>
-                          prev.includes(req.id) ? prev.filter((id) => id !== req.id) : [...prev, req.id]
-                        )
-                      }}
-                      className="w-full flex items-center justify-between px-4 py-3 rounded-md border border-border hover:border-primary/50 hover:bg-primary/10 transition-colors text-left disabled:opacity-50"
-                    >
-                      <div>
-                        <input
-                          type="checkbox"
-                          checked={selectedUnlinkedReqIds.includes(req.id)}
-                          readOnly
-                          className="mr-3"
-                        />
-                        <span className="font-mono text-sm text-primary mr-2">{req.req_id}</span>
-                        <span className="text-foreground">{req.title}</span>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          linkReqMutation.mutate(req.id)
-                        }}
-                        disabled={linkReqMutation.isPending}
-                        className="px-2 py-1 border border-input rounded text-xs hover:bg-accent/50"
-                      >
-                        Link
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+  return (
+    <div className="bg-card rounded-lg shadow-elegant">
+      <div className="px-6 py-4 border-b border-border flex justify-between items-center">
+        <div>
+          <h3 className="text-lg font-semibold">Document Links</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Typed links from this test case to requirements, specifications, designs, risks, and other controlled documents.</p>
         </div>
+        <button
+          onClick={() => setShowModal(true)}
+          className="inline-flex items-center px-3 py-2 border border-input rounded-md text-sm font-medium hover:bg-accent/50"
+        >
+          <Link2 className="h-4 w-4 mr-2" />
+          Link Document
+        </button>
+      </div>
+
+      {linkCount === 0 ? (
+        <div className="p-6 text-center text-muted-foreground">No document links yet.</div>
+      ) : (
+        <div className="divide-y divide-border">
+          {(outgoingLinks || []).map((link) => (
+            <DocumentLinkRow
+              key={`out-${link.id}`}
+              link={link}
+              doc={docLookup.get(docKey(link.target_type, link.target_id))}
+              projectPrefix={projectPrefix}
+              direction="outgoing"
+              onDelete={() => deleteMutation.mutate(link.id)}
+            />
+          ))}
+          {(incomingLinks || []).map((link) => (
+            <DocumentLinkRow
+              key={`in-${link.id}`}
+              link={link}
+              doc={docLookup.get(docKey(link.source_type, link.source_id))}
+              projectPrefix={projectPrefix}
+              direction="incoming"
+              onDelete={() => deleteMutation.mutate(link.id)}
+            />
+          ))}
+        </div>
+      )}
+
+      {showModal && (
+        <LinkDocumentModal
+          projectId={projectId}
+          sourceId={sourceId}
+          docs={(docs || []).filter((doc) => !(doc.doc_type === 'TC' && doc.id === sourceId))}
+          onClose={() => setShowModal(false)}
+        />
       )}
     </div>
   )
+}
+
+function LinkDocumentModal({
+  projectId,
+  sourceId,
+  docs,
+  onClose,
+}: {
+  projectId: number
+  sourceId: number
+  docs: DocShell[]
+  onClose: () => void
+}) {
+  const queryClient = useQueryClient()
+  const [role, setRole] = useState<(typeof LINK_ROLES)[number]>('verifies')
+  const [search, setSearch] = useState('')
+
+  const createMutation = useMutation({
+    mutationFn: (target: DocShell) => linksApi.create({
+      project_id: projectId,
+      source_type: 'TC',
+      source_id: sourceId,
+      target_type: target.doc_type,
+      target_id: target.id,
+      role,
+      suspect: false,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['docLinks', projectId] })
+      onClose()
+    },
+  })
+
+  const filteredDocs = docs.filter((doc) => {
+    const q = search.trim().toLowerCase()
+    if (!q) return true
+    return doc.doc_id.toLowerCase().includes(q) || doc.title.toLowerCase().includes(q) || doc.doc_type.toLowerCase().includes(q)
+  })
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-card rounded-lg shadow-elegant max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col">
+        <div className="px-6 py-4 border-b border-border flex justify-between items-center">
+          <h3 className="text-lg font-semibold">Link Document</h3>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">✕</button>
+        </div>
+        <div className="p-6 border-b border-border grid grid-cols-1 md:grid-cols-[1fr_12rem] gap-3">
+          <div className="relative">
+            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search controlled documents"
+              className="w-full pl-9 pr-3 py-2 bg-background border border-input rounded-md text-sm"
+            />
+          </div>
+          <select
+            value={role}
+            onChange={(event) => setRole(event.target.value as (typeof LINK_ROLES)[number])}
+            className="px-3 py-2 bg-background border border-input rounded-md text-sm"
+          >
+            {LINK_ROLES.map((item) => (
+              <option key={item} value={item}>{roleLabel(item, 'outgoing')}</option>
+            ))}
+          </select>
+        </div>
+        <div className="overflow-y-auto p-3">
+          {filteredDocs.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">No matching documents.</div>
+          ) : (
+            <div className="divide-y divide-border">
+              {filteredDocs.map((doc) => (
+                <button
+                  key={`${doc.doc_type}-${doc.id}`}
+                  onClick={() => createMutation.mutate(doc)}
+                  disabled={createMutation.isPending}
+                  className="w-full px-3 py-3 text-left hover:bg-accent/50 disabled:opacity-50"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <span className="font-mono text-sm text-primary mr-2">{doc.doc_id}</span>
+                      <span className="text-sm font-medium text-foreground">{doc.title}</span>
+                    </div>
+                    <span className="shrink-0 rounded border border-border px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                      {DOC_TYPE_LABELS[doc.doc_type] || doc.doc_type}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DocumentLinkRow({
+  link,
+  doc,
+  projectPrefix,
+  direction,
+  onDelete,
+}: {
+  link: ArtefactLink
+  doc: DocShell | undefined
+  projectPrefix: string
+  direction: 'incoming' | 'outgoing'
+  onDelete: () => void
+}) {
+  return (
+    <div className="flex items-center justify-between px-6 py-4 hover:bg-accent/50 transition-colors">
+      <Link to={doc ? `/projects/${projectPrefix}/docs/${doc.doc_id}` : '#'} className="min-w-0 flex items-center">
+        <FileText className="h-5 w-5 text-primary mr-3 shrink-0" />
+        <div className="min-w-0">
+          <div>
+            <span className="font-mono text-sm text-primary mr-2">{doc?.doc_id || `${direction === 'outgoing' ? link.target_type : link.source_type} #${direction === 'outgoing' ? link.target_id : link.source_id}`}</span>
+            <span className="text-foreground">{doc?.title || 'Linked document'}</span>
+          </div>
+          <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+            <span>{direction === 'incoming' ? 'Incoming' : 'Outgoing'}</span>
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">{roleLabel(link.role, direction)}</span>
+            {link.suspect && <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-amber-700 dark:text-amber-400">suspect</span>}
+            <span>{formatDateTime(link.created_at)} ago</span>
+          </div>
+        </div>
+      </Link>
+      <button
+        onClick={onDelete}
+        className="ml-3 p-1.5 rounded text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+        title="Remove link"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  )
+}
+
+function MembershipPanel({ title, countLabel, emptyText, children }: { title: string; countLabel: string; emptyText: string; children: ReactNode }) {
+  const hasChildren = Array.isArray(children) ? children.length > 0 : Boolean(children)
+  return (
+    <div className="bg-card rounded-lg shadow-elegant">
+      <div className="px-6 py-4 border-b border-border flex justify-between items-center">
+        <h3 className="text-lg font-semibold">{title}</h3>
+        <span className="text-sm text-muted-foreground">{countLabel}</span>
+      </div>
+      {hasChildren ? <div className="divide-y divide-border">{children}</div> : <div className="p-6 text-center text-muted-foreground">{emptyText}</div>}
+    </div>
+  )
+}
+
+function docKey(type: string, id: number) {
+  return `${type}:${id}`
+}
+
+function roleLabel(role: string, direction: 'incoming' | 'outgoing') {
+  const labels: Record<string, [string, string]> = {
+    verifies: ['verifies', 'verified by'],
+    implements: ['implements', 'implemented by'],
+    references: ['references', 'referenced by'],
+    depends_on: ['depends on', 'dependency of'],
+    impacts: ['impacts', 'impacted by'],
+    blocks: ['blocks', 'blocked by'],
+  }
+  const pair = labels[role]
+  if (!pair) return role.split('_').join(' ')
+  return direction === 'outgoing' ? pair[0] : pair[1]
 }
 
 function TcStatusBadge({ status }: { status: string }) {
@@ -603,27 +467,6 @@ function TcStatusBadge({ status }: { status: string }) {
       {status}
     </span>
   )
-}
-
-function RequirementStatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    Draft: 'bg-gray-500/10 text-gray-700 dark:text-gray-400',
-    Review: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-    Approved: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
-    Implemented: 'bg-teal-500/10 text-teal-700 dark:text-teal-400',
-    Verified: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-    Rejected: 'bg-red-500/10 text-red-700 dark:text-red-400',
-  }
-  return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[status] || 'bg-gray-500/10 text-gray-700 dark:text-gray-400'}`}>
-      {status}
-    </span>
-  )
-}
-
-function friendlyVerificationLabel(linkType: string, direction: 'incoming' | 'outgoing') {
-  if (linkType === 'verifies') return direction === 'incoming' ? 'verified by' : 'verifies'
-  return linkType.split('_').join(' ')
 }
 
 function resolveUserName(users: Array<{ id: number; full_name: string }> | undefined, userId: number | null) {

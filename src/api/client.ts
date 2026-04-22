@@ -302,7 +302,7 @@ export interface Step {
   expected_result: string
 }
 
-export type TcsRowType = 'precondition' | 'step' | 'loop' | 'postcondition'
+export type TcsRowType = 'precondition' | 'step' | 'loop'
 
 export interface TcsRow {
   id: string
@@ -655,6 +655,9 @@ export const testCasesApi = {
     description?: string
     preconditions?: string
     steps?: Step[] | TcsRow[]
+    status?: string
+    reviewer_id?: number
+    approver_id?: number
   }) => {
     const response = await api.post<TestCase>('/test-cases', data)
     return response.data
