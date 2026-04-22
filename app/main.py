@@ -1,5 +1,5 @@
 """
-FastAPI application for EmbedLabs Bloom - Application Lifecycle Management.
+FastAPI application for EmbedLabs Bloom - Product Lifecycle Management.
 
 Main entry point for the backend API.
 """
@@ -93,7 +93,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.BLOOM_APP_NAME,
-    description="Backend API for EmbedLabs Bloom - Application Lifecycle Management",
+    description="Backend API for EmbedLabs Bloom - Product Lifecycle Management",
     version=settings.BLOOM_APP_VERSION,
     docs_url="/api/docs" if settings.ENABLE_DOCS else None,
     redoc_url="/api/redoc" if settings.ENABLE_DOCS else None,

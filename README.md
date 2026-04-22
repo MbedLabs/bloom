@@ -1,6 +1,6 @@
-# EmbedLabs Bloom - Application Lifecycle Management
+# EmbedLabs Bloom - Product Lifecycle Management
 
-Backend API for **Bloom**, EmbedLabs' requirements and lifecycle management platform. Similar to Polarion ALM, Bloom manages requirements, test cases, and traceability across the product lifecycle.
+Backend API for **Bloom**, EmbedLabs' Product Lifecycle Management. Bloom manages requirements, test cases, and traceability across the product lifecycle.
 
 ## Features
 
@@ -8,7 +8,7 @@ Backend API for **Bloom**, EmbedLabs' requirements and lifecycle management plat
 - **Requirement Hierarchy** - Parent/child requirement relationships with statuses (Draft → Review → Approved → Implemented → Verified)
 - **Test Case Management** - Create test cases with structured steps and link them to requirements
 - **Traceability Matrix** - Full coverage tracking (Covered / Partial / Uncovered) across requirements and test cases
-- **Test Station Integration** - Link requirements to test runs in the [Bud Test Station app](https://github.com/elomariamin/bud-app-backend)
+- **Test Station Integration** - Link requirements to test runs in the [Bud Test Management Platform](https://github.com/MbedLabs/bud-app-backend)
 - **REST API** - FastAPI with automatic OpenAPI documentation
 
 ## Tech Stack

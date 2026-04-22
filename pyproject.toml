@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "bloom-app"
 version = "0.2.0"
-description = "Backend API for Bloom Application Lifecycle Management by EmbedLabs"
+description = "Backend API for Bloom Product Lifecycle Management by EmbedLabs"
 readme = "README.md"
 license = {text = "AGPL-3.0-or-later"}
 authors = [
