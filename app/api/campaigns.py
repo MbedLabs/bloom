@@ -98,30 +98,38 @@ async def sync_results_global(
     """
     Ingest automated test results across all campaigns.
     Matches results to campaign items by tc_id without requiring a specific campaign.
+    Only updates items in active campaigns (status 'Scope' or 'Running').
     Used by Bud backend for direct Bud→Bloom result synchronization.
     """
     tc_ids = [r.tc_id for r in data.results]
 
+    active_statuses = ("Scope", "Running", "In Progress")
+
     items_result = await db.execute(
-        select(TestCampaignItem, TestCase)
+        select(TestCampaignItem, TestCase, TestCampaign)
         .join(TestCase, TestCampaignItem.test_case_id == TestCase.id)
+        .join(TestCampaign, TestCampaignItem.campaign_id == TestCampaign.id)
         .where(TestCase.tc_id.in_(tc_ids))
+        .where(TestCampaign.status.in_(active_statuses))
     )
 
-    tc_id_to_item = {tc.tc_id: (item, tc) for item, tc in items_result.all()}
+    # Group by tc_id — one tc_id can match multiple active campaign items
+    tc_id_to_items: dict[str, list] = {}
+    for item, tc, campaign in items_result.all():
+        tc_id_to_items.setdefault(tc.tc_id, []).append(item)
 
     updated_count = 0
     not_found = []
 
     for res in data.results:
-        match = tc_id_to_item.get(res.tc_id)
-        if match:
-            item, _ = match
-            item.status = "Executed"
-            item.result = res.status
-            item.comment = res.comment
-            item.executed_at = res.executed_at or datetime.utcnow()
-            updated_count += 1
+        matched_items = tc_id_to_items.get(res.tc_id)
+        if matched_items:
+            for item in matched_items:
+                item.status = "Executed"
+                item.result = res.status
+                item.comment = res.comment
+                item.executed_at = res.executed_at or datetime.utcnow()
+                updated_count += 1
         else:
             not_found.append(res.tc_id)
 
