@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.document_kinds import normalize_document_kind
 from app.models import (
     ArtefactActivity,
     ChangeRequest,
@@ -205,8 +206,9 @@ async def build_related_response(
         related_documents=[
             RelatedDocumentSummary(
                 id=item["document"].id,
+                doc_id=item["document"].doc_id,
                 title=item["document"].title,
-                doc_type=item["document"].doc_type,
+                doc_type=normalize_document_kind(item["document"].doc_type),
                 status=item["document"].status,
                 matched_sections=item["matched_sections"],
             )

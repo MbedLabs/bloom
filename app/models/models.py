@@ -242,7 +242,7 @@ class Document(Base):
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
     doc_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
-    doc_type: Mapped[str] = mapped_column(String(30), default="Specification")
+    doc_type: Mapped[str] = mapped_column(String(30), default="SPEC")
     status: Mapped[str] = mapped_column(String(20), default="Draft")
     version: Mapped[str] = mapped_column(String(20), default="1.0")
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

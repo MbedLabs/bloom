@@ -5,6 +5,7 @@ Main entry point for the backend API.
 """
 
 import logging
+import re
 import sys
 from contextlib import asynccontextmanager
 
@@ -40,7 +41,10 @@ from app.api import users as users_api
 from app.core.config import settings
 from app.core.database import async_session_maker, create_tables, engine
 from app.core.deps import limiter
+from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS, normalize_document_kind
+from app.core.id_generator import compute_next_id
 from app.core.security import get_password_hash
+from app.models import ArtefactLink, Document, Project
 from app.models.user import User, UserRole
 
 # Configure logging
@@ -82,11 +86,109 @@ async def migrate_user_columns() -> None:
         )
 
 
+async def normalize_document_kinds_and_ids() -> None:
+    """Normalize legacy shared-document types and ids to canonical kind codes."""
+    async with async_session_maker() as session:
+        projects = (await session.execute(select(Project).order_by(Project.id))).scalars().all()
+        id_pattern = re.compile(r"^(?P<prefix>[A-Z0-9]+)-(?P<kind>[A-Z]+)-(?P<num>\d+)$")
+
+        for project in projects:
+            documents = (
+                (
+                    await session.execute(
+                        select(Document)
+                        .where(Document.project_id == project.id)
+                        .order_by(Document.created_at.asc(), Document.id.asc())
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            used_ids_by_kind: dict[str, set[str]] = {
+                kind: set() for kind in CANONICAL_DOCUMENT_KINDS
+            }
+            for document in documents:
+                normalized_kind = normalize_document_kind(document.doc_type)
+                if normalized_kind not in CANONICAL_DOCUMENT_KINDS:
+                    normalized_kind = "SPEC"
+
+                current_id = document.doc_id or ""
+                if current_id.startswith(f"{project.prefix}-{normalized_kind}-"):
+                    used_ids_by_kind[normalized_kind].add(current_id)
+
+            for document in documents:
+                normalized_kind = normalize_document_kind(document.doc_type)
+                if normalized_kind not in CANONICAL_DOCUMENT_KINDS:
+                    normalized_kind = "SPEC"
+                document.doc_type = normalized_kind
+
+                current_id = document.doc_id or ""
+                desired_prefix = f"{project.prefix}-{normalized_kind}-"
+                if current_id.startswith(desired_prefix):
+                    continue
+
+                replacement_id = None
+                match = id_pattern.match(current_id)
+                if match and match.group("prefix") == project.prefix:
+                    candidate = f"{desired_prefix}{match.group('num')}"
+                    if candidate not in used_ids_by_kind[normalized_kind]:
+                        replacement_id = candidate
+
+                if replacement_id is None:
+                    existing_ids = sorted(used_ids_by_kind[normalized_kind])
+                    replacement_id = compute_next_id(existing_ids, project.prefix, normalized_kind)
+
+                document.doc_id = replacement_id
+                used_ids_by_kind[normalized_kind].add(replacement_id)
+
+            documents_by_id = {document.id: document for document in documents}
+            links = (
+                (
+                    await session.execute(
+                        select(ArtefactLink)
+                        .where(ArtefactLink.project_id == project.id)
+                        .order_by(ArtefactLink.id.asc())
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            seen_link_keys: set[tuple[str, int, str, int, str]] = set()
+
+            for link in links:
+                if (
+                    link.source_id in documents_by_id
+                    and normalize_document_kind(link.source_type) in CANONICAL_DOCUMENT_KINDS
+                ):
+                    link.source_type = documents_by_id[link.source_id].doc_type
+                if (
+                    link.target_id in documents_by_id
+                    and normalize_document_kind(link.target_type) in CANONICAL_DOCUMENT_KINDS
+                ):
+                    link.target_type = documents_by_id[link.target_id].doc_type
+
+                link_key = (
+                    link.source_type,
+                    link.source_id,
+                    link.target_type,
+                    link.target_id,
+                    link.role,
+                )
+                if link_key in seen_link_keys:
+                    await session.delete(link)
+                else:
+                    seen_link_keys.add(link_key)
+
+        await session.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     await create_tables()
     await migrate_user_columns()
+    await normalize_document_kinds_and_ids()
     await seed_admin_user()
     yield
 
