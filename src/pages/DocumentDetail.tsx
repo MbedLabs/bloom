@@ -2,27 +2,13 @@ import { useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { documentsApi, projectsApi, DocumentSection } from '../api/client'
-import { Trash2, ChevronRight, FileText, ArrowLeft, FileEdit } from 'lucide-react'
+import { Trash2, ChevronRight, FileText, FileEdit } from 'lucide-react'
 import { DocEditor } from '../components/editor'
-
-function DocTypeBadge({ docType }: { docType: string }) {
-  const config: Record<string, string> = {
-    Specification: 'bg-primary/10 text-primary',
-    'Test Concept': 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400',
-    Report: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-    Other: 'bg-muted text-muted-foreground',
-  }
-  return <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${config[docType] || config.Other}`}>{docType}</span>
-}
-
-function DocStatusBadge({ status }: { status: string }) {
-  const config: Record<string, string> = {
-    Draft: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-    Review: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
-    Approved: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-  }
-  return <span className={`px-2.5 py-1 rounded-md text-xs font-semibold ${config[status] || config.Draft}`}>{status}</span>
-}
+import DocDetailShell, { MetaItem, SectionCard } from '../components/DocDetailShell'
+import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
+import { docEditUrl, kindSlugToType } from '../types/doc'
+import { formatDateTime } from '../test/date-utils'
+import { useAuth } from '../contexts/AuthContext'
 
 function flattenSections(sections: DocumentSection[]): DocumentSection[] {
   const result: DocumentSection[] = []
@@ -54,10 +40,14 @@ function TocItem({ section, depth }: { section: DocumentSection; depth: number }
 }
 
 export default function DocumentDetail({ resolvedId }: { resolvedId?: number } = {}) {
-  const { prefix, docId: docIdParam } = useParams<{ prefix: string; docId: string }>()
+  const { user } = useAuth()
+  const { prefix, docId: docIdParam, kind } = useParams<{ prefix: string; docId: string; kind: string }>()
   const docId = resolvedId || Number(docIdParam)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+
+  const resolvedDocType = kindSlugToType(kind || '')
+  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
 
   const { data: doc, isLoading } = useQuery({
     queryKey: ['document', docId],
@@ -104,27 +94,30 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
     )
   }
 
-  return (
-    <div className="animate-fade-in space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <Link to={`/projects/${projectPrefix}/docs`} className="p-2 hover:bg-accent/50 rounded-md">
-            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-          </Link>
-          <div>
-            <div className="flex items-center gap-3 flex-wrap mb-1">
-              {doc.doc_id && <span className="font-mono text-sm text-primary font-semibold">{doc.doc_id}</span>}
-              <DocTypeBadge docType={doc.doc_type} />
-              <DocStatusBadge status={doc.status} />
-              <span className="text-xs text-muted-foreground">v{doc.version}</span>
-            </div>
-            <h2 className="text-2xl font-bold text-foreground">{doc.title}</h2>
-            {doc.description && <p className="text-muted-foreground mt-2">{doc.description}</p>}
-          </div>
+  if (!resolvedDocType) {
+    return (
+      <div className="flex items-center justify-center h-64 animate-fade-in">
+        <div className="text-center">
+          <h3 className="text-lg font-semibold text-foreground mb-2">Invalid document route</h3>
+          <p className="text-sm text-muted-foreground">Unknown document kind &quot;{kind}&quot;.</p>
         </div>
-        <div className="flex items-center gap-2">
+      </div>
+    )
+  }
+
+  const editUrl = docEditUrl(projectPrefix, resolvedDocType, doc.doc_id || String(docId))
+
+  return (
+    <DocDetailShell
+      projectPrefix={projectPrefix}
+      docType={resolvedDocType}
+      docCode={doc.doc_id || String(docId)}
+      title={doc.title}
+      status={doc.status}
+      actions={canEditDocs ? (
+        <>
           <button
-            onClick={() => navigate(`/projects/${projectPrefix}/docs/${doc.doc_id || docId}/edit?type=DOC`)}
+            onClick={() => navigate(`${editUrl}?type=${resolvedDocType}`)}
             className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm font-medium"
           >
             <FileEdit className="h-4 w-4 mr-2" />
@@ -137,9 +130,19 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
           >
             <Trash2 className="h-4 w-4" />
           </button>
-        </div>
-      </div>
-
+        </>
+      ) : undefined}
+      rightRail={
+        <SectionCard title="Metadata">
+          <div className="space-y-4">
+            <MetaItem label="ID" value={doc.doc_id || String(docId)} mono />
+            <MetaItem label="Version" value={`v${doc.version}`} />
+            <MetaItem label="Created" value={formatDateTime(doc.created_at) + ' ago'} />
+            <MetaItem label="Updated" value={formatDateTime(doc.updated_at) + ' ago'} />
+          </div>
+        </SectionCard>
+      }
+    >
       {hasRichContent && (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-8">
           <div className="max-w-4xl mx-auto">
@@ -180,15 +183,24 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
           </div>
           <h3 className="text-lg font-semibold text-foreground mb-2">Empty Document</h3>
           <p className="text-sm text-muted-foreground max-w-md mx-auto mb-4">This document has no content yet. Open the editor to start writing.</p>
-          <button
-            onClick={() => navigate(`/projects/${projectPrefix}/docs/${doc.doc_id || docId}/edit?type=DOC`)}
-            className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm font-medium"
-          >
-            <FileEdit className="h-4 w-4 mr-2" />
-            Open Editor
-          </button>
+          {canEditDocs && (
+            <button
+              onClick={() => navigate(`${editUrl}?type=${resolvedDocType}`)}
+              className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm font-medium"
+            >
+              <FileEdit className="h-4 w-4 mr-2" />
+              Open Editor
+            </button>
+          )}
         </div>
       )}
-    </div>
+
+      <DocumentLinksPanel
+        projectId={doc.project_id}
+        projectPrefix={projectPrefix}
+        sourceType={resolvedDocType}
+        sourceId={docId}
+      />
+    </DocDetailShell>
   )
 }

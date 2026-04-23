@@ -5,6 +5,7 @@ import { ArrowLeft, Layers3, Plus, Trash2 } from 'lucide-react'
 
 import { campaignsApi, testCasesApi, testSuitesApi } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
+import { docUrl } from '../types/doc'
 
 export default function SuiteDetail() {
   const { prefix, suiteId } = useParams<{ prefix: string; suiteId: string }>()
@@ -133,7 +134,7 @@ export default function SuiteDetail() {
                   <div className="text-xs text-muted-foreground">#{item.order + 1}</div>
                   {item.test_case && (
                     <>
-                      <Link to={`/projects/${prefix}/docs/${item.test_case.tc_id}`} className="font-mono text-sm text-primary hover:text-primary/80">
+                      <Link to={docUrl(prefix!, 'TC', item.test_case.tc_id)} className="font-mono text-sm text-primary hover:text-primary/80">
                         {item.test_case.tc_id}
                       </Link>
                       <div className="text-foreground mt-1">{item.test_case.title}</div>
@@ -164,7 +165,7 @@ export default function SuiteDetail() {
           ) : (
             <div className="divide-y divide-border">
               {suite.related_requirements.map((req) => (
-                <Link key={req.id} to={`/projects/${prefix}/docs/${req.req_id}`} className="block px-6 py-4 hover:bg-accent/40">
+                <Link key={req.id} to={docUrl(prefix!, 'REQ', req.req_id)} className="block px-6 py-4 hover:bg-accent/40">
                   <div className="font-mono text-sm text-primary">{req.req_id}</div>
                   <div className="text-foreground mt-1">{req.title}</div>
                 </Link>

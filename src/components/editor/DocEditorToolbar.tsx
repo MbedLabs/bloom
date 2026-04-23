@@ -4,7 +4,8 @@ import {
   List, ListOrdered, ListChecks, Quote,
   Code, Minus, Image as ImageIcon, Link2, Table as TableIcon,
   Undo2, Redo2, RemoveFormatting, AlignLeft, AlignCenter,
-  AlignRight, Superscript, Subscript, ChevronDown, Palette
+  AlignRight, Superscript, Subscript, ChevronDown, Palette,
+  ListTree, Hash
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 
@@ -13,9 +14,17 @@ interface DocEditorToolbarProps {
   onAddLink: () => void
   onAddImage: () => void
   onAddTable: () => void
+  headingNumbered?: boolean
+  onHeadingNumberedChange?: (numbered: boolean) => void
+  outlineOpen?: boolean
+  onOutlineToggle?: () => void
 }
 
-export default function DocEditorToolbar({ editor, onAddLink, onAddImage, onAddTable }: DocEditorToolbarProps) {
+export default function DocEditorToolbar({
+  editor, onAddLink, onAddImage, onAddTable,
+  headingNumbered = true, onHeadingNumberedChange,
+  outlineOpen = false, onOutlineToggle,
+}: DocEditorToolbarProps) {
   const [headingOpen, setHeadingOpen] = useState(false)
   const [colorOpen, setColorOpen] = useState(false)
   const headingRef = useRef<HTMLDivElement>(null)
@@ -277,12 +286,12 @@ export default function DocEditorToolbar({ editor, onAddLink, onAddImage, onAddT
         <>
           <Separator />
           <div className="flex items-center gap-0.5">
-            <SmallButton onClick={() => editor.chain().focus().addColumnBefore().run()} label="+Col←" />
-            <SmallButton onClick={() => editor.chain().focus().addColumnAfter().run()} label="+Col→" />
-            <SmallButton onClick={() => editor.chain().focus().addRowBefore().run()} label="+Row↑" />
-            <SmallButton onClick={() => editor.chain().focus().addRowAfter().run()} label="+Row↓" />
-            <SmallButton onClick={() => editor.chain().focus().deleteColumn().run()} label="−Col" className="text-red-500" />
-            <SmallButton onClick={() => editor.chain().focus().deleteRow().run()} label="−Row" className="text-red-500" />
+            <SmallButton onClick={() => editor.chain().focus().addColumnBefore().run()} label="+Col\u2190" />
+            <SmallButton onClick={() => editor.chain().focus().addColumnAfter().run()} label="+Col\u2192" />
+            <SmallButton onClick={() => editor.chain().focus().addRowBefore().run()} label="+Row\u2191" />
+            <SmallButton onClick={() => editor.chain().focus().addRowAfter().run()} label="+Row\u2193" />
+            <SmallButton onClick={() => editor.chain().focus().deleteColumn().run()} label="\u2212Col" className="text-red-500" />
+            <SmallButton onClick={() => editor.chain().focus().deleteRow().run()} label="\u2212Row" className="text-red-500" />
             <SmallButton onClick={() => editor.chain().focus().mergeCells().run()} label="Merge" />
             <SmallButton onClick={() => editor.chain().focus().splitCell().run()} label="Split" />
             <SmallButton onClick={() => editor.chain().focus().toggleHeaderRow().run()} label="Header" />
@@ -290,6 +299,24 @@ export default function DocEditorToolbar({ editor, onAddLink, onAddImage, onAddT
           </div>
         </>
       )}
+
+      <Separator />
+
+      {/* Heading numbering toggle */}
+      <ToolbarButton
+        onClick={() => onHeadingNumberedChange?.(!headingNumbered)}
+        active={headingNumbered}
+        icon={<Hash className="h-4 w-4" />}
+        title={headingNumbered ? 'Disable heading numbering' : 'Enable heading numbering'}
+      />
+
+      {/* Outline toggle */}
+      <ToolbarButton
+        onClick={onOutlineToggle ?? (() => {})}
+        active={outlineOpen}
+        icon={<ListTree className="h-4 w-4" />}
+        title="Toggle outline"
+      />
     </div>
   )
 }

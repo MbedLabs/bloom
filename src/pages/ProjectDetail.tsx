@@ -17,6 +17,7 @@ import {
 
 import {
   TestConcept as TestConceptRecord,
+  type Document,
   changesApi,
   designsApi,
   documentsApi,
@@ -30,16 +31,19 @@ import {
 } from '../api/client'
 import { TcsArteTable } from '../components/TcsArteTable'
 import { createDefaultTcRows } from '../utils/tcs'
+import { docUrl, docCreateUrl, DOC_TYPE_LABELS, type DocType } from '../types/doc'
+import { useAuth } from '../contexts/AuthContext'
 
-type Tab = 'requirements' | 'test-cases' | 'documents' | 'test-concepts' | 'traceability' | 'design' | 'risks' | 'changes'
+type Tab = 'requirements' | 'test-cases' | 'specifications' | 'protocols' | 'reports' | 'standards' | 'test-concepts' | 'traceability' | 'design' | 'risks' | 'changes'
 
-const VALID_TABS: Tab[] = ['requirements', 'test-cases', 'documents', 'test-concepts', 'traceability', 'design', 'risks', 'changes']
+const VALID_TABS: Tab[] = ['requirements', 'test-cases', 'specifications', 'protocols', 'reports', 'standards', 'test-concepts', 'traceability', 'design', 'risks', 'changes']
 
 function getActiveTab(value: string | null): Tab {
   return VALID_TABS.includes(value as Tab) ? (value as Tab) : 'requirements'
 }
 
 export default function ProjectDetail() {
+  const { user } = useAuth()
   const { prefix } = useParams<{ prefix: string }>()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -62,6 +66,7 @@ export default function ProjectDetail() {
   const [designForm, setDesignForm] = useState({ title: '', description: '', status: 'Draft', priority: 'Medium', design_type: 'Architecture', linked_requirement_id: '' })
   const [riskForm, setRiskForm] = useState({ title: '', description: '', status: 'Open', severity: 'Medium', probability: 'Medium', mitigation: '', risk_category: 'Technical', linked_requirement_id: '' })
   const [changeForm, setChangeForm] = useState({ title: '', description: '', status: 'Submitted', priority: 'Medium', change_type: 'Enhancement', impact_assessment: '', justification: '' })
+  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
 
   const setTab = (tab: Tab) => {
     const next = new URLSearchParams(searchParams)
@@ -202,6 +207,11 @@ export default function ProjectDetail() {
     [testCases, tcStatusFilter]
   )
 
+  const specDocs = useMemo(() => documents?.filter((d) => d.doc_type === 'SPEC') ?? [], [documents])
+  const protDocs = useMemo(() => documents?.filter((d) => d.doc_type === 'PROT') ?? [], [documents])
+  const rptDocs = useMemo(() => documents?.filter((d) => d.doc_type === 'RPT') ?? [], [documents])
+  const stdDocs = useMemo(() => documents?.filter((d) => d.doc_type === 'STD') ?? [], [documents])
+
   const uncoveredRequirements = useMemo(
     () => matrix?.filter((item) => item.coverage_status !== 'Covered').slice(0, 6) ?? [],
     [matrix]
@@ -302,10 +312,13 @@ export default function ProjectDetail() {
   const tabs: { key: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { key: 'requirements', label: 'Requirements', icon: FileText },
     { key: 'test-cases', label: 'Test Cases', icon: CheckCircle },
+    { key: 'specifications', label: 'Specifications', icon: BookOpen },
+    { key: 'protocols', label: 'Protocols', icon: BookOpen },
+    { key: 'reports', label: 'Reports', icon: BookOpen },
+    { key: 'standards', label: 'Standards', icon: BookOpen },
     { key: 'design', label: 'Design', icon: PenTool },
     { key: 'risks', label: 'Risks', icon: AlertTriangle },
     { key: 'changes', label: 'Changes', icon: GitPullRequest },
-    { key: 'documents', label: 'Documents', icon: BookOpen },
     { key: 'test-concepts', label: 'Test Concepts', icon: Beaker },
     { key: 'traceability', label: 'Traceability', icon: GitBranch },
   ]
@@ -328,10 +341,10 @@ export default function ProjectDetail() {
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
         <SummaryTile label="Requirements" value={project.requirement_count} />
         <SummaryTile label="Test Cases" value={project.test_case_count} />
+        <SummaryTile label="Specifications" value={specDocs.length} />
         <SummaryTile label="Design" value={project.design_count} />
         <SummaryTile label="Risks" value={project.risk_count} />
         <SummaryTile label="Changes" value={project.change_count} />
-        <SummaryTile label="Concepts" value={project.test_concept_count} />
       </div>
 
       <div className="border-b border-border overflow-x-auto">
@@ -357,8 +370,8 @@ export default function ProjectDetail() {
         <div className="space-y-4">
           <SectionToolbar
             countLabel={`${filteredRequirements.length} requirement${filteredRequirements.length !== 1 ? 's' : ''}`}
-            actionLabel="New Requirement"
-            onAction={() => navigate(`/projects/${prefix}/docs/new?type=REQ`)}
+            actionLabel={canEditDocs ? 'New Requirement' : undefined}
+            onAction={canEditDocs ? () => navigate(docCreateUrl(prefix, 'REQ')) : undefined}
           >
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -395,8 +408,8 @@ export default function ProjectDetail() {
                 <tbody className="bg-card divide-y divide-border">
                   {filteredRequirements.map((req) => (
                     <tr key={req.id} className="hover:bg-accent/50">
-                      <Td><Link to={`/projects/${prefix}/docs/${req.req_id}`} className="text-primary font-mono text-sm font-medium">{req.req_id}</Link></Td>
-                      <Td><Link to={`/projects/${prefix}/docs/${req.req_id}`} className="text-foreground hover:text-primary/80 font-medium">{req.title}</Link></Td>
+<Td><Link to={docUrl(prefix, 'REQ', req.req_id)} className="text-primary font-mono text-sm font-medium">{req.req_id}</Link></Td>
+                       <Td><Link to={docUrl(prefix, 'REQ', req.req_id)} className="text-foreground hover:text-primary/80 font-medium">{req.title}</Link></Td>
                       <Td><RequirementStatusBadge status={req.status} /></Td>
                       <Td><PriorityBadge priority={req.priority} /></Td>
                       <Td>{req.req_type}</Td>
@@ -415,8 +428,8 @@ export default function ProjectDetail() {
         <div className="space-y-4">
           <SectionToolbar
             countLabel={`${filteredTestCases.length} test case${filteredTestCases.length !== 1 ? 's' : ''}`}
-            actionLabel="New Test Case"
-            onAction={() => navigate(`/projects/${prefix}/docs/new?type=TC`)}
+            actionLabel={canEditDocs ? 'New Test Case' : undefined}
+            onAction={canEditDocs ? () => navigate(docCreateUrl(prefix, 'TC')) : undefined}
           >
             <select
               value={tcStatusFilter}
@@ -444,8 +457,8 @@ export default function ProjectDetail() {
                 <tbody className="bg-card divide-y divide-border">
                   {filteredTestCases.map((tc) => (
                     <tr key={tc.id} className="hover:bg-accent/50">
-                      <Td><Link to={`/projects/${prefix}/docs/${tc.tc_id}`} className="text-primary font-mono text-sm font-medium">{tc.tc_id}</Link></Td>
-                      <Td><Link to={`/projects/${prefix}/docs/${tc.tc_id}`} className="text-foreground hover:text-primary/80 font-medium">{tc.title}</Link></Td>
+<Td><Link to={docUrl(prefix, 'TC', tc.tc_id)} className="text-primary font-mono text-sm font-medium">{tc.tc_id}</Link></Td>
+                       <Td><Link to={docUrl(prefix, 'TC', tc.tc_id)} className="text-foreground hover:text-primary/80 font-medium">{tc.title}</Link></Td>
                       <Td><TcStatusBadge status={tc.status} /></Td>
                       <Td>{tc.requirement_count}</Td>
                     </tr>
@@ -459,7 +472,11 @@ export default function ProjectDetail() {
 
       {activeTab === 'design' && (
         <div className="space-y-4">
-          <SectionToolbar countLabel={`${designItems?.length ?? 0} design item${(designItems?.length ?? 0) !== 1 ? 's' : ''}`} actionLabel="New Design Item" onAction={() => navigate(`/projects/${prefix}/docs/new?type=DES`)} />
+          <SectionToolbar
+            countLabel={`${designItems?.length ?? 0} design item${(designItems?.length ?? 0) !== 1 ? 's' : ''}`}
+            actionLabel={canEditDocs ? 'New Design Item' : undefined}
+            onAction={canEditDocs ? () => navigate(docCreateUrl(prefix, 'DES')) : undefined}
+          />
           <TableCard emptyTitle="No Design Items" emptyText="Capture architecture, interfaces, and implementation design here.">
             <table className="min-w-full divide-y divide-border">
               <thead className="bg-muted/50">
@@ -475,8 +492,8 @@ export default function ProjectDetail() {
               <tbody className="bg-card divide-y divide-border">
                 {(designItems ?? []).map((item) => (
                   <tr key={item.id} className="hover:bg-accent/50">
-                    <Td><Link to={`/projects/${prefix}/docs/${item.design_id}`} className="text-primary font-mono text-sm font-medium">{item.design_id}</Link></Td>
-                    <Td><Link to={`/projects/${prefix}/docs/${item.design_id}`} className="text-foreground hover:text-primary/80 font-medium">{item.title}</Link></Td>
+<Td><Link to={docUrl(prefix, 'DES', item.design_id)} className="text-primary font-mono text-sm font-medium">{item.design_id}</Link></Td>
+                     <Td><Link to={docUrl(prefix, 'DES', item.design_id)} className="text-foreground hover:text-primary/80 font-medium">{item.title}</Link></Td>
                     <Td>{item.design_type}</Td>
                     <Td><NeutralBadge value={item.status} /></Td>
                     <Td><PriorityBadge priority={item.priority} /></Td>
@@ -491,7 +508,11 @@ export default function ProjectDetail() {
 
       {activeTab === 'risks' && (
         <div className="space-y-4">
-          <SectionToolbar countLabel={`${riskItems?.length ?? 0} risk${(riskItems?.length ?? 0) !== 1 ? 's' : ''}`} actionLabel="New Risk" onAction={() => navigate(`/projects/${prefix}/docs/new?type=RSK`)} />
+          <SectionToolbar
+            countLabel={`${riskItems?.length ?? 0} risk${(riskItems?.length ?? 0) !== 1 ? 's' : ''}`}
+            actionLabel={canEditDocs ? 'New Risk' : undefined}
+            onAction={canEditDocs ? () => navigate(docCreateUrl(prefix, 'RSK')) : undefined}
+          />
           <TableCard emptyTitle="No Risks" emptyText="Track technical, business, and compliance risks here.">
             <table className="min-w-full divide-y divide-border">
               <thead className="bg-muted/50">
@@ -507,8 +528,8 @@ export default function ProjectDetail() {
               <tbody className="bg-card divide-y divide-border">
                 {(riskItems ?? []).map((item) => (
                   <tr key={item.id} className="hover:bg-accent/50">
-                    <Td><Link to={`/projects/${prefix}/docs/${item.risk_id}`} className="text-primary font-mono text-sm font-medium">{item.risk_id}</Link></Td>
-                    <Td><Link to={`/projects/${prefix}/docs/${item.risk_id}`} className="text-foreground hover:text-primary/80 font-medium">{item.title}</Link></Td>
+<Td><Link to={docUrl(prefix, 'RSK', item.risk_id)} className="text-primary font-mono text-sm font-medium">{item.risk_id}</Link></Td>
+                     <Td><Link to={docUrl(prefix, 'RSK', item.risk_id)} className="text-foreground hover:text-primary/80 font-medium">{item.title}</Link></Td>
                     <Td><NeutralBadge value={item.status} /></Td>
                     <Td><RiskBadge value={item.severity} /></Td>
                     <Td><RiskBadge value={item.probability} /></Td>
@@ -523,7 +544,11 @@ export default function ProjectDetail() {
 
       {activeTab === 'changes' && (
         <div className="space-y-4">
-          <SectionToolbar countLabel={`${changeRequests?.length ?? 0} change request${(changeRequests?.length ?? 0) !== 1 ? 's' : ''}`} actionLabel="New Change" onAction={() => navigate(`/projects/${prefix}/docs/new?type=CHG`)} />
+          <SectionToolbar
+            countLabel={`${changeRequests?.length ?? 0} change request${(changeRequests?.length ?? 0) !== 1 ? 's' : ''}`}
+            actionLabel={canEditDocs ? 'New Change' : undefined}
+            onAction={canEditDocs ? () => navigate(docCreateUrl(prefix, 'CHG')) : undefined}
+          />
           <TableCard emptyTitle="No Change Requests" emptyText="Capture requested changes and impact assessments here.">
             <table className="min-w-full divide-y divide-border">
               <thead className="bg-muted/50">
@@ -538,8 +563,8 @@ export default function ProjectDetail() {
               <tbody className="bg-card divide-y divide-border">
                 {(changeRequests ?? []).map((item) => (
                   <tr key={item.id} className="hover:bg-accent/50">
-                    <Td><Link to={`/projects/${prefix}/docs/${item.change_id}`} className="text-primary font-mono text-sm font-medium">{item.change_id}</Link></Td>
-                    <Td><Link to={`/projects/${prefix}/docs/${item.change_id}`} className="text-foreground hover:text-primary/80 font-medium">{item.title}</Link></Td>
+<Td><Link to={docUrl(prefix, 'CHG', item.change_id)} className="text-primary font-mono text-sm font-medium">{item.change_id}</Link></Td>
+                     <Td><Link to={docUrl(prefix, 'CHG', item.change_id)} className="text-foreground hover:text-primary/80 font-medium">{item.title}</Link></Td>
                     <Td><NeutralBadge value={item.status} /></Td>
                     <Td><PriorityBadge priority={item.priority} /></Td>
                     <Td>{item.change_type}</Td>
@@ -551,45 +576,29 @@ export default function ProjectDetail() {
         </div>
       )}
 
-      {activeTab === 'documents' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">All documents across all types in this project</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Link to={`/projects/${prefix}/docs`} className="inline-flex items-center px-4 py-2 border border-input rounded-md hover:bg-accent/50 text-sm font-medium">
-                <BookOpen className="h-4 w-4 mr-2" />
-                Open Full View
-              </Link>
-              <NewDocDropdown prefix={prefix || ''} />
-            </div>
-          </div>
+      {activeTab === 'specifications' && (
+        <DocTypeTab docs={specDocs} prefix={prefix || ''} docType="SPEC" canEdit={canEditDocs} emptyTitle="No Specifications" emptyText="Create your first specification for this project." />
+      )}
 
-          {!documents || documents.length === 0 ? (
-            <EmptyCard title="No Documents" text="Create your first document to get started." icon={BookOpen} />
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {documents.slice(0, 6).map((doc) => (
-                <Link key={doc.id} to={`/projects/${prefix}/docs/${doc.doc_id || doc.id}`} className="block bg-card rounded-lg border border-border shadow-elegant hover:border-primary/20 hover:shadow-glow transition-all p-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h3 className="font-semibold text-foreground">{doc.title}</h3>
-                      <p className="text-xs text-muted-foreground mt-1">{doc.doc_type} · v{doc.version}</p>
-                    </div>
-                    <NeutralBadge value={doc.status} />
-                  </div>
-                  {doc.description && <p className="text-sm text-muted-foreground mt-3 line-clamp-3">{doc.description}</p>}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+      {activeTab === 'protocols' && (
+        <DocTypeTab docs={protDocs} prefix={prefix || ''} docType="PROT" canEdit={canEditDocs} emptyTitle="No Protocols" emptyText="Create your first protocol for this project." />
+      )}
+
+      {activeTab === 'reports' && (
+        <DocTypeTab docs={rptDocs} prefix={prefix || ''} docType="RPT" canEdit={canEditDocs} emptyTitle="No Reports" emptyText="Create your first report for this project." />
+      )}
+
+      {activeTab === 'standards' && (
+        <DocTypeTab docs={stdDocs} prefix={prefix || ''} docType="STD" canEdit={canEditDocs} emptyTitle="No Standards" emptyText="Create your first external standard for this project." />
       )}
 
       {activeTab === 'test-concepts' && (
         <div className="space-y-4">
-          <SectionToolbar countLabel={`${testConcepts?.length ?? 0} test concept${(testConcepts?.length ?? 0) !== 1 ? 's' : ''}`} actionLabel="New Test Concept" onAction={() => navigate(`/projects/${prefix}/docs/new?type=TCO`)} />
+          <SectionToolbar
+            countLabel={`${testConcepts?.length ?? 0} test concept${(testConcepts?.length ?? 0) !== 1 ? 's' : ''}`}
+            actionLabel={canEditDocs ? 'New Test Concept' : undefined}
+            onAction={canEditDocs ? () => navigate(docCreateUrl(prefix, 'TCO')) : undefined}
+          />
           {!testConcepts || testConcepts.length === 0 ? (
             <EmptyCard title="No Test Concepts" text="Create your first test concept for this project." icon={Beaker} />
           ) : (
@@ -608,7 +617,7 @@ export default function ProjectDetail() {
                     <tr key={concept.id} className="hover:bg-accent/50">
                       <Td>
                         <div>
-                          <Link to={`/projects/${prefix}/docs/${concept.concept_id}`} className="font-medium text-foreground hover:text-primary/80">{concept.name}</Link>
+                          <Link to={docUrl(prefix, 'TCO', concept.concept_id)} className="font-medium text-foreground hover:text-primary/80">{concept.name}</Link>
                           {concept.description && <div className="text-sm text-muted-foreground mt-1">{concept.description}</div>}
                         </div>
                       </Td>
@@ -652,7 +661,7 @@ export default function ProjectDetail() {
                 {uncoveredRequirements.map((item) => (
                   <div key={item.requirement.id} className="flex items-center justify-between gap-4 p-3 rounded-lg border border-border bg-background/60">
                     <div>
-                      <Link to={`/projects/${prefix}/docs/${item.requirement.req_id}`} className="font-medium text-foreground hover:text-primary/80">
+                      <Link to={docUrl(prefix, 'REQ', item.requirement.req_id)} className="font-medium text-foreground hover:text-primary/80">
                         {item.requirement.req_id} · {item.requirement.title}
                       </Link>
                       <div className="text-sm text-muted-foreground mt-1">{item.linked_test_cases.length} linked test case{item.linked_test_cases.length !== 1 ? 's' : ''}</div>
@@ -771,56 +780,60 @@ export default function ProjectDetail() {
   )
 }
 
-function NewDocDropdown({ prefix }: { prefix: string }) {
-  const [open, setOpen] = useState(false)
+function DocTypeTab({ docs, prefix, docType, canEdit, emptyTitle, emptyText }: { docs: Document[]; prefix: string; docType: DocType; canEdit: boolean; emptyTitle: string; emptyText: string }) {
   const navigate = useNavigate()
-  const types = [
-    { code: 'REQ', label: 'Requirement' },
-    { code: 'TC', label: 'Test Case' },
-    { code: 'DES', label: 'Design' },
-    { code: 'RSK', label: 'Risk' },
-    { code: 'CHG', label: 'Change Request' },
-    { code: 'TCO', label: 'Test Concept' },
-    { code: 'DOC', label: 'Document' },
-  ]
-
   return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm font-medium"
-      >
-        <Plus className="h-4 w-4 mr-2" />
-        New Document
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 w-48 bg-card border border-border rounded-lg shadow-elegant overflow-hidden z-50">
-          {types.map((t) => (
-            <button
-              key={t.code}
-              onClick={() => { setOpen(false); navigate(`/projects/${prefix}/docs/new?type=${t.code}`) }}
-              className="w-full text-left px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors"
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+    <div className="space-y-4">
+      <SectionToolbar
+        countLabel={`${docs.length} document${docs.length !== 1 ? 's' : ''}`}
+        actionLabel={canEdit ? `New ${DOC_TYPE_LABELS[docType]}` : undefined}
+        onAction={canEdit ? () => navigate(docCreateUrl(prefix, docType)) : undefined}
+      />
+      {docs.length === 0 ? (
+        <EmptyCard title={emptyTitle} text={emptyText} icon={BookOpen} />
+      ) : (
+        <TableCard emptyTitle="" emptyText="">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-muted/50">
+              <tr>
+                <Th>ID</Th>
+                <Th>Title</Th>
+                <Th>Status</Th>
+                <Th>Version</Th>
+                <Th>Sections</Th>
+              </tr>
+            </thead>
+            <tbody className="bg-card divide-y divide-border">
+              {docs.map((doc) => (
+                <tr key={doc.id} className="hover:bg-accent/50">
+                  <Td><Link to={docUrl(prefix, docType, doc.doc_id || doc.id)} className="text-primary font-mono text-sm font-medium">{doc.doc_id || `#${doc.id}`}</Link></Td>
+                  <Td><Link to={docUrl(prefix, docType, doc.doc_id || doc.id)} className="text-foreground hover:text-primary/80 font-medium">{doc.title}</Link></Td>
+                  <Td><NeutralBadge value={doc.status} /></Td>
+                  <Td>{doc.version}</Td>
+                  <Td>{doc.section_count}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableCard>
       )}
     </div>
   )
 }
 
-function SectionToolbar({ children, countLabel, actionLabel, onAction }: { children?: ReactNode; countLabel: string; actionLabel: string; onAction: () => void }) {
+function SectionToolbar({ children, countLabel, actionLabel, onAction }: { children?: ReactNode; countLabel: string; actionLabel?: string; onAction?: () => void }) {
   return (
     <div className="flex justify-between items-center gap-4 flex-wrap">
       <div className="flex items-center gap-3">
         {children}
         <span className="text-sm text-muted-foreground">{countLabel}</span>
       </div>
-      <button onClick={onAction} className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm">
-        <Plus className="h-4 w-4 mr-2" />
-        {actionLabel}
-      </button>
+      {actionLabel && onAction && (
+        <button onClick={onAction} className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm">
+          <Plus className="h-4 w-4 mr-2" />
+          {actionLabel}
+        </button>
+      )}
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { type DocType, DOC_TYPE_SLUGS } from '../types/doc'
 import packageJson from '../../package.json'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api'
@@ -491,6 +492,7 @@ export interface RelatedTestCaseSummary {
 
 export interface RelatedDocumentSummary {
   id: number
+  doc_id: string | null
   title: string
   doc_type: string
   status: string
@@ -543,6 +545,10 @@ export interface DocShell {
   status: string
   priority: string | null
   project_id: number
+  reviewer_id: number | null
+  incoming_links: number
+  outgoing_links: number
+  suspect_links: number
   created_at: string
   updated_at: string
 }
@@ -563,8 +569,11 @@ export const docsApi = {
     const response = await api.get<DocShell[]>(`/projects/${projectRef}/docs${qs ? '?' + qs : ''}`)
     return response.data
   },
-  get: async (projectRef: string, docId: string) => {
-    const response = await api.get<DocDetailFacade>(`/projects/${projectRef}/docs/${docId}`)
+  get: async (projectRef: string, kind: string | DocType, docId: string) => {
+    const kindSlug = Object.prototype.hasOwnProperty.call(DOC_TYPE_SLUGS, kind)
+      ? DOC_TYPE_SLUGS[kind as DocType]
+      : kind
+    const response = await api.get<DocDetailFacade>(`/projects/${projectRef}/docs/${kindSlug}/${docId}`)
     return response.data
   },
 }

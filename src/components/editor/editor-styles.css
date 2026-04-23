@@ -1,5 +1,54 @@
 .ProseMirror {
   outline: none;
+  counter-reset: h1-counter;
+}
+
+.ProseMirror h1 { counter-reset: h2-counter; }
+.ProseMirror h2 { counter-reset: h3-counter; }
+.ProseMirror h3 { counter-reset: h4-counter; }
+.ProseMirror h4 { counter-reset: h5-counter; }
+.ProseMirror h5 { counter-reset: h6-counter; }
+
+.ProseMirror.heading-numbered h1::before {
+  counter-increment: h1-counter;
+  content: counter(h1-counter) ". ";
+  font-weight: 700;
+  color: hsl(var(--muted-foreground));
+}
+
+.ProseMirror.heading-numbered h2::before {
+  counter-increment: h2-counter;
+  content: counter(h1-counter) "." counter(h2-counter) " ";
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+
+.ProseMirror.heading-numbered h3::before {
+  counter-increment: h3-counter;
+  content: counter(h1-counter) "." counter(h2-counter) "." counter(h3-counter) " ";
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+
+.ProseMirror.heading-numbered h4::before {
+  counter-increment: h4-counter;
+  content: counter(h1-counter) "." counter(h2-counter) "." counter(h3-counter) "." counter(h4-counter) " ";
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+
+.ProseMirror.heading-numbered h5::before {
+  counter-increment: h5-counter;
+  content: counter(h1-counter) "." counter(h2-counter) "." counter(h3-counter) "." counter(h4-counter) "." counter(h5-counter) " ";
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+
+.ProseMirror.heading-numbered h6::before {
+  counter-increment: h6-counter;
+  content: counter(h1-counter) "." counter(h2-counter) "." counter(h3-counter) "." counter(h4-counter) "." counter(h5-counter) "." counter(h6-counter) " ";
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
 }
 
 .ProseMirror p.is-editor-empty:first-child::before {

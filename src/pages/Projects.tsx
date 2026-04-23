@@ -1,15 +1,21 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
-import { projectsApi, Project } from '../api/client'
-import { Plus, FolderKanban, Search, FileText, CheckCircle, ArrowRight } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { extractApiErrorMessage, projectsApi, Project } from '../api/client'
+import { Plus, FolderKanban, Search, FileText, CheckCircle, ArrowRight, Pencil } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function Projects() {
+  const { user } = useAuth()
+  const canManageProjects = user?.role === 'admin'
+  const canCreateProjects = user?.role === 'admin' || user?.role === 'maintainer'
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [name, setName] = useState('')
   const [prefix, setPrefix] = useState('')
   const [description, setDescription] = useState('')
   const [search, setSearch] = useState('')
+  const [formError, setFormError] = useState('')
   const queryClient = useQueryClient()
 
   const { data: projects, isLoading } = useQuery({
@@ -21,10 +27,31 @@ export default function Projects() {
     mutationFn: projectsApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
+      setFormError('')
       setShowCreateModal(false)
       setName('')
       setPrefix('')
       setDescription('')
+    },
+    onError: (error) => {
+      setFormError(extractApiErrorMessage(error, 'Could not create project'))
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: { name: string; prefix: string; description?: string } }) =>
+      projectsApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      setFormError('')
+      setShowCreateModal(false)
+      setEditingProject(null)
+      setName('')
+      setPrefix('')
+      setDescription('')
+    },
+    onError: (error) => {
+      setFormError(extractApiErrorMessage(error, 'Could not update project'))
     },
   })
 
@@ -37,7 +64,40 @@ export default function Projects() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    createMutation.mutate({ name, prefix, description: description || undefined })
+    setFormError('')
+    const payload = { name, prefix, description: description || undefined }
+    if (editingProject) {
+      updateMutation.mutate({ id: editingProject.id, data: payload })
+    } else {
+      createMutation.mutate(payload)
+    }
+  }
+
+  const openCreateModal = () => {
+    setFormError('')
+    setEditingProject(null)
+    setName('')
+    setPrefix('')
+    setDescription('')
+    setShowCreateModal(true)
+  }
+
+  const openEditModal = (project: Project) => {
+    setFormError('')
+    setEditingProject(project)
+    setName(project.name)
+    setPrefix(project.prefix)
+    setDescription(project.description || '')
+    setShowCreateModal(true)
+  }
+
+  const closeModal = () => {
+    setFormError('')
+    setEditingProject(null)
+    setShowCreateModal(false)
+    setName('')
+    setPrefix('')
+    setDescription('')
   }
 
   return (
@@ -48,13 +108,15 @@ export default function Projects() {
           <h2 className="text-xl font-bold text-foreground">Projects</h2>
           <p className="text-sm text-muted-foreground mt-0.5">{projects?.length || 0} projects total</p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 hover:shadow-glow transition-all duration-200"
-        >
-          <Plus className="h-4 w-4" />
-          New Project
-        </button>
+        {canCreateProjects && (
+          <button
+            onClick={openCreateModal}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 hover:shadow-glow transition-all duration-200"
+          >
+            <Plus className="h-4 w-4" />
+            New Project
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -85,9 +147,9 @@ export default function Projects() {
           <p className="text-sm text-muted-foreground mb-5 max-w-md mx-auto">
             {search ? 'Try a different search term.' : 'Create your first project to start managing requirements and test cases.'}
           </p>
-          {!search && (
+          {!search && canCreateProjects && (
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={openCreateModal}
               className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
             >
               <Plus className="h-4 w-4" />
@@ -98,7 +160,7 @@ export default function Projects() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredProjects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
+            <ProjectCard key={project.id} project={project} canEdit={canManageProjects} onEdit={openEditModal} />
           ))}
         </div>
       )}
@@ -108,11 +170,18 @@ export default function Projects() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-card border border-border rounded-xl shadow-glow max-w-md w-full mx-4 animate-fade-in">
             <div className="px-6 py-4 border-b border-border">
-              <h3 className="text-lg font-semibold text-foreground">New Project</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Create a new project</p>
+              <h3 className="text-lg font-semibold text-foreground">{editingProject ? 'Edit Project' : 'New Project'}</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {editingProject ? 'Update project details' : 'Create a new project'}
+              </p>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="p-6 space-y-4">
+                {formError && (
+                  <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600">
+                    {formError}
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Name</label>
                   <input
@@ -150,17 +219,19 @@ export default function Projects() {
               <div className="px-6 py-4 border-t border-border flex justify-end gap-3">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={closeModal}
                   className="px-4 py-2 border border-border rounded-md text-sm text-muted-foreground hover:bg-accent transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={createMutation.isPending}
+                  disabled={createMutation.isPending || updateMutation.isPending}
                   className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
                 >
-                  {createMutation.isPending ? 'Creating...' : 'Create Project'}
+                  {createMutation.isPending || updateMutation.isPending
+                    ? (editingProject ? 'Saving...' : 'Creating...')
+                    : (editingProject ? 'Save Project' : 'Create Project')}
                 </button>
               </div>
             </form>
@@ -171,69 +242,95 @@ export default function Projects() {
   )
 }
 
-function ProjectCard({ project }: { project: Project }) {
+function ProjectCard({
+  project,
+  canEdit,
+  onEdit,
+}: {
+  project: Project
+  canEdit: boolean
+  onEdit: (project: Project) => void
+}) {
+  const navigate = useNavigate()
   const coverage = project.requirement_count > 0
     ? Math.min(100, Math.round((project.test_case_count / project.requirement_count) * 100))
     : 0
 
   return (
-    <Link to={`/projects/${project.prefix}`} className="block group">
-      <div className="bg-card rounded-lg border border-border shadow-elegant hover:shadow-glow hover:border-primary/20 transition-all duration-300 overflow-hidden">
-        {/* Top accent */}
-        <div className={`h-1 ${
-          project.status === 'Active' ? 'bg-gradient-to-r from-primary via-teal-500 to-cyan-500' : 'bg-muted'
-        }`} />
+    <div className="group bg-card rounded-lg border border-border shadow-elegant hover:shadow-glow hover:border-primary/20 transition-all duration-300 overflow-hidden">
+      {/* Top accent */}
+      <div className={`h-1 ${
+        project.status === 'Active' ? 'bg-gradient-to-r from-primary via-teal-500 to-cyan-500' : 'bg-muted'
+      }`} />
 
-        <div className="p-5">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                <FolderKanban className="h-4 w-4 text-primary" />
-              </div>
-              <div>
+      <div className="p-5">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+              <FolderKanban className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-foreground text-sm group-hover:text-primary transition-colors">{project.name}</h3>
-                <span className="text-xs text-muted-foreground font-mono">{project.prefix}</span>
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => onEdit(project)}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                    title="Edit project"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
-            </div>
-            <ProjectStatusBadge status={project.status} />
-          </div>
-
-          {project.description && (
-            <p className="text-xs text-muted-foreground mb-4 line-clamp-2">{project.description}</p>
-          )}
-
-          {/* Stats */}
-          <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
-            <div className="flex items-center gap-1">
-              <FileText className="h-3.5 w-3.5" />
-              {project.requirement_count} reqs
-            </div>
-            <div className="flex items-center gap-1">
-              <CheckCircle className="h-3.5 w-3.5" />
-              {project.test_case_count} TCs
+              <span className="text-xs text-muted-foreground font-mono">{project.prefix}</span>
             </div>
           </div>
+          <ProjectStatusBadge status={project.status} />
+        </div>
 
-          {/* Coverage bar */}
-          <div className="flex items-center gap-2">
-            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${
-                  coverage >= 80 ? 'bg-gradient-to-r from-emerald-500 to-teal-400' : coverage >= 50 ? 'bg-gradient-to-r from-amber-500 to-amber-400' : 'bg-gradient-to-r from-red-400 to-red-300'
-                }`}
-                style={{ width: `${Math.max(coverage, 3)}%` }}
-              />
-            </div>
-            <span className="text-[11px] text-muted-foreground font-medium">{coverage}%</span>
+        {project.description && (
+          <p className="text-xs text-muted-foreground mb-4 line-clamp-2">{project.description}</p>
+        )}
+
+        {/* Stats */}
+        <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
+          <div className="flex items-center gap-1">
+            <FileText className="h-3.5 w-3.5" />
+            {project.requirement_count} reqs
           </div>
-
-          {/* Arrow */}
-          <div className="flex justify-end mt-3">
-            <ArrowRight className="h-4 w-4 text-primary/0 group-hover:text-primary/60 transition-all duration-200 -translate-x-2 group-hover:translate-x-0" />
+          <div className="flex items-center gap-1">
+            <CheckCircle className="h-3.5 w-3.5" />
+            {project.test_case_count} TCs
           </div>
         </div>
+
+        {/* Coverage bar */}
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                coverage >= 80 ? 'bg-gradient-to-r from-emerald-500 to-teal-400' : coverage >= 50 ? 'bg-gradient-to-r from-amber-500 to-amber-400' : 'bg-gradient-to-r from-red-400 to-red-300'
+              }`}
+              style={{ width: `${Math.max(coverage, 3)}%` }}
+            />
+          </div>
+          <span className="text-[11px] text-muted-foreground font-medium">{coverage}%</span>
+        </div>
+
+        {/* Arrow */}
+        <div className="flex justify-end mt-3">
+          <button
+            type="button"
+            onClick={() => navigate(`/projects/${project.prefix}`)}
+            className="inline-flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors"
+          >
+            Open
+            <ArrowRight className="h-4 w-4 transition-all duration-200 -translate-x-1 group-hover:translate-x-0" />
+          </button>
+        </div>
       </div>
-    </Link>
+    </div>
   )
 }
 

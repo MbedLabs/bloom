@@ -4,13 +4,14 @@ import { traceabilityApi, docsApi } from '../api/client'
 import { ArrowLeft, ArrowUpCircle, ArrowDownCircle, ChevronRight, ChevronDown, CheckCircle } from 'lucide-react'
 import { useState } from 'react'
 import type { ImpactNode } from '../api/client'
+import { docUrl } from '../types/doc'
 
 export default function ImpactAnalysis() {
   const { prefix, requirementId } = useParams<{ prefix: string; requirementId: string }>()
 
   const { data: resolvedDoc } = useQuery({
     queryKey: ['resolve-doc', prefix, requirementId],
-    queryFn: () => docsApi.get(prefix!, requirementId!),
+    queryFn: () => docsApi.get(prefix!, 'requirements', requirementId!),
     enabled: !!prefix && !!requirementId,
   })
 
@@ -43,7 +44,7 @@ export default function ImpactAnalysis() {
   return (
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center space-x-4">
-        <Link to={`/projects/${prefix}/docs/${requirementId}`} className="p-2 hover:bg-accent/50 rounded-md">
+        <Link to={docUrl(prefix!, 'REQ', requirementId!)} className="p-2 hover:bg-accent/50 rounded-md">
           <ArrowLeft className="h-5 w-5 text-muted-foreground" />
         </Link>
         <div>
@@ -179,13 +180,13 @@ function ImpactTreeNode({ node, direction, depth, prefix }: { node: ImpactNode; 
             <div className="w-5 flex-shrink-0" />
           )}
           <Link
-            to={`/projects/${prefix}/docs/${node.requirement.req_id}`}
+            to={docUrl(prefix, 'REQ', node.requirement.req_id)}
             className="font-mono text-xs text-primary hover:text-primary/80 font-medium flex-shrink-0"
           >
             {node.requirement.req_id}
           </Link>
           <Link
-            to={`/projects/${prefix}/docs/${node.requirement.req_id}`}
+            to={docUrl(prefix, 'REQ', node.requirement.req_id)}
             className="text-sm text-foreground truncate hover:text-primary/80"
           >
             {node.requirement.title}

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { traceabilityApi, projectsApi } from '../api/client'
+import { docUrl } from '../types/doc'
 import { ArrowLeft, CheckCircle, AlertCircle, XCircle, ExternalLink, Shield, Filter, ArrowUpDown, GitBranch, AlertTriangle } from 'lucide-react'
 
 export default function TraceabilityMatrix() {
@@ -131,12 +132,12 @@ export default function TraceabilityMatrix() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <Link
-                        to={`/projects/${prefix}/docs/${gap.requirement.req_id}`}
+                        to={docUrl(prefix!, 'REQ', gap.requirement.req_id)}
                         className="font-mono text-sm text-primary hover:text-primary/80 font-medium"
                       >
                         {gap.requirement.req_id}
                       </Link>
-                      <Link to={`/projects/${prefix}/docs/${gap.requirement.req_id}`} className="text-foreground hover:text-primary/80">
+                      <Link to={docUrl(prefix!, 'REQ', gap.requirement.req_id)} className="text-foreground hover:text-primary/80">
                         {gap.requirement.title}
                       </Link>
                     </div>
@@ -160,7 +161,7 @@ export default function TraceabilityMatrix() {
                       {gap.linked_test_cases.map((tc) => (
                         <Link
                           key={tc.id}
-                          to={`/projects/${prefix}/docs/${tc.tc_id}`}
+                          to={docUrl(prefix!, 'TC', tc.tc_id)}
                           className="inline-flex items-center px-1.5 py-0.5 bg-muted rounded text-xs font-mono text-muted-foreground hover:text-primary"
                         >
                           {tc.tc_id}
@@ -259,14 +260,14 @@ export default function TraceabilityMatrix() {
                 <tr key={item.requirement.id} className="hover:bg-accent/50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <Link
-                      to={`/projects/${prefix}/docs/${item.requirement.req_id}`}
+                      to={docUrl(prefix!, 'REQ', item.requirement.req_id)}
                       className="font-mono text-sm text-primary hover:text-primary/80 font-medium"
                     >
                       {item.requirement.req_id}
                     </Link>
                   </td>
                   <td className="px-6 py-4">
-                    <Link to={`/projects/${prefix}/docs/${item.requirement.req_id}`} className="text-foreground hover:text-primary/80">
+                    <Link to={docUrl(prefix!, 'REQ', item.requirement.req_id)} className="text-foreground hover:text-primary/80">
                       {item.requirement.title}
                     </Link>
                   </td>
@@ -285,7 +286,7 @@ export default function TraceabilityMatrix() {
                         {item.linked_test_cases.map((tc) => (
                           <Link
                             key={tc.id}
-                            to={`/projects/${prefix}/docs/${tc.tc_id}`}
+                            to={docUrl(prefix!, 'TC', tc.tc_id)}
                             className="inline-flex items-center px-2 py-0.5 bg-primary/10 text-primary rounded text-xs font-mono hover:bg-primary/20"
                           >
                             {tc.tc_id}
