@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.document_kinds import normalize_document_kind, require_document_kind
 from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import Document, DocumentSection
@@ -51,7 +52,7 @@ async def list_documents(
                 project_id=doc.project_id,
                 doc_id=doc.doc_id,
                 title=doc.title,
-                doc_type=doc.doc_type,
+                doc_type=normalize_document_kind(doc.doc_type),
                 status=doc.status,
                 version=doc.version,
                 description=doc.description,
@@ -81,12 +82,13 @@ async def create_document(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    doc_id = await next_doc_id(db, Document, Document.doc_id, project_id, project.prefix, "DOC")
+    type_code = require_document_kind(data.doc_type)
+    doc_id = await next_doc_id(db, Document, Document.doc_id, project_id, project.prefix, type_code)
     document = Document(
         project_id=project_id,
         doc_id=doc_id,
         title=data.title,
-        doc_type=data.doc_type,
+        doc_type=type_code,
         description=data.description,
         content_json=data.content_json,
         content_html=data.content_html,
@@ -101,7 +103,7 @@ async def create_document(
         project_id=document.project_id,
         doc_id=document.doc_id,
         title=document.title,
-        doc_type=document.doc_type,
+        doc_type=normalize_document_kind(document.doc_type),
         status=document.status,
         version=document.version,
         description=document.description,
@@ -169,7 +171,7 @@ async def get_document(
         project_id=document.project_id,
         doc_id=document.doc_id,
         title=document.title,
-        doc_type=document.doc_type,
+        doc_type=normalize_document_kind(document.doc_type),
         status=document.status,
         version=document.version,
         description=document.description,
@@ -197,7 +199,7 @@ async def update_document(
     if data.title is not None:
         document.title = data.title
     if data.doc_type is not None:
-        document.doc_type = data.doc_type
+        document.doc_type = require_document_kind(data.doc_type)
     if data.status is not None:
         document.status = data.status
     if data.version is not None:
@@ -222,7 +224,7 @@ async def update_document(
         project_id=document.project_id,
         doc_id=document.doc_id,
         title=document.title,
-        doc_type=document.doc_type,
+        doc_type=normalize_document_kind(document.doc_type),
         status=document.status,
         version=document.version,
         description=document.description,

@@ -206,7 +206,7 @@ async def update_project(
     project_id: int,
     data: ProjectUpdate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    _current_user: User = Depends(require_role(UserRole.admin)),
 ):
     """
     Update a project.

@@ -40,7 +40,10 @@ def test_different_type_codes():
         ("RSK", "PRJ-RSK-001"),
         ("CHG", "PRJ-CHG-001"),
         ("TCO", "PRJ-TCO-001"),
-        ("DOC", "PRJ-DOC-001"),
+        ("SPEC", "PRJ-SPEC-001"),
+        ("PROT", "PRJ-PROT-001"),
+        ("RPT", "PRJ-RPT-001"),
+        ("STD", "PRJ-STD-001"),
         ("BL", "PRJ-BL-001"),
         ("TS", "PRJ-TS-001"),
     ]:

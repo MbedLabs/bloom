@@ -416,7 +416,7 @@ class VersionResponse(BaseModel):
 class DocumentCreate(BaseModel):
     project_id: int
     title: str = Field(..., min_length=1, max_length=500)
-    doc_type: str = "Specification"
+    doc_type: str = Field(default="SPEC", pattern="^(SPEC|PROT|RPT|STD)$")
     description: Optional[str] = None
     content_json: Optional[Dict[str, Any]] = None
     content_html: Optional[str] = None
@@ -424,7 +424,7 @@ class DocumentCreate(BaseModel):
 
 class DocumentUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
-    doc_type: Optional[str] = None
+    doc_type: Optional[str] = Field(None, pattern="^(SPEC|PROT|RPT|STD)$")
     status: Optional[str] = None
     version: Optional[str] = None
     description: Optional[str] = None
@@ -993,6 +993,7 @@ class RelatedTestCaseSummary(BaseModel):
 
 class RelatedDocumentSummary(BaseModel):
     id: int
+    doc_id: Optional[str] = None
     title: str
     doc_type: str
     status: str
