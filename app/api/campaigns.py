@@ -1,5 +1,6 @@
 """Test Campaign API endpoints: configurations and traceability scopes."""
 
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -75,6 +76,47 @@ async def sync_results(
     for res in data.results:
         item = tc_id_to_item.get(res.tc_id)
         if item:
+            item.status = "Executed"
+            item.result = res.status
+            item.comment = res.comment
+            item.executed_at = res.executed_at or datetime.utcnow()
+            updated_count += 1
+        else:
+            not_found.append(res.tc_id)
+
+    await db.commit()
+
+    return SyncResultsResponse(updated=updated_count, not_found=not_found)
+
+
+@router.post("/sync-results", response_model=SyncResultsResponse)
+async def sync_results_global(
+    data: SyncResultsRequest,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+):
+    """
+    Ingest automated test results across all campaigns.
+    Matches results to campaign items by tc_id without requiring a specific campaign.
+    Used by Bud backend for direct Bud→Bloom result synchronization.
+    """
+    tc_ids = [r.tc_id for r in data.results]
+
+    items_result = await db.execute(
+        select(TestCampaignItem, TestCase)
+        .join(TestCase, TestCampaignItem.test_case_id == TestCase.id)
+        .where(TestCase.tc_id.in_(tc_ids))
+    )
+
+    tc_id_to_item = {tc.tc_id: (item, tc) for item, tc in items_result.all()}
+
+    updated_count = 0
+    not_found = []
+
+    for res in data.results:
+        match = tc_id_to_item.get(res.tc_id)
+        if match:
+            item, _ = match
             item.status = "Executed"
             item.result = res.status
             item.comment = res.comment
