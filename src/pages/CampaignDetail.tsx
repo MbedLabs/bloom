@@ -2,6 +2,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { campaignsApi } from '../api/client'
 import { ArrowLeft, Clock, MessageSquare } from 'lucide-react'
+import { docUrl } from '../types/doc'
 
 export default function CampaignDetail() {
   const { prefix, campaignId } = useParams<{ prefix: string; campaignId: string }>()
@@ -99,7 +100,7 @@ export default function CampaignDetail() {
         {campaign.related_requirements && campaign.related_requirements.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {campaign.related_requirements.map((req) => (
-              <Link key={req.id} to={`/projects/${prefix}/docs/${req.req_id}`} className="inline-flex items-center px-3 py-2 rounded-md bg-primary/10 text-primary hover:bg-primary/15 text-sm">
+              <Link key={req.id} to={docUrl(prefix!, 'REQ', req.req_id)} className="inline-flex items-center px-3 py-2 rounded-md bg-primary/10 text-primary hover:bg-primary/15 text-sm">
                 <span className="font-mono mr-2">{req.req_id}</span>
                 {req.title}
               </Link>
@@ -125,7 +126,7 @@ export default function CampaignDetail() {
                     <Clock className="h-5 w-5 text-primary/60" />
                     <div>
                       {item.test_case ? (
-                        <Link to={`/projects/${prefix}/docs/${item.test_case.tc_id}`} className="font-mono text-sm text-primary hover:text-primary/80 font-medium">
+                        <Link to={docUrl(prefix!, 'TC', item.test_case.tc_id)} className="font-mono text-sm text-primary hover:text-primary/80 font-medium">
                           {item.test_case.tc_id}
                         </Link>
                       ) : (
@@ -135,7 +136,7 @@ export default function CampaignDetail() {
                       {item.test_case?.linked_requirements && item.test_case.linked_requirements.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-2">
                           {item.test_case.linked_requirements.map((req) => (
-                            <Link key={req.id} to={`/projects/${prefix}/docs/${req.req_id}`} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary hover:bg-primary/15">
+                            <Link key={req.id} to={docUrl(prefix!, 'REQ', req.req_id)} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary hover:bg-primary/15">
                               <span className="font-mono mr-1">{req.req_id}</span>
                               {req.title}
                             </Link>

@@ -8,14 +8,13 @@ import DocumentDetail from './DocumentDetail'
 import ArtefactDetail from './ArtefactDetail'
 
 export default function UnifiedDocDetail() {
-  const { prefix, docId, itemId } = useParams<{ prefix: string; docId?: string; itemId?: string }>()
-  const resolvedDocId = docId || itemId
+  const { prefix, kind, docId } = useParams<{ prefix: string; kind: string; docId: string }>()
   const { data: project } = useProjectByPrefix(prefix)
 
   const { data: doc, isLoading } = useQuery({
-    queryKey: ['doc-facade', prefix, resolvedDocId],
-    queryFn: () => docsApi.get(prefix!, resolvedDocId!),
-    enabled: !!prefix && !!resolvedDocId,
+    queryKey: ['doc-facade', prefix, kind, docId],
+    queryFn: () => docsApi.get(prefix!, kind!, docId!),
+    enabled: !!prefix && !!kind && !!docId,
   })
 
   if (isLoading || !project) {
@@ -27,7 +26,7 @@ export default function UnifiedDocDetail() {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <h3 className="text-lg font-semibold text-foreground mb-2">Document not found</h3>
-          <p className="text-sm text-muted-foreground">Could not find document &quot;{resolvedDocId}&quot; in project {prefix}</p>
+          <p className="text-sm text-muted-foreground">Could not find document &quot;{docId}&quot; in project {prefix}</p>
         </div>
       </div>
     )
@@ -38,7 +37,10 @@ export default function UnifiedDocDetail() {
       return <RequirementDetail resolvedId={doc.id} />
     case 'TC':
       return <TestCaseDetail resolvedId={doc.id} />
-    case 'DOC':
+    case 'SPEC':
+    case 'PROT':
+    case 'RPT':
+    case 'STD':
       return <DocumentDetail resolvedId={doc.id} />
     case 'DES':
       return <ArtefactDetail kind="design" resolvedId={doc.id} />

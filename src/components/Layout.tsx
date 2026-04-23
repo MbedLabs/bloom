@@ -46,16 +46,20 @@ const mainNav = [
 ]
 
 const projectNav = [
+  { name: 'Documents', icon: BookOpen, tab: '', href: 'docs' as const },
   { name: 'Requirements', icon: FileText, tab: 'requirements' },
   { name: 'Test Cases', icon: CheckSquare, tab: 'test-cases' },
+  { name: 'Specifications', icon: FileText, tab: '', href: 'docs' as const, filter: 'type:SPEC' },
+  { name: 'Protocols', icon: BookOpen, tab: '', href: 'docs' as const, filter: 'type:PROT' },
+  { name: 'Reports', icon: Layers, tab: '', href: 'docs' as const, filter: 'type:RPT' },
+  { name: 'Standards', icon: BookOpen, tab: '', href: 'docs' as const, filter: 'type:STD' },
   { name: 'Design', icon: PenTool, tab: 'design' },
   { name: 'Risks', icon: AlertTriangle, tab: 'risks' },
   { name: 'Changes', icon: GitPullRequest, tab: 'changes' },
-  { name: 'Test Campaigns', icon: FlaskConical, tab: '', href: 'campaigns' as const },
-  { name: 'Documents', icon: BookOpen, tab: '', href: 'docs' as const },
-  { name: 'Parameters', icon: SlidersHorizontal, tab: '', href: 'parameters' as const },
   { name: 'Test Concepts', icon: Beaker, tab: 'test-concepts' },
+  { name: 'Test Campaigns', icon: FlaskConical, tab: '', href: 'campaigns' as const },
   { name: 'Traceability', icon: GitBranch, tab: '', href: 'traceability' as const },
+  { name: 'Parameters', icon: SlidersHorizontal, tab: '', href: 'parameters' as const },
 ]
 
 function Beaker(props: { className?: string }) {
@@ -415,9 +419,15 @@ function getBreadcrumbs(location: ReturnType<typeof useLocation>, projects: Arra
       if (parts[4] === 'new') {
         crumbs.push({ label: 'Documents', href: `/projects/${slug}/docs` })
         crumbs.push({ label: 'New' })
-      } else if (parts[4]) {
+      } else if (parts[4] && parts[5]) {
+        // kind-aware route: /projects/:prefix/docs/:kind/:docId[/edit]
         crumbs.push({ label: 'Documents', href: `/projects/${slug}/docs` })
-        crumbs.push({ label: parts[4] })
+        if (parts[6] === 'edit') {
+          crumbs.push({ label: parts[5], href: `/projects/${slug}/docs/${parts[4]}/${parts[5]}` })
+          crumbs.push({ label: 'Edit' })
+        } else {
+          crumbs.push({ label: parts[5] })
+        }
       } else {
         crumbs.push({ label: 'Documents' })
       }

@@ -10,21 +10,21 @@ import {
   risksApi, changesApi, testConceptsApi, documentsApi, usersApi,
 } from '../api/client'
 import type { DocType } from '../types/doc'
-import { DOC_CONFIGS, DOC_TYPE_LABELS, DOC_TYPE_COLORS } from '../types/doc'
+import { DOC_CONFIGS, DOC_TYPE_LABELS, DOC_TYPE_COLORS, docUrl } from '../types/doc'
+import { useAuth } from '../contexts/AuthContext'
 
 interface DocCreateProps {
   editMode?: boolean
 }
 
 export default function DocCreate({ editMode = false }: DocCreateProps) {
-  const { prefix, docId: docIdStr } = useParams<{ prefix: string; docId: string }>()
+  const { user } = useAuth()
+  const { prefix, kind, docId: docIdStr } = useParams<{ prefix: string; kind?: string; docId: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const requestedDocType = (searchParams.get('type') || 'REQ') as DocType
-  const numericDocId = docIdStr ? Number(docIdStr) : undefined
-  const hasNumericDocId = typeof numericDocId === 'number' && Number.isFinite(numericDocId)
+  const rawRequestedDocType = (searchParams.get('type') || 'REQ') as DocType
 
   const [title, setTitle] = useState('')
   const [contentJson, setContentJson] = useState<Record<string, unknown> | null>(null)
@@ -32,6 +32,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const [tcRows, setTcRows] = useState<TcsRow[]>(() => requestedDocType === 'TC' && !editMode ? createDefaultTcRows() : [])
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [metadata, setMetadata] = useState<Record<string, string>>({})
+  const [outlineOpen, setOutlineOpen] = useState(false)
+  const [headingNumbered, setHeadingNumbered] = useState(true)
 
   const { data: project } = useQuery({
     queryKey: ['project-by-prefix', prefix],
@@ -42,14 +44,16 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const projectId = project?.id || 0
 
   const { data: editDocFacade } = useQuery({
-    queryKey: ['doc-facade', prefix, docIdStr],
-    queryFn: () => docsApi.get(prefix!, docIdStr!),
-    enabled: editMode && !!prefix && !!docIdStr,
+    queryKey: ['doc-facade', prefix, kind, docIdStr],
+    queryFn: () => docsApi.get(prefix!, kind!, docIdStr!),
+    enabled: editMode && !!prefix && !!kind && !!docIdStr,
   })
 
+  const requestedDocType = rawRequestedDocType in DOC_CONFIGS ? rawRequestedDocType : 'REQ'
   const docType = ((editMode && editDocFacade?.doc_type) || requestedDocType) as DocType
   const config = DOC_CONFIGS[docType]
-  const resolvedDocId = editMode ? (hasNumericDocId ? numericDocId : editDocFacade?.id) : undefined
+  const resolvedDocId = editMode ? editDocFacade?.id : undefined
+  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
 
   const { data: users } = useQuery({
     queryKey: ['users'],
@@ -59,7 +63,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const apiForType = useCallback((type: DocType) => {
     const map = {
       REQ: requirementsApi, TC: testCasesApi, DES: designsApi,
-      RSK: risksApi, CHG: changesApi, TCO: testConceptsApi, DOC: documentsApi,
+      RSK: risksApi, CHG: changesApi, TCO: testConceptsApi,
+      SPEC: documentsApi, PROT: documentsApi, RPT: documentsApi, STD: documentsApi,
     }
     return map[type]
   }, [])
@@ -103,22 +108,22 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           reviewer_id: metadata.reviewer_id ? Number(metadata.reviewer_id) : undefined,
         })
       }
+      if (docType === 'SPEC' || docType === 'PROT' || docType === 'RPT' || docType === 'STD') {
+        return (api as typeof documentsApi).create({
+          project_id: projectId,
+          title,
+          doc_type: docType,
+          description: metadata.description,
+          content_json: contentJson,
+          content_html: contentHtml,
+        })
+      }
       const payload: Record<string, unknown> = {
         project_id: projectId,
         [config.titleField]: title,
         content_json: contentJson,
         content_html: contentHtml,
         ...metadata,
-      }
-      if (docType === 'DOC') {
-        return (api as typeof documentsApi).create({
-          project_id: projectId,
-          title,
-          doc_type: metadata.doc_type || 'Specification',
-          description: metadata.description,
-          content_json: contentJson,
-          content_html: contentHtml,
-        })
       }
       return (api as unknown as { create: (data: Record<string, unknown>) => Promise<Record<string, unknown>> }).create(payload)
     },
@@ -136,10 +141,11 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       const record = data as Record<string, unknown>
       const docIdFieldMap: Record<string, string> = {
         REQ: 'req_id', TC: 'tc_id', DES: 'design_id',
-        RSK: 'risk_id', CHG: 'change_id', TCO: 'concept_id', DOC: 'doc_id',
+        RSK: 'risk_id', CHG: 'change_id', TCO: 'concept_id',
+        SPEC: 'doc_id', PROT: 'doc_id', RPT: 'doc_id', STD: 'doc_id',
       }
       const newDocId = record[docIdFieldMap[docType]] || record.id
-      navigate(`/projects/${prefix}/docs/${newDocId}`)
+      navigate(docUrl(prefix!, docType, String(newDocId)))
     },
   })
 
@@ -166,7 +172,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       return api.update(resolvedDocId, payload)
     },
     onSuccess: () => {
-      navigate(`/projects/${prefix}/docs/${docIdStr}`)
+      navigate(docUrl(prefix!, docType, docIdStr!))
     },
   })
 
@@ -193,6 +199,24 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
 
   if (editMode && docIdStr && !resolvedDocId) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
+  }
+
+  if (!canEditDocs) {
+    return (
+      <div className="flex items-center justify-center h-64 animate-fade-in">
+        <div className="text-center">
+          <h3 className="text-lg font-semibold text-foreground mb-2">You do not have edit access</h3>
+          <p className="text-sm text-muted-foreground mb-4">Only admins and maintainers can create or edit documents.</p>
+          <Link
+            to={prefix ? `/projects/${prefix}` : '/projects'}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -240,33 +264,73 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
         </div>
       </div>
 
-      {/* Main area */}
+      {/* Document frame */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Editor area */}
-        <div className="flex-1 flex flex-col overflow-y-auto">
-          <div className={`${docType === 'TC' ? 'max-w-none' : 'max-w-4xl mx-auto'} w-full px-8 py-8`}>
-            {/* Title */}
+        {/* Editor area with outline */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Document header inside frame */}
+          <div className={`${docType === 'TC' ? 'max-w-none' : 'max-w-4xl mx-auto'} w-full px-8 pt-8 pb-0`}>
+            {/* Document header metadata bar */}
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider ${DOC_TYPE_COLORS[docType]}`}>
+                {DOC_TYPE_LABELS[docType]}
+              </span>
+              {project && (
+                <>
+                  <span className="text-xs text-muted-foreground">
+                    {project.prefix}-{config.typeCode}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {editMode ? (editDocFacade?.doc_id || docIdStr) : 'new'}
+                  </span>
+                </>
+              )}
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground">
+                {metadata.status || config.statusOptions[0]}
+              </span>
+            </div>
+
+            {/* Title inside the document frame */}
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Untitled"
               autoFocus
-              className="w-full text-3xl font-bold text-foreground placeholder:text-muted-foreground/40 bg-transparent border-none outline-none mb-6"
+              className="w-full text-3xl font-bold text-foreground placeholder:text-muted-foreground/40 bg-transparent border-none outline-none mb-2"
             />
 
-            {/* Editor */}
-            {docType === 'TC' ? (
-              <TcsArteTable rows={tcRows} onChange={setTcRows} editable />
-            ) : (
-              <DocEditor
-                content={contentJson}
-                onChange={handleEditorChange}
-                placeholder={`Start writing your ${config.label.toLowerCase()}... Use the toolbar above for formatting.`}
-                editable={true}
-                minHeight="min-h-[60vh]"
+            {/* Description field inside frame for applicable types */}
+            {showDescriptionMetadata && (
+              <input
+                type="text"
+                value={metadata.description || ''}
+                onChange={(e) => setMetadata({ ...metadata, description: e.target.value })}
+                placeholder="Brief description..."
+                className="w-full text-sm text-muted-foreground placeholder:text-muted-foreground/40 bg-transparent border-none outline-none mb-4 pb-4 border-b border-border"
               />
             )}
+          </div>
+
+          {/* Editor body */}
+          <div className="flex-1 overflow-hidden">
+            <div className={`${docType === 'TC' ? 'max-w-none' : 'max-w-4xl mx-auto'} w-full px-4 py-4 h-full`}>
+              {docType === 'TC' ? (
+                <TcsArteTable rows={tcRows} onChange={setTcRows} editable />
+              ) : (
+                <DocEditor
+                  content={contentJson}
+                  onChange={handleEditorChange}
+                  placeholder={`Start writing your ${config.label.toLowerCase()}... Use the toolbar above for formatting.`}
+                  editable={true}
+                  minHeight="min-h-[60vh]"
+                  headingNumbered={headingNumbered}
+                  onHeadingNumberedChange={setHeadingNumbered}
+                  showOutline={outlineOpen}
+                  onOutlineToggle={setOutlineOpen}
+                />
+              )}
+            </div>
           </div>
         </div>
 
@@ -317,17 +381,6 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                   ))}
                 </select>
               </MetaField>
-
-              {showDescriptionMetadata && (
-                <MetaField label="Description">
-                  <textarea
-                    value={metadata.description || ''}
-                    onChange={(e) => setMetadata({ ...metadata, description: e.target.value })}
-                    rows={4}
-                    className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm resize-y"
-                  />
-                </MetaField>
-              )}
 
               {/* Type-specific fields */}
               {visibleConfigFields.length > 0 && (

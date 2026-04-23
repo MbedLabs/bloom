@@ -19,6 +19,7 @@ import Subscript from '@tiptap/extension-subscript'
 import { common, createLowlight } from 'lowlight'
 import { useCallback, useEffect } from 'react'
 import DocEditorToolbar from './DocEditorToolbar'
+import OutlineSidebar from './OutlineSidebar'
 
 const lowlight = createLowlight(common)
 
@@ -29,6 +30,10 @@ interface DocEditorProps {
   editable?: boolean
   className?: string
   minHeight?: string
+  headingNumbered?: boolean
+  onHeadingNumberedChange?: (numbered: boolean) => void
+  showOutline?: boolean
+  onOutlineToggle?: (open: boolean) => void
 }
 
 export default function DocEditor({
@@ -38,6 +43,10 @@ export default function DocEditor({
   editable = true,
   className = '',
   minHeight = 'min-h-[500px]',
+  headingNumbered = true,
+  onHeadingNumberedChange,
+  showOutline = false,
+  onOutlineToggle,
 }: DocEditorProps) {
   const editor = useEditor({
     extensions: [
@@ -74,7 +83,7 @@ export default function DocEditor({
     },
     editorProps: {
       attributes: {
-        class: `prose prose-sm dark:prose-invert max-w-none focus:outline-none ${minHeight} px-6 py-4`,
+        class: `prose prose-sm dark:prose-invert max-w-none focus:outline-none ${minHeight} px-6 py-4 ${headingNumbered ? 'heading-numbered' : ''}`,
       },
     },
   })
@@ -120,51 +129,64 @@ export default function DocEditor({
   if (!editor) return null
 
   return (
-    <div className={`border border-border rounded-lg overflow-hidden bg-background ${className}`}>
-      {editable && (
-        <DocEditorToolbar
-          editor={editor}
-          onAddLink={addLink}
-          onAddImage={addImage}
-          onAddTable={addTable}
-        />
-      )}
+    <div className="flex flex-1 overflow-hidden">
+      <OutlineSidebar
+        editor={editor}
+        open={showOutline}
+        onToggle={() => onOutlineToggle?.(!showOutline)}
+      />
+      <div className={`flex-1 flex flex-col overflow-hidden border border-border rounded-lg bg-background ${className}`}>
+        {editable && (
+          <DocEditorToolbar
+            editor={editor}
+            onAddLink={addLink}
+            onAddImage={addImage}
+            onAddTable={addTable}
+            headingNumbered={headingNumbered}
+            onHeadingNumberedChange={onHeadingNumberedChange}
+            onOutlineToggle={() => onOutlineToggle?.(!showOutline)}
+            outlineOpen={showOutline}
+          />
+        )}
 
-      {editable && editor && (
-        <BubbleMenu editor={editor} className="bg-card border border-border rounded-lg shadow-elegant flex items-center gap-0.5 p-1">
-          <BubbleButton
-            active={editor.isActive('bold')}
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            label="B"
-            className="font-bold"
-          />
-          <BubbleButton
-            active={editor.isActive('italic')}
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            label="I"
-            className="italic"
-          />
-          <BubbleButton
-            active={editor.isActive('underline')}
-            onClick={() => editor.chain().focus().toggleUnderline().run()}
-            label="U"
-            className="underline"
-          />
-          <BubbleButton
-            active={editor.isActive('highlight')}
-            onClick={() => editor.chain().focus().toggleHighlight().run()}
-            label="H"
-            className="bg-yellow-200/50 dark:bg-yellow-500/20 px-1 rounded"
-          />
-          <BubbleButton
-            active={editor.isActive('link')}
-            onClick={addLink}
-            label="🔗"
-          />
-        </BubbleMenu>
-      )}
+        {editable && editor && (
+          <BubbleMenu editor={editor} className="bg-card border border-border rounded-lg shadow-elegant flex items-center gap-0.5 p-1">
+            <BubbleButton
+              active={editor.isActive('bold')}
+              onClick={() => editor.chain().focus().toggleBold().run()}
+              label="B"
+              className="font-bold"
+            />
+            <BubbleButton
+              active={editor.isActive('italic')}
+              onClick={() => editor.chain().focus().toggleItalic().run()}
+              label="I"
+              className="italic"
+            />
+            <BubbleButton
+              active={editor.isActive('underline')}
+              onClick={() => editor.chain().focus().toggleUnderline().run()}
+              label="U"
+              className="underline"
+            />
+            <BubbleButton
+              active={editor.isActive('highlight')}
+              onClick={() => editor.chain().focus().toggleHighlight().run()}
+              label="H"
+              className="bg-yellow-200/50 dark:bg-yellow-500/20 px-1 rounded"
+            />
+            <BubbleButton
+              active={editor.isActive('link')}
+              onClick={addLink}
+              label="\u{1F517}"
+            />
+          </BubbleMenu>
+        )}
 
-      <EditorContent editor={editor} />
+        <div className="flex-1 overflow-y-auto">
+          <EditorContent editor={editor} />
+        </div>
+      </div>
     </div>
   )
 }
