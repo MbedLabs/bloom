@@ -34,7 +34,7 @@ class ProjectResponse(BaseModel):
     id: int
     name: str
     prefix: str
-    description: Optional[str]
+    description: Optional[str] = None
     status: str
     created_at: datetime
     updated_at: datetime
@@ -75,7 +75,7 @@ class ProjectVariableResponse(BaseModel):
     kind: str
     key: str
     value: str
-    description: Optional[str]
+    description: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -177,18 +177,18 @@ class RequirementResponse(BaseModel):
 
     id: int
     project_id: int
-    parent_id: Optional[int]
+    parent_id: Optional[int] = None
     req_id: str
     title: str
-    description: Optional[str]
+    description: Optional[str] = None
     status: str
     priority: str
     req_type: str
     req_origin: str
-    reviewer_id: Optional[int]
-    approver_id: Optional[int]
-    reviewed_by_id: Optional[int]
-    approved_by_id: Optional[int]
+    reviewer_id: Optional[int] = None
+    approver_id: Optional[int] = None
+    reviewed_by_id: Optional[int] = None
+    approved_by_id: Optional[int] = None
     reviewed_at: Optional[datetime] = None
     approved_at: Optional[datetime] = None
     created_at: datetime
@@ -248,16 +248,16 @@ class TestCaseResponse(BaseModel):
     project_id: int
     tc_id: str
     title: str
-    description: Optional[str]
-    preconditions: Optional[str]
+    description: Optional[str] = None
+    preconditions: Optional[str] = None
     steps: Optional[List[Dict[str, Any]]]
     status: str
-    reviewer_id: Optional[int]
-    approver_id: Optional[int]
-    reviewed_by_id: Optional[int]
-    approved_by_id: Optional[int]
-    reviewed_at: Optional[datetime]
-    approved_at: Optional[datetime]
+    reviewer_id: Optional[int] = None
+    approver_id: Optional[int] = None
+    reviewed_by_id: Optional[int] = None
+    approved_by_id: Optional[int] = None
+    reviewed_at: Optional[datetime] = None
+    approved_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
     requirement_count: int = 0
@@ -340,9 +340,9 @@ class TestRunLinkResponse(BaseModel):
     id: int
     requirement_id: int
     test_run_id: int
-    test_run_name: Optional[str]
-    teststation_url: Optional[str]
-    status: Optional[str]
+    test_run_name: Optional[str] = None
+    teststation_url: Optional[str] = None
+    status: Optional[str] = None
     created_at: datetime
 
     @field_serializer("created_at")
@@ -451,10 +451,10 @@ class DocumentSectionUpdate(BaseModel):
 class DocumentSectionResponse(BaseModel):
     id: int
     document_id: int
-    parent_section_id: Optional[int]
+    parent_section_id: Optional[int] = None
     order: int
     title: str
-    content: Optional[str]
+    content: Optional[str] = None
     section_type: str
     created_at: datetime
     updated_at: datetime
@@ -476,7 +476,7 @@ class DocumentResponse(BaseModel):
     doc_type: str
     status: str
     version: str
-    description: Optional[str]
+    description: Optional[str] = None
     content_json: Optional[Dict[str, Any]] = None
     content_html: Optional[str] = None
     created_at: datetime
@@ -499,7 +499,7 @@ class DocumentDetailResponse(BaseModel):
     doc_type: str
     status: str
     version: str
-    description: Optional[str]
+    description: Optional[str] = None
     content_json: Optional[Dict[str, Any]] = None
     content_html: Optional[str] = None
     created_at: datetime
@@ -540,8 +540,8 @@ class TestConfigurationResponse(BaseModel):
     id: int
     project_id: int
     name: str
-    description: Optional[str]
-    environment: Optional[str]
+    description: Optional[str] = None
+    environment: Optional[str] = None
     parameters: Optional[Dict[str, Any]]
     created_at: datetime
     updated_at: datetime
@@ -589,7 +589,7 @@ class TestSuiteResponse(BaseModel):
     project_id: int
     suite_id: str
     name: str
-    description: Optional[str]
+    description: Optional[str] = None
     status: str
     created_at: datetime
     updated_at: datetime
@@ -637,9 +637,9 @@ class TestCampaignItemResponse(BaseModel):
     campaign_id: int
     test_case_id: int
     status: str
-    result: Optional[str]
-    comment: Optional[str]
-    executed_at: Optional[datetime]
+    result: Optional[str] = None
+    comment: Optional[str] = None
+    executed_at: Optional[datetime] = None
     created_at: datetime
     test_case: Optional[TestCaseResponse] = None
 
@@ -654,16 +654,16 @@ class TestCampaignItemResponse(BaseModel):
 class TestCampaignResponse(BaseModel):
     id: int
     project_id: int
-    configuration_id: Optional[int]
-    suite_id: Optional[int]
-    bud_run_id: Optional[int]
-    bud_run_url: Optional[str]
-    bud_run_status: Optional[str]
+    configuration_id: Optional[int] = None
+    suite_id: Optional[int] = None
+    bud_run_id: Optional[int] = None
+    bud_run_url: Optional[str] = None
+    bud_run_status: Optional[str] = None
     name: str
-    description: Optional[str]
+    description: Optional[str] = None
     status: str
-    started_at: Optional[datetime]
-    completed_at: Optional[datetime]
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
     total_items: int = 0
@@ -747,11 +747,11 @@ class DesignItemResponse(BaseModel):
     project_id: int
     design_id: str
     title: str
-    description: Optional[str]
+    description: Optional[str] = None
     status: str
     priority: str
     design_type: str
-    linked_requirement_id: Optional[int]
+    linked_requirement_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
@@ -794,13 +794,13 @@ class RiskItemResponse(BaseModel):
     project_id: int
     risk_id: str
     title: str
-    description: Optional[str]
+    description: Optional[str] = None
     status: str
     severity: str
     probability: str
-    mitigation: Optional[str]
+    mitigation: Optional[str] = None
     risk_category: str
-    linked_requirement_id: Optional[int]
+    linked_requirement_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
@@ -841,12 +841,12 @@ class ChangeRequestResponse(BaseModel):
     project_id: int
     change_id: str
     title: str
-    description: Optional[str]
+    description: Optional[str] = None
     status: str
     priority: str
     change_type: str
-    impact_assessment: Optional[str]
-    justification: Optional[str]
+    impact_assessment: Optional[str] = None
+    justification: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -879,7 +879,7 @@ class BaselineResponse(BaseModel):
     id: int
     project_id: int
     name: str
-    description: Optional[str]
+    description: Optional[str] = None
     status: str
     baseline_type: str
     snapshot: Optional[Dict[str, Any]] = None
@@ -919,7 +919,7 @@ class TestConceptResponse(BaseModel):
     project_id: int
     concept_id: str
     name: str
-    description: Optional[str]
+    description: Optional[str] = None
     status: str
     linked_requirement_ids: List[int] = []
     coverage: float
