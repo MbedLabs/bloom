@@ -4,7 +4,7 @@ import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { docsApi, type DocShell, usersApi } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { Plus, Search, BookOpen, ChevronDown, ChevronUp, ArrowUpDown, ArrowRightLeft, ShieldAlert } from 'lucide-react'
-import { docUrl, docCreateUrl, type DocType } from '../types/doc'
+import { docUrl, docCreateUrl, normalizeDocTypeParam, type DocType } from '../types/doc'
 import { format } from 'date-fns'
 
 const TYPE_BADGES: Record<string, { label: string; color: string }> = {
@@ -76,12 +76,11 @@ type SortDir = 'asc' | 'desc'
 export default function Documents() {
   const { prefix } = useParams<{ prefix: string }>()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { data: project } = useProjectByPrefix(prefix)
   const [search, setSearch] = useState('')
-  const urlType = searchParams.get('type')
-  const [typeFilter, setTypeFilter] = useState(urlType || '')
-  const [statusFilter, setStatusFilter] = useState('')
+  const typeFilter = normalizeDocTypeParam(searchParams.get('type')) || ''
+  const statusFilter = searchParams.get('status') || ''
   const [sortField, setSortField] = useState<SortField>('updated_at')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
@@ -168,6 +167,26 @@ export default function Documents() {
     </th>
   )
 
+  const updateUrlFilters = (next: { type?: string; status?: string }) => {
+    const params = new URLSearchParams(searchParams)
+    const nextType = next.type ?? typeFilter
+    const nextStatus = next.status ?? statusFilter
+
+    if (nextType) {
+      params.set('type', nextType)
+    } else {
+      params.delete('type')
+    }
+
+    if (nextStatus) {
+      params.set('status', nextStatus)
+    } else {
+      params.delete('status')
+    }
+
+    setSearchParams(params, { replace: true })
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
@@ -186,7 +205,7 @@ export default function Documents() {
         </div>
         <div className="relative">
           <button
-            onClick={() => navigate(docCreateUrl(prefix!, typeFilter as DocType || 'DOC'))}
+            onClick={() => navigate(docCreateUrl(prefix!, (typeFilter as DocType) || 'REQ'))}
             className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-all"
           >
             <Plus className="h-4 w-4" />
@@ -208,7 +227,7 @@ export default function Documents() {
         </div>
         <select
           value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
+          onChange={(e) => updateUrlFilters({ type: e.target.value })}
           className="px-3 py-2.5 bg-card border border-border rounded-lg text-sm"
         >
           {DOC_TYPES.map((t) => (
@@ -217,7 +236,7 @@ export default function Documents() {
         </select>
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => updateUrlFilters({ status: e.target.value })}
           className="px-3 py-2.5 bg-card border border-border rounded-lg text-sm"
         >
           {STATUS_OPTIONS.map((t) => (

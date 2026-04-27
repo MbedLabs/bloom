@@ -257,8 +257,10 @@ function ProjectCard({
     : 0
 
   return (
-    <div className="group bg-card rounded-lg border border-border shadow-elegant hover:shadow-glow hover:border-primary/20 transition-all duration-300 overflow-hidden">
-      {/* Top accent */}
+    <div
+      className="group bg-card rounded-lg border border-border shadow-elegant hover:shadow-glow hover:border-primary/20 transition-all duration-300 overflow-hidden cursor-pointer"
+      onClick={() => navigate(`/projects/${project.prefix}`)}
+    >
       <div className={`h-1 ${
         project.status === 'Active' ? 'bg-gradient-to-r from-primary via-teal-500 to-cyan-500' : 'bg-muted'
       }`} />
@@ -275,7 +277,7 @@ function ProjectCard({
                 {canEdit && (
                   <button
                     type="button"
-                    onClick={() => onEdit(project)}
+                    onClick={(e) => { e.stopPropagation(); onEdit(project) }}
                     className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                     title="Edit project"
                   >

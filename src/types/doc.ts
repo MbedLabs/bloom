@@ -236,6 +236,11 @@ export const DOC_TYPE_SLUGS: Record<DocType, string> = {
   STD: 'standards',
 }
 
+const DOC_TYPE_CODES = Object.keys(DOC_TYPE_SLUGS) as DocType[]
+const SLUG_TO_DOC_TYPE = Object.fromEntries(
+  Object.entries(DOC_TYPE_SLUGS).map(([type, slug]) => [slug, type])
+) as Record<string, DocType>
+
 export function docUrl(prefix: string | undefined, docType: DocType, docId: string | number): string {
   const slug = DOC_TYPE_SLUGS[docType]
   return `/projects/${prefix}/docs/${slug}/${docId}`
@@ -247,10 +252,18 @@ export function docEditUrl(prefix: string | undefined, docType: DocType, docId: 
 }
 
 export function docCreateUrl(prefix: string | undefined, docType: DocType): string {
-  return `/projects/${prefix}/docs/new?type=${docType}`
+  const slug = DOC_TYPE_SLUGS[docType]
+  return `/projects/${prefix}/docs/new?type=${slug}`
 }
 
 export function kindSlugToType(slug: string): DocType | null {
-  const entry = Object.entries(DOC_TYPE_SLUGS).find(([, v]) => v === slug)
-  return entry ? (entry[0] as DocType) : null
+  return SLUG_TO_DOC_TYPE[slug] || null
+}
+
+export function normalizeDocTypeParam(value: string | null | undefined): DocType | null {
+  if (!value) return null
+  if (DOC_TYPE_CODES.includes(value as DocType)) {
+    return value as DocType
+  }
+  return kindSlugToType(value)
 }
