@@ -70,19 +70,6 @@ const STATUS_OPTIONS = [
   { code: 'Implemented', label: 'Implemented' },
 ]
 
-const NEW_DOC_TYPES = [
-  { code: 'REQ', label: 'Requirement' },
-  { code: 'SPEC', label: 'Specification' },
-  { code: 'TC', label: 'Test Case' },
-  { code: 'DES', label: 'Design' },
-  { code: 'RSK', label: 'Risk' },
-  { code: 'CHG', label: 'Change Request' },
-  { code: 'TCO', label: 'Test Concept' },
-  { code: 'PROT', label: 'Protocol' },
-  { code: 'RPT', label: 'Report' },
-  { code: 'STD', label: 'External Standard' },
-]
-
 type SortField = 'updated_at' | 'doc_id' | 'doc_type' | 'status' | 'title'
 type SortDir = 'asc' | 'desc'
 
@@ -95,7 +82,6 @@ export default function Documents() {
   const urlType = searchParams.get('type')
   const [typeFilter, setTypeFilter] = useState(urlType || '')
   const [statusFilter, setStatusFilter] = useState('')
-  const [newDocOpen, setNewDocOpen] = useState(false)
   const [sortField, setSortField] = useState<SortField>('updated_at')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
@@ -200,26 +186,12 @@ export default function Documents() {
         </div>
         <div className="relative">
           <button
-            onClick={() => setNewDocOpen(!newDocOpen)}
+            onClick={() => navigate(docCreateUrl(prefix!, typeFilter as DocType || 'DOC'))}
             className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-all"
           >
             <Plus className="h-4 w-4" />
-            New
-            <ChevronDown className="h-3 w-3" />
+            New Document
           </button>
-          {newDocOpen && (
-            <div className="absolute right-0 top-full mt-1 w-48 bg-card border border-border rounded-lg shadow-elegant overflow-hidden z-50">
-              {NEW_DOC_TYPES.map((t) => (
-                <button
-                  key={t.code}
-                  onClick={() => { setNewDocOpen(false); navigate(docCreateUrl(prefix!, t.code as DocType)) }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors"
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
@@ -271,19 +243,6 @@ export default function Documents() {
               ? 'Try a different search or filter.'
               : 'Create your first controlled document to get started.'}
           </p>
-          {!search && !typeFilter && !statusFilter && (
-            <div className="flex flex-wrap gap-2 justify-center">
-              {NEW_DOC_TYPES.slice(0, 4).map((t) => (
-                <button
-                  key={t.code}
-                  onClick={() => navigate(docCreateUrl(prefix!, t.code as DocType))}
-                  className="px-3 py-1.5 bg-primary/10 text-primary rounded-md text-sm hover:bg-primary/20 transition-colors"
-                >
-                  + {t.label}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       ) : (
         <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
