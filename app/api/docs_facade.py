@@ -70,11 +70,19 @@ async def resolve_project(db: AsyncSession, identifier: str) -> Project:
 
 TYPE_MAP = {
     "REQ": (Requirement, "req_id", "requirements"),
-    "TC": (TestCase, "tc_id", "test_cases"),
-    "DES": (DesignItem, "design_id", "design_items"),
-    "RSK": (RiskItem, "risk_id", "risk_items"),
-    "CHG": (ChangeRequest, "change_id", "change_requests"),
-    "TCO": (TestConcept, "concept_id", "test_concepts"),
+    "TC": (TestCase, "tc_id", "test-cases"),
+    "DES": (DesignItem, "design_id", "designs"),
+    "RSK": (RiskItem, "risk_id", "risks"),
+    "CHG": (ChangeRequest, "change_id", "changes"),
+    "TCO": (TestConcept, "concept_id", "test-concepts"),
+}
+
+LEGACY_TYPE_SLUG_ALIASES = {
+    "test_cases": "test-cases",
+    "design_items": "designs",
+    "risk_items": "risks",
+    "change_requests": "changes",
+    "test_concepts": "test-concepts",
 }
 
 
@@ -276,6 +284,7 @@ async def get_doc_by_kind_and_string_id(
 ):
     """Look up a doc by its kind-aware slug and human-readable string ID."""
     project = await resolve_project(db, project_ref)
+    kind_slug = LEGACY_TYPE_SLUG_ALIASES.get(kind_slug, kind_slug)
     requested_kind = None
     if kind_slug in {slug for _, (_, _, slug) in TYPE_MAP.items()}:
         pass
