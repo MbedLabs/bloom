@@ -97,25 +97,19 @@ async def sync_results_global(
 ):
     """
     Ingest automated test results across all campaigns.
-    Matches results to campaign items by tc_id without requiring a specific campaign.
-    Only updates items in active campaigns (status 'Scope' or 'Running').
-    Used by Bud backend for direct Bud→Bloom result synchronization.
+    Matches results to campaign items by tc_id. A tc_id can appear in
+    multiple campaigns — all matching items are updated.
     """
     tc_ids = [r.tc_id for r in data.results]
 
-    active_statuses = ("Scope", "Running", "In Progress")
-
     items_result = await db.execute(
-        select(TestCampaignItem, TestCase, TestCampaign)
+        select(TestCampaignItem, TestCase)
         .join(TestCase, TestCampaignItem.test_case_id == TestCase.id)
-        .join(TestCampaign, TestCampaignItem.campaign_id == TestCampaign.id)
         .where(TestCase.tc_id.in_(tc_ids))
-        .where(TestCampaign.status.in_(active_statuses))
     )
 
-    # Group by tc_id — one tc_id can match multiple active campaign items
     tc_id_to_items: dict[str, list] = {}
-    for item, tc, campaign in items_result.all():
+    for item, tc in items_result.all():
         tc_id_to_items.setdefault(tc.tc_id, []).append(item)
 
     updated_count = 0
