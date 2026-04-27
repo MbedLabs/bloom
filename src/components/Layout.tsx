@@ -47,16 +47,16 @@ const mainNav = [
 
 const projectNav = [
   { name: 'Documents', icon: BookOpen, tab: '', href: 'docs' as const },
-  { name: 'Requirements', icon: FileText, tab: 'requirements' },
-  { name: 'Test Cases', icon: CheckSquare, tab: 'test-cases' },
+  { name: 'Requirements', icon: FileText, tab: '', href: 'docs' as const, filter: 'type:REQ' },
+  { name: 'Test Cases', icon: CheckSquare, tab: '', href: 'docs' as const, filter: 'type:TC' },
   { name: 'Specifications', icon: FileText, tab: '', href: 'docs' as const, filter: 'type:SPEC' },
   { name: 'Protocols', icon: BookOpen, tab: '', href: 'docs' as const, filter: 'type:PROT' },
   { name: 'Reports', icon: Layers, tab: '', href: 'docs' as const, filter: 'type:RPT' },
   { name: 'Standards', icon: BookOpen, tab: '', href: 'docs' as const, filter: 'type:STD' },
-  { name: 'Design', icon: PenTool, tab: 'design' },
-  { name: 'Risks', icon: AlertTriangle, tab: 'risks' },
-  { name: 'Changes', icon: GitPullRequest, tab: 'changes' },
-  { name: 'Test Concepts', icon: Beaker, tab: 'test-concepts' },
+  { name: 'Design', icon: PenTool, tab: '', href: 'docs' as const, filter: 'type:DES' },
+  { name: 'Risks', icon: AlertTriangle, tab: '', href: 'docs' as const, filter: 'type:RSK' },
+  { name: 'Changes', icon: GitPullRequest, tab: '', href: 'docs' as const, filter: 'type:CHG' },
+  { name: 'Test Concepts', icon: Beaker, tab: '', href: 'docs' as const, filter: 'type:TCO' },
   { name: 'Test Campaigns', icon: FlaskConical, tab: '', href: 'campaigns' as const },
   { name: 'Traceability', icon: GitBranch, tab: '', href: 'traceability' as const },
   { name: 'Parameters', icon: SlidersHorizontal, tab: '', href: 'parameters' as const },
@@ -212,9 +212,15 @@ export default function Layout() {
             <div className="space-y-0.5 mt-2">
               {projectNav.map((item) => {
                 const projSlug = location.pathname.split('/')[2]
-                const to = item.tab
-                  ? `/projects/${projSlug}?tab=${item.tab}`
-                  : `/projects/${projSlug}/${(item as { href: string }).href}`
+                let to = ''
+                if (item.tab) {
+                  to = `/projects/${projSlug}?tab=${item.tab}`
+                } else if ('filter' in item && item.filter) {
+                  const typeVal = item.filter.replace('type:', '')
+                  to = `/projects/${projSlug}/${item.href}?type=${encodeURIComponent(typeVal)}`
+                } else if ('href' in item) {
+                  to = `/projects/${projSlug}/${item.href}`
+                }
                 return (
                   <Link
                     key={item.name}
