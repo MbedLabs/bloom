@@ -10,7 +10,13 @@ import {
   risksApi, changesApi, testConceptsApi, documentsApi, usersApi,
 } from '../api/client'
 import type { DocType } from '../types/doc'
-import { DOC_CONFIGS, DOC_TYPE_LABELS, DOC_TYPE_COLORS, docUrl } from '../types/doc'
+import {
+  DOC_CONFIGS,
+  DOC_TYPE_LABELS,
+  DOC_TYPE_COLORS,
+  docUrl,
+  normalizeDocTypeParam,
+} from '../types/doc'
 import { useAuth } from '../contexts/AuthContext'
 
 interface DocCreateProps {
@@ -24,7 +30,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const rawRequestedDocType = (searchParams.get('type') || 'REQ') as DocType
+  const rawRequestedDocType = normalizeDocTypeParam(searchParams.get('type')) || 'REQ'
+  const requestedDocType = rawRequestedDocType in DOC_CONFIGS ? rawRequestedDocType : 'REQ'
 
   const [title, setTitle] = useState('')
   const [contentJson, setContentJson] = useState<Record<string, unknown> | null>(null)
@@ -49,7 +56,6 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
     enabled: editMode && !!prefix && !!kind && !!docIdStr,
   })
 
-  const requestedDocType = rawRequestedDocType in DOC_CONFIGS ? rawRequestedDocType : 'REQ'
   const docType = ((editMode && editDocFacade?.doc_type) || requestedDocType) as DocType
   const config = DOC_CONFIGS[docType]
   const resolvedDocId = editMode ? editDocFacade?.id : undefined
