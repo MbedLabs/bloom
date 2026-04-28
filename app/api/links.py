@@ -5,12 +5,67 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS
+from app.core.link_rules import (
+    get_allowed_link_roles,
+    is_allowed_link_role,
+    is_known_linkable_type,
+    normalize_linkable_type,
+)
 from app.core.security import get_current_user, require_role
-from app.models import ArtefactLink, Project
+from app.models import (
+    ArtefactLink,
+    ChangeRequest,
+    DesignItem,
+    Document,
+    Project,
+    Requirement,
+    RiskItem,
+    TestCase,
+    TestConcept,
+)
 from app.models.user import User, UserRole
 from app.schemas import ArtefactLinkCreate, ArtefactLinkResponse
 
 router = APIRouter()
+
+ARTEFACT_MODELS = {
+    "REQ": Requirement,
+    "TC": TestCase,
+    "DES": DesignItem,
+    "RSK": RiskItem,
+    "CHG": ChangeRequest,
+    "TCO": TestConcept,
+}
+
+
+async def _artefact_exists_in_project(
+    db: AsyncSession, project_id: int, artefact_type: str, artefact_id: int
+) -> bool:
+    normalized_type = normalize_linkable_type(artefact_type)
+
+    if normalized_type in ARTEFACT_MODELS:
+        model = ARTEFACT_MODELS[normalized_type]
+        row = (
+            await db.execute(
+                select(model.id).where(model.project_id == project_id, model.id == artefact_id)
+            )
+        ).scalar_one_or_none()
+        return row is not None
+
+    if normalized_type in CANONICAL_DOCUMENT_KINDS:
+        row = (
+            await db.execute(
+                select(Document.id).where(
+                    Document.project_id == project_id,
+                    Document.id == artefact_id,
+                    Document.doc_type == normalized_type,
+                )
+            )
+        ).scalar_one_or_none()
+        return row is not None
+
+    return False
 
 
 @router.get("", response_model=list[ArtefactLinkResponse])
@@ -25,11 +80,11 @@ async def list_links(
 ):
     query = select(ArtefactLink).where(ArtefactLink.project_id == project_id)
     if source_type:
-        query = query.where(ArtefactLink.source_type == source_type)
+        query = query.where(ArtefactLink.source_type == normalize_linkable_type(source_type))
     if source_id is not None:
         query = query.where(ArtefactLink.source_id == source_id)
     if target_type:
-        query = query.where(ArtefactLink.target_type == target_type)
+        query = query.where(ArtefactLink.target_type == normalize_linkable_type(target_type))
     if target_id is not None:
         query = query.where(ArtefactLink.target_id == target_id)
     rows = (await db.execute(query.order_by(ArtefactLink.created_at.desc()))).scalars().all()
@@ -42,14 +97,46 @@ async def create_link(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
+    data.source_type = normalize_linkable_type(data.source_type)
+    data.target_type = normalize_linkable_type(data.target_type)
+
     project = (
         await db.execute(select(Project).where(Project.id == data.project_id))
     ).scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+    if not is_known_linkable_type(data.source_type) or not is_known_linkable_type(data.target_type):
+        raise HTTPException(status_code=422, detail="Unsupported relationship document kind")
+    if data.source_type == data.target_type and data.source_id == data.target_id:
+        raise HTTPException(status_code=400, detail="A document cannot link to itself")
+    if not is_allowed_link_role(data.source_type, data.target_type, data.role):
+        allowed_roles = get_allowed_link_roles(data.source_type, data.target_type)
+        if not allowed_roles:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Relationships from {data.source_type} to {data.target_type} are not allowed",
+            )
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Role '{data.role}' is not allowed for "
+                f"{data.source_type} -> {data.target_type}. Allowed roles: {', '.join(allowed_roles)}"
+            ),
+        )
+    source_exists = await _artefact_exists_in_project(
+        db, data.project_id, data.source_type, data.source_id
+    )
+    if not source_exists:
+        raise HTTPException(status_code=404, detail="Source document not found in project")
+    target_exists = await _artefact_exists_in_project(
+        db, data.project_id, data.target_type, data.target_id
+    )
+    if not target_exists:
+        raise HTTPException(status_code=404, detail="Target document not found in project")
     existing = (
         await db.execute(
             select(ArtefactLink).where(
+                ArtefactLink.project_id == data.project_id,
                 ArtefactLink.source_type == data.source_type,
                 ArtefactLink.source_id == data.source_id,
                 ArtefactLink.target_type == data.target_type,
