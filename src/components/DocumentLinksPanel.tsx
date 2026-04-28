@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { FileText, Link2, Search, X } from 'lucide-react'
@@ -9,28 +9,19 @@ import {
   linksApi,
 } from '../api/client'
 import { formatDateTime } from '../test/date-utils'
-import { docUrl, DOC_TYPE_LABELS, type DocType } from '../types/doc'
+import {
+  docUrl,
+  DOC_TYPE_LABELS,
+  getDocLinkOptions,
+  getDocLinkRoleLabel,
+  normalizeDocTypeParam,
+  type DocType,
+} from '../types/doc'
 import { SectionCard } from './DocDetailShell'
 import { useAuth } from '../contexts/AuthContext'
 
-const LINK_ROLES = ['verifies', 'implements', 'references', 'depends_on', 'impacts', 'blocks'] as const
-
 function docKey(type: string, id: number) {
   return `${type}:${id}`
-}
-
-function roleLabel(role: string, direction: 'incoming' | 'outgoing') {
-  const labels: Record<string, [string, string]> = {
-    verifies: ['verifies', 'verified by'],
-    implements: ['implements', 'implemented by'],
-    references: ['references', 'referenced by'],
-    depends_on: ['depends on', 'dependency of'],
-    impacts: ['impacts', 'impacted by'],
-    blocks: ['blocks', 'blocked by'],
-  }
-  const pair = labels[role]
-  if (!pair) return role.split('_').join(' ')
-  return direction === 'outgoing' ? pair[0] : pair[1]
 }
 
 function DocumentLinkRow({
@@ -57,7 +48,7 @@ function DocumentLinkRow({
           </div>
           <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
             <span>{direction === 'incoming' ? 'Incoming' : 'Outgoing'}</span>
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">{roleLabel(link.role, direction)}</span>
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">{getDocLinkRoleLabel(link.role, direction)}</span>
             {link.suspect && <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-amber-700 dark:text-amber-400">suspect</span>}
             <span>{formatDateTime(link.created_at)} ago</span>
           </div>
@@ -90,26 +81,77 @@ function LinkDocumentModal({
   onClose: () => void
 }) {
   const queryClient = useQueryClient()
-  const [role, setRole] = useState<(typeof LINK_ROLES)[number]>('verifies')
+  const normalizedSourceType = normalizeDocTypeParam(sourceType)
   const [search, setSearch] = useState('')
+  const eligibleDocs = useMemo(
+    () => docs.filter((doc) => {
+      const normalizedDocType = normalizeDocTypeParam(doc.doc_type)
+      if (!normalizedSourceType || !normalizedDocType) return false
+      if (normalizedDocType === normalizedSourceType && doc.id === sourceId) return false
+      return getDocLinkOptions(normalizedSourceType, normalizedDocType).length > 0
+    }),
+    [docs, normalizedSourceType, sourceId]
+  )
+  const availableTargetTypes = useMemo(
+    () => Array.from(new Set(eligibleDocs.map((doc) => normalizeDocTypeParam(doc.doc_type)).filter((docType): docType is DocType => !!docType))),
+    [eligibleDocs]
+  )
+  const [targetType, setTargetType] = useState<DocType | ''>('')
+  const availableOptions = useMemo(
+    () => (normalizedSourceType && targetType ? getDocLinkOptions(normalizedSourceType, targetType) : []),
+    [normalizedSourceType, targetType]
+  )
+  const [selectedOptionKey, setSelectedOptionKey] = useState('')
+  const selectedOption = useMemo(
+    () => availableOptions.find((option) => option.key === selectedOptionKey) || null,
+    [availableOptions, selectedOptionKey]
+  )
+
+  useEffect(() => {
+    if (availableTargetTypes.length === 0) {
+      setTargetType('')
+      return
+    }
+    setTargetType((current) => (current && availableTargetTypes.includes(current) ? current : availableTargetTypes[0]))
+  }, [availableTargetTypes])
+
+  useEffect(() => {
+    if (availableOptions.length === 0) {
+      setSelectedOptionKey('')
+      return
+    }
+    setSelectedOptionKey((current) => (
+      current && availableOptions.some((option) => option.key === current)
+        ? current
+        : availableOptions[0].key
+    ))
+  }, [availableOptions])
 
   const createMutation = useMutation({
-    mutationFn: (target: DocShell) => linksApi.create({
-      project_id: projectId,
-      source_type: sourceType,
-      source_id: sourceId,
-      target_type: target.doc_type,
-      target_id: target.id,
-      role,
-      suspect: false,
-    }),
+    mutationFn: (target: DocShell) => {
+      const normalizedTargetType = normalizeDocTypeParam(target.doc_type)
+      if (!normalizedSourceType || !normalizedTargetType || !selectedOption) {
+        throw new Error('Link type configuration is incomplete')
+      }
+      return linksApi.create({
+        project_id: projectId,
+        source_type: selectedOption.sourceType,
+        source_id: selectedOption.displayDirection === 'outgoing' ? sourceId : target.id,
+        target_type: selectedOption.targetType,
+        target_id: selectedOption.displayDirection === 'outgoing' ? target.id : sourceId,
+        role: selectedOption.role,
+        suspect: false,
+      })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['docLinks', projectId] })
       onClose()
     },
   })
 
-  const filteredDocs = docs.filter((doc) => {
+  const filteredDocs = eligibleDocs.filter((doc) => {
+    const normalizedDocType = normalizeDocTypeParam(doc.doc_type)
+    if (!targetType || normalizedDocType !== targetType) return false
     const q = search.trim().toLowerCase()
     if (!q) return true
     return doc.doc_id.toLowerCase().includes(q) || doc.title.toLowerCase().includes(q) || doc.doc_type.toLowerCase().includes(q)
@@ -122,36 +164,57 @@ function LinkDocumentModal({
           <h3 className="text-lg font-semibold">Link Document</h3>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">✕</button>
         </div>
-        <div className="p-6 border-b border-border grid grid-cols-1 md:grid-cols-[1fr_12rem] gap-3">
+        <div className="p-6 border-b border-border grid grid-cols-1 md:grid-cols-[1fr_12rem_12rem] gap-3">
           <div className="relative">
             <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search controlled documents"
+              placeholder={targetType ? `Search ${DOC_TYPE_LABELS[targetType].toLowerCase()}s` : 'Search controlled documents'}
               className="w-full pl-9 pr-3 py-2 bg-background border border-input rounded-md text-sm"
             />
           </div>
           <select
-            value={role}
-            onChange={(event) => setRole(event.target.value as (typeof LINK_ROLES)[number])}
+            value={targetType}
+            onChange={(event) => setTargetType(event.target.value as DocType)}
             className="px-3 py-2 bg-background border border-input rounded-md text-sm"
+            disabled={availableTargetTypes.length === 0}
           >
-            {LINK_ROLES.map((item) => (
-              <option key={item} value={item}>{roleLabel(item, 'outgoing')}</option>
-            ))}
+            {availableTargetTypes.length === 0 ? (
+              <option value="">No target kinds</option>
+            ) : (
+              availableTargetTypes.map((item) => (
+                <option key={item} value={item}>{DOC_TYPE_LABELS[item]}</option>
+              ))
+            )}
+          </select>
+          <select
+            value={selectedOptionKey}
+            onChange={(event) => setSelectedOptionKey(event.target.value)}
+            className="px-3 py-2 bg-background border border-input rounded-md text-sm"
+            disabled={availableOptions.length === 0}
+          >
+            {availableOptions.length === 0 ? (
+              <option value="">No valid roles</option>
+            ) : (
+              availableOptions.map((option) => (
+                <option key={option.key} value={option.key}>{option.label}</option>
+              ))
+            )}
           </select>
         </div>
         <div className="overflow-y-auto p-3">
-          {filteredDocs.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground">No matching documents.</div>
+          {availableTargetTypes.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">No valid link targets for this document type yet.</div>
+          ) : filteredDocs.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">No matching documents for the selected kind.</div>
           ) : (
             <div className="divide-y divide-border">
               {filteredDocs.map((doc) => (
                 <button
                   key={`${doc.doc_type}-${doc.id}`}
                   onClick={() => createMutation.mutate(doc)}
-                  disabled={createMutation.isPending}
+                  disabled={createMutation.isPending || !selectedOption}
                   className="w-full px-3 py-3 text-left hover:bg-accent/50 disabled:opacity-50"
                 >
                   <div className="flex items-center justify-between gap-3">
