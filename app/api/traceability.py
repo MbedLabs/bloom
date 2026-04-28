@@ -14,12 +14,7 @@ from app.api.link_read_utils import (
 )
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
-from app.models import (
-    Requirement,
-    RequirementLink,
-    TestCase,
-    TestRunLink,
-)
+from app.models import Requirement, RequirementLink, TestCase, TestRunLink
 from app.models.user import User, UserRole
 from app.schemas import (
     CoverageGap,

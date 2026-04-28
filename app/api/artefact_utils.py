@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.link_read_utils import get_test_case_ids_verifying_requirements
 from app.core.document_kinds import normalize_document_kind
 from app.models import (
-    ArtefactLink,
     ArtefactActivity,
+    ArtefactLink,
     ChangeRequest,
     DesignItem,
     Document,

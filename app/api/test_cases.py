@@ -8,10 +8,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.link_read_utils import get_verified_requirement_links_for_test_case
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_role
-from app.api.link_read_utils import get_verified_requirement_links_for_test_case
 from app.models import (
     ArtefactLink,
     Project,
