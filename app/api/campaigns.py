@@ -7,12 +7,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.link_read_utils import get_verified_requirement_links_for_test_case
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
 from app.models import (
     Project,
     Requirement,
-    RequirementTestCase,
     TestCampaign,
     TestCampaignItem,
     TestCase,
@@ -597,24 +597,11 @@ async def _build_campaign_detail(
 
 
 async def _build_test_case_response(tc: TestCase, db: AsyncSession) -> TestCaseResponse:
-    req_links = (
-        (
-            await db.execute(
-                select(RequirementTestCase).where(RequirementTestCase.test_case_id == tc.id)
-            )
-        )
-        .scalars()
-        .all()
-    )
     linked_requirements = []
-    for link in req_links:
-        req = (
-            await db.execute(select(Requirement).where(Requirement.id == link.requirement_id))
-        ).scalar_one_or_none()
-        if req:
-            linked_requirements.append(
-                RequirementSummary(id=req.id, req_id=req.req_id, title=req.title, status=req.status)
-            )
+    for _link, req in await get_verified_requirement_links_for_test_case(tc.id, db):
+        linked_requirements.append(
+            RequirementSummary(id=req.id, req_id=req.req_id, title=req.title, status=req.status)
+        )
     return TestCaseResponse(
         id=tc.id,
         project_id=tc.project_id,

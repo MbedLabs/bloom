@@ -8,12 +8,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.link_read_utils import (
+    get_verified_requirement_links_for_test_case,
+    get_verifying_test_case_links_for_requirement,
+)
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
 from app.models import (
     Requirement,
     RequirementLink,
-    RequirementTestCase,
     TestCase,
     TestRunLink,
 )
@@ -33,19 +36,11 @@ from app.schemas import (
 
 router = APIRouter()
 
-VALID_TC_LINK_TYPES = {"verifies", "traces_to", "exercises"}
 VALID_REQ_LINK_TYPES = {"depends_on", "derived_from", "refines", "copies", "satisfies"}
 
 
 async def _build_req_response(req: Requirement, db: AsyncSession) -> RequirementResponse:
-    from sqlalchemy import func
-
-    from app.models import RequirementTestCase as RtcModel
-
-    tc_count_result = await db.execute(
-        select(func.count(RtcModel.id)).where(RtcModel.requirement_id == req.id)
-    )
-    tc_count = tc_count_result.scalar()
+    tc_count = len(await get_verifying_test_case_links_for_requirement(req.id, db))
 
     children_result = await db.execute(select(Requirement).where(Requirement.parent_id == req.id))
     children = children_result.scalars().all()
@@ -89,17 +84,9 @@ async def _build_tc_response(tc: TestCase) -> TestCaseResponse:
 
 
 async def _get_linked_test_cases(req_id: int, db: AsyncSession):
-    tc_links_result = await db.execute(
-        select(RequirementTestCase).where(RequirementTestCase.requirement_id == req_id)
-    )
-    tc_links = tc_links_result.scalars().all()
-
     linked = []
-    for link in tc_links:
-        tc_result = await db.execute(select(TestCase).where(TestCase.id == link.test_case_id))
-        tc = tc_result.scalar_one_or_none()
-        if tc:
-            linked.append(await _build_tc_response(tc))
+    for _link, tc in await get_verifying_test_case_links_for_requirement(req_id, db):
+        linked.append(await _build_tc_response(tc))
     return linked
 
 
@@ -231,11 +218,6 @@ async def get_impact_analysis(
         )
         links = links_result.scalars().all()
 
-        links_result2 = await db.execute(
-            select(RequirementTestCase).where(RequirementTestCase.requirement_id == req_id)
-        )
-        tc_links = links_result2.scalars().all()
-
         nodes = []
         for link in links:
             tgt_result = await db.execute(
@@ -255,37 +237,32 @@ async def get_impact_analysis(
                     )
                 )
 
-        for tc_link in tc_links:
-            tc_result = await db.execute(
-                select(TestCase).where(TestCase.id == tc_link.test_case_id)
-            )
-            tc = tc_result.scalar_one_or_none()
-            if tc:
-                tc_resp = await _build_tc_response(tc)
-                nodes.append(
-                    ImpactNode(
-                        requirement=RequirementResponse(
-                            id=tc.id,
-                            project_id=tc.project_id,
-                            parent_id=None,
-                            req_id=tc.tc_id,
-                            title=tc.title,
-                            description=tc.description,
-                            status=tc.status,
-                            priority="N/A",
-                            req_type="test_case",
-                            req_origin="N/A",
-                            created_at=tc.created_at,
-                            updated_at=tc.updated_at,
-                            children=[],
-                            test_case_count=0,
-                        ),
-                        link_type=tc_link.link_type,
-                        direction="downstream",
-                        depth=current_depth,
+        for tc_link, tc in await get_verifying_test_case_links_for_requirement(req_id, db):
+            tc_resp = await _build_tc_response(tc)
+            nodes.append(
+                ImpactNode(
+                    requirement=RequirementResponse(
+                        id=tc.id,
+                        project_id=tc.project_id,
+                        parent_id=None,
+                        req_id=tc.tc_id,
+                        title=tc.title,
+                        description=tc.description,
+                        status=tc.status,
+                        priority="N/A",
+                        req_type="test_case",
+                        req_origin="N/A",
+                        created_at=tc.created_at,
+                        updated_at=tc.updated_at,
                         children=[],
-                    )
+                        test_case_count=0,
+                    ),
+                    link_type=tc_link.role,
+                    direction="downstream",
+                    depth=current_depth,
+                    children=[],
                 )
+            )
         return nodes
 
     upstream = await _build_upstream(requirement_id, 1, set())
@@ -311,23 +288,13 @@ async def get_coverage_gaps(
     covered = 0
     partial = 0
     uncovered = 0
-    required_link_types = {"verifies"}
-
     for req in requirements:
         linked_tcs = await _get_linked_test_cases(req.id, db)
 
         tc_count = len(linked_tcs)
         all_draft = tc_count > 0 and all(tc.status == "Draft" for tc in linked_tcs)
 
-        present_link_types = set()
-        tc_links_result = await db.execute(
-            select(RequirementTestCase).where(RequirementTestCase.requirement_id == req.id)
-        )
-        tc_links = tc_links_result.scalars().all()
-        for link in tc_links:
-            present_link_types.add(link.link_type)
-
-        missing = [lt for lt in required_link_types if lt not in present_link_types]
+        missing: list[str] = []
 
         if tc_count == 0:
             gap_type = "no_test_cases"

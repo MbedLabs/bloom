@@ -152,6 +152,36 @@ async def create_tables():
                 "UPDATE requirement_test_cases SET link_type = 'verifies' WHERE link_type = 'validates'"
             )
         )
+        await conn.execute(
+            text(
+                """
+                INSERT INTO artefact_links (
+                    project_id,
+                    source_type,
+                    source_id,
+                    target_type,
+                    target_id,
+                    role,
+                    suspect,
+                    created_at
+                )
+                SELECT
+                    req.project_id,
+                    'TC',
+                    rtc.test_case_id,
+                    'REQ',
+                    rtc.requirement_id,
+                    'verifies',
+                    FALSE,
+                    rtc.created_at
+                FROM requirement_test_cases rtc
+                JOIN requirements req ON req.id = rtc.requirement_id
+                JOIN test_cases tc ON tc.id = rtc.test_case_id
+                WHERE req.project_id = tc.project_id
+                ON CONFLICT ON CONSTRAINT uq_artefact_link DO NOTHING
+                """
+            )
+        )
 
         await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS invited_at TIMESTAMP"))
         await conn.execute(

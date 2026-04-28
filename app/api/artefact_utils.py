@@ -6,8 +6,10 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.link_read_utils import get_test_case_ids_verifying_requirements
 from app.core.document_kinds import normalize_document_kind
 from app.models import (
+    ArtefactLink,
     ArtefactActivity,
     ChangeRequest,
     DesignItem,
@@ -15,7 +17,6 @@ from app.models import (
     DocumentSection,
     Project,
     Requirement,
-    RequirementTestCase,
     RiskItem,
     TestCase,
     TestConcept,
@@ -35,6 +36,13 @@ ARTEFACT_MODELS = {
     "risk": RiskItem,
     "change": ChangeRequest,
     "test-concept": TestConcept,
+}
+
+ARTEFACT_LINK_TYPES = {
+    "design": "DES",
+    "risk": "RSK",
+    "change": "CHG",
+    "test-concept": "TCO",
 }
 
 WORKFLOW_TRANSITIONS = {
@@ -101,6 +109,42 @@ def get_allowed_transitions(artefact_type: str, current_status: str) -> list[str
     return WORKFLOW_TRANSITIONS.get(artefact_type, {}).get(current_status, [])
 
 
+async def _get_related_requirement_ids_from_links(
+    db: AsyncSession, artefact_type: str, artefact_id: int
+) -> list[int]:
+    artefact_link_type = ARTEFACT_LINK_TYPES.get(artefact_type)
+    if not artefact_link_type:
+        return []
+
+    outgoing_rows = (
+        (
+            await db.execute(
+                select(ArtefactLink.target_id).where(
+                    ArtefactLink.source_type == artefact_link_type,
+                    ArtefactLink.source_id == artefact_id,
+                    ArtefactLink.target_type == "REQ",
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    incoming_rows = (
+        (
+            await db.execute(
+                select(ArtefactLink.source_id).where(
+                    ArtefactLink.target_type == artefact_link_type,
+                    ArtefactLink.target_id == artefact_id,
+                    ArtefactLink.source_type == "REQ",
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return sorted({*outgoing_rows, *incoming_rows})
+
+
 async def build_related_response(
     db: AsyncSession, artefact_type: str, artefact_id: int
 ) -> ArtefactRelatedResponse:
@@ -110,12 +154,14 @@ async def build_related_response(
     ).scalar_one()
 
     requirement_ids: list[int] = []
+    requirement_ids.extend(await _get_related_requirement_ids_from_links(db, artefact_type, artefact_id))
     if artefact_type in {"design", "risk"}:
         linked_requirement_id = getattr(artefact, "linked_requirement_id", None)
         if linked_requirement_id:
-            requirement_ids = [linked_requirement_id]
+            requirement_ids.append(linked_requirement_id)
     elif artefact_type == "test-concept":
-        requirement_ids = list(getattr(artefact, "linked_requirement_ids", []) or [])
+        requirement_ids.extend(list(getattr(artefact, "linked_requirement_ids", []) or []))
+    requirement_ids = sorted(set(requirement_ids))
 
     requirements = []
     if requirement_ids:
@@ -131,21 +177,7 @@ async def build_related_response(
             .all()
         )
 
-    rtc_links = []
-    if requirement_ids:
-        rtc_links = (
-            (
-                await db.execute(
-                    select(RequirementTestCase).where(
-                        RequirementTestCase.requirement_id.in_(requirement_ids)
-                    )
-                )
-            )
-            .scalars()
-            .all()
-        )
-
-    test_case_ids = sorted({link.test_case_id for link in rtc_links})
+    test_case_ids = await get_test_case_ids_verifying_requirements(requirement_ids, db)
     test_cases = []
     if test_case_ids:
         test_cases = (

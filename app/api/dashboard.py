@@ -9,10 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models import (
+    ArtefactLink,
     Document,
     Project,
     Requirement,
-    RequirementTestCase,
     TestCampaign,
     TestCampaignItem,
     TestCase,
@@ -45,12 +45,26 @@ async def get_dashboard_stats(
     )
     tc_status_dist = {row[0]: row[1] for row in tc_status_result}
 
-    total_links = await db.scalar(select(func.count(RequirementTestCase.id)))
+    total_links = await db.scalar(
+        select(func.count(ArtefactLink.id)).where(
+            ArtefactLink.source_type == "TC",
+            ArtefactLink.target_type == "REQ",
+            ArtefactLink.role == "verifies",
+        )
+    )
     coverage_pct = round((total_links / total_requirements * 100) if total_requirements else 0, 1)
 
     uncovered_reqs = await db.scalar(
         select(func.count(Requirement.id)).where(
-            ~Requirement.id.in_(select(RequirementTestCase.requirement_id).distinct())
+            ~Requirement.id.in_(
+                select(ArtefactLink.target_id)
+                .where(
+                    ArtefactLink.source_type == "TC",
+                    ArtefactLink.target_type == "REQ",
+                    ArtefactLink.role == "verifies",
+                )
+                .distinct()
+            )
         )
     )
 
