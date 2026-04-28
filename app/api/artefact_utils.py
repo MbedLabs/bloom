@@ -154,7 +154,9 @@ async def build_related_response(
     ).scalar_one()
 
     requirement_ids: list[int] = []
-    requirement_ids.extend(await _get_related_requirement_ids_from_links(db, artefact_type, artefact_id))
+    requirement_ids.extend(
+        await _get_related_requirement_ids_from_links(db, artefact_type, artefact_id)
+    )
     if artefact_type in {"design", "risk"}:
         linked_requirement_id = getattr(artefact, "linked_requirement_id", None)
         if linked_requirement_id:
