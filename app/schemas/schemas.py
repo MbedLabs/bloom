@@ -5,7 +5,7 @@ Pydantic schemas for API request/response validation.
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, Field, field_serializer, field_validator
 
 # ==================== Project Schemas ====================
 
@@ -699,6 +699,16 @@ class ArtefactLinkCreate(BaseModel):
     target_id: int
     role: str = Field(..., min_length=1, max_length=50)
     suspect: bool = False
+
+    @field_validator("source_type", "target_type")
+    @classmethod
+    def normalize_type_fields(cls, value: str) -> str:
+        return value.upper()
+
+    @field_validator("role")
+    @classmethod
+    def normalize_role_field(cls, value: str) -> str:
+        return value.lower()
 
 
 class ArtefactLinkResponse(BaseModel):
