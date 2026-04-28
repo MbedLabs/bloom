@@ -627,15 +627,6 @@ export const requirementsApi = {
     await api.delete(`/requirements/${id}`)
   },
 
-  linkTestCase: async (requirementId: number, testCaseId: number, linkType: string = 'verifies') => {
-    const response = await api.post(`/requirements/${requirementId}/link-testcase`, { test_case_id: testCaseId, link_type: linkType })
-    return response.data
-  },
-
-  unlinkTestCase: async (requirementId: number, testCaseId: number) => {
-    await api.delete(`/requirements/${requirementId}/link-testcase/${testCaseId}`)
-  },
-
   linkTestRun: async (requirementId: number, testRunId: number) => {
     const response = await api.post(`/requirements/${requirementId}/link-testrun`, { test_run_id: testRunId })
     return response.data
@@ -691,18 +682,6 @@ export const testCasesApi = {
       approved_at: new Date().toISOString(),
     })
     return response.data
-  },
-
-  linkRequirement: async (testCaseId: number, requirementId: number, linkType: string = 'verifies') => {
-    const response = await api.post(`/test-cases/${testCaseId}/link-requirement`, {
-      requirement_id: requirementId,
-      link_type: linkType,
-    })
-    return response.data
-  },
-
-  unlinkRequirement: async (testCaseId: number, requirementId: number) => {
-    await api.delete(`/test-cases/${testCaseId}/link-requirement/${requirementId}`)
   },
 
   delete: async (id: number) => {
@@ -1040,7 +1019,15 @@ export const designsApi = {
     const response = await api.get<DesignItem>(`/designs/${id}`)
     return response.data
   },
-  create: async (data: Omit<DesignItem, 'id' | 'design_id' | 'created_at' | 'updated_at'>) => {
+  create: async (data: {
+    project_id: number
+    title: string
+    description?: string | null
+    status?: string
+    priority?: string
+    design_type?: string
+    linked_requirement_id?: number | null
+  }) => {
     const response = await api.post<DesignItem>('/designs', data)
     return response.data
   },
@@ -1062,7 +1049,17 @@ export const risksApi = {
     const response = await api.get<RiskItem>(`/risks/${id}`)
     return response.data
   },
-  create: async (data: Omit<RiskItem, 'id' | 'risk_id' | 'created_at' | 'updated_at'>) => {
+  create: async (data: {
+    project_id: number
+    title: string
+    description?: string | null
+    status?: string
+    severity?: string
+    probability?: string
+    mitigation?: string | null
+    risk_category?: string
+    linked_requirement_id?: number | null
+  }) => {
     const response = await api.post<RiskItem>('/risks', data)
     return response.data
   },
@@ -1128,7 +1125,7 @@ export const testConceptsApi = {
     const response = await api.get<TestConcept>(`/test-concepts/${id}`)
     return response.data
   },
-  create: async (data: { project_id: number; name: string; description?: string | null; status?: string; linked_requirement_ids?: number[]; coverage?: number }) => {
+  create: async (data: { project_id: number; name: string; description?: string | null; status?: string; coverage?: number }) => {
     const response = await api.post<TestConcept>('/test-concepts', data)
     return response.data
   },

@@ -1,4 +1,25 @@
 export type DocType = 'REQ' | 'SPEC' | 'TC' | 'DES' | 'RSK' | 'CHG' | 'TCO' | 'PROT' | 'RPT' | 'STD'
+export type DocLinkRole =
+  | 'derives_from'
+  | 'refines'
+  | 'satisfies'
+  | 'implements'
+  | 'verifies'
+  | 'mitigates'
+  | 'depends_on'
+  | 'impacts'
+  | 'blocks'
+  | 'duplicates'
+  | 'references'
+  | 'relates_to'
+export interface DocLinkOption {
+  key: string
+  label: string
+  role: DocLinkRole
+  sourceType: DocType
+  targetType: DocType
+  displayDirection: 'incoming' | 'outgoing'
+}
 
 export interface DocShell {
   id: number
@@ -241,6 +262,83 @@ const SLUG_TO_DOC_TYPE = Object.fromEntries(
   Object.entries(DOC_TYPE_SLUGS).map(([type, slug]) => [slug, type])
 ) as Record<string, DocType>
 
+type DocLinkRuleRow = {
+  sourceType: DocType
+  targetType: DocType
+  roles: DocLinkRole[]
+}
+
+const DOC_LINK_RULE_ROWS: DocLinkRuleRow[] = [
+  { sourceType: 'REQ', targetType: 'REQ', roles: ['derives_from', 'refines', 'depends_on', 'duplicates', 'relates_to'] },
+  { sourceType: 'REQ', targetType: 'STD', roles: ['references'] },
+  { sourceType: 'SPEC', targetType: 'REQ', roles: ['derives_from', 'refines', 'references'] },
+  { sourceType: 'SPEC', targetType: 'SPEC', roles: ['derives_from', 'refines', 'depends_on', 'duplicates', 'relates_to'] },
+  { sourceType: 'SPEC', targetType: 'STD', roles: ['references'] },
+  { sourceType: 'STD', targetType: 'STD', roles: ['duplicates', 'relates_to', 'references'] },
+  { sourceType: 'TCO', targetType: 'SPEC', roles: ['verifies', 'references'] },
+  { sourceType: 'TCO', targetType: 'TC', roles: ['implements'] },
+  { sourceType: 'TCO', targetType: 'TCO', roles: ['derives_from', 'refines', 'relates_to'] },
+  { sourceType: 'TCO', targetType: 'STD', roles: ['references'] },
+  { sourceType: 'TC', targetType: 'REQ', roles: ['verifies'] },
+  { sourceType: 'TC', targetType: 'SPEC', roles: ['verifies'] },
+  { sourceType: 'TC', targetType: 'PROT', roles: ['implements', 'references'] },
+  { sourceType: 'TC', targetType: 'TC', roles: ['depends_on', 'duplicates', 'relates_to'] },
+  { sourceType: 'TC', targetType: 'STD', roles: ['references'] },
+  { sourceType: 'PROT', targetType: 'REQ', roles: ['verifies', 'references'] },
+  { sourceType: 'PROT', targetType: 'SPEC', roles: ['verifies', 'references'] },
+  { sourceType: 'PROT', targetType: 'TCO', roles: ['implements'] },
+  { sourceType: 'PROT', targetType: 'PROT', roles: ['derives_from', 'depends_on', 'duplicates', 'relates_to'] },
+  { sourceType: 'PROT', targetType: 'STD', roles: ['references'] },
+  { sourceType: 'RPT', targetType: 'REQ', roles: ['references'] },
+  { sourceType: 'RPT', targetType: 'SPEC', roles: ['references'] },
+  { sourceType: 'RPT', targetType: 'TCO', roles: ['references'] },
+  { sourceType: 'RPT', targetType: 'TC', roles: ['references'] },
+  { sourceType: 'RPT', targetType: 'PROT', roles: ['references'] },
+  { sourceType: 'RPT', targetType: 'DES', roles: ['references'] },
+  { sourceType: 'RPT', targetType: 'RSK', roles: ['references'] },
+  { sourceType: 'RPT', targetType: 'CHG', roles: ['references'] },
+  { sourceType: 'RPT', targetType: 'STD', roles: ['references'] },
+  { sourceType: 'RPT', targetType: 'RPT', roles: ['duplicates', 'relates_to', 'references'] },
+  { sourceType: 'DES', targetType: 'REQ', roles: ['satisfies', 'implements', 'references'] },
+  { sourceType: 'DES', targetType: 'SPEC', roles: ['implements', 'references'] },
+  { sourceType: 'DES', targetType: 'RSK', roles: ['mitigates'] },
+  { sourceType: 'DES', targetType: 'DES', roles: ['depends_on', 'derives_from', 'duplicates', 'relates_to'] },
+  { sourceType: 'DES', targetType: 'STD', roles: ['references'] },
+  { sourceType: 'RSK', targetType: 'REQ', roles: ['impacts', 'mitigates', 'references'] },
+  { sourceType: 'RSK', targetType: 'SPEC', roles: ['impacts', 'references'] },
+  { sourceType: 'RSK', targetType: 'DES', roles: ['impacts', 'references'] },
+  { sourceType: 'RSK', targetType: 'TC', roles: ['impacts', 'references'] },
+  { sourceType: 'RSK', targetType: 'TCO', roles: ['impacts', 'references'] },
+  { sourceType: 'RSK', targetType: 'PROT', roles: ['impacts', 'references'] },
+  { sourceType: 'RSK', targetType: 'CHG', roles: ['impacts', 'references'] },
+  { sourceType: 'RSK', targetType: 'RSK', roles: ['depends_on', 'duplicates', 'relates_to'] },
+  { sourceType: 'RSK', targetType: 'STD', roles: ['references'] },
+  { sourceType: 'CHG', targetType: 'REQ', roles: ['impacts', 'implements', 'blocks', 'references'] },
+  { sourceType: 'CHG', targetType: 'SPEC', roles: ['impacts', 'implements', 'blocks', 'references'] },
+  { sourceType: 'CHG', targetType: 'DES', roles: ['impacts', 'implements', 'blocks', 'references'] },
+  { sourceType: 'CHG', targetType: 'TC', roles: ['impacts', 'blocks', 'references'] },
+  { sourceType: 'CHG', targetType: 'TCO', roles: ['impacts', 'blocks', 'references'] },
+  { sourceType: 'CHG', targetType: 'PROT', roles: ['impacts', 'blocks', 'references'] },
+  { sourceType: 'CHG', targetType: 'RSK', roles: ['mitigates', 'impacts', 'references'] },
+  { sourceType: 'CHG', targetType: 'CHG', roles: ['depends_on', 'duplicates', 'blocks', 'relates_to'] },
+  { sourceType: 'CHG', targetType: 'STD', roles: ['references'] },
+]
+
+const DOC_LINK_ROLE_LABELS: Record<DocLinkRole, [string, string]> = {
+  derives_from: ['derives from', 'derived by'],
+  refines: ['refines', 'refined by'],
+  satisfies: ['satisfies', 'satisfied by'],
+  implements: ['implements', 'implemented by'],
+  verifies: ['verifies', 'verified by'],
+  mitigates: ['mitigates', 'mitigated by'],
+  depends_on: ['depends on', 'dependency of'],
+  impacts: ['impacts', 'impacted by'],
+  blocks: ['blocks', 'blocked by'],
+  duplicates: ['duplicates', 'duplicated by'],
+  references: ['references', 'referenced by'],
+  relates_to: ['relates to', 'related to'],
+}
+
 export function docUrl(prefix: string | undefined, docType: DocType, docId: string | number): string {
   const slug = DOC_TYPE_SLUGS[docType]
   return `/projects/${prefix}/docs/${slug}/${docId}`
@@ -266,4 +364,55 @@ export function normalizeDocTypeParam(value: string | null | undefined): DocType
     return value as DocType
   }
   return kindSlugToType(value)
+}
+
+export function getDocLinkRoleLabel(role: string, direction: 'incoming' | 'outgoing'): string {
+  const pair = DOC_LINK_ROLE_LABELS[role as DocLinkRole]
+  if (!pair) {
+    return role.split('_').join(' ')
+  }
+  return direction === 'outgoing' ? pair[0] : pair[1]
+}
+
+function getCanonicalDocLinkRoles(sourceType: DocType, targetType: DocType): DocLinkRole[] {
+  const matchedRow = DOC_LINK_RULE_ROWS.find((row) => (
+    row.sourceType === sourceType &&
+    row.targetType === targetType
+  ))
+  return matchedRow ? matchedRow.roles : []
+}
+
+export function getDocLinkOptions(sourceType: DocType, targetType: DocType): DocLinkOption[] {
+  if (!DOC_TYPE_CODES.includes(sourceType) || !DOC_TYPE_CODES.includes(targetType)) {
+    return []
+  }
+
+  const outgoingRoles = getCanonicalDocLinkRoles(sourceType, targetType)
+  const incomingRoles = sourceType === targetType ? [] : getCanonicalDocLinkRoles(targetType, sourceType)
+
+  const options: DocLinkOption[] = outgoingRoles.map((role) => ({
+    key: `${sourceType}:${role}:${targetType}:outgoing`,
+    label: getDocLinkRoleLabel(role, 'outgoing'),
+    role,
+    sourceType,
+    targetType,
+    displayDirection: 'outgoing',
+  }))
+
+  incomingRoles.forEach((role) => {
+    options.push({
+      key: `${targetType}:${role}:${sourceType}:incoming`,
+      label: getDocLinkRoleLabel(role, 'incoming'),
+      role,
+      sourceType: targetType,
+      targetType: sourceType,
+      displayDirection: 'incoming',
+    })
+  })
+
+  return options
+}
+
+export function getAllowedDocLinkRoles(sourceType: DocType, targetType: DocType): DocLinkRole[] {
+  return Array.from(new Set(getDocLinkOptions(sourceType, targetType).map((option) => option.role)))
 }

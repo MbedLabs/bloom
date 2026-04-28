@@ -63,8 +63,8 @@ export default function ProjectDetail() {
   const [tcForm, setTcForm] = useState({ title: '', description: '', preconditions: '' })
   const [tcRows, setTcRows] = useState<TcsRow[]>(() => createDefaultTcRows())
   const [conceptForm, setConceptForm] = useState({ name: '', description: '', status: 'Draft', coverage: '0' })
-  const [designForm, setDesignForm] = useState({ title: '', description: '', status: 'Draft', priority: 'Medium', design_type: 'Architecture', linked_requirement_id: '' })
-  const [riskForm, setRiskForm] = useState({ title: '', description: '', status: 'Open', severity: 'Medium', probability: 'Medium', mitigation: '', risk_category: 'Technical', linked_requirement_id: '' })
+  const [designForm, setDesignForm] = useState({ title: '', description: '', status: 'Draft', priority: 'Medium', design_type: 'Architecture' })
+  const [riskForm, setRiskForm] = useState({ title: '', description: '', status: 'Open', severity: 'Medium', probability: 'Medium', mitigation: '', risk_category: 'Technical' })
   const [changeForm, setChangeForm] = useState({ title: '', description: '', status: 'Submitted', priority: 'Medium', change_type: 'Enhancement', impact_assessment: '', justification: '' })
   const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
 
@@ -163,7 +163,7 @@ export default function ProjectDetail() {
       queryClient.invalidateQueries({ queryKey: ['designs', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       setShowCreateDesign(false)
-      setDesignForm({ title: '', description: '', status: 'Draft', priority: 'Medium', design_type: 'Architecture', linked_requirement_id: '' })
+      setDesignForm({ title: '', description: '', status: 'Draft', priority: 'Medium', design_type: 'Architecture' })
     },
   })
 
@@ -173,7 +173,7 @@ export default function ProjectDetail() {
       queryClient.invalidateQueries({ queryKey: ['risks', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       setShowCreateRisk(false)
-      setRiskForm({ title: '', description: '', status: 'Open', severity: 'Medium', probability: 'Medium', mitigation: '', risk_category: 'Technical', linked_requirement_id: '' })
+      setRiskForm({ title: '', description: '', status: 'Open', severity: 'Medium', probability: 'Medium', mitigation: '', risk_category: 'Technical' })
     },
   })
 
@@ -247,7 +247,6 @@ export default function ProjectDetail() {
       name: conceptForm.name,
       description: conceptForm.description || null,
       status: conceptForm.status,
-      linked_requirement_ids: [],
       coverage: Number(conceptForm.coverage) || 0,
     })
   }
@@ -261,7 +260,6 @@ export default function ProjectDetail() {
       status: designForm.status,
       priority: designForm.priority,
       design_type: designForm.design_type,
-      linked_requirement_id: designForm.linked_requirement_id ? Number(designForm.linked_requirement_id) : null,
     })
   }
 
@@ -276,7 +274,6 @@ export default function ProjectDetail() {
       probability: riskForm.probability,
       mitigation: riskForm.mitigation || null,
       risk_category: riskForm.risk_category,
-      linked_requirement_id: riskForm.linked_requirement_id ? Number(riskForm.linked_requirement_id) : null,
     })
   }
 
@@ -486,7 +483,6 @@ export default function ProjectDetail() {
                   <Th>Type</Th>
                   <Th>Status</Th>
                   <Th>Priority</Th>
-                  <Th>REQ</Th>
                 </tr>
               </thead>
               <tbody className="bg-card divide-y divide-border">
@@ -497,7 +493,6 @@ export default function ProjectDetail() {
                     <Td>{item.design_type}</Td>
                     <Td><NeutralBadge value={item.status} /></Td>
                     <Td><PriorityBadge priority={item.priority} /></Td>
-                    <Td>{item.linked_requirement_id ? `#${item.linked_requirement_id}` : '-'}</Td>
                   </tr>
                 ))}
               </tbody>
@@ -606,8 +601,8 @@ export default function ProjectDetail() {
               <table className="min-w-full divide-y divide-border">
                 <thead className="bg-muted/50">
                   <tr>
+                    <Th>ID</Th>
                     <Th>Name</Th>
-                    <Th>Linked Requirements</Th>
                     <Th>Coverage</Th>
                     <Th>Status</Th>
                   </tr>
@@ -616,12 +611,14 @@ export default function ProjectDetail() {
                   {testConcepts.map((concept: TestConceptRecord) => (
                     <tr key={concept.id} className="hover:bg-accent/50">
                       <Td>
+                        <Link to={docUrl(prefix, 'TCO', concept.concept_id)} className="text-primary font-mono text-sm font-medium">{concept.concept_id}</Link>
+                      </Td>
+                      <Td>
                         <div>
                           <Link to={docUrl(prefix, 'TCO', concept.concept_id)} className="font-medium text-foreground hover:text-primary/80">{concept.name}</Link>
                           {concept.description && <div className="text-sm text-muted-foreground mt-1">{concept.description}</div>}
                         </div>
                       </Td>
-                      <Td>{concept.linked_requirement_ids.length}</Td>
                       <Td><CoverageBar coverage={concept.coverage} /></Td>
                       <Td><NeutralBadge value={concept.status} /></Td>
                     </tr>
@@ -734,7 +731,6 @@ export default function ProjectDetail() {
               <SelectInput label="Status" value={designForm.status} onChange={(value) => setDesignForm({ ...designForm, status: value })} options={['Draft', 'Review', 'Approved']} />
               <SelectInput label="Priority" value={designForm.priority} onChange={(value) => setDesignForm({ ...designForm, priority: value })} options={['Low', 'Medium', 'High', 'Critical']} />
               <SelectInput label="Design Type" value={designForm.design_type} onChange={(value) => setDesignForm({ ...designForm, design_type: value })} options={['Architecture', 'Interface', 'Component', 'Data']} />
-              <TextInput label="Linked Requirement ID" value={designForm.linked_requirement_id} onChange={(value) => setDesignForm({ ...designForm, linked_requirement_id: value })} />
             </div>
             <ModalActions onClose={() => setShowCreateDesign(false)} submitting={createDesignMutation.isPending} />
           </form>
@@ -753,7 +749,6 @@ export default function ProjectDetail() {
               <SelectInput label="Probability" value={riskForm.probability} onChange={(value) => setRiskForm({ ...riskForm, probability: value })} options={['Low', 'Medium', 'High']} />
               <SelectInput label="Category" value={riskForm.risk_category} onChange={(value) => setRiskForm({ ...riskForm, risk_category: value })} options={['Technical', 'Business', 'Compliance', 'Schedule', 'Security']} />
             </div>
-            <TextInput label="Linked Requirement ID" value={riskForm.linked_requirement_id} onChange={(value) => setRiskForm({ ...riskForm, linked_requirement_id: value })} />
             <ModalActions onClose={() => setShowCreateRisk(false)} submitting={createRiskMutation.isPending} />
           </form>
         </Modal>
