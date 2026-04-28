@@ -4,13 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.link_read_utils import get_requirement_ids_verified_by_test_cases
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import (
     Project,
     Requirement,
-    RequirementTestCase,
     TestCampaign,
     TestCase,
     TestSuite,
@@ -89,17 +89,7 @@ async def _build_suite_detail(suite: TestSuite, db: AsyncSession) -> TestSuiteDe
                     test_case=_test_case_summary(tc),
                 )
             )
-            links = (
-                (
-                    await db.execute(
-                        select(RequirementTestCase).where(RequirementTestCase.test_case_id == tc.id)
-                    )
-                )
-                .scalars()
-                .all()
-            )
-            for link in links:
-                requirement_ids.add(link.requirement_id)
+            requirement_ids.update(await get_requirement_ids_verified_by_test_cases([tc.id], db))
 
     requirements = []
     if requirement_ids:

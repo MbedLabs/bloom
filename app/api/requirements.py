@@ -12,7 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_role
+from app.api.link_read_utils import get_verifying_test_case_links_for_requirement
 from app.models import (
+    ArtefactLink,
     Project,
     Requirement,
     RequirementTestCase,
@@ -58,33 +60,16 @@ def _build_test_case_summary(tc: TestCase) -> TestCaseSummary:
 async def _get_verified_by(
     req_id: int, db: AsyncSession
 ) -> list[RequirementVerifiedByLinkResponse]:
-    tc_links = (
-        (
-            await db.execute(
-                select(RequirementTestCase)
-                .where(RequirementTestCase.requirement_id == req_id)
-                .order_by(RequirementTestCase.created_at.desc())
-            )
+    link_rows = await get_verifying_test_case_links_for_requirement(req_id, db)
+    return [
+        RequirementVerifiedByLinkResponse(
+            id=link.id,
+            link_type=link.role,
+            created_at=link.created_at,
+            test_case=_build_test_case_summary(tc),
         )
-        .scalars()
-        .all()
-    )
-
-    linked = []
-    for link in tc_links:
-        tc = (
-            await db.execute(select(TestCase).where(TestCase.id == link.test_case_id))
-        ).scalar_one_or_none()
-        if tc:
-            linked.append(
-                RequirementVerifiedByLinkResponse(
-                    id=link.id,
-                    link_type=link.link_type,
-                    created_at=link.created_at,
-                    test_case=_build_test_case_summary(tc),
-                )
-            )
-    return linked
+        for link, tc in link_rows
+    ]
 
 
 async def _build_requirement_response(req: Requirement, db: AsyncSession) -> RequirementResponse:
@@ -448,8 +433,18 @@ async def link_test_case(
         test_case_id=data.test_case_id,
         link_type=data.link_type,
     )
+    artefact_link = ArtefactLink(
+        project_id=requirement.project_id,
+        source_type="TC",
+        source_id=data.test_case_id,
+        target_type="REQ",
+        target_id=requirement_id,
+        role=data.link_type,
+        suspect=False,
+    )
 
     db.add(link)
+    db.add(artefact_link)
     await db.flush()
     await db.refresh(link)
 
@@ -478,6 +473,22 @@ async def unlink_test_case(
         raise HTTPException(status_code=404, detail="Link not found")
 
     await db.delete(link)
+    generic_links = (
+        (
+            await db.execute(
+                select(ArtefactLink).where(
+                    ArtefactLink.source_type == "TC",
+                    ArtefactLink.source_id == test_case_id,
+                    ArtefactLink.target_type == "REQ",
+                    ArtefactLink.target_id == requirement_id,
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for generic_link in generic_links:
+        await db.delete(generic_link)
 
 
 @router.post(
