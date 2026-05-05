@@ -129,9 +129,6 @@ class Requirement(Base):
         remote_side=[id], back_populates="children"
     )
     children: Mapped[List["Requirement"]] = relationship(back_populates="parent")
-    test_case_links: Mapped[List["RequirementTestCase"]] = relationship(
-        back_populates="requirement"
-    )
     test_run_links: Mapped[List["TestRunLink"]] = relationship(back_populates="requirement")
     outgoing_links: Mapped[List["RequirementLink"]] = relationship(
         foreign_keys="RequirementLink.source_id", back_populates="source"
@@ -176,27 +173,8 @@ class TestCase(Base):
     project: Mapped["Project"] = relationship(
         back_populates="test_cases", foreign_keys=[project_id]
     )
-    requirement_links: Mapped[List["RequirementTestCase"]] = relationship(
-        back_populates="test_case"
-    )
     suite_items: Mapped[List["TestSuiteItem"]] = relationship(back_populates="test_case")
     campaign_items: Mapped[List["TestCampaignItem"]] = relationship(back_populates="test_case")
-
-
-class RequirementTestCase(Base):
-    """Junction table linking requirements to test cases with link semantics."""
-
-    __tablename__ = "requirement_test_cases"
-    __table_args__ = (UniqueConstraint("requirement_id", "test_case_id", name="uq_req_tc"),)
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    requirement_id: Mapped[int] = mapped_column(ForeignKey("requirements.id"), nullable=False)
-    test_case_id: Mapped[int] = mapped_column(ForeignKey("test_cases.id"), nullable=False)
-    link_type: Mapped[str] = mapped_column(String(30), default="verifies")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
-    requirement: Mapped["Requirement"] = relationship(back_populates="test_case_links")
-    test_case: Mapped["TestCase"] = relationship(back_populates="requirement_links")
 
 
 class RequirementLink(Base):

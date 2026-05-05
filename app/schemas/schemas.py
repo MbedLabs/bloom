@@ -274,34 +274,6 @@ class TestCaseResponse(BaseModel):
         from_attributes = True
 
 
-# ==================== RequirementTestCase Schemas ====================
-
-
-class RequirementTestCaseCreate(BaseModel):
-    test_case_id: int
-    link_type: str = "verifies"
-
-
-class TestCaseRequirementLinkCreate(BaseModel):
-    requirement_id: int
-    link_type: str = "verifies"
-
-
-class RequirementTestCaseResponse(BaseModel):
-    id: int
-    requirement_id: int
-    test_case_id: int
-    link_type: str
-    created_at: datetime
-
-    @field_serializer("created_at")
-    def serialize_dt(self, dt: datetime, _info):
-        return f"{dt.isoformat()}Z"
-
-    class Config:
-        from_attributes = True
-
-
 class RequirementLinkCreate(BaseModel):
     target_id: int
     link_type: str = "depends_on"

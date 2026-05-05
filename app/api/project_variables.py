@@ -87,6 +87,22 @@ async def update_project_variable(
     if not item:
         raise HTTPException(status_code=404, detail="Variable not found")
 
+    updated_kind = data.kind if data.kind is not None else item.kind
+    updated_key = data.key if data.key is not None else item.key
+
+    existing = (
+        await db.execute(
+            select(ProjectVariable).where(
+                ProjectVariable.project_id == item.project_id,
+                ProjectVariable.kind == updated_kind,
+                ProjectVariable.key == updated_key,
+                ProjectVariable.id != item_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=400, detail="Variable key already exists in this project")
+
     fields_set = data.model_fields_set
     if "kind" in fields_set and data.kind is not None:
         item.kind = data.kind
