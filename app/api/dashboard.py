@@ -10,7 +10,6 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models import (
     ArtefactLink,
-    Document,
     Project,
     Requirement,
     TestCampaign,
@@ -33,7 +32,6 @@ async def get_dashboard_stats(
     )
     total_requirements = await db.scalar(select(func.count(Requirement.id)))
     total_test_cases = await db.scalar(select(func.count(TestCase.id)))
-    total_documents = await db.scalar(select(func.count(Document.id)))
 
     req_status_result = await db.execute(
         select(Requirement.status, func.count(Requirement.id)).group_by(Requirement.status)
@@ -113,7 +111,6 @@ async def get_dashboard_stats(
         "active_projects": active_projects or 0,
         "total_requirements": total_requirements or 0,
         "total_test_cases": total_test_cases or 0,
-        "total_documents": total_documents or 0,
         "total_campaigns": total_campaigns or 0,
         "active_campaigns": active_campaigns or 0,
         "coverage_percent": coverage_pct,

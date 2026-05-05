@@ -5,7 +5,7 @@ Test cases API endpoints.
 from datetime import timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.link_read_utils import get_verified_requirement_links_for_test_case
@@ -13,10 +13,8 @@ from app.core.database import get_db
 from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import (
-    ArtefactLink,
     Project,
     Requirement,
-    RequirementTestCase,
     TestCampaign,
     TestCampaignItem,
     TestCase,
@@ -28,10 +26,8 @@ from app.models.user import User as UserModel
 from app.models.user import UserRole
 from app.schemas import (
     RequirementSummary,
-    RequirementTestCaseResponse,
     TestCampaignSummary,
     TestCaseCreate,
-    TestCaseRequirementLinkCreate,
     TestCaseResponse,
     TestCaseUpdate,
     TestCaseVerifiesLinkResponse,
@@ -318,95 +314,3 @@ async def delete_test_case(
         raise HTTPException(status_code=404, detail="Test case not found")
 
     await db.delete(test_case)
-
-
-@router.post(
-    "/{test_case_id}/link-requirement",
-    response_model=RequirementTestCaseResponse,
-    status_code=201,
-)
-async def link_requirement(
-    test_case_id: int,
-    data: TestCaseRequirementLinkCreate,
-    db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
-):
-    test_case = (
-        await db.execute(select(TestCase).where(TestCase.id == test_case_id))
-    ).scalar_one_or_none()
-    if not test_case:
-        raise HTTPException(status_code=404, detail="Test case not found")
-    requirement = (
-        await db.execute(select(Requirement).where(Requirement.id == data.requirement_id))
-    ).scalar_one_or_none()
-    if not requirement:
-        raise HTTPException(status_code=404, detail="Requirement not found")
-    if requirement.project_id != test_case.project_id:
-        raise HTTPException(status_code=400, detail="Requirement must belong to same project")
-
-    existing = (
-        await db.execute(
-            select(RequirementTestCase).where(
-                RequirementTestCase.requirement_id == data.requirement_id,
-                RequirementTestCase.test_case_id == test_case_id,
-            )
-        )
-    ).scalar_one_or_none()
-    if existing:
-        raise HTTPException(status_code=400, detail="Requirement already linked to this test case")
-
-    link = RequirementTestCase(
-        requirement_id=data.requirement_id,
-        test_case_id=test_case_id,
-        link_type=data.link_type,
-    )
-    artefact_link = ArtefactLink(
-        project_id=test_case.project_id,
-        source_type="TC",
-        source_id=test_case_id,
-        target_type="REQ",
-        target_id=data.requirement_id,
-        role=data.link_type,
-        suspect=False,
-    )
-    db.add(link)
-    db.add(artefact_link)
-    await db.flush()
-    await db.refresh(link)
-    return RequirementTestCaseResponse.model_validate(link)
-
-
-@router.delete("/{test_case_id}/link-requirement/{requirement_id}", status_code=204)
-async def unlink_requirement(
-    test_case_id: int,
-    requirement_id: int,
-    db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
-):
-    link = (
-        await db.execute(
-            select(RequirementTestCase).where(
-                RequirementTestCase.test_case_id == test_case_id,
-                RequirementTestCase.requirement_id == requirement_id,
-            )
-        )
-    ).scalar_one_or_none()
-    if not link:
-        raise HTTPException(status_code=404, detail="Link not found")
-    await db.delete(link)
-    generic_links = (
-        (
-            await db.execute(
-                select(ArtefactLink).where(
-                    ArtefactLink.source_type == "TC",
-                    ArtefactLink.source_id == test_case_id,
-                    ArtefactLink.target_type == "REQ",
-                    ArtefactLink.target_id == requirement_id,
-                )
-            )
-        )
-        .scalars()
-        .all()
-    )
-    for generic_link in generic_links:
-        await db.delete(generic_link)
