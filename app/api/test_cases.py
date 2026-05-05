@@ -5,14 +5,20 @@ Test cases API endpoints.
 from datetime import timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.link_read_utils import get_verified_requirement_links_for_test_case
+from app.api.link_read_utils import (
+    VERIFY_LINK_ROLE,
+    VERIFY_SOURCE_TYPE,
+    VERIFY_TARGET_TYPE,
+    get_verified_requirement_links_for_test_case,
+)
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import (
+    ArtefactLink,
     Project,
     Requirement,
     TestCampaign,
@@ -141,6 +147,32 @@ async def _build_test_case_response(tc: TestCase, db: AsyncSession) -> TestCaseR
     )
 
 
+def _build_test_case_list_response(tc: TestCase, requirement_count: int = 0) -> TestCaseResponse:
+    return TestCaseResponse(
+        id=tc.id,
+        project_id=tc.project_id,
+        tc_id=tc.tc_id,
+        title=tc.title,
+        description=tc.description,
+        preconditions=tc.preconditions,
+        steps=tc.steps,
+        status=tc.status,
+        reviewer_id=tc.reviewer_id,
+        approver_id=tc.approver_id,
+        reviewed_by_id=tc.reviewed_by_id,
+        approved_by_id=tc.approved_by_id,
+        reviewed_at=tc.reviewed_at,
+        approved_at=tc.approved_at,
+        created_at=tc.created_at,
+        updated_at=tc.updated_at,
+        requirement_count=requirement_count,
+        linked_requirements=[],
+        verifies=[],
+        suite_memberships=[],
+        campaign_memberships=[],
+    )
+
+
 @router.get("", response_model=list[TestCaseResponse])
 async def list_test_cases(
     project_id: int = Query(..., description="Filter by project ID"),
@@ -156,13 +188,27 @@ async def list_test_cases(
         .order_by(TestCase.created_at.desc())
     )
     test_cases = result.scalars().all()
+    test_case_ids = [tc.id for tc in test_cases]
 
-    response = []
-    for tc in test_cases:
-        resp = await _build_test_case_response(tc, db)
-        response.append(resp)
+    requirement_counts = {tc_id: 0 for tc_id in test_case_ids}
+    if test_case_ids:
+        count_rows = (
+            await db.execute(
+                select(ArtefactLink.source_id, func.count(ArtefactLink.id))
+                .where(
+                    ArtefactLink.source_type == VERIFY_SOURCE_TYPE,
+                    ArtefactLink.target_type == VERIFY_TARGET_TYPE,
+                    ArtefactLink.source_id.in_(test_case_ids),
+                    ArtefactLink.role == VERIFY_LINK_ROLE,
+                )
+                .group_by(ArtefactLink.source_id)
+            )
+        ).all()
+        requirement_counts.update({tc_id: count for tc_id, count in count_rows})
 
-    return response
+    return [
+        _build_test_case_list_response(tc, requirement_counts.get(tc.id, 0)) for tc in test_cases
+    ]
 
 
 @router.post("", response_model=TestCaseResponse, status_code=201)
