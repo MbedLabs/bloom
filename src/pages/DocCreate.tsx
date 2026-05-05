@@ -7,7 +7,7 @@ import { TcsArteTable } from '../components/TcsArteTable'
 import { createDefaultTcRows, normalizeTcsRows, type TcsRow } from '../utils/tcs'
 import {
   docsApi, projectsApi, requirementsApi, testCasesApi, designsApi,
-  risksApi, changesApi, testConceptsApi, documentsApi, usersApi,
+  risksApi, changesApi, testConceptsApi, documentsApi, usersApi, projectVariablesApi,
 } from '../api/client'
 import type { DocType } from '../types/doc'
 import {
@@ -64,6 +64,12 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const { data: users } = useQuery({
     queryKey: ['users'],
     queryFn: usersApi.list,
+  })
+
+  const { data: projectVariables } = useQuery({
+    queryKey: ['projectVariables', projectId],
+    queryFn: () => projectVariablesApi.list(projectId),
+    enabled: !!projectId,
   })
 
   const apiForType = useCallback((type: DocType) => {
@@ -334,6 +340,9 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                   onHeadingNumberedChange={setHeadingNumbered}
                   showOutline={outlineOpen}
                   onOutlineToggle={setOutlineOpen}
+                  mentionItems={(projectVariables ?? [])
+                    .filter((variable) => variable.kind === 'parameter')
+                    .map((variable) => ({ id: variable.id, label: variable.key }))}
                 />
               )}
             </div>
@@ -351,6 +360,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                 <select
                   value={metadata.status || config.statusOptions[0]}
                   onChange={(e) => setMetadata({ ...metadata, status: e.target.value })}
+                  title="Select status"
                   className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
                 >
                   {config.statusOptions.map((opt) => (
@@ -365,6 +375,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                   <select
                     value={metadata.priority || config.priorityOptions[0]}
                     onChange={(e) => setMetadata({ ...metadata, priority: e.target.value })}
+                    title="Select priority"
                     className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
                   >
                     {config.priorityOptions.map((opt) => (
@@ -379,6 +390,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                 <select
                   value={metadata.reviewer_id || ''}
                   onChange={(e) => setMetadata({ ...metadata, reviewer_id: e.target.value })}
+                  title="Select reviewer"
                   className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
                 >
                   <option value="">Unassigned</option>
@@ -402,6 +414,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                         <select
                           value={metadata[field.key] || field.options[0]}
                           onChange={(e) => setMetadata({ ...metadata, [field.key]: e.target.value })}
+                          title={field.label}
                           className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
                         >
                           {field.options.map((opt) => (
@@ -413,6 +426,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                           type="number"
                           value={metadata[field.key] || ''}
                           onChange={(e) => setMetadata({ ...metadata, [field.key]: e.target.value })}
+                          title={field.label}
+                          placeholder={field.label}
                           className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
                         />
                       ) : (
@@ -420,6 +435,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                           type="text"
                           value={metadata[field.key] || ''}
                           onChange={(e) => setMetadata({ ...metadata, [field.key]: e.target.value })}
+                          title={field.label}
+                          placeholder={field.label}
                           className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
                         />
                       )}
@@ -431,6 +448,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                       <textarea
                         value={metadata[field.key] || ''}
                         onChange={(e) => setMetadata({ ...metadata, [field.key]: e.target.value })}
+                        title={field.label}
+                        placeholder={field.label}
                         rows={3}
                         className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm resize-none"
                       />

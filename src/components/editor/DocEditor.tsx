@@ -1,6 +1,9 @@
 import './editor-styles.css'
+import { useRef, useCallback, useEffect } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import { BubbleMenu } from '@tiptap/react/menus'
+import { ReactRenderer } from '@tiptap/react'
+import Mention from '@tiptap/extension-mention'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import LinkExtension from '@tiptap/extension-link'
@@ -17,11 +20,13 @@ import Typography from '@tiptap/extension-typography'
 import Superscript from '@tiptap/extension-superscript'
 import Subscript from '@tiptap/extension-subscript'
 import { common, createLowlight } from 'lowlight'
-import { useCallback, useEffect } from 'react'
 import DocEditorToolbar from './DocEditorToolbar'
 import OutlineSidebar from './OutlineSidebar'
+import MentionList, { type MentionListRef, type MentionSuggestion } from './MentionList'
 
 const lowlight = createLowlight(common)
+const PARAMETER_MENTION_TRIGGER = '{{'
+const PARAMETER_MENTION_SUFFIX = '}}'
 
 interface DocEditorProps {
   content?: Record<string, unknown> | null
@@ -34,6 +39,7 @@ interface DocEditorProps {
   onHeadingNumberedChange?: (numbered: boolean) => void
   showOutline?: boolean
   onOutlineToggle?: (open: boolean) => void
+  mentionItems?: MentionSuggestion[]
 }
 
 export default function DocEditor({
@@ -47,12 +53,102 @@ export default function DocEditor({
   onHeadingNumberedChange,
   showOutline = false,
   onOutlineToggle,
+  mentionItems = [],
 }: DocEditorProps) {
+  const mentionItemsRef = useRef(mentionItems)
+
+  useEffect(() => {
+    mentionItemsRef.current = mentionItems
+  }, [mentionItems])
+
+  const renderParameterMentionList = useCallback(() => {
+    let component: ReactRenderer<MentionListRef> | null = null
+    let popup: HTMLDivElement | null = null
+
+    const destroy = () => {
+      component?.destroy()
+      component = null
+      popup?.remove()
+      popup = null
+    }
+
+    const position = (clientRect: (() => DOMRect | null) | null | undefined) => {
+      if (!popup || !clientRect) return
+      const rect = clientRect()
+      if (!rect) return
+      popup.style.left = `${rect.left}px`
+      popup.style.top = `${rect.bottom + 8}px`
+    }
+
+    return {
+      onStart: (props: { editor: typeof editor; items: MentionSuggestion[]; command: (item: MentionSuggestion) => void; clientRect?: (() => DOMRect | null) | null }) => {
+        component = new ReactRenderer(MentionList, {
+          editor: props.editor,
+          props: {
+            items: props.items,
+            command: props.command,
+            triggerPrefix: PARAMETER_MENTION_TRIGGER,
+            triggerSuffix: PARAMETER_MENTION_SUFFIX,
+          },
+          as: 'div',
+          className: 'mention-suggestion-popover',
+        })
+
+        popup = document.createElement('div')
+        popup.style.position = 'fixed'
+        popup.style.zIndex = '50'
+        popup.appendChild(component.element)
+        document.body.appendChild(popup)
+        position(props.clientRect)
+      },
+      onUpdate: (props: { items: MentionSuggestion[]; command: (item: MentionSuggestion) => void; clientRect?: (() => DOMRect | null) | null }) => {
+        component?.updateProps({
+          items: props.items,
+          command: props.command,
+          triggerPrefix: PARAMETER_MENTION_TRIGGER,
+          triggerSuffix: PARAMETER_MENTION_SUFFIX,
+        })
+        position(props.clientRect)
+      },
+      onKeyDown: (props: { event: KeyboardEvent }) => component?.ref?.onKeyDown(props) ?? false,
+      onExit: destroy,
+    }
+  }, [])
+
+  const parameterMentionItems = mentionItemsRef.current
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
         codeBlock: false,
         heading: { levels: [1, 2, 3, 4, 5, 6] },
+      }),
+      Mention.configure({
+        HTMLAttributes: { class: 'mention' },
+        renderText: ({ node }) => `{{${String(node.attrs.label ?? node.attrs.id)}}}`,
+        renderHTML: ({ node }) => ['span', { 'data-type': 'mention', class: 'mention' }, `{{${String(node.attrs.label ?? node.attrs.id)}}}`],
+        suggestions: [
+          {
+            char: PARAMETER_MENTION_TRIGGER,
+            allowedPrefixes: null,
+            items: ({ query }) => parameterMentionItems.filter((item) => {
+              const normalizedQuery = query.trim().toLowerCase()
+              if (!normalizedQuery) return true
+              return item.label.toLowerCase().includes(normalizedQuery)
+            }),
+            command: ({ editor: mentionEditor, range, props }) => {
+              mentionEditor.chain().focus().insertContentAt(range, {
+                type: 'mention',
+                attrs: {
+                  id: String(props.id),
+                  label: props.label,
+                  mentionSuggestionChar: PARAMETER_MENTION_TRIGGER,
+                },
+              }).run()
+            },
+            render: renderParameterMentionList,
+          },
+        ],
       }),
       Placeholder.configure({ placeholder }),
       LinkExtension.configure({
