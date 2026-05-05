@@ -159,6 +159,7 @@ async def list_all_docs(
     type: Optional[List[str]] = Query(None),
     status: Optional[str] = None,
     q: Optional[str] = None,
+    include_link_counts: bool = Query(True),
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
@@ -189,7 +190,9 @@ async def list_all_docs(
 
         rows = (await db.execute(query.order_by(model.created_at.desc()))).scalars().all()
         row_ids = [row.id for row in rows]
-        link_counts = await _count_links(db, project.id, type_code, row_ids)
+        link_counts = (
+            await _count_links(db, project.id, type_code, row_ids) if include_link_counts else {}
+        )
 
         for row in rows:
             doc_id_val = getattr(row, id_col_name)
@@ -239,10 +242,14 @@ async def list_all_docs(
         grouped_row_ids: dict[str, list[int]] = {}
         for row in document_rows:
             grouped_row_ids.setdefault(normalize_document_kind(row.doc_type), []).append(row.id)
-        link_counts_by_type = {
-            doc_type: await _count_links(db, project.id, doc_type, row_ids)
-            for doc_type, row_ids in grouped_row_ids.items()
-        }
+        link_counts_by_type = (
+            {
+                doc_type: await _count_links(db, project.id, doc_type, row_ids)
+                for doc_type, row_ids in grouped_row_ids.items()
+            }
+            if include_link_counts
+            else {}
+        )
 
         for row in document_rows:
             doc_type = normalize_document_kind(row.doc_type)

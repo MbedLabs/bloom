@@ -6,14 +6,20 @@ from datetime import timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.link_read_utils import get_verifying_test_case_links_for_requirement
+from app.api.link_read_utils import (
+    VERIFY_LINK_ROLE,
+    VERIFY_SOURCE_TYPE,
+    VERIFY_TARGET_TYPE,
+    get_verifying_test_case_links_for_requirement,
+)
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import (
+    ArtefactLink,
     Project,
     Requirement,
     TestCampaign,
@@ -170,6 +176,38 @@ async def _build_requirement_response(req: Requirement, db: AsyncSession) -> Req
     )
 
 
+def _build_requirement_list_response(
+    req: Requirement, test_case_count: int = 0
+) -> RequirementResponse:
+    return RequirementResponse(
+        id=req.id,
+        project_id=req.project_id,
+        parent_id=req.parent_id,
+        req_id=req.req_id,
+        title=req.title,
+        description=req.description,
+        status=req.status,
+        priority=req.priority,
+        req_type=req.req_type,
+        req_origin=req.req_origin,
+        reviewer_id=req.reviewer_id,
+        approver_id=req.approver_id,
+        reviewed_by_id=req.reviewed_by_id,
+        approved_by_id=req.approved_by_id,
+        reviewed_at=req.reviewed_at,
+        approved_at=req.approved_at,
+        created_at=req.created_at,
+        updated_at=req.updated_at,
+        children=[],
+        test_case_count=test_case_count,
+        linked_test_cases=[],
+        verified_by=[],
+        linked_test_runs=[],
+        suite_backlinks=[],
+        campaign_backlinks=[],
+    )
+
+
 @router.get("", response_model=list[RequirementResponse])
 async def list_requirements(
     project_id: int = Query(..., description="Filter by project ID"),
@@ -188,13 +226,28 @@ async def list_requirements(
     query = query.order_by(Requirement.created_at.desc())
     result = await db.execute(query)
     requirements = result.scalars().all()
+    requirement_ids = [req.id for req in requirements]
 
-    response = []
-    for req in requirements:
-        resp = await _build_requirement_response(req, db)
-        response.append(resp)
+    test_case_counts = {req_id: 0 for req_id in requirement_ids}
+    if requirement_ids:
+        count_rows = (
+            await db.execute(
+                select(ArtefactLink.target_id, func.count(ArtefactLink.id))
+                .where(
+                    ArtefactLink.source_type == VERIFY_SOURCE_TYPE,
+                    ArtefactLink.target_type == VERIFY_TARGET_TYPE,
+                    ArtefactLink.target_id.in_(requirement_ids),
+                    ArtefactLink.role == VERIFY_LINK_ROLE,
+                )
+                .group_by(ArtefactLink.target_id)
+            )
+        ).all()
+        test_case_counts.update({req_id: count for req_id, count in count_rows})
 
-    return response
+    return [
+        _build_requirement_list_response(req, test_case_counts.get(req.id, 0))
+        for req in requirements
+    ]
 
 
 @router.post("", response_model=RequirementResponse, status_code=201)
