@@ -11,7 +11,7 @@ export default function Reports() {
 
   const s = stats || {
     total_projects: 0, active_projects: 0, total_requirements: 0,
-    total_test_cases: 0, total_documents: 0, total_campaigns: 0,
+    total_test_cases: 0, total_campaigns: 0,
     active_campaigns: 0, coverage_percent: 0, uncovered_requirements: 0,
     requirement_status_distribution: {}, test_case_status_distribution: {},
     campaign_result_distribution: {}, projects: [],

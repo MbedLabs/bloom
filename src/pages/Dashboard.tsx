@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { dashboardApi } from '../api/client'
-import { FolderKanban, FileText, CheckCircle, TrendingUp, Flower2, ArrowRight, FlaskConical, BookOpen } from 'lucide-react'
+import { FolderKanban, FileText, CheckCircle, TrendingUp, Flower2, ArrowRight, FlaskConical } from 'lucide-react'
 
 export default function Dashboard() {
   const { data: stats, isLoading } = useQuery({
@@ -15,7 +15,7 @@ export default function Dashboard() {
 
   const s = stats || {
     total_projects: 0, active_projects: 0, total_requirements: 0,
-    total_test_cases: 0, total_documents: 0, total_campaigns: 0,
+    total_test_cases: 0, total_campaigns: 0,
     active_campaigns: 0, coverage_percent: 0, uncovered_requirements: 0,
     requirement_status_distribution: {}, test_case_status_distribution: {},
     campaign_result_distribution: {}, projects: [],
@@ -45,13 +45,12 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         <StatCard title="Projects" value={s.total_projects} subtitle={`${s.active_projects} active`} icon={FolderKanban} gradient="from-primary to-teal-700" />
         <StatCard title="Requirements" value={s.total_requirements} subtitle="Total" icon={FileText} gradient="from-emerald-500 to-emerald-700" />
         <StatCard title="Test Cases" value={s.total_test_cases} subtitle="Defined" icon={CheckCircle} gradient="from-cyan-500 to-teal-700" />
-        <StatCard title="Documents" value={s.total_documents} subtitle="Created" icon={BookOpen} gradient="from-indigo-500 to-indigo-700" />
         <StatCard title="Campaigns" value={s.total_campaigns} subtitle={`${s.active_campaigns} active`} icon={FlaskConical} gradient="from-purple-500 to-purple-700" />
-        <div className="bg-card rounded-lg border border-border shadow-elegant hover:shadow-glow transition-shadow duration-300 p-5 col-span-2 md:col-span-2 lg:col-span-2">
+        <div className="bg-card rounded-lg border border-border shadow-elegant hover:shadow-glow transition-shadow duration-300 p-5">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Coverage</p>

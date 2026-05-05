@@ -161,7 +161,6 @@ export interface DashboardStats {
   active_projects: number
   total_requirements: number
   total_test_cases: number
-  total_documents: number
   total_campaigns: number
   active_campaigns: number
   coverage_percent: number

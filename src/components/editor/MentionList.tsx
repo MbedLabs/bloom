@@ -12,9 +12,11 @@ export interface MentionListRef {
 interface MentionListProps {
   items: MentionSuggestion[]
   command: (item: MentionSuggestion) => void
+  triggerPrefix?: string
+  triggerSuffix?: string
 }
 
-const MentionList = forwardRef<MentionListRef, MentionListProps>(({ items, command }, ref) => {
+const MentionList = forwardRef<MentionListRef, MentionListProps>(({ items, command, triggerPrefix = '@', triggerSuffix = '' }, ref) => {
   const [selectedIndex, setSelectedIndex] = useState(0)
 
   useEffect(() => setSelectedIndex(0), [items])
@@ -57,7 +59,7 @@ const MentionList = forwardRef<MentionListRef, MentionListProps>(({ items, comma
               : 'text-foreground hover:bg-accent'
           }`}
         >
-          <span className="font-medium">@{item.label}</span>
+          <span className="font-medium">{triggerPrefix}{item.label}{triggerSuffix}</span>
         </button>
       ))}
     </div>
