@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Check, ChevronRight, Download, AlertCircle } from 'lucide-react'
-import { projectsApi, requirementsApi, testCasesApi, importApi } from '../api/client'
+import { docsApi, projectsApi, importApi } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import type { ImportResult } from '../api/client'
 
@@ -27,22 +27,22 @@ export default function ImportWizard() {
     queryFn: projectsApi.list,
   })
 
+  const availableProjects = projects?.filter((p) => p.id !== projectId) || []
+  const sourceProject = projects?.find((p) => p.id === sourceProjectId)
+
   const { data: targetProject } = useQuery({
     queryKey: ['project', projectId],
     queryFn: () => projectsApi.get(projectId),
     enabled: !!projectId,
   })
 
-  const { data: sourceReqs } = useQuery({
-    queryKey: ['requirements', sourceProjectId],
-    queryFn: () => requirementsApi.list(sourceProjectId!),
-    enabled: !!sourceProjectId && docType === 'REQ' && step >= 3,
-  })
-
-  const { data: sourceTcs } = useQuery({
-    queryKey: ['testCases', sourceProjectId],
-    queryFn: () => testCasesApi.list(sourceProjectId!),
-    enabled: !!sourceProjectId && docType === 'TC' && step >= 3,
+  const { data: sourceDocs, isLoading: sourceDocsLoading } = useQuery({
+    queryKey: ['import-docs', sourceProject?.prefix, docType],
+    queryFn: () => docsApi.list(sourceProject!.prefix, {
+      type: [docType],
+      includeLinkCounts: false,
+    }),
+    enabled: !!sourceProject?.prefix && step >= 3,
   })
 
   const importMutation = useMutation({
@@ -58,13 +58,10 @@ export default function ImportWizard() {
       setStep(5)
       queryClient.invalidateQueries({ queryKey: ['requirements', projectId] })
       queryClient.invalidateQueries({ queryKey: ['testCases', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['all-docs', prefix] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
     },
   })
-
-  const sourceDocs = docType === 'REQ' ? sourceReqs : sourceTcs
-  const availableProjects = projects?.filter((p) => p.id !== projectId) || []
-  const sourceProject = projects?.find((p) => p.id === sourceProjectId)
 
   const toggleId = (id: number) => {
     setSelectedIds((prev) => prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id])
@@ -158,9 +155,13 @@ export default function ImportWizard() {
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-foreground">Select Docs to Import</h3>
             <p className="text-sm text-muted-foreground">
-              {selectedIds.length} of {sourceDocs?.length || 0} selected
+              {sourceDocsLoading
+                ? `Loading ${docType === 'REQ' ? 'requirements' : 'test cases'}...`
+                : `${selectedIds.length} of ${sourceDocs?.length || 0} selected`}
             </p>
-            {sourceDocs && sourceDocs.length > 0 ? (
+            {sourceDocsLoading ? (
+              <p className="text-muted-foreground">Fetching the lightweight document list from {sourceProject?.prefix}.</p>
+            ) : sourceDocs && sourceDocs.length > 0 ? (
               <>
                 <button
                   onClick={() => setSelectedIds(
@@ -173,7 +174,6 @@ export default function ImportWizard() {
                 <div className="max-h-96 overflow-y-auto space-y-1">
                   {sourceDocs.map((doc) => {
                     const isSelected = selectedIds.includes(doc.id)
-                    const docRecord = doc as unknown as Record<string, unknown>
                     return (
                       <button
                         key={doc.id}
@@ -187,8 +187,8 @@ export default function ImportWizard() {
                             {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
                           </div>
                           <div>
-                            <span className="font-mono text-xs text-primary">{String(docRecord.req_id || docRecord.tc_id || '')}</span>
-                            <span className="ml-2 text-sm text-foreground">{String(docRecord.title || docRecord.name || '')}</span>
+                            <span className="font-mono text-xs text-primary">{doc.doc_id}</span>
+                            <span className="ml-2 text-sm text-foreground">{doc.title}</span>
                           </div>
                         </div>
                       </button>

@@ -252,12 +252,6 @@ export function DocumentLinksPanel({
   const [showModal, setShowModal] = useState(false)
   const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
 
-  const { data: docs } = useQuery({
-    queryKey: ['all-docs', projectPrefix, `${sourceType.toLowerCase()}-links`],
-    queryFn: () => docsApi.list(projectPrefix),
-    enabled: !!projectPrefix,
-  })
-
   const { data: outgoingLinks } = useQuery({
     queryKey: ['docLinks', projectId, sourceType, sourceId, 'outgoing'],
     queryFn: () => linksApi.list({ project_id: projectId, source_type: sourceType, source_id: sourceId }),
@@ -266,6 +260,14 @@ export function DocumentLinksPanel({
   const { data: incomingLinks } = useQuery({
     queryKey: ['docLinks', projectId, sourceType, sourceId, 'incoming'],
     queryFn: () => linksApi.list({ project_id: projectId, target_type: sourceType, target_id: sourceId }),
+  })
+
+  const linkCount = (outgoingLinks?.length || 0) + (incomingLinks?.length || 0)
+
+  const { data: docs } = useQuery({
+    queryKey: ['all-docs', projectPrefix, 'link-targets'],
+    queryFn: () => docsApi.list(projectPrefix, { includeLinkCounts: false }),
+    enabled: !!projectPrefix && (showModal || linkCount > 0),
   })
 
   const deleteMutation = useMutation({
@@ -280,8 +282,6 @@ export function DocumentLinksPanel({
     ;(docs || []).forEach((doc) => map.set(docKey(doc.doc_type, doc.id), doc))
     return map
   }, [docs])
-
-  const linkCount = (outgoingLinks?.length || 0) + (incomingLinks?.length || 0)
 
   return (
     <SectionCard

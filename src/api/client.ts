@@ -559,11 +559,12 @@ export interface DocDetailFacade extends DocShell {
 }
 
 export const docsApi = {
-  list: async (projectRef: string, params?: { type?: string[]; status?: string; q?: string }) => {
+  list: async (projectRef: string, params?: { type?: string[]; status?: string; q?: string; includeLinkCounts?: boolean }) => {
     const query = new URLSearchParams()
     if (params?.type) params.type.forEach(t => query.append('type', t))
     if (params?.status) query.set('status', params.status)
     if (params?.q) query.set('q', params.q)
+    if (params?.includeLinkCounts !== undefined) query.set('include_link_counts', String(params.includeLinkCounts))
     const qs = query.toString()
     const response = await api.get<DocShell[]>(`/projects/${projectRef}/docs${qs ? '?' + qs : ''}`)
     return response.data
