@@ -5,7 +5,7 @@ Tests the pure compute_next_id function directly -- no DB mocking needed.
 
 import pytest
 
-from app.core.id_generator import compute_next_id
+from app.core.id_generator import compute_next_id, normalize_doc_id
 
 
 def test_first_id_when_none_exist():
@@ -57,16 +57,26 @@ def test_ignores_malformed_ids():
     assert result == "PRJ-REQ-004"
 
 
+def test_ignores_wrong_project_or_type_prefixes():
+    """Only exact PROJECT-TYPE matches can advance the sequence."""
+    result = compute_next_id(
+        ["PRJ-REQ-001", "OTHER-REQ-099", "PRJ-TC-050", "PRJ-REQ-002-extra"],
+        "PRJ",
+        "REQ",
+    )
+    assert result == "PRJ-REQ-002"
+
+
 def test_different_project_prefix():
-    """Works with any project prefix."""
-    result = compute_next_id(["BLOOM-TC-005", "BLOOM-TC-012"], "BLOOM", "TC")
-    assert result == "BLOOM-TC-013"
+    """Works with another three-letter project prefix."""
+    result = compute_next_id(["VCU-TC-005", "VCU-TC-012"], "VCU", "TC")
+    assert result == "VCU-TC-013"
 
 
-def test_high_numbers_beyond_999():
-    """IDs beyond 999 still work (4+ digit numbers)."""
-    result = compute_next_id(["PRJ-REQ-999"], "PRJ", "REQ")
-    assert result == "PRJ-REQ-1000"
+def test_sequence_stops_at_999():
+    """The PRJ-TYP-XXX convention only permits three numeric suffix digits."""
+    with pytest.raises(ValueError, match="maximum is 999"):
+        compute_next_id(["PRJ-REQ-999"], "PRJ", "REQ")
 
 
 def test_import_scenario_bulk_ids():
@@ -97,3 +107,22 @@ def test_zero_padded_consistency():
     result2 = compute_next_id(["PRJ-REQ-098"], "PRJ", "REQ")
     assert result2 == "PRJ-REQ-099"
     assert len(result2.split("-")[-1]) == 3
+
+
+def test_rejects_project_prefix_that_is_not_three_letters():
+    with pytest.raises(ValueError, match="exactly three uppercase letters"):
+        compute_next_id([], "BLOOM", "REQ")
+
+
+def test_rejects_unsupported_type_code():
+    with pytest.raises(ValueError, match="Unsupported document type code"):
+        compute_next_id([], "PRJ", "BUG")
+
+
+def test_normalizes_creator_supplied_doc_id():
+    assert normalize_doc_id(" prj-req-001 ", expected_type_code="REQ") == "PRJ-REQ-001"
+
+
+def test_rejects_creator_supplied_doc_id_with_wrong_project_prefix():
+    with pytest.raises(ValueError, match="ID project prefix must be VCU"):
+        normalize_doc_id("PRJ-REQ-001", expected_type_code="REQ", expected_project_prefix="VCU")

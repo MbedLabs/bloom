@@ -42,6 +42,40 @@ router = APIRouter()
 ...
 
 
+def _normalize_datetime(value: Optional[datetime]) -> Optional[datetime]:
+    if value is None:
+        return None
+    if value.tzinfo is not None:
+        return value.astimezone().replace(tzinfo=None)
+    return value
+
+
+def _resolved_execution_time(value: Optional[datetime]) -> datetime:
+    return value or datetime.utcnow()
+
+
+def _apply_result_to_test_case(tc: TestCase, res) -> None:
+    executed_at = _resolved_execution_time(res.executed_at)
+    current = _normalize_datetime(tc.last_executed_at)
+    incoming = _normalize_datetime(executed_at)
+
+    if current and incoming and incoming < current:
+        return
+
+    tc.last_execution_status = res.status
+    tc.last_executed_at = executed_at
+    tc.last_execution_comment = res.comment
+    if res.bud_run_id is not None:
+        tc.last_bud_run_id = res.bud_run_id
+
+
+def _apply_result_to_campaign_item(item: TestCampaignItem, res) -> None:
+    item.status = "Executed"
+    item.result = res.status
+    item.comment = res.comment
+    item.executed_at = _resolved_execution_time(res.executed_at)
+
+
 @router.post("/{campaign_id}/sync-results", response_model=SyncResultsResponse)
 async def sync_results(
     campaign_id: int,
@@ -67,22 +101,25 @@ async def sync_results(
         .where(TestCampaignItem.campaign_id == campaign_id)
     )
 
-    # Map tc_id to campaign item
-    tc_id_to_item = {tc.tc_id: item for item, tc in items_result.all()}
+    tc_id_to_item = {}
+    tc_id_to_case = {}
+    for item, tc in items_result.all():
+        tc_id_to_item[tc.tc_id] = item
+        tc_id_to_case[tc.tc_id] = tc
 
     updated_count = 0
     not_found = []
 
     for res in data.results:
         item = tc_id_to_item.get(res.tc_id)
-        if item:
-            item.status = "Executed"
-            item.result = res.status
-            item.comment = res.comment
-            item.executed_at = res.executed_at or datetime.utcnow()
-            updated_count += 1
-        else:
+        tc = tc_id_to_case.get(res.tc_id)
+        if not item or not tc:
             not_found.append(res.tc_id)
+            continue
+
+        _apply_result_to_campaign_item(item, res)
+        _apply_result_to_test_case(tc, res)
+        updated_count += 1
 
     await db.commit()
 
@@ -102,6 +139,9 @@ async def sync_results_global(
     """
     tc_ids = [r.tc_id for r in data.results]
 
+    test_cases_result = await db.execute(select(TestCase).where(TestCase.tc_id.in_(tc_ids)))
+    tc_id_to_case = {tc.tc_id: tc for tc in test_cases_result.scalars().all()}
+
     items_result = await db.execute(
         select(TestCampaignItem, TestCase)
         .join(TestCase, TestCampaignItem.test_case_id == TestCase.id)
@@ -116,16 +156,18 @@ async def sync_results_global(
     not_found = []
 
     for res in data.results:
-        matched_items = tc_id_to_items.get(res.tc_id)
-        if matched_items:
-            for item in matched_items:
-                item.status = "Executed"
-                item.result = res.status
-                item.comment = res.comment
-                item.executed_at = res.executed_at or datetime.utcnow()
-                updated_count += 1
-        else:
+        tc = tc_id_to_case.get(res.tc_id)
+        if not tc:
             not_found.append(res.tc_id)
+            continue
+
+        _apply_result_to_test_case(tc, res)
+
+        matched_items = tc_id_to_items.get(res.tc_id, [])
+        for item in matched_items:
+            _apply_result_to_campaign_item(item, res)
+
+        updated_count += 1
 
     await db.commit()
 
