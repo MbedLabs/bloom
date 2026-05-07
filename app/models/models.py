@@ -159,6 +159,10 @@ class TestCase(Base):
     approved_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_execution_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    last_executed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_execution_comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    last_bud_run_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     source_project_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("projects.id"), nullable=True

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import log_artefact_activity
 from app.core.database import get_db
-from app.core.id_generator import next_doc_id
+from app.core.id_generator import normalize_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import Project, RiskItem
 from app.models.user import User, UserRole
@@ -45,9 +45,24 @@ async def create_risk_item(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    risk_id = await next_doc_id(
-        db, RiskItem, RiskItem.risk_id, data.project_id, project.prefix, "RSK"
+    try:
+        risk_id = normalize_doc_id(
+            data.risk_id,
+            expected_type_code="RSK",
+            expected_project_prefix=project.prefix,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    existing = await db.execute(
+        select(RiskItem).where(
+            RiskItem.project_id == data.project_id,
+            RiskItem.risk_id == risk_id,
+        )
     )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Risk item with this ID already exists")
+
     item = RiskItem(
         project_id=data.project_id,
         risk_id=risk_id,

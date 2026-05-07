@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import log_artefact_activity
 from app.core.database import get_db
-from app.core.id_generator import next_doc_id
+from app.core.id_generator import normalize_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import Project, TestConcept
 from app.models.user import User, UserRole
@@ -56,9 +56,24 @@ async def create_test_concept(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    concept_id = await next_doc_id(
-        db, TestConcept, TestConcept.concept_id, data.project_id, project.prefix, "TCO"
+    try:
+        concept_id = normalize_doc_id(
+            data.concept_id,
+            expected_type_code="TCO",
+            expected_project_prefix=project.prefix,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    existing = await db.execute(
+        select(TestConcept).where(
+            TestConcept.project_id == data.project_id,
+            TestConcept.concept_id == concept_id,
+        )
     )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Test concept with this ID already exists")
+
     item = TestConcept(
         project_id=data.project_id,
         concept_id=concept_id,

@@ -2,12 +2,30 @@
 Pydantic schemas for API request/response validation.
 """
 
+import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
+
+from app.core.id_generator import normalize_doc_id
 
 # ==================== Project Schemas ====================
+
+PROJECT_PREFIX_PATTERN = re.compile(r"^[A-Z]{3}$")
+PROJECT_PREFIX_ERROR = (
+    "Project prefix must be exactly three uppercase letters so generated IDs follow "
+    "PRJ-TYP-001."
+)
+
+
+def normalize_project_prefix(value: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(PROJECT_PREFIX_ERROR)
+    normalized = value.strip().upper()
+    if not PROJECT_PREFIX_PATTERN.fullmatch(normalized):
+        raise ValueError(PROJECT_PREFIX_ERROR)
+    return normalized
 
 
 class ProjectCreate(BaseModel):
@@ -18,6 +36,11 @@ class ProjectCreate(BaseModel):
     description: Optional[str] = None
     status: str = "Active"
 
+    @field_validator("prefix", mode="before")
+    @classmethod
+    def validate_prefix(cls, value: str) -> str:
+        return normalize_project_prefix(value)
+
 
 class ProjectUpdate(BaseModel):
     """Schema for updating a project."""
@@ -26,6 +49,13 @@ class ProjectUpdate(BaseModel):
     prefix: Optional[str] = Field(None, min_length=1, max_length=10)
     description: Optional[str] = None
     status: Optional[str] = None
+
+    @field_validator("prefix", mode="before")
+    @classmethod
+    def validate_prefix(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        return normalize_project_prefix(value)
 
 
 class ProjectResponse(BaseModel):
@@ -143,6 +173,7 @@ class RequirementCreate(BaseModel):
     """Schema for creating a requirement."""
 
     project_id: int
+    req_id: str = Field(..., min_length=11, max_length=12)
     parent_id: Optional[int] = None
     title: str = Field(..., min_length=1, max_length=500)
     description: Optional[str] = None
@@ -152,6 +183,11 @@ class RequirementCreate(BaseModel):
     req_origin: str = "Internal"
     reviewer_id: Optional[int] = None
     approver_id: Optional[int] = None
+
+    @field_validator("req_id", mode="before")
+    @classmethod
+    def validate_req_id(cls, value: str) -> str:
+        return normalize_doc_id(value, expected_type_code="REQ")
 
 
 class RequirementUpdate(BaseModel):
@@ -216,6 +252,7 @@ class TestCaseCreate(BaseModel):
     """Schema for creating a test case."""
 
     project_id: int
+    tc_id: str = Field(..., min_length=10, max_length=10)
     title: str = Field(..., min_length=1, max_length=500)
     description: Optional[str] = None
     preconditions: Optional[str] = None
@@ -223,6 +260,11 @@ class TestCaseCreate(BaseModel):
     status: str = "Draft"
     reviewer_id: Optional[int] = None
     approver_id: Optional[int] = None
+
+    @field_validator("tc_id", mode="before")
+    @classmethod
+    def validate_tc_id(cls, value: str) -> str:
+        return normalize_doc_id(value, expected_type_code="TC")
 
 
 class TestCaseUpdate(BaseModel):
@@ -258,6 +300,10 @@ class TestCaseResponse(BaseModel):
     approved_by_id: Optional[int] = None
     reviewed_at: Optional[datetime] = None
     approved_at: Optional[datetime] = None
+    last_execution_status: Optional[str] = None
+    last_executed_at: Optional[datetime] = None
+    last_execution_comment: Optional[str] = None
+    last_bud_run_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
     requirement_count: int = 0
@@ -266,7 +312,13 @@ class TestCaseResponse(BaseModel):
     suite_memberships: List[TestSuiteSummary] = []
     campaign_memberships: List[TestCampaignSummary] = []
 
-    @field_serializer("created_at", "updated_at", "reviewed_at", "approved_at")
+    @field_serializer(
+        "created_at",
+        "updated_at",
+        "reviewed_at",
+        "approved_at",
+        "last_executed_at",
+    )
     def serialize_dt(self, dt: Optional[datetime], _info):
         return f"{dt.isoformat()}Z" if dt else None
 
@@ -387,11 +439,22 @@ class VersionResponse(BaseModel):
 
 class DocumentCreate(BaseModel):
     project_id: int
+    doc_id: str = Field(..., min_length=11, max_length=12)
     title: str = Field(..., min_length=1, max_length=500)
     doc_type: str = Field(default="SPEC", pattern="^(SPEC|PROT|RPT|STD)$")
     description: Optional[str] = None
     content_json: Optional[Dict[str, Any]] = None
     content_html: Optional[str] = None
+
+    @field_validator("doc_id", mode="before")
+    @classmethod
+    def validate_doc_id(cls, value: str) -> str:
+        return normalize_doc_id(value)
+
+    @model_validator(mode="after")
+    def validate_doc_id_type(self):
+        self.doc_id = normalize_doc_id(self.doc_id, expected_type_code=self.doc_type)
+        return self
 
 
 class DocumentUpdate(BaseModel):
@@ -707,12 +770,18 @@ class ArtefactLinkResponse(BaseModel):
 
 class DesignItemCreate(BaseModel):
     project_id: int
+    design_id: str = Field(..., min_length=11, max_length=11)
     title: str = Field(..., min_length=1, max_length=500)
     description: Optional[str] = None
     status: str = "Draft"
     priority: str = "Medium"
     design_type: str = "Architecture"
     linked_requirement_id: Optional[int] = None
+
+    @field_validator("design_id", mode="before")
+    @classmethod
+    def validate_design_id(cls, value: str) -> str:
+        return normalize_doc_id(value, expected_type_code="DES")
 
 
 class DesignItemUpdate(BaseModel):
@@ -750,6 +819,7 @@ class DesignItemResponse(BaseModel):
 
 class RiskItemCreate(BaseModel):
     project_id: int
+    risk_id: str = Field(..., min_length=11, max_length=11)
     title: str = Field(..., min_length=1, max_length=500)
     description: Optional[str] = None
     status: str = "Open"
@@ -758,6 +828,11 @@ class RiskItemCreate(BaseModel):
     mitigation: Optional[str] = None
     risk_category: str = "Technical"
     linked_requirement_id: Optional[int] = None
+
+    @field_validator("risk_id", mode="before")
+    @classmethod
+    def validate_risk_id(cls, value: str) -> str:
+        return normalize_doc_id(value, expected_type_code="RSK")
 
 
 class RiskItemUpdate(BaseModel):
@@ -799,6 +874,7 @@ class RiskItemResponse(BaseModel):
 
 class ChangeRequestCreate(BaseModel):
     project_id: int
+    change_id: str = Field(..., min_length=11, max_length=11)
     title: str = Field(..., min_length=1, max_length=500)
     description: Optional[str] = None
     status: str = "Submitted"
@@ -806,6 +882,11 @@ class ChangeRequestCreate(BaseModel):
     change_type: str = "Enhancement"
     impact_assessment: Optional[str] = None
     justification: Optional[str] = None
+
+    @field_validator("change_id", mode="before")
+    @classmethod
+    def validate_change_id(cls, value: str) -> str:
+        return normalize_doc_id(value, expected_type_code="CHG")
 
 
 class ChangeRequestUpdate(BaseModel):
@@ -881,11 +962,17 @@ class BaselineResponse(BaseModel):
 
 class TestConceptCreate(BaseModel):
     project_id: int
+    concept_id: str = Field(..., min_length=11, max_length=11)
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     status: str = "Draft"
     linked_requirement_ids: List[int] = []
     coverage: float = 0
+
+    @field_validator("concept_id", mode="before")
+    @classmethod
+    def validate_concept_id(cls, value: str) -> str:
+        return normalize_doc_id(value, expected_type_code="TCO")
 
 
 class TestConceptUpdate(BaseModel):
@@ -1007,6 +1094,7 @@ class AutomatedResult(BaseModel):
     status: str  # "Passed", "Failed", "Skipped"
     comment: Optional[str] = None
     executed_at: Optional[datetime] = None
+    bud_run_id: Optional[int] = None
 
 
 class SyncResultsRequest(BaseModel):

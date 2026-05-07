@@ -16,7 +16,7 @@ from app.api.link_read_utils import (
     get_verifying_test_case_links_for_requirement,
 )
 from app.core.database import get_db
-from app.core.id_generator import next_doc_id
+from app.core.id_generator import normalize_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import (
     ArtefactLink,
@@ -257,7 +257,7 @@ async def create_requirement(
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     """
-    Create a new requirement. Auto-generates req_id based on project prefix.
+    Create a new requirement using the creator-supplied req_id.
     """
     project_result = await db.execute(select(Project).where(Project.id == data.project_id))
     project = project_result.scalar_one_or_none()
@@ -287,9 +287,23 @@ async def create_requirement(
         if not approver:
             raise HTTPException(status_code=404, detail="Approver not found")
 
-    req_id = await next_doc_id(
-        db, Requirement, Requirement.req_id, data.project_id, project.prefix, "REQ"
+    try:
+        req_id = normalize_doc_id(
+            data.req_id,
+            expected_type_code="REQ",
+            expected_project_prefix=project.prefix,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    existing = await db.execute(
+        select(Requirement).where(
+            Requirement.project_id == data.project_id,
+            Requirement.req_id == req_id,
+        )
     )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Requirement with this ID already exists")
 
     requirement = Requirement(
         project_id=data.project_id,

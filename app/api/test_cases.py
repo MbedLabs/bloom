@@ -15,7 +15,7 @@ from app.api.link_read_utils import (
     get_verified_requirement_links_for_test_case,
 )
 from app.core.database import get_db
-from app.core.id_generator import next_doc_id
+from app.core.id_generator import normalize_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import (
     ArtefactLink,
@@ -137,6 +137,10 @@ async def _build_test_case_response(tc: TestCase, db: AsyncSession) -> TestCaseR
         approved_by_id=tc.approved_by_id,
         reviewed_at=tc.reviewed_at,
         approved_at=tc.approved_at,
+        last_execution_status=tc.last_execution_status,
+        last_executed_at=tc.last_executed_at,
+        last_execution_comment=tc.last_execution_comment,
+        last_bud_run_id=tc.last_bud_run_id,
         created_at=tc.created_at,
         updated_at=tc.updated_at,
         requirement_count=req_count,
@@ -163,6 +167,10 @@ def _build_test_case_list_response(tc: TestCase, requirement_count: int = 0) -> 
         approved_by_id=tc.approved_by_id,
         reviewed_at=tc.reviewed_at,
         approved_at=tc.approved_at,
+        last_execution_status=tc.last_execution_status,
+        last_executed_at=tc.last_executed_at,
+        last_execution_comment=tc.last_execution_comment,
+        last_bud_run_id=tc.last_bud_run_id,
         created_at=tc.created_at,
         updated_at=tc.updated_at,
         requirement_count=requirement_count,
@@ -218,7 +226,7 @@ async def create_test_case(
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     """
-    Create a new test case. Auto-generates tc_id.
+    Create a new test case using the creator-supplied tc_id.
     """
     project_result = await db.execute(select(Project).where(Project.id == data.project_id))
     project = project_result.scalar_one_or_none()
@@ -226,7 +234,23 @@ async def create_test_case(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    tc_id = await next_doc_id(db, TestCase, TestCase.tc_id, data.project_id, project.prefix, "TC")
+    try:
+        tc_id = normalize_doc_id(
+            data.tc_id,
+            expected_type_code="TC",
+            expected_project_prefix=project.prefix,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    existing = await db.execute(
+        select(TestCase).where(
+            TestCase.project_id == data.project_id,
+            TestCase.tc_id == tc_id,
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Test case with this ID already exists")
 
     test_case = TestCase(
         project_id=data.project_id,
