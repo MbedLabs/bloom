@@ -33,6 +33,19 @@ function MembershipPanel({ title, countLabel, emptyText, children }: { title: st
   )
 }
 
+function ExecutionBadge({ status }: { status: string }) {
+  const colors: Record<string, string> = {
+    Passed: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+    Failed: 'bg-red-500/10 text-red-700 dark:text-red-400',
+    Skipped: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
+  }
+  return (
+    <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[status] || 'bg-muted text-muted-foreground'}`}>
+      {status}
+    </span>
+  )
+}
+
 export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } = {}) {
   const { user } = useAuth()
   const { itemId } = useParams<{ prefix: string; itemId: string }>()
@@ -109,6 +122,33 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
       ) : undefined}
       rightRail={
         <>
+          <SectionCard title="Last Execution">
+            {testCase.last_execution_status ? (
+              <div className="space-y-4">
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Result</div>
+                  <ExecutionBadge status={testCase.last_execution_status} />
+                </div>
+                <MetaItem
+                  label="Executed"
+                  value={testCase.last_executed_at ? formatDateTime(testCase.last_executed_at) : 'Unknown'}
+                />
+                <MetaItem
+                  label="Bud Run"
+                  value={testCase.last_bud_run_id ? `Run ${testCase.last_bud_run_id}` : 'Not recorded'}
+                />
+                {testCase.last_execution_comment && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Comment</div>
+                    <div className="text-sm text-foreground whitespace-pre-wrap">{testCase.last_execution_comment}</div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No synced execution has been recorded for this test case yet.</p>
+            )}
+          </SectionCard>
+
           <SectionCard title="Review">
             <div className="space-y-3">
               <div>
@@ -155,6 +195,9 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
 
           <SectionCard title="Metadata">
             <div className="space-y-4">
+              <MetaItem label="Execution" value={testCase.last_execution_status || 'Not executed'} />
+              <MetaItem label="Last Executed" value={testCase.last_executed_at ? formatDateTime(testCase.last_executed_at) : 'Not executed'} />
+              <MetaItem label="Bud Run" value={testCase.last_bud_run_id ? `Run ${testCase.last_bud_run_id}` : 'Not recorded'} />
               <MetaItem label="Created" value={formatDateTime(testCase.created_at) + ' ago'} />
               <MetaItem label="Updated" value={formatDateTime(testCase.updated_at) + ' ago'} />
             </div>

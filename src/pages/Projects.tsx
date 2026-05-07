@@ -5,6 +5,9 @@ import { extractApiErrorMessage, projectsApi, Project } from '../api/client'
 import { Plus, FolderKanban, Search, FileText, CheckCircle, ArrowRight, Pencil } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
+const PROJECT_PREFIX_PATTERN = /^[A-Z]{3}$/
+const PROJECT_PREFIX_ERROR = 'Use exactly three uppercase letters, e.g. PRJ.'
+
 export default function Projects() {
   const { user } = useAuth()
   const canManageProjects = user?.role === 'admin'
@@ -62,10 +65,19 @@ export default function Projects() {
       )
     : projects
 
+  const normalizedPrefix = prefix.trim().toUpperCase()
+  const prefixIsValid = PROJECT_PREFIX_PATTERN.test(normalizedPrefix)
+  const showPrefixError = prefix.length > 0 && !prefixIsValid
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setFormError('')
-    const payload = { name, prefix, description: description || undefined }
+    if (!prefixIsValid) {
+      setFormError(PROJECT_PREFIX_ERROR)
+      return
+    }
+
+    const payload = { name, prefix: normalizedPrefix, description: description || undefined }
     if (editingProject) {
       updateMutation.mutate({ id: editingProject.id, data: payload })
     } else {
@@ -200,10 +212,16 @@ export default function Projects() {
                     required
                     value={prefix}
                     onChange={(e) => setPrefix(e.target.value.toUpperCase())}
-                    className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:border-ring transition-colors font-mono"
+                    className={`w-full px-3 py-2 bg-background border rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:border-ring transition-colors font-mono ${
+                      showPrefixError ? 'border-red-500/70' : 'border-input'
+                    }`}
                     placeholder="PRJ"
-                    maxLength={10}
+                    maxLength={3}
+                    aria-invalid={showPrefixError}
                   />
+                  <p className={`mt-1 text-xs ${showPrefixError ? 'text-red-600' : 'text-muted-foreground'}`}>
+                    {showPrefixError ? PROJECT_PREFIX_ERROR : 'Item IDs use PRJ-TYP-001.'}
+                  </p>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Description</label>
@@ -226,7 +244,7 @@ export default function Projects() {
                 </button>
                 <button
                   type="submit"
-                  disabled={createMutation.isPending || updateMutation.isPending}
+                  disabled={createMutation.isPending || updateMutation.isPending || !prefixIsValid}
                   className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
                 >
                   {createMutation.isPending || updateMutation.isPending

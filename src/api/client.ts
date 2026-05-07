@@ -207,6 +207,9 @@ export interface TestCaseSummary {
   tc_id: string
   title: string
   status: string
+  last_execution_status: string | null
+  last_executed_at: string | null
+  last_bud_run_id: number | null
 }
 
 export interface TestSuiteSummary {
@@ -285,6 +288,10 @@ export interface TestCase {
   approved_by_id: number | null
   reviewed_at: string | null
   approved_at: string | null
+  last_execution_status: string | null
+  last_executed_at: string | null
+  last_execution_comment: string | null
+  last_bud_run_id: number | null
   source_ref?: string | null
   source_project_id?: number | null
   requirement_count: number
@@ -591,6 +598,7 @@ export const requirementsApi = {
 
   create: async (data: {
     project_id: number
+    req_id: string
     title: string
     description?: string
     priority?: string
@@ -651,6 +659,7 @@ export const testCasesApi = {
 
   create: async (data: {
     project_id: number
+    tc_id: string
     title: string
     description?: string
     preconditions?: string
@@ -771,7 +780,7 @@ export const documentsApi = {
     const response = await api.get<DocumentDetail>(`/documents/${documentId}`)
     return response.data
   },
-  create: async (data: { project_id: number; title: string; doc_type?: string; description?: string; content_json?: Record<string, unknown> | null; content_html?: string | null }) => {
+  create: async (data: { project_id: number; doc_id: string; title: string; doc_type?: string; description?: string; content_json?: Record<string, unknown> | null; content_html?: string | null }) => {
     const response = await api.post<Document>('/projects/' + data.project_id + '/documents', data)
     return response.data
   },
@@ -1021,6 +1030,7 @@ export const designsApi = {
   },
   create: async (data: {
     project_id: number
+    design_id: string
     title: string
     description?: string | null
     status?: string
@@ -1051,6 +1061,7 @@ export const risksApi = {
   },
   create: async (data: {
     project_id: number
+    risk_id: string
     title: string
     description?: string | null
     status?: string
@@ -1081,7 +1092,7 @@ export const changesApi = {
     const response = await api.get<ChangeRequest>(`/changes/${id}`)
     return response.data
   },
-  create: async (data: Omit<ChangeRequest, 'id' | 'change_id' | 'created_at' | 'updated_at'>) => {
+  create: async (data: Omit<ChangeRequest, 'id' | 'created_at' | 'updated_at'>) => {
     const response = await api.post<ChangeRequest>('/changes', data)
     return response.data
   },
@@ -1125,7 +1136,7 @@ export const testConceptsApi = {
     const response = await api.get<TestConcept>(`/test-concepts/${id}`)
     return response.data
   },
-  create: async (data: { project_id: number; name: string; description?: string | null; status?: string; coverage?: number }) => {
+  create: async (data: { project_id: number; concept_id: string; name: string; description?: string | null; status?: string; coverage?: number }) => {
     const response = await api.post<TestConcept>('/test-concepts', data)
     return response.data
   },
