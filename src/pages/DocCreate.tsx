@@ -34,6 +34,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const requestedDocType = rawRequestedDocType in DOC_CONFIGS ? rawRequestedDocType : 'REQ'
 
   const [title, setTitle] = useState('')
+  const [docId, setDocId] = useState('')
   const [contentJson, setContentJson] = useState<Record<string, unknown> | null>(null)
   const [contentHtml, setContentHtml] = useState('')
   const [tcRows, setTcRows] = useState<TcsRow[]>(() => requestedDocType === 'TC' && !editMode ? createDefaultTcRows() : [])
@@ -60,6 +61,11 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const config = DOC_CONFIGS[docType]
   const resolvedDocId = editMode ? editDocFacade?.id : undefined
   const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const normalizedDocId = docId.trim().toUpperCase()
+  const expectedDocIdExample = project ? `${project.prefix}-${config.typeCode}-001` : `PRJ-${config.typeCode}-001`
+  const docIdPattern = project ? new RegExp(`^${project.prefix}-${config.typeCode}-\\d{3}$`) : null
+  const docIdIsValid = editMode || (!!docIdPattern && docIdPattern.test(normalizedDocId))
+  const showDocIdError = !editMode && docId.length > 0 && !docIdIsValid
 
   const { data: users } = useQuery({
     queryKey: ['users'],
@@ -86,6 +92,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
     const api = apiForType(docType) as unknown as { get: (id: number) => Promise<Record<string, unknown>> }
     api.get(resolvedDocId).then((data) => {
       setTitle((data[config.titleField] as string) || '')
+      setDocId((data[config.idField] as string) || '')
       if (data.content_json) setContentJson(data.content_json as Record<string, unknown>)
       if (data.content_html) setContentHtml(data.content_html as string)
       if (docType === 'TC') setTcRows(normalizeTcsRows(data.steps))
@@ -112,6 +119,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       if (docType === 'TC') {
         return testCasesApi.create({
           project_id: projectId,
+          tc_id: normalizedDocId,
           title,
           description: metadata.description || undefined,
           preconditions: metadata.preconditions || undefined,
@@ -123,6 +131,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       if (docType === 'SPEC' || docType === 'PROT' || docType === 'RPT' || docType === 'STD') {
         return (api as typeof documentsApi).create({
           project_id: projectId,
+          doc_id: normalizedDocId,
           title,
           doc_type: docType,
           description: metadata.description,
@@ -132,6 +141,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       }
       const payload: Record<string, unknown> = {
         project_id: projectId,
+        [config.idField]: normalizedDocId,
         [config.titleField]: title,
         content_json: contentJson,
         content_html: contentHtml,
@@ -194,6 +204,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   }, [])
 
   const handleSave = () => {
+    if (!editMode && !docIdIsValid) return
+
     if (editMode) {
       updateMutation.mutate()
     } else {
@@ -248,7 +260,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           </span>
           {project && (
             <span className="text-xs text-muted-foreground">
-              {project.prefix}-{config.typeCode}-...
+              {expectedDocIdExample}
             </span>
           )}
         </div>
@@ -268,7 +280,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           </button>
           <button
             onClick={handleSave}
-            disabled={!title.trim() || isPending}
+            disabled={!title.trim() || !docIdIsValid || isPending}
             className="px-4 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
             {isPending ? 'Saving...' : editMode ? 'Save' : 'Create'}
@@ -289,18 +301,34 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
               </span>
               {project && (
                 <>
-                  <span className="text-xs text-muted-foreground">
-                    {project.prefix}-{config.typeCode}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {editMode ? (editDocFacade?.doc_id || docIdStr) : 'new'}
-                  </span>
+                  {editMode ? (
+                    <span className="text-xs font-mono text-muted-foreground">
+                      {editDocFacade?.doc_id || docIdStr}
+                    </span>
+                  ) : (
+                    <input
+                      type="text"
+                      value={docId}
+                      onChange={(event) => setDocId(event.target.value.toUpperCase())}
+                      placeholder={expectedDocIdExample}
+                      className={`w-40 rounded-md border bg-background px-2 py-1 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring ${
+                        showDocIdError ? 'border-red-500/70' : 'border-input'
+                      }`}
+                      aria-invalid={showDocIdError}
+                      maxLength={12}
+                    />
+                  )}
                 </>
               )}
               <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground">
                 {metadata.status || config.statusOptions[0]}
               </span>
             </div>
+            {!editMode && (
+              <p className={`mb-3 text-xs ${showDocIdError ? 'text-red-600' : 'text-muted-foreground'}`}>
+                {showDocIdError ? `ID must match ${expectedDocIdExample}.` : 'Set the controlled item ID before creating.'}
+              </p>
+            )}
 
             {/* Title inside the document frame */}
             <input

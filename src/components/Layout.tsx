@@ -384,6 +384,11 @@ export default function Layout() {
 }
 
 function getBreadcrumbs(location: ReturnType<typeof useLocation>, projects: Array<{ id: number; name: string; prefix: string }>) {
+  const TYPE_PAGE_TITLE: Record<string, string> = {
+    REQ: 'Requirements', SPEC: 'Specifications', TC: 'Test Cases',
+    DES: 'Design Items', RSK: 'Risks', CHG: 'Changes', TCO: 'Test Concepts',
+    PROT: 'Protocols', RPT: 'Reports', STD: 'Standards',
+  }
   const path = location.pathname
   const crumbs: { label: string; href?: string }[] = [{ label: 'Home', href: '/' }]
   const parts = path.split('/')
@@ -422,12 +427,13 @@ function getBreadcrumbs(location: ReturnType<typeof useLocation>, projects: Arra
     }
 
     if (sub === 'docs') {
+      const typeParam = new URLSearchParams(location.search).get('type')
+      const docLabel = typeParam ? (TYPE_PAGE_TITLE[typeParam] || 'Documents') : 'Documents'
       if (parts[4] === 'new') {
-        crumbs.push({ label: 'Documents', href: `/projects/${slug}/docs` })
+        crumbs.push({ label: docLabel, href: `/projects/${slug}/docs${typeParam ? '?type=' + typeParam : ''}` })
         crumbs.push({ label: 'New' })
       } else if (parts[4] && parts[5]) {
-        // kind-aware route: /projects/:prefix/docs/:kind/:docId[/edit]
-        crumbs.push({ label: 'Documents', href: `/projects/${slug}/docs` })
+        crumbs.push({ label: docLabel, href: `/projects/${slug}/docs${typeParam ? '?type=' + typeParam : ''}` })
         if (parts[6] === 'edit') {
           crumbs.push({ label: parts[5], href: `/projects/${slug}/docs/${parts[4]}/${parts[5]}` })
           crumbs.push({ label: 'Edit' })
@@ -435,7 +441,7 @@ function getBreadcrumbs(location: ReturnType<typeof useLocation>, projects: Arra
           crumbs.push({ label: parts[5] })
         }
       } else {
-        crumbs.push({ label: 'Documents' })
+        crumbs.push({ label: docLabel })
       }
     } else if (sub === 'campaigns' && parts[4]) {
       crumbs.push({ label: 'Campaigns', href: `/projects/${slug}/campaigns` })

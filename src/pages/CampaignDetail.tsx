@@ -146,8 +146,10 @@ export default function CampaignDetail() {
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <ResultBadge result={item.status || 'Pending'} />
-                    {item.result && <span className="text-xs text-muted-foreground">Bud: {item.result}</span>}
+                    <ResultBadge result={item.result || item.status || 'Pending'} />
+                    {item.result && item.status && (
+                      <span className="text-xs text-muted-foreground">{item.status}</span>
+                    )}
                   </div>
                 </div>
 
@@ -188,10 +190,14 @@ function CampaignStatusBadge({ status }: { status: string }) {
 
 function ResultBadge({ result }: { result: string }) {
   const config: Record<string, string> = {
+    Passed: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+    Failed: 'bg-red-500/10 text-red-700 dark:text-red-400',
+    Skipped: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
     Planned: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
     Scope: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
     Pending: 'bg-gray-500/10 text-gray-700 dark:text-gray-400',
     Linked: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400',
+    Executed: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
   }
   return (
     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${config[result] || config.Pending}`}>

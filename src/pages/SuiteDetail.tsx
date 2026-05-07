@@ -55,7 +55,6 @@ export default function SuiteDetail() {
       description: `Traceability scope campaign from suite ${suite?.suite_id || ''}`,
       suite_id: parsedSuiteId,
       status: 'Scope',
-      test_case_ids: [],
     }),
     onSuccess: (campaign) => {
       queryClient.invalidateQueries({ queryKey: ['campaigns', projectId] })

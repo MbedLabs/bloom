@@ -33,6 +33,7 @@ import { TcsArteTable } from '../components/TcsArteTable'
 import { createDefaultTcRows } from '../utils/tcs'
 import { docUrl, docCreateUrl, DOC_TYPE_LABELS, type DocType } from '../types/doc'
 import { useAuth } from '../contexts/AuthContext'
+import { formatDateTime } from '../test/date-utils'
 
 type Tab = 'requirements' | 'test-cases' | 'specifications' | 'protocols' | 'reports' | 'standards' | 'test-concepts' | 'traceability' | 'design' | 'risks' | 'changes'
 
@@ -59,13 +60,13 @@ export default function ProjectDetail() {
   const [showCreateRisk, setShowCreateRisk] = useState(false)
   const [showCreateChange, setShowCreateChange] = useState(false)
 
-  const [reqForm, setReqForm] = useState({ title: '', description: '', priority: 'Medium', req_type: 'Functional', req_origin: 'Internal' })
-  const [tcForm, setTcForm] = useState({ title: '', description: '', preconditions: '' })
+  const [reqForm, setReqForm] = useState({ req_id: '', title: '', description: '', priority: 'Medium', req_type: 'Functional', req_origin: 'Internal' })
+  const [tcForm, setTcForm] = useState({ tc_id: '', title: '', description: '', preconditions: '' })
   const [tcRows, setTcRows] = useState<TcsRow[]>(() => createDefaultTcRows())
-  const [conceptForm, setConceptForm] = useState({ name: '', description: '', status: 'Draft', coverage: '0' })
-  const [designForm, setDesignForm] = useState({ title: '', description: '', status: 'Draft', priority: 'Medium', design_type: 'Architecture' })
-  const [riskForm, setRiskForm] = useState({ title: '', description: '', status: 'Open', severity: 'Medium', probability: 'Medium', mitigation: '', risk_category: 'Technical' })
-  const [changeForm, setChangeForm] = useState({ title: '', description: '', status: 'Submitted', priority: 'Medium', change_type: 'Enhancement', impact_assessment: '', justification: '' })
+  const [conceptForm, setConceptForm] = useState({ concept_id: '', name: '', description: '', status: 'Draft', coverage: '0' })
+  const [designForm, setDesignForm] = useState({ design_id: '', title: '', description: '', status: 'Draft', priority: 'Medium', design_type: 'Architecture' })
+  const [riskForm, setRiskForm] = useState({ risk_id: '', title: '', description: '', status: 'Open', severity: 'Medium', probability: 'Medium', mitigation: '', risk_category: 'Technical' })
+  const [changeForm, setChangeForm] = useState({ change_id: '', title: '', description: '', status: 'Submitted', priority: 'Medium', change_type: 'Enhancement', impact_assessment: '', justification: '' })
   const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
 
   const setTab = (tab: Tab) => {
@@ -81,6 +82,9 @@ export default function ProjectDetail() {
   })
 
   const projectId = project?.id || 0
+  const normalizeInlineDocId = (value: string) => value.trim().toUpperCase()
+  const isInlineDocIdValid = (value: string, typeCode: string) =>
+    !!project && new RegExp(`^${project.prefix}-${typeCode}-\\d{3}$`).test(normalizeInlineDocId(value))
 
   const { data: requirements, isLoading: reqsLoading } = useQuery({
     queryKey: ['requirements', projectId],
@@ -142,7 +146,7 @@ export default function ProjectDetail() {
       queryClient.invalidateQueries({ queryKey: ['requirements', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       setShowCreateReq(false)
-      setReqForm({ title: '', description: '', priority: 'Medium', req_type: 'Functional', req_origin: 'Internal' })
+      setReqForm({ req_id: '', title: '', description: '', priority: 'Medium', req_type: 'Functional', req_origin: 'Internal' })
     },
   })
 
@@ -152,7 +156,7 @@ export default function ProjectDetail() {
       queryClient.invalidateQueries({ queryKey: ['testCases', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       setShowCreateTc(false)
-      setTcForm({ title: '', description: '', preconditions: '' })
+      setTcForm({ tc_id: '', title: '', description: '', preconditions: '' })
       setTcRows(createDefaultTcRows())
     },
   })
@@ -163,7 +167,7 @@ export default function ProjectDetail() {
       queryClient.invalidateQueries({ queryKey: ['designs', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       setShowCreateDesign(false)
-      setDesignForm({ title: '', description: '', status: 'Draft', priority: 'Medium', design_type: 'Architecture' })
+      setDesignForm({ design_id: '', title: '', description: '', status: 'Draft', priority: 'Medium', design_type: 'Architecture' })
     },
   })
 
@@ -173,7 +177,7 @@ export default function ProjectDetail() {
       queryClient.invalidateQueries({ queryKey: ['risks', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       setShowCreateRisk(false)
-      setRiskForm({ title: '', description: '', status: 'Open', severity: 'Medium', probability: 'Medium', mitigation: '', risk_category: 'Technical' })
+      setRiskForm({ risk_id: '', title: '', description: '', status: 'Open', severity: 'Medium', probability: 'Medium', mitigation: '', risk_category: 'Technical' })
     },
   })
 
@@ -183,7 +187,7 @@ export default function ProjectDetail() {
       queryClient.invalidateQueries({ queryKey: ['changes', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       setShowCreateChange(false)
-      setChangeForm({ title: '', description: '', status: 'Submitted', priority: 'Medium', change_type: 'Enhancement', impact_assessment: '', justification: '' })
+      setChangeForm({ change_id: '', title: '', description: '', status: 'Submitted', priority: 'Medium', change_type: 'Enhancement', impact_assessment: '', justification: '' })
     },
   })
 
@@ -193,7 +197,7 @@ export default function ProjectDetail() {
       queryClient.invalidateQueries({ queryKey: ['testConcepts', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       setShowCreateConcept(false)
-      setConceptForm({ name: '', description: '', status: 'Draft', coverage: '0' })
+      setConceptForm({ concept_id: '', name: '', description: '', status: 'Draft', coverage: '0' })
     },
   })
 
@@ -219,8 +223,10 @@ export default function ProjectDetail() {
 
   const handleCreateReq = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!isInlineDocIdValid(reqForm.req_id, 'REQ')) return
     createReqMutation.mutate({
       project_id: projectId,
+      req_id: normalizeInlineDocId(reqForm.req_id),
       title: reqForm.title,
       description: reqForm.description || undefined,
       priority: reqForm.priority,
@@ -231,8 +237,10 @@ export default function ProjectDetail() {
 
   const handleCreateTc = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!isInlineDocIdValid(tcForm.tc_id, 'TC')) return
     createTcMutation.mutate({
       project_id: projectId,
+      tc_id: normalizeInlineDocId(tcForm.tc_id),
       title: tcForm.title,
       description: tcForm.description || undefined,
       preconditions: tcForm.preconditions || undefined,
@@ -242,8 +250,10 @@ export default function ProjectDetail() {
 
   const handleCreateConcept = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!isInlineDocIdValid(conceptForm.concept_id, 'TCO')) return
     createConceptMutation.mutate({
       project_id: projectId,
+      concept_id: normalizeInlineDocId(conceptForm.concept_id),
       name: conceptForm.name,
       description: conceptForm.description || null,
       status: conceptForm.status,
@@ -253,8 +263,10 @@ export default function ProjectDetail() {
 
   const handleCreateDesign = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!isInlineDocIdValid(designForm.design_id, 'DES')) return
     createDesignMutation.mutate({
       project_id: projectId,
+      design_id: normalizeInlineDocId(designForm.design_id),
       title: designForm.title,
       description: designForm.description || null,
       status: designForm.status,
@@ -265,8 +277,10 @@ export default function ProjectDetail() {
 
   const handleCreateRisk = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!isInlineDocIdValid(riskForm.risk_id, 'RSK')) return
     createRiskMutation.mutate({
       project_id: projectId,
+      risk_id: normalizeInlineDocId(riskForm.risk_id),
       title: riskForm.title,
       description: riskForm.description || null,
       status: riskForm.status,
@@ -279,8 +293,10 @@ export default function ProjectDetail() {
 
   const handleCreateChange = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!isInlineDocIdValid(changeForm.change_id, 'CHG')) return
     createChangeMutation.mutate({
       project_id: projectId,
+      change_id: normalizeInlineDocId(changeForm.change_id),
       title: changeForm.title,
       description: changeForm.description || null,
       status: changeForm.status,
@@ -448,6 +464,7 @@ export default function ProjectDetail() {
                     <Th>ID</Th>
                     <Th>Title</Th>
                     <Th>Status</Th>
+                    <Th>Execution</Th>
                     <Th>Requirements</Th>
                   </tr>
                 </thead>
@@ -457,6 +474,14 @@ export default function ProjectDetail() {
 <Td><Link to={docUrl(prefix, 'TC', tc.tc_id)} className="text-primary font-mono text-sm font-medium">{tc.tc_id}</Link></Td>
                        <Td><Link to={docUrl(prefix, 'TC', tc.tc_id)} className="text-foreground hover:text-primary/80 font-medium">{tc.title}</Link></Td>
                       <Td><TcStatusBadge status={tc.status} /></Td>
+                      <Td>
+                        <div className="space-y-1">
+                          <ExecutionBadge status={tc.last_execution_status} />
+                          <div className="text-xs text-muted-foreground">
+                            {tc.last_executed_at ? formatDateTime(tc.last_executed_at) : 'No execution yet'}
+                          </div>
+                        </div>
+                      </Td>
                       <Td>{tc.requirement_count}</Td>
                     </tr>
                   ))}
@@ -681,6 +706,7 @@ export default function ProjectDetail() {
       {showCreateReq && (
         <Modal title="New Requirement" onClose={() => setShowCreateReq(false)}>
           <form onSubmit={handleCreateReq} className="space-y-4">
+            <TextInput label="ID" value={reqForm.req_id} onChange={(value) => setReqForm({ ...reqForm, req_id: value.toUpperCase() })} required />
             <TextInput label="Title" value={reqForm.title} onChange={(value) => setReqForm({ ...reqForm, title: value })} required />
             <TextArea label="Description" value={reqForm.description} onChange={(value) => setReqForm({ ...reqForm, description: value })} rows={3} />
             <div className="grid grid-cols-3 gap-4">
@@ -696,6 +722,7 @@ export default function ProjectDetail() {
       {showCreateTc && (
         <Modal title="New Test Case" onClose={() => setShowCreateTc(false)} maxWidth="max-w-4xl">
           <form onSubmit={handleCreateTc} className="space-y-4">
+            <TextInput label="ID" value={tcForm.tc_id} onChange={(value) => setTcForm({ ...tcForm, tc_id: value.toUpperCase() })} required />
             <TextInput label="Title" value={tcForm.title} onChange={(value) => setTcForm({ ...tcForm, title: value })} required />
             <TextArea label="Description" value={tcForm.description} onChange={(value) => setTcForm({ ...tcForm, description: value })} rows={3} />
             <TextArea label="Preconditions" value={tcForm.preconditions} onChange={(value) => setTcForm({ ...tcForm, preconditions: value })} rows={2} />
@@ -711,6 +738,7 @@ export default function ProjectDetail() {
       {showCreateConcept && (
         <Modal title="New Test Concept" onClose={() => setShowCreateConcept(false)}>
           <form onSubmit={handleCreateConcept} className="space-y-4">
+            <TextInput label="ID" value={conceptForm.concept_id} onChange={(value) => setConceptForm({ ...conceptForm, concept_id: value.toUpperCase() })} required />
             <TextInput label="Name" value={conceptForm.name} onChange={(value) => setConceptForm({ ...conceptForm, name: value })} required />
             <TextArea label="Description" value={conceptForm.description} onChange={(value) => setConceptForm({ ...conceptForm, description: value })} rows={3} />
             <div className="grid grid-cols-2 gap-4">
@@ -725,6 +753,7 @@ export default function ProjectDetail() {
       {showCreateDesign && (
         <Modal title="New Design Item" onClose={() => setShowCreateDesign(false)}>
           <form onSubmit={handleCreateDesign} className="space-y-4">
+            <TextInput label="ID" value={designForm.design_id} onChange={(value) => setDesignForm({ ...designForm, design_id: value.toUpperCase() })} required />
             <TextInput label="Title" value={designForm.title} onChange={(value) => setDesignForm({ ...designForm, title: value })} required />
             <TextArea label="Description" value={designForm.description} onChange={(value) => setDesignForm({ ...designForm, description: value })} rows={3} />
             <div className="grid grid-cols-2 gap-4">
@@ -740,6 +769,7 @@ export default function ProjectDetail() {
       {showCreateRisk && (
         <Modal title="New Risk" onClose={() => setShowCreateRisk(false)}>
           <form onSubmit={handleCreateRisk} className="space-y-4">
+            <TextInput label="ID" value={riskForm.risk_id} onChange={(value) => setRiskForm({ ...riskForm, risk_id: value.toUpperCase() })} required />
             <TextInput label="Title" value={riskForm.title} onChange={(value) => setRiskForm({ ...riskForm, title: value })} required />
             <TextArea label="Description" value={riskForm.description} onChange={(value) => setRiskForm({ ...riskForm, description: value })} rows={3} />
             <TextArea label="Mitigation" value={riskForm.mitigation} onChange={(value) => setRiskForm({ ...riskForm, mitigation: value })} rows={2} />
@@ -757,6 +787,7 @@ export default function ProjectDetail() {
       {showCreateChange && (
         <Modal title="New Change Request" onClose={() => setShowCreateChange(false)}>
           <form onSubmit={handleCreateChange} className="space-y-4">
+            <TextInput label="ID" value={changeForm.change_id} onChange={(value) => setChangeForm({ ...changeForm, change_id: value.toUpperCase() })} required />
             <TextInput label="Title" value={changeForm.title} onChange={(value) => setChangeForm({ ...changeForm, title: value })} required />
             <TextArea label="Description" value={changeForm.description} onChange={(value) => setChangeForm({ ...changeForm, description: value })} rows={3} />
             <TextArea label="Impact Assessment" value={changeForm.impact_assessment} onChange={(value) => setChangeForm({ ...changeForm, impact_assessment: value })} rows={2} />
@@ -978,6 +1009,20 @@ function TcStatusBadge({ status }: { status: string }) {
     Deprecated: 'bg-red-500/10 text-red-700 dark:text-red-400',
   }
   return <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[status] || colors.Draft}`}>{status}</span>
+}
+
+function ExecutionBadge({ status }: { status: string | null }) {
+  if (!status) {
+    return <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">Not executed</span>
+  }
+
+  const colors: Record<string, string> = {
+    Passed: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+    Failed: 'bg-red-500/10 text-red-700 dark:text-red-400',
+    Skipped: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
+  }
+
+  return <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[status] || 'bg-muted text-muted-foreground'}`}>{status}</span>
 }
 
 function NeutralBadge({ value }: { value: string }) {
