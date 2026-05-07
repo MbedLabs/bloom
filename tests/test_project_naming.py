@@ -24,7 +24,9 @@ def test_project_prefix_is_normalized_for_id_convention():
     assert project.prefix == "VCU"
 
 
-@pytest.mark.parametrize("prefix", ["BLOOM", "VC1", "VCU-1", "VCU REQ", "1VCU", "VCU_REQ", "VCU.REQ"])
+@pytest.mark.parametrize(
+    "prefix", ["BLOOM", "VC1", "VCU-1", "VCU REQ", "1VCU", "VCU_REQ", "VCU.REQ"]
+)
 def test_project_prefix_rejects_values_that_break_generated_ids(prefix):
     with pytest.raises(ValidationError):
         ProjectCreate(name="Controller", prefix=prefix)

@@ -6,7 +6,13 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 from app.core.id_generator import normalize_doc_id
 
@@ -14,8 +20,7 @@ from app.core.id_generator import normalize_doc_id
 
 PROJECT_PREFIX_PATTERN = re.compile(r"^[A-Z]{3}$")
 PROJECT_PREFIX_ERROR = (
-    "Project prefix must be exactly three uppercase letters so generated IDs follow "
-    "PRJ-TYP-001."
+    "Project prefix must be exactly three uppercase letters so generated IDs follow " "PRJ-TYP-001."
 )
 
 

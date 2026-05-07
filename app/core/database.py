@@ -78,7 +78,9 @@ async def create_tables():
             text("ALTER TABLE test_cases ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP")
         )
         await conn.execute(
-            text("ALTER TABLE test_cases ADD COLUMN IF NOT EXISTS last_execution_status VARCHAR(20)")
+            text(
+                "ALTER TABLE test_cases ADD COLUMN IF NOT EXISTS last_execution_status VARCHAR(20)"
+            )
         )
         await conn.execute(
             text("ALTER TABLE test_cases ADD COLUMN IF NOT EXISTS last_executed_at TIMESTAMP")
