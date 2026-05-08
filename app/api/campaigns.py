@@ -306,7 +306,7 @@ async def create_campaign(
         bud_run_id=data.bud_run_id,
         bud_run_url=data.bud_run_url,
         bud_run_status=data.bud_run_status,
-        status=data.status or "Planned",
+        status="Planned",
     )
     db.add(campaign)
     await db.flush()
