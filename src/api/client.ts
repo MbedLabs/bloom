@@ -555,6 +555,8 @@ export interface DocShell {
   incoming_links: number
   outgoing_links: number
   suspect_links: number
+  last_execution_status: string | null
+  last_executed_at: string | null
   created_at: string
   updated_at: string
 }

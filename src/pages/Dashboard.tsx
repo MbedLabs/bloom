@@ -94,7 +94,7 @@ export default function Dashboard() {
             <CircleDot className="h-3.5 w-3.5 text-primary" />
             Bloom PLM
           </div>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">Controlled Documents Dashboard</h2>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">Bloom Dashboard</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Portfolio health across requirements, specifications, protocols, test assets, designs, risks, changes, reports, and standards.
           </p>

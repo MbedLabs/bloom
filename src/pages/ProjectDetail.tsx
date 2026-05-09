@@ -53,6 +53,10 @@ export default function ProjectDetail() {
 
   const [reqStatusFilter, setReqStatusFilter] = useState('')
   const [tcStatusFilter, setTcStatusFilter] = useState('')
+  const [tcExecFilter, setTcExecFilter] = useState('')
+  const [tcSearch, setTcSearch] = useState('')
+  const [tcSortField, setTcSortField] = useState<'tc_id' | 'title' | 'status' | 'execution' | 'updated_at'>('updated_at')
+  const [tcSortDir, setTcSortDir] = useState<'asc' | 'desc'>('desc')
   const [showCreateReq, setShowCreateReq] = useState(false)
   const [showCreateTc, setShowCreateTc] = useState(false)
   const [showCreateConcept, setShowCreateConcept] = useState(false)
@@ -206,10 +210,37 @@ export default function ProjectDetail() {
     [requirements, reqStatusFilter]
   )
 
-  const filteredTestCases = useMemo(
-    () => testCases?.filter((item) => !tcStatusFilter || item.status === tcStatusFilter) ?? [],
-    [testCases, tcStatusFilter]
-  )
+  const filteredTestCases = useMemo(() => {
+    let result = testCases ?? []
+    if (tcStatusFilter) result = result.filter((tc) => tc.status === tcStatusFilter)
+    if (tcExecFilter) result = result.filter((tc) => (tc.last_execution_status || 'Not executed') === tcExecFilter)
+    if (tcSearch.trim()) {
+      const q = tcSearch.toLowerCase()
+      result = result.filter((tc) =>
+        [tc.tc_id, tc.title, tc.status, tc.last_execution_status || ''].join(' ').toLowerCase().includes(q)
+      )
+    }
+    return [...result].sort((a, b) => {
+      let cmp = 0
+      switch (tcSortField) {
+        case 'updated_at':
+          cmp = new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime()
+          break
+        case 'tc_id':
+        case 'title':
+        case 'status':
+          cmp = String(a[tcSortField]).localeCompare(String(b[tcSortField]), undefined, { numeric: true, sensitivity: 'base' })
+          break
+        case 'execution': {
+          const ea = a.last_execution_status || ''
+          const eb = b.last_execution_status || ''
+          cmp = ea.localeCompare(eb, undefined, { sensitivity: 'base' })
+          break
+        }
+      }
+      return tcSortDir === 'asc' ? cmp : -cmp
+    })
+  }, [testCases, tcStatusFilter, tcExecFilter, tcSearch, tcSortField, tcSortDir])
 
   const specDocs = useMemo(() => documents?.filter((d) => d.doc_type === 'SPEC') ?? [], [documents])
   const protDocs = useMemo(() => documents?.filter((d) => d.doc_type === 'PROT') ?? [], [documents])
@@ -444,6 +475,16 @@ export default function ProjectDetail() {
             actionLabel={canEditDocs ? 'New Test Case' : undefined}
             onAction={canEditDocs ? () => navigate(docCreateUrl(prefix, 'TC')) : undefined}
           >
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search ID, title..."
+                value={tcSearch}
+                onChange={(e) => setTcSearch(e.target.value)}
+                className="w-48 rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring"
+              />
+            </div>
             <select
               value={tcStatusFilter}
               onChange={(e) => setTcStatusFilter(e.target.value)}
@@ -453,6 +494,32 @@ export default function ProjectDetail() {
               <option value="Draft">Draft</option>
               <option value="Active">Active</option>
               <option value="Deprecated">Deprecated</option>
+            </select>
+            <select
+              value={tcExecFilter}
+              onChange={(e) => setTcExecFilter(e.target.value)}
+              className="px-3 py-2 bg-background border border-input rounded-md text-sm"
+            >
+              <option value="">All Exec Results</option>
+              <option value="Passed">Passed</option>
+              <option value="Failed">Failed</option>
+              <option value="Skipped">Skipped</option>
+              <option value="Not executed">Not executed</option>
+            </select>
+            <select
+              value={tcSortField}
+              onChange={(e) => {
+                const f = e.target.value as typeof tcSortField
+                setTcSortField(f)
+                setTcSortDir(f === 'updated_at' ? 'desc' : 'asc')
+              }}
+              className="px-3 py-2 bg-background border border-input rounded-md text-sm"
+            >
+              <option value="updated_at">Sort by Updated</option>
+              <option value="tc_id">Sort by ID</option>
+              <option value="title">Sort by Title</option>
+              <option value="status">Sort by Status</option>
+              <option value="execution">Sort by Exec Result</option>
             </select>
           </SectionToolbar>
 
