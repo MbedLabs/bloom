@@ -16,6 +16,7 @@ ALLOWED_TYPE_CODES = frozenset(
         "RSK",
         "CHG",
         "TCO",
+        "DEF",
         "SPEC",
         "PROT",
         "RPT",

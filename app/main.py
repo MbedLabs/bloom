@@ -22,11 +22,13 @@ from app.api import (
     campaigns,
     changes,
     dashboard,
+    defects,
     designs,
     docs_facade,
     documents,
     health,
     import_service,
+    integrations,
     links,
     project_variables,
     projects,
@@ -234,6 +236,8 @@ app.include_router(campaigns.router, prefix="/api/campaigns", tags=["Campaigns"]
 app.include_router(designs.router, prefix="/api/designs", tags=["Designs"])
 app.include_router(risks.router, prefix="/api/risks", tags=["Risks"])
 app.include_router(changes.router, prefix="/api/changes", tags=["Changes"])
+app.include_router(defects.router, prefix="/api/defects", tags=["Defects"])
+app.include_router(integrations.router, prefix="/api/integrations", tags=["Integrations"])
 app.include_router(baselines.router, prefix="/api/baselines", tags=["Baselines"])
 app.include_router(test_concepts.router, prefix="/api/test-concepts", tags=["Test Concepts"])
 app.include_router(artefacts.router, prefix="/api/artefacts", tags=["Artefacts"])

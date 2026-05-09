@@ -10,12 +10,15 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models import (
     ArtefactLink,
+    Defect,
     Project,
     Requirement,
     TestCampaign,
     TestCampaignItem,
     TestCase,
 )
+
+OPEN_DEFECT_STATUSES = ("Open", "Triaged", "In Progress", "Resolved", "Verified")
 from app.models.user import User
 
 router = APIRouter()
@@ -78,6 +81,21 @@ async def get_dashboard_stats(
     )
     campaign_result_dist = {row[0]: row[1] for row in campaign_item_result}
 
+    total_defects = await db.scalar(select(func.count(Defect.id)))
+    open_defects = await db.scalar(
+        select(func.count(Defect.id)).where(Defect.status.in_(OPEN_DEFECT_STATUSES))
+    )
+    defect_severity_result = await db.execute(
+        select(Defect.severity, func.count(Defect.id))
+        .where(Defect.status.in_(OPEN_DEFECT_STATUSES))
+        .group_by(Defect.severity)
+    )
+    defect_severity_dist = {row[0]: row[1] for row in defect_severity_result}
+    defect_status_result = await db.execute(
+        select(Defect.status, func.count(Defect.id)).group_by(Defect.status)
+    )
+    defect_status_dist = {row[0]: row[1] for row in defect_status_result}
+
     project_stats_result = await db.execute(
         select(
             Project.id,
@@ -118,5 +136,9 @@ async def get_dashboard_stats(
         "requirement_status_distribution": req_status_dist,
         "test_case_status_distribution": tc_status_dist,
         "campaign_result_distribution": campaign_result_dist,
+        "total_defects": total_defects or 0,
+        "open_defects": open_defects or 0,
+        "defect_severity_distribution": defect_severity_dist,
+        "defect_status_distribution": defect_status_dist,
         "projects": projects,
     }

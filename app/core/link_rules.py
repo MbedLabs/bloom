@@ -2,7 +2,7 @@
 
 from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS, normalize_document_kind
 
-LINKABLE_ARTEFACT_KINDS = ("REQ", "TC", "DES", "RSK", "CHG", "TCO")
+LINKABLE_ARTEFACT_KINDS = ("REQ", "TC", "DES", "RSK", "CHG", "TCO", "DEF", "CMP")
 LINKABLE_DOC_KINDS = LINKABLE_ARTEFACT_KINDS + tuple(CANONICAL_DOCUMENT_KINDS)
 
 LINK_RULE_ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
@@ -59,6 +59,30 @@ LINK_RULE_ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("CHG", "RSK", ("mitigates", "impacts", "references")),
     ("CHG", "CHG", ("depends_on", "duplicates", "blocks", "relates_to")),
     ("CHG", "STD", ("references",)),
+    ("CHG", "DEF", ("implements", "references")),
+    # DEF (defect) rules
+    ("DEF", "REQ", ("impacts", "references")),
+    ("DEF", "SPEC", ("impacts", "references")),
+    ("DEF", "TC", ("references",)),
+    ("DEF", "TCO", ("references",)),
+    ("DEF", "PROT", ("references",)),
+    ("DEF", "CHG", ("references",)),
+    ("DEF", "RPT", ("references",)),
+    ("DEF", "DES", ("impacts", "references")),
+    ("DEF", "RSK", ("references",)),
+    ("DEF", "DEF", ("duplicates", "relates_to", "depends_on")),
+    ("DEF", "STD", ("references",)),
+    ("DEF", "CMP", ("references",)),
+    # CMP (campaign) rules
+    ("CMP", "DEF", ("references",)),
+    ("CMP", "REQ", ("verifies", "references")),
+    ("CMP", "SPEC", ("verifies", "references")),
+    ("CMP", "TC", ("references",)),
+    ("CMP", "CMP", ("relates_to",)),
+    # Reverse edges allowing TC/RPT/RSK to reference DEF
+    ("TC", "DEF", ("references",)),
+    ("RPT", "DEF", ("references",)),
+    ("RSK", "DEF", ("impacts", "references")),
 )
 
 

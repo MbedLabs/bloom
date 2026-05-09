@@ -192,6 +192,15 @@ async def create_tables():
             text("CREATE INDEX IF NOT EXISTS ix_user_tokens_used_at ON user_tokens(used_at)")
         )
 
+        # Backfill existing campaigns that have suite_id into the new campaign_suites join table
+        await conn.execute(
+            text(
+                "INSERT INTO campaign_suites (campaign_id, suite_id, created_at) "
+                "SELECT id, suite_id, created_at FROM test_campaigns WHERE suite_id IS NOT NULL "
+                "ON CONFLICT DO NOTHING"
+            )
+        )
+
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """

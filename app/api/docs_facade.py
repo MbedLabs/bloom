@@ -46,6 +46,8 @@ class DocShellResponse(BaseModel):
     incoming_links: int = 0
     outgoing_links: int = 0
     suspect_links: int = 0
+    last_execution_status: str | None = None
+    last_executed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -211,6 +213,8 @@ async def list_all_docs(
                     incoming_links=lc["incoming"],
                     outgoing_links=lc["outgoing"],
                     suspect_links=lc["suspect"],
+                    last_execution_status=getattr(row, "last_execution_status", None),
+                    last_executed_at=getattr(row, "last_executed_at", None),
                     created_at=row.created_at,
                     updated_at=row.updated_at,
                 )

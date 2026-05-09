@@ -80,6 +80,7 @@ class ProjectResponse(BaseModel):
     change_count: int = 0
     test_concept_count: int = 0
     test_suite_count: int = 0
+    defect_count: int = 0
 
     @field_serializer("created_at", "updated_at")
     def serialize_dt(self, dt: datetime, _info):
@@ -145,6 +146,13 @@ class TestSuiteSummary(BaseModel):
 
 class TestCampaignSummary(BaseModel):
     id: int
+    name: str
+    status: str
+
+
+class TestConceptSummary(BaseModel):
+    id: int
+    concept_id: str
     name: str
     status: str
 
@@ -647,6 +655,7 @@ class TestSuiteDetailResponse(TestSuiteResponse):
     items: List[TestSuiteItemResponse] = []
     related_requirements: List[RequirementSummary] = []
     linked_campaigns: List[TestCampaignSummary] = []
+    related_concepts: List[TestConceptSummary] = []
 
 
 class TestCampaignCreate(BaseModel):
@@ -655,6 +664,7 @@ class TestCampaignCreate(BaseModel):
     description: Optional[str] = None
     configuration_id: Optional[int] = None
     suite_id: Optional[int] = None
+    suite_ids: List[int] = []
     bud_run_id: Optional[int] = None
     bud_run_url: Optional[str] = None
     bud_run_status: Optional[str] = None
@@ -666,6 +676,7 @@ class TestCampaignUpdate(BaseModel):
     description: Optional[str] = None
     configuration_id: Optional[int] = None
     suite_id: Optional[int] = None
+    suite_ids: Optional[List[int]] = None
     bud_run_id: Optional[int] = None
     bud_run_url: Optional[str] = None
     bud_run_status: Optional[str] = None
@@ -713,6 +724,7 @@ class TestCampaignResponse(BaseModel):
     pending: int = 0
     configuration: Optional[TestConfigurationResponse] = None
     suite: Optional[TestSuiteSummary] = None
+    suites: List[TestSuiteSummary] = []
 
     @field_serializer("started_at", "completed_at", "created_at", "updated_at")
     def serialize_dt(self, dt: Optional[datetime], _info):
@@ -722,9 +734,17 @@ class TestCampaignResponse(BaseModel):
         from_attributes = True
 
 
+class TestCampaignSuiteScope(BaseModel):
+    suite: TestSuiteSummary
+    items: List[TestCampaignItemResponse] = []
+
+
 class TestCampaignDetailResponse(TestCampaignResponse):
     items: List[TestCampaignItemResponse] = []
+    suite_scopes: List[TestCampaignSuiteScope] = []
+    ad_hoc_items: List[TestCampaignItemResponse] = []
     related_requirements: List[RequirementSummary] = []
+    related_concepts: List[TestConceptSummary] = []
 
 
 class TestCampaignItemUpdate(BaseModel):
@@ -920,6 +940,92 @@ class ChangeRequestResponse(BaseModel):
 
     @field_serializer("created_at", "updated_at")
     def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
+
+    class Config:
+        from_attributes = True
+
+
+# ==================== Defect Schemas ====================
+
+
+class DefectCreate(BaseModel):
+    project_id: int
+    defect_id: str = Field(..., min_length=11, max_length=11)
+    title: str = Field(..., min_length=1, max_length=500)
+    description: Optional[str] = None
+    status: str = "Open"
+    severity: str = "Medium"
+    priority: str = "Medium"
+    source_type: Optional[str] = None
+    source_id: Optional[int] = None
+    owner_id: Optional[int] = None
+    reporter_id: Optional[int] = None
+    reviewer_id: Optional[int] = None
+    resolution_summary: Optional[str] = None
+    external_tracker: Optional[str] = None
+    external_repo_full_name: Optional[str] = None
+    external_issue_number: Optional[int] = None
+    external_issue_url: Optional[str] = None
+    external_issue_state: Optional[str] = None
+
+    @field_validator("defect_id", mode="before")
+    @classmethod
+    def validate_defect_id(cls, value: str) -> str:
+        return normalize_doc_id(value, expected_type_code="DEF")
+
+
+class DefectUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=500)
+    description: Optional[str] = None
+    status: Optional[str] = None
+    severity: Optional[str] = None
+    priority: Optional[str] = None
+    source_type: Optional[str] = None
+    source_id: Optional[int] = None
+    owner_id: Optional[int] = None
+    reporter_id: Optional[int] = None
+    reviewer_id: Optional[int] = None
+    resolution_summary: Optional[str] = None
+    external_tracker: Optional[str] = None
+    external_repo_full_name: Optional[str] = None
+    external_issue_number: Optional[int] = None
+    external_issue_url: Optional[str] = None
+    external_issue_state: Optional[str] = None
+
+
+class DefectResponse(BaseModel):
+    id: int
+    project_id: int
+    defect_id: str
+    title: str
+    description: Optional[str] = None
+    status: str
+    severity: str
+    priority: str
+    source_type: Optional[str] = None
+    source_id: Optional[int] = None
+    owner_id: Optional[int] = None
+    reporter_id: Optional[int] = None
+    reviewer_id: Optional[int] = None
+    resolution_summary: Optional[str] = None
+    external_tracker: Optional[str] = None
+    external_repo_full_name: Optional[str] = None
+    external_issue_number: Optional[int] = None
+    external_issue_url: Optional[str] = None
+    external_issue_state: Optional[str] = None
+    closed_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+    @field_serializer("created_at", "updated_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
+
+    @field_serializer("closed_at")
+    def serialize_closed_at(self, dt: Optional[datetime], _info):
+        if dt is None:
+            return None
         return f"{dt.isoformat()}Z"
 
     class Config:
