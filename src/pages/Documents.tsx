@@ -18,6 +18,7 @@ import {
 import { docsApi, type DocShell, usersApi } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { docCreateUrl, docUrl, normalizeDocTypeParam, type DocType } from '../types/doc'
+import { formatDateTime } from '../test/date-utils'
 
 const TYPE_BADGES: Record<DocType, { label: string; color: string }> = {
   REQ: { label: 'Requirement', color: 'bg-amber-500/10 text-amber-700 dark:text-amber-400' },
@@ -162,6 +163,18 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${colors[status] || 'bg-muted text-muted-foreground'}`}>{status}</span>
 }
 
+function ExecutionBadge({ status }: { status: string | null }) {
+  if (!status) {
+    return <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">Not executed</span>
+  }
+  const colors: Record<string, string> = {
+    Passed: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+    Failed: 'bg-red-500/10 text-red-700 dark:text-red-400',
+    Skipped: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
+  }
+  return <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[status] || 'bg-muted text-muted-foreground'}`}>{status}</span>
+}
+
 export default function Documents() {
   const { prefix } = useParams<{ prefix: string }>()
   const navigate = useNavigate()
@@ -197,6 +210,7 @@ export default function Documents() {
   const sortParam = searchParams.get('sort')
   const sortField: SortField = isSortField(sortParam) ? sortParam : 'updated_at'
   const pageTitle = typeFilters.length === 1 ? TYPE_PAGE_TITLE[typeFilters[0]] : 'Documents'
+  const showExecColumn = typeFilters.length === 0 || typeFilters.includes('TC')
 
   const { data: docs, isLoading } = useQuery({
     queryKey: ['all-docs', prefix, typeFilters],
@@ -430,6 +444,7 @@ export default function Documents() {
     sortField !== 'updated_at'
   )
   const createTypes = typeFilters.length === 1 ? DOC_TYPE_OPTIONS.filter((type) => type.code === typeFilters[0]) : DOC_TYPE_OPTIONS
+  const createButtonLabel = createTypes.length === 1 ? `New ${TYPE_BADGES[createTypes[0].code].label}` : 'New item'
   const totalDocs = docs?.length ?? 0
 
   const SortHeader = ({ field, children, compact = false }: { field: SortField; children: React.ReactNode; compact?: boolean }) => (
@@ -479,7 +494,7 @@ export default function Documents() {
               className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-all"
             >
               <Plus className="h-4 w-4" />
-              New Controlled Item
+              {createButtonLabel}
               <ChevronDown className={`h-4 w-4 transition-transform ${createMenuOpen ? 'rotate-180' : ''}`} />
             </button>
             {createMenuOpen && (
@@ -493,7 +508,7 @@ export default function Documents() {
                     }}
                     className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-accent"
                   >
-                    <span>{TYPE_BADGES[type.code].label}</span>
+                    <span>New {TYPE_BADGES[type.code].label}</span>
                     <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${TYPE_BADGES[type.code].color}`}>{type.code}</span>
                   </button>
                 ))}
@@ -716,6 +731,7 @@ export default function Documents() {
                   <SortHeader field="doc_type">Kind</SortHeader>
                   <SortHeader field="title">Name / Title</SortHeader>
                   <SortHeader field="status">Status</SortHeader>
+                  {showExecColumn && <SortHeader field="updated_at">Execution</SortHeader>}
                   <SortHeader field="priority" compact>Priority</SortHeader>
                   <SortHeader field="reviewer" compact>Reviewer</SortHeader>
                   <SortHeader field="created_at">Created</SortHeader>
@@ -741,6 +757,20 @@ export default function Documents() {
                     <td className="px-6 py-3 whitespace-nowrap">
                       <StatusBadge status={doc.status} />
                     </td>
+                    {showExecColumn && (
+                      <td className="px-6 py-3 whitespace-nowrap">
+                        {doc.doc_type === 'TC' ? (
+                          <div className="space-y-1">
+                            <ExecutionBadge status={doc.last_execution_status} />
+                            <div className="text-xs text-muted-foreground">
+                              {doc.last_executed_at ? formatDateTime(doc.last_executed_at) : 'No execution yet'}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </td>
+                    )}
                     <td className="px-4 py-3 whitespace-nowrap text-xs text-muted-foreground">
                       {doc.priority || '-'}
                     </td>
