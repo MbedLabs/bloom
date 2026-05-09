@@ -22,6 +22,8 @@ import ProjectParameters from './pages/ProjectParameters'
 import DocCreate from './pages/DocCreate'
 import ImportWizard from './pages/ImportWizard'
 import UnifiedDocDetail from './pages/UnifiedDocDetail'
+import Defects from './pages/Defects'
+import ArtefactDetail from './pages/ArtefactDetail'
 import VerifyEmail from './pages/VerifyEmail'
 
 function NotFound() {
@@ -56,6 +58,8 @@ function App() {
         <Route path="projects/:prefix/docs/:kind/:docId/edit" element={<DocCreate editMode />} />
         <Route path="projects/:prefix/docs/:kind/:docId" element={<UnifiedDocDetail />} />
         <Route path="projects/:prefix/parameters" element={<ProjectParameters />} />
+        <Route path="projects/:prefix/defects" element={<Defects />} />
+        <Route path="projects/:prefix/defects/:itemId" element={<ArtefactDetail kind="defect" />} />
         <Route path="projects/:prefix/campaigns" element={<TestCampaigns />} />
         <Route path="projects/:prefix/suites/:suiteId" element={<SuiteDetail />} />
         <Route path="projects/:prefix/campaigns/:campaignId" element={<CampaignDetail />} />

@@ -28,6 +28,8 @@ const TYPE_BADGES: Record<DocType, { label: string; color: string }> = {
   RSK: { label: 'Risk', color: 'bg-red-500/10 text-red-700 dark:text-red-400' },
   CHG: { label: 'Change Request', color: 'bg-blue-500/10 text-blue-700 dark:text-blue-400' },
   TCO: { label: 'Test Concept', color: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' },
+  DEF: { label: 'Defect', color: 'bg-rose-500/10 text-rose-700 dark:text-rose-400' },
+  CMP: { label: 'Campaign', color: 'bg-sky-500/10 text-sky-700 dark:text-sky-400' },
   PROT: { label: 'Protocol', color: 'bg-teal-500/10 text-teal-700 dark:text-teal-400' },
   RPT: { label: 'Report', color: 'bg-slate-500/10 text-slate-700 dark:text-slate-400' },
   STD: { label: 'External Standard', color: 'bg-orange-500/10 text-orange-700 dark:text-orange-400' },
@@ -51,6 +53,8 @@ const TYPE_PAGE_TITLE: Record<DocType, string> = {
   SPEC: 'Specifications',
   TC: 'Test Cases',
   TCO: 'Test Concepts',
+  DEF: 'Defects',
+  CMP: 'Campaigns',
   PROT: 'Protocols',
   DES: 'Design Items',
   RSK: 'Risks',
@@ -444,7 +448,7 @@ export default function Documents() {
     sortField !== 'updated_at'
   )
   const createTypes = typeFilters.length === 1 ? DOC_TYPE_OPTIONS.filter((type) => type.code === typeFilters[0]) : DOC_TYPE_OPTIONS
-  const createButtonLabel = createTypes.length === 1 ? `New ${TYPE_BADGES[createTypes[0].code].label}` : 'New item'
+  const createButtonLabel = createTypes.length === 1 ? `New ${TYPE_BADGES[createTypes[0].code].label}` : 'New Document'
   const totalDocs = docs?.length ?? 0
 
   const SortHeader = ({ field, children, compact = false }: { field: SortField; children: React.ReactNode; compact?: boolean }) => (

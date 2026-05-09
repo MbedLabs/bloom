@@ -1,4 +1,4 @@
-export type DocType = 'REQ' | 'SPEC' | 'TC' | 'DES' | 'RSK' | 'CHG' | 'TCO' | 'PROT' | 'RPT' | 'STD'
+export type DocType = 'REQ' | 'SPEC' | 'TC' | 'DES' | 'RSK' | 'CHG' | 'TCO' | 'DEF' | 'CMP' | 'PROT' | 'RPT' | 'STD'
 export type DocLinkRole =
   | 'derives_from'
   | 'refines'
@@ -158,6 +158,35 @@ export const DOC_CONFIGS: Record<DocType, DocConfig> = {
       { key: 'coverage', label: 'Coverage %', type: 'number' },
     ],
   },
+  DEF: {
+    label: 'Defect',
+    typeCode: 'DEF',
+    apiBase: 'defects',
+    idField: 'defect_id',
+    titleField: 'title',
+    descriptionField: 'description',
+    statusOptions: ['Open', 'Triaged', 'In Progress', 'Resolved', 'Verified', 'Closed', 'Rejected', 'Duplicate'],
+    priorityOptions: ['Low', 'Medium', 'High', 'Critical'],
+    fields: [
+      { key: 'title', label: 'Title', type: 'text', required: true },
+      { key: 'description', label: 'Description', type: 'textarea' },
+      { key: 'severity', label: 'Severity', type: 'select', options: ['Low', 'Medium', 'High', 'Critical'] },
+      { key: 'priority', label: 'Priority', type: 'select', options: ['Low', 'Medium', 'High', 'Critical'] },
+    ],
+  },
+  CMP: {
+    label: 'Campaign',
+    typeCode: 'CMP',
+    apiBase: 'campaigns',
+    idField: 'id',
+    titleField: 'name',
+    descriptionField: 'description',
+    statusOptions: ['Planned', 'Running', 'Completed'],
+    fields: [
+      { key: 'name', label: 'Name', type: 'text', required: true },
+      { key: 'description', label: 'Description', type: 'textarea' },
+    ],
+  },
   SPEC: {
     label: 'Specification',
     typeCode: 'SPEC',
@@ -226,6 +255,8 @@ export const DOC_TYPE_LABELS: Record<DocType, string> = {
   RSK: 'Risk',
   CHG: 'Change Request',
   TCO: 'Test Concept',
+  DEF: 'Defect',
+  CMP: 'Campaign',
   PROT: 'Protocol',
   RPT: 'Report',
   STD: 'External Standard',
@@ -239,6 +270,8 @@ export const DOC_TYPE_COLORS: Record<DocType, string> = {
   RSK: 'bg-red-500/10 text-red-700 dark:text-red-400',
   CHG: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
   TCO: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+  DEF: 'bg-rose-500/10 text-rose-700 dark:text-rose-400',
+  CMP: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
   PROT: 'bg-teal-500/10 text-teal-700 dark:text-teal-400',
   RPT: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
   STD: 'bg-orange-500/10 text-orange-700 dark:text-orange-400',
@@ -252,6 +285,8 @@ export const DOC_TYPE_SLUGS: Record<DocType, string> = {
   RSK: 'risks',
   CHG: 'changes',
   TCO: 'test-concepts',
+  DEF: 'defects',
+  CMP: 'campaigns',
   PROT: 'protocols',
   RPT: 'reports',
   STD: 'standards',
@@ -322,6 +357,27 @@ const DOC_LINK_RULE_ROWS: DocLinkRuleRow[] = [
   { sourceType: 'CHG', targetType: 'RSK', roles: ['mitigates', 'impacts', 'references'] },
   { sourceType: 'CHG', targetType: 'CHG', roles: ['depends_on', 'duplicates', 'blocks', 'relates_to'] },
   { sourceType: 'CHG', targetType: 'STD', roles: ['references'] },
+  { sourceType: 'CHG', targetType: 'DEF', roles: ['implements', 'references'] },
+  { sourceType: 'DEF', targetType: 'REQ', roles: ['impacts', 'references'] },
+  { sourceType: 'DEF', targetType: 'SPEC', roles: ['impacts', 'references'] },
+  { sourceType: 'DEF', targetType: 'TC', roles: ['references'] },
+  { sourceType: 'DEF', targetType: 'TCO', roles: ['references'] },
+  { sourceType: 'DEF', targetType: 'PROT', roles: ['references'] },
+  { sourceType: 'DEF', targetType: 'CHG', roles: ['references'] },
+  { sourceType: 'DEF', targetType: 'RPT', roles: ['references'] },
+  { sourceType: 'DEF', targetType: 'DES', roles: ['impacts', 'references'] },
+  { sourceType: 'DEF', targetType: 'RSK', roles: ['references'] },
+  { sourceType: 'DEF', targetType: 'DEF', roles: ['duplicates', 'relates_to', 'depends_on'] },
+  { sourceType: 'DEF', targetType: 'STD', roles: ['references'] },
+  { sourceType: 'DEF', targetType: 'CMP', roles: ['references'] },
+  { sourceType: 'CMP', targetType: 'DEF', roles: ['references'] },
+  { sourceType: 'CMP', targetType: 'REQ', roles: ['verifies', 'references'] },
+  { sourceType: 'CMP', targetType: 'SPEC', roles: ['verifies', 'references'] },
+  { sourceType: 'CMP', targetType: 'TC', roles: ['references'] },
+  { sourceType: 'CMP', targetType: 'CMP', roles: ['relates_to'] },
+  { sourceType: 'TC', targetType: 'DEF', roles: ['references'] },
+  { sourceType: 'RPT', targetType: 'DEF', roles: ['references'] },
+  { sourceType: 'RSK', targetType: 'DEF', roles: ['impacts', 'references'] },
 ]
 
 const DOC_LINK_ROLE_LABELS: Record<DocLinkRole, [string, string]> = {

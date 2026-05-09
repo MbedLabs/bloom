@@ -79,7 +79,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   })
 
   const apiForType = useCallback((type: DocType) => {
-    const map = {
+    const map: Record<string, unknown> = {
       REQ: requirementsApi, TC: testCasesApi, DES: designsApi,
       RSK: risksApi, CHG: changesApi, TCO: testConceptsApi,
       SPEC: documentsApi, PROT: documentsApi, RPT: documentsApi, STD: documentsApi,

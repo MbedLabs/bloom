@@ -15,7 +15,7 @@ export default function TestCampaigns() {
   const [form, setForm] = useState({ name: '', description: '' })
   const [suiteForm, setSuiteForm] = useState({ name: '', description: '' })
   const [selectedTcIds, setSelectedTcIds] = useState<number[]>([])
-  const [selectedSuiteId, setSelectedSuiteId] = useState('')
+  const [selectedSuiteIds, setSelectedSuiteIds] = useState<number[]>([])
   const [createError, setCreateError] = useState('')
 
   const { data: campaigns, isLoading } = useQuery({
@@ -36,13 +36,12 @@ export default function TestCampaigns() {
     enabled: !!projectId && showCreateSuite,
   })
 
-  const selectedSuite = (suites || []).find((suite) => String(suite.id) === selectedSuiteId)
   const hasSuites = (suites?.length || 0) > 0
 
   const openCreateCampaign = () => {
     setCreateError('')
     setSelectedTcIds([])
-    setSelectedSuiteId(suites && suites.length > 0 ? String(suites[0].id) : '')
+    setSelectedSuiteIds([])
     setShowCreate(true)
   }
 
@@ -56,7 +55,7 @@ export default function TestCampaigns() {
       setShowCreate(false)
       setForm({ name: '', description: '' })
       setSelectedTcIds([])
-      setSelectedSuiteId('')
+      setSelectedSuiteIds([])
     },
     onError: (error: unknown) => {
       setCreateError(extractApiErrorMessage(error, 'Campaign creation failed.'))
@@ -71,21 +70,27 @@ export default function TestCampaigns() {
       setShowCreateSuite(false)
       setSuiteForm({ name: '', description: '' })
       setSelectedTcIds([])
-      setSelectedSuiteId(String(suite.id))
+      setSelectedSuiteIds((prev) => [...prev, suite.id])
     },
   })
 
+  const toggleSuiteId = (id: number) => {
+    setSelectedSuiteIds((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+    )
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedSuiteId) {
-      setCreateError('Select a suite before creating a campaign.')
+    if (selectedSuiteIds.length === 0) {
+      setCreateError('Select at least one suite before creating a campaign.')
       return
     }
     createMutation.mutate({
       project_id: projectId,
       name: form.name,
       description: form.description || undefined,
-      suite_id: Number(selectedSuiteId),
+      suite_ids: selectedSuiteIds,
     })
   }
 
@@ -229,29 +234,28 @@ export default function TestCampaigns() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Campaign Suite</label>
-                  <select
-                    required
-                    value={selectedSuiteId}
-                    onChange={(e) => setSelectedSuiteId(e.target.value)}
-                    className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
-                  >
-                    <option value="">Select a suite</option>
-                    {(suites || []).map((suite) => (
-                      <option key={suite.id} value={suite.id}>{suite.suite_id} · {suite.name}</option>
-                    ))}
-                  </select>
-                  {selectedSuite && (
-                    <div className="mt-2 rounded-md border border-border bg-muted/35 p-3 text-sm">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="font-medium text-foreground">{selectedSuite.name}</span>
-                        <span className="text-xs text-muted-foreground">{selectedSuite.total_items} TC{selectedSuite.total_items !== 1 ? 's' : ''}</span>
-                      </div>
-                      {selectedSuite.description && (
-                        <p className="mt-1 text-muted-foreground line-clamp-2">{selectedSuite.description}</p>
-                      )}
-                    </div>
-                  )}
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    Campaign Suites ({selectedSuiteIds.length} selected)
+                  </label>
+                  <div className="border border-input rounded-md max-h-48 overflow-y-auto">
+                    {(suites || []).length > 0 ? (
+                      (suites || []).map((suite) => (
+                        <label key={suite.id} className="flex items-center px-3 py-2 hover:bg-accent/30 cursor-pointer border-b border-border last:border-b-0">
+                          <input
+                            type="checkbox"
+                            checked={selectedSuiteIds.includes(suite.id)}
+                            onChange={() => toggleSuiteId(suite.id)}
+                            className="mr-3 accent-primary"
+                          />
+                          <span className="font-mono text-xs text-primary mr-2">{suite.suite_id}</span>
+                          <span className="text-sm text-foreground truncate">{suite.name}</span>
+                          <span className="ml-auto text-xs text-muted-foreground">{suite.total_items} TC{suite.total_items !== 1 ? 's' : ''}</span>
+                        </label>
+                      ))
+                    ) : (
+                      <div className="p-4 text-center text-sm text-muted-foreground">No suites available.</div>
+                    )}
+                  </div>
                   {!hasSuites && (
                     <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
                       Create a test suite first. Campaigns are scoped from suites.
@@ -263,21 +267,21 @@ export default function TestCampaigns() {
                     </div>
                   )}
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Campaign items are copied from the selected suite at creation time.
+                    Campaign items are copied from the selected suites at creation time.
                   </p>
                 </div>
               </div>
               <div className="px-6 py-4 border-t border-border flex justify-end space-x-3">
                 <button
                   type="button"
-                  onClick={() => { setShowCreate(false); setCreateError(''); setSelectedTcIds([]); setSelectedSuiteId('') }}
+                  onClick={() => { setShowCreate(false); setCreateError(''); setSelectedTcIds([]); setSelectedSuiteIds([]) }}
                   className="px-4 py-2 border border-input rounded-md text-foreground hover:bg-accent/50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={createMutation.isPending || !selectedSuiteId}
+                  disabled={createMutation.isPending || selectedSuiteIds.length === 0}
                   className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50"
                 >
                   {createMutation.isPending ? 'Creating...' : 'Create Campaign'}
@@ -376,10 +380,16 @@ function CampaignCard({ campaign, prefix }: { campaign: import('../api/client').
         </div>
       )}
 
-      {campaign.suite && (
+      {campaign.suites && campaign.suites.length > 0 && (
         <div className="mb-3 text-xs text-muted-foreground">
-          Suite: <span className="text-foreground font-medium">{campaign.suite.suite_id}</span>
-          <span className="ml-1">{campaign.suite.name}</span>
+          Suite{campaign.suites.length > 1 ? 's' : ''}:{' '}
+          {campaign.suites.map((s, i) => (
+            <span key={s.id}>
+              {i > 0 && ', '}
+              <span className="text-foreground font-medium">{s.suite_id}</span>
+              <span className="ml-1">{s.name}</span>
+            </span>
+          ))}
         </div>
       )}
 

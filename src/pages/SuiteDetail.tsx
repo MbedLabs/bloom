@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Layers3, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, FlaskConical, Layers3, Pencil, Plus, Trash2 } from 'lucide-react'
 
 import { campaignsApi, testCasesApi, testSuitesApi } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { docUrl } from '../types/doc'
+
+const SUITE_STATUSES = ['Draft', 'Active', 'Archived']
 
 export default function SuiteDetail() {
   const { prefix, suiteId } = useParams<{ prefix: string; suiteId: string }>()
@@ -13,7 +15,11 @@ export default function SuiteDetail() {
   const projectId = project?.id || 0
   const parsedSuiteId = Number(suiteId)
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [showAddCase, setShowAddCase] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editForm, setEditForm] = useState({ name: '', description: '', status: '' })
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const { data: suite, isLoading } = useQuery({
     queryKey: ['testSuite', parsedSuiteId],
@@ -53,7 +59,7 @@ export default function SuiteDetail() {
       project_id: projectId,
       name: `${suite?.name || 'Suite'} Scope ${new Date().toISOString().slice(0, 10)}`,
       description: `Traceability scope campaign from suite ${suite?.suite_id || ''}`,
-      suite_id: parsedSuiteId,
+      suite_ids: [parsedSuiteId],
       status: 'Scope',
     }),
     onSuccess: (campaign) => {
@@ -62,6 +68,39 @@ export default function SuiteDetail() {
       window.location.href = `/projects/${prefix}/campaigns/${campaign.id}`
     },
   })
+
+  const updateMutation = useMutation({
+    mutationFn: (data: { name?: string; description?: string; status?: string }) =>
+      testSuitesApi.update(parsedSuiteId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
+      queryClient.invalidateQueries({ queryKey: ['testSuites', projectId] })
+      setEditing(false)
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => testSuitesApi.delete(parsedSuiteId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['testSuites', projectId] })
+      navigate(`/projects/${prefix}/campaigns`)
+    },
+  })
+
+  const startEdit = () => {
+    if (!suite) return
+    setEditForm({ name: suite.name, description: suite.description || '', status: suite.status })
+    setEditing(true)
+  }
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    updateMutation.mutate({
+      name: editForm.name,
+      description: editForm.description || undefined,
+      status: editForm.status,
+    })
+  }
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
@@ -95,6 +134,12 @@ export default function SuiteDetail() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <button onClick={startEdit} className="inline-flex items-center px-3 py-1.5 border border-input text-foreground rounded-md hover:bg-accent/50 text-sm">
+            <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
+          </button>
+          <button onClick={() => setConfirmDelete(true)} className="inline-flex items-center px-3 py-1.5 border border-destructive/30 text-destructive rounded-md hover:bg-destructive/10 text-sm">
+            <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete
+          </button>
           <button
             onClick={() => setShowAddCase(true)}
             className="inline-flex items-center px-4 py-2 border border-input rounded-md text-foreground hover:bg-accent/50 text-sm"
@@ -112,6 +157,45 @@ export default function SuiteDetail() {
           </button>
         </div>
       </div>
+
+      {editing && (
+        <div className="bg-card rounded-lg shadow-elegant p-5">
+          <h3 className="text-sm font-medium text-muted-foreground mb-3">Edit Suite</h3>
+          <form onSubmit={handleEditSubmit} className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Name</label>
+              <input type="text" required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Description</label>
+              <textarea value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring" rows={2} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Status</label>
+              <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring">
+                {SUITE_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setEditing(false)} className="px-4 py-2 border border-input rounded-md text-foreground hover:bg-accent/50 text-sm">Cancel</button>
+              <button type="submit" disabled={updateMutation.isPending} className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm">{updateMutation.isPending ? 'Saving...' : 'Save'}</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-card rounded-lg shadow-elegant p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold text-foreground mb-2">Delete Suite?</h3>
+            <p className="text-sm text-muted-foreground mb-4">This action cannot be undone. All suite items will be removed.</p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setConfirmDelete(false)} className="px-4 py-2 border border-input rounded-md text-foreground hover:bg-accent/50 text-sm">Cancel</button>
+              <button onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending} className="px-4 py-2 bg-destructive text-white rounded-md hover:bg-destructive/90 disabled:opacity-50 text-sm">{deleteMutation.isPending ? 'Deleting...' : 'Delete'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <SummaryCard label="Suite Items" value={suite.total_items} />
@@ -191,6 +275,21 @@ export default function SuiteDetail() {
           )}
         </div>
       </div>
+
+      {suite.related_concepts && suite.related_concepts.length > 0 && (
+        <div className="bg-card rounded-lg shadow-elegant p-5">
+          <h3 className="text-sm font-medium text-muted-foreground mb-3">Related Concepts</h3>
+          <div className="flex flex-wrap gap-2">
+            {suite.related_concepts.map((concept) => (
+              <Link key={concept.id} to={docUrl(prefix!, 'TCO', concept.concept_id)} className="inline-flex items-center px-3 py-2 rounded-md bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 hover:bg-cyan-500/15 text-sm">
+                <FlaskConical className="h-3.5 w-3.5 mr-1.5" />
+                <span className="font-mono mr-2">{concept.concept_id}</span>
+                {concept.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {showAddCase && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">

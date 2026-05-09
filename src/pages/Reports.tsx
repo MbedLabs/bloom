@@ -14,7 +14,10 @@ export default function Reports() {
     total_test_cases: 0, total_campaigns: 0,
     active_campaigns: 0, coverage_percent: 0, uncovered_requirements: 0,
     requirement_status_distribution: {}, test_case_status_distribution: {},
-    campaign_result_distribution: {}, projects: [],
+    campaign_result_distribution: {},
+    total_defects: 0, open_defects: 0,
+    defect_severity_distribution: {}, defect_status_distribution: {},
+    projects: [],
   }
 
   const campaignResults = s.campaign_result_distribution
