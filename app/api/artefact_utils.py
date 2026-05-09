@@ -12,6 +12,7 @@ from app.models import (
     ArtefactActivity,
     ArtefactLink,
     ChangeRequest,
+    Defect,
     DesignItem,
     Document,
     DocumentSection,
@@ -36,6 +37,7 @@ ARTEFACT_MODELS = {
     "risk": RiskItem,
     "change": ChangeRequest,
     "test-concept": TestConcept,
+    "defect": Defect,
 }
 
 ARTEFACT_LINK_TYPES = {
@@ -43,6 +45,7 @@ ARTEFACT_LINK_TYPES = {
     "risk": "RSK",
     "change": "CHG",
     "test-concept": "TCO",
+    "defect": "DEF",
 }
 
 WORKFLOW_TRANSITIONS = {
@@ -68,6 +71,16 @@ WORKFLOW_TRANSITIONS = {
         "Draft": ["Review"],
         "Review": ["Approved", "Draft"],
         "Approved": ["Review"],
+    },
+    "defect": {
+        "Open": ["Triaged", "Rejected", "Duplicate"],
+        "Triaged": ["In Progress", "Rejected", "Duplicate"],
+        "In Progress": ["Resolved", "Triaged"],
+        "Resolved": ["Verified", "In Progress"],
+        "Verified": ["Closed", "In Progress"],
+        "Closed": ["Open"],
+        "Rejected": ["Open"],
+        "Duplicate": ["Open"],
     },
 }
 

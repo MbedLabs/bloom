@@ -62,6 +62,9 @@ class Project(Base):
     test_concepts: Mapped[List["TestConcept"]] = relationship(
         back_populates="project", foreign_keys="TestConcept.project_id"
     )
+    defects: Mapped[List["Defect"]] = relationship(
+        back_populates="project", foreign_keys="Defect.project_id"
+    )
     variables: Mapped[List["ProjectVariable"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
@@ -323,6 +326,7 @@ class TestSuite(Base):
         back_populates="suite", cascade="all, delete-orphan"
     )
     campaigns: Mapped[List["TestCampaign"]] = relationship(back_populates="suite")
+    campaign_suites: Mapped[List["CampaignSuite"]] = relationship(back_populates="suite")
 
 
 class TestSuiteItem(Base):
@@ -373,6 +377,9 @@ class TestCampaign(Base):
     items: Mapped[List["TestCampaignItem"]] = relationship(
         back_populates="campaign", cascade="all, delete-orphan"
     )
+    campaign_suites: Mapped[List["CampaignSuite"]] = relationship(
+        back_populates="campaign", cascade="all, delete-orphan"
+    )
 
 
 class TestCampaignItem(Base):
@@ -391,6 +398,27 @@ class TestCampaignItem(Base):
 
     campaign: Mapped["TestCampaign"] = relationship(back_populates="items")
     test_case: Mapped["TestCase"] = relationship(back_populates="campaign_items")
+
+
+class CampaignSuite(Base):
+    """Many-to-many association between campaigns and suites."""
+
+    __tablename__ = "campaign_suites"
+    __table_args__ = (
+        UniqueConstraint("campaign_id", "suite_id", name="uq_campaign_suite"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    campaign_id: Mapped[int] = mapped_column(
+        ForeignKey("test_campaigns.id"), nullable=False
+    )
+    suite_id: Mapped[int] = mapped_column(
+        ForeignKey("test_suites.id"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    campaign: Mapped["TestCampaign"] = relationship(back_populates="campaign_suites")
+    suite: Mapped["TestSuite"] = relationship(back_populates="campaign_suites")
 
 
 class ArtefactLink(Base):
@@ -566,6 +594,82 @@ class TestConcept(Base):
     project: Mapped["Project"] = relationship(
         back_populates="test_concepts", foreign_keys=[project_id]
     )
+
+
+class Defect(Base):
+    """A confirmed or triaged problem linked to verification, requirements, or external trackers."""
+
+    __tablename__ = "defects"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    defect_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="Open")
+    severity: Mapped[str] = mapped_column(String(20), default="Medium")
+    priority: Mapped[str] = mapped_column(String(20), default="Medium")
+    source_type: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    source_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    owner_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    reporter_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    reviewer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    resolution_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    external_tracker: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    external_repo_full_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    external_issue_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    external_issue_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    external_issue_state: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    external_last_event_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
+
+    project: Mapped["Project"] = relationship(back_populates="defects", foreign_keys=[project_id])
+
+
+class IntegrationSetting(Base):
+    """Per-project external tracker integration credentials and config."""
+
+    __tablename__ = "integration_settings"
+    __table_args__ = (
+        UniqueConstraint("project_id", "tracker", name="uq_integration_project_tracker"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    tracker: Mapped[str] = mapped_column(String(20), nullable=False)
+    base_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    token_encrypted: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    webhook_secret: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    enabled: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
+
+
+class DefectSyncEvent(Base):
+    """Append-only log of inbound/outbound sync attempts for defects."""
+
+    __tablename__ = "defect_sync_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    defect_id: Mapped[int] = mapped_column(ForeignKey("defects.id"), nullable=False)
+    direction: Mapped[str] = mapped_column(String(10), nullable=False)
+    tracker: Mapped[str] = mapped_column(String(20), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    payload_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    success: Mapped[bool] = mapped_column(default=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    external_event_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class ArtefactComment(Base):

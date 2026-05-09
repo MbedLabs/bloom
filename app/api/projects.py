@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user, require_role
 from app.models import (
     ChangeRequest,
+    Defect,
     DesignItem,
     Project,
     Requirement,
@@ -54,6 +55,9 @@ async def _project_counts(db: AsyncSession, project_id: int) -> dict[str, int]:
     test_suite_count = (
         await db.execute(select(func.count(TestSuite.id)).where(TestSuite.project_id == project_id))
     ).scalar()
+    defect_count = (
+        await db.execute(select(func.count(Defect.id)).where(Defect.project_id == project_id))
+    ).scalar()
 
     return {
         "requirement_count": req_count,
@@ -63,6 +67,7 @@ async def _project_counts(db: AsyncSession, project_id: int) -> dict[str, int]:
         "change_count": change_count,
         "test_concept_count": test_concept_count,
         "test_suite_count": test_suite_count,
+        "defect_count": defect_count,
     }
 
 
@@ -140,6 +145,7 @@ async def create_project(
         change_count=0,
         test_concept_count=0,
         test_suite_count=0,
+        defect_count=0,
     )
 
 

@@ -16,11 +16,13 @@ from app.core.security import get_current_user, require_role
 from app.models import (
     ArtefactLink,
     ChangeRequest,
+    Defect,
     DesignItem,
     Document,
     Project,
     Requirement,
     RiskItem,
+    TestCampaign,
     TestCase,
     TestConcept,
 )
@@ -36,6 +38,8 @@ ARTEFACT_MODELS = {
     "RSK": RiskItem,
     "CHG": ChangeRequest,
     "TCO": TestConcept,
+    "DEF": Defect,
+    "CMP": TestCampaign,
 }
 
 

@@ -9,10 +9,13 @@ from app.core.database import get_db
 from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import (
+    ArtefactLink,
+    CampaignSuite,
     Project,
     Requirement,
     TestCampaign,
     TestCase,
+    TestConcept,
     TestSuite,
     TestSuiteItem,
 )
@@ -21,6 +24,7 @@ from app.schemas import (
     RequirementSummary,
     TestCampaignSummary,
     TestCaseSummary,
+    TestConceptSummary,
     TestSuiteCreate,
     TestSuiteDetailResponse,
     TestSuiteItemResponse,
@@ -110,7 +114,8 @@ async def _build_suite_detail(suite: TestSuite, db: AsyncSession) -> TestSuiteDe
         (
             await db.execute(
                 select(TestCampaign)
-                .where(TestCampaign.suite_id == suite.id)
+                .join(CampaignSuite, CampaignSuite.campaign_id == TestCampaign.id)
+                .where(CampaignSuite.suite_id == suite.id)
                 .order_by(TestCampaign.created_at.desc())
             )
         )
@@ -122,11 +127,40 @@ async def _build_suite_detail(suite: TestSuite, db: AsyncSession) -> TestSuiteDe
         for campaign in campaigns
     ]
 
+    # Related concepts: find TCOs linked to any TC in this suite via ArtefactLink
+    tc_ids = [item.test_case_id for item in items]
+    related_concepts: list[TestConceptSummary] = []
+    if tc_ids:
+        concept_links = (
+            await db.execute(
+                select(ArtefactLink.source_id)
+                .where(
+                    ArtefactLink.source_type == "TCO",
+                    ArtefactLink.target_type == "TC",
+                    ArtefactLink.target_id.in_(tc_ids),
+                )
+                .distinct()
+            )
+        ).scalars().all()
+        if concept_links:
+            concepts = (
+                await db.execute(
+                    select(TestConcept).where(TestConcept.id.in_(concept_links))
+                )
+            ).scalars().all()
+            related_concepts = [
+                TestConceptSummary(
+                    id=c.id, concept_id=c.concept_id, name=c.name, status=c.status
+                )
+                for c in concepts
+            ]
+
     return TestSuiteDetailResponse(
         **base.model_dump(),
         items=item_responses,
         related_requirements=requirements,
         linked_campaigns=linked_campaigns,
+        related_concepts=related_concepts,
     )
 
 

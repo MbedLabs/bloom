@@ -11,11 +11,14 @@ from app.api.link_read_utils import get_verified_requirement_links_for_test_case
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
 from app.models import (
+    ArtefactLink,
+    CampaignSuite,
     Project,
     Requirement,
     TestCampaign,
     TestCampaignItem,
     TestCase,
+    TestConcept,
     TestConfiguration,
     TestSuite,
     TestSuiteItem,
@@ -30,8 +33,10 @@ from app.schemas import (
     TestCampaignItemResponse,
     TestCampaignItemUpdate,
     TestCampaignResponse,
+    TestCampaignSuiteScope,
     TestCampaignUpdate,
     TestCaseResponse,
+    TestConceptSummary,
     TestConfigurationCreate,
     TestConfigurationResponse,
     TestConfigurationUpdate,
@@ -280,13 +285,20 @@ async def create_campaign(
     if not proj.scalar_one_or_none():
         raise HTTPException(404, "Project not found")
 
-    suite = None
-    if data.suite_id is not None:
+    # Resolve suite_ids: prefer new field, fall back to legacy suite_id
+    resolved_suite_ids = list(data.suite_ids) if data.suite_ids else []
+    if not resolved_suite_ids and data.suite_id is not None:
+        resolved_suite_ids = [data.suite_id]
+
+    # Validate all suites exist and belong to the project
+    validated_suites: list[TestSuite] = []
+    for sid in resolved_suite_ids:
         suite = (
-            await db.execute(select(TestSuite).where(TestSuite.id == data.suite_id))
+            await db.execute(select(TestSuite).where(TestSuite.id == sid))
         ).scalar_one_or_none()
         if not suite or suite.project_id != data.project_id:
-            raise HTTPException(404, "Suite not found")
+            raise HTTPException(404, f"Suite {sid} not found")
+        validated_suites.append(suite)
 
     if data.configuration_id is not None:
         config = (
@@ -302,7 +314,7 @@ async def create_campaign(
         name=data.name,
         description=data.description,
         configuration_id=data.configuration_id,
-        suite_id=data.suite_id,
+        suite_id=resolved_suite_ids[0] if resolved_suite_ids else None,
         bud_run_id=data.bud_run_id,
         bud_run_url=data.bud_run_url,
         bud_run_status=data.bud_run_status,
@@ -312,8 +324,13 @@ async def create_campaign(
     await db.flush()
     await db.refresh(campaign)
 
-    selected_test_case_ids = list(data.test_case_ids)
-    if suite is not None:
+    # Create CampaignSuite rows for multi-suite support
+    for suite in validated_suites:
+        db.add(CampaignSuite(campaign_id=campaign.id, suite_id=suite.id))
+
+    # Collect test case IDs from all suites (union, dedup)
+    selected_test_case_ids: set[int] = set(data.test_case_ids)
+    for suite in validated_suites:
         suite_items = (
             (
                 await db.execute(
@@ -325,7 +342,7 @@ async def create_campaign(
             .scalars()
             .all()
         )
-        selected_test_case_ids = [item.test_case_id for item in suite_items]
+        selected_test_case_ids.update(item.test_case_id for item in suite_items)
 
     for tc_id in selected_test_case_ids:
         tc_result = await db.execute(select(TestCase).where(TestCase.id == tc_id))
@@ -382,13 +399,29 @@ async def update_campaign(
             if not config or config.project_id != campaign.project_id:
                 raise HTTPException(404, "Configuration not found")
         campaign.configuration_id = data.configuration_id
-    if data.suite_id is not None:
-        suite = (
-            await db.execute(select(TestSuite).where(TestSuite.id == data.suite_id))
-        ).scalar_one_or_none()
-        if not suite or suite.project_id != campaign.project_id:
-            raise HTTPException(404, "Suite not found")
-        campaign.suite_id = data.suite_id
+    # Handle suite_ids (multi-suite) or legacy suite_id
+    resolved_suite_ids = data.suite_ids
+    if resolved_suite_ids is None and data.suite_id is not None:
+        resolved_suite_ids = [data.suite_id]
+    if resolved_suite_ids is not None:
+        for sid in resolved_suite_ids:
+            suite = (
+                await db.execute(select(TestSuite).where(TestSuite.id == sid))
+            ).scalar_one_or_none()
+            if not suite or suite.project_id != campaign.project_id:
+                raise HTTPException(404, f"Suite {sid} not found")
+        # Delete existing CampaignSuite rows
+        existing_cs = (
+            await db.execute(
+                select(CampaignSuite).where(CampaignSuite.campaign_id == campaign.id)
+            )
+        ).scalars().all()
+        for cs in existing_cs:
+            await db.delete(cs)
+        # Insert new CampaignSuite rows
+        for sid in resolved_suite_ids:
+            db.add(CampaignSuite(campaign_id=campaign.id, suite_id=sid))
+        campaign.suite_id = resolved_suite_ids[0] if resolved_suite_ids else None
     if data.bud_run_id is not None:
         campaign.bud_run_id = data.bud_run_id
     if data.bud_run_url is not None:
@@ -526,7 +559,6 @@ async def _build_campaign_response(
     ).scalar() or 0
 
     config_resp = None
-    suite_resp = None
     if campaign.configuration_id:
         cfg_result = await db.execute(
             select(TestConfiguration).where(TestConfiguration.id == campaign.configuration_id)
@@ -543,17 +575,29 @@ async def _build_campaign_response(
                 created_at=cfg.created_at,
                 updated_at=cfg.updated_at,
             )
-    if campaign.suite_id:
+
+    # Build suites list from CampaignSuite join table
+    cs_rows = (
+        await db.execute(
+            select(CampaignSuite)
+            .where(CampaignSuite.campaign_id == campaign.id)
+            .order_by(CampaignSuite.id)
+        )
+    ).scalars().all()
+    suites_list: list[TestSuiteSummary] = []
+    for cs in cs_rows:
         suite = (
-            await db.execute(select(TestSuite).where(TestSuite.id == campaign.suite_id))
+            await db.execute(select(TestSuite).where(TestSuite.id == cs.suite_id))
         ).scalar_one_or_none()
         if suite:
-            suite_resp = TestSuiteSummary(
-                id=suite.id,
-                suite_id=suite.suite_id,
-                name=suite.name,
-                status=suite.status,
+            suites_list.append(
+                TestSuiteSummary(
+                    id=suite.id, suite_id=suite.suite_id, name=suite.name, status=suite.status
+                )
             )
+
+    # Legacy single-suite field: first suite or direct FK
+    suite_resp = suites_list[0] if suites_list else None
 
     return TestCampaignResponse(
         id=campaign.id,
@@ -577,6 +621,7 @@ async def _build_campaign_response(
         pending=total,
         configuration=config_resp,
         suite=suite_resp,
+        suites=suites_list,
     )
 
 
@@ -631,10 +676,92 @@ async def _build_campaign_detail(
             for req in reqs
         ]
 
+    # Related concepts: find TCOs linked to any TC in the campaign via ArtefactLink
+    tc_ids = [item.test_case_id for item in items]
+    related_concepts: list[TestConceptSummary] = []
+    if tc_ids:
+        concept_links = (
+            await db.execute(
+                select(ArtefactLink.source_id)
+                .where(
+                    ArtefactLink.source_type == "TCO",
+                    ArtefactLink.target_type == "TC",
+                    ArtefactLink.target_id.in_(tc_ids),
+                )
+                .distinct()
+            )
+        ).scalars().all()
+        if concept_links:
+            concepts = (
+                await db.execute(
+                    select(TestConcept).where(TestConcept.id.in_(concept_links))
+                )
+            ).scalars().all()
+            related_concepts = [
+                TestConceptSummary(
+                    id=c.id, concept_id=c.concept_id, name=c.name, status=c.status
+                )
+                for c in concepts
+            ]
+
+    # Build suite_scopes: group campaign items under their linked suites
+    item_by_tc_id: dict[int, TestCampaignItemResponse] = {
+        ir.test_case_id: ir for ir in item_responses
+    }
+    claimed_tc_ids: set[int] = set()
+    suite_scopes: list[TestCampaignSuiteScope] = []
+
+    cs_rows = (
+        await db.execute(
+            select(CampaignSuite)
+            .where(CampaignSuite.campaign_id == campaign.id)
+            .order_by(CampaignSuite.id)
+        )
+    ).scalars().all()
+
+    for cs in cs_rows:
+        suite_result = await db.execute(
+            select(TestSuite).where(TestSuite.id == cs.suite_id)
+        )
+        suite = suite_result.scalar_one_or_none()
+        if not suite:
+            continue
+
+        si_rows = (
+            await db.execute(
+                select(TestSuiteItem.test_case_id)
+                .where(TestSuiteItem.suite_id == suite.id)
+            )
+        ).scalars().all()
+        suite_tc_ids = set(si_rows)
+
+        scope_items = [
+            item_by_tc_id[tc_id]
+            for tc_id in suite_tc_ids
+            if tc_id in item_by_tc_id
+        ]
+        claimed_tc_ids.update(tc_id for tc_id in suite_tc_ids if tc_id in item_by_tc_id)
+
+        suite_scopes.append(
+            TestCampaignSuiteScope(
+                suite=TestSuiteSummary(
+                    id=suite.id, suite_id=suite.suite_id, name=suite.name, status=suite.status
+                ),
+                items=scope_items,
+            )
+        )
+
+    ad_hoc_items = [
+        ir for ir in item_responses if ir.test_case_id not in claimed_tc_ids
+    ]
+
     return TestCampaignDetailResponse(
         **base.model_dump(),
         items=item_responses,
+        suite_scopes=suite_scopes,
+        ad_hoc_items=ad_hoc_items,
         related_requirements=related_requirements,
+        related_concepts=related_concepts,
     )
 
 
