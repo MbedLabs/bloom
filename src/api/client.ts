@@ -168,6 +168,10 @@ export interface DashboardStats {
   requirement_status_distribution: Record<string, number>
   test_case_status_distribution: Record<string, number>
   campaign_result_distribution: Record<string, number>
+  total_defects: number
+  open_defects: number
+  defect_severity_distribution: Record<string, number>
+  defect_status_distribution: Record<string, number>
   projects: { id: number; name: string; prefix: string; status: string; requirement_count: number; test_case_count: number }[]
 }
 
@@ -191,6 +195,7 @@ export interface Project {
   change_count: number
   test_concept_count: number
   test_suite_count: number
+  defect_count: number
   created_at: string
   updated_at: string
 }
@@ -221,6 +226,13 @@ export interface TestSuiteSummary {
 
 export interface TestCampaignSummary {
   id: number
+  name: string
+  status: string
+}
+
+export interface TestConceptSummary {
+  id: number
+  concept_id: string
   name: string
   status: string
 }
@@ -431,6 +443,31 @@ export interface ChangeRequest {
   justification: string | null
   source_ref?: string | null
   source_project_id?: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Defect {
+  id: number
+  project_id: number
+  defect_id: string
+  title: string
+  description: string | null
+  status: string
+  severity: string
+  priority: string
+  source_type: string | null
+  source_id: number | null
+  owner_id: number | null
+  reporter_id: number | null
+  reviewer_id: number | null
+  resolution_summary: string | null
+  external_tracker: string | null
+  external_repo_full_name: string | null
+  external_issue_number: number | null
+  external_issue_url: string | null
+  external_issue_state: string | null
+  closed_at: string | null
   created_at: string
   updated_at: string
 }
@@ -871,6 +908,7 @@ export interface TestSuiteDetail extends TestSuite {
   items: TestSuiteItem[]
   related_requirements: RequirementSummary[]
   linked_campaigns: TestCampaignSummary[]
+  related_concepts: TestConceptSummary[]
 }
 
 export interface TestCampaignItem {
@@ -907,11 +945,20 @@ export interface TestCampaign {
   pending: number
   configuration: TestConfiguration | null
   suite: TestSuiteSummary | null
+  suites: TestSuiteSummary[]
+}
+
+export interface TestCampaignSuiteScope {
+  suite: TestSuiteSummary
+  items: TestCampaignItem[]
 }
 
 export interface TestCampaignDetail extends TestCampaign {
   items: TestCampaignItem[]
+  suite_scopes: TestCampaignSuiteScope[]
+  ad_hoc_items: TestCampaignItem[]
   related_requirements: RequirementSummary[]
+  related_concepts: TestConceptSummary[]
 }
 
 export interface ArtefactLink {
@@ -939,12 +986,12 @@ export const campaignsApi = {
     return response.data
   },
 
-  create: async (data: { project_id: number; name: string; description?: string; configuration_id?: number; suite_id?: number; status?: string; bud_run_id?: number; bud_run_url?: string; bud_run_status?: string; test_case_ids?: number[] }) => {
+  create: async (data: { project_id: number; name: string; description?: string; configuration_id?: number; suite_id?: number; suite_ids?: number[]; status?: string; bud_run_id?: number; bud_run_url?: string; bud_run_status?: string; test_case_ids?: number[] }) => {
     const response = await api.post<TestCampaignDetail>('/campaigns', data)
     return response.data
   },
 
-  update: async (campaignId: number, data: Partial<Pick<TestCampaign, 'name' | 'description' | 'status' | 'bud_run_id' | 'bud_run_url' | 'bud_run_status'>> & { configuration_id?: number; suite_id?: number | null }) => {
+  update: async (campaignId: number, data: Partial<Pick<TestCampaign, 'name' | 'description' | 'status' | 'bud_run_id' | 'bud_run_url' | 'bud_run_status'>> & { configuration_id?: number; suite_id?: number | null; suite_ids?: number[] }) => {
     const response = await api.patch<TestCampaign>(`/campaigns/${campaignId}`, data)
     return response.data
   },
@@ -1104,6 +1151,100 @@ export const changesApi = {
   },
   delete: async (id: number) => {
     await api.delete(`/changes/${id}`)
+  },
+}
+
+export const defectsApi = {
+  list: async (projectId: number, params?: { status?: string; severity?: string }) => {
+    const response = await api.get<Defect[]>('/defects', { params: { project_id: projectId, ...params } })
+    return response.data
+  },
+  get: async (id: number) => {
+    const response = await api.get<Defect>(`/defects/${id}`)
+    return response.data
+  },
+  create: async (data: {
+    project_id: number
+    defect_id: string
+    title: string
+    description?: string | null
+    status?: string
+    severity?: string
+    priority?: string
+    source_type?: string | null
+    source_id?: number | null
+    owner_id?: number | null
+    reporter_id?: number | null
+    reviewer_id?: number | null
+    resolution_summary?: string | null
+    external_tracker?: string | null
+    external_repo_full_name?: string | null
+    external_issue_number?: number | null
+    external_issue_url?: string | null
+    external_issue_state?: string | null
+  }) => {
+    const response = await api.post<Defect>('/defects', data)
+    return response.data
+  },
+  update: async (id: number, data: Partial<Defect>) => {
+    const response = await api.patch<Defect>(`/defects/${id}`, data)
+    return response.data
+  },
+  delete: async (id: number) => {
+    await api.delete(`/defects/${id}`)
+  },
+}
+
+export interface IntegrationSetting {
+  id: number
+  project_id: number
+  tracker: string
+  base_url: string | null
+  has_token: boolean
+  webhook_secret: string | null
+  enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface SyncEvent {
+  id: number
+  defect_id: number
+  direction: string
+  tracker: string
+  event_type: string
+  payload_summary: string | null
+  success: boolean
+  error_message: string | null
+  created_at: string
+}
+
+export const integrationsApi = {
+  listSettings: async (projectId: number) => {
+    const response = await api.get<IntegrationSetting[]>('/integrations/settings', { params: { project_id: projectId } })
+    return response.data
+  },
+  createSetting: async (data: { project_id: number; tracker: string; base_url?: string; token?: string; webhook_secret?: string; enabled?: boolean }) => {
+    const response = await api.post<IntegrationSetting>('/integrations/settings', data)
+    return response.data
+  },
+  updateSetting: async (id: number, data: { base_url?: string; token?: string; webhook_secret?: string; enabled?: boolean }) => {
+    const response = await api.patch<IntegrationSetting>(`/integrations/settings/${id}`, data)
+    return response.data
+  },
+  deleteSetting: async (id: number) => {
+    await api.delete(`/integrations/settings/${id}`)
+  },
+  listSyncEvents: async (defectId: number) => {
+    const response = await api.get<SyncEvent[]>('/integrations/sync-events', { params: { defect_id: defectId } })
+    return response.data
+  },
+  refreshExternal: async (defectId: number, token?: string) => {
+    const response = await api.post<Defect>(
+      `/defects/${defectId}/refresh-external`,
+      token ? { token } : {}
+    )
+    return response.data
   },
 }
 

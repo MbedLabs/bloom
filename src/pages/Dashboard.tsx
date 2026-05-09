@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ArrowRight,
   BarChart3,
+  Bug,
   CheckCircle,
   CircleDot,
   FileText,
@@ -67,6 +68,10 @@ export default function Dashboard() {
     requirement_status_distribution: {},
     test_case_status_distribution: {},
     campaign_result_distribution: {},
+    total_defects: 0,
+    open_defects: 0,
+    defect_severity_distribution: {},
+    defect_status_distribution: {},
     projects: [],
   }
 
@@ -117,11 +122,18 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
         <MetricCard title="Projects" value={portfolioProjects.length || s.total_projects} detail={`${activeProjects} active`} icon={FolderKanban} />
-        <MetricCard title="Controlled Docs" value={totalControlledDocs} detail={`${usedKindCount} of ${CONTROLLED_DOC_TYPES.length} kinds in use`} icon={FileText} />
-        <MetricCard title="Linked Docs" value={linkedDocs} detail={`${suspectLinks} suspect links`} icon={GitBranch} />
+        <MetricCard title="Docs" value={totalControlledDocs} detail={`${usedKindCount} of ${CONTROLLED_DOC_TYPES.length} kinds in use`} icon={FileText} />
+        <MetricCard title="Links" value={linkedDocs} detail={`${suspectLinks} suspect links`} icon={GitBranch} />
         <MetricCard title="Campaigns" value={s.total_campaigns} detail={`${s.active_campaigns} active`} icon={FlaskConical} />
+        <MetricCard
+          title="Defects"
+          value={s.total_defects}
+          detail={`${s.open_defects} open`}
+          icon={Bug}
+          tone={s.open_defects > 0 ? 'warning' : 'default'}
+        />
       </section>
 
       <section className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(360px,1fr)]">
@@ -243,7 +255,7 @@ export default function Dashboard() {
         </aside>
       </section>
 
-      <section className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      <section className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <DistributionPanel
           title="Campaign Results"
           icon={FlaskConical}
@@ -255,6 +267,20 @@ export default function Dashboard() {
             Failed: 'bg-red-500',
             Blocked: 'bg-amber-500',
             Skipped: 'bg-slate-400',
+          }}
+        />
+
+        <DistributionPanel
+          title="Open Defects by Severity"
+          icon={Bug}
+          data={s.defect_severity_distribution}
+          total={Object.values(s.defect_severity_distribution).reduce((a, b) => a + b, 0)}
+          emptyMessage="No open defects"
+          colorMap={{
+            Critical: 'bg-red-600',
+            High: 'bg-red-500',
+            Medium: 'bg-amber-500',
+            Low: 'bg-emerald-500',
           }}
         />
 
@@ -274,21 +300,32 @@ export default function Dashboard() {
   )
 }
 
-function MetricCard({ title, value, detail, icon: Icon }: {
+function MetricCard({ title, value, detail, icon: Icon, tone = 'default' }: {
   title: string
   value: number | string
   detail: string
   icon: React.ComponentType<{ className?: string }>
+  tone?: 'default' | 'warning'
 }) {
+  const isWarning = tone === 'warning'
+  const cardClass = isWarning
+    ? 'rounded-lg border border-amber-400/60 bg-amber-50/40 p-4 dark:bg-amber-500/5'
+    : 'rounded-lg border border-border bg-card p-4'
+  const iconClass = isWarning
+    ? 'rounded-md bg-amber-500/10 p-2 text-amber-700 dark:text-amber-400'
+    : 'rounded-md bg-primary/10 p-2 text-primary'
+  const detailClass = isWarning
+    ? 'mt-1 text-xs font-medium text-amber-700 dark:text-amber-400'
+    : 'mt-1 text-xs text-muted-foreground'
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
+    <div className={cardClass}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+          <p className={detailClass}>{detail}</p>
         </div>
-        <div className="rounded-md bg-primary/10 p-2 text-primary">
+        <div className={iconClass}>
           <Icon className="h-4 w-4" />
         </div>
       </div>

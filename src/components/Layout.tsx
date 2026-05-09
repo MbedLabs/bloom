@@ -7,7 +7,7 @@ import {
   LayoutDashboard, FolderKanban, FileText, CheckSquare,
   GitBranch, BarChart3, Sun, Moon,
   ExternalLink, ChevronDown, Search, Flower2,
-  BookOpen, Layers, FlaskConical, LogOut, Users, PenTool, AlertTriangle, GitPullRequest, Settings, SlidersHorizontal
+  BookOpen, Bug, Layers, FlaskConical, LogOut, Users, PenTool, AlertTriangle, GitPullRequest, Settings, SlidersHorizontal
 } from 'lucide-react'
 
 const getBudUrl = () => {
@@ -57,6 +57,7 @@ const projectNav = [
   { name: 'Risks', icon: AlertTriangle, tab: '', href: 'docs' as const, filter: 'type:RSK' },
   { name: 'Changes', icon: GitPullRequest, tab: '', href: 'docs' as const, filter: 'type:CHG' },
   { name: 'Test Concepts', icon: Beaker, tab: '', href: 'docs' as const, filter: 'type:TCO' },
+  { name: 'Defects', icon: Bug, tab: '', href: 'defects' as const },
   { name: 'Test Campaigns', icon: FlaskConical, tab: '', href: 'campaigns' as const },
   { name: 'Traceability', icon: GitBranch, tab: '', href: 'traceability' as const },
   { name: 'Parameters', icon: SlidersHorizontal, tab: '', href: 'parameters' as const },

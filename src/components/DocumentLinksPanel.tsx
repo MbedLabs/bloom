@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { FileText, Link2, Search, X } from 'lucide-react'
+import { Bug, FileText, FlaskConical, Link2, Search, X } from 'lucide-react'
 import {
   type ArtefactLink,
   type DocShell,
+  campaignsApi,
+  defectsApi,
   docsApi,
   linksApi,
 } from '../api/client'
@@ -20,31 +22,67 @@ import {
 import { SectionCard } from './DocDetailShell'
 import { useAuth } from '../contexts/AuthContext'
 
+export interface LinkTarget {
+  id: number
+  doc_id: string
+  doc_type: DocType
+  title: string
+  status: string
+}
+
 function docKey(type: string, id: number) {
   return `${type}:${id}`
 }
 
+function targetUrl(prefix: string, type: DocType, target: LinkTarget | undefined): string {
+  if (!target) return '#'
+  if (type === 'DEF') return `/projects/${prefix}/defects/${target.id}`
+  if (type === 'CMP') return `/projects/${prefix}/campaigns/${target.id}`
+  return docUrl(prefix, type, target.doc_id)
+}
+
+function docShellToTarget(doc: DocShell): LinkTarget | null {
+  const normalized = normalizeDocTypeParam(doc.doc_type)
+  if (!normalized) return null
+  return {
+    id: doc.id,
+    doc_id: doc.doc_id,
+    doc_type: normalized,
+    title: doc.title,
+    status: doc.status,
+  }
+}
+
+const TYPE_ICONS: Partial<Record<DocType, React.ComponentType<{ className?: string }>>> = {
+  DEF: Bug,
+  CMP: FlaskConical,
+}
+
 function DocumentLinkRow({
   link,
-  doc,
+  target,
   projectPrefix,
   direction,
   onDelete,
 }: {
   link: ArtefactLink
-  doc: DocShell | undefined
+  target: LinkTarget | undefined
   projectPrefix: string
   direction: 'incoming' | 'outgoing'
   onDelete?: () => void
 }) {
+  const otherType = (direction === 'outgoing' ? link.target_type : link.source_type) as DocType
+  const otherId = direction === 'outgoing' ? link.target_id : link.source_id
+  const Icon = TYPE_ICONS[otherType] ?? FileText
+  const fallbackLabel = `${otherType} #${otherId}`
   return (
     <div className="flex items-center justify-between px-6 py-4 hover:bg-accent/50 transition-colors">
-      <Link to={doc ? docUrl(projectPrefix, (doc.doc_type || 'SPEC') as DocType, doc.doc_id) : '#'} className="min-w-0 flex items-center">
-        <FileText className="h-5 w-5 text-primary mr-3 shrink-0" />
+      <Link to={targetUrl(projectPrefix, otherType, target)} className="min-w-0 flex items-center">
+        <Icon className="h-5 w-5 text-primary mr-3 shrink-0" />
         <div className="min-w-0">
           <div>
-            <span className="font-mono text-sm text-primary mr-2">{doc?.doc_id || `${direction === 'outgoing' ? link.target_type : link.source_type} #${direction === 'outgoing' ? link.target_id : link.source_id}`}</span>
-            <span className="text-foreground">{doc?.title || 'Linked document'}</span>
+            <span className="font-mono text-sm text-primary mr-2">{target?.doc_id || fallbackLabel}</span>
+            <span className="text-foreground">{target?.title || `Linked ${DOC_TYPE_LABELS[otherType]?.toLowerCase() ?? 'artefact'}`}</span>
           </div>
           <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
             <span>{direction === 'incoming' ? 'Incoming' : 'Outgoing'}</span>
@@ -71,30 +109,29 @@ function LinkDocumentModal({
   projectId,
   sourceType,
   sourceId,
-  docs,
+  targets,
   onClose,
 }: {
   projectId: number
   sourceType: string
   sourceId: number
-  docs: DocShell[]
+  targets: LinkTarget[]
   onClose: () => void
 }) {
   const queryClient = useQueryClient()
   const normalizedSourceType = normalizeDocTypeParam(sourceType)
   const [search, setSearch] = useState('')
-  const eligibleDocs = useMemo(
-    () => docs.filter((doc) => {
-      const normalizedDocType = normalizeDocTypeParam(doc.doc_type)
-      if (!normalizedSourceType || !normalizedDocType) return false
-      if (normalizedDocType === normalizedSourceType && doc.id === sourceId) return false
-      return getDocLinkOptions(normalizedSourceType, normalizedDocType).length > 0
+  const eligibleTargets = useMemo(
+    () => targets.filter((target) => {
+      if (!normalizedSourceType) return false
+      if (target.doc_type === normalizedSourceType && target.id === sourceId) return false
+      return getDocLinkOptions(normalizedSourceType, target.doc_type).length > 0
     }),
-    [docs, normalizedSourceType, sourceId]
+    [targets, normalizedSourceType, sourceId]
   )
   const availableTargetTypes = useMemo(
-    () => Array.from(new Set(eligibleDocs.map((doc) => normalizeDocTypeParam(doc.doc_type)).filter((docType): docType is DocType => !!docType))),
-    [eligibleDocs]
+    () => Array.from(new Set(eligibleTargets.map((target) => target.doc_type))),
+    [eligibleTargets]
   )
   const [targetType, setTargetType] = useState<DocType | ''>('')
   const availableOptions = useMemo(
@@ -128,9 +165,8 @@ function LinkDocumentModal({
   }, [availableOptions])
 
   const createMutation = useMutation({
-    mutationFn: (target: DocShell) => {
-      const normalizedTargetType = normalizeDocTypeParam(target.doc_type)
-      if (!normalizedSourceType || !normalizedTargetType || !selectedOption) {
+    mutationFn: (target: LinkTarget) => {
+      if (!normalizedSourceType || !selectedOption) {
         throw new Error('Link type configuration is incomplete')
       }
       return linksApi.create({
@@ -149,12 +185,15 @@ function LinkDocumentModal({
     },
   })
 
-  const filteredDocs = eligibleDocs.filter((doc) => {
-    const normalizedDocType = normalizeDocTypeParam(doc.doc_type)
-    if (!targetType || normalizedDocType !== targetType) return false
+  const filteredTargets = eligibleTargets.filter((target) => {
+    if (!targetType || target.doc_type !== targetType) return false
     const q = search.trim().toLowerCase()
     if (!q) return true
-    return doc.doc_id.toLowerCase().includes(q) || doc.title.toLowerCase().includes(q) || doc.doc_type.toLowerCase().includes(q)
+    return (
+      target.doc_id.toLowerCase().includes(q) ||
+      target.title.toLowerCase().includes(q) ||
+      target.doc_type.toLowerCase().includes(q)
+    )
   })
 
   return (
@@ -170,13 +209,15 @@ function LinkDocumentModal({
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder={targetType ? `Search ${DOC_TYPE_LABELS[targetType].toLowerCase()}s` : 'Search controlled documents'}
+              placeholder={targetType ? `Search ${DOC_TYPE_LABELS[targetType].toLowerCase()}s` : 'Search linkable artefacts'}
+              title="Filter targets by ID, title, or type"
               className="w-full pl-9 pr-3 py-2 bg-background border border-input rounded-md text-sm"
             />
           </div>
           <select
             value={targetType}
             onChange={(event) => setTargetType(event.target.value as DocType)}
+            title="Target artefact kind"
             className="px-3 py-2 bg-background border border-input rounded-md text-sm"
             disabled={availableTargetTypes.length === 0}
           >
@@ -191,6 +232,7 @@ function LinkDocumentModal({
           <select
             value={selectedOptionKey}
             onChange={(event) => setSelectedOptionKey(event.target.value)}
+            title="Link relationship"
             className="px-3 py-2 bg-background border border-input rounded-md text-sm"
             disabled={availableOptions.length === 0}
           >
@@ -205,25 +247,25 @@ function LinkDocumentModal({
         </div>
         <div className="overflow-y-auto p-3">
           {availableTargetTypes.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground">No valid link targets for this document type yet.</div>
-          ) : filteredDocs.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground">No matching documents for the selected kind.</div>
+            <div className="p-8 text-center text-muted-foreground">No valid link targets for this artefact type yet.</div>
+          ) : filteredTargets.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">No matching items for the selected kind.</div>
           ) : (
             <div className="divide-y divide-border">
-              {filteredDocs.map((doc) => (
+              {filteredTargets.map((target) => (
                 <button
-                  key={`${doc.doc_type}-${doc.id}`}
-                  onClick={() => createMutation.mutate(doc)}
+                  key={`${target.doc_type}-${target.id}`}
+                  onClick={() => createMutation.mutate(target)}
                   disabled={createMutation.isPending || !selectedOption}
                   className="w-full px-3 py-3 text-left hover:bg-accent/50 disabled:opacity-50"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <span className="font-mono text-sm text-primary mr-2">{doc.doc_id}</span>
-                      <span className="text-sm font-medium text-foreground">{doc.title}</span>
+                      <span className="font-mono text-sm text-primary mr-2">{target.doc_id}</span>
+                      <span className="text-sm font-medium text-foreground">{target.title}</span>
                     </div>
                     <span className="shrink-0 rounded border border-border px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-                      {DOC_TYPE_LABELS[doc.doc_type as DocType] || doc.doc_type}
+                      {DOC_TYPE_LABELS[target.doc_type] || target.doc_type}
                     </span>
                   </div>
                 </button>
@@ -263,12 +305,52 @@ export function DocumentLinksPanel({
   })
 
   const linkCount = (outgoingLinks?.length || 0) + (incomingLinks?.length || 0)
+  const enabled = !!projectId && (showModal || linkCount > 0)
 
   const { data: docs } = useQuery({
     queryKey: ['all-docs', projectPrefix, 'link-targets'],
     queryFn: () => docsApi.list(projectPrefix, { includeLinkCounts: false }),
-    enabled: !!projectPrefix && (showModal || linkCount > 0),
+    enabled: !!projectPrefix && enabled,
   })
+
+  const { data: defects } = useQuery({
+    queryKey: ['defects', projectId, 'link-targets'],
+    queryFn: () => defectsApi.list(projectId),
+    enabled,
+  })
+
+  const { data: campaigns } = useQuery({
+    queryKey: ['campaigns', projectId, 'link-targets'],
+    queryFn: () => campaignsApi.list(projectId),
+    enabled,
+  })
+
+  const targets = useMemo<LinkTarget[]>(() => {
+    const items: LinkTarget[] = []
+    ;(docs || []).forEach((doc) => {
+      const target = docShellToTarget(doc)
+      if (target) items.push(target)
+    })
+    ;(defects || []).forEach((defect) =>
+      items.push({
+        id: defect.id,
+        doc_id: defect.defect_id,
+        doc_type: 'DEF',
+        title: defect.title,
+        status: defect.status,
+      })
+    )
+    ;(campaigns || []).forEach((campaign) =>
+      items.push({
+        id: campaign.id,
+        doc_id: `CMP-${campaign.id}`,
+        doc_type: 'CMP',
+        title: campaign.name,
+        status: campaign.status,
+      })
+    )
+    return items
+  }, [docs, defects, campaigns])
 
   const deleteMutation = useMutation({
     mutationFn: linksApi.delete,
@@ -277,35 +359,35 @@ export function DocumentLinksPanel({
     },
   })
 
-  const docLookup = useMemo(() => {
-    const map = new Map<string, DocShell>()
-    ;(docs || []).forEach((doc) => map.set(docKey(doc.doc_type, doc.id), doc))
+  const targetLookup = useMemo(() => {
+    const map = new Map<string, LinkTarget>()
+    targets.forEach((target) => map.set(docKey(target.doc_type, target.id), target))
     return map
-  }, [docs])
+  }, [targets])
 
   return (
     <SectionCard
-      title="Document Links"
+      title="Linked Documents"
       actions={canEditDocs ? (
         <button
           onClick={() => setShowModal(true)}
           className="inline-flex items-center px-3 py-2 border border-input rounded-md text-sm font-medium hover:bg-accent/50"
         >
           <Link2 className="h-4 w-4 mr-2" />
-          Link Document
+          Link Artefact
         </button>
       ) : undefined}
     >
-      <p className="text-xs text-muted-foreground mb-3">Typed links to requirements, specifications, designs, risks, and other controlled documents.</p>
+      <p className="text-xs text-muted-foreground mb-3">Typed links to requirements, specifications, designs, risks, defects, campaigns, and other controlled documents.</p>
       {linkCount === 0 ? (
-        <p className="text-muted-foreground">No document links yet.</p>
+        <p className="text-muted-foreground">No links yet.</p>
       ) : (
         <div className="divide-y divide-border -mx-6 -mb-6">
           {(outgoingLinks || []).map((link) => (
             <DocumentLinkRow
               key={`out-${link.id}`}
               link={link}
-              doc={docLookup.get(docKey(link.target_type, link.target_id))}
+              target={targetLookup.get(docKey(link.target_type, link.target_id))}
               projectPrefix={projectPrefix}
               direction="outgoing"
               onDelete={canEditDocs ? () => deleteMutation.mutate(link.id) : undefined}
@@ -315,7 +397,7 @@ export function DocumentLinksPanel({
             <DocumentLinkRow
               key={`in-${link.id}`}
               link={link}
-              doc={docLookup.get(docKey(link.source_type, link.source_id))}
+              target={targetLookup.get(docKey(link.source_type, link.source_id))}
               projectPrefix={projectPrefix}
               direction="incoming"
               onDelete={canEditDocs ? () => deleteMutation.mutate(link.id) : undefined}
@@ -329,7 +411,7 @@ export function DocumentLinksPanel({
           projectId={projectId}
           sourceType={sourceType}
           sourceId={sourceId}
-          docs={(docs || []).filter((doc) => !(doc.doc_type === sourceType && doc.id === sourceId))}
+          targets={targets.filter((target) => !(target.doc_type === sourceType && target.id === sourceId))}
           onClose={() => setShowModal(false)}
         />
       )}

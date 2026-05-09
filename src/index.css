@@ -109,4 +109,39 @@
   .dark .glass {
     background: rgba(10, 17, 32, 0.8);
   }
+
+  /*
+   * React Flow zoom/fit controls ship light-theme defaults on .react-flow__controls-button.
+   * Scope overrides to topology only so icons/backgrounds follow shadcn light + dark tokens.
+   */
+  .topology-canvas .react-flow__controls {
+    background-color: hsl(var(--card)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  }
+
+  .dark .topology-canvas .react-flow__controls {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.35);
+  }
+
+  .topology-canvas .react-flow__controls-button {
+    background-color: hsl(var(--card)) !important;
+    border-bottom: 1px solid hsl(var(--border)) !important;
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .topology-canvas .react-flow__controls-button:last-child {
+    border-bottom: none !important;
+  }
+
+  .topology-canvas .react-flow__controls-button:hover {
+    background-color: hsl(var(--accent)) !important;
+    color: hsl(var(--accent-foreground)) !important;
+  }
+
+  .topology-canvas .react-flow__controls-button svg,
+  .topology-canvas .react-flow__controls-button svg path {
+    fill: currentColor !important;
+    stroke: currentColor !important;
+  }
 }

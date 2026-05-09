@@ -50,6 +50,8 @@ export default function UnifiedDocDetail() {
       return <ArtefactDetail kind="change" resolvedId={doc.id} />
     case 'TCO':
       return <ArtefactDetail kind="test-concept" resolvedId={doc.id} />
+    case 'DEF':
+      return <ArtefactDetail kind="defect" resolvedId={doc.id} />
     default:
       return <div className="text-center py-16 text-muted-foreground">Unknown document type: {doc.doc_type}</div>
   }
