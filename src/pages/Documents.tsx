@@ -745,24 +745,24 @@ export default function Documents() {
               <tbody className="bg-card divide-y divide-border">
                 {sorted.map((doc: DocShell) => (
                   <tr key={`${doc.doc_type}-${doc.id}`} className="hover:bg-accent/50">
-                    <td className="px-6 py-3 whitespace-nowrap">
+                    <td className="px-4 py-2.5 whitespace-nowrap">
                       <Link to={docUrl(prefix!, doc.doc_type as DocType, doc.doc_id)} className="text-primary font-mono text-sm font-medium">
                         {doc.doc_id}
                       </Link>
                     </td>
-                    <td className="px-6 py-3 whitespace-nowrap">
+                    <td className="px-4 py-2.5 whitespace-nowrap">
                       <TypeBadge type={doc.doc_type} />
                     </td>
-                    <td className="px-6 py-3 max-w-sm truncate">
+                    <td className="px-4 py-2.5 max-w-sm truncate">
                       <Link to={docUrl(prefix!, doc.doc_type as DocType, doc.doc_id)} className="text-foreground hover:text-primary/80 font-medium">
                         {doc.title}
                       </Link>
                     </td>
-                    <td className="px-6 py-3 whitespace-nowrap">
+                    <td className="px-4 py-2.5 whitespace-nowrap">
                       <StatusBadge status={doc.status} />
                     </td>
                     {showExecColumn && (
-                      <td className="px-6 py-3 whitespace-nowrap">
+                      <td className="px-4 py-2.5 whitespace-nowrap">
                         {doc.doc_type === 'TC' ? (
                           <div className="space-y-1">
                             <ExecutionBadge status={doc.last_execution_status} />
@@ -775,16 +775,16 @@ export default function Documents() {
                         )}
                       </td>
                     )}
-                    <td className="px-4 py-3 whitespace-nowrap text-xs text-muted-foreground">
+                    <td className="px-3 py-2.5 whitespace-nowrap text-xs text-muted-foreground">
                       {doc.priority || '-'}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-xs text-muted-foreground">
+                    <td className="px-3 py-2.5 whitespace-nowrap text-xs text-muted-foreground">
                       {doc.reviewer_id ? userMap.get(doc.reviewer_id) || '-' : '-'}
                     </td>
-                    <td className="px-6 py-3 whitespace-nowrap text-xs text-muted-foreground">
+                    <td className="px-4 py-2.5 whitespace-nowrap text-xs text-muted-foreground">
                       {format(new Date(doc.created_at), 'MMM d, yyyy')}
                     </td>
-                    <td className="px-6 py-3 whitespace-nowrap text-xs text-muted-foreground">
+                    <td className="px-4 py-2.5 whitespace-nowrap text-xs text-muted-foreground">
                       {format(new Date(doc.updated_at), 'MMM d, yyyy')}
                     </td>
                   </tr>
