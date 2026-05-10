@@ -18,7 +18,6 @@ from app.core.link_rules import (
     is_known_linkable_type,
 )
 
-
 # ==================== Link rules for DEF and CMP ====================
 
 
@@ -120,12 +119,15 @@ def test_parse_issue_url_auto_detects():
 
 
 def test_validate_external_fields_valid():
-    assert validate_external_fields(
-        "github",
-        "https://github.com/owner/repo/issues/5",
-        "owner/repo",
-        5,
-    ) is None
+    assert (
+        validate_external_fields(
+            "github",
+            "https://github.com/owner/repo/issues/5",
+            "owner/repo",
+            5,
+        )
+        is None
+    )
 
 
 def test_validate_external_fields_tracker_mismatch():

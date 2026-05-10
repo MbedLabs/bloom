@@ -412,10 +412,14 @@ async def update_campaign(
                 raise HTTPException(404, f"Suite {sid} not found")
         # Delete existing CampaignSuite rows
         existing_cs = (
-            await db.execute(
-                select(CampaignSuite).where(CampaignSuite.campaign_id == campaign.id)
+            (
+                await db.execute(
+                    select(CampaignSuite).where(CampaignSuite.campaign_id == campaign.id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         for cs in existing_cs:
             await db.delete(cs)
         # Insert new CampaignSuite rows
@@ -578,12 +582,16 @@ async def _build_campaign_response(
 
     # Build suites list from CampaignSuite join table
     cs_rows = (
-        await db.execute(
-            select(CampaignSuite)
-            .where(CampaignSuite.campaign_id == campaign.id)
-            .order_by(CampaignSuite.id)
+        (
+            await db.execute(
+                select(CampaignSuite)
+                .where(CampaignSuite.campaign_id == campaign.id)
+                .order_by(CampaignSuite.id)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     suites_list: list[TestSuiteSummary] = []
     for cs in cs_rows:
         suite = (
@@ -681,26 +689,28 @@ async def _build_campaign_detail(
     related_concepts: list[TestConceptSummary] = []
     if tc_ids:
         concept_links = (
-            await db.execute(
-                select(ArtefactLink.source_id)
-                .where(
-                    ArtefactLink.source_type == "TCO",
-                    ArtefactLink.target_type == "TC",
-                    ArtefactLink.target_id.in_(tc_ids),
+            (
+                await db.execute(
+                    select(ArtefactLink.source_id)
+                    .where(
+                        ArtefactLink.source_type == "TCO",
+                        ArtefactLink.target_type == "TC",
+                        ArtefactLink.target_id.in_(tc_ids),
+                    )
+                    .distinct()
                 )
-                .distinct()
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         if concept_links:
             concepts = (
-                await db.execute(
-                    select(TestConcept).where(TestConcept.id.in_(concept_links))
-                )
-            ).scalars().all()
+                (await db.execute(select(TestConcept).where(TestConcept.id.in_(concept_links))))
+                .scalars()
+                .all()
+            )
             related_concepts = [
-                TestConceptSummary(
-                    id=c.id, concept_id=c.concept_id, name=c.name, status=c.status
-                )
+                TestConceptSummary(id=c.id, concept_id=c.concept_id, name=c.name, status=c.status)
                 for c in concepts
             ]
 
@@ -712,34 +722,35 @@ async def _build_campaign_detail(
     suite_scopes: list[TestCampaignSuiteScope] = []
 
     cs_rows = (
-        await db.execute(
-            select(CampaignSuite)
-            .where(CampaignSuite.campaign_id == campaign.id)
-            .order_by(CampaignSuite.id)
+        (
+            await db.execute(
+                select(CampaignSuite)
+                .where(CampaignSuite.campaign_id == campaign.id)
+                .order_by(CampaignSuite.id)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     for cs in cs_rows:
-        suite_result = await db.execute(
-            select(TestSuite).where(TestSuite.id == cs.suite_id)
-        )
+        suite_result = await db.execute(select(TestSuite).where(TestSuite.id == cs.suite_id))
         suite = suite_result.scalar_one_or_none()
         if not suite:
             continue
 
         si_rows = (
-            await db.execute(
-                select(TestSuiteItem.test_case_id)
-                .where(TestSuiteItem.suite_id == suite.id)
+            (
+                await db.execute(
+                    select(TestSuiteItem.test_case_id).where(TestSuiteItem.suite_id == suite.id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         suite_tc_ids = set(si_rows)
 
-        scope_items = [
-            item_by_tc_id[tc_id]
-            for tc_id in suite_tc_ids
-            if tc_id in item_by_tc_id
-        ]
+        scope_items = [item_by_tc_id[tc_id] for tc_id in suite_tc_ids if tc_id in item_by_tc_id]
         claimed_tc_ids.update(tc_id for tc_id in suite_tc_ids if tc_id in item_by_tc_id)
 
         suite_scopes.append(
@@ -751,9 +762,7 @@ async def _build_campaign_detail(
             )
         )
 
-    ad_hoc_items = [
-        ir for ir in item_responses if ir.test_case_id not in claimed_tc_ids
-    ]
+    ad_hoc_items = [ir for ir in item_responses if ir.test_case_id not in claimed_tc_ids]
 
     return TestCampaignDetailResponse(
         **base.model_dump(),
