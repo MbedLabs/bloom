@@ -404,17 +404,11 @@ class CampaignSuite(Base):
     """Many-to-many association between campaigns and suites."""
 
     __tablename__ = "campaign_suites"
-    __table_args__ = (
-        UniqueConstraint("campaign_id", "suite_id", name="uq_campaign_suite"),
-    )
+    __table_args__ = (UniqueConstraint("campaign_id", "suite_id", name="uq_campaign_suite"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    campaign_id: Mapped[int] = mapped_column(
-        ForeignKey("test_campaigns.id"), nullable=False
-    )
-    suite_id: Mapped[int] = mapped_column(
-        ForeignKey("test_suites.id"), nullable=False
-    )
+    campaign_id: Mapped[int] = mapped_column(ForeignKey("test_campaigns.id"), nullable=False)
+    suite_id: Mapped[int] = mapped_column(ForeignKey("test_suites.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     campaign: Mapped["TestCampaign"] = relationship(back_populates="campaign_suites")

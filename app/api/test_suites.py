@@ -132,26 +132,28 @@ async def _build_suite_detail(suite: TestSuite, db: AsyncSession) -> TestSuiteDe
     related_concepts: list[TestConceptSummary] = []
     if tc_ids:
         concept_links = (
-            await db.execute(
-                select(ArtefactLink.source_id)
-                .where(
-                    ArtefactLink.source_type == "TCO",
-                    ArtefactLink.target_type == "TC",
-                    ArtefactLink.target_id.in_(tc_ids),
+            (
+                await db.execute(
+                    select(ArtefactLink.source_id)
+                    .where(
+                        ArtefactLink.source_type == "TCO",
+                        ArtefactLink.target_type == "TC",
+                        ArtefactLink.target_id.in_(tc_ids),
+                    )
+                    .distinct()
                 )
-                .distinct()
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         if concept_links:
             concepts = (
-                await db.execute(
-                    select(TestConcept).where(TestConcept.id.in_(concept_links))
-                )
-            ).scalars().all()
+                (await db.execute(select(TestConcept).where(TestConcept.id.in_(concept_links))))
+                .scalars()
+                .all()
+            )
             related_concepts = [
-                TestConceptSummary(
-                    id=c.id, concept_id=c.concept_id, name=c.name, status=c.status
-                )
+                TestConceptSummary(id=c.id, concept_id=c.concept_id, name=c.name, status=c.status)
                 for c in concepts
             ]
 
