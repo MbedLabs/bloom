@@ -459,11 +459,11 @@ function EmptyState() {
 }
 
 function Th({ children }: { children?: React.ReactNode }) {
-  return <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">{children}</th>
+  return <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">{children}</th>
 }
 
 function Td({ children }: { children: React.ReactNode }) {
-  return <td className="whitespace-nowrap px-5 py-3.5 text-sm text-muted-foreground">{children}</td>
+  return <td className="whitespace-nowrap px-4 py-3 text-sm text-muted-foreground">{children}</td>
 }
 
 function DashboardSkeleton() {

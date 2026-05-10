@@ -66,6 +66,10 @@
 }
 
 @layer base {
+  html {
+    font-size: 15px;
+  }
+
   * {
     @apply border-border;
   }
@@ -75,6 +79,7 @@
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   #root {
