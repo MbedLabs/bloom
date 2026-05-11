@@ -18,7 +18,7 @@ const fakeStorage = {
   removeItem: (key: string) => { store.delete(key) },
   clear: () => { store.clear() },
   get length() { return store.size },
-  key: (_i: number) => null as string | null,
+  key: () => null as string | null,
 }
 
 beforeEach(() => {
