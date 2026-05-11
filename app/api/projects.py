@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
 from app.models import (
+    ArtefactLink,
     ChangeRequest,
     Defect,
     DesignItem,
@@ -59,6 +60,20 @@ async def _project_counts(db: AsyncSession, project_id: int) -> dict[str, int]:
         await db.execute(select(func.count(Defect.id)).where(Defect.project_id == project_id))
     ).scalar()
 
+    covered_reqs = (
+        await db.execute(
+            select(func.count(func.distinct(ArtefactLink.target_id))).where(
+                ArtefactLink.source_type == "TC",
+                ArtefactLink.target_type == "REQ",
+                ArtefactLink.role == "verifies",
+                ArtefactLink.target_id.in_(
+                    select(Requirement.id).where(Requirement.project_id == project_id)
+                ),
+            )
+        )
+    ).scalar()
+    coverage_percent = round((covered_reqs / req_count * 100) if req_count else 0, 1)
+
     return {
         "requirement_count": req_count,
         "test_case_count": tc_count,
@@ -68,6 +83,7 @@ async def _project_counts(db: AsyncSession, project_id: int) -> dict[str, int]:
         "test_concept_count": test_concept_count,
         "test_suite_count": test_suite_count,
         "defect_count": defect_count,
+        "coverage_percent": coverage_percent,
     }
 
 
