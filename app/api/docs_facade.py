@@ -21,6 +21,7 @@ from app.core.security import get_current_user
 from app.models import (
     ArtefactLink,
     ChangeRequest,
+    Defect,
     DesignItem,
     Document,
     Project,
@@ -77,6 +78,7 @@ TYPE_MAP = {
     "RSK": (RiskItem, "risk_id", "risks"),
     "CHG": (ChangeRequest, "change_id", "changes"),
     "TCO": (TestConcept, "concept_id", "test-concepts"),
+    "DEF": (Defect, "defect_id", "defects"),
 }
 
 LEGACY_TYPE_SLUG_ALIASES = {
