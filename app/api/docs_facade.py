@@ -8,7 +8,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import String, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -27,8 +27,10 @@ from app.models import (
     Project,
     Requirement,
     RiskItem,
+    TestCampaign,
     TestCase,
     TestConcept,
+    TestSuite,
 )
 from app.models.user import User
 
@@ -79,6 +81,8 @@ TYPE_MAP = {
     "CHG": (ChangeRequest, "change_id", "changes"),
     "TCO": (TestConcept, "concept_id", "test-concepts"),
     "DEF": (Defect, "defect_id", "defects"),
+    "CMP": (TestCampaign, "id", "campaigns"),
+    "TS": (TestSuite, "suite_id", "test-suites"),
 }
 
 LEGACY_TYPE_SLUG_ALIASES = {
@@ -188,7 +192,7 @@ async def list_all_docs(
             query = query.where(
                 or_(
                     title_col.ilike(f"%{q}%"),
-                    id_col.ilike(f"%{q}%"),
+                    func.cast(id_col, String).ilike(f"%{q}%"),
                 )
             )
 
@@ -205,7 +209,7 @@ async def list_all_docs(
             results.append(
                 DocShellResponse(
                     id=row.id,
-                    doc_id=doc_id_val or f"{type_code}-{row.id}",
+                    doc_id=str(doc_id_val) if doc_id_val is not None else f"{type_code}-{row.id}",
                     doc_type=type_code,
                     title=title_val,
                     status=row.status,
@@ -341,10 +345,17 @@ async def get_doc_by_kind_and_string_id(
                 continue
 
             id_col = getattr(model, id_col_name)
+            if id_col_name == "id":
+                try:
+                    id_filter = model.id == int(doc_id_str)
+                except ValueError:
+                    continue
+            else:
+                id_filter = id_col == doc_id_str
             result = await db.execute(
                 select(model).where(
                     model.project_id == project.id,
-                    id_col == doc_id_str,
+                    id_filter,
                 )
             )
             row = result.scalar_one_or_none()
@@ -360,7 +371,7 @@ async def get_doc_by_kind_and_string_id(
 
                 return DocDetailFacadeResponse(
                     id=row.id,
-                    doc_id=doc_id_val,
+                    doc_id=str(doc_id_val),
                     doc_type=resolved_type,
                     title=title_val,
                     status=row.status,

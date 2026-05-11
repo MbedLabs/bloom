@@ -81,6 +81,7 @@ class ProjectResponse(BaseModel):
     test_concept_count: int = 0
     test_suite_count: int = 0
     defect_count: int = 0
+    coverage_percent: float = 0
 
     @field_serializer("created_at", "updated_at")
     def serialize_dt(self, dt: datetime, _info):
