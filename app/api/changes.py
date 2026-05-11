@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import log_artefact_activity
 from app.core.database import get_db
-from app.core.id_generator import normalize_doc_id
+from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import ChangeRequest, Project
 from app.models.user import User, UserRole
@@ -45,14 +45,9 @@ async def create_change_request(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    try:
-        change_id = normalize_doc_id(
-            data.change_id,
-            expected_type_code="CHG",
-            expected_project_prefix=project.prefix,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    change_id = await next_doc_id(
+        db, ChangeRequest, ChangeRequest.change_id, data.project_id, project.prefix, "CHG"
+    )
 
     existing = await db.execute(
         select(ChangeRequest).where(

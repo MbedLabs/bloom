@@ -23,6 +23,7 @@ ALLOWED_TYPE_CODES = frozenset(
         "STD",
         "BL",
         "TS",
+        "CMP",
     }
 )
 

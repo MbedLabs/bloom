@@ -123,7 +123,12 @@ async def _build_suite_detail(suite: TestSuite, db: AsyncSession) -> TestSuiteDe
         .all()
     )
     linked_campaigns = [
-        TestCampaignSummary(id=campaign.id, name=campaign.name, status=campaign.status)
+        TestCampaignSummary(
+            id=campaign.id,
+            campaign_id=campaign.campaign_id or "",
+            name=campaign.name,
+            status=campaign.status,
+        )
         for campaign in campaigns
     ]
 

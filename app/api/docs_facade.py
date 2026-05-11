@@ -81,7 +81,7 @@ TYPE_MAP = {
     "CHG": (ChangeRequest, "change_id", "changes"),
     "TCO": (TestConcept, "concept_id", "test-concepts"),
     "DEF": (Defect, "defect_id", "defects"),
-    "CMP": (TestCampaign, "id", "campaigns"),
+    "CMP": (TestCampaign, "campaign_id", "campaigns"),
     "TS": (TestSuite, "suite_id", "test-suites"),
 }
 

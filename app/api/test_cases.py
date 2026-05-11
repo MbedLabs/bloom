@@ -15,7 +15,7 @@ from app.api.link_read_utils import (
     get_verified_requirement_links_for_test_case,
 )
 from app.core.database import get_db
-from app.core.id_generator import normalize_doc_id
+from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import (
     ArtefactLink,
@@ -119,7 +119,12 @@ async def _build_test_case_response(tc: TestCase, db: AsyncSession) -> TestCaseR
         if campaign and campaign.id not in seen_campaign_ids:
             seen_campaign_ids.add(campaign.id)
             campaign_memberships.append(
-                TestCampaignSummary(id=campaign.id, name=campaign.name, status=campaign.status)
+                TestCampaignSummary(
+                    id=campaign.id,
+                    campaign_id=campaign.campaign_id or "",
+                    name=campaign.name,
+                    status=campaign.status,
+                )
             )
 
     return TestCaseResponse(
@@ -226,7 +231,7 @@ async def create_test_case(
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     """
-    Create a new test case using the creator-supplied tc_id.
+    Create a new test case; server assigns tc_id.
     """
     project_result = await db.execute(select(Project).where(Project.id == data.project_id))
     project = project_result.scalar_one_or_none()
@@ -234,14 +239,7 @@ async def create_test_case(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    try:
-        tc_id = normalize_doc_id(
-            data.tc_id,
-            expected_type_code="TC",
-            expected_project_prefix=project.prefix,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    tc_id = await next_doc_id(db, TestCase, TestCase.tc_id, data.project_id, project.prefix, "TC")
 
     existing = await db.execute(
         select(TestCase).where(
