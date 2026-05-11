@@ -148,6 +148,14 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
     countText: 'text-sky-900 dark:text-sky-200',
     accent: '#0284c7',
   },
+  TS: {
+    icon: CheckSquare,
+    borderTop: 'border-t-lime-600',
+    surface: 'bg-gradient-to-br from-lime-500/10 to-card ring-1 ring-lime-500/10',
+    iconChip: 'bg-lime-500/15 text-lime-900 dark:text-lime-200',
+    countText: 'text-lime-900 dark:text-lime-200',
+    accent: '#65a30d',
+  },
 }
 
 // ────────────────────────────────────────────────────────────────────────────

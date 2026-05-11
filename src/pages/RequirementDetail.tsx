@@ -5,6 +5,7 @@ import { requirementsApi, usersApi, projectsApi } from '../api/client'
 import { ExternalLink, ChevronRight, UserCheck, UserCog } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
 import { docUrl } from '../types/doc'
+import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocDetailShell, { StatusBadge, MetaItem, SectionCard } from '../components/DocDetailShell'
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
 import { useAuth } from '../contexts/AuthContext'
@@ -55,7 +56,7 @@ function resolveUserName(users: Array<{ id: number; full_name: string }> | undef
 
 export default function RequirementDetail({ resolvedId }: { resolvedId?: number } = {}) {
   const { user } = useAuth()
-  const { itemId } = useParams<{ prefix: string; itemId: string }>()
+  const { prefix, itemId } = useParams<{ prefix: string; itemId: string }>()
   const reqId = resolvedId || parseInt(itemId || '0')
   const queryClient = useQueryClient()
 
@@ -155,8 +156,8 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
     return (
       <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6 text-center">
         <h3 className="text-lg font-medium text-destructive">Requirement Not Found</h3>
-        <Link to="/projects" className="mt-4 inline-block text-primary hover:text-primary/80">
-          ← Back to Projects
+        <Link to={docRegistryListUrl(prefix!, 'REQ')} className="mt-4 inline-block text-primary hover:text-primary/80">
+          &larr; Back to Requirements
         </Link>
       </div>
     )
@@ -411,7 +412,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
 
       {requirement.linked_test_runs && requirement.linked_test_runs.length > 0 && (
         <SectionCard title="Linked Test Runs">
-          <div className="overflow-hidden -mx-6">
+          <div className="overflow-x-auto -mx-6">
             <table className="min-w-full divide-y divide-border">
               <thead className="bg-muted/50">
                 <tr>

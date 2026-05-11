@@ -1,21 +1,25 @@
 import { useState } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, FlaskConical, Layers3, Pencil, Plus, Trash2 } from 'lucide-react'
 
 import { campaignsApi, testCasesApi, testSuitesApi } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { docUrl } from '../types/doc'
+import { docRegistryListUrl } from '../lib/docRegistryParams'
 
 const SUITE_STATUSES = ['Draft', 'Active', 'Archived']
 
-export default function SuiteDetail() {
+export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}) {
   const { prefix, suiteId } = useParams<{ prefix: string; suiteId: string }>()
   const { data: project } = useProjectByPrefix(prefix)
   const projectId = project?.id || 0
-  const parsedSuiteId = Number(suiteId)
+  const parsedSuiteId = resolvedId || Number(suiteId)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const location = useLocation()
+  const backUrl = (location.state as { returnTo?: string } | null)?.returnTo
+    || docRegistryListUrl(prefix!, 'CMP')
   const [showAddCase, setShowAddCase] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', description: '', status: '' })
@@ -65,7 +69,7 @@ export default function SuiteDetail() {
     onSuccess: (campaign) => {
       queryClient.invalidateQueries({ queryKey: ['campaigns', projectId] })
       queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
-      window.location.href = `/projects/${prefix}/campaigns/${campaign.id}`
+      window.location.href = `/projects/${prefix}/docs/campaigns/${campaign.id}`
     },
   })
 
@@ -83,7 +87,7 @@ export default function SuiteDetail() {
     mutationFn: () => testSuitesApi.delete(parsedSuiteId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['testSuites', projectId] })
-      navigate(`/projects/${prefix}/campaigns`)
+      navigate(backUrl)
     },
   })
 
@@ -110,7 +114,7 @@ export default function SuiteDetail() {
     return (
       <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6 text-center">
         <h3 className="text-lg font-medium text-destructive">Suite Not Found</h3>
-        <Link to={`/projects/${prefix}/campaigns`} className="mt-4 inline-block text-primary hover:text-primary/80">
+        <Link to={backUrl} className="mt-4 inline-block text-primary hover:text-primary/80">
           &larr; Back to Campaigns
         </Link>
       </div>
@@ -124,7 +128,7 @@ export default function SuiteDetail() {
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Link to={`/projects/${prefix}/campaigns`} className="p-2 hover:bg-accent/50 rounded-md">
+          <Link to={backUrl} className="p-2 hover:bg-accent/50 rounded-md">
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
           <div>
@@ -266,7 +270,7 @@ export default function SuiteDetail() {
           ) : (
             <div className="divide-y divide-border">
               {suite.linked_campaigns.map((campaign) => (
-                <Link key={campaign.id} to={`/projects/${prefix}/campaigns/${campaign.id}`} className="block px-6 py-4 hover:bg-accent/40">
+                <Link key={campaign.id} to={`/projects/${prefix}/docs/campaigns/${campaign.id}`} className="block px-6 py-4 hover:bg-accent/40">
                   <div className="font-medium text-foreground">{campaign.name}</div>
                   <div className="text-xs text-muted-foreground mt-1">{campaign.status}</div>
                 </Link>

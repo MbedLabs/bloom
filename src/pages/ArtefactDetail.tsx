@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowUpDown, ExternalLink, GitBranch, History, MessageSquare, Pencil, RefreshCw, Trash2 } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
 import { docUrl, docEditUrl, type DocType } from '../types/doc'
+import { docRegistryListUrl } from '../lib/docRegistryParams'
 import { DocEditor } from '../components/editor'
 import DocDetailShell, { MetaItem, SectionCard, StatusBadge } from '../components/DocDetailShell'
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
@@ -236,7 +237,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
       queryClient.invalidateQueries({ queryKey: [config.listKey, artefact.project_id] })
       queryClient.invalidateQueries({ queryKey: ['project', artefact.project_id] })
       if (kind === 'defect') {
-        navigate(`/projects/${projectPrefix}/docs?type=DEF`)
+        navigate(docRegistryListUrl(projectPrefix, 'DEF'))
       } else {
         navigate(`/projects/${projectPrefix}?tab=${config.tabKey}`)
       }
@@ -378,7 +379,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
 
           <SectionCard title="Quick Links">
             <div className="space-y-3 text-sm">
-              <Link to={kind === 'defect' ? `/projects/${projectPrefix}/docs?type=DEF` : `/projects/${projectPrefix}?tab=${config.tabKey}`} className="block text-primary hover:text-primary/80">Back to project {config.singular.toLowerCase()} list</Link>
+              <Link to={kind === 'defect' ? docRegistryListUrl(projectPrefix, 'DEF') : `/projects/${projectPrefix}?tab=${config.tabKey}`} className="block text-primary hover:text-primary/80">Back to project {config.singular.toLowerCase()} list</Link>
               {related?.project && <Link to={`/projects/${related.project.prefix}`} className="block text-primary hover:text-primary/80">Open project workspace</Link>}
             </div>
           </SectionCard>

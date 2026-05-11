@@ -12,6 +12,7 @@ import { normalizeTcsRows } from '../utils/tcs'
 import { Pencil, UserCheck, UserCog } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
 import { docEditUrl } from '../types/doc'
+import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocDetailShell, { MetaItem, SectionCard } from '../components/DocDetailShell'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -48,7 +49,7 @@ function ExecutionBadge({ status }: { status: string }) {
 
 export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } = {}) {
   const { user } = useAuth()
-  const { itemId } = useParams<{ prefix: string; itemId: string }>()
+  const { prefix, itemId } = useParams<{ prefix: string; itemId: string }>()
   const tcId = resolvedId || parseInt(itemId || '0')
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -92,8 +93,8 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
     return (
       <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6 text-center">
         <h3 className="text-lg font-medium text-destructive">Test Case Not Found</h3>
-        <Link to="/projects" className="mt-4 inline-block text-primary hover:text-primary/80">
-          &larr; Back to Projects
+        <Link to={docRegistryListUrl(prefix!, 'TC')} className="mt-4 inline-block text-primary hover:text-primary/80">
+          &larr; Back to Test Cases
         </Link>
       </div>
     )

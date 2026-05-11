@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
@@ -17,6 +17,14 @@ import {
 
 import { docsApi, type DocShell, usersApi } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
+import {
+  readStoredSort,
+  writeStoredSort,
+  DEFAULT_SORT_FIELD,
+  DEFAULT_SORT_DIR,
+  type RegistrySortField,
+  type RegistrySortDir,
+} from '../lib/docRegistryParams'
 import { docCreateUrl, docUrl, normalizeDocTypeParam, type DocType } from '../types/doc'
 import { formatDateTime } from '../test/date-utils'
 
@@ -30,6 +38,7 @@ const TYPE_BADGES: Record<DocType, { label: string; color: string }> = {
   TCO: { label: 'Test Concept', color: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' },
   DEF: { label: 'Defect', color: 'bg-rose-500/10 text-rose-700 dark:text-rose-400' },
   CMP: { label: 'Campaign', color: 'bg-sky-500/10 text-sky-700 dark:text-sky-400' },
+  TS: { label: 'Test Suite', color: 'bg-lime-500/10 text-lime-700 dark:text-lime-400' },
   PROT: { label: 'Protocol', color: 'bg-teal-500/10 text-teal-700 dark:text-teal-400' },
   RPT: { label: 'Report', color: 'bg-slate-500/10 text-slate-700 dark:text-slate-400' },
   STD: { label: 'External Standard', color: 'bg-orange-500/10 text-orange-700 dark:text-orange-400' },
@@ -45,6 +54,7 @@ const DOC_TYPE_OPTIONS: { code: DocType; label: string }[] = [
   { code: 'RSK', label: 'Risks' },
   { code: 'CHG', label: 'Changes' },
   { code: 'DEF', label: 'Defects' },
+  { code: 'CMP', label: 'Campaigns' },
   { code: 'RPT', label: 'Reports' },
   { code: 'STD', label: 'Standards' },
 ]
@@ -56,6 +66,7 @@ const TYPE_PAGE_TITLE: Record<DocType, string> = {
   TCO: 'Test Concepts',
   DEF: 'Defects',
   CMP: 'Campaigns',
+  TS: 'Test Suites',
   PROT: 'Protocols',
   DES: 'Design Items',
   RSK: 'Risks',
@@ -77,6 +88,12 @@ const STATUS_OPTIONS = [
   'Active',
   'Final',
   'Superseded',
+  'Planned',
+  'Running',
+  'Completed',
+  'Scope',
+  'In Progress',
+  'Aborted',
 ]
 
 const PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Critical']
@@ -187,16 +204,35 @@ export default function Documents() {
   const { data: project } = useProjectByPrefix(prefix)
   const [createMenuOpen, setCreateMenuOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const dirParam = searchParams.get('dir')
+  const sortDir: SortDir = dirParam === 'asc' || dirParam === 'desc' ? dirParam : 'desc'
 
   useEffect(() => {
     const sortFromUrl = searchParams.get('sort')
-    if (!searchParams.has('dir') && (!sortFromUrl || isSortField(sortFromUrl))) return
-    const params = new URLSearchParams(searchParams)
-    params.delete('dir')
-    if (sortFromUrl && !isSortField(sortFromUrl)) params.delete('sort')
-    setSearchParams(params, { replace: true })
-  }, [searchParams, setSearchParams])
+    if (sortFromUrl && !isSortField(sortFromUrl)) {
+      const params = new URLSearchParams(searchParams)
+      params.delete('sort')
+      params.delete('dir')
+      setSearchParams(params, { replace: true })
+      return
+    }
+    if (!prefix) return
+    const urlSort = searchParams.get('sort')
+    const urlDir = searchParams.get('dir')
+    if (urlSort || urlDir) {
+      const field: RegistrySortField = isSortField(urlSort) ? urlSort as RegistrySortField : DEFAULT_SORT_FIELD
+      const dir: RegistrySortDir = urlDir === 'asc' || urlDir === 'desc' ? urlDir : DEFAULT_SORT_DIR
+      writeStoredSort(prefix, { field, dir })
+    } else {
+      const stored = readStoredSort(prefix)
+      if (stored && (stored.field !== DEFAULT_SORT_FIELD || stored.dir !== DEFAULT_SORT_DIR)) {
+        const params = new URLSearchParams(searchParams)
+        if (stored.field !== DEFAULT_SORT_FIELD) params.set('sort', stored.field)
+        if (stored.dir !== DEFAULT_SORT_DIR) params.set('dir', stored.dir)
+        setSearchParams(params, { replace: true })
+      }
+    }
+  }, [prefix, searchParams, setSearchParams])
 
   const typeFilters = useMemo(
     () => unique(readListParam(searchParams, 'type').map((value) => normalizeDocTypeParam(value)).filter(Boolean) as DocType[]),
@@ -249,6 +285,7 @@ export default function Documents() {
     updatedFrom?: string
     updatedTo?: string
     sort?: SortField
+    dir?: SortDir
   }) => {
     const params = new URLSearchParams(searchParams)
     const nextTypes = next.types ?? typeFilters
@@ -262,6 +299,7 @@ export default function Documents() {
     const nextUpdatedFrom = next.updatedFrom ?? updatedFrom
     const nextUpdatedTo = next.updatedTo ?? updatedTo
     const nextSort = next.sort ?? sortField
+    const nextDir = next.dir ?? sortDir
 
     writeListParam(params, 'type', nextTypes)
     writeListParam(params, 'status', nextStatuses)
@@ -293,14 +331,21 @@ export default function Documents() {
     if (nextSort !== 'updated_at') params.set('sort', nextSort)
     else params.delete('sort')
 
-    params.delete('dir')
+    if (nextDir !== 'desc') params.set('dir', nextDir)
+    else params.delete('dir')
+
+    if (prefix) {
+      writeStoredSort(prefix, { field: nextSort as RegistrySortField, dir: nextDir as RegistrySortDir })
+    }
 
     setSearchParams(params, { replace: true })
   }
 
   const clearFilters = () => {
-    const params = new URLSearchParams(searchParams)
-    ;['type', 'status', 'q', 'priority', 'reviewer', 'links', 'created_from', 'created_to', 'updated_from', 'updated_to', 'sort', 'dir'].forEach((key) => params.delete(key))
+    const params = new URLSearchParams()
+    typeFilters.forEach((t) => params.append('type', t))
+    if (sortField !== 'updated_at') params.set('sort', sortField)
+    if (sortDir !== 'desc') params.set('dir', sortDir)
     setSearchParams(params, { replace: true })
   }
 
@@ -322,10 +367,11 @@ export default function Documents() {
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
-      setSortDir((current) => current === 'asc' ? 'desc' : 'asc')
+      const nextDir = sortDir === 'asc' ? 'desc' : 'asc'
+      updateRegistryParams({ dir: nextDir })
     } else {
-      setSortDir(field === 'updated_at' || field === 'created_at' ? 'desc' : 'asc')
-      updateRegistryParams({ sort: field })
+      const defaultDir = field === 'updated_at' || field === 'created_at' ? 'desc' : 'asc'
+      updateRegistryParams({ sort: field, dir: defaultDir })
     }
   }
 
@@ -436,7 +482,6 @@ export default function Documents() {
 
   const sortLabel = SORT_OPTIONS.find((option) => option.field === sortField)?.label || 'Updated'
   const hasActiveFilters = Boolean(
-    typeFilters.length ||
     statusFilters.length ||
     search ||
     priorityFilter ||
@@ -445,9 +490,9 @@ export default function Documents() {
     createdFrom ||
     createdTo ||
     updatedFrom ||
-    updatedTo ||
-    sortField !== 'updated_at'
+    updatedTo
   )
+  const hasSortOverride = sortField !== 'updated_at' || sortDir !== 'desc'
   const createTypes = typeFilters.length === 1 ? DOC_TYPE_OPTIONS.filter((type) => type.code === typeFilters[0]) : DOC_TYPE_OPTIONS
   const createButtonLabel = createTypes.length === 1 ? `New ${TYPE_BADGES[createTypes[0].code].label}` : 'New Document'
   const totalDocs = docs?.length ?? 0
@@ -539,8 +584,8 @@ export default function Documents() {
             value={sortField}
             onChange={(event) => {
               const nextSort = event.target.value as SortField
-              setSortDir(nextSort === 'updated_at' || nextSort === 'created_at' ? 'desc' : 'asc')
-              updateRegistryParams({ sort: nextSort })
+              const defaultDir = nextSort === 'updated_at' || nextSort === 'created_at' ? 'desc' : 'asc'
+              updateRegistryParams({ sort: nextSort, dir: defaultDir })
             }}
             className="rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
           >
@@ -552,7 +597,7 @@ export default function Documents() {
             type="button"
             onClick={() => setFiltersOpen((open) => !open)}
             className={`inline-flex items-center justify-center gap-2 rounded-md border px-2.5 py-1.5 text-sm font-medium transition-colors ${
-              filtersOpen || hasActiveFilters
+              filtersOpen || hasActiveFilters || hasSortOverride
                 ? 'border-primary bg-primary/10 text-primary'
                 : 'border-input bg-background text-foreground hover:bg-accent'
             }`}
@@ -561,7 +606,7 @@ export default function Documents() {
           >
             <Filter className="h-4 w-4" />
             Filters
-            {hasActiveFilters && (
+            {(hasActiveFilters || hasSortOverride) && (
               <span className="rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">On</span>
             )}
           </button>
@@ -688,7 +733,7 @@ export default function Documents() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
-            <FilterChip label={`Sort: ${sortLabel}`} muted={!hasActiveFilters} />
+            <FilterChip label={`Sort: ${sortLabel}`} muted={!hasSortOverride} />
             {search && <FilterChip label={`Search: ${search}`} />}
             {typeFilters.map((type) => <FilterChip key={type} label={`Kind: ${type}`} />)}
             {statusFilters.map((status) => <FilterChip key={status} label={`Status: ${status}`} />)}
@@ -744,10 +789,13 @@ export default function Documents() {
                 </tr>
               </thead>
               <tbody className="bg-card divide-y divide-border">
-                {sorted.map((doc: DocShell) => (
+                {sorted.map((doc: DocShell) => {
+                  const detailUrl = docUrl(prefix!, doc.doc_type as DocType, doc.doc_id)
+                  const listState = { returnTo: `/projects/${prefix}/docs?${searchParams.toString()}` }
+                  return (
                   <tr key={`${doc.doc_type}-${doc.id}`} className="hover:bg-accent/50">
                     <td className="px-3 py-2 whitespace-nowrap">
-                      <Link to={docUrl(prefix!, doc.doc_type as DocType, doc.doc_id)} className="text-primary font-mono text-sm font-medium">
+                      <Link to={detailUrl} state={listState} className="text-primary font-mono text-sm font-medium">
                         {doc.doc_id}
                       </Link>
                     </td>
@@ -755,7 +803,7 @@ export default function Documents() {
                       <TypeBadge type={doc.doc_type} />
                     </td>
                     <td className="px-3 py-2 max-w-sm truncate">
-                      <Link to={docUrl(prefix!, doc.doc_type as DocType, doc.doc_id)} className="text-foreground hover:text-primary/80 font-medium">
+                      <Link to={detailUrl} state={listState} className="text-foreground hover:text-primary/80 font-medium">
                         {doc.title}
                       </Link>
                     </td>
@@ -789,7 +837,8 @@ export default function Documents() {
                       {format(new Date(doc.updated_at), 'MMM d, yyyy')}
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>

@@ -196,6 +196,7 @@ export interface Project {
   test_concept_count: number
   test_suite_count: number
   defect_count: number
+  coverage_percent: number
   created_at: string
   updated_at: string
 }

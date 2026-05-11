@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { DOC_TYPE_LABELS, DOC_TYPE_COLORS, type DocType } from '../types/doc'
+import { docRegistryListUrl } from '../lib/docRegistryParams'
 
 const STATUS_COLORS: Record<string, string> = {
   Draft: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
@@ -90,6 +91,7 @@ interface DocDetailShellProps {
   actions?: ReactNode
   rightRail?: ReactNode
   children: ReactNode
+  backTo?: string
 }
 
 export default function DocDetailShell({
@@ -102,12 +104,18 @@ export default function DocDetailShell({
   actions,
   rightRail,
   children,
+  backTo,
 }: DocDetailShellProps) {
+  const location = useLocation()
+  const returnTo = backTo
+    || (location.state as { returnTo?: string } | null)?.returnTo
+    || docRegistryListUrl(projectPrefix, docType)
+
   return (
     <div className="animate-fade-in space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
-          <Link to={`/projects/${projectPrefix}`} className="p-2 hover:bg-accent/50 rounded-md">
+          <Link to={returnTo} className="p-2 hover:bg-accent/50 rounded-md">
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
           <div>

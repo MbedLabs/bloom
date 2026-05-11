@@ -1,18 +1,22 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignsApi, type ArtefactLink, type TestCampaignItem } from '../api/client'
 import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Pencil, Trash2, X } from 'lucide-react'
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
 import { usePageMeta } from '../contexts/PageMetaContext'
 import { docUrl } from '../types/doc'
+import { docRegistryListUrl } from '../lib/docRegistryParams'
 
 const CAMPAIGN_STATUSES = ['Planned', 'Scope', 'In Progress', 'Completed', 'Aborted']
 
-export default function CampaignDetail() {
+export default function CampaignDetail({ resolvedId }: { resolvedId?: number } = {}) {
   const { prefix, campaignId } = useParams<{ prefix: string; campaignId: string }>()
-  const campId = parseInt(campaignId || '0')
+  const campId = resolvedId || parseInt(campaignId || '0')
   const navigate = useNavigate()
+  const location = useLocation()
+  const backUrl = (location.state as { returnTo?: string } | null)?.returnTo
+    || docRegistryListUrl(prefix!, 'CMP')
   const queryClient = useQueryClient()
 
   const [editOpen, setEditOpen] = useState(false)
@@ -49,7 +53,7 @@ export default function CampaignDetail() {
     mutationFn: () => campaignsApi.delete(campId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['campaigns'] })
-      navigate(`/projects/${prefix}/campaigns`)
+      navigate(docRegistryListUrl(prefix!, 'CMP'))
     },
   })
 
@@ -98,7 +102,7 @@ export default function CampaignDetail() {
     return (
       <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6 text-center">
         <h3 className="text-lg font-medium text-destructive">Campaign Not Found</h3>
-        <Link to={`/projects/${prefix}/campaigns`} className="mt-4 inline-block text-primary hover:text-primary/80">
+        <Link to={backUrl} className="mt-4 inline-block text-primary hover:text-primary/80">
           &larr; Back to Campaigns
         </Link>
       </div>
@@ -113,7 +117,7 @@ export default function CampaignDetail() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <Link to={`/projects/${prefix}/campaigns`} className="p-2 hover:bg-accent/50 rounded-md">
+          <Link to={backUrl} className="p-2 hover:bg-accent/50 rounded-md">
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
           <div>
@@ -218,7 +222,7 @@ export default function CampaignDetail() {
                         <span className="text-xs text-muted-foreground">{scope.items.length} TC{scope.items.length !== 1 ? 's' : ''}</span>
                         <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">{scope.suite.status}</span>
                         <Link
-                          to={`/projects/${prefix}/suites/${scope.suite.id}`}
+                          to={`/projects/${prefix}/docs/test-suites/${scope.suite.suite_id}`}
                           onClick={(e) => e.stopPropagation()}
                           className="p-1 rounded hover:bg-accent/50 text-muted-foreground hover:text-primary"
                           title="Open suite detail"
