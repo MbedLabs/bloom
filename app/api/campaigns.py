@@ -1,4 +1,4 @@
-"""Test Campaign API endpoints: configurations and traceability scopes."""
+"""Test campaign API: traceability scopes and Bud execution linkage."""
 
 from datetime import datetime
 from typing import Optional
@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.link_read_utils import get_verified_requirement_links_for_test_case
 from app.core.database import get_db
+from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import (
     ArtefactLink,
@@ -19,7 +20,6 @@ from app.models import (
     TestCampaignItem,
     TestCase,
     TestConcept,
-    TestConfiguration,
     TestSuite,
     TestSuiteItem,
 )
@@ -38,9 +38,6 @@ from app.schemas import (
     TestCampaignUpdate,
     TestCaseResponse,
     TestConceptSummary,
-    TestConfigurationCreate,
-    TestConfigurationResponse,
-    TestConfigurationUpdate,
     TestSuiteSummary,
 )
 
@@ -80,56 +77,6 @@ def _apply_result_to_campaign_item(item: TestCampaignItem, res) -> None:
     item.result = res.status
     item.comment = res.comment
     item.executed_at = _resolved_execution_time(res.executed_at)
-
-
-@router.post("/{campaign_id}/sync-results", response_model=SyncResultsResponse)
-async def sync_results(
-    campaign_id: int,
-    data: SyncResultsRequest,
-    db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
-):
-    """
-    Ingest automated test results for a campaign in bulk.
-    Matches results to campaign items using the test case ID (tc_id).
-    """
-    campaign = (
-        await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
-    ).scalar_one_or_none()
-
-    if not campaign:
-        raise HTTPException(404, "Campaign not found")
-
-    # Get all items in this campaign joined with their test cases
-    items_result = await db.execute(
-        select(TestCampaignItem, TestCase)
-        .join(TestCase, TestCampaignItem.test_case_id == TestCase.id)
-        .where(TestCampaignItem.campaign_id == campaign_id)
-    )
-
-    tc_id_to_item = {}
-    tc_id_to_case = {}
-    for item, tc in items_result.all():
-        tc_id_to_item[tc.tc_id] = item
-        tc_id_to_case[tc.tc_id] = tc
-
-    updated_count = 0
-    not_found = []
-
-    for res in data.results:
-        item = tc_id_to_item.get(res.tc_id)
-        tc = tc_id_to_case.get(res.tc_id)
-        if not item or not tc:
-            not_found.append(res.tc_id)
-            continue
-
-        _apply_result_to_campaign_item(item, res)
-        _apply_result_to_test_case(tc, res)
-        updated_count += 1
-
-    await db.commit()
-
-    return SyncResultsResponse(updated=updated_count, not_found=not_found)
 
 
 @router.post("/sync-results", response_model=SyncResultsResponse)
@@ -180,81 +127,6 @@ async def sync_results_global(
     return SyncResultsResponse(updated=updated_count, not_found=not_found)
 
 
-# ==================== Configurations ====================
-
-
-@router.get("/configurations", response_model=list[TestConfigurationResponse])
-async def list_configurations(
-    project_id: int = Query(...),
-    db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
-):
-    result = await db.execute(
-        select(TestConfiguration)
-        .where(TestConfiguration.project_id == project_id)
-        .order_by(TestConfiguration.created_at.desc())
-    )
-    return result.scalars().all()
-
-
-@router.post("/configurations", response_model=TestConfigurationResponse, status_code=201)
-async def create_configuration(
-    data: TestConfigurationCreate,
-    db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
-):
-    proj = await db.execute(select(Project).where(Project.id == data.project_id))
-    if not proj.scalar_one_or_none():
-        raise HTTPException(404, "Project not found")
-
-    config = TestConfiguration(
-        project_id=data.project_id,
-        name=data.name,
-        description=data.description,
-        environment=data.environment,
-        parameters=data.parameters,
-    )
-    db.add(config)
-    await db.flush()
-    await db.refresh(config)
-    return config
-
-
-@router.patch("/configurations/{config_id}", response_model=TestConfigurationResponse)
-async def update_configuration(
-    config_id: int,
-    data: TestConfigurationUpdate,
-    db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
-):
-    result = await db.execute(select(TestConfiguration).where(TestConfiguration.id == config_id))
-    config = result.scalar_one_or_none()
-    if not config:
-        raise HTTPException(404, "Configuration not found")
-
-    for field, value in data.model_dump(exclude_unset=True).items():
-        setattr(config, field, value)
-    await db.flush()
-    await db.refresh(config)
-    return config
-
-
-@router.delete("/configurations/{config_id}", status_code=204)
-async def delete_configuration(
-    config_id: int,
-    db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
-):
-    result = await db.execute(select(TestConfiguration).where(TestConfiguration.id == config_id))
-    config = result.scalar_one_or_none()
-    if not config:
-        raise HTTPException(404, "Configuration not found")
-    await db.delete(config)
-
-
-# ==================== Campaigns ====================
-
-
 @router.get("", response_model=list[TestCampaignResponse])
 async def list_campaigns(
     project_id: int = Query(...),
@@ -282,8 +154,9 @@ async def create_campaign(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    proj = await db.execute(select(Project).where(Project.id == data.project_id))
-    if not proj.scalar_one_or_none():
+    proj_row = await db.execute(select(Project).where(Project.id == data.project_id))
+    project = proj_row.scalar_one_or_none()
+    if not project:
         raise HTTPException(404, "Project not found")
 
     # Resolve suite_ids: prefer new field, fall back to legacy suite_id
@@ -301,20 +174,20 @@ async def create_campaign(
             raise HTTPException(404, f"Suite {sid} not found")
         validated_suites.append(suite)
 
-    if data.configuration_id is not None:
-        config = (
-            await db.execute(
-                select(TestConfiguration).where(TestConfiguration.id == data.configuration_id)
-            )
-        ).scalar_one_or_none()
-        if not config or config.project_id != data.project_id:
-            raise HTTPException(404, "Configuration not found")
+    campaign_public_id = await next_doc_id(
+        db,
+        TestCampaign,
+        TestCampaign.campaign_id,
+        data.project_id,
+        project.prefix,
+        "CMP",
+    )
 
     campaign = TestCampaign(
         project_id=data.project_id,
+        campaign_id=campaign_public_id,
         name=data.name,
         description=data.description,
-        configuration_id=data.configuration_id,
         suite_id=resolved_suite_ids[0] if resolved_suite_ids else None,
         bud_run_id=data.bud_run_id,
         bud_run_url=data.bud_run_url,
@@ -390,16 +263,6 @@ async def update_campaign(
         campaign.name = data.name
     if data.description is not None:
         campaign.description = data.description
-    if data.configuration_id is not None:
-        if data.configuration_id:
-            config = (
-                await db.execute(
-                    select(TestConfiguration).where(TestConfiguration.id == data.configuration_id)
-                )
-            ).scalar_one_or_none()
-            if not config or config.project_id != campaign.project_id:
-                raise HTTPException(404, "Configuration not found")
-        campaign.configuration_id = data.configuration_id
     # Handle suite_ids (multi-suite) or legacy suite_id
     resolved_suite_ids = data.suite_ids
     if resolved_suite_ids is None and data.suite_id is not None:
@@ -607,24 +470,6 @@ async def _build_campaign_response(
         )
     ).scalar() or 0
 
-    config_resp = None
-    if campaign.configuration_id:
-        cfg_result = await db.execute(
-            select(TestConfiguration).where(TestConfiguration.id == campaign.configuration_id)
-        )
-        cfg = cfg_result.scalar_one_or_none()
-        if cfg:
-            config_resp = TestConfigurationResponse(
-                id=cfg.id,
-                project_id=cfg.project_id,
-                name=cfg.name,
-                description=cfg.description,
-                environment=cfg.environment,
-                parameters=cfg.parameters,
-                created_at=cfg.created_at,
-                updated_at=cfg.updated_at,
-            )
-
     # Build suites list from CampaignSuite join table
     cs_rows = (
         (
@@ -651,11 +496,14 @@ async def _build_campaign_response(
 
     # Legacy single-suite field: first suite or direct FK
     suite_resp = suites_list[0] if suites_list else None
+    public_id = campaign.campaign_id or ""
+    if not public_id:
+        raise ValueError(f"Campaign {campaign.id} missing campaign_id; ensure startup backfill ran")
 
     return TestCampaignResponse(
         id=campaign.id,
         project_id=campaign.project_id,
-        configuration_id=campaign.configuration_id,
+        campaign_id=public_id,
         suite_id=campaign.suite_id,
         bud_run_id=campaign.bud_run_id,
         bud_run_url=campaign.bud_run_url,
@@ -672,7 +520,6 @@ async def _build_campaign_response(
         failed=0,
         blocked=0,
         pending=total,
-        configuration=config_resp,
         suite=suite_resp,
         suites=suites_list,
     )

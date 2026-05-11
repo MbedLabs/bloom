@@ -13,6 +13,7 @@ LINK_RULE_ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("SPEC", "STD", ("references",)),
     ("STD", "STD", ("duplicates", "relates_to", "references")),
     ("TCO", "SPEC", ("verifies", "references")),
+    ("TCO", "REQ", ("verifies", "references")),
     ("TCO", "TC", ("implements",)),
     ("TCO", "TCO", ("derives_from", "refines", "relates_to")),
     ("TCO", "STD", ("references",)),

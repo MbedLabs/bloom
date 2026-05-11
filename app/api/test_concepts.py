@@ -5,8 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import log_artefact_activity
+from app.api.link_read_utils import merged_linked_requirement_ids_for_test_concept
 from app.core.database import get_db
-from app.core.id_generator import normalize_doc_id
+from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import Project, TestConcept
 from app.models.user import User, UserRole
@@ -15,7 +16,10 @@ from app.schemas import TestConceptCreate, TestConceptResponse, TestConceptUpdat
 router = APIRouter()
 
 
-def _response(item: TestConcept) -> TestConceptResponse:
+async def _response(db: AsyncSession, item: TestConcept) -> TestConceptResponse:
+    merged = await merged_linked_requirement_ids_for_test_concept(
+        db, item.id, item.linked_requirement_ids
+    )
     return TestConceptResponse(
         id=item.id,
         project_id=item.project_id,
@@ -23,7 +27,7 @@ def _response(item: TestConcept) -> TestConceptResponse:
         name=item.name,
         description=item.description,
         status=item.status,
-        linked_requirement_ids=item.linked_requirement_ids or [],
+        linked_requirement_ids=merged,
         coverage=item.coverage,
         created_at=item.created_at,
         updated_at=item.updated_at,
@@ -41,7 +45,8 @@ async def list_test_concepts(
         .where(TestConcept.project_id == project_id)
         .order_by(TestConcept.created_at.desc())
     )
-    return [_response(item) for item in result.scalars().all()]
+    items = result.scalars().all()
+    return [await _response(db, item) for item in items]
 
 
 @router.post("", response_model=TestConceptResponse, status_code=201)
@@ -56,14 +61,9 @@ async def create_test_concept(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    try:
-        concept_id = normalize_doc_id(
-            data.concept_id,
-            expected_type_code="TCO",
-            expected_project_prefix=project.prefix,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    concept_id = await next_doc_id(
+        db, TestConcept, TestConcept.concept_id, data.project_id, project.prefix, "TCO"
+    )
 
     existing = await db.execute(
         select(TestConcept).where(
@@ -80,7 +80,7 @@ async def create_test_concept(
         name=data.name,
         description=data.description,
         status=data.status,
-        linked_requirement_ids=data.linked_requirement_ids,
+        linked_requirement_ids=None,
         coverage=data.coverage,
     )
     db.add(item)
@@ -93,7 +93,7 @@ async def create_test_concept(
         "created",
         f"{current_user.full_name} created test concept {item.concept_id}",
     )
-    return _response(item)
+    return await _response(db, item)
 
 
 @router.get("/{concept_id}", response_model=TestConceptResponse)
@@ -107,7 +107,7 @@ async def get_test_concept(
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Test concept not found")
-    return _response(item)
+    return await _response(db, item)
 
 
 @router.patch("/{concept_id}", response_model=TestConceptResponse)
@@ -135,7 +135,7 @@ async def update_test_concept(
         "updated",
         f"{current_user.full_name} updated test concept {item.concept_id}",
     )
-    return _response(item)
+    return await _response(db, item)
 
 
 @router.delete("/{concept_id}", status_code=204)

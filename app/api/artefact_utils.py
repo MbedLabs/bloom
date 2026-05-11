@@ -170,12 +170,6 @@ async def build_related_response(
     requirement_ids.extend(
         await _get_related_requirement_ids_from_links(db, artefact_type, artefact_id)
     )
-    if artefact_type in {"design", "risk"}:
-        linked_requirement_id = getattr(artefact, "linked_requirement_id", None)
-        if linked_requirement_id:
-            requirement_ids.append(linked_requirement_id)
-    elif artefact_type == "test-concept":
-        requirement_ids.extend(list(getattr(artefact, "linked_requirement_ids", []) or []))
     requirement_ids = sorted(set(requirement_ids))
 
     requirements = []

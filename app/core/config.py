@@ -4,6 +4,7 @@ Application configuration.
 Loads settings from environment variables with sensible defaults.
 """
 
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import List, Optional
@@ -148,6 +149,15 @@ class Settings(BaseSettings):
             "BLOOM_PASSWORD_RESET_TOKEN_TTL_HOURS", "PASSWORD_RESET_TOKEN_TTL_HOURS"
         ),
     )
+
+    @classmethod
+    def settings_customise_sources(
+        cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings
+    ):
+        """Let CI/pytest bypass workspace `.env` when injecting `DATABASE_URL` / secrets via the shell."""
+        if os.environ.get("BLOOM_DOTENV_DISABLED") == "1":
+            return init_settings, env_settings, file_secret_settings
+        return init_settings, env_settings, dotenv_settings, file_secret_settings
 
     @model_validator(mode="after")
     def populate_database_url(self):

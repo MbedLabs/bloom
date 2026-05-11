@@ -46,7 +46,6 @@ class Project(Base):
     documents: Mapped[List["Document"]] = relationship(
         back_populates="project", foreign_keys="Document.project_id"
     )
-    test_configurations: Mapped[List["TestConfiguration"]] = relationship(back_populates="project")
     test_suites: Mapped[List["TestSuite"]] = relationship(back_populates="project")
     test_campaigns: Mapped[List["TestCampaign"]] = relationship(back_populates="project")
     design_items: Mapped[List["DesignItem"]] = relationship(
@@ -282,27 +281,6 @@ class DocumentSection(Base):
     linked_requirement: Mapped[Optional["Requirement"]] = relationship()
 
 
-class TestConfiguration(Base):
-    """Reusable test configuration (environment, parameters)."""
-
-    __tablename__ = "test_configurations"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    environment: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    parameters: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-    )
-
-    project: Mapped["Project"] = relationship(back_populates="test_configurations")
-
-
 class TestSuite(Base):
     """Reusable suite of test cases."""
 
@@ -346,15 +324,13 @@ class TestSuiteItem(Base):
 
 
 class TestCampaign(Base):
-    """A test campaign: a collection of test cases to execute with a configuration."""
+    """A test campaign: traceability scope and execution grouping for test cases."""
 
     __tablename__ = "test_campaigns"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
-    configuration_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("test_configurations.id"), nullable=True
-    )
+    campaign_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     suite_id: Mapped[Optional[int]] = mapped_column(ForeignKey("test_suites.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -372,7 +348,6 @@ class TestCampaign(Base):
     )
 
     project: Mapped["Project"] = relationship(back_populates="test_campaigns")
-    configuration: Mapped[Optional["TestConfiguration"]] = relationship()
     suite: Mapped[Optional["TestSuite"]] = relationship(back_populates="campaigns")
     items: Mapped[List["TestCampaignItem"]] = relationship(
         back_populates="campaign", cascade="all, delete-orphan"

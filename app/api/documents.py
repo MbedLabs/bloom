@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.document_kinds import normalize_document_kind, require_document_kind
-from app.core.id_generator import normalize_doc_id
+from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import Document, DocumentSection
 from app.models.user import User, UserRole
@@ -82,15 +82,11 @@ async def create_document(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
+    if data.project_id != project_id:
+        raise HTTPException(status_code=400, detail="project_id must match URL path")
+
     type_code = require_document_kind(data.doc_type)
-    try:
-        doc_id = normalize_doc_id(
-            data.doc_id,
-            expected_type_code=type_code,
-            expected_project_prefix=project.prefix,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    doc_id = await next_doc_id(db, Document, Document.doc_id, project_id, project.prefix, type_code)
 
     existing = await db.execute(
         select(Document).where(

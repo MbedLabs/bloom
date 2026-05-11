@@ -22,6 +22,7 @@ def test_get_allowed_link_roles_uses_only_explicit_matrix_rows():
     assert get_allowed_link_roles("TC", "DES") == ()
     assert get_allowed_link_roles("TCO", "TC") == ("implements",)
     assert get_allowed_link_roles("TCO", "SPEC") == ("verifies", "references")
+    assert get_allowed_link_roles("TCO", "REQ") == ("verifies", "references")
 
 
 def test_link_rule_helpers_recognize_supported_types_and_roles():

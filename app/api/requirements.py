@@ -16,7 +16,7 @@ from app.api.link_read_utils import (
     get_verifying_test_case_links_for_requirement,
 )
 from app.core.database import get_db
-from app.core.id_generator import normalize_doc_id
+from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import (
     ArtefactLink,
@@ -144,7 +144,12 @@ async def _build_requirement_response(req: Requirement, db: AsyncSession) -> Req
             if campaign and campaign.id not in seen_campaign_ids:
                 seen_campaign_ids.add(campaign.id)
                 campaign_backlinks.append(
-                    TestCampaignSummary(id=campaign.id, name=campaign.name, status=campaign.status)
+                    TestCampaignSummary(
+                        id=campaign.id,
+                        campaign_id=campaign.campaign_id or "",
+                        name=campaign.name,
+                        status=campaign.status,
+                    )
                 )
 
     return RequirementResponse(
@@ -257,7 +262,7 @@ async def create_requirement(
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     """
-    Create a new requirement using the creator-supplied req_id.
+    Create a new requirement; server assigns req_id.
     """
     project_result = await db.execute(select(Project).where(Project.id == data.project_id))
     project = project_result.scalar_one_or_none()
@@ -287,14 +292,9 @@ async def create_requirement(
         if not approver:
             raise HTTPException(status_code=404, detail="Approver not found")
 
-    try:
-        req_id = normalize_doc_id(
-            data.req_id,
-            expected_type_code="REQ",
-            expected_project_prefix=project.prefix,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    req_id = await next_doc_id(
+        db, Requirement, Requirement.req_id, data.project_id, project.prefix, "REQ"
+    )
 
     existing = await db.execute(
         select(Requirement).where(

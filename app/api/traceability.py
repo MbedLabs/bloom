@@ -1,5 +1,6 @@
 """
-Traceability API endpoints: matrix, impact analysis, coverage gaps, requirement links.
+Traceability API endpoints: matrix, impact analysis, coverage gaps.
+Cross-requirement relationships use POST /api/links (ArtefactLink).
 """
 
 from typing import Optional
@@ -9,20 +10,19 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.link_read_utils import (
-    get_verified_requirement_links_for_test_case,
     get_verifying_test_case_links_for_requirement,
+    iter_req_req_incoming_neighbors,
+    iter_req_req_outgoing_neighbors,
 )
 from app.core.database import get_db
-from app.core.security import get_current_user, require_role
-from app.models import Requirement, RequirementLink, TestCase, TestRunLink
-from app.models.user import User, UserRole
+from app.core.security import get_current_user
+from app.models import Requirement, TestCase, TestRunLink
+from app.models.user import User
 from app.schemas import (
     CoverageGap,
     CoverageGapReport,
     ImpactAnalysisResponse,
     ImpactNode,
-    RequirementLinkCreate,
-    RequirementLinkResponse,
     RequirementResponse,
     TestCaseResponse,
     TestRunLinkResponse,
@@ -30,8 +30,6 @@ from app.schemas import (
 )
 
 router = APIRouter()
-
-VALID_REQ_LINK_TYPES = {"depends_on", "derived_from", "refines", "copies", "satisfies"}
 
 
 async def _build_req_response(req: Requirement, db: AsyncSession) -> RequirementResponse:
@@ -172,22 +170,16 @@ async def get_impact_analysis(
         raise HTTPException(status_code=404, detail="Requirement not found")
 
     root_resp = await _build_req_response(root, db)
+    project_id = root.project_id
 
     async def _build_upstream(req_id: int, current_depth: int, visited: set) -> list:
         if current_depth > depth or req_id in visited:
             return []
         visited.add(req_id)
 
-        links_result = await db.execute(
-            select(RequirementLink).where(RequirementLink.target_id == req_id)
-        )
-        links = links_result.scalars().all()
-
         nodes = []
-        for link in links:
-            src_result = await db.execute(
-                select(Requirement).where(Requirement.id == link.source_id)
-            )
+        async for src_id, role in iter_req_req_incoming_neighbors(req_id, project_id, db):
+            src_result = await db.execute(select(Requirement).where(Requirement.id == src_id))
             src = src_result.scalar_one_or_none()
             if src and src.id not in visited:
                 src_resp = await _build_req_response(src, db)
@@ -195,7 +187,7 @@ async def get_impact_analysis(
                 nodes.append(
                     ImpactNode(
                         requirement=src_resp,
-                        link_type=link.link_type,
+                        link_type=role,
                         direction="upstream",
                         depth=current_depth,
                         children=children,
@@ -208,16 +200,9 @@ async def get_impact_analysis(
             return []
         visited.add(req_id)
 
-        links_result = await db.execute(
-            select(RequirementLink).where(RequirementLink.source_id == req_id)
-        )
-        links = links_result.scalars().all()
-
         nodes = []
-        for link in links:
-            tgt_result = await db.execute(
-                select(Requirement).where(Requirement.id == link.target_id)
-            )
+        async for tgt_id, role in iter_req_req_outgoing_neighbors(req_id, project_id, db):
+            tgt_result = await db.execute(select(Requirement).where(Requirement.id == tgt_id))
             tgt = tgt_result.scalar_one_or_none()
             if tgt and tgt.id not in visited:
                 tgt_resp = await _build_req_response(tgt, db)
@@ -225,7 +210,7 @@ async def get_impact_analysis(
                 nodes.append(
                     ImpactNode(
                         requirement=tgt_resp,
-                        link_type=link.link_type,
+                        link_type=role,
                         direction="downstream",
                         depth=current_depth,
                         children=children,
@@ -328,82 +313,3 @@ async def get_coverage_gaps(
         coverage_percent=coverage_pct,
         gaps=gaps,
     )
-
-
-@router.post("/requirement-links", response_model=RequirementLinkResponse, status_code=201)
-async def create_requirement_link(
-    data: RequirementLinkCreate,
-    source_id: int = Query(..., description="Source requirement ID"),
-    db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
-):
-    if data.link_type not in VALID_REQ_LINK_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid link_type. Must be one of: {VALID_REQ_LINK_TYPES}",
-        )
-
-    if source_id == data.target_id:
-        raise HTTPException(status_code=400, detail="Cannot link requirement to itself")
-
-    src_result = await db.execute(select(Requirement).where(Requirement.id == source_id))
-    if not src_result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Source requirement not found")
-
-    tgt_result = await db.execute(select(Requirement).where(Requirement.id == data.target_id))
-    if not tgt_result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Target requirement not found")
-
-    existing = await db.execute(
-        select(RequirementLink).where(
-            RequirementLink.source_id == source_id,
-            RequirementLink.target_id == data.target_id,
-            RequirementLink.link_type == data.link_type,
-        )
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Link already exists")
-
-    link = RequirementLink(
-        source_id=source_id,
-        target_id=data.target_id,
-        link_type=data.link_type,
-    )
-    db.add(link)
-    await db.flush()
-    await db.refresh(link)
-    return link
-
-
-@router.delete("/requirement-links/{link_id}", status_code=204)
-async def delete_requirement_link(
-    link_id: int,
-    db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
-):
-    result = await db.execute(select(RequirementLink).where(RequirementLink.id == link_id))
-    link = result.scalar_one_or_none()
-    if not link:
-        raise HTTPException(status_code=404, detail="Link not found")
-    await db.delete(link)
-
-
-@router.get("/requirement-links/{requirement_id}", response_model=list[RequirementLinkResponse])
-async def get_requirement_links(
-    requirement_id: int,
-    direction: Optional[str] = Query(None, description="Filter: outgoing, incoming"),
-    db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
-):
-    links = []
-    if direction in (None, "outgoing"):
-        result = await db.execute(
-            select(RequirementLink).where(RequirementLink.source_id == requirement_id)
-        )
-        links.extend(result.scalars().all())
-    if direction in (None, "incoming"):
-        result = await db.execute(
-            select(RequirementLink).where(RequirementLink.target_id == requirement_id)
-        )
-        links.extend(result.scalars().all())
-    return links

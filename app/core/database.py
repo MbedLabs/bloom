@@ -93,7 +93,17 @@ async def create_tables():
         )
 
         await conn.execute(
-            text("ALTER TABLE test_campaigns ADD COLUMN IF NOT EXISTS configuration_id INTEGER")
+            text("ALTER TABLE test_campaigns DROP COLUMN IF EXISTS configuration_id")
+        )
+        await conn.execute(text("DROP TABLE IF EXISTS test_configurations"))
+        await conn.execute(
+            text("ALTER TABLE test_campaigns ADD COLUMN IF NOT EXISTS campaign_id VARCHAR(50)")
+        )
+        await conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_project_campaign_id "
+                "ON test_campaigns (project_id, campaign_id) WHERE campaign_id IS NOT NULL"
+            )
         )
         await conn.execute(
             text("ALTER TABLE test_campaigns ADD COLUMN IF NOT EXISTS suite_id INTEGER")

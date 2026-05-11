@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from sqlalchemy import select, text
+from sqlalchemy import or_, select, text
 
 from app.api import artefacts
 from app.api import auth as auth_api
@@ -44,9 +44,9 @@ from app.core.config import settings
 from app.core.database import async_session_maker, create_tables, engine
 from app.core.deps import limiter
 from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS, normalize_document_kind
-from app.core.id_generator import compute_next_id
+from app.core.id_generator import compute_next_id, next_doc_id
 from app.core.security import get_password_hash
-from app.models import ArtefactLink, Document, Project
+from app.models import ArtefactLink, Document, Project, TestCampaign
 from app.models.user import User, UserRole
 
 # Configure logging
@@ -185,12 +185,47 @@ async def normalize_document_kinds_and_ids() -> None:
         await session.commit()
 
 
+async def backfill_campaign_public_ids() -> None:
+    """Assign PRJ-CMP-NNN to campaigns missing campaign_id (legacy rows)."""
+    async with async_session_maker() as session:
+        projects = (await session.execute(select(Project).order_by(Project.id))).scalars().all()
+        for project in projects:
+            campaigns = (
+                (
+                    await session.execute(
+                        select(TestCampaign)
+                        .where(
+                            TestCampaign.project_id == project.id,
+                            or_(
+                                TestCampaign.campaign_id.is_(None),
+                                TestCampaign.campaign_id == "",
+                            ),
+                        )
+                        .order_by(TestCampaign.id.asc())
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for campaign in campaigns:
+                campaign.campaign_id = await next_doc_id(
+                    session,
+                    TestCampaign,
+                    TestCampaign.campaign_id,
+                    project.id,
+                    project.prefix,
+                    "CMP",
+                )
+        await session.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     await create_tables()
     await migrate_user_columns()
     await normalize_document_kinds_and_ids()
+    await backfill_campaign_public_ids()
     await seed_admin_user()
     yield
 

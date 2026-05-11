@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import log_artefact_activity
 from app.core.database import get_db
-from app.core.id_generator import normalize_doc_id
+from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import DesignItem, Project
 from app.models.user import User, UserRole
@@ -45,14 +45,9 @@ async def create_design_item(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    try:
-        design_id = normalize_doc_id(
-            data.design_id,
-            expected_type_code="DES",
-            expected_project_prefix=project.prefix,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    design_id = await next_doc_id(
+        db, DesignItem, DesignItem.design_id, data.project_id, project.prefix, "DES"
+    )
 
     existing = await db.execute(
         select(DesignItem).where(
@@ -71,7 +66,7 @@ async def create_design_item(
         status=data.status,
         priority=data.priority,
         design_type=data.design_type,
-        linked_requirement_id=data.linked_requirement_id,
+        linked_requirement_id=None,
     )
     db.add(item)
     await db.flush()

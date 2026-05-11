@@ -87,6 +87,7 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_bloom
           SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
           ENABLE_DOCS: "false"
+          BLOOM_DOTENV_DISABLED: "1"
         run: |
           pytest --cov=app --cov-report=xml --cov-report=term-missing tests/ -v
 

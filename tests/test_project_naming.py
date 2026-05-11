@@ -37,31 +37,32 @@ def test_project_update_rejects_invalid_prefix():
         ProjectUpdate(prefix="PRJ-REQ-001")
 
 
-@pytest.mark.parametrize(
-    ("schema", "field", "doc_id"),
-    [
-        (RequirementCreate, "req_id", "PRJ-REQ-001"),
-        (TestCaseCreate, "tc_id", "PRJ-TC-001"),
-        (DocumentCreate, "doc_id", "PRJ-SPEC-001"),
-        (DesignItemCreate, "design_id", "PRJ-DES-001"),
-        (RiskItemCreate, "risk_id", "PRJ-RSK-001"),
-        (ChangeRequestCreate, "change_id", "PRJ-CHG-001"),
-        (TestConceptCreate, "concept_id", "PRJ-TCO-001"),
-    ],
-)
-def test_creator_supplied_ids_are_required_and_normalized(schema, field, doc_id):
-    title_field = "name" if schema is TestConceptCreate else "title"
-    item = schema(project_id=1, **{field: doc_id.lower(), title_field: "Title"})
-
-    assert getattr(item, field) == doc_id
+def test_requirement_create_has_no_client_req_id():
+    r = RequirementCreate(project_id=1, title="Title")
+    assert r.project_id == 1
+    assert r.title == "Title"
+    assert "req_id" not in RequirementCreate.model_fields
 
 
-@pytest.mark.parametrize("doc_id", ["PR1-REQ-001", "PRJ-BUG-001", "PRJ-REQ-1", "PRJ-REQ-1000"])
-def test_creator_supplied_requirement_id_must_match_convention(doc_id):
-    with pytest.raises(ValidationError):
-        RequirementCreate(project_id=1, req_id=doc_id, title="Title")
+def test_testcase_create_has_no_client_tc_id():
+    t = TestCaseCreate(project_id=1, title="TC Title")
+    assert t.project_id == 1
+    assert "tc_id" not in TestCaseCreate.model_fields
 
 
-def test_shared_document_id_type_must_match_document_type():
-    with pytest.raises(ValidationError):
-        DocumentCreate(project_id=1, doc_id="PRJ-RPT-001", doc_type="SPEC", title="Title")
+def test_document_create_has_no_client_doc_id():
+    d = DocumentCreate(project_id=1, title="Spec", doc_type="SPEC")
+    assert d.doc_type == "SPEC"
+    assert "doc_id" not in DocumentCreate.model_fields
+
+
+def test_design_risk_change_concept_create_without_public_ids():
+    assert "design_id" not in DesignItemCreate.model_fields
+    assert "risk_id" not in RiskItemCreate.model_fields
+    assert "change_id" not in ChangeRequestCreate.model_fields
+    assert "concept_id" not in TestConceptCreate.model_fields
+
+    DesignItemCreate(project_id=1, title="D")
+    RiskItemCreate(project_id=1, title="R")
+    ChangeRequestCreate(project_id=1, title="C")
+    TestConceptCreate(project_id=1, name="N")
