@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { campaignsApi, TestCampaignItem } from '../api/client'
-import { ArrowLeft, Clock, MessageSquare, Pencil, Trash2, FlaskConical, X } from 'lucide-react'
+import { campaignsApi, type ArtefactLink, type TestCampaignItem } from '../api/client'
+import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Pencil, Trash2, X } from 'lucide-react'
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
+import { usePageMeta } from '../contexts/PageMetaContext'
 import { docUrl } from '../types/doc'
 
 const CAMPAIGN_STATUSES = ['Planned', 'Scope', 'In Progress', 'Completed', 'Aborted']
-
-type ScopeFilter = 'all' | 'ad_hoc' | number
 
 export default function CampaignDetail() {
   const { prefix, campaignId } = useParams<{ prefix: string; campaignId: string }>()
@@ -19,13 +18,21 @@ export default function CampaignDetail() {
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', description: '', status: '' })
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>('all')
+  const [expandedSuites, setExpandedSuites] = useState<Set<number>>(new Set())
+  const [adHocExpanded, setAdHocExpanded] = useState(false)
+  const { setCrumbLabel } = usePageMeta()
 
   const editNameRef = useRef<HTMLInputElement>(null)
 
   const { data: campaign, isLoading } = useQuery({
     queryKey: ['campaign', campId],
     queryFn: () => campaignsApi.get(campId),
+    enabled: !!campId,
+  })
+
+  const { data: scopeLinks } = useQuery<ArtefactLink[]>({
+    queryKey: ['campaign-scope-links', campId],
+    queryFn: () => campaignsApi.scopeLinks(campId),
     enabled: !!campId,
   })
 
@@ -45,6 +52,11 @@ export default function CampaignDetail() {
       navigate(`/projects/${prefix}/campaigns`)
     },
   })
+
+  useEffect(() => {
+    if (campaign?.name) setCrumbLabel(campaign.name)
+    return () => setCrumbLabel(undefined)
+  }, [campaign?.name, setCrumbLabel])
 
   useEffect(() => {
     if (editOpen) editNameRef.current?.focus()
@@ -69,6 +81,15 @@ export default function CampaignDetail() {
     if (e.key === 'Escape') setEditOpen(false)
   }
 
+  const toggleSuite = (suiteId: number) => {
+    setExpandedSuites((prev) => {
+      const next = new Set(prev)
+      if (next.has(suiteId)) next.delete(suiteId)
+      else next.add(suiteId)
+      return next
+    })
+  }
+
   if (isLoading) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
   }
@@ -84,27 +105,12 @@ export default function CampaignDetail() {
     )
   }
 
-  const total = campaign.total_items
   const suiteScopes = campaign.suite_scopes ?? []
   const adHocItems = campaign.ad_hoc_items ?? []
 
-  const filteredItems: TestCampaignItem[] = (() => {
-    if (scopeFilter === 'all') return campaign.items ?? []
-    if (scopeFilter === 'ad_hoc') return adHocItems
-    const scope = suiteScopes.find((s) => s.suite.id === scopeFilter)
-    return scope?.items ?? []
-  })()
-
-  const filterLabel = (() => {
-    if (scopeFilter === 'all') return 'All test cases (union)'
-    if (scopeFilter === 'ad_hoc') return 'Other / ad-hoc'
-    const scope = suiteScopes.find((s) => s.suite.id === scopeFilter)
-    return scope?.suite.name ?? 'Unknown suite'
-  })()
-
   return (
     <div className="animate-fade-in space-y-6">
-      {/* Hero row */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Link to={`/projects/${prefix}/campaigns`} className="p-2 hover:bg-accent/50 rounded-md">
@@ -177,32 +183,94 @@ export default function CampaignDetail() {
       )}
 
       {/* Stats row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard label="Suites" value={campaign.suites?.length ?? 0} color="text-primary" />
-        <StatCard label="Test cases (resolved)" value={total} color="text-foreground" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard label="Suites" value={suiteScopes.length} color="text-primary" />
         <StatCard label="Bud Run" value={campaign.bud_run_id || '-'} color="text-foreground" />
-        <StatCard label="Req Coverage" value={campaign.related_requirements?.length || 0} color="text-emerald-600" />
+        <StatCard label="Status" value={campaign.status} color="text-foreground" />
       </div>
 
-      {/* Suites in this campaign — primary section, moved up */}
-      <div className="bg-card rounded-lg shadow-elegant p-5">
-        <h3 className="text-sm font-medium text-muted-foreground mb-3">Suites in this campaign</h3>
-        {campaign.suites && campaign.suites.length > 0 ? (
-          <div className="space-y-2">
-            {campaign.suites.map((suite) => (
-              <Link key={suite.id} to={`/projects/${prefix}/suites/${suite.id}`} className="flex items-center justify-between gap-4 p-3 rounded-md border border-border hover:bg-accent/30 transition-colors">
-                <div>
-                  <div className="font-mono text-sm text-primary">{suite.suite_id}</div>
-                  <div className="text-foreground mt-0.5">{suite.name}</div>
-                </div>
-                <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">{suite.status}</span>
-              </Link>
-            ))}
+      {/* Suites — expandable inline list */}
+      {(suiteScopes.length > 0 || adHocItems.length > 0) && (
+        <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
+          <div className="px-6 py-4 border-b border-border">
+            <h3 className="text-lg font-semibold text-foreground">Suites</h3>
           </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No suites linked to this campaign.</p>
-        )}
-      </div>
+
+          {suiteScopes.length === 0 && adHocItems.length > 0 ? (
+            <div className="px-6 py-4 text-sm text-muted-foreground">No suites linked to this campaign.</div>
+          ) : (
+            <div className="divide-y divide-border">
+              {suiteScopes.map((scope) => {
+                const isOpen = expandedSuites.has(scope.suite.id)
+                return (
+                  <div key={scope.suite.id}>
+                    <button
+                      type="button"
+                      onClick={() => toggleSuite(scope.suite.id)}
+                      className="w-full px-6 py-4 flex items-center justify-between gap-4 hover:bg-accent/30 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        {isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+                        <span className="font-mono text-xs text-primary shrink-0">{scope.suite.suite_id}</span>
+                        <span className="text-foreground font-medium truncate">{scope.suite.name}</span>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-xs text-muted-foreground">{scope.items.length} TC{scope.items.length !== 1 ? 's' : ''}</span>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">{scope.suite.status}</span>
+                        <Link
+                          to={`/projects/${prefix}/suites/${scope.suite.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="p-1 rounded hover:bg-accent/50 text-muted-foreground hover:text-primary"
+                          title="Open suite detail"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </Link>
+                      </div>
+                    </button>
+
+                    {isOpen && (
+                      <div className="border-t border-border bg-muted/20">
+                        {scope.items.length === 0 ? (
+                          <div className="px-10 py-4 text-sm text-muted-foreground">No test cases resolved for this suite yet.</div>
+                        ) : (
+                          <div className="divide-y divide-border/50">
+                            {scope.items.map((item) => (
+                              <CampaignItemRow key={item.id} item={item} prefix={prefix!} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {adHocItems.length > 0 && (
+            <div className="border-t border-border">
+              <button
+                type="button"
+                onClick={() => setAdHocExpanded(!adHocExpanded)}
+                className="w-full px-6 py-4 flex items-center justify-between gap-4 hover:bg-accent/30 transition-colors text-left"
+              >
+                <div className="flex items-center gap-3">
+                  {adHocExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                  <span className="text-foreground font-medium">Other items</span>
+                </div>
+                <span className="text-xs text-muted-foreground">{adHocItems.length} TC{adHocItems.length !== 1 ? 's' : ''}</span>
+              </button>
+              {adHocExpanded && (
+                <div className="border-t border-border bg-muted/20 divide-y divide-border/50">
+                  {adHocItems.map((item) => (
+                    <CampaignItemRow key={item.id} item={item} prefix={prefix!} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Bud Execution Link */}
       <div className="bg-card rounded-lg shadow-elegant p-5">
@@ -232,131 +300,37 @@ export default function CampaignDetail() {
         </div>
       )}
 
-      {/* Requirement Coverage */}
-      <div className="bg-card rounded-lg shadow-elegant p-5">
-        <h3 className="text-sm font-medium text-muted-foreground mb-3">Requirement Coverage</h3>
-        {campaign.related_requirements && campaign.related_requirements.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {campaign.related_requirements.map((req) => (
-              <Link key={req.id} to={docUrl(prefix!, 'REQ', req.req_id)} className="inline-flex items-center px-3 py-2 rounded-md bg-primary/10 text-primary hover:bg-primary/15 text-sm">
-                <span className="font-mono mr-2">{req.req_id}</span>
-                {req.title}
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No requirements are covered by this campaign scope yet.</p>
-        )}
-      </div>
-
-      {/* Related Concepts */}
-      {campaign.related_concepts && campaign.related_concepts.length > 0 && (
-        <div className="bg-card rounded-lg shadow-elegant p-5">
-          <h3 className="text-sm font-medium text-muted-foreground mb-3">Related Concepts</h3>
-          <div className="flex flex-wrap gap-2">
-            {campaign.related_concepts.map((concept) => (
-              <Link key={concept.id} to={docUrl(prefix!, 'TCO', concept.concept_id)} className="inline-flex items-center px-3 py-2 rounded-md bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 hover:bg-cyan-500/15 text-sm">
-                <FlaskConical className="h-3.5 w-3.5 mr-1.5" />
-                <span className="font-mono mr-2">{concept.concept_id}</span>
-                {concept.name}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Linked documents (defects, requirements, specs, etc.) */}
+      {/* Linked documents */}
       <DocumentLinksPanel
         projectId={campaign.project_id}
         projectPrefix={prefix || ''}
         sourceType="CMP"
         sourceId={campaign.id}
+        derivedLinks={scopeLinks}
       />
+    </div>
+  )
+}
 
-      {/* Resolved test cases — with suite dropdown filter */}
-      <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
-        <div className="px-6 py-4 border-b border-border flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <h3 className="text-lg font-semibold">Resolved test cases</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Union of test cases from the suites above; used for Bud result sync.</p>
-          </div>
-          {(suiteScopes.length > 0 || adHocItems.length > 0) && (
-            <div className="flex items-center gap-2">
-              <label htmlFor="scope-filter" className="text-sm text-muted-foreground whitespace-nowrap">View suite:</label>
-              <select
-                id="scope-filter"
-                value={String(scopeFilter)}
-                onChange={(e) => {
-                  const v = e.target.value
-                  setScopeFilter(v === 'all' ? 'all' : v === 'ad_hoc' ? 'ad_hoc' : Number(v))
-                }}
-                className="px-3 py-1.5 bg-background border border-input rounded-md text-sm focus:ring-2 focus:ring-ring min-w-[180px]"
-              >
-                <option value="all">All test cases (union)</option>
-                {suiteScopes.map((ss) => (
-                  <option key={ss.suite.id} value={String(ss.suite.id)}>
-                    {ss.suite.name} ({ss.items.length})
-                  </option>
-                ))}
-                {adHocItems.length > 0 && (
-                  <option value="ad_hoc">Other / ad-hoc ({adHocItems.length})</option>
-                )}
-              </select>
-            </div>
-          )}
-        </div>
-
-        {filteredItems.length === 0 ? (
-          <div className="p-12 text-center text-muted-foreground">
-            {scopeFilter === 'all'
-              ? 'No test cases in this campaign scope.'
-              : `No test cases for "${filterLabel}".`}
+function CampaignItemRow({ item, prefix }: { item: TestCampaignItem; prefix: string }) {
+  return (
+    <div className="px-10 py-3 flex items-center justify-between gap-4">
+      <div className="min-w-0">
+        {item.test_case ? (
+          <div className="flex items-center gap-2">
+            <Link to={docUrl(prefix, 'TC', item.test_case.tc_id)} className="font-mono text-xs text-primary hover:text-primary/80">
+              {item.test_case.tc_id}
+            </Link>
+            <span className="text-sm text-foreground truncate">{item.test_case.title}</span>
           </div>
         ) : (
-          <div className="divide-y divide-border">
-            {filteredItems.map((item) => (
-              <div key={item.id} className="px-6 py-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <Clock className="h-5 w-5 text-primary/60" />
-                    <div>
-                      {item.test_case ? (
-                        <Link to={docUrl(prefix!, 'TC', item.test_case.tc_id)} className="font-mono text-sm text-primary hover:text-primary/80 font-medium">
-                          {item.test_case.tc_id}
-                        </Link>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">TC#{item.test_case_id}</span>
-                      )}
-                      {item.test_case && <span className="ml-2 text-foreground">{item.test_case.title}</span>}
-                      {item.test_case?.linked_requirements && item.test_case.linked_requirements.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {item.test_case.linked_requirements.map((req) => (
-                            <Link key={req.id} to={docUrl(prefix!, 'REQ', req.req_id)} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary hover:bg-primary/15">
-                              <span className="font-mono mr-1">{req.req_id}</span>
-                              {req.title}
-                            </Link>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <ResultBadge result={item.result || item.status || 'Pending'} />
-                    {item.result && item.status && (
-                      <span className="text-xs text-muted-foreground">{item.status}</span>
-                    )}
-                  </div>
-                </div>
-
-                {item.comment && (
-                  <div className="mt-2 flex items-start space-x-2 text-sm">
-                    <MessageSquare className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
-                    <span className="text-muted-foreground">{item.comment}</span>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+          <span className="text-sm text-muted-foreground">TC#{item.test_case_id}</span>
+        )}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <ResultBadge result={item.result || item.status || 'Pending'} />
+        {item.result && item.status && item.result !== item.status && (
+          <span className="text-xs text-muted-foreground">{item.status}</span>
         )}
       </div>
     </div>

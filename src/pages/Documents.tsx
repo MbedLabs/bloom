@@ -44,6 +44,7 @@ const DOC_TYPE_OPTIONS: { code: DocType; label: string }[] = [
   { code: 'DES', label: 'Design' },
   { code: 'RSK', label: 'Risks' },
   { code: 'CHG', label: 'Changes' },
+  { code: 'DEF', label: 'Defects' },
   { code: 'RPT', label: 'Reports' },
   { code: 'STD', label: 'Standards' },
 ]
@@ -453,7 +454,7 @@ export default function Documents() {
 
   const SortHeader = ({ field, children, compact = false }: { field: SortField; children: React.ReactNode; compact?: boolean }) => (
     <th
-      className={`${compact ? 'px-4' : 'px-6'} py-3 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer select-none hover:text-foreground transition-colors`}
+      className={`${compact ? 'px-3' : 'px-5'} py-2.5 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer select-none hover:text-foreground transition-colors`}
       onClick={() => toggleSort(field)}
     >
       <div className="flex items-center gap-1">
@@ -468,8 +469,8 @@ export default function Documents() {
   )
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="space-y-3.5 animate-fade-in">
+      <div className="flex flex-col gap-2.5 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
             <Link to={`/projects/${prefix}`} className="hover:text-primary transition-colors">
@@ -478,7 +479,7 @@ export default function Documents() {
             <span>/</span>
             <span className="text-foreground">{pageTitle}</span>
           </div>
-          <h2 className="text-xl font-bold text-foreground">{pageTitle}</h2>
+          <h2 className="text-base font-bold text-foreground">{pageTitle}</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
             {sorted.length} of {totalDocs} controlled item{totalDocs !== 1 ? 's' : ''} shown
           </p>
@@ -487,7 +488,7 @@ export default function Documents() {
         <div className="flex items-center gap-2">
           <Link
             to={`/projects/${prefix}/import`}
-            className="inline-flex items-center gap-2 px-3 py-2 border border-input bg-background text-foreground rounded-md text-sm font-medium hover:bg-accent transition-colors"
+            className="inline-flex items-center gap-2 px-2.5 py-1.5 border border-input bg-background text-foreground rounded-md text-sm font-medium hover:bg-accent transition-colors"
           >
             <Upload className="h-4 w-4" />
             Import
@@ -495,7 +496,7 @@ export default function Documents() {
           <div className="relative">
             <button
               onClick={() => setCreateMenuOpen((open) => !open)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-all"
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-all"
             >
               <Plus className="h-4 w-4" />
               {createButtonLabel}
@@ -523,7 +524,7 @@ export default function Documents() {
       </div>
 
       <section className="rounded-lg border border-border bg-card">
-        <div className="grid grid-cols-1 gap-3 border-b border-border p-4 xl:grid-cols-[minmax(260px,1fr)_220px_auto]">
+        <div className="grid grid-cols-1 gap-2 border-b border-border p-3 xl:grid-cols-[minmax(220px,1fr)_190px_auto]">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -531,7 +532,7 @@ export default function Documents() {
               placeholder="Search name, ID, kind, status, reviewer, dates, links..."
               value={search}
               onChange={(event) => updateRegistryParams({ q: event.target.value })}
-              className="w-full rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring"
+              className="w-full rounded-md border border-input bg-background py-1.5 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring"
             />
           </div>
           <select
@@ -541,7 +542,7 @@ export default function Documents() {
               setSortDir(nextSort === 'updated_at' || nextSort === 'created_at' ? 'desc' : 'asc')
               updateRegistryParams({ sort: nextSort })
             }}
-            className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+            className="rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
           >
             {SORT_OPTIONS.map((option) => (
               <option key={option.field} value={option.field}>Sort by {option.label}</option>
@@ -550,7 +551,7 @@ export default function Documents() {
           <button
             type="button"
             onClick={() => setFiltersOpen((open) => !open)}
-            className={`inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+            className={`inline-flex items-center justify-center gap-2 rounded-md border px-2.5 py-1.5 text-sm font-medium transition-colors ${
               filtersOpen || hasActiveFilters
                 ? 'border-primary bg-primary/10 text-primary'
                 : 'border-input bg-background text-foreground hover:bg-accent'
@@ -567,7 +568,7 @@ export default function Documents() {
         </div>
 
         {filtersOpen && (
-        <div id="documents-filter-panel" className="space-y-4 p-4">
+        <div id="documents-filter-panel" className="space-y-3 p-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
             <Filter className="h-4 w-4 text-primary" />
             Filters
@@ -580,7 +581,7 @@ export default function Documents() {
                 <button
                   key={type.code}
                   onClick={() => toggleType(type.code)}
-                  className={`rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                  className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
                     typeFilters.includes(type.code)
                       ? 'border-primary bg-primary/10 text-primary'
                       : 'border-border bg-background text-muted-foreground hover:text-foreground'
@@ -599,7 +600,7 @@ export default function Documents() {
                 <button
                   key={status}
                   onClick={() => toggleStatus(status)}
-                  className={`rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                  className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
                     statusFilters.includes(status)
                       ? 'border-primary bg-primary/10 text-primary'
                       : 'border-border bg-background text-muted-foreground hover:text-foreground'
@@ -611,13 +612,13 @@ export default function Documents() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
             <label className="space-y-1">
               <span className="text-xs font-medium uppercase text-muted-foreground">Priority / Severity</span>
               <select
                 value={priorityFilter}
                 onChange={(event) => updateRegistryParams({ priority: event.target.value })}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
               >
                 <option value="">Any priority</option>
                 {PRIORITY_OPTIONS.map((priority) => (
@@ -631,7 +632,7 @@ export default function Documents() {
               <select
                 value={reviewerFilter}
                 onChange={(event) => updateRegistryParams({ reviewer: event.target.value })}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
               >
                 <option value="">Any reviewer</option>
                 <option value="assigned">Any assigned</option>
@@ -647,7 +648,7 @@ export default function Documents() {
               <select
                 value={linkFilter}
                 onChange={(event) => updateRegistryParams({ links: event.target.value as LinkFilter })}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
               >
                 {LINK_FILTER_OPTIONS.map((option) => (
                   <option key={option.code} value={option.code}>{option.label}</option>
@@ -656,7 +657,7 @@ export default function Documents() {
             </label>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
             <DatePickerField
               label="Created From"
               value={createdFrom}
@@ -686,7 +687,7 @@ export default function Documents() {
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
             <FilterChip label={`Sort: ${sortLabel}`} muted={!hasActiveFilters} />
             {search && <FilterChip label={`Search: ${search}`} />}
             {typeFilters.map((type) => <FilterChip key={type} label={`Kind: ${type}`} />)}
@@ -710,18 +711,18 @@ export default function Documents() {
       </section>
 
       {isLoading ? (
-        <div className="bg-card rounded-lg border border-border shadow-elegant p-8 text-center text-muted-foreground">
+        <div className="bg-card rounded-lg border border-border shadow-elegant p-5 text-center text-muted-foreground">
           Loading...
         </div>
       ) : sorted.length === 0 ? (
-        <div className="bg-card rounded-lg border border-border shadow-elegant p-16 text-center">
-          <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-5">
-            <BookOpen className="h-10 w-10 text-primary/40" />
+        <div className="bg-card rounded-lg border border-border shadow-elegant p-10 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
+            <BookOpen className="h-9 w-9 text-primary/40" />
           </div>
-          <h3 className="text-lg font-semibold text-foreground mb-2">
+          <h3 className="text-sm font-semibold text-foreground mb-2">
             {hasActiveFilters ? 'No documents found' : 'No Controlled Documents Yet'}
           </h3>
-          <p className="text-sm text-muted-foreground mb-5 max-w-md mx-auto">
+          <p className="text-sm text-muted-foreground mb-3 max-w-md mx-auto">
             {hasActiveFilters ? 'Try a different filter combination.' : 'Create a Requirement, Specification, Protocol, or Test Case to get started.'}
           </p>
         </div>
@@ -745,24 +746,24 @@ export default function Documents() {
               <tbody className="bg-card divide-y divide-border">
                 {sorted.map((doc: DocShell) => (
                   <tr key={`${doc.doc_type}-${doc.id}`} className="hover:bg-accent/50">
-                    <td className="px-4 py-2.5 whitespace-nowrap">
+                    <td className="px-3 py-2 whitespace-nowrap">
                       <Link to={docUrl(prefix!, doc.doc_type as DocType, doc.doc_id)} className="text-primary font-mono text-sm font-medium">
                         {doc.doc_id}
                       </Link>
                     </td>
-                    <td className="px-4 py-2.5 whitespace-nowrap">
+                    <td className="px-3 py-2 whitespace-nowrap">
                       <TypeBadge type={doc.doc_type} />
                     </td>
-                    <td className="px-4 py-2.5 max-w-sm truncate">
+                    <td className="px-3 py-2 max-w-sm truncate">
                       <Link to={docUrl(prefix!, doc.doc_type as DocType, doc.doc_id)} className="text-foreground hover:text-primary/80 font-medium">
                         {doc.title}
                       </Link>
                     </td>
-                    <td className="px-4 py-2.5 whitespace-nowrap">
+                    <td className="px-3 py-2 whitespace-nowrap">
                       <StatusBadge status={doc.status} />
                     </td>
                     {showExecColumn && (
-                      <td className="px-4 py-2.5 whitespace-nowrap">
+                      <td className="px-3 py-2 whitespace-nowrap">
                         {doc.doc_type === 'TC' ? (
                           <div className="space-y-1">
                             <ExecutionBadge status={doc.last_execution_status} />
@@ -775,16 +776,16 @@ export default function Documents() {
                         )}
                       </td>
                     )}
-                    <td className="px-3 py-2.5 whitespace-nowrap text-xs text-muted-foreground">
+                    <td className="px-2.5 py-2 whitespace-nowrap text-xs text-muted-foreground">
                       {doc.priority || '-'}
                     </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-xs text-muted-foreground">
+                    <td className="px-2.5 py-2 whitespace-nowrap text-xs text-muted-foreground">
                       {doc.reviewer_id ? userMap.get(doc.reviewer_id) || '-' : '-'}
                     </td>
-                    <td className="px-4 py-2.5 whitespace-nowrap text-xs text-muted-foreground">
+                    <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">
                       {format(new Date(doc.created_at), 'MMM d, yyyy')}
                     </td>
-                    <td className="px-4 py-2.5 whitespace-nowrap text-xs text-muted-foreground">
+                    <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">
                       {format(new Date(doc.updated_at), 'MMM d, yyyy')}
                     </td>
                   </tr>
@@ -800,7 +801,7 @@ export default function Documents() {
 
 function FilterChip({ label, muted = false }: { label: string; muted?: boolean }) {
   return (
-    <span className={`inline-flex items-center rounded-md border px-2 py-1 text-xs ${muted ? 'border-border text-muted-foreground' : 'border-primary/20 bg-primary/10 text-primary'}`}>
+    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs ${muted ? 'border-border text-muted-foreground' : 'border-primary/20 bg-primary/10 text-primary'}`}>
       {label}
     </span>
   )
@@ -822,7 +823,7 @@ function DatePickerField({
   return (
     <label className="space-y-1">
       <span className="text-xs font-medium uppercase text-muted-foreground">{label}</span>
-      <span className="relative flex w-full items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground transition-colors hover:bg-accent/40 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring">
+      <span className="relative flex w-full items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-accent/40 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring">
         <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
         <span className={value ? 'text-foreground' : 'text-muted-foreground'}>{displayValue}</span>
         <input

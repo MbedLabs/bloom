@@ -1014,6 +1014,11 @@ export const campaignsApi = {
     await api.delete(`/campaigns/${campaignId}/items/${itemId}`)
   },
 
+  scopeLinks: async (campaignId: number) => {
+    const response = await api.get<ArtefactLink[]>(`/campaigns/${campaignId}/scope-links`)
+    return response.data
+  },
+
   listConfigurations: async (projectId: number) => {
     const response = await api.get<TestConfiguration[]>(`/campaigns/configurations?project_id=${projectId}`)
     return response.data
@@ -1165,7 +1170,6 @@ export const defectsApi = {
   },
   create: async (data: {
     project_id: number
-    defect_id: string
     title: string
     description?: string | null
     status?: string

@@ -236,7 +236,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
       queryClient.invalidateQueries({ queryKey: [config.listKey, artefact.project_id] })
       queryClient.invalidateQueries({ queryKey: ['project', artefact.project_id] })
       if (kind === 'defect') {
-        navigate(`/projects/${projectPrefix}/defects`)
+        navigate(`/projects/${projectPrefix}/docs?type=DEF`)
       } else {
         navigate(`/projects/${projectPrefix}?tab=${config.tabKey}`)
       }
@@ -290,12 +290,6 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
       payload.title = (form.title ?? '').trim() || (artefactRecord?.[config.titleField] as string) || ''
       payload.description = form.description ?? null
       payload.resolution_summary = (form.resolution_summary ?? '').trim() || null
-      const tracker = (form.external_tracker ?? '').trim()
-      payload.external_tracker = tracker || null
-      payload.external_repo_full_name = tracker ? (form.external_repo_full_name ?? '').trim() || null : null
-      const issueNumberRaw = tracker ? (form.external_issue_number ?? '').trim() : ''
-      payload.external_issue_number = issueNumberRaw ? Number(issueNumberRaw) : null
-      payload.external_issue_url = tracker ? (form.external_issue_url ?? '').trim() || null : null
     }
     updateMutation.mutate(payload as Partial<ArtefactRecord>)
   }
@@ -384,7 +378,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
 
           <SectionCard title="Quick Links">
             <div className="space-y-3 text-sm">
-              <Link to={`/projects/${projectPrefix}?tab=${config.tabKey}`} className="block text-primary hover:text-primary/80">Back to project {config.singular.toLowerCase()} list</Link>
+              <Link to={kind === 'defect' ? `/projects/${projectPrefix}/docs?type=DEF` : `/projects/${projectPrefix}?tab=${config.tabKey}`} className="block text-primary hover:text-primary/80">Back to project {config.singular.toLowerCase()} list</Link>
               {related?.project && <Link to={`/projects/${related.project.prefix}`} className="block text-primary hover:text-primary/80">Open project workspace</Link>}
             </div>
           </SectionCard>
@@ -460,53 +454,6 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
                     placeholder="What was done to resolve this defect?"
                   />
                 </div>
-                <fieldset className="space-y-3 rounded-md border border-border p-4">
-                  <legend className="px-1 text-sm font-medium text-foreground">External Issue</legend>
-                  <div>
-                    <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">Tracker</label>
-                    <select
-                      value={form.external_tracker ?? ''}
-                      onChange={(e) => setForm({ ...form, external_tracker: e.target.value })}
-                      title="External tracker for this defect"
-                      className="w-full px-3 py-2 bg-background border border-input rounded-md"
-                    >
-                      <option value="">None</option>
-                      <option value="github">GitHub</option>
-                      <option value="gitlab">GitLab</option>
-                    </select>
-                  </div>
-                  {form.external_tracker && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">Repo / Namespace</label>
-                        <input
-                          value={form.external_repo_full_name ?? ''}
-                          onChange={(e) => setForm({ ...form, external_repo_full_name: e.target.value })}
-                          placeholder="owner/repo"
-                          className="w-full px-3 py-2 bg-background border border-input rounded-md font-mono text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">Issue #</label>
-                        <input
-                          value={form.external_issue_number ?? ''}
-                          onChange={(e) => setForm({ ...form, external_issue_number: e.target.value })}
-                          inputMode="numeric"
-                          className="w-full px-3 py-2 bg-background border border-input rounded-md font-mono text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">URL</label>
-                        <input
-                          value={form.external_issue_url ?? ''}
-                          onChange={(e) => setForm({ ...form, external_issue_url: e.target.value })}
-                          placeholder="https://github.com/owner/repo/issues/123"
-                          className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </fieldset>
               </>
             )}
             {updateMutation.isError && (
@@ -566,8 +513,6 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
                 defect={artefactRecord as unknown as Defect}
                 projectPrefix={projectPrefix}
                 hasStoredToken={!!trackerSetting?.has_token}
-                canEdit={canEditDocs}
-                onEdit={() => setIsEditing(true)}
                 onRefresh={() => refreshExternalMutation.mutate()}
                 refreshing={refreshExternalMutation.isPending}
                 refreshError={refreshExternalMutation.isError ? extractApiErrorMessage(refreshExternalMutation.error) : null}
@@ -718,8 +663,6 @@ function ExternalIssueCard({
   defect,
   projectPrefix,
   hasStoredToken,
-  canEdit,
-  onEdit,
   onRefresh,
   refreshing,
   refreshError,
@@ -727,8 +670,6 @@ function ExternalIssueCard({
   defect: Defect
   projectPrefix: string
   hasStoredToken: boolean
-  canEdit: boolean
-  onEdit: () => void
   onRefresh: () => void
   refreshing: boolean
   refreshError: string | null
@@ -740,26 +681,7 @@ function ExternalIssueCard({
   if (!tracker) {
     return (
       <SectionCard title="External Issue">
-        <p className="text-sm text-muted-foreground">
-          This defect is not linked to a GitHub or GitLab issue.
-        </p>
-        {canEdit && (
-          <button
-            type="button"
-            onClick={onEdit}
-            className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 border border-input rounded-md text-sm hover:bg-accent/40"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-            Link an external issue
-          </button>
-        )}
-        <p className="mt-3 text-xs text-muted-foreground">
-          Webhooks and tokens are configured per project in{' '}
-          <Link to={`/projects/${projectPrefix}/parameters`} className="text-primary hover:text-primary/80">
-            project parameters
-          </Link>
-          .
-        </p>
+        <p className="text-sm text-muted-foreground">No external issue linked.</p>
       </SectionCard>
     )
   }
@@ -798,29 +720,19 @@ function ExternalIssueCard({
             type="button"
             onClick={onRefresh}
             disabled={refreshing || !hasStoredToken}
-            title={hasStoredToken ? `Refresh state from ${trackerLabel}` : `Add a ${trackerLabel} token in project parameters to refresh`}
+            title={hasStoredToken ? `Refresh state from ${trackerLabel}` : `Add a ${trackerLabel} token in project settings to refresh`}
             className="inline-flex items-center gap-2 px-3 py-1.5 border border-input rounded-md text-sm hover:bg-accent/40 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
             {refreshing ? 'Refreshing...' : 'Refresh from tracker'}
           </button>
-          {canEdit && (
-            <button
-              type="button"
-              onClick={onEdit}
-              className="inline-flex items-center gap-2 px-3 py-1.5 border border-input rounded-md text-sm hover:bg-accent/40"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-              Edit link
-            </button>
-          )}
         </div>
 
         {!hasStoredToken && (
           <p className="text-xs text-amber-700 dark:text-amber-400">
             No {trackerLabel} token configured for this project. Add one in{' '}
-            <Link to={`/projects/${projectPrefix}/parameters`} className="underline hover:no-underline">
-              project parameters
+            <Link to={`/projects/${projectPrefix}/edit`} className="underline hover:no-underline">
+              project settings
             </Link>{' '}
             to enable refresh and outbound sync.
           </p>
@@ -835,7 +747,7 @@ function ExternalIssueCard({
           <p className="mt-2">
             Configure your repository to POST issue events to{' '}
             <code className="font-mono text-foreground">{webhookPath}</code> using the secret stored in project
-            parameters. Bloom updates the linked defect when the webhook fires.
+            settings. Bloom updates the linked defect when the webhook fires.
           </p>
         </details>
       </div>

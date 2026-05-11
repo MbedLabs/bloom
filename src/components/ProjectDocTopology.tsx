@@ -34,6 +34,7 @@ import {
 
 import { docsApi, linksApi } from '../api/client'
 import { DOC_TYPE_LABELS, type DocType } from '../types/doc'
+import TopologyLinkEdge, { type TopologyLinkData } from './TopologyLinkEdge'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Type-level visual config
@@ -47,7 +48,6 @@ interface TypeStyle {
   surface: string
   iconChip: string
   countText: string
-  /** Edge / marker stroke (SVG) */
   accent: string
 }
 
@@ -150,10 +150,9 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
   },
 }
 
-// Edge label / line colors (shadcn tokens are HSL channels — need full hsl() for SVG)
-const EDGE_LABEL_BG = 'hsl(var(--card))'
-const EDGE_LABEL_FG = 'hsl(var(--foreground))'
-const EDGE_LABEL_OUTLINE = 'hsl(var(--border))'
+// ────────────────────────────────────────────────────────────────────────────
+// Dark mode hook
+// ────────────────────────────────────────────────────────────────────────────
 
 function subscribeDarkMode(cb: () => void) {
   const root = document.documentElement
@@ -170,26 +169,28 @@ function useIsDarkMode(): boolean {
   return useSyncExternalStore(subscribeDarkMode, darkModeSnapshot, () => false)
 }
 
-/** Readable on near-white (light) and dark panes without huge hue shift. */
-function linkStrokeColor(accent: string, isDark: boolean, suspect: boolean): string {
-  if (suspect) return isDark ? '#f87171' : '#b91c1c'
-  if (isDark) return `color-mix(in srgb, ${accent} 80%, #f8fafc)`
-  return `color-mix(in srgb, ${accent} 52%, #0f172a)`
+// ────────────────────────────────────────────────────────────────────────────
+// Role helpers
+// ────────────────────────────────────────────────────────────────────────────
+
+const ROLE_INVERSE: Record<string, string> = {
+  verifies: 'verified by',
+  implements: 'implemented by',
+  satisfies: 'satisfied by',
+  derives_from: 'derived into',
+  mitigates: 'mitigated by',
+  impacts: 'impacted by',
+  blocks: 'blocked by',
 }
 
-/** XYFlow defaults markerUnits to strokeWidth — thick edges get comically large arrowheads. */
-function linkMarkerEnd(stroke: string, lineWidthPx: number) {
-  return {
-    type: MarkerType.ArrowClosed,
-    color: stroke,
-    width: 12,
-    height: 12,
-    markerUnits: 'userSpaceOnUse',
-    strokeWidth: Math.max(1.2, Math.min(1.75, lineWidthPx * 0.4)),
-  } as const
+function roleDisplayLabel(role: string): string {
+  return role.replace(/_/g, ' ')
 }
 
-// Node sizing scales smoothly with doc count
+// ────────────────────────────────────────────────────────────────────────────
+// Node sizing
+// ────────────────────────────────────────────────────────────────────────────
+
 const NODE_MIN_W = 180
 const NODE_MAX_W = 260
 const NODE_MIN_H = 110
@@ -230,7 +231,8 @@ function TypeNode({ data }: { data: TypeNodeData }) {
       style={{ width: data.width, height: data.height }}
       className={`group relative overflow-hidden rounded-xl border border-border border-t-4 ${style.borderTop} ${style.surface} shadow-md ring-1 ring-black/5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg dark:shadow-black/40 dark:ring-white/5 cursor-pointer`}
     >
-      <Handle type="target" position={Position.Left} style={{ opacity: 0, pointerEvents: 'none' }} />
+      <Handle type="target" position={Position.Left} style={{ opacity: 0, pointerEvents: 'none', top: '40%' }} />
+      <Handle type="target" position={Position.Right} id="target-right" style={{ opacity: 0, pointerEvents: 'none', top: '60%' }} />
 
       <div className="flex h-full flex-col justify-between p-3">
         <div className="flex items-start justify-between gap-2">
@@ -268,14 +270,15 @@ function TypeNode({ data }: { data: TypeNodeData }) {
         </div>
       </div>
 
-      <Handle type="source" position={Position.Right} style={{ opacity: 0, pointerEvents: 'none' }} />
+      <Handle type="source" position={Position.Right} style={{ opacity: 0, pointerEvents: 'none', top: '40%' }} />
+      <Handle type="source" position={Position.Left} id="source-left" style={{ opacity: 0, pointerEvents: 'none', top: '60%' }} />
     </div>
   )
 }
 
 const nodeTypes = { typeNode: TypeNode }
+const edgeTypes = { topologyLink: TopologyLinkEdge }
 
-/** Call fitView only when layout changes — not on every ReactFlow re-render (fixes zoom +/- resetting). */
 function FitViewOnLayout({ layoutToken }: { layoutToken: number }) {
   const { fitView } = useReactFlow()
   useEffect(() => {
@@ -289,64 +292,113 @@ function FitViewOnLayout({ layoutToken }: { layoutToken: number }) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Aggregation
+// Aggregation – one edge per directional (source, target) pair
 // ────────────────────────────────────────────────────────────────────────────
 
-interface AggregatedEdge {
-  source: DocType
-  target: DocType
+interface RoleEntry {
+  role: string
+  displayLabel: string
   count: number
   suspectCount: number
-  roles: Map<string, number>
+}
+
+interface AggregatedEdge {
+  id: string
+  source: DocType
+  target: DocType
+  roles: RoleEntry[]
+  totalCount: number
+  totalSuspect: number
+  isSyntheticInverse: boolean
 }
 
 function aggregateEdges(
   links: { source_type: string; target_type: string; role: string; suspect: boolean }[],
   docTypesPresent: Set<DocType>,
 ): AggregatedEdge[] {
-  const map = new Map<string, AggregatedEdge>()
+  const pairMap = new Map<string, Map<string, { count: number; suspectCount: number }>>()
+
   for (const link of links) {
     const src = link.source_type as DocType
     const tgt = link.target_type as DocType
     if (!docTypesPresent.has(src) || !docTypesPresent.has(tgt)) continue
-    const key = `${src}->${tgt}`
-    let agg = map.get(key)
-    if (!agg) {
-      agg = { source: src, target: tgt, count: 0, suspectCount: 0, roles: new Map() }
-      map.set(key, agg)
+    const pairKey = `${src}->${tgt}`
+    let roleMap = pairMap.get(pairKey)
+    if (!roleMap) {
+      roleMap = new Map()
+      pairMap.set(pairKey, roleMap)
     }
-    agg.count += 1
-    if (link.suspect) agg.suspectCount += 1
-    agg.roles.set(link.role, (agg.roles.get(link.role) ?? 0) + 1)
+    const cur = roleMap.get(link.role) ?? { count: 0, suspectCount: 0 }
+    cur.count += 1
+    if (link.suspect) cur.suspectCount += 1
+    roleMap.set(link.role, cur)
   }
-  return Array.from(map.values())
-}
 
-function rolesSummary(roles: Map<string, number>): string {
-  const sorted = Array.from(roles.entries()).sort((a, b) => b[1] - a[1])
-  return sorted.map(([role, n]) => `${n} ${role.replace(/_/g, ' ')}`).join(', ')
-}
+  const forwardEdges: AggregatedEdge[] = []
+  for (const [pairKey, roleMap] of pairMap) {
+    const [src, tgt] = pairKey.split('->') as [DocType, DocType]
+    const roles: RoleEntry[] = []
+    let totalCount = 0
+    let totalSuspect = 0
+    for (const [role, stats] of roleMap) {
+      roles.push({ role, displayLabel: roleDisplayLabel(role), count: stats.count, suspectCount: stats.suspectCount })
+      totalCount += stats.count
+      totalSuspect += stats.suspectCount
+    }
+    forwardEdges.push({ id: pairKey, source: src, target: tgt, roles, totalCount, totalSuspect, isSyntheticInverse: false })
+  }
 
-function strokeWidthForCount(count: number, maxCount: number): number {
-  if (maxCount <= 0) return 1
-  const scale = Math.sqrt(count) / Math.sqrt(maxCount)
-  return Math.max(1.75, Math.min(4.5, scale * 4.5))
+  const result = [...forwardEdges]
+  const forwardKeys = new Set(forwardEdges.map((e) => e.id))
+
+  for (const e of forwardEdges) {
+    const reverseKey = `${e.target}->${e.source}`
+    if (forwardKeys.has(reverseKey)) continue
+    const inverseRoles: RoleEntry[] = []
+    let invTotal = 0
+    let invSuspect = 0
+    for (const r of e.roles) {
+      const inv = ROLE_INVERSE[r.role]
+      if (!inv) continue
+      inverseRoles.push({ role: r.role, displayLabel: inv, count: r.count, suspectCount: r.suspectCount })
+      invTotal += r.count
+      invSuspect += r.suspectCount
+    }
+    if (inverseRoles.length === 0) continue
+    result.push({
+      id: `${reverseKey}::inv`,
+      source: e.target,
+      target: e.source,
+      roles: inverseRoles,
+      totalCount: invTotal,
+      totalSuspect: invSuspect,
+      isSyntheticInverse: true,
+    })
+  }
+
+  return result
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Layout (dagre, left-to-right)
+// Layout – dagre runs on acyclic collapsed edges; render uses full set
 // ────────────────────────────────────────────────────────────────────────────
 
-function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
+function applyDagreLayout(nodes: Node[], layoutEdges: { source: string; target: string }[]): Node[] {
   const g = new dagre.graphlib.Graph()
   g.setDefaultEdgeLabel(() => ({}))
-  g.setGraph({ rankdir: 'LR', nodesep: 70, ranksep: 110, marginx: 30, marginy: 30 })
+  g.setGraph({ rankdir: 'LR', nodesep: 100, ranksep: 160, marginx: 30, marginy: 30 })
   nodes.forEach((n) => {
     const data = n.data as TypeNodeData
     g.setNode(n.id, { width: data.width, height: data.height })
   })
-  // Skip self-loops in dagre to avoid layout artifacts
-  edges.filter((e) => e.source !== e.target).forEach((e) => g.setEdge(e.source, e.target))
+  const added = new Set<string>()
+  for (const e of layoutEdges) {
+    if (e.source === e.target) continue
+    const pair = `${e.source}->${e.target}`
+    if (added.has(pair)) continue
+    added.add(pair)
+    g.setEdge(e.source, e.target)
+  }
   dagre.layout(g)
   return nodes.map((n) => {
     const pos = g.node(n.id)
@@ -370,7 +422,6 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null)
-  /** Incremented only in `rebuild` so we fit the viewport after layout, not on hover/zoom. */
   const [layoutToken, setLayoutToken] = useState(0)
 
   const { data: docs, isLoading: docsLoading } = useQuery({
@@ -385,7 +436,6 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
     enabled: !!projectId,
   })
 
-  // Per-type doc counts and suspect totals
   const typeCounts = useMemo(() => {
     const counts = new Map<DocType, { count: number; suspect: number }>()
     if (!docs) return counts
@@ -404,10 +454,16 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
     [typeCounts],
   )
 
-  const aggregatedEdges = useMemo<AggregatedEdge[]>(() => {
+  const aggEdges = useMemo<AggregatedEdge[]>(() => {
     if (!links) return []
     return aggregateEdges(links, new Set(presentTypes))
   }, [links, presentTypes])
+
+  const aggEdgeMap = useMemo(() => {
+    const m = new Map<string, AggregatedEdge>()
+    for (const e of aggEdges) m.set(e.id, e)
+    return m
+  }, [aggEdges])
 
   const rebuild = useCallback(() => {
     if (presentTypes.length === 0) {
@@ -435,50 +491,59 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
       }
     })
 
-    const maxEdgeCount = aggregatedEdges.reduce((m, e) => Math.max(m, e.count), 0)
+    // Dagre layout: only forward (non-synthetic) edges, collapsed per (src,tgt)
+    const layoutEdges = aggEdges
+      .filter((e) => !e.isSyntheticInverse)
+      .map((e) => ({ source: e.source, target: e.target }))
 
-    const newEdges: Edge[] = aggregatedEdges.map((e) => {
-      const isSelfLoop = e.source === e.target
-      const hasSuspect = e.suspectCount > 0
-      const stroke = linkStrokeColor(TYPE_STYLE[e.source].accent, isDark, hasSuspect)
-      const width = strokeWidthForCount(e.count, maxEdgeCount)
-      const id = `${e.source}->${e.target}`
+    const laidOut = applyDagreLayout(newNodes, layoutEdges)
+
+    const newEdges: Edge[] = aggEdges.map((e) => {
+      const hasSuspect = e.totalSuspect > 0
+      const stroke = hasSuspect
+        ? (isDark ? '#f87171' : '#b91c1c')
+        : (isDark ? '#94a3b8' : '#64748b')
+      const curvature = 0.25
+
       return {
-        id,
+        id: e.id,
         source: e.source,
         target: e.target,
-        type: 'smoothstep',
+        type: 'topologyLink',
         animated: hasSuspect,
-        label: `${e.count}${hasSuspect ? ` · ${e.suspectCount} suspect` : ''}`,
-        labelStyle: { fontSize: 11, fontWeight: 600, fill: EDGE_LABEL_FG },
-        labelBgStyle: {
-          fill: EDGE_LABEL_BG,
-          fillOpacity: 0.98,
-          stroke: EDGE_LABEL_OUTLINE,
-          strokeWidth: 1,
-        },
-        labelBgPadding: [7, 4],
-        labelBgBorderRadius: 7,
         interactionWidth: 22,
-        pathOptions: isSelfLoop
-          ? { borderRadius: 22, offset: 32 }
-          : { borderRadius: 11 },
+        ...(e.isSyntheticInverse
+          ? { sourceHandle: 'source-left', targetHandle: 'target-right' }
+          : {}),
         style: {
           stroke,
-          strokeWidth: width,
-          strokeLinecap: 'round',
-          strokeLinejoin: 'round',
-          strokeDasharray: hasSuspect ? '8 4' : isSelfLoop ? '4 3' : undefined,
+          strokeWidth: 1.5,
+          strokeLinecap: 'round' as const,
+          strokeLinejoin: 'round' as const,
+          ...(e.isSyntheticInverse ? { strokeDasharray: '6 3', opacity: 0.6 } : {}),
         },
-        markerEnd: linkMarkerEnd(stroke, width),
-        data: { roles: e.roles, count: e.count, suspectCount: e.suspectCount },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: stroke,
+          width: 14,
+          height: 14,
+          markerUnits: 'userSpaceOnUse',
+          strokeWidth: 1,
+        },
+        data: {
+          totalCount: e.totalCount,
+          totalSuspect: e.totalSuspect,
+          roles: e.roles,
+          isSyntheticInverse: e.isSyntheticInverse,
+          curvature,
+        } satisfies TopologyLinkData,
       } as Edge
     })
 
-    setNodes(applyDagreLayout(newNodes, newEdges))
+    setNodes(laidOut)
     setEdges(newEdges)
     setLayoutToken((t) => t + 1)
-  }, [presentTypes, typeCounts, aggregatedEdges, isDark, setNodes, setEdges])
+  }, [presentTypes, typeCounts, aggEdges, isDark, setNodes, setEdges])
 
   useEffect(() => { rebuild() }, [rebuild])
 
@@ -512,13 +577,11 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
     )
   }
 
-  const hoveredEdge = hoveredEdgeId
-    ? aggregatedEdges.find((e) => `${e.source}->${e.target}` === hoveredEdgeId)
-    : null
+  const hoveredEdge = hoveredEdgeId ? aggEdgeMap.get(hoveredEdgeId) ?? null : null
 
   const totalDocs = presentTypes.reduce((s, t) => s + (typeCounts.get(t)?.count ?? 0), 0)
-  const totalLinks = aggregatedEdges.reduce((s, e) => s + e.count, 0)
-  const totalSuspect = aggregatedEdges.reduce((s, e) => s + e.suspectCount, 0)
+  const totalLinks = aggEdges.filter((e) => !e.isSyntheticInverse).reduce((s, e) => s + e.totalCount, 0)
+  const totalSuspect = aggEdges.filter((e) => !e.isSyntheticInverse).reduce((s, e) => s + e.totalSuspect, 0)
 
   return (
     <div className="topology-canvas relative h-[60vh] min-h-[480px] overflow-hidden rounded-xl border border-border bg-card shadow-elegant">
@@ -531,6 +594,7 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
         onEdgeMouseEnter={(_, edge) => setHoveredEdgeId(edge.id)}
         onEdgeMouseLeave={() => setHoveredEdgeId(null)}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         proOptions={{ hideAttribution: true }}
         nodesConnectable={false}
         edgesFocusable={false}
@@ -542,7 +606,7 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
       >
         <FitViewOnLayout layoutToken={layoutToken} />
         <Background variant={BackgroundVariant.Dots} gap={18} size={1.2} className="opacity-50" />
-        <Controls showInteractive={false} position="bottom-left" />
+        <Controls showInteractive={false} position="bottom-right" />
 
         {/* Top-left header / stats */}
         <Panel position="top-left" className="m-3">
@@ -591,14 +655,22 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
                 <span style={{ color: TYPE_STYLE[hoveredEdge.target].accent }}>
                   {DOC_TYPE_LABELS[hoveredEdge.target]}
                 </span>
-              </div>
-              <div className="mt-1 text-[11px] text-muted-foreground">
-                {rolesSummary(hoveredEdge.roles)}
-                {hoveredEdge.suspectCount > 0 && (
-                  <span className="ml-1.5 text-red-600 dark:text-red-400 font-medium">
-                    · {hoveredEdge.suspectCount} suspect
-                  </span>
+                {hoveredEdge.isSyntheticInverse && (
+                  <span className="text-[10px] text-muted-foreground/70 italic font-normal">(inverse)</span>
                 )}
+              </div>
+              <div className="mt-1 space-y-0.5">
+                {hoveredEdge.roles.map((r) => (
+                  <div key={r.role} className="text-[11px] text-muted-foreground">
+                    <span className="tabular-nums font-semibold text-foreground">{r.count}</span>
+                    {' '}{r.displayLabel}
+                    {r.suspectCount > 0 && (
+                      <span className="ml-1 text-red-600 dark:text-red-400 font-medium">
+                        ({r.suspectCount} suspect)
+                      </span>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </Panel>

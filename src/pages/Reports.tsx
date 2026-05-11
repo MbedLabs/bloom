@@ -9,15 +9,19 @@ export default function Reports() {
     queryFn: dashboardApi.getStats,
   })
 
-  const s = stats || {
+  const raw = stats || {}
+  const s = {
     total_projects: 0, active_projects: 0, total_requirements: 0,
     total_test_cases: 0, total_campaigns: 0,
     active_campaigns: 0, coverage_percent: 0, uncovered_requirements: 0,
-    requirement_status_distribution: {}, test_case_status_distribution: {},
-    campaign_result_distribution: {},
+    requirement_status_distribution: {} as Record<string, number>,
+    test_case_status_distribution: {} as Record<string, number>,
+    campaign_result_distribution: {} as Record<string, number>,
     total_defects: 0, open_defects: 0,
-    defect_severity_distribution: {}, defect_status_distribution: {},
-    projects: [],
+    defect_severity_distribution: {} as Record<string, number>,
+    defect_status_distribution: {} as Record<string, number>,
+    projects: [] as Array<{ id: number; name: string; prefix: string; status: string; requirement_count: number; test_case_count: number }>,
+    ...raw,
   }
 
   const campaignResults = s.campaign_result_distribution
