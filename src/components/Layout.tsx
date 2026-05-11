@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { APP_VERSION, projectsApi } from '../api/client'
-import { normalizeDocTypeParam } from '../types/doc'
+import { normalizeDocTypeParam, DOC_TYPE_LABELS, type DocType } from '../types/doc'
 import { docRegistryListUrl, syncRegistryProjectContext } from '../lib/docRegistryParams'
 import { useAuth } from '../contexts/AuthContext'
 import { PageMetaProvider, usePageMeta } from '../contexts/PageMetaContext'
@@ -487,7 +487,7 @@ function getBreadcrumbs(location: ReturnType<typeof useLocation>, projects: Arra
     REQ: 'Requirements', SPEC: 'Specifications', TC: 'Test Cases',
     DES: 'Design Items', RSK: 'Risks', CHG: 'Changes', TCO: 'Test Concepts',
     PROT: 'Protocols', RPT: 'Reports', STD: 'Standards',
-    DEF: 'Defects', CMP: 'Campaigns',
+    DEF: 'Defects', CMP: 'Campaigns', TS: 'Test Suites',
   }
   const path = location.pathname
   const crumbs: { label: string; href?: string }[] = [{ label: 'Home', href: '/' }]
@@ -538,12 +538,21 @@ function getBreadcrumbs(location: ReturnType<typeof useLocation>, projects: Arra
         : docRegistryListUrl(slug)
       if (parts[4] === 'new') {
         crumbs.push({ label: docLabel, href: docsHref })
-        crumbs.push({ label: 'New' })
+        const newLabel =
+          resolvedDocType && resolvedDocType in DOC_TYPE_LABELS
+            ? `New ${DOC_TYPE_LABELS[resolvedDocType as DocType]}`
+            : 'New'
+        crumbs.push({ label: newLabel })
       } else if (parts[4] && parts[5]) {
         crumbs.push({ label: docLabel, href: docsHref })
         if (parts[6] === 'edit') {
           crumbs.push({ label: parts[5], href: `/projects/${slug}/docs/${parts[4]}/${parts[5]}` })
-          crumbs.push({ label: 'Edit' })
+          const editType = normalizeDocTypeParam(parts[4])
+          const editLabel =
+            editType && editType in DOC_TYPE_LABELS
+              ? `Edit ${DOC_TYPE_LABELS[editType as DocType]}`
+              : 'Edit'
+          crumbs.push({ label: editLabel })
         } else {
           crumbs.push({ label: parts[5] })
         }
@@ -554,7 +563,7 @@ function getBreadcrumbs(location: ReturnType<typeof useLocation>, projects: Arra
       crumbs.push({ label: 'Campaigns', href: docRegistryListUrl(slug, 'CMP') })
       crumbs.push({ label: pageCrumbLabel || parts[4] })
     } else if (sub === 'suites' && parts[4]) {
-      crumbs.push({ label: 'Suites', href: docRegistryListUrl(slug, 'CMP') })
+      crumbs.push({ label: 'Suites', href: docRegistryListUrl(slug, 'TS') })
       crumbs.push({ label: pageCrumbLabel || parts[4] })
     } else if (subMap[sub]) {
       crumbs.push({ label: subMap[sub] })
