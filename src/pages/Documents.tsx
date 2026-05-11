@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import {
+  ArrowLeft,
   ArrowUpDown,
   BookOpen,
   Calendar,
@@ -16,10 +17,10 @@ import {
 } from 'lucide-react'
 
 import { docsApi, type DocShell, usersApi } from '../api/client'
-import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import {
   readStoredSort,
   writeStoredSort,
+  registrySortScope,
   DEFAULT_SORT_FIELD,
   DEFAULT_SORT_DIR,
   type RegistrySortField,
@@ -201,9 +202,13 @@ export default function Documents() {
   const { prefix } = useParams<{ prefix: string }>()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { data: project } = useProjectByPrefix(prefix)
   const [createMenuOpen, setCreateMenuOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const typeFilters = useMemo(
+    () => unique(readListParam(searchParams, 'type').map((value) => normalizeDocTypeParam(value)).filter(Boolean) as DocType[]),
+    [searchParams]
+  )
+  const sortScope = useMemo(() => registrySortScope(typeFilters), [typeFilters])
   const dirParam = searchParams.get('dir')
   const sortDir: SortDir = dirParam === 'asc' || dirParam === 'desc' ? dirParam : 'desc'
 
@@ -219,12 +224,15 @@ export default function Documents() {
     if (!prefix) return
     const urlSort = searchParams.get('sort')
     const urlDir = searchParams.get('dir')
+    if (!sortScope) {
+      return
+    }
     if (urlSort || urlDir) {
       const field: RegistrySortField = isSortField(urlSort) ? urlSort as RegistrySortField : DEFAULT_SORT_FIELD
       const dir: RegistrySortDir = urlDir === 'asc' || urlDir === 'desc' ? urlDir : DEFAULT_SORT_DIR
-      writeStoredSort(prefix, { field, dir })
+      writeStoredSort(prefix, sortScope, { field, dir })
     } else {
-      const stored = readStoredSort(prefix)
+      const stored = readStoredSort(prefix, sortScope)
       if (stored && (stored.field !== DEFAULT_SORT_FIELD || stored.dir !== DEFAULT_SORT_DIR)) {
         const params = new URLSearchParams(searchParams)
         if (stored.field !== DEFAULT_SORT_FIELD) params.set('sort', stored.field)
@@ -232,12 +240,8 @@ export default function Documents() {
         setSearchParams(params, { replace: true })
       }
     }
-  }, [prefix, searchParams, setSearchParams])
+  }, [prefix, searchParams, setSearchParams, sortScope])
 
-  const typeFilters = useMemo(
-    () => unique(readListParam(searchParams, 'type').map((value) => normalizeDocTypeParam(value)).filter(Boolean) as DocType[]),
-    [searchParams]
-  )
   const statusFilters = useMemo(() => readListParam(searchParams, 'status'), [searchParams])
   const search = searchParams.get('q') || ''
   const priorityFilter = searchParams.get('priority') || ''
@@ -334,8 +338,12 @@ export default function Documents() {
     if (nextDir !== 'desc') params.set('dir', nextDir)
     else params.delete('dir')
 
-    if (prefix) {
-      writeStoredSort(prefix, { field: nextSort as RegistrySortField, dir: nextDir as RegistrySortDir })
+    const scopeAfter = registrySortScope(nextTypes)
+    if (prefix && scopeAfter) {
+      writeStoredSort(prefix, scopeAfter, {
+        field: nextSort as RegistrySortField,
+        dir: nextDir as RegistrySortDir,
+      })
     }
 
     setSearchParams(params, { replace: true })
@@ -495,7 +503,6 @@ export default function Documents() {
   const hasSortOverride = sortField !== 'updated_at' || sortDir !== 'desc'
   const createTypes = typeFilters.length === 1 ? DOC_TYPE_OPTIONS.filter((type) => type.code === typeFilters[0]) : DOC_TYPE_OPTIONS
   const createButtonLabel = createTypes.length === 1 ? `New ${TYPE_BADGES[createTypes[0].code].label}` : 'New Document'
-  const totalDocs = docs?.length ?? 0
 
   const SortHeader = ({ field, children, compact = false }: { field: SortField; children: React.ReactNode; compact?: boolean }) => (
     <th
@@ -516,18 +523,13 @@ export default function Documents() {
   return (
     <div className="space-y-3.5 animate-fade-in">
       <div className="flex flex-col gap-2.5 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-            <Link to={`/projects/${prefix}`} className="hover:text-primary transition-colors">
-              {project?.name || prefix}
-            </Link>
-            <span>/</span>
-            <span className="text-foreground">{pageTitle}</span>
+        <div className="flex items-start gap-2.5 min-w-0">
+          <Link to={`/projects/${prefix}`} className="p-1 hover:bg-accent/50 rounded-md shrink-0 mt-0.5" aria-label="Back to project">
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+          </Link>
+          <div className="min-w-0">
+            <h2 className="text-base font-bold text-foreground">{pageTitle}</h2>
           </div>
-          <h2 className="text-base font-bold text-foreground">{pageTitle}</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {sorted.length} of {totalDocs} controlled item{totalDocs !== 1 ? 's' : ''} shown
-          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -554,7 +556,9 @@ export default function Documents() {
                     key={type.code}
                     onClick={() => {
                       setCreateMenuOpen(false)
-                      navigate(docCreateUrl(prefix!, type.code))
+                      navigate(docCreateUrl(prefix!, type.code), {
+                        state: { returnTo: `/projects/${prefix}/docs?${searchParams.toString()}` },
+                      })
                     }}
                     className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-accent"
                   >
@@ -765,7 +769,7 @@ export default function Documents() {
             <BookOpen className="h-9 w-9 text-primary/40" />
           </div>
           <h3 className="text-sm font-semibold text-foreground mb-2">
-            {hasActiveFilters ? 'No documents found' : 'No Controlled Documents Yet'}
+            {hasActiveFilters ? 'No documents found' : 'No documents yet'}
           </h3>
           <p className="text-sm text-muted-foreground mb-3 max-w-md mx-auto">
             {hasActiveFilters ? 'Try a different filter combination.' : 'Create a Requirement, Specification, Protocol, or Test Case to get started.'}

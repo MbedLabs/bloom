@@ -1,5 +1,5 @@
-import { useEffect, useMemo, type ReactNode } from 'react'
-import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom'
+import { useMemo } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   ArrowLeft,
@@ -16,29 +16,10 @@ import {
   Pencil,
 } from 'lucide-react'
 
-import { defectsApi, docsApi, projectsApi } from '../api/client'
+import { docsApi, projectsApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import ProjectDocTopology from '../components/ProjectDocTopology'
-
-const OPEN_DEFECT_STATUSES = new Set(['Open', 'Triaged', 'In Progress', 'Resolved', 'Verified'])
-
-// Legacy ?tab= values → modern route within the project
-const LEGACY_TAB_ROUTES: Record<string, string> = {
-  'requirements': 'docs?type=REQ',
-  'test-cases': 'docs?type=TC',
-  'specifications': 'docs?type=SPEC',
-  'protocols': 'docs?type=PROT',
-  'reports': 'docs?type=RPT',
-  'standards': 'docs?type=STD',
-  'design': 'docs?type=DES',
-  'risks': 'docs?type=RSK',
-  'changes': 'docs?type=CHG',
-  'test-concepts': 'docs?type=TCO',
-  'traceability': 'traceability',
-  'defects': 'docs?type=DEF',
-  'campaigns': 'docs?type=CMP',
-}
 
 function Beaker(props: { className?: string }) {
   return (
@@ -56,18 +37,7 @@ type NavItem = {
 
 export default function ProjectDetail() {
   const { prefix } = useParams<{ prefix: string }>()
-  const navigate = useNavigate()
   const { user } = useAuth()
-  const [searchParams] = useSearchParams()
-
-  // Redirect legacy ?tab= URLs to the equivalent sidebar route
-  useEffect(() => {
-    const tab = searchParams.get('tab')
-    if (tab && tab !== 'overview') {
-      const route = LEGACY_TAB_ROUTES[tab]
-      if (route) navigate(`/projects/${prefix}/${route}`, { replace: true })
-    }
-  }, [searchParams, prefix, navigate])
 
   const { data: project, isLoading: projectLoading } = useQuery({
     queryKey: ['project-by-prefix', prefix],
@@ -83,21 +53,7 @@ export default function ProjectDetail() {
     enabled: !!prefix,
   })
 
-  const { data: defects } = useQuery({
-    queryKey: ['defects', projectId],
-    queryFn: () => defectsApi.list(projectId),
-    enabled: !!projectId,
-  })
-
   const specCount = useMemo(() => docs?.filter((d) => d.doc_type === 'SPEC').length ?? 0, [docs])
-  const openDefectCount = useMemo(
-    () => defects?.filter((d) => OPEN_DEFECT_STATUSES.has(d.status)).length ?? 0,
-    [defects]
-  )
-  const closedDefectCount = useMemo(() => {
-    if (!defects) return null
-    return defects.length - openDefectCount
-  }, [defects, openDefectCount])
 
   if (projectLoading) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
@@ -165,29 +121,7 @@ export default function ProjectDetail() {
         <SummaryTile label="Design" value={project.design_count} to={docRegistryListUrl(prefix!, 'DES')} />
         <SummaryTile label="Risks" value={project.risk_count} to={docRegistryListUrl(prefix!, 'RSK')} />
         <SummaryTile label="Changes" value={project.change_count} to={docRegistryListUrl(prefix!, 'CHG')} />
-          <SummaryTile
-            label="Defects"
-            value={defects?.length ?? project.defect_count}
-            to={docRegistryListUrl(prefix!, 'DEF')}
-            accent={openDefectCount > 0 ? 'warning' : undefined}
-            labelMeta={
-              closedDefectCount != null ? (
-                <span className="inline-flex flex-wrap items-center justify-end gap-x-1 text-[10px] font-semibold tabular-nums leading-snug">
-                  <span
-                    className={
-                      openDefectCount > 0
-                        ? 'text-amber-700 dark:text-amber-400'
-                        : 'text-muted-foreground'
-                    }
-                  >
-                    {openDefectCount} open
-                  </span>
-                  <span className="text-muted-foreground">·</span>
-                  <span className="text-muted-foreground">{closedDefectCount} closed</span>
-                </span>
-              ) : undefined
-            }
-          />
+        <SummaryTile label="Defects" value={project.defect_count} to={docRegistryListUrl(prefix!, 'DEF')} />
       </div>
 
       {/* Tab / navigation strip */}
@@ -217,34 +151,14 @@ export default function ProjectDetail() {
   )
 }
 
-function SummaryTile({
-  label,
-  value,
-  to,
-  accent,
-  labelMeta,
-}: {
-  label: string
-  value: number
-  to?: string
-  accent?: 'warning'
-  /** Shown on the label row (not under the total) so tile height stays uniform */
-  labelMeta?: ReactNode
-}) {
-  const accentClass =
-    accent === 'warning' ? 'border-amber-400/60 bg-amber-50/40 dark:bg-amber-500/5' : ''
+function SummaryTile({ label, value, to }: { label: string; value: number; to?: string }) {
   const content = (
-      <div
-        className={`bg-card rounded-lg border border-border shadow-elegant p-3 transition-colors ${accentClass} ${
-          to ? 'hover:bg-accent/40 cursor-pointer' : ''
-        }`}
-      >
-      <div className="flex items-start justify-between gap-2">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground leading-snug">{label}</div>
-        {labelMeta ? (
-          <div className="shrink-0 pt-0.5 text-right">{labelMeta}</div>
-        ) : null}
-      </div>
+    <div
+      className={`bg-card rounded-lg border border-border shadow-elegant p-3 transition-colors ${
+        to ? 'hover:bg-accent/40 cursor-pointer' : ''
+      }`}
+    >
+      <div className="text-xs uppercase tracking-wide text-muted-foreground leading-snug">{label}</div>
       <div className="text-xl font-bold text-foreground mt-1.5 tabular-nums">{value}</div>
     </div>
   )
