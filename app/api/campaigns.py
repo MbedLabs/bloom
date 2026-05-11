@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.link_read_utils import get_verified_requirement_links_for_test_case
@@ -25,6 +25,7 @@ from app.models import (
 )
 from app.models.user import User, UserRole
 from app.schemas import (
+    ArtefactLinkResponse,
     RequirementSummary,
     SyncResultsRequest,
     SyncResultsResponse,
@@ -450,6 +451,50 @@ async def delete_campaign(
     if not campaign:
         raise HTTPException(404, "Campaign not found")
     await db.delete(campaign)
+
+
+@router.get("/{campaign_id}/scope-links", response_model=list[ArtefactLinkResponse])
+async def get_campaign_scope_links(
+    campaign_id: int,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
+):
+    """Return all ArtefactLinks involving test cases that belong to this campaign."""
+    result = await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
+    if not result.scalar_one_or_none():
+        raise HTTPException(404, "Campaign not found")
+
+    tc_ids = (
+        (
+            await db.execute(
+                select(TestCampaignItem.test_case_id).where(
+                    TestCampaignItem.campaign_id == campaign_id
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if not tc_ids:
+        return []
+
+    rows = (
+        (
+            await db.execute(
+                select(ArtefactLink)
+                .where(
+                    or_(
+                        and_(ArtefactLink.source_type == "TC", ArtefactLink.source_id.in_(tc_ids)),
+                        and_(ArtefactLink.target_type == "TC", ArtefactLink.target_id.in_(tc_ids)),
+                    )
+                )
+                .order_by(ArtefactLink.created_at.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [ArtefactLinkResponse.model_validate(row) for row in rows]
 
 
 @router.post("/{campaign_id}/items", response_model=TestCampaignItemResponse, status_code=201)

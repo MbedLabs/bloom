@@ -951,7 +951,6 @@ class ChangeRequestResponse(BaseModel):
 
 class DefectCreate(BaseModel):
     project_id: int
-    defect_id: str = Field(..., min_length=11, max_length=11)
     title: str = Field(..., min_length=1, max_length=500)
     description: Optional[str] = None
     status: str = "Open"
@@ -968,11 +967,6 @@ class DefectCreate(BaseModel):
     external_issue_number: Optional[int] = None
     external_issue_url: Optional[str] = None
     external_issue_state: Optional[str] = None
-
-    @field_validator("defect_id", mode="before")
-    @classmethod
-    def validate_defect_id(cls, value: str) -> str:
-        return normalize_doc_id(value, expected_type_code="DEF")
 
 
 class DefectUpdate(BaseModel):
