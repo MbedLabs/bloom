@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { extractApiErrorMessage, projectsApi, Project } from '../api/client'
+import { extractApiErrorMessage, projectsApi, type Project } from '../api/client'
 import { Plus, FolderKanban, Search, FileText, CheckCircle, ArrowRight, Pencil } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -12,8 +12,8 @@ export default function Projects() {
   const { user } = useAuth()
   const canManageProjects = user?.role === 'admin'
   const canCreateProjects = user?.role === 'admin' || user?.role === 'maintainer'
+  const navigate = useNavigate()
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [name, setName] = useState('')
   const [prefix, setPrefix] = useState('')
   const [description, setDescription] = useState('')
@@ -41,23 +41,6 @@ export default function Projects() {
     },
   })
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { name: string; prefix: string; description?: string } }) =>
-      projectsApi.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
-      setFormError('')
-      setShowCreateModal(false)
-      setEditingProject(null)
-      setName('')
-      setPrefix('')
-      setDescription('')
-    },
-    onError: (error) => {
-      setFormError(extractApiErrorMessage(error, 'Could not update project'))
-    },
-  })
-
   const filteredProjects = search
     ? projects?.filter(p =>
         p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -77,35 +60,19 @@ export default function Projects() {
       return
     }
 
-    const payload = { name, prefix: normalizedPrefix, description: description || undefined }
-    if (editingProject) {
-      updateMutation.mutate({ id: editingProject.id, data: payload })
-    } else {
-      createMutation.mutate(payload)
-    }
+    createMutation.mutate({ name, prefix: normalizedPrefix, description: description || undefined })
   }
 
   const openCreateModal = () => {
     setFormError('')
-    setEditingProject(null)
     setName('')
     setPrefix('')
     setDescription('')
     setShowCreateModal(true)
   }
 
-  const openEditModal = (project: Project) => {
-    setFormError('')
-    setEditingProject(project)
-    setName(project.name)
-    setPrefix(project.prefix)
-    setDescription(project.description || '')
-    setShowCreateModal(true)
-  }
-
   const closeModal = () => {
     setFormError('')
-    setEditingProject(null)
     setShowCreateModal(false)
     setName('')
     setPrefix('')
@@ -172,7 +139,12 @@ export default function Projects() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredProjects.map((project) => (
-            <ProjectCard key={project.id} project={project} canEdit={canManageProjects} onEdit={openEditModal} />
+            <ProjectCard
+              key={project.id}
+              project={project}
+              canEdit={canManageProjects}
+              onEdit={() => navigate(`/projects/${project.prefix}/edit`)}
+            />
           ))}
         </div>
       )}
@@ -182,10 +154,8 @@ export default function Projects() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-card border border-border rounded-xl shadow-glow max-w-md w-full mx-4 animate-fade-in">
             <div className="px-6 py-4 border-b border-border">
-              <h3 className="text-lg font-semibold text-foreground">{editingProject ? 'Edit Project' : 'New Project'}</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {editingProject ? 'Update project details' : 'Create a new project'}
-              </p>
+              <h3 className="text-lg font-semibold text-foreground">New Project</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Create a new project</p>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="p-6 space-y-4">
@@ -244,12 +214,10 @@ export default function Projects() {
                 </button>
                 <button
                   type="submit"
-                  disabled={createMutation.isPending || updateMutation.isPending || !prefixIsValid}
+                  disabled={createMutation.isPending || !prefixIsValid}
                   className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
                 >
-                  {createMutation.isPending || updateMutation.isPending
-                    ? (editingProject ? 'Saving...' : 'Creating...')
-                    : (editingProject ? 'Save Project' : 'Create Project')}
+                  {createMutation.isPending ? 'Creating...' : 'Create Project'}
                 </button>
               </div>
             </form>
@@ -267,7 +235,7 @@ function ProjectCard({
 }: {
   project: Project
   canEdit: boolean
-  onEdit: (project: Project) => void
+  onEdit: () => void
 }) {
   const navigate = useNavigate()
   const coverage = project.requirement_count > 0
@@ -295,7 +263,7 @@ function ProjectCard({
                 {canEdit && (
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); onEdit(project) }}
+                    onClick={(e) => { e.stopPropagation(); onEdit() }}
                     className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                     title="Edit project"
                   >

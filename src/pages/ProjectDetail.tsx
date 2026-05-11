@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -13,9 +13,11 @@ import {
   Map,
   PenTool,
   AlertTriangle,
+  Pencil,
 } from 'lucide-react'
 
 import { defectsApi, docsApi, projectsApi } from '../api/client'
+import { useAuth } from '../contexts/AuthContext'
 import ProjectDocTopology from '../components/ProjectDocTopology'
 
 const OPEN_DEFECT_STATUSES = new Set(['Open', 'Triaged', 'In Progress', 'Resolved', 'Verified'])
@@ -54,6 +56,7 @@ type NavItem = {
 export default function ProjectDetail() {
   const { prefix } = useParams<{ prefix: string }>()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [searchParams] = useSearchParams()
 
   // Redirect legacy ?tab= URLs to the equivalent sidebar route
@@ -90,6 +93,10 @@ export default function ProjectDetail() {
     () => defects?.filter((d) => OPEN_DEFECT_STATUSES.has(d.status)).length ?? 0,
     [defects]
   )
+  const closedDefectCount = useMemo(() => {
+    if (!defects) return null
+    return defects.length - openDefectCount
+  }, [defects, openDefectCount])
 
   if (projectLoading) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
@@ -118,49 +125,75 @@ export default function ProjectDetail() {
     { label: 'Changes', icon: GitPullRequest, to: `/projects/${prefix}/docs?type=CHG` },
     { label: 'Test Concepts', icon: Beaker, to: `/projects/${prefix}/docs?type=TCO` },
     { label: 'Campaigns', icon: FlaskConical, to: `/projects/${prefix}/campaigns` },
-    { label: 'Defects', icon: Bug, to: `/projects/${prefix}/defects` },
+    { label: 'Defects', icon: Bug, to: `/projects/${prefix}/docs?type=DEF` },
     { label: 'Traceability', icon: GitBranch, to: `/projects/${prefix}/traceability` },
   ]
 
   return (
-    <div className="animate-fade-in space-y-6">
+    <div className="animate-fade-in space-y-3.5">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center space-x-4">
-          <Link to="/projects" className="p-2 hover:bg-accent/50 rounded-md">
+      <div className="flex items-center justify-between gap-2.5">
+        <div className="flex items-center space-x-2.5">
+          <Link to="/projects" className="p-1 hover:bg-accent/50 rounded-md">
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
           <div>
-            <h2 className="text-2xl font-bold text-foreground">{project.name}</h2>
+            <h2 className="text-lg font-bold text-foreground">{project.name}</h2>
             <p className="text-muted-foreground">{project.prefix}{project.description ? ` - ${project.description}` : ''}</p>
           </div>
         </div>
-        <ProjectStatusBadge status={project.status} />
+        <div className="flex items-center gap-2 shrink-0">
+          {user?.role === 'admin' && (
+            <Link
+              to={`/projects/${prefix}/edit`}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent/50 transition-colors"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Edit project
+            </Link>
+          )}
+          <ProjectStatusBadge status={project.status} />
+        </div>
       </div>
 
       {/* Summary tiles */}
-      <div className="grid grid-cols-2 lg:grid-cols-7 gap-4">
-        <SummaryTile label="Requirements" value={project.requirement_count} />
-        <SummaryTile label="Test Cases" value={project.test_case_count} />
-        <SummaryTile label="Specifications" value={specCount} />
-        <SummaryTile label="Design" value={project.design_count} />
-        <SummaryTile label="Risks" value={project.risk_count} />
-        <SummaryTile label="Changes" value={project.change_count} />
-        <SummaryTile
-          label="Defects"
-          value={project.defect_count}
-          to={`/projects/${prefix}/defects`}
-          accent={openDefectCount > 0 ? 'warning' : undefined}
-          subValue={openDefectCount > 0 ? `${openDefectCount} open` : undefined}
-        />
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-2.5">
+        <SummaryTile label="Requirements" value={project.requirement_count} to={`/projects/${prefix}/docs?type=REQ`} />
+        <SummaryTile label="Test Cases" value={project.test_case_count} to={`/projects/${prefix}/docs?type=TC`} />
+        <SummaryTile label="Specifications" value={specCount} to={`/projects/${prefix}/docs?type=SPEC`} />
+        <SummaryTile label="Design" value={project.design_count} to={`/projects/${prefix}/docs?type=DES`} />
+        <SummaryTile label="Risks" value={project.risk_count} to={`/projects/${prefix}/docs?type=RSK`} />
+        <SummaryTile label="Changes" value={project.change_count} to={`/projects/${prefix}/docs?type=CHG`} />
+          <SummaryTile
+            label="Defects"
+            value={defects?.length ?? project.defect_count}
+            to={`/projects/${prefix}/docs?type=DEF`}
+            accent={openDefectCount > 0 ? 'warning' : undefined}
+            labelMeta={
+              closedDefectCount != null ? (
+                <span className="inline-flex flex-wrap items-center justify-end gap-x-1 text-[10px] font-semibold tabular-nums leading-snug">
+                  <span
+                    className={
+                      openDefectCount > 0
+                        ? 'text-amber-700 dark:text-amber-400'
+                        : 'text-muted-foreground'
+                    }
+                  >
+                    {openDefectCount} open
+                  </span>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="text-muted-foreground">{closedDefectCount} closed</span>
+                </span>
+              ) : undefined
+            }
+          />
       </div>
 
       {/* Tab / navigation strip */}
-      <div className="border-b border-border overflow-x-auto">
-        <nav className="flex space-x-6 min-w-max">
-          {/* Overview is always the active tab on this page */}
-          <span className="flex items-center py-3 px-1 border-b-2 border-primary text-sm font-medium text-primary">
-            <Map className="h-4 w-4 mr-2" />
+      <div className="border-b border-border">
+        <nav className="flex flex-wrap gap-1">
+          <span className="flex items-center py-2.5 px-2 border-b-2 border-primary text-sm font-medium text-primary whitespace-nowrap">
+            <Map className="h-4 w-4 mr-1.5" />
             Overview
           </span>
 
@@ -168,9 +201,9 @@ export default function ProjectDetail() {
             <Link
               key={item.label}
               to={item.to}
-              className="flex items-center py-3 px-1 border-b-2 border-transparent text-sm font-medium text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+              className="flex items-center py-2.5 px-2 border-b-2 border-transparent text-sm font-medium text-muted-foreground hover:text-foreground hover:border-border transition-colors whitespace-nowrap"
             >
-              <item.icon className="h-4 w-4 mr-2" />
+              <item.icon className="h-4 w-4 mr-1.5" />
               {item.label}
             </Link>
           ))}
@@ -188,29 +221,30 @@ function SummaryTile({
   value,
   to,
   accent,
-  subValue,
+  labelMeta,
 }: {
   label: string
   value: number
   to?: string
   accent?: 'warning'
-  subValue?: string
+  /** Shown on the label row (not under the total) so tile height stays uniform */
+  labelMeta?: ReactNode
 }) {
   const accentClass =
     accent === 'warning' ? 'border-amber-400/60 bg-amber-50/40 dark:bg-amber-500/5' : ''
   const content = (
-    <div
-      className={`bg-card rounded-lg border border-border shadow-elegant p-4 transition-colors ${accentClass} ${
-        to ? 'hover:bg-accent/40 cursor-pointer' : ''
-      }`}
-    >
-      <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="text-2xl font-bold text-foreground mt-2">{value}</div>
-      {subValue && (
-        <div className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-400">
-          {subValue}
-        </div>
-      )}
+      <div
+        className={`bg-card rounded-lg border border-border shadow-elegant p-3 transition-colors ${accentClass} ${
+          to ? 'hover:bg-accent/40 cursor-pointer' : ''
+        }`}
+      >
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-xs uppercase tracking-wide text-muted-foreground leading-snug">{label}</div>
+        {labelMeta ? (
+          <div className="shrink-0 pt-0.5 text-right">{labelMeta}</div>
+        ) : null}
+      </div>
+      <div className="text-xl font-bold text-foreground mt-1.5 tabular-nums">{value}</div>
     </div>
   )
   return to ? <Link to={to}>{content}</Link> : content

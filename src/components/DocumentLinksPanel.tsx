@@ -36,7 +36,6 @@ function docKey(type: string, id: number) {
 
 function targetUrl(prefix: string, type: DocType, target: LinkTarget | undefined): string {
   if (!target) return '#'
-  if (type === 'DEF') return `/projects/${prefix}/defects/${target.id}`
   if (type === 'CMP') return `/projects/${prefix}/campaigns/${target.id}`
   return docUrl(prefix, type, target.doc_id)
 }
@@ -283,11 +282,13 @@ export function DocumentLinksPanel({
   projectPrefix,
   sourceType,
   sourceId,
+  derivedLinks,
 }: {
   projectId: number
   projectPrefix: string
   sourceType: string
   sourceId: number
+  derivedLinks?: ArtefactLink[]
 }) {
   const { user } = useAuth()
   const queryClient = useQueryClient()
@@ -304,8 +305,9 @@ export function DocumentLinksPanel({
     queryFn: () => linksApi.list({ project_id: projectId, target_type: sourceType, target_id: sourceId }),
   })
 
-  const linkCount = (outgoingLinks?.length || 0) + (incomingLinks?.length || 0)
-  const enabled = !!projectId && (showModal || linkCount > 0)
+  const directLinkCount = (outgoingLinks?.length || 0) + (incomingLinks?.length || 0)
+  const hasDerived = (derivedLinks?.length || 0) > 0
+  const enabled = !!projectId && (showModal || directLinkCount > 0 || hasDerived)
 
   const { data: docs } = useQuery({
     queryKey: ['all-docs', projectPrefix, 'link-targets'],
@@ -365,6 +367,16 @@ export function DocumentLinksPanel({
     return map
   }, [targets])
 
+  const filteredDerivedLinks = useMemo(() => {
+    if (!derivedLinks?.length) return []
+    const directIds = new Set<number>()
+    ;(outgoingLinks || []).forEach((l) => directIds.add(l.id))
+    ;(incomingLinks || []).forEach((l) => directIds.add(l.id))
+    return derivedLinks.filter((l) => !directIds.has(l.id))
+  }, [derivedLinks, outgoingLinks, incomingLinks])
+
+  const totalCount = directLinkCount + filteredDerivedLinks.length
+
   return (
     <SectionCard
       title="Linked Documents"
@@ -379,7 +391,7 @@ export function DocumentLinksPanel({
       ) : undefined}
     >
       <p className="text-xs text-muted-foreground mb-3">Typed links to requirements, specifications, designs, risks, defects, campaigns, and other controlled documents.</p>
-      {linkCount === 0 ? (
+      {totalCount === 0 ? (
         <p className="text-muted-foreground">No links yet.</p>
       ) : (
         <div className="divide-y divide-border -mx-6 -mb-6">
@@ -403,6 +415,22 @@ export function DocumentLinksPanel({
               onDelete={canEditDocs ? () => deleteMutation.mutate(link.id) : undefined}
             />
           ))}
+          {filteredDerivedLinks.length > 0 && (
+            <>
+              <div className="px-6 py-3 bg-muted/30">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">From campaign scope</span>
+              </div>
+              {filteredDerivedLinks.map((link) => (
+                <DocumentLinkRow
+                  key={`derived-${link.id}`}
+                  link={link}
+                  target={targetLookup.get(docKey(link.target_type, link.target_id)) || targetLookup.get(docKey(link.source_type, link.source_id))}
+                  projectPrefix={projectPrefix}
+                  direction="outgoing"
+                />
+              ))}
+            </>
+          )}
         </div>
       )}
 

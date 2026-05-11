@@ -1,12 +1,22 @@
-import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignsApi, extractApiErrorMessage, testCasesApi, testSuitesApi } from '../api/client'
-import { ArrowLeft, Plus, Clock, FlaskConical, Layers3 } from 'lucide-react'
+import { ArrowLeft, Plus, Clock, FlaskConical, Layers3, Search, ChevronUp, ChevronDown } from 'lucide-react'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
+
+type CampaignSortField = 'name' | 'status' | 'updated_at'
+type SortDir = 'asc' | 'desc'
+const CAMPAIGN_STATUSES = ['Planned', 'Scope', 'In Progress', 'Completed', 'Aborted']
+const SORT_OPTIONS: { field: CampaignSortField; label: string }[] = [
+  { field: 'updated_at', label: 'Updated Time' },
+  { field: 'name', label: 'Name' },
+  { field: 'status', label: 'Status' },
+]
 
 export default function TestCampaigns() {
   const { prefix } = useParams<{ prefix: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { data: project } = useProjectByPrefix(prefix)
   const projectId = project?.id || 0
   const queryClient = useQueryClient()
@@ -17,6 +27,23 @@ export default function TestCampaigns() {
   const [selectedTcIds, setSelectedTcIds] = useState<number[]>([])
   const [selectedSuiteIds, setSelectedSuiteIds] = useState<number[]>([])
   const [createError, setCreateError] = useState('')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
+
+  const search = searchParams.get('q') || ''
+  const statusFilter = searchParams.get('status') || ''
+  const sortParam = searchParams.get('sort') as CampaignSortField | null
+  const sortField: CampaignSortField = sortParam && SORT_OPTIONS.some((o) => o.field === sortParam) ? sortParam : 'updated_at'
+
+  const updateParams = (next: { q?: string; status?: string; sort?: CampaignSortField }) => {
+    const params = new URLSearchParams(searchParams)
+    const nextQ = next.q ?? search
+    const nextStatus = next.status ?? statusFilter
+    const nextSort = next.sort ?? sortField
+    if (nextQ.trim()) params.set('q', nextQ); else params.delete('q')
+    if (nextStatus) params.set('status', nextStatus); else params.delete('status')
+    if (nextSort !== 'updated_at') params.set('sort', nextSort); else params.delete('sort')
+    setSearchParams(params, { replace: true })
+  }
 
   const { data: campaigns, isLoading } = useQuery({
     queryKey: ['campaigns', projectId],
@@ -37,6 +64,25 @@ export default function TestCampaigns() {
   })
 
   const hasSuites = (suites?.length || 0) > 0
+
+  const filteredCampaigns = useMemo(() => {
+    let list = campaigns ?? []
+    const q = search.trim().toLowerCase()
+    if (q) {
+      list = list.filter((c) =>
+        c.name.toLowerCase().includes(q) || (c.description || '').toLowerCase().includes(q) || c.status.toLowerCase().includes(q)
+      )
+    }
+    if (statusFilter) {
+      list = list.filter((c) => c.status === statusFilter)
+    }
+    const mult = sortDir === 'asc' ? 1 : -1
+    return [...list].sort((a, b) => {
+      if (sortField === 'name') return mult * a.name.localeCompare(b.name)
+      if (sortField === 'status') return mult * a.status.localeCompare(b.status)
+      return mult * (new Date(a.updated_at || 0).getTime() - new Date(b.updated_at || 0).getTime())
+    })
+  }, [campaigns, search, statusFilter, sortField, sortDir])
 
   const openCreateCampaign = () => {
     setCreateError('')
@@ -177,6 +223,48 @@ export default function TestCampaigns() {
         </div>
 
         <div>
+          {/* Campaigns toolbar */}
+          {(campaigns?.length ?? 0) > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <div className="relative flex-1 min-w-[200px] max-w-xs">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => updateParams({ q: e.target.value })}
+                  placeholder="Search campaigns..."
+                  className="w-full pl-8 pr-3 py-1.5 bg-background border border-input rounded-md text-sm focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <select
+                aria-label="Filter by status"
+                value={statusFilter}
+                onChange={(e) => updateParams({ status: e.target.value })}
+                className="px-3 py-1.5 bg-background border border-input rounded-md text-sm focus:ring-2 focus:ring-ring"
+              >
+                <option value="">All statuses</option>
+                {CAMPAIGN_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <div className="flex items-center gap-1">
+                <select
+                  aria-label="Sort by"
+                  value={sortField}
+                  onChange={(e) => updateParams({ sort: e.target.value as CampaignSortField })}
+                  className="px-3 py-1.5 bg-background border border-input rounded-md text-sm focus:ring-2 focus:ring-ring"
+                >
+                  {SORT_OPTIONS.map((o) => <option key={o.field} value={o.field}>{o.label}</option>)}
+                </select>
+                <button
+                  onClick={() => setSortDir((d) => d === 'asc' ? 'desc' : 'asc')}
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+                  title={sortDir === 'asc' ? 'Ascending' : 'Descending'}
+                >
+                  {sortDir === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+          )}
+
           {!campaigns || campaigns.length === 0 ? (
             <div className="bg-card rounded-lg shadow-elegant p-12 text-center">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-cyan-500/10 flex items-center justify-center mx-auto mb-4">
@@ -194,9 +282,13 @@ export default function TestCampaigns() {
                 Create First Campaign
               </button>
             </div>
+          ) : filteredCampaigns.length === 0 ? (
+            <div className="bg-card rounded-lg shadow-elegant p-12 text-center text-muted-foreground">
+              No campaigns match the current filters.
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {campaigns.map((campaign) => (
+              {filteredCampaigns.map((campaign) => (
                 <CampaignCard key={campaign.id} campaign={campaign} prefix={prefix!} />
               ))}
             </div>

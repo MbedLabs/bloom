@@ -1,4 +1,4 @@
-import { Routes, Route, Link } from 'react-router-dom'
+import { Routes, Route, Link, Navigate, useParams } from 'react-router-dom'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
@@ -19,10 +19,10 @@ import Users from './pages/Users'
 import Documents from './pages/Documents'
 import Settings from './pages/Settings'
 import ProjectParameters from './pages/ProjectParameters'
+import ProjectEdit from './pages/ProjectEdit'
 import DocCreate from './pages/DocCreate'
 import ImportWizard from './pages/ImportWizard'
 import UnifiedDocDetail from './pages/UnifiedDocDetail'
-import Defects from './pages/Defects'
 import ArtefactDetail from './pages/ArtefactDetail'
 import VerifyEmail from './pages/VerifyEmail'
 
@@ -41,6 +41,11 @@ function NotFound() {
   )
 }
 
+function DefectsRedirect() {
+  const { prefix } = useParams<{ prefix: string }>()
+  return <Navigate to={`/projects/${prefix}/docs?type=DEF`} replace />
+}
+
 function App() {
   return (
     <Routes>
@@ -57,8 +62,9 @@ function App() {
         <Route path="projects/:prefix/docs/new" element={<DocCreate />} />
         <Route path="projects/:prefix/docs/:kind/:docId/edit" element={<DocCreate editMode />} />
         <Route path="projects/:prefix/docs/:kind/:docId" element={<UnifiedDocDetail />} />
+        <Route path="projects/:prefix/edit" element={<ProjectEdit />} />
         <Route path="projects/:prefix/parameters" element={<ProjectParameters />} />
-        <Route path="projects/:prefix/defects" element={<Defects />} />
+        <Route path="projects/:prefix/defects" element={<DefectsRedirect />} />
         <Route path="projects/:prefix/defects/:itemId" element={<ArtefactDetail kind="defect" />} />
         <Route path="projects/:prefix/campaigns" element={<TestCampaigns />} />
         <Route path="projects/:prefix/suites/:suiteId" element={<SuiteDetail />} />

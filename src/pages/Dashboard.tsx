@@ -56,7 +56,8 @@ export default function Dashboard() {
     return <DashboardSkeleton />
   }
 
-  const s = stats || {
+  const raw = stats || {}
+  const s = {
     total_projects: 0,
     active_projects: 0,
     total_requirements: 0,
@@ -65,14 +66,15 @@ export default function Dashboard() {
     active_campaigns: 0,
     coverage_percent: 0,
     uncovered_requirements: 0,
-    requirement_status_distribution: {},
-    test_case_status_distribution: {},
-    campaign_result_distribution: {},
+    requirement_status_distribution: {} as Record<string, number>,
+    test_case_status_distribution: {} as Record<string, number>,
+    campaign_result_distribution: {} as Record<string, number>,
     total_defects: 0,
     open_defects: 0,
-    defect_severity_distribution: {},
-    defect_status_distribution: {},
-    projects: [],
+    defect_severity_distribution: {} as Record<string, number>,
+    defect_status_distribution: {} as Record<string, number>,
+    projects: [] as Array<{ id: number; name: string; prefix: string; status: string; requirement_count: number; test_case_count: number }>,
+    ...raw,
   }
 
   const portfolioProjects = projects ?? []
@@ -92,14 +94,14 @@ export default function Dashboard() {
   const usedKindCount = CONTROLLED_DOC_TYPES.filter((type) => (kindCounts[type] ?? 0) > 0).length
 
   return (
-    <div className="animate-fade-in space-y-5">
-      <header className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
+    <div className="animate-fade-in space-y-3.5">
+      <header className="flex flex-col gap-2.5 border-b border-border pb-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             <CircleDot className="h-3.5 w-3.5 text-primary" />
             Bloom PLM
           </div>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">Bloom Dashboard</h2>
+          <h2 className="mt-1 text-lg font-semibold tracking-tight text-foreground">Bloom Dashboard</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Portfolio health across requirements, specifications, protocols, test assets, designs, risks, changes, reports, and standards.
           </p>
@@ -107,14 +109,14 @@ export default function Dashboard() {
         <div className="flex flex-wrap items-center gap-2">
           <Link
             to="/projects"
-            className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-2.5 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
             <FolderKanban className="h-4 w-4" />
             Projects
           </Link>
           <Link
             to="/projects"
-            className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-2.5 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             <Plus className="h-4 w-4" />
             New Project
@@ -122,23 +124,24 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <MetricCard title="Projects" value={portfolioProjects.length || s.total_projects} detail={`${activeProjects} active`} icon={FolderKanban} />
-        <MetricCard title="Docs" value={totalControlledDocs} detail={`${usedKindCount} of ${CONTROLLED_DOC_TYPES.length} kinds in use`} icon={FileText} />
-        <MetricCard title="Links" value={linkedDocs} detail={`${suspectLinks} suspect links`} icon={GitBranch} />
-        <MetricCard title="Campaigns" value={s.total_campaigns} detail={`${s.active_campaigns} active`} icon={FlaskConical} />
+      <section className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-5">
+        <MetricCard title="Projects" value={portfolioProjects.length || s.total_projects} detail={`${activeProjects} active`} icon={FolderKanban} to="/projects" />
+        <MetricCard title="Docs" value={totalControlledDocs} detail={`${usedKindCount} of ${CONTROLLED_DOC_TYPES.length} kinds in use`} icon={FileText} anchor="dash-docs" />
+        <MetricCard title="Links" value={linkedDocs} detail={`${suspectLinks} suspect links`} icon={GitBranch} anchor="dash-links" />
+        <MetricCard title="Campaigns" value={s.total_campaigns} detail={`${s.active_campaigns} active`} icon={FlaskConical} anchor="dash-campaigns" />
         <MetricCard
           title="Defects"
           value={s.total_defects}
           detail={`${s.open_defects} open`}
           icon={Bug}
           tone={s.open_defects > 0 ? 'warning' : 'default'}
+          anchor="dash-defects"
         />
       </section>
 
-      <section className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(360px,1fr)]">
-        <div className="rounded-lg border border-border bg-card">
-          <div className="flex flex-col gap-3 border-b border-border px-5 py-4 md:flex-row md:items-center md:justify-between">
+      <section className="grid grid-cols-1 gap-3.5 xl:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+        <div id="dash-docs" className="rounded-lg border border-border bg-card">
+          <div className="flex flex-col gap-2 border-b border-border px-3.5 py-2.5 md:flex-row md:items-center md:justify-between">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Project Document Scope</h3>
               <p className="mt-1 text-xs text-muted-foreground">Counts come from the canonical project docs registry.</p>
@@ -210,25 +213,25 @@ export default function Dashboard() {
           )}
         </div>
 
-        <aside className="space-y-5">
-          <div className="rounded-lg border border-border bg-card p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Verification Coverage</h3>
-                <p className="mt-1 text-xs text-muted-foreground">
+        <aside className="space-y-3.5">
+            <div className="rounded-lg border border-border bg-card p-3.5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Verification Coverage</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
                   {coveredRequirements} covered · {s.uncovered_requirements} uncovered requirements
                 </p>
               </div>
               <div className={`rounded-md px-2.5 py-1 text-sm font-semibold ${coverageTone.badge}`}>{s.coverage_percent}%</div>
             </div>
-            <div className="mt-5 h-2 overflow-hidden rounded-full bg-muted">
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
               <div className={`h-full rounded-full ${coverageTone.bar}`} style={{ width: `${s.coverage_percent}%` }} />
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <SignalStat label="Covered" value={coveredRequirements} icon={CheckCircle} />
-              <SignalStat label="At risk" value={s.uncovered_requirements} icon={AlertTriangle} />
+              <div className="mt-3.5 grid grid-cols-2 gap-2 text-sm">
+                <SignalStat label="Covered" value={coveredRequirements} icon={CheckCircle} />
+                <SignalStat label="At risk" value={s.uncovered_requirements} icon={AlertTriangle} />
+              </div>
             </div>
-          </div>
 
           <DocKindPanel kindCounts={kindCounts} total={totalControlledDocs} />
 
@@ -255,8 +258,9 @@ export default function Dashboard() {
         </aside>
       </section>
 
-      <section className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+      <section className="grid grid-cols-1 gap-3.5 lg:grid-cols-3">
         <DistributionPanel
+          id="dash-campaigns"
           title="Campaign Results"
           icon={FlaskConical}
           data={s.campaign_result_distribution}
@@ -271,6 +275,7 @@ export default function Dashboard() {
         />
 
         <DistributionPanel
+          id="dash-defects"
           title="Open Defects by Severity"
           icon={Bug}
           data={s.defect_severity_distribution}
@@ -284,12 +289,12 @@ export default function Dashboard() {
           }}
         />
 
-        <div className="rounded-lg border border-border bg-card p-5">
+        <div id="dash-links" className="rounded-lg border border-border bg-card p-3.5">
           <div className="flex items-center gap-2">
             <GitBranch className="h-4 w-4 text-primary" />
             <h3 className="text-sm font-semibold text-foreground">Traceability Focus</h3>
           </div>
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-3">
             <TraceabilityTile label="Coverage" value={`${s.coverage_percent}%`} tone={coverageTone.text} />
             <TraceabilityTile label="Suspect links" value={suspectLinks} tone={suspectLinks > 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'} />
             <TraceabilityTile label="Linked docs" value={linkedDocs} tone="text-foreground" />
@@ -300,42 +305,64 @@ export default function Dashboard() {
   )
 }
 
-function MetricCard({ title, value, detail, icon: Icon, tone = 'default' }: {
+function MetricCard({ title, value, detail, icon: Icon, tone = 'default', to, anchor }: {
   title: string
   value: number | string
   detail: string
   icon: React.ComponentType<{ className?: string }>
   tone?: 'default' | 'warning'
+  to?: string
+  anchor?: string
 }) {
   const isWarning = tone === 'warning'
-  const cardClass = isWarning
-    ? 'rounded-lg border border-amber-400/60 bg-amber-50/40 p-4 dark:bg-amber-500/5'
-    : 'rounded-lg border border-border bg-card p-4'
+  const interactive = !!(to || anchor)
+  const cardClass = [
+    'rounded-lg border p-3',
+    isWarning ? 'border-amber-400/60 bg-amber-50/40 dark:bg-amber-500/5' : 'border-border bg-card',
+    interactive ? 'hover:bg-accent/40 cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-primary' : '',
+  ].join(' ')
   const iconClass = isWarning
     ? 'rounded-md bg-amber-500/10 p-2 text-amber-700 dark:text-amber-400'
     : 'rounded-md bg-primary/10 p-2 text-primary'
   const detailClass = isWarning
     ? 'mt-1 text-xs font-medium text-amber-700 dark:text-amber-400'
     : 'mt-1 text-xs text-muted-foreground'
-  return (
-    <div className={cardClass}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
-          <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
-          <p className={detailClass}>{detail}</p>
-        </div>
-        <div className={iconClass}>
-          <Icon className="h-4 w-4" />
-        </div>
+
+  const inner = (
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
+        <p className="mt-1.5 text-xl font-semibold text-foreground">{value}</p>
+        <p className={detailClass}>{detail}</p>
+      </div>
+      <div className={iconClass}>
+        <Icon className="h-4 w-4" />
       </div>
     </div>
   )
+
+  if (to) {
+    return <Link to={to} className={`block ${cardClass}`}>{inner}</Link>
+  }
+
+  if (anchor) {
+    return (
+      <button
+        type="button"
+        className={`block w-full text-left ${cardClass}`}
+        onClick={() => document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+      >
+        {inner}
+      </button>
+    )
+  }
+
+  return <div className={cardClass}>{inner}</div>
 }
 
 function DocKindPanel({ kindCounts, total }: { kindCounts: Record<DocType, number>; total: number }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-5">
+    <div className="rounded-lg border border-border bg-card p-3.5">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <FileText className="h-4 w-4 text-primary" />
@@ -343,11 +370,11 @@ function DocKindPanel({ kindCounts, total }: { kindCounts: Record<DocType, numbe
         </div>
         <span className="text-xs text-muted-foreground">{total} total</span>
       </div>
-      <div className="mt-5 grid grid-cols-2 gap-2">
+      <div className="mt-3.5 grid grid-cols-2 gap-2">
         {CONTROLLED_DOC_TYPES.map((type) => (
           <div
             key={type}
-            className="rounded-md border border-border bg-background/60 p-3"
+            className="rounded-md border border-border bg-background/60 p-2"
           >
             <div className="flex items-center justify-between gap-2">
               <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${DOC_TYPE_COLORS[type]}`}>{type}</span>
@@ -361,7 +388,8 @@ function DocKindPanel({ kindCounts, total }: { kindCounts: Record<DocType, numbe
   )
 }
 
-function DistributionPanel({ title, icon: Icon, data, total, emptyMessage, colorMap }: {
+function DistributionPanel({ id, title, icon: Icon, data, total, emptyMessage, colorMap }: {
+  id?: string
   title: string
   icon: React.ComponentType<{ className?: string }>
   data: Record<string, number>
@@ -372,7 +400,7 @@ function DistributionPanel({ title, icon: Icon, data, total, emptyMessage, color
   const entries = Object.entries(data).filter(([, value]) => value > 0)
 
   return (
-    <div className="rounded-lg border border-border bg-card p-5">
+    <div id={id} className="rounded-lg border border-border bg-card p-3.5">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Icon className="h-4 w-4 text-primary" />
@@ -382,9 +410,9 @@ function DistributionPanel({ title, icon: Icon, data, total, emptyMessage, color
       </div>
 
       {entries.length === 0 ? (
-        <div className="mt-5 rounded-md border border-dashed border-border p-5 text-center text-sm text-muted-foreground">{emptyMessage}</div>
+        <div className="mt-3.5 rounded-md border border-dashed border-border p-3.5 text-center text-sm text-muted-foreground">{emptyMessage}</div>
       ) : (
-        <div className="mt-5 space-y-3">
+        <div className="mt-3.5 space-y-2">
           {entries.map(([label, value]) => {
             const percent = total > 0 ? Math.round((value / total) * 100) : 0
             return (
@@ -407,21 +435,21 @@ function DistributionPanel({ title, icon: Icon, data, total, emptyMessage, color
 
 function SignalStat({ label, value, icon: Icon }: { label: string; value: number; icon: React.ComponentType<{ className?: string }> }) {
   return (
-    <div className="rounded-md border border-border bg-background/60 p-3">
+    <div className="rounded-md border border-border bg-background/60 p-2">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Icon className="h-3.5 w-3.5" />
         {label}
       </div>
-      <div className="mt-2 text-lg font-semibold text-foreground">{value}</div>
+      <div className="mt-1 text-lg font-semibold text-foreground">{value}</div>
     </div>
   )
 }
 
 function TraceabilityTile({ label, value, tone }: { label: string; value: number | string; tone: string }) {
   return (
-    <div className="rounded-md border border-border bg-background/60 p-4">
+    <div className="rounded-md border border-border bg-background/60 p-2.5">
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className={`mt-2 text-xl font-semibold ${tone}`}>{value}</div>
+      <div className={`mt-1 text-base font-semibold ${tone}`}>{value}</div>
     </div>
   )
 }
@@ -441,15 +469,15 @@ function StatusBadge({ status }: { status: string }) {
 
 function EmptyState() {
   return (
-    <div className="p-12 text-center">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
-        <FolderKanban className="h-6 w-6" />
+    <div className="p-10 text-center">
+      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <FolderKanban className="h-5 w-5" />
       </div>
-      <h3 className="mt-4 text-sm font-semibold text-foreground">No Projects Yet</h3>
+      <h3 className="mt-3 text-sm font-semibold text-foreground">No Projects Yet</h3>
       <p className="mt-1 text-sm text-muted-foreground">Create a project to start managing controlled documents.</p>
       <Link
         to="/projects"
-        className="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+        className="mt-3 inline-flex items-center gap-2 rounded-md bg-primary px-2.5 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
       >
         <Plus className="h-4 w-4" />
         Create Project
@@ -459,25 +487,25 @@ function EmptyState() {
 }
 
 function Th({ children }: { children?: React.ReactNode }) {
-  return <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">{children}</th>
+  return <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">{children}</th>
 }
 
 function Td({ children }: { children: React.ReactNode }) {
-  return <td className="whitespace-nowrap px-4 py-3 text-sm text-muted-foreground">{children}</td>
+  return <td className="whitespace-nowrap px-3 py-2.5 text-sm text-muted-foreground">{children}</td>
 }
 
 function DashboardSkeleton() {
   return (
-    <div className="animate-pulse space-y-5">
+    <div className="animate-pulse space-y-3.5">
       <div className="h-24 rounded-lg bg-muted/50" />
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="h-28 rounded-lg bg-muted/50" />
         ))}
       </div>
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(360px,1fr)]">
+      <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
         <div className="h-96 rounded-lg bg-muted/50" />
-        <div className="space-y-5">
+        <div className="space-y-3.5">
           <div className="h-40 rounded-lg bg-muted/50" />
           <div className="h-48 rounded-lg bg-muted/50" />
         </div>

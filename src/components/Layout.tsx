@@ -2,13 +2,18 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { APP_VERSION, projectsApi } from '../api/client'
+import { normalizeDocTypeParam, DOC_TYPE_SLUGS } from '../types/doc'
 import { useAuth } from '../contexts/AuthContext'
+import { PageMetaProvider, usePageMeta } from '../contexts/PageMetaContext'
 import {
   LayoutDashboard, FolderKanban, FileText, CheckSquare,
   GitBranch, BarChart3, Sun, Moon,
-  ExternalLink, ChevronDown, Search, Flower2,
-  BookOpen, Bug, Layers, FlaskConical, LogOut, Users, PenTool, AlertTriangle, GitPullRequest, Settings, SlidersHorizontal
+  ExternalLink, ChevronDown, ChevronLeft, ChevronRight, Search, Flower2,
+  BookOpen, Bug, Layers, FlaskConical, LogOut, Users, PenTool, AlertTriangle, GitPullRequest, Settings, SlidersHorizontal,
 } from 'lucide-react'
+
+/** Must match Tailwind `w-60` / `w-14` and main `ml-*` — also positions the seam toggle. */
+const SIDEBAR_EDGE = { expanded: '15rem', collapsed: '3.5rem' } as const
 
 const getBudUrl = () => {
   const runtimeUrl = window.runtimeConfig?.BUD_APP_URL
@@ -57,7 +62,7 @@ const projectNav = [
   { name: 'Risks', icon: AlertTriangle, tab: '', href: 'docs' as const, filter: 'type:RSK' },
   { name: 'Changes', icon: GitPullRequest, tab: '', href: 'docs' as const, filter: 'type:CHG' },
   { name: 'Test Concepts', icon: Beaker, tab: '', href: 'docs' as const, filter: 'type:TCO' },
-  { name: 'Defects', icon: Bug, tab: '', href: 'defects' as const },
+  { name: 'Defects', icon: Bug, tab: '', href: 'docs' as const, filter: 'type:DEF' },
   { name: 'Test Campaigns', icon: FlaskConical, tab: '', href: 'campaigns' as const },
   { name: 'Traceability', icon: GitBranch, tab: '', href: 'traceability' as const },
   { name: 'Parameters', icon: SlidersHorizontal, tab: '', href: 'parameters' as const },
@@ -72,15 +77,47 @@ function Beaker(props: { className?: string }) {
 }
 
 export default function Layout() {
+  return (
+    <PageMetaProvider>
+      <LayoutInner />
+    </PageMetaProvider>
+  )
+}
+
+function LayoutInner() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   const [dark, setDark] = useDarkMode()
   const [projectDropdownOpen, setProjectDropdownOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchOpen, setSearchOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const stored = localStorage.getItem('bloom-sidebar-collapsed')
+    return stored ? stored === 'true' : false
+  })
   const userMenuRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  const searchShortcutLabel = useMemo(() => {
+    if (typeof navigator === 'undefined') return 'Ctrl K'
+    return /Mac|iPhone|iPad|iPod/.test(navigator.userAgent) ? '⌘K' : 'Ctrl K'
+  }, [])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.metaKey && !e.ctrlKey) return
+      if (e.key !== 'k' && e.key !== 'K') return
+      const el = e.target as HTMLElement | null
+      if (el?.closest('[contenteditable="true"]')) return
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') && el !== searchInputRef.current) return
+      e.preventDefault()
+      searchInputRef.current?.focus()
+      searchInputRef.current?.select()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -91,6 +128,10 @@ export default function Layout() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  useEffect(() => {
+    localStorage.setItem('bloom-sidebar-collapsed', String(sidebarCollapsed))
+  }, [sidebarCollapsed])
 
   const { data: projects } = useQuery({
     queryKey: ['projects'],
@@ -103,7 +144,8 @@ export default function Layout() {
     ? projects?.find((p) => p.prefix === currentProjectSlug || String(p.id) === currentProjectSlug)?.name || currentProjectSlug
     : null
 
-  const breadcrumbs = useMemo(() => getBreadcrumbs(location, projects || []), [location, projects])
+  const { crumbLabel: pageCrumbLabel } = usePageMeta()
+  const breadcrumbs = useMemo(() => getBreadcrumbs(location, projects || [], pageCrumbLabel), [location, projects, pageCrumbLabel])
 
   const roleBadgeColor = user?.role === 'admin'
     ? 'bg-red-500/10 text-red-400'
@@ -123,22 +165,24 @@ export default function Layout() {
   return (
     <div className="min-h-screen flex">
       {/* Sidebar */}
-      <aside className="w-64 bg-gradient-sidebar text-white flex flex-col fixed inset-y-0 left-0 z-30 overflow-y-auto">
+      <aside className={`${sidebarCollapsed ? 'w-14' : 'w-60'} sidebar-scrollbar bg-gradient-sidebar text-white flex flex-col fixed inset-y-0 left-0 z-30 overflow-y-auto transition-all duration-200`}>
         {/* Logo */}
-        <div className="px-5 pt-6 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center">
+        <div className={`${sidebarCollapsed ? 'px-2 pt-4 pb-2.5' : 'px-3 pt-4 pb-2.5'}`}>
+          <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-2.5'}`}>
+            <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
               <Flower2 className="h-5 w-5 text-teal-200" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-teal-100 tracking-tight">Bloom</h1>
-              <p className="text-[11px] text-teal-300/60 font-medium uppercase tracking-wider">Product Lifecycle Management</p>
-            </div>
+            {!sidebarCollapsed && (
+              <div className="min-w-0">
+                <h1 className="text-base font-bold text-teal-100 tracking-tight">Bloom</h1>
+                <p className="text-[10px] text-teal-300/60 font-medium uppercase tracking-wider leading-snug">Product Lifecycle Management</p>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Main Navigation */}
-        <nav className="px-3 space-y-1">
+        <nav className={`${sidebarCollapsed ? 'px-2' : 'px-3'} space-y-1`}>
           {mainNav.map((item) => {
             const isActive = location.pathname === item.href ||
               (item.href !== '/' && location.pathname.startsWith(item.href))
@@ -146,17 +190,23 @@ export default function Layout() {
               <Link
                 key={item.name}
                 to={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${
+                className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-2 rounded-lg text-sm font-medium transition-all duration-200 group ${
                   isActive && !isInProject
                     ? 'bg-[var(--sidebar-active)] text-white shadow-sm'
                     : 'text-teal-100/70 hover:bg-[var(--sidebar-hover)] hover:text-white'
                 }`}
+                title={sidebarCollapsed ? item.name : undefined}
+                onClick={() => {
+                  if (sidebarCollapsed && location.pathname !== item.href) {
+                    setSidebarCollapsed(false)
+                  }
+                }}
               >
-                <item.icon className={`h-[18px] w-[18px] transition-colors ${
+                <item.icon className={`h-[18px] w-[18px] shrink-0 transition-colors ${
                   isActive && !isInProject ? 'text-teal-300' : 'text-teal-400/50 group-hover:text-teal-300'
                 }`} />
-                {item.name}
-                {isActive && !isInProject && (
+                {!sidebarCollapsed && item.name}
+                {isActive && !isInProject && !sidebarCollapsed && (
                   <div className="ml-auto w-1.5 h-1.5 rounded-full bg-teal-400" />
                 )}
               </Link>
@@ -165,21 +215,27 @@ export default function Layout() {
           {user?.role === 'admin' && (
             <Link
               to="/users"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-teal-100/70 hover:bg-[var(--sidebar-hover)] hover:text-white transition-all duration-200 group"
+              className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-2 rounded-lg text-sm font-medium text-teal-100/70 hover:bg-[var(--sidebar-hover)] hover:text-white transition-all duration-200 group`}
+              title={sidebarCollapsed ? 'Users' : undefined}
+              onClick={() => {
+                if (sidebarCollapsed && location.pathname !== '/users') {
+                  setSidebarCollapsed(false)
+                }
+              }}
             >
-              <Users className="h-[18px] w-[18px] text-teal-400/50 group-hover:text-teal-300" />
-              Users
+              <Users className="h-[18px] w-[18px] shrink-0 text-teal-400/50 group-hover:text-teal-300" />
+              {!sidebarCollapsed && 'Users'}
             </Link>
           )}
         </nav>
 
         {/* Project Section */}
-        <div className="mt-6 px-3">
-          <div className="h-px bg-white/10 mb-3" />
-          <p className="px-3 text-[10px] font-semibold text-teal-300/40 uppercase tracking-widest mb-2">Project</p>
+        <div className={`mt-4 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}>
+          <div className="h-px bg-white/10 mb-2" />
+          {!sidebarCollapsed && <p className="px-3 text-xs font-semibold text-teal-300/40 uppercase tracking-widest mb-2">Project</p>}
 
           {/* Project Selector */}
-          {projects && projects.length > 0 && (
+          {projects && projects.length > 0 && !sidebarCollapsed && (
             <div className="relative mb-2">
               <button
                 onClick={() => setProjectDropdownOpen(!projectDropdownOpen)}
@@ -226,10 +282,16 @@ export default function Layout() {
                   <Link
                     key={item.name}
                     to={to}
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-teal-200/60 hover:bg-[var(--sidebar-hover)] hover:text-teal-100 transition-all duration-200 group"
+                    className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-1.5 rounded-lg text-[13px] font-medium text-teal-200/60 hover:bg-[var(--sidebar-hover)] hover:text-teal-100 transition-all duration-200 group`}
+                    title={sidebarCollapsed ? item.name : undefined}
+                    onClick={() => {
+                      if (sidebarCollapsed && location.pathname !== to) {
+                        setSidebarCollapsed(false)
+                      }
+                    }}
                   >
-                    <item.icon className="h-4 w-4 text-teal-400/40 group-hover:text-teal-300" />
-                    {item.name}
+                    <item.icon className="h-4 w-4 shrink-0 text-teal-400/40 group-hover:text-teal-300" />
+                    {!sidebarCollapsed && item.name}
                   </Link>
                 )
               })}
@@ -238,100 +300,131 @@ export default function Layout() {
         </div>
 
         {/* Reports & Settings */}
-        <div className="px-3 mt-6 space-y-0.5">
+        <div className={`${sidebarCollapsed ? 'px-2' : 'px-3'} mt-4 space-y-0.5`}>
           <Link
             to="/reports"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-teal-200/60 hover:bg-[var(--sidebar-hover)] hover:text-teal-100 transition-all duration-200 group"
+            className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-1.5 rounded-lg text-[13px] font-medium text-teal-200/60 hover:bg-[var(--sidebar-hover)] hover:text-teal-100 transition-all duration-200 group`}
+            title={sidebarCollapsed ? 'Reports' : undefined}
+            onClick={() => {
+              if (sidebarCollapsed && location.pathname !== '/reports') {
+                setSidebarCollapsed(false)
+              }
+            }}
           >
-            <BarChart3 className="h-4 w-4 text-teal-400/40 group-hover:text-teal-300" />
-            Reports
+            <BarChart3 className="h-4 w-4 shrink-0 text-teal-400/40 group-hover:text-teal-300" />
+            {!sidebarCollapsed && 'Reports'}
           </Link>
           <Link
             to="/baselines"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-teal-200/60 hover:bg-[var(--sidebar-hover)] hover:text-teal-100 transition-all duration-200 group"
+            className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-1.5 rounded-lg text-[13px] font-medium text-teal-200/60 hover:bg-[var(--sidebar-hover)] hover:text-teal-100 transition-all duration-200 group`}
+            title={sidebarCollapsed ? 'Baselines' : undefined}
+            onClick={() => {
+              if (sidebarCollapsed && location.pathname !== '/baselines') {
+                setSidebarCollapsed(false)
+              }
+            }}
           >
-            <Layers className="h-4 w-4 text-teal-400/40 group-hover:text-teal-300" />
-            Baselines
+            <Layers className="h-4 w-4 shrink-0 text-teal-400/40 group-hover:text-teal-300" />
+            {!sidebarCollapsed && 'Baselines'}
           </Link>
         </div>
 
         {/* Bottom section */}
-        <div className="mt-auto px-3 pb-6 pt-2 space-y-1" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
-          <div className="h-px bg-white/10 mx-2 mb-3" />
+        <div className={`mt-auto ${sidebarCollapsed ? 'px-2' : 'px-3'} pb-4 pt-2 space-y-1`} style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+          <div className="h-px bg-white/10 mx-2 mb-2" />
           <a
             href={TESTSTATION_APP_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium text-teal-100/70 hover:bg-[var(--sidebar-hover)] hover:text-white transition-all duration-200 group"
+            className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-1.5 rounded-lg text-[13px] font-medium text-teal-100/70 hover:bg-[var(--sidebar-hover)] hover:text-white transition-all duration-200 group`}
+            title={sidebarCollapsed ? 'Bud TMP' : undefined}
           >
-            <ExternalLink className="h-[18px] w-[18px] text-teal-400/50 group-hover:text-teal-300" />
-            Bud TMP
+            <ExternalLink className="h-4 w-4 shrink-0 text-teal-400/50 group-hover:text-teal-300" />
+            {!sidebarCollapsed && 'Bud TMP'}
           </a>
           <Link
             to="/settings"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium text-teal-100/70 hover:bg-[var(--sidebar-hover)] hover:text-white transition-all duration-200 group"
+            className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-1.5 rounded-lg text-[13px] font-medium text-teal-100/70 hover:bg-[var(--sidebar-hover)] hover:text-white transition-all duration-200 group`}
+            title={sidebarCollapsed ? 'Settings' : undefined}
+            onClick={() => {
+              if (sidebarCollapsed && location.pathname !== '/settings') {
+                setSidebarCollapsed(false)
+              }
+            }}
           >
-            <Settings className="h-[18px] w-[18px] text-teal-400/50 group-hover:text-teal-300" />
-            Settings
+            <Settings className="h-4 w-4 shrink-0 text-teal-400/50 group-hover:text-teal-300" />
+            {!sidebarCollapsed && 'Settings'}
           </Link>
-          <div className="pt-2 pb-1 px-3 text-center">
-            <a href="https://www.embedlabs.de/en" target="_blank" rel="noopener noreferrer" className="text-[10px] text-teal-300/50 hover:text-teal-200 transition-colors">
-              by EmbedLabs
-            </a>
-            <p className="text-[10px] text-teal-300/30 mt-1">v{APP_VERSION}</p>
-          </div>
+          {!sidebarCollapsed && (
+            <div className="pt-2 pb-1 px-3 text-center">
+              <a href="https://www.embedlabs.de/en" target="_blank" rel="noopener noreferrer" className="text-xs text-teal-300/50 hover:text-teal-200 transition-colors">
+                by EmbedLabs
+              </a>
+              <p className="text-xs text-teal-300/30 mt-1">v{APP_VERSION}</p>
+            </div>
+          )}
         </div>
       </aside>
 
+      <button
+        type="button"
+        onClick={() => setSidebarCollapsed((c) => !c)}
+        className="fixed z-[35] top-4 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-md transition-[left,background-color,color,box-shadow] duration-200 hover:bg-accent hover:text-foreground dark:bg-card dark:hover:bg-accent"
+        style={{ left: sidebarCollapsed ? SIDEBAR_EDGE.collapsed : SIDEBAR_EDGE.expanded }}
+        aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        {sidebarCollapsed ? <ChevronRight className="h-4 w-4" strokeWidth={2.25} /> : <ChevronLeft className="h-4 w-4" strokeWidth={2.25} />}
+      </button>
+
       {/* Main content */}
-      <div className="flex-1 flex flex-col ml-64">
+      <div className={`flex-1 flex flex-col ${sidebarCollapsed ? 'ml-14' : 'ml-60'} transition-all duration-200`}>
         {/* Header */}
         <header className="glass border-b border-border sticky top-0 z-20">
-          <div className="px-6 py-3 flex items-center justify-between">
-            {/* Breadcrumbs */}
-            <div className="flex items-center gap-2 text-sm">
+          <div className="px-3 py-2 flex items-center gap-3 min-w-0">
+            {/* Breadcrumbs — extra left inset so seam toggle does not cover “Home” */}
+            <div className="flex min-w-0 shrink-0 items-center gap-2 overflow-x-auto overflow-y-hidden pl-6 text-sm">
               {breadcrumbs.map((crumb, i) => (
-                <div key={i} className="flex items-center gap-2">
+                <div key={i} className="flex items-center gap-2 shrink-0">
                   {i > 0 && <span className="text-muted-foreground/40">/</span>}
                   {crumb.href ? (
-                    <Link to={crumb.href} className="text-muted-foreground hover:text-foreground transition-colors">
+                    <Link to={crumb.href} className="text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
                       {crumb.label}
                     </Link>
                   ) : (
-                    <span className="text-foreground font-medium">{crumb.label}</span>
+                    <span className="text-foreground font-medium whitespace-nowrap">{crumb.label}</span>
                   )}
                 </div>
               ))}
             </div>
 
-            {/* Right side */}
-            <div className="flex items-center gap-3">
-              {/* Search */}
-              <div className="relative">
-                <button
-                  onClick={() => setSearchOpen(!searchOpen)}
-                  className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                >
-                  <Search className="h-4 w-4" />
-                </button>
-                {searchOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-80 bg-card border border-border rounded-lg shadow-elegant p-2 z-50">
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search requirements, test cases..."
-                      className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:border-ring"
-                      autoFocus
-                    />
-                  </div>
-                )}
+            {/* Inline search */}
+            <div className="flex-1 min-w-0 flex justify-center">
+              <div className="relative w-full max-w-sm">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+                <input
+                  ref={searchInputRef}
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search requirements, test cases..."
+                  title={`Focus search (${searchShortcutLabel})`}
+                  className="w-full rounded-md border border-input bg-background py-1.5 pl-9 pr-[5.25rem] text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+                <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 select-none text-[10px] font-medium text-muted-foreground" aria-hidden>
+                  <kbd className="inline-flex h-5 min-w-[2.75rem] items-center justify-center rounded border border-border bg-muted px-1.5 font-sans shadow-sm">
+                    {searchShortcutLabel}
+                  </kbd>
+                </span>
               </div>
+            </div>
 
+            {/* Right side */}
+            <div className="flex shrink-0 items-center gap-1.5">
               {/* Dark mode toggle */}
               <button
                 onClick={() => setDark(!dark)}
-                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               >
                 {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </button>
@@ -376,7 +469,7 @@ export default function Layout() {
           </div>
         </header>
 
-        <main className="flex-1 p-6 bg-background overflow-auto">
+        <main className="flex-1 p-4 bg-background overflow-auto">
           <Outlet />
         </main>
       </div>
@@ -384,11 +477,12 @@ export default function Layout() {
   )
 }
 
-function getBreadcrumbs(location: ReturnType<typeof useLocation>, projects: Array<{ id: number; name: string; prefix: string }>) {
+function getBreadcrumbs(location: ReturnType<typeof useLocation>, projects: Array<{ id: number; name: string; prefix: string }>, pageCrumbLabel?: string) {
   const TYPE_PAGE_TITLE: Record<string, string> = {
     REQ: 'Requirements', SPEC: 'Specifications', TC: 'Test Cases',
     DES: 'Design Items', RSK: 'Risks', CHG: 'Changes', TCO: 'Test Concepts',
     PROT: 'Protocols', RPT: 'Reports', STD: 'Standards',
+    DEF: 'Defects', CMP: 'Campaigns',
   }
   const path = location.pathname
   const crumbs: { label: string; href?: string }[] = [{ label: 'Home', href: '/' }]
@@ -425,16 +519,23 @@ function getBreadcrumbs(location: ReturnType<typeof useLocation>, projects: Arra
       'impact-analysis': 'Impact Analysis',
       parameters: 'Parameters',
       baselines: 'Baselines',
+      defects: 'Defects',
+      edit: 'Edit project',
     }
 
     if (sub === 'docs') {
-      const typeParam = new URLSearchParams(location.search).get('type')
-      const docLabel = typeParam ? (TYPE_PAGE_TITLE[typeParam] || 'Documents') : 'Documents'
+      const docTypeFromQuery = normalizeDocTypeParam(new URLSearchParams(location.search).get('type'))
+      const docTypeFromPath = parts[4] !== 'new' ? normalizeDocTypeParam(parts[4]) : null
+      const resolvedDocType = docTypeFromQuery ?? docTypeFromPath
+      const docLabel = resolvedDocType ? (TYPE_PAGE_TITLE[resolvedDocType] || 'Documents') : 'Documents'
+      const docsHref = resolvedDocType
+        ? `/projects/${slug}/docs?type=${DOC_TYPE_SLUGS[resolvedDocType]}`
+        : `/projects/${slug}/docs`
       if (parts[4] === 'new') {
-        crumbs.push({ label: docLabel, href: `/projects/${slug}/docs${typeParam ? '?type=' + typeParam : ''}` })
+        crumbs.push({ label: docLabel, href: docsHref })
         crumbs.push({ label: 'New' })
       } else if (parts[4] && parts[5]) {
-        crumbs.push({ label: docLabel, href: `/projects/${slug}/docs${typeParam ? '?type=' + typeParam : ''}` })
+        crumbs.push({ label: docLabel, href: docsHref })
         if (parts[6] === 'edit') {
           crumbs.push({ label: parts[5], href: `/projects/${slug}/docs/${parts[4]}/${parts[5]}` })
           crumbs.push({ label: 'Edit' })
@@ -446,10 +547,13 @@ function getBreadcrumbs(location: ReturnType<typeof useLocation>, projects: Arra
       }
     } else if (sub === 'campaigns' && parts[4]) {
       crumbs.push({ label: 'Campaigns', href: `/projects/${slug}/campaigns` })
-      crumbs.push({ label: 'Campaign Detail' })
+      crumbs.push({ label: pageCrumbLabel || parts[4] })
     } else if (sub === 'suites' && parts[4]) {
       crumbs.push({ label: 'Suites', href: `/projects/${slug}/campaigns` })
-      crumbs.push({ label: 'Suite Detail' })
+      crumbs.push({ label: pageCrumbLabel || parts[4] })
+    } else if (sub === 'defects' && parts[4]) {
+      crumbs.push({ label: 'Defects', href: `/projects/${slug}/docs?type=DEF` })
+      crumbs.push({ label: parts[4] })
     } else if (subMap[sub]) {
       crumbs.push({ label: subMap[sub] })
     }

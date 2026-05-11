@@ -8,6 +8,7 @@ import { createDefaultTcRows, normalizeTcsRows, type TcsRow } from '../utils/tcs
 import {
   docsApi, projectsApi, requirementsApi, testCasesApi, designsApi,
   risksApi, changesApi, testConceptsApi, documentsApi, usersApi, projectVariablesApi,
+  defectsApi,
 } from '../api/client'
 import type { DocType } from '../types/doc'
 import {
@@ -64,8 +65,9 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const normalizedDocId = docId.trim().toUpperCase()
   const expectedDocIdExample = project ? `${project.prefix}-${config.typeCode}-001` : `PRJ-${config.typeCode}-001`
   const docIdPattern = project ? new RegExp(`^${project.prefix}-${config.typeCode}-\\d{3}$`) : null
-  const docIdIsValid = editMode || (!!docIdPattern && docIdPattern.test(normalizedDocId))
-  const showDocIdError = !editMode && docId.length > 0 && !docIdIsValid
+  const serverAssignedId = docType === 'DEF'
+  const docIdIsValid = editMode || serverAssignedId || (!!docIdPattern && docIdPattern.test(normalizedDocId))
+  const showDocIdError = !editMode && !serverAssignedId && docId.length > 0 && !docIdIsValid
 
   const { data: users } = useQuery({
     queryKey: ['users'],
@@ -81,7 +83,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const apiForType = useCallback((type: DocType) => {
     const map: Record<string, unknown> = {
       REQ: requirementsApi, TC: testCasesApi, DES: designsApi,
-      RSK: risksApi, CHG: changesApi, TCO: testConceptsApi,
+      RSK: risksApi, CHG: changesApi, TCO: testConceptsApi, DEF: defectsApi,
       SPEC: documentsApi, PROT: documentsApi, RPT: documentsApi, STD: documentsApi,
     }
     return map[type]
@@ -139,6 +141,15 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           content_html: contentHtml,
         })
       }
+      if (docType === 'DEF') {
+        return defectsApi.create({
+          project_id: projectId,
+          title,
+          description: metadata.description || undefined,
+          severity: metadata.severity || undefined,
+          priority: metadata.priority || undefined,
+        })
+      }
       const payload: Record<string, unknown> = {
         project_id: projectId,
         [config.idField]: normalizedDocId,
@@ -157,6 +168,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       queryClient.invalidateQueries({ queryKey: ['risks', projectId] })
       queryClient.invalidateQueries({ queryKey: ['changes', projectId] })
       queryClient.invalidateQueries({ queryKey: ['test-concepts', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['defects', projectId] })
       queryClient.invalidateQueries({ queryKey: ['documents', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project-by-prefix', prefix] })
 
@@ -164,6 +176,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       const docIdFieldMap: Record<string, string> = {
         REQ: 'req_id', TC: 'tc_id', DES: 'design_id',
         RSK: 'risk_id', CHG: 'change_id', TCO: 'concept_id',
+        DEF: 'defect_id',
         SPEC: 'doc_id', PROT: 'doc_id', RPT: 'doc_id', STD: 'doc_id',
       }
       const newDocId = record[docIdFieldMap[docType]] || record.id
@@ -305,6 +318,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                     <span className="text-xs font-mono text-muted-foreground">
                       {editDocFacade?.doc_id || docIdStr}
                     </span>
+                  ) : serverAssignedId ? (
+                    <span className="text-xs font-mono text-muted-foreground">Auto-assigned</span>
                   ) : (
                     <input
                       type="text"
@@ -324,7 +339,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                 {metadata.status || config.statusOptions[0]}
               </span>
             </div>
-            {!editMode && (
+            {!editMode && !serverAssignedId && (
               <p className={`mb-3 text-xs ${showDocIdError ? 'text-red-600' : 'text-muted-foreground'}`}>
                 {showDocIdError ? `ID must match ${expectedDocIdExample}.` : 'Set the controlled item ID before creating.'}
               </p>
