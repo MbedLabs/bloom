@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { docCreateUrl, getAllowedDocLinkRoles, getDocLinkOptions, getDocLinkRoleLabel, normalizeDocTypeParam } from '../types/doc'
+import { docCreateUrl, docListUrl, getAllowedDocLinkRoles, getDocLinkOptions, getDocLinkRoleLabel, normalizeDocTypeParam } from '../types/doc'
 
 describe('docCreateUrl', () => {
   it('uses normalized kind slugs in create routes', () => {
@@ -64,6 +64,18 @@ describe('getAllowedDocLinkRoles', () => {
 
   it('returns no roles for unknown document kinds', () => {
     expect(getAllowedDocLinkRoles('REQ', 'UNKNOWN' as never)).toEqual([])
+  })
+})
+
+describe('docListUrl', () => {
+  it('builds typed list URLs with slugs', () => {
+    expect(docListUrl('VCU', 'REQ')).toBe('/projects/VCU/docs?type=requirements')
+    expect(docListUrl('VCU', 'CMP')).toBe('/projects/VCU/docs?type=campaigns')
+    expect(docListUrl('VCU', 'TS')).toBe('/projects/VCU/docs?type=test-suites')
+  })
+
+  it('appends extra search params', () => {
+    expect(docListUrl('VCU', 'REQ', 'sort=doc_id&dir=asc')).toBe('/projects/VCU/docs?type=requirements&sort=doc_id&dir=asc')
   })
 })
 

@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { APP_VERSION, projectsApi } from '../api/client'
-import { normalizeDocTypeParam, DOC_TYPE_SLUGS } from '../types/doc'
+import { normalizeDocTypeParam } from '../types/doc'
+import { docRegistryListUrl } from '../lib/docRegistryParams'
 import { useAuth } from '../contexts/AuthContext'
 import { PageMetaProvider, usePageMeta } from '../contexts/PageMetaContext'
 import {
@@ -63,7 +64,7 @@ const projectNav = [
   { name: 'Changes', icon: GitPullRequest, tab: '', href: 'docs' as const, filter: 'type:CHG' },
   { name: 'Test Concepts', icon: Beaker, tab: '', href: 'docs' as const, filter: 'type:TCO' },
   { name: 'Defects', icon: Bug, tab: '', href: 'docs' as const, filter: 'type:DEF' },
-  { name: 'Test Campaigns', icon: FlaskConical, tab: '', href: 'campaigns' as const },
+  { name: 'Test Campaigns', icon: FlaskConical, tab: '', href: 'docs' as const, filter: 'type:CMP' },
   { name: 'Traceability', icon: GitBranch, tab: '', href: 'traceability' as const },
   { name: 'Parameters', icon: SlidersHorizontal, tab: '', href: 'parameters' as const },
 ]
@@ -274,7 +275,9 @@ function LayoutInner() {
                   to = `/projects/${projSlug}?tab=${item.tab}`
                 } else if ('filter' in item && item.filter) {
                   const typeVal = item.filter.replace('type:', '')
-                  to = `/projects/${projSlug}/${item.href}?type=${encodeURIComponent(typeVal)}`
+                  to = docRegistryListUrl(projSlug, typeVal as import('../types/doc').DocType)
+                } else if ('href' in item && item.href === 'docs') {
+                  to = docRegistryListUrl(projSlug)
                 } else if ('href' in item) {
                   to = `/projects/${projSlug}/${item.href}`
                 }
@@ -378,7 +381,7 @@ function LayoutInner() {
       </button>
 
       {/* Main content */}
-      <div className={`flex-1 flex flex-col ${sidebarCollapsed ? 'ml-14' : 'ml-60'} transition-all duration-200`}>
+      <div className={`flex-1 flex flex-col min-w-0 ${sidebarCollapsed ? 'ml-14' : 'ml-60'} transition-all duration-200`}>
         {/* Header */}
         <header className="glass border-b border-border sticky top-0 z-20">
           <div className="px-3 py-2 flex items-center gap-3 min-w-0">
@@ -529,8 +532,8 @@ function getBreadcrumbs(location: ReturnType<typeof useLocation>, projects: Arra
       const resolvedDocType = docTypeFromQuery ?? docTypeFromPath
       const docLabel = resolvedDocType ? (TYPE_PAGE_TITLE[resolvedDocType] || 'Documents') : 'Documents'
       const docsHref = resolvedDocType
-        ? `/projects/${slug}/docs?type=${DOC_TYPE_SLUGS[resolvedDocType]}`
-        : `/projects/${slug}/docs`
+        ? docRegistryListUrl(slug, resolvedDocType)
+        : docRegistryListUrl(slug)
       if (parts[4] === 'new') {
         crumbs.push({ label: docLabel, href: docsHref })
         crumbs.push({ label: 'New' })
@@ -546,14 +549,11 @@ function getBreadcrumbs(location: ReturnType<typeof useLocation>, projects: Arra
         crumbs.push({ label: docLabel })
       }
     } else if (sub === 'campaigns' && parts[4]) {
-      crumbs.push({ label: 'Campaigns', href: `/projects/${slug}/campaigns` })
+      crumbs.push({ label: 'Campaigns', href: docRegistryListUrl(slug, 'CMP') })
       crumbs.push({ label: pageCrumbLabel || parts[4] })
     } else if (sub === 'suites' && parts[4]) {
-      crumbs.push({ label: 'Suites', href: `/projects/${slug}/campaigns` })
+      crumbs.push({ label: 'Suites', href: docRegistryListUrl(slug, 'CMP') })
       crumbs.push({ label: pageCrumbLabel || parts[4] })
-    } else if (sub === 'defects' && parts[4]) {
-      crumbs.push({ label: 'Defects', href: `/projects/${slug}/docs?type=DEF` })
-      crumbs.push({ label: parts[4] })
     } else if (subMap[sub]) {
       crumbs.push({ label: subMap[sub] })
     }

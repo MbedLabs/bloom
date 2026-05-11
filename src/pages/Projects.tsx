@@ -238,9 +238,7 @@ function ProjectCard({
   onEdit: () => void
 }) {
   const navigate = useNavigate()
-  const coverage = project.requirement_count > 0
-    ? Math.min(100, Math.round((project.test_case_count / project.requirement_count) * 100))
-    : 0
+  const coverage = Math.round(project.coverage_percent)
 
   return (
     <div

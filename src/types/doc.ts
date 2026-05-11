@@ -1,4 +1,4 @@
-export type DocType = 'REQ' | 'SPEC' | 'TC' | 'DES' | 'RSK' | 'CHG' | 'TCO' | 'DEF' | 'CMP' | 'PROT' | 'RPT' | 'STD'
+export type DocType = 'REQ' | 'SPEC' | 'TC' | 'DES' | 'RSK' | 'CHG' | 'TCO' | 'DEF' | 'CMP' | 'TS' | 'PROT' | 'RPT' | 'STD'
 export type DocLinkRole =
   | 'derives_from'
   | 'refines'
@@ -187,6 +187,19 @@ export const DOC_CONFIGS: Record<DocType, DocConfig> = {
       { key: 'description', label: 'Description', type: 'textarea' },
     ],
   },
+  TS: {
+    label: 'Test Suite',
+    typeCode: 'TS',
+    apiBase: 'test-suites',
+    idField: 'suite_id',
+    titleField: 'name',
+    descriptionField: 'description',
+    statusOptions: ['Draft', 'Review', 'Approved'],
+    fields: [
+      { key: 'name', label: 'Name', type: 'text', required: true },
+      { key: 'description', label: 'Description', type: 'textarea' },
+    ],
+  },
   SPEC: {
     label: 'Specification',
     typeCode: 'SPEC',
@@ -257,6 +270,7 @@ export const DOC_TYPE_LABELS: Record<DocType, string> = {
   TCO: 'Test Concept',
   DEF: 'Defect',
   CMP: 'Campaign',
+  TS: 'Test Suite',
   PROT: 'Protocol',
   RPT: 'Report',
   STD: 'External Standard',
@@ -272,6 +286,7 @@ export const DOC_TYPE_COLORS: Record<DocType, string> = {
   TCO: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
   DEF: 'bg-rose-500/10 text-rose-700 dark:text-rose-400',
   CMP: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
+  TS: 'bg-lime-500/10 text-lime-700 dark:text-lime-400',
   PROT: 'bg-teal-500/10 text-teal-700 dark:text-teal-400',
   RPT: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
   STD: 'bg-orange-500/10 text-orange-700 dark:text-orange-400',
@@ -287,6 +302,7 @@ export const DOC_TYPE_SLUGS: Record<DocType, string> = {
   TCO: 'test-concepts',
   DEF: 'defects',
   CMP: 'campaigns',
+  TS: 'test-suites',
   PROT: 'protocols',
   RPT: 'reports',
   STD: 'standards',
@@ -408,6 +424,12 @@ export function docEditUrl(prefix: string | undefined, docType: DocType, docId: 
 export function docCreateUrl(prefix: string | undefined, docType: DocType): string {
   const slug = DOC_TYPE_SLUGS[docType]
   return `/projects/${prefix}/docs/new?type=${slug}`
+}
+
+export function docListUrl(prefix: string | undefined, docType: DocType, extraSearch?: string): string {
+  const slug = DOC_TYPE_SLUGS[docType]
+  const base = `/projects/${prefix}/docs?type=${slug}`
+  return extraSearch ? `${base}&${extraSearch}` : base
 }
 
 export function kindSlugToType(slug: string): DocType | null {

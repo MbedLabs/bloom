@@ -36,7 +36,6 @@ function docKey(type: string, id: number) {
 
 function targetUrl(prefix: string, type: DocType, target: LinkTarget | undefined): string {
   if (!target) return '#'
-  if (type === 'CMP') return `/projects/${prefix}/campaigns/${target.id}`
   return docUrl(prefix, type, target.doc_id)
 }
 

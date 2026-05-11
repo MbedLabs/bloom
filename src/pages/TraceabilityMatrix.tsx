@@ -242,6 +242,7 @@ export default function TraceabilityMatrix() {
         </div>
       ) : (
         <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-border">
             <thead className="bg-muted/50">
               <tr>
@@ -329,6 +330,7 @@ export default function TraceabilityMatrix() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

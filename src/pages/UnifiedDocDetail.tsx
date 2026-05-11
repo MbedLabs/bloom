@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { docsApi } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
@@ -6,6 +6,8 @@ import RequirementDetail from './RequirementDetail'
 import TestCaseDetail from './TestCaseDetail'
 import DocumentDetail from './DocumentDetail'
 import ArtefactDetail from './ArtefactDetail'
+import CampaignDetail from './CampaignDetail'
+import SuiteDetail from './SuiteDetail'
 
 export default function UnifiedDocDetail() {
   const { prefix, kind, docId } = useParams<{ prefix: string; kind: string; docId: string }>()
@@ -27,6 +29,9 @@ export default function UnifiedDocDetail() {
         <div className="text-center">
           <h3 className="text-lg font-semibold text-foreground mb-2">Document not found</h3>
           <p className="text-sm text-muted-foreground">Could not find document &quot;{docId}&quot; in project {prefix}</p>
+          <Link to={`/projects/${prefix}/docs${kind ? `?type=${kind}` : ''}`} className="mt-4 inline-block text-primary hover:text-primary/80">
+            &larr; Back to Documents
+          </Link>
         </div>
       </div>
     )
@@ -52,6 +57,10 @@ export default function UnifiedDocDetail() {
       return <ArtefactDetail kind="test-concept" resolvedId={doc.id} />
     case 'DEF':
       return <ArtefactDetail kind="defect" resolvedId={doc.id} />
+    case 'CMP':
+      return <CampaignDetail resolvedId={doc.id} />
+    case 'TS':
+      return <SuiteDetail resolvedId={doc.id} />
     default:
       return <div className="text-center py-16 text-muted-foreground">Unknown document type: {doc.doc_type}</div>
   }

@@ -18,6 +18,7 @@ import {
 
 import { defectsApi, docsApi, projectsApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
+import { docRegistryListUrl } from '../lib/docRegistryParams'
 import ProjectDocTopology from '../components/ProjectDocTopology'
 
 const OPEN_DEFECT_STATUSES = new Set(['Open', 'Triaged', 'In Progress', 'Resolved', 'Verified'])
@@ -35,8 +36,8 @@ const LEGACY_TAB_ROUTES: Record<string, string> = {
   'changes': 'docs?type=CHG',
   'test-concepts': 'docs?type=TCO',
   'traceability': 'traceability',
-  'defects': 'defects',
-  'campaigns': 'campaigns',
+  'defects': 'docs?type=DEF',
+  'campaigns': 'docs?type=CMP',
 }
 
 function Beaker(props: { className?: string }) {
@@ -114,18 +115,18 @@ export default function ProjectDetail() {
   }
 
   const navItems: NavItem[] = [
-    { label: 'Requirements', icon: FileText, to: `/projects/${prefix}/docs?type=REQ` },
-    { label: 'Test Cases', icon: CheckCircle, to: `/projects/${prefix}/docs?type=TC` },
-    { label: 'Specifications', icon: BookOpen, to: `/projects/${prefix}/docs?type=SPEC` },
-    { label: 'Protocols', icon: BookOpen, to: `/projects/${prefix}/docs?type=PROT` },
-    { label: 'Reports', icon: BookOpen, to: `/projects/${prefix}/docs?type=RPT` },
-    { label: 'Standards', icon: BookOpen, to: `/projects/${prefix}/docs?type=STD` },
-    { label: 'Design', icon: PenTool, to: `/projects/${prefix}/docs?type=DES` },
-    { label: 'Risks', icon: AlertTriangle, to: `/projects/${prefix}/docs?type=RSK` },
-    { label: 'Changes', icon: GitPullRequest, to: `/projects/${prefix}/docs?type=CHG` },
-    { label: 'Test Concepts', icon: Beaker, to: `/projects/${prefix}/docs?type=TCO` },
-    { label: 'Campaigns', icon: FlaskConical, to: `/projects/${prefix}/campaigns` },
-    { label: 'Defects', icon: Bug, to: `/projects/${prefix}/docs?type=DEF` },
+    { label: 'Requirements', icon: FileText, to: docRegistryListUrl(prefix!, 'REQ') },
+    { label: 'Test Cases', icon: CheckCircle, to: docRegistryListUrl(prefix!, 'TC') },
+    { label: 'Specifications', icon: BookOpen, to: docRegistryListUrl(prefix!, 'SPEC') },
+    { label: 'Protocols', icon: BookOpen, to: docRegistryListUrl(prefix!, 'PROT') },
+    { label: 'Reports', icon: BookOpen, to: docRegistryListUrl(prefix!, 'RPT') },
+    { label: 'Standards', icon: BookOpen, to: docRegistryListUrl(prefix!, 'STD') },
+    { label: 'Design', icon: PenTool, to: docRegistryListUrl(prefix!, 'DES') },
+    { label: 'Risks', icon: AlertTriangle, to: docRegistryListUrl(prefix!, 'RSK') },
+    { label: 'Changes', icon: GitPullRequest, to: docRegistryListUrl(prefix!, 'CHG') },
+    { label: 'Test Concepts', icon: Beaker, to: docRegistryListUrl(prefix!, 'TCO') },
+    { label: 'Campaigns', icon: FlaskConical, to: docRegistryListUrl(prefix!, 'CMP') },
+    { label: 'Defects', icon: Bug, to: docRegistryListUrl(prefix!, 'DEF') },
     { label: 'Traceability', icon: GitBranch, to: `/projects/${prefix}/traceability` },
   ]
 
@@ -158,16 +159,16 @@ export default function ProjectDetail() {
 
       {/* Summary tiles */}
       <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-2.5">
-        <SummaryTile label="Requirements" value={project.requirement_count} to={`/projects/${prefix}/docs?type=REQ`} />
-        <SummaryTile label="Test Cases" value={project.test_case_count} to={`/projects/${prefix}/docs?type=TC`} />
-        <SummaryTile label="Specifications" value={specCount} to={`/projects/${prefix}/docs?type=SPEC`} />
-        <SummaryTile label="Design" value={project.design_count} to={`/projects/${prefix}/docs?type=DES`} />
-        <SummaryTile label="Risks" value={project.risk_count} to={`/projects/${prefix}/docs?type=RSK`} />
-        <SummaryTile label="Changes" value={project.change_count} to={`/projects/${prefix}/docs?type=CHG`} />
+        <SummaryTile label="Requirements" value={project.requirement_count} to={docRegistryListUrl(prefix!, 'REQ')} />
+        <SummaryTile label="Test Cases" value={project.test_case_count} to={docRegistryListUrl(prefix!, 'TC')} />
+        <SummaryTile label="Specifications" value={specCount} to={docRegistryListUrl(prefix!, 'SPEC')} />
+        <SummaryTile label="Design" value={project.design_count} to={docRegistryListUrl(prefix!, 'DES')} />
+        <SummaryTile label="Risks" value={project.risk_count} to={docRegistryListUrl(prefix!, 'RSK')} />
+        <SummaryTile label="Changes" value={project.change_count} to={docRegistryListUrl(prefix!, 'CHG')} />
           <SummaryTile
             label="Defects"
             value={defects?.length ?? project.defect_count}
-            to={`/projects/${prefix}/docs?type=DEF`}
+            to={docRegistryListUrl(prefix!, 'DEF')}
             accent={openDefectCount > 0 ? 'warning' : undefined}
             labelMeta={
               closedDefectCount != null ? (
