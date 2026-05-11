@@ -344,7 +344,7 @@ export function DocumentLinksPanel({
     ;(campaigns || []).forEach((campaign) =>
       items.push({
         id: campaign.id,
-        doc_id: `CMP-${campaign.id}`,
+        doc_id: campaign.campaign_id,
         doc_type: 'CMP',
         title: campaign.name,
         status: campaign.status,

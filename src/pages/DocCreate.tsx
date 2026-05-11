@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useSearchParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, PanelRightOpen, PanelRightClose } from 'lucide-react'
 import { DocEditor } from '../components/editor'
@@ -8,7 +8,7 @@ import { createDefaultTcRows, normalizeTcsRows, type TcsRow } from '../utils/tcs
 import {
   docsApi, projectsApi, requirementsApi, testCasesApi, designsApi,
   risksApi, changesApi, testConceptsApi, documentsApi, usersApi, projectVariablesApi,
-  defectsApi,
+  defectsApi, campaignsApi, testSuitesApi,
 } from '../api/client'
 import type { DocType } from '../types/doc'
 import {
@@ -19,6 +19,7 @@ import {
   normalizeDocTypeParam,
 } from '../types/doc'
 import { useAuth } from '../contexts/AuthContext'
+import { docRegistryBackUrl, docRegistryListLabel } from '../lib/docRegistryParams'
 
 interface DocCreateProps {
   editMode?: boolean
@@ -26,6 +27,7 @@ interface DocCreateProps {
 
 export default function DocCreate({ editMode = false }: DocCreateProps) {
   const { user } = useAuth()
+  const location = useLocation()
   const { prefix, kind, docId: docIdStr } = useParams<{ prefix: string; kind?: string; docId: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -35,7 +37,6 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const requestedDocType = rawRequestedDocType in DOC_CONFIGS ? rawRequestedDocType : 'REQ'
 
   const [title, setTitle] = useState('')
-  const [docId, setDocId] = useState('')
   const [contentJson, setContentJson] = useState<Record<string, unknown> | null>(null)
   const [contentHtml, setContentHtml] = useState('')
   const [tcRows, setTcRows] = useState<TcsRow[]>(() => requestedDocType === 'TC' && !editMode ? createDefaultTcRows() : [])
@@ -60,14 +61,15 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
 
   const docType = ((editMode && editDocFacade?.doc_type) || requestedDocType) as DocType
   const config = DOC_CONFIGS[docType]
+  const returnToRaw = (location.state as { returnTo?: string } | null)?.returnTo
+  const listBackUrl =
+    prefix ? docRegistryBackUrl(prefix, docType, returnToRaw ?? null) : '/projects'
+  const backNavLabel =
+    typeof returnToRaw === 'string' && returnToRaw.trim() !== ''
+      ? 'Back'
+      : `Back to ${docRegistryListLabel(docType)}`
   const resolvedDocId = editMode ? editDocFacade?.id : undefined
   const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
-  const normalizedDocId = docId.trim().toUpperCase()
-  const expectedDocIdExample = project ? `${project.prefix}-${config.typeCode}-001` : `PRJ-${config.typeCode}-001`
-  const docIdPattern = project ? new RegExp(`^${project.prefix}-${config.typeCode}-\\d{3}$`) : null
-  const serverAssignedId = docType === 'DEF'
-  const docIdIsValid = editMode || serverAssignedId || (!!docIdPattern && docIdPattern.test(normalizedDocId))
-  const showDocIdError = !editMode && !serverAssignedId && docId.length > 0 && !docIdIsValid
 
   const { data: users } = useQuery({
     queryKey: ['users'],
@@ -85,6 +87,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       REQ: requirementsApi, TC: testCasesApi, DES: designsApi,
       RSK: risksApi, CHG: changesApi, TCO: testConceptsApi, DEF: defectsApi,
       SPEC: documentsApi, PROT: documentsApi, RPT: documentsApi, STD: documentsApi,
+      CMP: campaignsApi, TS: testSuitesApi,
     }
     return map[type]
   }, [])
@@ -94,7 +97,6 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
     const api = apiForType(docType) as unknown as { get: (id: number) => Promise<Record<string, unknown>> }
     api.get(resolvedDocId).then((data) => {
       setTitle((data[config.titleField] as string) || '')
-      setDocId((data[config.idField] as string) || '')
       if (data.content_json) setContentJson(data.content_json as Record<string, unknown>)
       if (data.content_html) setContentHtml(data.content_html as string)
       if (docType === 'TC') setTcRows(normalizeTcsRows(data.steps))
@@ -121,7 +123,6 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       if (docType === 'TC') {
         return testCasesApi.create({
           project_id: projectId,
-          tc_id: normalizedDocId,
           title,
           description: metadata.description || undefined,
           preconditions: metadata.preconditions || undefined,
@@ -133,7 +134,6 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       if (docType === 'SPEC' || docType === 'PROT' || docType === 'RPT' || docType === 'STD') {
         return (api as typeof documentsApi).create({
           project_id: projectId,
-          doc_id: normalizedDocId,
           title,
           doc_type: docType,
           description: metadata.description,
@@ -150,9 +150,23 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           priority: metadata.priority || undefined,
         })
       }
+      if (docType === 'CMP') {
+        return campaignsApi.create({
+          project_id: projectId,
+          name: title,
+          description: metadata.description || undefined,
+        })
+      }
+      if (docType === 'TS') {
+        return testSuitesApi.create({
+          project_id: projectId,
+          name: title,
+          description: metadata.description || undefined,
+          status: metadata.status || 'Draft',
+        })
+      }
       const payload: Record<string, unknown> = {
         project_id: projectId,
-        [config.idField]: normalizedDocId,
         [config.titleField]: title,
         content_json: contentJson,
         content_html: contentHtml,
@@ -170,6 +184,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       queryClient.invalidateQueries({ queryKey: ['test-concepts', projectId] })
       queryClient.invalidateQueries({ queryKey: ['defects', projectId] })
       queryClient.invalidateQueries({ queryKey: ['documents', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['campaigns', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['test-suites', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project-by-prefix', prefix] })
 
       const record = data as Record<string, unknown>
@@ -178,6 +194,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
         RSK: 'risk_id', CHG: 'change_id', TCO: 'concept_id',
         DEF: 'defect_id',
         SPEC: 'doc_id', PROT: 'doc_id', RPT: 'doc_id', STD: 'doc_id',
+        CMP: 'campaign_id', TS: 'suite_id',
       }
       const newDocId = record[docIdFieldMap[docType]] || record.id
       navigate(docUrl(prefix!, docType, String(newDocId)))
@@ -195,6 +212,20 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           steps: tcRows.length > 0 ? tcRows : null,
           status: metadata.status || config.statusOptions[0],
           reviewer_id: metadata.reviewer_id ? Number(metadata.reviewer_id) : null,
+        })
+      }
+      if (docType === 'CMP') {
+        return campaignsApi.update(resolvedDocId, {
+          name: title,
+          description: metadata.description || undefined,
+          status: metadata.status || undefined,
+        })
+      }
+      if (docType === 'TS') {
+        return testSuitesApi.update(resolvedDocId, {
+          name: title,
+          description: metadata.description || undefined,
+          status: metadata.status || undefined,
         })
       }
       const api = apiForType(docType) as unknown as { update: (id: number, data: Record<string, unknown>) => Promise<Record<string, unknown>> }
@@ -217,7 +248,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   }, [])
 
   const handleSave = () => {
-    if (!editMode && !docIdIsValid) return
+    if (!title.trim()) return
 
     if (editMode) {
       updateMutation.mutate()
@@ -245,11 +276,11 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           <h3 className="text-lg font-semibold text-foreground mb-2">You do not have edit access</h3>
           <p className="text-sm text-muted-foreground mb-4">Only admins and maintainers can create or edit documents.</p>
           <Link
-            to={prefix ? `/projects/${prefix}` : '/projects'}
+            to={listBackUrl}
             className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back
+            {backNavLabel}
           </Link>
         </div>
       </div>
@@ -262,18 +293,18 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-card shrink-0">
         <div className="flex items-center gap-3">
           <Link
-            to={`/projects/${prefix}`}
+            to={listBackUrl}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to project
+            {backNavLabel}
           </Link>
           <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${DOC_TYPE_COLORS[docType]}`}>
             {DOC_TYPE_LABELS[docType]}
           </span>
-          {project && (
+          {project && !editMode && (
             <span className="text-xs text-muted-foreground">
-              {expectedDocIdExample}
+              ID assigned on save
             </span>
           )}
         </div>
@@ -286,14 +317,14 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
             {sidebarOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
           </button>
           <button
-            onClick={() => navigate(`/projects/${prefix}`)}
+            onClick={() => navigate(listBackUrl)}
             className="px-3 py-1.5 text-sm text-muted-foreground border border-border rounded-md hover:bg-accent transition-colors"
           >
             Discard
           </button>
           <button
             onClick={handleSave}
-            disabled={!title.trim() || !docIdIsValid || isPending}
+            disabled={!title.trim() || isPending}
             className="px-4 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
             {isPending ? 'Saving...' : editMode ? 'Save' : 'Create'}
@@ -318,20 +349,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                     <span className="text-xs font-mono text-muted-foreground">
                       {editDocFacade?.doc_id || docIdStr}
                     </span>
-                  ) : serverAssignedId ? (
-                    <span className="text-xs font-mono text-muted-foreground">Auto-assigned</span>
                   ) : (
-                    <input
-                      type="text"
-                      value={docId}
-                      onChange={(event) => setDocId(event.target.value.toUpperCase())}
-                      placeholder={expectedDocIdExample}
-                      className={`w-40 rounded-md border bg-background px-2 py-1 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring ${
-                        showDocIdError ? 'border-red-500/70' : 'border-input'
-                      }`}
-                      aria-invalid={showDocIdError}
-                      maxLength={12}
-                    />
+                    <span className="text-xs font-mono text-muted-foreground">Auto-assigned</span>
                   )}
                 </>
               )}
@@ -339,11 +358,6 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                 {metadata.status || config.statusOptions[0]}
               </span>
             </div>
-            {!editMode && !serverAssignedId && (
-              <p className={`mb-3 text-xs ${showDocIdError ? 'text-red-600' : 'text-muted-foreground'}`}>
-                {showDocIdError ? `ID must match ${expectedDocIdExample}.` : 'Set the controlled item ID before creating.'}
-              </p>
-            )}
 
             {/* Title inside the document frame */}
             <input

@@ -11,7 +11,7 @@ import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
 import { normalizeTcsRows } from '../utils/tcs'
 import { Pencil, UserCheck, UserCog } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
-import { docEditUrl } from '../types/doc'
+import { docEditUrl, docUrl } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocDetailShell, { MetaItem, SectionCard } from '../components/DocDetailShell'
 import { useAuth } from '../contexts/AuthContext'
@@ -247,10 +247,17 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
         emptyText="This test case is not included in any campaign scope yet."
       >
         {testCase.campaign_memberships?.map((campaign) => (
-          <div key={campaign.id} className="px-6 py-4 flex items-center justify-between">
-            <div className="text-foreground">{campaign.name}</div>
+          <Link
+            key={campaign.id}
+            to={docUrl(prefix!, 'CMP', campaign.campaign_id)}
+            className="px-6 py-4 flex items-center justify-between hover:bg-accent/40"
+          >
+            <div>
+              <div className="font-mono text-xs text-primary">{campaign.campaign_id}</div>
+              <div className="text-foreground mt-1">{campaign.name}</div>
+            </div>
             <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">{campaign.status}</span>
-          </div>
+          </Link>
         ))}
       </MembershipPanel>
     </DocDetailShell>

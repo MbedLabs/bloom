@@ -3,7 +3,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { APP_VERSION, projectsApi } from '../api/client'
 import { normalizeDocTypeParam } from '../types/doc'
-import { docRegistryListUrl } from '../lib/docRegistryParams'
+import { docRegistryListUrl, syncRegistryProjectContext } from '../lib/docRegistryParams'
 import { useAuth } from '../contexts/AuthContext'
 import { PageMetaProvider, usePageMeta } from '../contexts/PageMetaContext'
 import {
@@ -52,21 +52,21 @@ const mainNav = [
 ]
 
 const projectNav = [
-  { name: 'Documents', icon: BookOpen, tab: '', href: 'docs' as const },
-  { name: 'Requirements', icon: FileText, tab: '', href: 'docs' as const, filter: 'type:REQ' },
-  { name: 'Test Cases', icon: CheckSquare, tab: '', href: 'docs' as const, filter: 'type:TC' },
-  { name: 'Specifications', icon: FileText, tab: '', href: 'docs' as const, filter: 'type:SPEC' },
-  { name: 'Protocols', icon: BookOpen, tab: '', href: 'docs' as const, filter: 'type:PROT' },
-  { name: 'Reports', icon: Layers, tab: '', href: 'docs' as const, filter: 'type:RPT' },
-  { name: 'Standards', icon: BookOpen, tab: '', href: 'docs' as const, filter: 'type:STD' },
-  { name: 'Design', icon: PenTool, tab: '', href: 'docs' as const, filter: 'type:DES' },
-  { name: 'Risks', icon: AlertTriangle, tab: '', href: 'docs' as const, filter: 'type:RSK' },
-  { name: 'Changes', icon: GitPullRequest, tab: '', href: 'docs' as const, filter: 'type:CHG' },
-  { name: 'Test Concepts', icon: Beaker, tab: '', href: 'docs' as const, filter: 'type:TCO' },
-  { name: 'Defects', icon: Bug, tab: '', href: 'docs' as const, filter: 'type:DEF' },
-  { name: 'Test Campaigns', icon: FlaskConical, tab: '', href: 'docs' as const, filter: 'type:CMP' },
-  { name: 'Traceability', icon: GitBranch, tab: '', href: 'traceability' as const },
-  { name: 'Parameters', icon: SlidersHorizontal, tab: '', href: 'parameters' as const },
+  { name: 'Documents', icon: BookOpen, href: 'docs' as const },
+  { name: 'Requirements', icon: FileText, href: 'docs' as const, filter: 'type:REQ' },
+  { name: 'Test Cases', icon: CheckSquare, href: 'docs' as const, filter: 'type:TC' },
+  { name: 'Specifications', icon: FileText, href: 'docs' as const, filter: 'type:SPEC' },
+  { name: 'Protocols', icon: BookOpen, href: 'docs' as const, filter: 'type:PROT' },
+  { name: 'Reports', icon: Layers, href: 'docs' as const, filter: 'type:RPT' },
+  { name: 'Standards', icon: BookOpen, href: 'docs' as const, filter: 'type:STD' },
+  { name: 'Design', icon: PenTool, href: 'docs' as const, filter: 'type:DES' },
+  { name: 'Risks', icon: AlertTriangle, href: 'docs' as const, filter: 'type:RSK' },
+  { name: 'Changes', icon: GitPullRequest, href: 'docs' as const, filter: 'type:CHG' },
+  { name: 'Test Concepts', icon: Beaker, href: 'docs' as const, filter: 'type:TCO' },
+  { name: 'Defects', icon: Bug, href: 'docs' as const, filter: 'type:DEF' },
+  { name: 'Test Campaigns', icon: FlaskConical, href: 'docs' as const, filter: 'type:CMP' },
+  { name: 'Traceability', icon: GitBranch, href: 'traceability' as const },
+  { name: 'Parameters', icon: SlidersHorizontal, href: 'parameters' as const },
 ]
 
 function Beaker(props: { className?: string }) {
@@ -141,6 +141,10 @@ function LayoutInner() {
 
   const isInProject = location.pathname.startsWith('/projects/')
   const currentProjectSlug = isInProject ? location.pathname.split('/')[2] : null
+
+  useEffect(() => {
+    syncRegistryProjectContext(currentProjectSlug)
+  }, [currentProjectSlug])
   const currentProjectName = currentProjectSlug
     ? projects?.find((p) => p.prefix === currentProjectSlug || String(p.id) === currentProjectSlug)?.name || currentProjectSlug
     : null
@@ -271,9 +275,7 @@ function LayoutInner() {
               {projectNav.map((item) => {
                 const projSlug = location.pathname.split('/')[2]
                 let to = ''
-                if (item.tab) {
-                  to = `/projects/${projSlug}?tab=${item.tab}`
-                } else if ('filter' in item && item.filter) {
+                if ('filter' in item && item.filter) {
                   const typeVal = item.filter.replace('type:', '')
                   to = docRegistryListUrl(projSlug, typeVal as import('../types/doc').DocType)
                 } else if ('href' in item && item.href === 'docs') {
