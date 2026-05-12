@@ -291,6 +291,19 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
         )}
       </div>
 
+      {/* Configuration */}
+      {campaign.configuration && (
+        <div className="bg-card rounded-lg shadow-elegant p-5">
+          <h3 className="text-sm font-medium text-muted-foreground mb-2">Configuration</h3>
+          <div className="flex items-center space-x-4 text-sm">
+            <span className="text-foreground font-medium">{campaign.configuration.name}</span>
+            {campaign.configuration.environment && (
+              <span className="px-2 py-0.5 bg-muted rounded text-xs text-muted-foreground">{campaign.configuration.environment}</span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Linked documents */}
       <DocumentLinksPanel
         projectId={campaign.project_id}

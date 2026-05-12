@@ -46,6 +46,7 @@ const configs = {
     docType: 'DES' as DocType,
     queryKey: 'design',
     listKey: 'designs',
+    tabKey: 'design',
     idField: 'design_id',
     titleField: 'title',
     descriptionField: 'description',
@@ -64,6 +65,7 @@ const configs = {
     docType: 'RSK' as DocType,
     queryKey: 'risk',
     listKey: 'risks',
+    tabKey: 'risks',
     idField: 'risk_id',
     titleField: 'title',
     descriptionField: 'description',
@@ -83,6 +85,7 @@ const configs = {
     docType: 'CHG' as DocType,
     queryKey: 'change',
     listKey: 'changes',
+    tabKey: 'changes',
     idField: 'change_id',
     titleField: 'title',
     descriptionField: 'description',
@@ -101,6 +104,7 @@ const configs = {
     docType: 'TCO' as DocType,
     queryKey: 'testConcept',
     listKey: 'testConcepts',
+    tabKey: 'test-concepts',
     idField: 'concept_id',
     titleField: 'name',
     descriptionField: 'description',
@@ -118,6 +122,7 @@ const configs = {
     docType: 'DEF' as DocType,
     queryKey: 'defect',
     listKey: 'defects',
+    tabKey: 'defects',
     idField: 'defect_id',
     titleField: 'title',
     descriptionField: 'description',
@@ -231,7 +236,11 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
       if (!artefact) return
       queryClient.invalidateQueries({ queryKey: [config.listKey, artefact.project_id] })
       queryClient.invalidateQueries({ queryKey: ['project', artefact.project_id] })
-      navigate(docRegistryListUrl(projectPrefix, config.docType))
+      if (kind === 'defect') {
+        navigate(docRegistryListUrl(projectPrefix, 'DEF'))
+      } else {
+        navigate(`/projects/${projectPrefix}?tab=${config.tabKey}`)
+      }
     },
   })
 
@@ -370,7 +379,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
 
           <SectionCard title="Quick Links">
             <div className="space-y-3 text-sm">
-              <Link to={docRegistryListUrl(projectPrefix, config.docType)} className="block text-primary hover:text-primary/80">Back to project {config.singular.toLowerCase()} list</Link>
+              <Link to={kind === 'defect' ? docRegistryListUrl(projectPrefix, 'DEF') : `/projects/${projectPrefix}?tab=${config.tabKey}`} className="block text-primary hover:text-primary/80">Back to project {config.singular.toLowerCase()} list</Link>
               {related?.project && <Link to={`/projects/${related.project.prefix}`} className="block text-primary hover:text-primary/80">Open project workspace</Link>}
             </div>
           </SectionCard>
@@ -458,11 +467,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
           </form>
         ) : (
           <div className="space-y-6">
-            {kind === 'defect' ? (
-              <SectionCard title="Description">
-                <p className="text-foreground whitespace-pre-wrap leading-relaxed">{description || 'No description provided.'}</p>
-              </SectionCard>
-            ) : (artefactRecord.content_json as Record<string, unknown> | null) ? (
+            {(artefactRecord.content_json as Record<string, unknown> | null) ? (
               <SectionCard title="Content">
                 <DocEditor
                   content={artefactRecord.content_json as Record<string, unknown>}
