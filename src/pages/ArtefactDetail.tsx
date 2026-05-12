@@ -458,7 +458,11 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
           </form>
         ) : (
           <div className="space-y-6">
-            {(artefactRecord.content_json as Record<string, unknown> | null) ? (
+            {kind === 'defect' ? (
+              <SectionCard title="Description">
+                <p className="text-foreground whitespace-pre-wrap leading-relaxed">{description || 'No description provided.'}</p>
+              </SectionCard>
+            ) : (artefactRecord.content_json as Record<string, unknown> | null) ? (
               <SectionCard title="Content">
                 <DocEditor
                   content={artefactRecord.content_json as Record<string, unknown>}
