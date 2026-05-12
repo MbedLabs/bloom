@@ -1,4 +1,4 @@
-export type DocType = 'REQ' | 'SPEC' | 'TC' | 'DES' | 'RSK' | 'CHG' | 'TCO' | 'DEF' | 'CMP' | 'TS' | 'PROT' | 'RPT' | 'STD'
+export type DocType = 'REQ' | 'SPEC' | 'TC' | 'DES' | 'RSK' | 'CHG' | 'CPT' | 'DEF' | 'CMP' | 'TS' | 'PRT' | 'RPT' | 'STD'
 export type DocLinkRole =
   | 'derives_from'
   | 'refines'
@@ -12,6 +12,8 @@ export type DocLinkRole =
   | 'duplicates'
   | 'references'
   | 'relates_to'
+  | 'covers'
+  | 'contains'
 export interface DocLinkOption {
   key: string
   label: string
@@ -144,9 +146,9 @@ export const DOC_CONFIGS: Record<DocType, DocConfig> = {
       { key: 'justification', label: 'Justification', type: 'textarea' },
     ],
   },
-  TCO: {
+  CPT: {
     label: 'Test Concept',
-    typeCode: 'TCO',
+    typeCode: 'CPT',
     apiBase: 'test-concepts',
     idField: 'concept_id',
     titleField: 'name',
@@ -216,9 +218,9 @@ export const DOC_CONFIGS: Record<DocType, DocConfig> = {
       { key: 'spec_type', label: 'Specification Type', type: 'select', options: ['Product Specification', 'System Specification', 'Subsystem Specification', 'Interface Specification', 'Compliance Specification', 'Customer Specification', 'Supplier Specification'] },
     ],
   },
-  PROT: {
+  PRT: {
     label: 'Protocol',
-    typeCode: 'PROT',
+    typeCode: 'PRT',
     apiBase: 'documents',
     idField: 'doc_id',
     titleField: 'title',
@@ -267,11 +269,11 @@ export const DOC_TYPE_LABELS: Record<DocType, string> = {
   DES: 'Design',
   RSK: 'Risk',
   CHG: 'Change Request',
-  TCO: 'Test Concept',
+  CPT: 'Test Concept',
   DEF: 'Defect',
   CMP: 'Campaign',
   TS: 'Test Suite',
-  PROT: 'Protocol',
+  PRT: 'Protocol',
   RPT: 'Report',
   STD: 'External Standard',
 }
@@ -283,11 +285,11 @@ export const DOC_TYPE_COLORS: Record<DocType, string> = {
   DES: 'bg-violet-500/10 text-violet-700 dark:text-violet-400',
   RSK: 'bg-red-500/10 text-red-700 dark:text-red-400',
   CHG: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
-  TCO: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+  CPT: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
   DEF: 'bg-rose-500/10 text-rose-700 dark:text-rose-400',
   CMP: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
   TS: 'bg-lime-500/10 text-lime-700 dark:text-lime-400',
-  PROT: 'bg-teal-500/10 text-teal-700 dark:text-teal-400',
+  PRT: 'bg-teal-500/10 text-teal-700 dark:text-teal-400',
   RPT: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
   STD: 'bg-orange-500/10 text-orange-700 dark:text-orange-400',
 }
@@ -299,11 +301,11 @@ export const DOC_TYPE_SLUGS: Record<DocType, string> = {
   DES: 'designs',
   RSK: 'risks',
   CHG: 'changes',
-  TCO: 'test-concepts',
+  CPT: 'test-concepts',
   DEF: 'defects',
   CMP: 'campaigns',
   TS: 'test-suites',
-  PROT: 'protocols',
+  PRT: 'protocols',
   RPT: 'reports',
   STD: 'standards',
 }
@@ -321,34 +323,55 @@ type DocLinkRuleRow = {
 
 const DOC_LINK_RULE_ROWS: DocLinkRuleRow[] = [
   { sourceType: 'REQ', targetType: 'REQ', roles: ['derives_from', 'refines', 'depends_on', 'duplicates', 'relates_to'] },
+  { sourceType: 'REQ', targetType: 'SPEC', roles: ['derives_from', 'refines', 'references'] },
   { sourceType: 'REQ', targetType: 'STD', roles: ['references'] },
-  { sourceType: 'SPEC', targetType: 'REQ', roles: ['derives_from', 'refines', 'references'] },
+  { sourceType: 'REQ', targetType: 'TS', roles: ['references'] },
+  { sourceType: 'REQ', targetType: 'CMP', roles: ['references'] },
   { sourceType: 'SPEC', targetType: 'SPEC', roles: ['derives_from', 'refines', 'depends_on', 'duplicates', 'relates_to'] },
   { sourceType: 'SPEC', targetType: 'STD', roles: ['references'] },
   { sourceType: 'STD', targetType: 'STD', roles: ['duplicates', 'relates_to', 'references'] },
-  { sourceType: 'TCO', targetType: 'SPEC', roles: ['verifies', 'references'] },
-  { sourceType: 'TCO', targetType: 'TC', roles: ['implements'] },
-  { sourceType: 'TCO', targetType: 'TCO', roles: ['derives_from', 'refines', 'relates_to'] },
-  { sourceType: 'TCO', targetType: 'STD', roles: ['references'] },
+  { sourceType: 'CPT', targetType: 'SPEC', roles: ['covers', 'verifies', 'references'] },
+  { sourceType: 'CPT', targetType: 'REQ', roles: ['covers', 'verifies', 'references'] },
+  { sourceType: 'CPT', targetType: 'TC', roles: ['implements'] },
+  { sourceType: 'CPT', targetType: 'CPT', roles: ['derives_from', 'refines', 'relates_to'] },
+  { sourceType: 'CPT', targetType: 'STD', roles: ['references'] },
+  { sourceType: 'CPT', targetType: 'TS', roles: ['references'] },
   { sourceType: 'TC', targetType: 'REQ', roles: ['verifies'] },
   { sourceType: 'TC', targetType: 'SPEC', roles: ['verifies'] },
-  { sourceType: 'TC', targetType: 'PROT', roles: ['implements', 'references'] },
+  { sourceType: 'TC', targetType: 'PRT', roles: ['implements', 'references'] },
   { sourceType: 'TC', targetType: 'TC', roles: ['depends_on', 'duplicates', 'relates_to'] },
   { sourceType: 'TC', targetType: 'STD', roles: ['references'] },
-  { sourceType: 'PROT', targetType: 'REQ', roles: ['verifies', 'references'] },
-  { sourceType: 'PROT', targetType: 'SPEC', roles: ['verifies', 'references'] },
-  { sourceType: 'PROT', targetType: 'TCO', roles: ['implements'] },
-  { sourceType: 'PROT', targetType: 'PROT', roles: ['derives_from', 'depends_on', 'duplicates', 'relates_to'] },
-  { sourceType: 'PROT', targetType: 'STD', roles: ['references'] },
+  { sourceType: 'TC', targetType: 'DEF', roles: ['references'] },
+  { sourceType: 'TS', targetType: 'TC', roles: ['contains', 'references'] },
+  { sourceType: 'TS', targetType: 'CPT', roles: ['contains', 'references'] },
+  { sourceType: 'TS', targetType: 'SPEC', roles: ['covers', 'references'] },
+  { sourceType: 'TS', targetType: 'REQ', roles: ['covers', 'references'] },
+  { sourceType: 'TS', targetType: 'TS', roles: ['relates_to'] },
+  { sourceType: 'TS', targetType: 'CMP', roles: ['relates_to'] },
+  { sourceType: 'CMP', targetType: 'SPEC', roles: ['verifies', 'references'] },
+  { sourceType: 'CMP', targetType: 'REQ', roles: ['covers', 'references'] },
+  { sourceType: 'CMP', targetType: 'TC', roles: ['contains', 'references'] },
+  { sourceType: 'CMP', targetType: 'CPT', roles: ['contains', 'references'] },
+  { sourceType: 'CMP', targetType: 'TS', roles: ['relates_to'] },
+  { sourceType: 'CMP', targetType: 'DEF', roles: ['references'] },
+  { sourceType: 'CMP', targetType: 'CMP', roles: ['relates_to'] },
+  { sourceType: 'PRT', targetType: 'REQ', roles: ['verifies', 'references'] },
+  { sourceType: 'PRT', targetType: 'SPEC', roles: ['verifies', 'references'] },
+  { sourceType: 'PRT', targetType: 'CPT', roles: ['implements'] },
+  { sourceType: 'PRT', targetType: 'PRT', roles: ['derives_from', 'depends_on', 'duplicates', 'relates_to'] },
+  { sourceType: 'PRT', targetType: 'STD', roles: ['references'] },
   { sourceType: 'RPT', targetType: 'REQ', roles: ['references'] },
   { sourceType: 'RPT', targetType: 'SPEC', roles: ['references'] },
-  { sourceType: 'RPT', targetType: 'TCO', roles: ['references'] },
+  { sourceType: 'RPT', targetType: 'CPT', roles: ['references'] },
   { sourceType: 'RPT', targetType: 'TC', roles: ['references'] },
-  { sourceType: 'RPT', targetType: 'PROT', roles: ['references'] },
+  { sourceType: 'RPT', targetType: 'TS', roles: ['references'] },
+  { sourceType: 'RPT', targetType: 'CMP', roles: ['references'] },
+  { sourceType: 'RPT', targetType: 'PRT', roles: ['references'] },
   { sourceType: 'RPT', targetType: 'DES', roles: ['references'] },
   { sourceType: 'RPT', targetType: 'RSK', roles: ['references'] },
   { sourceType: 'RPT', targetType: 'CHG', roles: ['references'] },
   { sourceType: 'RPT', targetType: 'STD', roles: ['references'] },
+  { sourceType: 'RPT', targetType: 'DEF', roles: ['references'] },
   { sourceType: 'RPT', targetType: 'RPT', roles: ['duplicates', 'relates_to', 'references'] },
   { sourceType: 'DES', targetType: 'REQ', roles: ['satisfies', 'implements', 'references'] },
   { sourceType: 'DES', targetType: 'SPEC', roles: ['implements', 'references'] },
@@ -359,17 +382,18 @@ const DOC_LINK_RULE_ROWS: DocLinkRuleRow[] = [
   { sourceType: 'RSK', targetType: 'SPEC', roles: ['impacts', 'references'] },
   { sourceType: 'RSK', targetType: 'DES', roles: ['impacts', 'references'] },
   { sourceType: 'RSK', targetType: 'TC', roles: ['impacts', 'references'] },
-  { sourceType: 'RSK', targetType: 'TCO', roles: ['impacts', 'references'] },
-  { sourceType: 'RSK', targetType: 'PROT', roles: ['impacts', 'references'] },
+  { sourceType: 'RSK', targetType: 'CPT', roles: ['impacts', 'references'] },
+  { sourceType: 'RSK', targetType: 'PRT', roles: ['impacts', 'references'] },
   { sourceType: 'RSK', targetType: 'CHG', roles: ['impacts', 'references'] },
   { sourceType: 'RSK', targetType: 'RSK', roles: ['depends_on', 'duplicates', 'relates_to'] },
   { sourceType: 'RSK', targetType: 'STD', roles: ['references'] },
+  { sourceType: 'RSK', targetType: 'DEF', roles: ['impacts', 'references'] },
   { sourceType: 'CHG', targetType: 'REQ', roles: ['impacts', 'implements', 'blocks', 'references'] },
   { sourceType: 'CHG', targetType: 'SPEC', roles: ['impacts', 'implements', 'blocks', 'references'] },
   { sourceType: 'CHG', targetType: 'DES', roles: ['impacts', 'implements', 'blocks', 'references'] },
   { sourceType: 'CHG', targetType: 'TC', roles: ['impacts', 'blocks', 'references'] },
-  { sourceType: 'CHG', targetType: 'TCO', roles: ['impacts', 'blocks', 'references'] },
-  { sourceType: 'CHG', targetType: 'PROT', roles: ['impacts', 'blocks', 'references'] },
+  { sourceType: 'CHG', targetType: 'CPT', roles: ['impacts', 'blocks', 'references'] },
+  { sourceType: 'CHG', targetType: 'PRT', roles: ['impacts', 'blocks', 'references'] },
   { sourceType: 'CHG', targetType: 'RSK', roles: ['mitigates', 'impacts', 'references'] },
   { sourceType: 'CHG', targetType: 'CHG', roles: ['depends_on', 'duplicates', 'blocks', 'relates_to'] },
   { sourceType: 'CHG', targetType: 'STD', roles: ['references'] },
@@ -377,8 +401,8 @@ const DOC_LINK_RULE_ROWS: DocLinkRuleRow[] = [
   { sourceType: 'DEF', targetType: 'REQ', roles: ['impacts', 'references'] },
   { sourceType: 'DEF', targetType: 'SPEC', roles: ['impacts', 'references'] },
   { sourceType: 'DEF', targetType: 'TC', roles: ['references'] },
-  { sourceType: 'DEF', targetType: 'TCO', roles: ['references'] },
-  { sourceType: 'DEF', targetType: 'PROT', roles: ['references'] },
+  { sourceType: 'DEF', targetType: 'CPT', roles: ['references'] },
+  { sourceType: 'DEF', targetType: 'PRT', roles: ['references'] },
   { sourceType: 'DEF', targetType: 'CHG', roles: ['references'] },
   { sourceType: 'DEF', targetType: 'RPT', roles: ['references'] },
   { sourceType: 'DEF', targetType: 'DES', roles: ['impacts', 'references'] },
@@ -387,13 +411,6 @@ const DOC_LINK_RULE_ROWS: DocLinkRuleRow[] = [
   { sourceType: 'DEF', targetType: 'STD', roles: ['references'] },
   { sourceType: 'DEF', targetType: 'CMP', roles: ['references'] },
   { sourceType: 'CMP', targetType: 'DEF', roles: ['references'] },
-  { sourceType: 'CMP', targetType: 'REQ', roles: ['verifies', 'references'] },
-  { sourceType: 'CMP', targetType: 'SPEC', roles: ['verifies', 'references'] },
-  { sourceType: 'CMP', targetType: 'TC', roles: ['references'] },
-  { sourceType: 'CMP', targetType: 'CMP', roles: ['relates_to'] },
-  { sourceType: 'TC', targetType: 'DEF', roles: ['references'] },
-  { sourceType: 'RPT', targetType: 'DEF', roles: ['references'] },
-  { sourceType: 'RSK', targetType: 'DEF', roles: ['impacts', 'references'] },
 ]
 
 const DOC_LINK_ROLE_LABELS: Record<DocLinkRole, [string, string]> = {
@@ -409,6 +426,8 @@ const DOC_LINK_ROLE_LABELS: Record<DocLinkRole, [string, string]> = {
   duplicates: ['duplicates', 'duplicated by'],
   references: ['references', 'referenced by'],
   relates_to: ['relates to', 'related to'],
+  covers: ['covers', 'covered by'],
+  contains: ['contains', 'contained by'],
 }
 
 export function docUrl(prefix: string | undefined, docType: DocType, docId: string | number): string {
@@ -436,10 +455,18 @@ export function kindSlugToType(slug: string): DocType | null {
   return SLUG_TO_DOC_TYPE[slug] || null
 }
 
+const LEGACY_DOC_TYPE_ALIASES: Record<string, DocType> = {
+  TCO: 'CPT',
+  PROT: 'PRT',
+}
+
 export function normalizeDocTypeParam(value: string | null | undefined): DocType | null {
   if (!value) return null
-  if (DOC_TYPE_CODES.includes(value as DocType)) {
-    return value as DocType
+  const upper = value.toUpperCase()
+  const legacy = LEGACY_DOC_TYPE_ALIASES[upper]
+  if (legacy) return legacy
+  if (DOC_TYPE_CODES.includes(upper as DocType)) {
+    return upper as DocType
   }
   return kindSlugToType(value)
 }

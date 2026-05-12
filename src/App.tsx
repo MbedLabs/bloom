@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import ForgotPassword from './pages/ForgotPassword'
 import Projects from './pages/Projects'
 import ProjectDetail from './pages/ProjectDetail'
+import ProjectEdit from './pages/ProjectEdit'
 import TraceabilityMatrix from './pages/TraceabilityMatrix'
 import ImpactAnalysis from './pages/ImpactAnalysis'
 import TestCampaigns from './pages/TestCampaigns'
@@ -52,6 +53,7 @@ function App() {
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
         <Route path="projects" element={<Projects />} />
+        <Route path="projects/:prefix/edit" element={<ProjectEdit />} />
         <Route path="projects/:prefix" element={<ProjectDetail />} />
         <Route path="projects/:prefix/docs" element={<Documents />} />
         <Route path="projects/:prefix/docs/new" element={<DocCreate />} />

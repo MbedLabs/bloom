@@ -36,7 +36,7 @@ const SOURCE_TYPE_CODES: Record<ArtefactKind, string> = {
   design: 'DES',
   risk: 'RSK',
   change: 'CHG',
-  'test-concept': 'TCO',
+  'test-concept': 'CPT',
   defect: 'DEF',
 }
 
@@ -98,7 +98,7 @@ const configs = {
   },
   'test-concept': {
     singular: 'Test Concept',
-    docType: 'TCO' as DocType,
+    docType: 'CPT' as DocType,
     queryKey: 'testConcept',
     listKey: 'testConcepts',
     idField: 'concept_id',

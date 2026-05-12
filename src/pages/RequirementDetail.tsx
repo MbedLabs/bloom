@@ -1,14 +1,19 @@
-import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useState, useEffect, useMemo } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { requirementsApi, usersApi, projectsApi } from '../api/client'
-import { ExternalLink, ChevronRight, UserCheck, UserCog } from 'lucide-react'
+import { ExternalLink, ChevronRight, UserCheck, UserCog, Trash2 } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
 import { docUrl } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
+import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import DocDetailShell, { StatusBadge, MetaItem, SectionCard } from '../components/DocDetailShell'
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
 import { useAuth } from '../contexts/AuthContext'
+import {
+  membershipLinksForCampaigns,
+  membershipLinksForSuites,
+} from '../lib/membershipLinks'
 
 function TypeBadge({ reqType }: { reqType: string }) {
   return (
@@ -59,6 +64,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
   const { prefix, itemId } = useParams<{ prefix: string; itemId: string }>()
   const reqId = resolvedId || parseInt(itemId || '0')
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
 
   const { data: requirement, isLoading, error } = useQuery({
     queryKey: ['requirement', reqId],
@@ -73,6 +79,24 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
   })
 
   const projectPrefix = project?.prefix || ''
+
+  const derivedMembershipLinks = useMemo(() => {
+    if (!requirement) return []
+    return [
+      ...membershipLinksForSuites(
+        requirement.suite_backlinks,
+        'REQ',
+        requirement.id,
+        requirement.project_id,
+      ),
+      ...membershipLinksForCampaigns(
+        requirement.campaign_backlinks,
+        'REQ',
+        requirement.id,
+        requirement.project_id,
+      ),
+    ]
+  }, [requirement])
 
   const { data: parentReq } = useQuery({
     queryKey: ['requirement', requirement?.parent_id],
@@ -116,7 +140,20 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
     mutationFn: (data: Parameters<typeof requirementsApi.update>[1]) => requirementsApi.update(reqId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['requirement', reqId] })
+      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'requirement', reqId] })
       setIsEditing(false)
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => requirementsApi.delete(reqId),
+    onSuccess: () => {
+      if (!requirement) return
+      queryClient.invalidateQueries({ queryKey: ['requirements', requirement.project_id] })
+      queryClient.invalidateQueries({ queryKey: ['all-docs', prefix] })
+      queryClient.invalidateQueries({ queryKey: ['project', requirement.project_id] })
+      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'requirement', reqId] })
+      navigate(docRegistryListUrl(prefix!, 'REQ'))
     },
   })
 
@@ -124,6 +161,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
     mutationFn: (reviewedById: number) => requirementsApi.setReviewed(reqId, reviewedById),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['requirement', reqId] })
+      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'requirement', reqId] })
     },
   })
 
@@ -131,6 +169,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
     mutationFn: (approvedById: number) => requirementsApi.setApproved(reqId, approvedById),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['requirement', reqId] })
+      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'requirement', reqId] })
     },
   })
 
@@ -174,12 +213,26 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
       status={requirement.status}
       priority={requirement.priority}
       actions={canEditDocs ? (
-        <button
-          onClick={() => setIsEditing(true)}
-          className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
-        >
-          Edit
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsEditing(true)}
+            className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!window.confirm(`Delete requirement ${requirement.req_id}?`)) return
+              deleteMutation.mutate()
+            }}
+            disabled={deleteMutation.isPending}
+            className="inline-flex items-center gap-1.5 px-4 py-2 border border-destructive/30 text-destructive rounded-md hover:bg-destructive/10 disabled:opacity-50 text-sm"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </button>
+        </div>
       ) : undefined}
       rightRail={
         <>
@@ -457,46 +510,14 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
         </SectionCard>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SectionCard title="Appears In Suites" actions={<span className="text-sm text-muted-foreground">{requirement.suite_backlinks?.length || 0}</span>}>
-          {requirement.suite_backlinks && requirement.suite_backlinks.length > 0 ? (
-            <div className="space-y-3">
-              {requirement.suite_backlinks.map((suite) => (
-                <div key={suite.id} className="flex items-center justify-between">
-                  <div>
-                    <div className="font-mono text-sm text-primary">{suite.suite_id}</div>
-                    <div className="text-foreground mt-1">{suite.name}</div>
-                  </div>
-                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">{suite.status}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-muted-foreground">No suites include verification test cases for this requirement.</p>
-          )}
-        </SectionCard>
-
-        <SectionCard title="Covered By Campaign Scopes" actions={<span className="text-sm text-muted-foreground">{requirement.campaign_backlinks?.length || 0}</span>}>
-          {requirement.campaign_backlinks && requirement.campaign_backlinks.length > 0 ? (
-            <div className="space-y-3">
-              {requirement.campaign_backlinks.map((campaign) => (
-                <div key={campaign.id} className="flex items-center justify-between">
-                  <div className="text-foreground">{campaign.name}</div>
-                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">{campaign.status}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-muted-foreground">No campaign scopes reference this requirement yet.</p>
-          )}
-        </SectionCard>
-      </div>
+      <DocumentActivityPanel artefactType="requirement" artefactId={reqId} />
 
       <DocumentLinksPanel
         projectId={requirement.project_id}
         projectPrefix={projectPrefix}
         sourceType="REQ"
         sourceId={reqId}
+        derivedLinks={derivedMembershipLinks}
       />
     </DocDetailShell>
   )

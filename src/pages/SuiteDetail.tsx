@@ -292,7 +292,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
           <h3 className="text-sm font-medium text-muted-foreground mb-3">Related Concepts</h3>
           <div className="flex flex-wrap gap-2">
             {suite.related_concepts.map((concept) => (
-              <Link key={concept.id} to={docUrl(prefix!, 'TCO', concept.concept_id)} className="inline-flex items-center px-3 py-2 rounded-md bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 hover:bg-cyan-500/15 text-sm">
+              <Link key={concept.id} to={docUrl(prefix!, 'CPT', concept.concept_id)} className="inline-flex items-center px-3 py-2 rounded-md bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 hover:bg-cyan-500/15 text-sm">
                 <FlaskConical className="h-3.5 w-3.5 mr-1.5" />
                 <span className="font-mono mr-2">{concept.concept_id}</span>
                 {concept.name}

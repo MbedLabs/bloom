@@ -205,7 +205,7 @@ describe('docRegistryListLabel', () => {
   it('returns plural list title per DocType', () => {
     expect(docRegistryListLabel('REQ')).toBe('Requirements')
     expect(docRegistryListLabel('TC')).toBe('Test Cases')
-    expect(docRegistryListLabel('CMP')).toBe('Campaigns')
+    expect(docRegistryListLabel('CMP')).toBe('Test Campaigns')
     expect(docRegistryListLabel('TS')).toBe('Test Suites')
   })
 })

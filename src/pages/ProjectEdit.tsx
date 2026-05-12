@@ -5,6 +5,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { extractApiErrorMessage, projectsApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
+import {
+  projectDeleteConfirmationMatches,
+  projectDeleteConfirmationPhrase,
+} from '../lib/projectDelete'
 import IntegrationSettingsPanel from '../components/IntegrationSettingsPanel'
 
 const PROJECT_PREFIX_PATTERN = /^[A-Z]{3}$/
@@ -24,6 +28,10 @@ export default function ProjectEdit() {
   const [description, setDescription] = useState('')
   const [status, setStatus] = useState('Active')
   const [formError, setFormError] = useState('')
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('')
+  const [deleteExpectedPhrase, setDeleteExpectedPhrase] = useState('')
+  const [deleteError, setDeleteError] = useState('')
 
   useEffect(() => {
     if (!project) return
@@ -56,6 +64,18 @@ export default function ProjectEdit() {
     },
     onError: (error) => {
       setFormError(extractApiErrorMessage(error, 'Could not update project'))
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => projectsApi.delete(project!.id),
+    onSuccess: () => {
+      setDeleteError('')
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      navigate('/projects', { replace: true })
+    },
+    onError: (error) => {
+      setDeleteError(extractApiErrorMessage(error, 'Could not delete project'))
     },
   })
 
@@ -113,6 +133,25 @@ export default function ProjectEdit() {
   const prefixTaken =
     normalizedPrefix !== project.prefix &&
     projectList?.some((p) => p.prefix === normalizedPrefix && p.id !== project.id)
+
+  const deleteConfirmationMatches = projectDeleteConfirmationMatches(
+    deleteConfirmationText,
+    deleteExpectedPhrase,
+  )
+
+  const openDeleteModal = () => {
+    setDeleteError('')
+    setDeleteConfirmationText('')
+    setDeleteExpectedPhrase(projectDeleteConfirmationPhrase(project.prefix))
+    setConfirmDeleteOpen(true)
+  }
+
+  const closeDeleteModal = () => {
+    setDeleteError('')
+    setDeleteConfirmationText('')
+    setDeleteExpectedPhrase('')
+    setConfirmDeleteOpen(false)
+  }
 
   return (
     <div className="space-y-8 animate-fade-in max-w-3xl">
@@ -210,6 +249,68 @@ export default function ProjectEdit() {
           </button>
         </div>
       </form>
+
+      <section className="rounded-lg border border-destructive/30 bg-card p-6 shadow-elegant">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-destructive">Danger zone</h3>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Permanently delete this project and its project-scoped data. This action cannot be undone.
+        </p>
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={openDeleteModal}
+            className="rounded-md border border-destructive/30 px-4 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10"
+          >
+            Delete project
+          </button>
+        </div>
+      </section>
+
+      {confirmDeleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="mx-4 w-full max-w-md rounded-lg bg-card p-6 shadow-elegant">
+            <h3 className="text-lg font-semibold text-foreground">Delete project?</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              This permanently removes <span className="font-medium text-foreground">{project.name}</span> ({project.prefix}).
+              Type <span className="font-mono text-foreground">{deleteExpectedPhrase}</span> to confirm.
+            </p>
+            <label className="mt-4 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Confirmation
+              <input
+                type="text"
+                value={deleteConfirmationText}
+                onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={deleteExpectedPhrase}
+                className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:ring-2 focus:ring-ring"
+              />
+            </label>
+            {deleteError && (
+              <div className="mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600">
+                {deleteError}
+              </div>
+            )}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeDeleteModal}
+                className="rounded-md border border-input px-4 py-2 text-sm text-foreground transition-colors hover:bg-accent/50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteMutation.mutate()}
+                disabled={!deleteConfirmationMatches || deleteMutation.isPending}
+                className="rounded-md bg-destructive px-4 py-2 text-sm text-white transition-colors hover:bg-destructive/90 disabled:opacity-50"
+              >
+                {deleteMutation.isPending ? 'Deleting...' : 'Delete project'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <IntegrationSettingsPanel projectId={project.id} />
     </div>

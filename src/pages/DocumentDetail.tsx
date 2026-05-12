@@ -6,6 +6,7 @@ import { Trash2, ChevronRight, FileText, FileEdit } from 'lucide-react'
 import { DocEditor } from '../components/editor'
 import DocDetailShell, { MetaItem, SectionCard } from '../components/DocDetailShell'
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
+import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import { docEditUrl, kindSlugToType } from '../types/doc'
 import { formatDateTime } from '../test/date-utils'
 import { useAuth } from '../contexts/AuthContext'
@@ -66,6 +67,7 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
   const deleteDocumentMutation = useMutation({
     mutationFn: () => documentsApi.delete(docId),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'document', docId] })
       if (projectPrefix) {
         queryClient.invalidateQueries({ queryKey: ['documents', doc?.project_id] })
         navigate(`/projects/${projectPrefix}/docs`)
@@ -194,6 +196,8 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
           )}
         </div>
       )}
+
+      <DocumentActivityPanel artefactType="document" artefactId={docId} />
 
       <DocumentLinksPanel
         projectId={doc.project_id}

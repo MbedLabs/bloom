@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Bug, FileText, FlaskConical, Link2, Search, X } from 'lucide-react'
+import { Bug, FileText, FlaskConical, Layers, Link2, Search, X } from 'lucide-react'
 import {
   type ArtefactLink,
   type DocShell,
@@ -9,6 +9,7 @@ import {
   defectsApi,
   docsApi,
   linksApi,
+  testSuitesApi,
 } from '../api/client'
 import { formatDateTime } from '../test/date-utils'
 import {
@@ -54,6 +55,7 @@ function docShellToTarget(doc: DocShell): LinkTarget | null {
 const TYPE_ICONS: Partial<Record<DocType, React.ComponentType<{ className?: string }>>> = {
   DEF: Bug,
   CMP: FlaskConical,
+  TS: Layers,
 }
 
 function DocumentLinkRow({
@@ -326,6 +328,12 @@ export function DocumentLinksPanel({
     enabled,
   })
 
+  const { data: suites } = useQuery({
+    queryKey: ['test-suites', projectId, 'link-targets'],
+    queryFn: () => testSuitesApi.list(projectId),
+    enabled,
+  })
+
   const targets = useMemo<LinkTarget[]>(() => {
     const items: LinkTarget[] = []
     ;(docs || []).forEach((doc) => {
@@ -344,14 +352,23 @@ export function DocumentLinksPanel({
     ;(campaigns || []).forEach((campaign) =>
       items.push({
         id: campaign.id,
-        doc_id: `CMP-${campaign.id}`,
+        doc_id: campaign.campaign_id || `CMP-${campaign.id}`,
         doc_type: 'CMP',
         title: campaign.name,
         status: campaign.status,
       })
     )
+    ;(suites || []).forEach((suite) =>
+      items.push({
+        id: suite.id,
+        doc_id: suite.suite_id,
+        doc_type: 'TS',
+        title: suite.name,
+        status: suite.status,
+      })
+    )
     return items
-  }, [docs, defects, campaigns])
+  }, [docs, defects, campaigns, suites])
 
   const deleteMutation = useMutation({
     mutationFn: linksApi.delete,
@@ -389,7 +406,7 @@ export function DocumentLinksPanel({
         </button>
       ) : undefined}
     >
-      <p className="text-xs text-muted-foreground mb-3">Typed links to requirements, specifications, designs, risks, defects, campaigns, and other controlled documents.</p>
+      <p className="text-xs text-muted-foreground mb-3">Typed links to requirements, specifications, designs, risks, defects, campaigns, test suites, and other controlled documents.</p>
       {totalCount === 0 ? (
         <p className="text-muted-foreground">No links yet.</p>
       ) : (
@@ -414,22 +431,15 @@ export function DocumentLinksPanel({
               onDelete={canEditDocs ? () => deleteMutation.mutate(link.id) : undefined}
             />
           ))}
-          {filteredDerivedLinks.length > 0 && (
-            <>
-              <div className="px-6 py-3 bg-muted/30">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">From campaign scope</span>
-              </div>
-              {filteredDerivedLinks.map((link) => (
-                <DocumentLinkRow
-                  key={`derived-${link.id}`}
-                  link={link}
-                  target={targetLookup.get(docKey(link.target_type, link.target_id)) || targetLookup.get(docKey(link.source_type, link.source_id))}
-                  projectPrefix={projectPrefix}
-                  direction="outgoing"
-                />
-              ))}
-            </>
-          )}
+          {filteredDerivedLinks.map((link) => (
+            <DocumentLinkRow
+              key={`derived-${link.id}`}
+              link={link}
+              target={targetLookup.get(docKey(link.source_type, link.source_id))}
+              projectPrefix={projectPrefix}
+              direction="incoming"
+            />
+          ))}
         </div>
       )}
 

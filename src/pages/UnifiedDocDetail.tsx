@@ -43,7 +43,7 @@ export default function UnifiedDocDetail() {
     case 'TC':
       return <TestCaseDetail resolvedId={doc.id} />
     case 'SPEC':
-    case 'PROT':
+    case 'PRT':
     case 'RPT':
     case 'STD':
       return <DocumentDetail resolvedId={doc.id} />
@@ -53,7 +53,7 @@ export default function UnifiedDocDetail() {
       return <ArtefactDetail kind="risk" resolvedId={doc.id} />
     case 'CHG':
       return <ArtefactDetail kind="change" resolvedId={doc.id} />
-    case 'TCO':
+    case 'CPT':
       return <ArtefactDetail kind="test-concept" resolvedId={doc.id} />
     case 'DEF':
       return <ArtefactDetail kind="defect" resolvedId={doc.id} />

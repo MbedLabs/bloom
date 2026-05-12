@@ -1,37 +1,24 @@
 import { useEffect, useMemo } from 'react'
 import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import {
-  ArrowLeft,
-  BookOpen,
-  Bug,
-  CheckCircle,
-  FileText,
-  FlaskConical,
-  GitBranch,
-  GitPullRequest,
-  Map,
-  PenTool,
-  AlertTriangle,
-  Pencil,
-} from 'lucide-react'
+import { ArrowLeft, BookOpen, FlaskConical, GitBranch, Map, Pencil } from 'lucide-react'
 
 import { docsApi, projectsApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
-import { docRegistryListUrl } from '../lib/docRegistryParams'
+import { docRegistryListLabel, docRegistryListUrl } from '../lib/docRegistryParams'
 import ProjectDocTopology from '../components/ProjectDocTopology'
 
 const LEGACY_TAB_ROUTES: Record<string, string> = {
   'requirements': 'docs?type=REQ',
   'test-cases': 'docs?type=TC',
   'specifications': 'docs?type=SPEC',
-  'protocols': 'docs?type=PROT',
+  'protocols': 'docs?type=PRT',
   'reports': 'docs?type=RPT',
   'standards': 'docs?type=STD',
   'design': 'docs?type=DES',
   'risks': 'docs?type=RSK',
   'changes': 'docs?type=CHG',
-  'test-concepts': 'docs?type=TCO',
+  'test-concepts': 'docs?type=CPT',
   'traceability': 'traceability',
   'defects': 'defects',
   'campaigns': 'campaigns',
@@ -97,18 +84,11 @@ export default function ProjectDetail() {
   }
 
   const navItems: NavItem[] = [
-    { label: 'Requirements', icon: FileText, to: docRegistryListUrl(prefix!, 'REQ') },
-    { label: 'Test Cases', icon: CheckCircle, to: docRegistryListUrl(prefix!, 'TC') },
-    { label: 'Specifications', icon: BookOpen, to: docRegistryListUrl(prefix!, 'SPEC') },
-    { label: 'Protocols', icon: BookOpen, to: docRegistryListUrl(prefix!, 'PROT') },
-    { label: 'Reports', icon: BookOpen, to: docRegistryListUrl(prefix!, 'RPT') },
-    { label: 'Standards', icon: BookOpen, to: docRegistryListUrl(prefix!, 'STD') },
-    { label: 'Design', icon: PenTool, to: docRegistryListUrl(prefix!, 'DES') },
-    { label: 'Risks', icon: AlertTriangle, to: docRegistryListUrl(prefix!, 'RSK') },
-    { label: 'Changes', icon: GitPullRequest, to: docRegistryListUrl(prefix!, 'CHG') },
-    { label: 'Test Concepts', icon: Beaker, to: docRegistryListUrl(prefix!, 'TCO') },
-    { label: 'Campaigns', icon: FlaskConical, to: `/projects/${prefix}/campaigns` },
-    { label: 'Defects', icon: Bug, to: `/projects/${prefix}/defects` },
+    { label: docRegistryListLabel('PRT'), icon: BookOpen, to: docRegistryListUrl(prefix!, 'PRT') },
+    { label: docRegistryListLabel('RPT'), icon: BookOpen, to: docRegistryListUrl(prefix!, 'RPT') },
+    { label: docRegistryListLabel('STD'), icon: BookOpen, to: docRegistryListUrl(prefix!, 'STD') },
+    { label: docRegistryListLabel('CPT'), icon: Beaker, to: docRegistryListUrl(prefix!, 'CPT') },
+    { label: docRegistryListLabel('CMP'), icon: FlaskConical, to: `/projects/${prefix}/campaigns` },
     { label: 'Traceability', icon: GitBranch, to: `/projects/${prefix}/traceability` },
   ]
 
@@ -161,7 +141,7 @@ export default function ProjectDetail() {
 
           {navItems.map((item) => (
             <Link
-              key={item.label}
+              key={item.to}
               to={item.to}
               className="flex items-center py-2.5 px-2 border-b-2 border-transparent text-sm font-medium text-muted-foreground hover:text-foreground hover:border-border transition-colors whitespace-nowrap"
             >

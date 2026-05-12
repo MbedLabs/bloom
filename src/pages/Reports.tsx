@@ -20,13 +20,24 @@ export default function Reports() {
     total_defects: 0, open_defects: 0,
     defect_severity_distribution: {} as Record<string, number>,
     defect_status_distribution: {} as Record<string, number>,
-    projects: [] as Array<{ id: number; name: string; prefix: string; status: string; requirement_count: number; test_case_count: number }>,
+    projects: [] as Array<{
+      id: number
+      name: string
+      prefix: string
+      status: string
+      requirement_count: number
+      test_case_count: number
+      uncovered_requirement_count: number
+    }>,
     ...raw,
   }
 
   const campaignResults = s.campaign_result_distribution
   const totalExecuted = Object.values(campaignResults).reduce((a, b) => a + b, 0)
   const passRate = totalExecuted > 0 ? Math.round(((campaignResults.Passed || 0) / totalExecuted) * 100) : 0
+  const projectsWithUncovered = [...s.projects]
+    .filter((project) => project.uncovered_requirement_count > 0)
+    .sort((a, b) => a.prefix.localeCompare(b.prefix))
 
   if (isLoading) {
     return (
@@ -193,7 +204,7 @@ export default function Reports() {
         )}
       </div>
 
-      {s.uncovered_requirements > 0 && (
+      {s.uncovered_requirements > 0 && projectsWithUncovered.length > 0 && (
         <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-5">
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
@@ -201,8 +212,20 @@ export default function Reports() {
               <h3 className="text-sm font-semibold text-foreground">Coverage Attention Needed</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 {s.uncovered_requirements} requirement{s.uncovered_requirements !== 1 ? 's' : ''} across all projects have no linked test cases.
-                Consider adding test coverage to ensure full lifecycle traceability.
+                Review traceability by project:
               </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {projectsWithUncovered.map((project) => (
+                  <Link
+                    key={project.id}
+                    to={`/projects/${project.prefix}/traceability`}
+                    className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-background px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-amber-500/10"
+                  >
+                    {project.prefix}: {project.uncovered_requirement_count} uncovered
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
         </div>
