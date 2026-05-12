@@ -46,6 +46,7 @@ else:
         os.environ["SECRET_KEY"] = os.environ["BLOOM_SECRET_KEY"]
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characters-long")
+os.environ.setdefault("BLOOM_DISABLE_RATE_LIMIT", "1")
 
 
 @pytest.fixture(scope="session")
