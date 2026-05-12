@@ -76,6 +76,7 @@ class ProjectResponse(BaseModel):
     test_suite_count: int = 0
     defect_count: int = 0
     coverage_percent: float = 0
+    uncovered_requirement_count: int = 0
 
     @field_serializer("created_at", "updated_at")
     def serialize_dt(self, dt: datetime, _info):
@@ -414,7 +415,7 @@ class VersionResponse(BaseModel):
 class DocumentCreate(BaseModel):
     project_id: int
     title: str = Field(..., min_length=1, max_length=500)
-    doc_type: str = Field(default="SPEC", pattern="^(SPEC|PROT|RPT|STD)$")
+    doc_type: str = Field(default="SPEC", pattern="^(SPEC|PRT|RPT|STD)$")
     description: Optional[str] = None
     content_json: Optional[Dict[str, Any]] = None
     content_html: Optional[str] = None
@@ -422,7 +423,7 @@ class DocumentCreate(BaseModel):
 
 class DocumentUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
-    doc_type: Optional[str] = Field(None, pattern="^(SPEC|PROT|RPT|STD)$")
+    doc_type: Optional[str] = Field(None, pattern="^(SPEC|PRT|RPT|STD)$")
     status: Optional[str] = None
     version: Optional[str] = None
     description: Optional[str] = None

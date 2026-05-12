@@ -5,6 +5,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import pytest
+from fastapi.testclient import TestClient
+
 # Workspace `.env` lives at `budProject/.env` (parent of `bloom-app-backend/`).
 
 
@@ -41,3 +44,14 @@ else:
     _load_workspace_dotenv_into_environ()
     if "SECRET_KEY" not in os.environ and os.environ.get("BLOOM_SECRET_KEY"):
         os.environ["SECRET_KEY"] = os.environ["BLOOM_SECRET_KEY"]
+
+os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characters-long")
+
+
+@pytest.fixture(scope="session")
+def api_client():
+    """One TestClient per pytest session — avoids asyncpg teardown across HTTP modules."""
+    from app.main import app
+
+    with TestClient(app, base_url="http://test") as client:
+        yield client

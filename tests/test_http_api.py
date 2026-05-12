@@ -14,17 +14,7 @@ import os
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characters-long")
 
-import pytest
 from fastapi.testclient import TestClient
-
-
-@pytest.fixture(scope="module")
-def api_client():
-    """Single client for the module — avoids asyncpg/event-loop teardown bugs across function-scoped clients."""
-    from app.main import app
-
-    with TestClient(app, base_url="http://test") as client:
-        yield client
 
 
 def test_health_and_root(api_client: TestClient):

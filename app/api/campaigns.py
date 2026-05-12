@@ -54,7 +54,8 @@ def _normalize_datetime(value: Optional[datetime]) -> Optional[datetime]:
 
 
 def _resolved_execution_time(value: Optional[datetime]) -> datetime:
-    return value or datetime.utcnow()
+    resolved = value or datetime.utcnow()
+    return _normalize_datetime(resolved) or datetime.utcnow()
 
 
 def _apply_result_to_test_case(tc: TestCase, res) -> None:
@@ -576,7 +577,7 @@ async def _build_campaign_detail(
             for req in reqs
         ]
 
-    # Related concepts: find TCOs linked to any TC in the campaign via ArtefactLink
+    # Related concepts: find CPTs linked to any TC in the campaign via ArtefactLink
     tc_ids = [item.test_case_id for item in items]
     related_concepts: list[TestConceptSummary] = []
     if tc_ids:
@@ -585,7 +586,7 @@ async def _build_campaign_detail(
                 await db.execute(
                     select(ArtefactLink.source_id)
                     .where(
-                        ArtefactLink.source_type == "TCO",
+                        ArtefactLink.source_type == "CPT",
                         ArtefactLink.target_type == "TC",
                         ArtefactLink.target_id.in_(tc_ids),
                     )

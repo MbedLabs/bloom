@@ -3,27 +3,79 @@ Projects API endpoints.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
 from app.models import (
     ArtefactLink,
+    Baseline,
+    CampaignSuite,
     ChangeRequest,
     Defect,
+    DefectSyncEvent,
     DesignItem,
+    Document,
+    DocumentSection,
+    IntegrationSetting,
     Project,
+    ProjectVariable,
     Requirement,
+    RequirementLink,
     RiskItem,
+    TestCampaign,
+    TestCampaignItem,
     TestCase,
     TestConcept,
+    TestRunLink,
     TestSuite,
+    TestSuiteItem,
 )
 from app.models.user import User, UserRole
 from app.schemas import ProjectCreate, ProjectResponse, ProjectUpdate
 
 router = APIRouter()
+
+
+async def _delete_project_scoped_data(db: AsyncSession, project_id: int) -> None:
+    requirement_ids = select(Requirement.id).where(Requirement.project_id == project_id)
+    defect_ids = select(Defect.id).where(Defect.project_id == project_id)
+    document_ids = select(Document.id).where(Document.project_id == project_id)
+    campaign_ids = select(TestCampaign.id).where(TestCampaign.project_id == project_id)
+    suite_ids = select(TestSuite.id).where(TestSuite.project_id == project_id)
+
+    await db.execute(delete(DefectSyncEvent).where(DefectSyncEvent.defect_id.in_(defect_ids)))
+    await db.execute(delete(TestCampaignItem).where(TestCampaignItem.campaign_id.in_(campaign_ids)))
+    await db.execute(delete(CampaignSuite).where(CampaignSuite.campaign_id.in_(campaign_ids)))
+    await db.execute(delete(TestSuiteItem).where(TestSuiteItem.suite_id.in_(suite_ids)))
+    await db.execute(delete(ArtefactLink).where(ArtefactLink.project_id == project_id))
+    await db.execute(
+        delete(RequirementLink).where(
+            or_(
+                RequirementLink.source_id.in_(requirement_ids),
+                RequirementLink.target_id.in_(requirement_ids),
+            )
+        )
+    )
+    await db.execute(delete(TestRunLink).where(TestRunLink.requirement_id.in_(requirement_ids)))
+    await db.execute(delete(DocumentSection).where(DocumentSection.document_id.in_(document_ids)))
+    await db.execute(delete(IntegrationSetting).where(IntegrationSetting.project_id == project_id))
+    await db.execute(delete(ProjectVariable).where(ProjectVariable.project_id == project_id))
+    await db.execute(delete(TestCampaign).where(TestCampaign.project_id == project_id))
+    await db.execute(delete(TestSuite).where(TestSuite.project_id == project_id))
+    await db.execute(delete(Defect).where(Defect.project_id == project_id))
+    await db.execute(delete(TestCase).where(TestCase.project_id == project_id))
+    await db.execute(delete(Document).where(Document.project_id == project_id))
+    await db.execute(delete(DesignItem).where(DesignItem.project_id == project_id))
+    await db.execute(delete(RiskItem).where(RiskItem.project_id == project_id))
+    await db.execute(delete(ChangeRequest).where(ChangeRequest.project_id == project_id))
+    await db.execute(delete(Baseline).where(Baseline.project_id == project_id))
+    await db.execute(delete(TestConcept).where(TestConcept.project_id == project_id))
+    await db.execute(
+        update(Requirement).where(Requirement.project_id == project_id).values(parent_id=None)
+    )
+    await db.execute(delete(Requirement).where(Requirement.project_id == project_id))
 
 
 async def _project_counts(db: AsyncSession, project_id: int) -> dict[str, int]:
@@ -73,6 +125,7 @@ async def _project_counts(db: AsyncSession, project_id: int) -> dict[str, int]:
         )
     ).scalar()
     coverage_percent = round((covered_reqs / req_count * 100) if req_count else 0, 1)
+    uncovered_requirement_count = max((req_count or 0) - (covered_reqs or 0), 0)
 
     return {
         "requirement_count": req_count,
@@ -84,6 +137,7 @@ async def _project_counts(db: AsyncSession, project_id: int) -> dict[str, int]:
         "test_suite_count": test_suite_count,
         "defect_count": defect_count,
         "coverage_percent": coverage_percent,
+        "uncovered_requirement_count": uncovered_requirement_count,
     }
 
 
@@ -292,4 +346,5 @@ async def delete_project(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
+    await _delete_project_scoped_data(db, project_id)
     await db.delete(project)

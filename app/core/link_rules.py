@@ -2,40 +2,64 @@
 
 from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS, normalize_document_kind
 
-LINKABLE_ARTEFACT_KINDS = ("REQ", "TC", "DES", "RSK", "CHG", "TCO", "DEF", "CMP")
+LINKABLE_ARTEFACT_KINDS = ("REQ", "TC", "DES", "RSK", "CHG", "CPT", "DEF", "CMP", "TS")
 LINKABLE_DOC_KINDS = LINKABLE_ARTEFACT_KINDS + tuple(CANONICAL_DOCUMENT_KINDS)
 
+LEGACY_LINK_KIND_ALIASES = {
+    "TCO": "CPT",
+    "PROT": "PRT",
+}
 LINK_RULE_ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("REQ", "REQ", ("derives_from", "refines", "depends_on", "duplicates", "relates_to")),
+    ("REQ", "SPEC", ("derives_from", "refines", "references")),
     ("REQ", "STD", ("references",)),
-    ("SPEC", "REQ", ("derives_from", "refines", "references")),
+    ("REQ", "TS", ("references",)),
+    ("REQ", "CMP", ("references",)),
     ("SPEC", "SPEC", ("derives_from", "refines", "depends_on", "duplicates", "relates_to")),
     ("SPEC", "STD", ("references",)),
     ("STD", "STD", ("duplicates", "relates_to", "references")),
-    ("TCO", "SPEC", ("verifies", "references")),
-    ("TCO", "REQ", ("verifies", "references")),
-    ("TCO", "TC", ("implements",)),
-    ("TCO", "TCO", ("derives_from", "refines", "relates_to")),
-    ("TCO", "STD", ("references",)),
+    ("CPT", "SPEC", ("covers", "verifies", "references")),
+    ("CPT", "REQ", ("covers", "verifies", "references")),
+    ("CPT", "TC", ("implements",)),
+    ("CPT", "CPT", ("derives_from", "refines", "relates_to")),
+    ("CPT", "STD", ("references",)),
+    ("CPT", "TS", ("references",)),
     ("TC", "REQ", ("verifies",)),
     ("TC", "SPEC", ("verifies",)),
-    ("TC", "PROT", ("implements", "references")),
+    ("TC", "PRT", ("implements", "references")),
     ("TC", "TC", ("depends_on", "duplicates", "relates_to")),
     ("TC", "STD", ("references",)),
-    ("PROT", "REQ", ("verifies", "references")),
-    ("PROT", "SPEC", ("verifies", "references")),
-    ("PROT", "TCO", ("implements",)),
-    ("PROT", "PROT", ("derives_from", "depends_on", "duplicates", "relates_to")),
-    ("PROT", "STD", ("references",)),
+    ("TC", "DEF", ("references",)),
+    ("TS", "TC", ("contains", "references")),
+    ("TS", "CPT", ("contains", "references")),
+    ("TS", "SPEC", ("covers", "references")),
+    ("TS", "REQ", ("covers", "references")),
+    ("TS", "TS", ("relates_to",)),
+    ("TS", "CMP", ("relates_to",)),
+    ("CMP", "SPEC", ("verifies", "references")),
+    ("CMP", "REQ", ("covers", "references")),
+    ("CMP", "TC", ("contains", "references")),
+    ("CMP", "CPT", ("contains", "references")),
+    ("CMP", "TS", ("relates_to",)),
+    ("CMP", "DEF", ("references",)),
+    ("CMP", "CMP", ("relates_to",)),
+    ("PRT", "REQ", ("verifies", "references")),
+    ("PRT", "SPEC", ("verifies", "references")),
+    ("PRT", "CPT", ("implements",)),
+    ("PRT", "PRT", ("derives_from", "depends_on", "duplicates", "relates_to")),
+    ("PRT", "STD", ("references",)),
     ("RPT", "REQ", ("references",)),
     ("RPT", "SPEC", ("references",)),
-    ("RPT", "TCO", ("references",)),
+    ("RPT", "CPT", ("references",)),
     ("RPT", "TC", ("references",)),
-    ("RPT", "PROT", ("references",)),
+    ("RPT", "TS", ("references",)),
+    ("RPT", "CMP", ("references",)),
+    ("RPT", "PRT", ("references",)),
     ("RPT", "DES", ("references",)),
     ("RPT", "RSK", ("references",)),
     ("RPT", "CHG", ("references",)),
     ("RPT", "STD", ("references",)),
+    ("RPT", "DEF", ("references",)),
     ("RPT", "RPT", ("duplicates", "relates_to", "references")),
     ("DES", "REQ", ("satisfies", "implements", "references")),
     ("DES", "SPEC", ("implements", "references")),
@@ -46,27 +70,27 @@ LINK_RULE_ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("RSK", "SPEC", ("impacts", "references")),
     ("RSK", "DES", ("impacts", "references")),
     ("RSK", "TC", ("impacts", "references")),
-    ("RSK", "TCO", ("impacts", "references")),
-    ("RSK", "PROT", ("impacts", "references")),
+    ("RSK", "CPT", ("impacts", "references")),
+    ("RSK", "PRT", ("impacts", "references")),
     ("RSK", "CHG", ("impacts", "references")),
     ("RSK", "RSK", ("depends_on", "duplicates", "relates_to")),
     ("RSK", "STD", ("references",)),
+    ("RSK", "DEF", ("impacts", "references")),
     ("CHG", "REQ", ("impacts", "implements", "blocks", "references")),
     ("CHG", "SPEC", ("impacts", "implements", "blocks", "references")),
     ("CHG", "DES", ("impacts", "implements", "blocks", "references")),
     ("CHG", "TC", ("impacts", "blocks", "references")),
-    ("CHG", "TCO", ("impacts", "blocks", "references")),
-    ("CHG", "PROT", ("impacts", "blocks", "references")),
+    ("CHG", "CPT", ("impacts", "blocks", "references")),
+    ("CHG", "PRT", ("impacts", "blocks", "references")),
     ("CHG", "RSK", ("mitigates", "impacts", "references")),
     ("CHG", "CHG", ("depends_on", "duplicates", "blocks", "relates_to")),
     ("CHG", "STD", ("references",)),
     ("CHG", "DEF", ("implements", "references")),
-    # DEF (defect) rules
     ("DEF", "REQ", ("impacts", "references")),
     ("DEF", "SPEC", ("impacts", "references")),
     ("DEF", "TC", ("references",)),
-    ("DEF", "TCO", ("references",)),
-    ("DEF", "PROT", ("references",)),
+    ("DEF", "CPT", ("references",)),
+    ("DEF", "PRT", ("references",)),
     ("DEF", "CHG", ("references",)),
     ("DEF", "RPT", ("references",)),
     ("DEF", "DES", ("impacts", "references")),
@@ -74,16 +98,7 @@ LINK_RULE_ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("DEF", "DEF", ("duplicates", "relates_to", "depends_on")),
     ("DEF", "STD", ("references",)),
     ("DEF", "CMP", ("references",)),
-    # CMP (campaign) rules
     ("CMP", "DEF", ("references",)),
-    ("CMP", "REQ", ("verifies", "references")),
-    ("CMP", "SPEC", ("verifies", "references")),
-    ("CMP", "TC", ("references",)),
-    ("CMP", "CMP", ("relates_to",)),
-    # Reverse edges allowing TC/RPT/RSK to reference DEF
-    ("TC", "DEF", ("references",)),
-    ("RPT", "DEF", ("references",)),
-    ("RSK", "DEF", ("impacts", "references")),
 )
 
 
@@ -91,6 +106,9 @@ def normalize_linkable_type(value: str | None) -> str:
     if value is None:
         return ""
     upper_value = value.upper()
+    legacy_kind = LEGACY_LINK_KIND_ALIASES.get(upper_value)
+    if legacy_kind:
+        return legacy_kind
     normalized_document_kind = normalize_document_kind(upper_value)
     if normalized_document_kind in CANONICAL_DOCUMENT_KINDS:
         return normalized_document_kind

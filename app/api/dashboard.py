@@ -46,14 +46,14 @@ async def get_dashboard_stats(
     )
     tc_status_dist = {row[0]: row[1] for row in tc_status_result}
 
-    total_links = await db.scalar(
-        select(func.count(ArtefactLink.id)).where(
+    covered_reqs = await db.scalar(
+        select(func.count(func.distinct(ArtefactLink.target_id))).where(
             ArtefactLink.source_type == "TC",
             ArtefactLink.target_type == "REQ",
             ArtefactLink.role == "verifies",
         )
     )
-    coverage_pct = round((total_links / total_requirements * 100) if total_requirements else 0, 1)
+    coverage_pct = round((covered_reqs / total_requirements * 100) if total_requirements else 0, 1)
 
     uncovered_reqs = await db.scalar(
         select(func.count(Requirement.id)).where(
@@ -109,9 +109,25 @@ async def get_dashboard_stats(
         .outerjoin(TestCase, TestCase.project_id == Project.id)
         .group_by(Project.id)
         .order_by(Project.created_at.desc())
-        .limit(10)
     )
     project_rows = project_stats_result.all()
+
+    covered_req_ids = (
+        select(ArtefactLink.target_id)
+        .where(
+            ArtefactLink.source_type == "TC",
+            ArtefactLink.target_type == "REQ",
+            ArtefactLink.role == "verifies",
+        )
+        .distinct()
+    )
+    uncovered_by_project_result = await db.execute(
+        select(Requirement.project_id, func.count(Requirement.id))
+        .where(~Requirement.id.in_(covered_req_ids))
+        .group_by(Requirement.project_id)
+    )
+    uncovered_by_project = {row[0]: row[1] for row in uncovered_by_project_result}
+
     projects = [
         {
             "id": r.id,
@@ -120,6 +136,7 @@ async def get_dashboard_stats(
             "status": r.status,
             "requirement_count": r.req_count,
             "test_case_count": r.tc_count,
+            "uncovered_requirement_count": uncovered_by_project.get(r.id, 0),
         }
         for r in project_rows
     ]

@@ -6,6 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.artefact_utils import (
+    log_artefact_activity,
+    log_document_workflow_activity_from_patch,
+    should_log_generic_document_update,
+)
 from app.core.database import get_db
 from app.core.document_kinds import normalize_document_kind, require_document_kind
 from app.core.id_generator import next_doc_id
@@ -72,7 +77,7 @@ async def create_document(
     project_id: int,
     data: DocumentCreate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     from app.models import Project
 
@@ -109,6 +114,13 @@ async def create_document(
     db.add(document)
     await db.flush()
     await db.refresh(document)
+    await log_artefact_activity(
+        db,
+        "document",
+        document.id,
+        "created",
+        f"{current_user.full_name} created document {document.doc_id}",
+    )
 
     return DocumentResponse(
         id=document.id,
@@ -200,13 +212,16 @@ async def update_document(
     document_id: int,
     data: DocumentUpdate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     result = await db.execute(select(Document).where(Document.id == document_id))
     document = result.scalar_one_or_none()
 
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    fields_set = data.model_fields_set
+    previous_status = document.status if "status" in fields_set else None
 
     if data.title is not None:
         document.title = data.title
@@ -225,6 +240,24 @@ async def update_document(
 
     await db.flush()
     await db.refresh(document)
+    await log_document_workflow_activity_from_patch(
+        db,
+        artefact_type="document",
+        artefact_id=document.id,
+        public_id=document.doc_id or str(document.id),
+        actor=current_user,
+        fields_set=fields_set,
+        previous_status=previous_status,
+        next_status=document.status,
+    )
+    if should_log_generic_document_update(fields_set):
+        await log_artefact_activity(
+            db,
+            "document",
+            document.id,
+            "updated",
+            f"{current_user.full_name} updated document {document.doc_id}",
+        )
 
     section_count_result = await db.execute(
         select(func.count(DocumentSection.id)).where(DocumentSection.document_id == document.id)
@@ -252,7 +285,7 @@ async def update_document(
 async def delete_document(
     document_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     result = await db.execute(select(Document).where(Document.id == document_id))
     document = result.scalar_one_or_none()
@@ -260,6 +293,13 @@ async def delete_document(
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    await log_artefact_activity(
+        db,
+        "document",
+        document.id,
+        "deleted",
+        f"{current_user.full_name} deleted document {document.doc_id}",
+    )
     await db.delete(document)
 
 

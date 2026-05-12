@@ -9,6 +9,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.artefact_utils import (
+    log_artefact_activity,
+    log_document_workflow_activity_from_patch,
+    should_log_generic_document_update,
+)
 from app.api.link_read_utils import (
     VERIFY_LINK_ROLE,
     VERIFY_SOURCE_TYPE,
@@ -259,7 +264,7 @@ async def list_requirements(
 async def create_requirement(
     data: RequirementCreate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     """
     Create a new requirement; server assigns req_id.
@@ -322,6 +327,13 @@ async def create_requirement(
     db.add(requirement)
     await db.flush()
     await db.refresh(requirement)
+    await log_artefact_activity(
+        db,
+        "requirement",
+        requirement.id,
+        "created",
+        f"{current_user.full_name} created requirement {requirement.req_id}",
+    )
 
     return await _build_requirement_response(requirement, db)
 
@@ -349,7 +361,7 @@ async def update_requirement(
     requirement_id: int,
     data: RequirementUpdate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     """
     Update a requirement.
@@ -359,6 +371,9 @@ async def update_requirement(
 
     if not requirement:
         raise HTTPException(status_code=404, detail="Requirement not found")
+
+    fields_set = data.model_fields_set
+    previous_status = requirement.status if "status" in fields_set else None
 
     if data.title is not None:
         requirement.title = data.title
@@ -372,7 +387,6 @@ async def update_requirement(
         requirement.req_type = data.req_type
     if data.req_origin is not None:
         requirement.req_origin = data.req_origin
-    fields_set = data.model_fields_set
 
     if "parent_id" in fields_set:
         if data.parent_id is None:
@@ -434,6 +448,24 @@ async def update_requirement(
 
     await db.flush()
     await db.refresh(requirement)
+    await log_document_workflow_activity_from_patch(
+        db,
+        artefact_type="requirement",
+        artefact_id=requirement.id,
+        public_id=requirement.req_id,
+        actor=current_user,
+        fields_set=fields_set,
+        previous_status=previous_status,
+        next_status=requirement.status,
+    )
+    if should_log_generic_document_update(fields_set):
+        await log_artefact_activity(
+            db,
+            "requirement",
+            requirement.id,
+            "updated",
+            f"{current_user.full_name} updated requirement {requirement.req_id}",
+        )
 
     return await _build_requirement_response(requirement, db)
 
@@ -442,7 +474,7 @@ async def update_requirement(
 async def delete_requirement(
     requirement_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     """
     Delete a requirement.
@@ -453,6 +485,13 @@ async def delete_requirement(
     if not requirement:
         raise HTTPException(status_code=404, detail="Requirement not found")
 
+    await log_artefact_activity(
+        db,
+        "requirement",
+        requirement.id,
+        "deleted",
+        f"{current_user.full_name} deleted requirement {requirement.req_id}",
+    )
     await db.delete(requirement)
 
 

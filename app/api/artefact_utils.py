@@ -38,13 +38,16 @@ ARTEFACT_MODELS = {
     "change": ChangeRequest,
     "test-concept": TestConcept,
     "defect": Defect,
+    "requirement": Requirement,
+    "test-case": TestCase,
+    "document": Document,
 }
 
 ARTEFACT_LINK_TYPES = {
     "design": "DES",
     "risk": "RSK",
     "change": "CHG",
-    "test-concept": "TCO",
+    "test-concept": "CPT",
     "defect": "DEF",
 }
 
@@ -112,6 +115,137 @@ async def log_artefact_activity(
         )
     )
     await db.flush()
+
+
+WORKFLOW_ACTIVITY_FIELDS = frozenset(
+    {
+        "reviewed_by_id",
+        "reviewed_at",
+        "approved_by_id",
+        "approved_at",
+        "status",
+    }
+)
+
+ARTEFACT_PUBLIC_ID_ATTRS = {
+    "requirement": "req_id",
+    "test-case": "tc_id",
+    "document": "doc_id",
+    "design": "design_id",
+    "risk": "risk_id",
+    "change": "change_id",
+    "test-concept": "concept_id",
+    "defect": "defect_id",
+}
+
+
+def artefact_public_id(artefact_type: str, artefact: Any) -> str:
+    attr = ARTEFACT_PUBLIC_ID_ATTRS.get(artefact_type, "id")
+    value = getattr(artefact, attr, None)
+    return str(value if value is not None else artefact.id)
+
+
+def _workflow_status_event_for_target(next_status: str) -> str | None:
+    normalized = next_status.strip().lower()
+    if normalized == "review":
+        return "reviewed"
+    if normalized == "approved":
+        return "approved"
+    return None
+
+
+async def log_workflow_status_transition(
+    db: AsyncSession,
+    *,
+    artefact_type: str,
+    artefact_id: int,
+    public_id: str,
+    actor: User,
+    previous_status: str,
+    next_status: str,
+    skip_reviewed: bool = False,
+    skip_approved: bool = False,
+) -> None:
+    if previous_status == next_status:
+        return
+
+    event = _workflow_status_event_for_target(next_status)
+    if event == "reviewed" and not skip_reviewed:
+        await log_artefact_activity(
+            db,
+            artefact_type,
+            artefact_id,
+            "reviewed",
+            f"{actor.full_name} marked {public_id} reviewed",
+        )
+        return
+    if event == "approved" and not skip_approved:
+        await log_artefact_activity(
+            db,
+            artefact_type,
+            artefact_id,
+            "approved",
+            f"{actor.full_name} marked {public_id} approved",
+        )
+        return
+
+    await log_artefact_activity(
+        db,
+        artefact_type,
+        artefact_id,
+        "status_changed",
+        build_status_summary(actor, previous_status, next_status),
+    )
+
+
+async def log_document_workflow_activity_from_patch(
+    db: AsyncSession,
+    *,
+    artefact_type: str,
+    artefact_id: int,
+    public_id: str,
+    actor: User,
+    fields_set: set[str],
+    previous_status: str | None = None,
+    next_status: str | None = None,
+) -> None:
+    if fields_set.intersection({"reviewed_by_id", "reviewed_at"}):
+        await log_artefact_activity(
+            db,
+            artefact_type,
+            artefact_id,
+            "reviewed",
+            f"{actor.full_name} marked {public_id} reviewed",
+        )
+    if fields_set.intersection({"approved_by_id", "approved_at"}):
+        await log_artefact_activity(
+            db,
+            artefact_type,
+            artefact_id,
+            "approved",
+            f"{actor.full_name} marked {public_id} approved",
+        )
+    if (
+        "status" in fields_set
+        and previous_status is not None
+        and next_status is not None
+        and previous_status != next_status
+    ):
+        await log_workflow_status_transition(
+            db,
+            artefact_type=artefact_type,
+            artefact_id=artefact_id,
+            public_id=public_id,
+            actor=actor,
+            previous_status=previous_status,
+            next_status=next_status,
+            skip_reviewed=bool(fields_set.intersection({"reviewed_by_id", "reviewed_at"})),
+            skip_approved=bool(fields_set.intersection({"approved_by_id", "approved_at"})),
+        )
+
+
+def should_log_generic_document_update(fields_set: set[str]) -> bool:
+    return not fields_set.issubset(WORKFLOW_ACTIVITY_FIELDS)
 
 
 def build_activity_response(activity: ArtefactActivity) -> ArtefactActivityResponse:

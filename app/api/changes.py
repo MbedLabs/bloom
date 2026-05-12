@@ -4,7 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.artefact_utils import log_artefact_activity
+from app.api.artefact_utils import (
+    log_artefact_activity,
+    log_document_workflow_activity_from_patch,
+    should_log_generic_document_update,
+)
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_role
@@ -109,18 +113,32 @@ async def update_change_request(
     if not item:
         raise HTTPException(status_code=404, detail="Change request not found")
 
+    fields_set = data.model_fields_set
+    previous_status = item.status if "status" in fields_set else None
+
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(item, field, value)
 
     await db.flush()
     await db.refresh(item)
-    await log_artefact_activity(
+    await log_document_workflow_activity_from_patch(
         db,
-        "change",
-        item.id,
-        "updated",
-        f"{current_user.full_name} updated change request {item.change_id}",
+        artefact_type="change",
+        artefact_id=item.id,
+        public_id=item.change_id,
+        actor=current_user,
+        fields_set=fields_set,
+        previous_status=previous_status,
+        next_status=item.status,
     )
+    if should_log_generic_document_update(fields_set):
+        await log_artefact_activity(
+            db,
+            "change",
+            item.id,
+            "updated",
+            f"{current_user.full_name} updated change request {item.change_id}",
+        )
     return _change_response(item)
 
 
