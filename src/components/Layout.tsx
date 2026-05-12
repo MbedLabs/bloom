@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { APP_VERSION, projectsApi } from '../api/client'
-import { normalizeDocTypeParam } from '../types/doc'
-import { docRegistryListUrl, syncRegistryProjectContext } from '../lib/docRegistryParams'
+import { docRegistryListLabel, docRegistryListUrl, syncRegistryProjectContext } from '../lib/docRegistryParams'
+import { getBreadcrumbs } from '../lib/breadcrumbs'
 import { useAuth } from '../contexts/AuthContext'
 import { PageMetaProvider, usePageMeta } from '../contexts/PageMetaContext'
 import {
@@ -56,13 +56,13 @@ const projectNav = [
   { name: 'Requirements', icon: FileText, tab: '', href: 'docs' as const, filter: 'type:REQ' },
   { name: 'Test Cases', icon: CheckSquare, tab: '', href: 'docs' as const, filter: 'type:TC' },
   { name: 'Specifications', icon: FileText, tab: '', href: 'docs' as const, filter: 'type:SPEC' },
-  { name: 'Protocols', icon: BookOpen, tab: '', href: 'docs' as const, filter: 'type:PROT' },
+  { name: docRegistryListLabel('PRT'), icon: BookOpen, tab: '', href: 'docs' as const, filter: 'type:PRT' },
   { name: 'Reports', icon: Layers, tab: '', href: 'docs' as const, filter: 'type:RPT' },
   { name: 'Standards', icon: BookOpen, tab: '', href: 'docs' as const, filter: 'type:STD' },
   { name: 'Design', icon: PenTool, tab: '', href: 'docs' as const, filter: 'type:DES' },
   { name: 'Risks', icon: AlertTriangle, tab: '', href: 'docs' as const, filter: 'type:RSK' },
   { name: 'Changes', icon: GitPullRequest, tab: '', href: 'docs' as const, filter: 'type:CHG' },
-  { name: 'Test Concepts', icon: Beaker, tab: '', href: 'docs' as const, filter: 'type:TCO' },
+  { name: docRegistryListLabel('CPT'), icon: Beaker, tab: '', href: 'docs' as const, filter: 'type:CPT' },
   { name: 'Defects', icon: Bug, tab: '', href: 'defects' as const },
   { name: 'Test Campaigns', icon: FlaskConical, tab: '', href: 'campaigns' as const },
   { name: 'Traceability', icon: GitBranch, tab: '', href: 'traceability' as const },
@@ -150,7 +150,10 @@ function LayoutInner() {
     : null
 
   const { crumbLabel: pageCrumbLabel } = usePageMeta()
-  const breadcrumbs = useMemo(() => getBreadcrumbs(location, projects || [], pageCrumbLabel), [location, projects, pageCrumbLabel])
+  const breadcrumbs = useMemo(
+    () => getBreadcrumbs(location.pathname, location.search, projects || [], pageCrumbLabel),
+    [location.pathname, location.search, projects, pageCrumbLabel],
+  )
 
   const roleBadgeColor = user?.role === 'admin'
     ? 'bg-red-500/10 text-red-400'
@@ -395,11 +398,16 @@ function LayoutInner() {
                 <div key={i} className="flex items-center gap-2 shrink-0">
                   {i > 0 && <span className="text-muted-foreground/40">/</span>}
                   {crumb.href ? (
-                    <Link to={crumb.href} className="text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
+                    <Link
+                      to={crumb.href}
+                      className="whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground"
+                    >
                       {crumb.label}
                     </Link>
                   ) : (
-                    <span className="text-foreground font-medium whitespace-nowrap">{crumb.label}</span>
+                    <span className="whitespace-nowrap font-medium text-foreground">
+                      {crumb.label}
+                    </span>
                   )}
                 </div>
               ))}
@@ -482,86 +490,4 @@ function LayoutInner() {
       </div>
     </div>
   )
-}
-
-function getBreadcrumbs(location: ReturnType<typeof useLocation>, projects: Array<{ id: number; name: string; prefix: string }>, pageCrumbLabel?: string) {
-  const TYPE_PAGE_TITLE: Record<string, string> = {
-    REQ: 'Requirements', SPEC: 'Specifications', TC: 'Test Cases',
-    DES: 'Design Items', RSK: 'Risks', CHG: 'Changes', TCO: 'Test Concepts',
-    PROT: 'Protocols', RPT: 'Reports', STD: 'Standards',
-    DEF: 'Defects', CMP: 'Campaigns',
-  }
-  const path = location.pathname
-  const crumbs: { label: string; href?: string }[] = [{ label: 'Home', href: '/' }]
-  const parts = path.split('/')
-  const slug = parts[2]
-  const projectName = slug
-    ? (projects.find((p) => p.prefix === slug || String(p.id) === slug)?.name || slug)
-    : undefined
-
-  if (path === '/') return [{ label: 'Dashboard' }]
-  if (path === '/reports') return [{ label: 'Home', href: '/' }, { label: 'Reports' }]
-  if (path === '/baselines') return [{ label: 'Home', href: '/' }, { label: 'Baselines' }]
-  if (path === '/settings') return [{ label: 'Home', href: '/' }, { label: 'Settings' }]
-
-  if (path.startsWith('/projects')) {
-    crumbs.push({ label: 'Projects', href: '/projects' })
-    if (!slug) return crumbs
-
-    const sub = parts[3]
-    const projCrumb = { label: projectName!, href: `/projects/${slug}` }
-
-    if (!sub) {
-      crumbs.push({ label: projectName! })
-      return crumbs
-    }
-
-    crumbs.push(projCrumb)
-
-    const subMap: Record<string, string> = {
-      docs: 'Documents',
-      campaigns: 'Campaigns',
-      suites: 'Suites',
-      traceability: 'Traceability Matrix',
-      'impact-analysis': 'Impact Analysis',
-      parameters: 'Parameters',
-      baselines: 'Baselines',
-      defects: 'Defects',
-      edit: 'Edit project',
-    }
-
-    if (sub === 'docs') {
-      const docTypeFromQuery = normalizeDocTypeParam(new URLSearchParams(location.search).get('type'))
-      const docTypeFromPath = parts[4] !== 'new' ? normalizeDocTypeParam(parts[4]) : null
-      const resolvedDocType = docTypeFromQuery ?? docTypeFromPath
-      const docLabel = resolvedDocType ? (TYPE_PAGE_TITLE[resolvedDocType] || 'Documents') : 'Documents'
-      const docsHref = resolvedDocType
-        ? docRegistryListUrl(slug, resolvedDocType)
-        : docRegistryListUrl(slug)
-      if (parts[4] === 'new') {
-        crumbs.push({ label: docLabel, href: docsHref })
-        crumbs.push({ label: 'New' })
-      } else if (parts[4] && parts[5]) {
-        crumbs.push({ label: docLabel, href: docsHref })
-        if (parts[6] === 'edit') {
-          crumbs.push({ label: parts[5], href: `/projects/${slug}/docs/${parts[4]}/${parts[5]}` })
-          crumbs.push({ label: 'Edit' })
-        } else {
-          crumbs.push({ label: parts[5] })
-        }
-      } else {
-        crumbs.push({ label: docLabel })
-      }
-    } else if (sub === 'campaigns' && parts[4]) {
-      crumbs.push({ label: 'Campaigns', href: `/projects/${slug}/campaigns` })
-      crumbs.push({ label: pageCrumbLabel || parts[4] })
-    } else if (sub === 'suites' && parts[4]) {
-      crumbs.push({ label: 'Suites', href: docRegistryListUrl(slug, 'TS') })
-      crumbs.push({ label: pageCrumbLabel || parts[4] })
-    } else if (subMap[sub]) {
-      crumbs.push({ label: subMap[sub] })
-    }
-  }
-
-  return crumbs
 }

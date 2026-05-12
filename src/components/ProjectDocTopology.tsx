@@ -33,6 +33,7 @@ import {
 } from 'lucide-react'
 
 import { docsApi, linksApi } from '../api/client'
+import { docRegistryListUrl } from '../lib/docRegistryParams'
 import { DOC_TYPE_LABELS, type DocType } from '../types/doc'
 import TopologyLinkEdge, { type TopologyLinkData } from './TopologyLinkEdge'
 
@@ -40,7 +41,7 @@ import TopologyLinkEdge, { type TopologyLinkData } from './TopologyLinkEdge'
 // Type-level visual config
 // ────────────────────────────────────────────────────────────────────────────
 
-const TYPE_ORDER: DocType[] = ['REQ', 'SPEC', 'STD', 'DES', 'RSK', 'CHG', 'TCO', 'TC', 'PROT', 'RPT']
+const TYPE_ORDER: DocType[] = ['REQ', 'SPEC', 'STD', 'DES', 'RSK', 'CHG', 'CPT', 'TC', 'PRT', 'RPT']
 
 interface TypeStyle {
   icon: LucideIcon
@@ -76,7 +77,7 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
     countText: 'text-cyan-900 dark:text-cyan-200',
     accent: '#0891b2',
   },
-  TCO: {
+  CPT: {
     icon: Beaker,
     borderTop: 'border-t-emerald-600',
     surface: 'bg-gradient-to-br from-emerald-500/10 to-card ring-1 ring-emerald-500/10',
@@ -84,7 +85,7 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
     countText: 'text-emerald-900 dark:text-emerald-200',
     accent: '#059669',
   },
-  PROT: {
+  PRT: {
     icon: BookOpen,
     borderTop: 'border-t-teal-600',
     surface: 'bg-gradient-to-br from-teal-500/10 to-card ring-1 ring-teal-500/10',
@@ -558,7 +559,7 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
       const data = node.data as unknown as TypeNodeData
-      navigate(`/projects/${prefix}/docs?type=${data.docType}`)
+      navigate(docRegistryListUrl(prefix, data.docType))
     },
     [navigate, prefix],
   )

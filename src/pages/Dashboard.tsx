@@ -1,12 +1,9 @@
-import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import {
-  AlertTriangle,
   ArrowRight,
   BarChart3,
   Bug,
-  CheckCircle,
   CircleDot,
   FileText,
   FlaskConical,
@@ -15,15 +12,10 @@ import {
   Plus,
 } from 'lucide-react'
 
-import { dashboardApi, docsApi, projectsApi, type DocShell, type Project } from '../api/client'
+import { dashboardApi, projectsApi, type Project } from '../api/client'
 import { DOC_TYPE_COLORS, DOC_TYPE_LABELS, type DocType } from '../types/doc'
 
-const CONTROLLED_DOC_TYPES: DocType[] = ['REQ', 'SPEC', 'TC', 'TCO', 'PROT', 'DES', 'RSK', 'CHG', 'RPT', 'STD']
-
-type ProjectDocBundle = {
-  project: Project
-  docs: DocShell[]
-}
+const CONTROLLED_DOC_TYPES: DocType[] = ['REQ', 'SPEC', 'TC', 'CPT', 'PRT', 'DES', 'RSK', 'CHG', 'RPT', 'STD']
 
 export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -36,23 +28,7 @@ export default function Dashboard() {
     queryFn: projectsApi.list,
   })
 
-  const projectPrefixes = useMemo(() => projects?.map((project) => project.prefix).sort().join('|') ?? '', [projects])
-
-  const { data: projectDocBundles, isLoading: docsLoading } = useQuery({
-    queryKey: ['dashboard-controlled-docs', projectPrefixes],
-    queryFn: async (): Promise<ProjectDocBundle[]> => {
-      if (!projects || projects.length === 0) return []
-      return Promise.all(
-        projects.map(async (project) => ({
-          project,
-          docs: await docsApi.list(project.prefix, { includeLinkCounts: true }),
-        }))
-      )
-    },
-    enabled: !!projects,
-  })
-
-  if (statsLoading || projectsLoading || docsLoading) {
+  if (statsLoading || projectsLoading) {
     return <DashboardSkeleton />
   }
 
@@ -78,19 +54,13 @@ export default function Dashboard() {
   }
 
   const portfolioProjects = projects ?? []
-  const docBundles = projectDocBundles ?? []
-  const docsByProject = new Map(docBundles.map((bundle) => [bundle.project.id, bundle.docs]))
-  const allDocs = docBundles.flatMap((bundle) => bundle.docs)
-
   const fallbackKindCounts = buildFallbackKindCounts(portfolioProjects, s.total_requirements, s.total_test_cases)
-  const kindCounts = allDocs.length > 0 ? countByDocType(allDocs) : fallbackKindCounts
-  const statusDistribution = allDocs.length > 0 ? countByStatus(allDocs) : mergeDistributions(s.requirement_status_distribution, s.test_case_status_distribution)
-  const totalControlledDocs = sumRecord(kindCounts)
+  const kindCounts = fallbackKindCounts
+  const statusDistribution = mergeDistributions(s.requirement_status_distribution, s.test_case_status_distribution)
+  const totalControlledDocs = sumKindCounts(kindCounts)
   const activeProjects = portfolioProjects.filter((project) => project.status === 'Active').length || s.active_projects
-  const coveredRequirements = Math.max(0, s.total_requirements - s.uncovered_requirements)
-  const coverageTone = getCoverageTone(s.coverage_percent)
-  const suspectLinks = allDocs.reduce((total, doc) => total + doc.suspect_links, 0)
-  const linkedDocs = allDocs.filter((doc) => doc.incoming_links + doc.outgoing_links > 0).length
+  const suspectLinks = 0
+  const linkedDocs = 0
   const usedKindCount = CONTROLLED_DOC_TYPES.filter((type) => (kindCounts[type] ?? 0) > 0).length
 
   return (
@@ -144,7 +114,7 @@ export default function Dashboard() {
           <div className="flex flex-col gap-2 border-b border-border px-3.5 py-2.5 md:flex-row md:items-center md:justify-between">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Project Document Scope</h3>
-              <p className="mt-1 text-xs text-muted-foreground">Counts come from the canonical project docs registry.</p>
+              <p className="mt-1 text-xs text-muted-foreground">All projects from the portfolio registry ({portfolioProjects.length} total).</p>
             </div>
             <Link to="/projects" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:text-primary/80">
               View projects
@@ -155,26 +125,24 @@ export default function Dashboard() {
           {portfolioProjects.length === 0 ? (
             <EmptyState />
           ) : (
+            <div className="max-h-[28rem] overflow-y-auto">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-border">
-                <thead className="bg-muted/40">
+                <thead className="sticky top-0 z-10 bg-muted/40">
                   <tr>
                     <Th>Project</Th>
                     <Th>Status</Th>
                     <Th>Docs</Th>
                     <Th>REQ</Th>
-                    <Th>SPEC/PROT</Th>
+                    <Th>TC</Th>
                     <Th>RSK/CHG</Th>
-                    <Th>Suspect</Th>
                     <Th />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border bg-card">
-                  {portfolioProjects.slice(0, 8).map((project) => {
-                    const projectDocs = docsByProject.get(project.id) ?? []
-                    const projectKindCounts = projectDocs.length > 0 ? countByDocType(projectDocs) : countProjectFallbackKinds(project)
-                    const projectSuspectLinks = projectDocs.reduce((total, doc) => total + doc.suspect_links, 0)
-                    const projectDocCount = sumRecord(projectKindCounts)
+                  {portfolioProjects.map((project) => {
+                    const projectKindCounts = countProjectFallbackKinds(project)
+                    const projectDocCount = sumKindCounts(projectKindCounts)
                     return (
                       <tr key={project.id} className="transition-colors hover:bg-accent/50">
                         <Td>
@@ -188,13 +156,8 @@ export default function Dashboard() {
                         <Td><StatusBadge status={project.status} /></Td>
                         <Td>{projectDocCount}</Td>
                         <Td>{projectKindCounts.REQ}</Td>
-                        <Td>{projectKindCounts.SPEC + projectKindCounts.PROT}</Td>
+                        <Td>{projectKindCounts.TC}</Td>
                         <Td>{projectKindCounts.RSK + projectKindCounts.CHG}</Td>
-                        <Td>
-                          <span className={projectSuspectLinks > 0 ? 'font-medium text-red-600 dark:text-red-400' : 'text-muted-foreground'}>
-                            {projectSuspectLinks}
-                          </span>
-                        </Td>
                         <Td>
                           <Link
                             to={`/projects/${project.prefix}/docs`}
@@ -210,29 +173,11 @@ export default function Dashboard() {
                 </tbody>
               </table>
             </div>
+            </div>
           )}
         </div>
 
         <aside className="space-y-3.5">
-            <div className="rounded-lg border border-border bg-card p-3.5">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground">Verification Coverage</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                  {coveredRequirements} covered · {s.uncovered_requirements} uncovered requirements
-                </p>
-              </div>
-              <div className={`rounded-md px-2.5 py-1 text-sm font-semibold ${coverageTone.badge}`}>{s.coverage_percent}%</div>
-            </div>
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
-              <div className={`h-full rounded-full ${coverageTone.bar}`} style={{ width: `${s.coverage_percent}%` }} />
-            </div>
-              <div className="mt-3.5 grid grid-cols-2 gap-2 text-sm">
-                <SignalStat label="Covered" value={coveredRequirements} icon={CheckCircle} />
-                <SignalStat label="At risk" value={s.uncovered_requirements} icon={AlertTriangle} />
-              </div>
-            </div>
-
           <DocKindPanel kindCounts={kindCounts} total={totalControlledDocs} />
 
           <DistributionPanel
@@ -294,8 +239,7 @@ export default function Dashboard() {
             <GitBranch className="h-4 w-4 text-primary" />
             <h3 className="text-sm font-semibold text-foreground">Traceability Focus</h3>
           </div>
-          <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <TraceabilityTile label="Coverage" value={`${s.coverage_percent}%`} tone={coverageTone.text} />
+          <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
             <TraceabilityTile label="Suspect links" value={suspectLinks} tone={suspectLinks > 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'} />
             <TraceabilityTile label="Linked docs" value={linkedDocs} tone="text-foreground" />
           </div>
@@ -366,7 +310,7 @@ function DocKindPanel({ kindCounts, total }: { kindCounts: Record<DocType, numbe
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <FileText className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-semibold text-foreground">Controlled Document Kinds</h3>
+          <h3 className="text-sm font-semibold text-foreground">Documents</h3>
         </div>
         <span className="text-xs text-muted-foreground">{total} total</span>
       </div>
@@ -429,18 +373,6 @@ function DistributionPanel({ id, title, icon: Icon, data, total, emptyMessage, c
           })}
         </div>
       )}
-    </div>
-  )
-}
-
-function SignalStat({ label, value, icon: Icon }: { label: string; value: number; icon: React.ComponentType<{ className?: string }> }) {
-  return (
-    <div className="rounded-md border border-border bg-background/60 p-2">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Icon className="h-3.5 w-3.5" />
-        {label}
-      </div>
-      <div className="mt-1 text-lg font-semibold text-foreground">{value}</div>
     </div>
   )
 }
@@ -514,10 +446,6 @@ function DashboardSkeleton() {
   )
 }
 
-function isDocType(value: string): value is DocType {
-  return CONTROLLED_DOC_TYPES.includes(value as DocType)
-}
-
 function emptyKindCounts(): Record<DocType, number> {
   return CONTROLLED_DOC_TYPES.reduce((acc, type) => {
     acc[type] = 0
@@ -525,80 +453,47 @@ function emptyKindCounts(): Record<DocType, number> {
   }, {} as Record<DocType, number>)
 }
 
-function countByDocType(docs: DocShell[]): Record<DocType, number> {
-  const counts = emptyKindCounts()
-  docs.forEach((doc) => {
-    if (isDocType(doc.doc_type)) {
-      counts[doc.doc_type] += 1
-    }
-  })
-  return counts
-}
-
-function countByStatus(docs: DocShell[]): Record<string, number> {
-  return docs.reduce((acc, doc) => {
-    acc[doc.status] = (acc[doc.status] ?? 0) + 1
-    return acc
-  }, {} as Record<string, number>)
+function coerceCount(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
 
 function countProjectFallbackKinds(project: Project): Record<DocType, number> {
   const counts = emptyKindCounts()
-  counts.REQ = project.requirement_count
-  counts.TC = project.test_case_count
-  counts.DES = project.design_count
-  counts.RSK = project.risk_count
-  counts.CHG = project.change_count
-  counts.TCO = project.test_concept_count
+  counts.REQ = coerceCount(project.requirement_count)
+  counts.TC = coerceCount(project.test_case_count)
+  counts.DES = coerceCount(project.design_count)
+  counts.RSK = coerceCount(project.risk_count)
+  counts.CHG = coerceCount(project.change_count)
+  counts.CPT = coerceCount(project.test_concept_count)
   return counts
 }
 
 function buildFallbackKindCounts(projects: Project[], requirementTotal: number, testCaseTotal: number): Record<DocType, number> {
   const counts = emptyKindCounts()
-  counts.REQ = requirementTotal
-  counts.TC = testCaseTotal
+  counts.REQ = coerceCount(requirementTotal)
+  counts.TC = coerceCount(testCaseTotal)
   projects.forEach((project) => {
-    counts.DES += project.design_count
-    counts.RSK += project.risk_count
-    counts.CHG += project.change_count
-    counts.TCO += project.test_concept_count
+    counts.DES += coerceCount(project.design_count)
+    counts.RSK += coerceCount(project.risk_count)
+    counts.CHG += coerceCount(project.change_count)
+    counts.CPT += coerceCount(project.test_concept_count)
   })
   return counts
+}
+
+function sumKindCounts(record: Record<DocType, number>) {
+  return CONTROLLED_DOC_TYPES.reduce((total, type) => total + coerceCount(record[type]), 0)
 }
 
 function mergeDistributions(...distributions: Record<string, number>[]): Record<string, number> {
   return distributions.reduce((acc, distribution) => {
     Object.entries(distribution).forEach(([status, count]) => {
-      acc[status] = (acc[status] ?? 0) + count
+      acc[status] = (acc[status] ?? 0) + coerceCount(count)
     })
     return acc
   }, {} as Record<string, number>)
 }
 
 function sumRecord(record: Record<string, number>) {
-  return Object.values(record).reduce((total, value) => total + value, 0)
-}
-
-function getCoverageTone(coverage: number) {
-  if (coverage >= 80) {
-    return {
-      badge: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-      bar: 'bg-emerald-500',
-      text: 'text-emerald-700 dark:text-emerald-300',
-    }
-  }
-
-  if (coverage >= 50) {
-    return {
-      badge: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
-      bar: 'bg-amber-500',
-      text: 'text-amber-700 dark:text-amber-300',
-    }
-  }
-
-  return {
-    badge: 'bg-red-500/10 text-red-700 dark:text-red-300',
-    bar: 'bg-red-500',
-    text: 'text-red-700 dark:text-red-300',
-  }
+  return Object.values(record).reduce((total, value) => total + coerceCount(value), 0)
 }

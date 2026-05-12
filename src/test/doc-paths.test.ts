@@ -14,6 +14,8 @@ describe('normalizeDocTypeParam', () => {
     expect(normalizeDocTypeParam('SPEC')).toBe('SPEC')
     expect(normalizeDocTypeParam('specifications')).toBe('SPEC')
     expect(normalizeDocTypeParam('test-cases')).toBe('TC')
+    expect(normalizeDocTypeParam('TCO')).toBe('CPT')
+    expect(normalizeDocTypeParam('PROT')).toBe('PRT')
   })
 
   it('returns null for unknown values', () => {
@@ -37,12 +39,12 @@ describe('getDocLinkOptions', () => {
   })
 
   it('keeps forward semantics when the current document is the source side', () => {
-    expect(getDocLinkOptions('TCO', 'TC')).toEqual([
+    expect(getDocLinkOptions('CPT', 'TC')).toEqual([
       {
-        key: 'TCO:implements:TC:outgoing',
+        key: 'CPT:implements:TC:outgoing',
         label: 'implements',
         role: 'implements',
-        sourceType: 'TCO',
+        sourceType: 'CPT',
         targetType: 'TC',
         displayDirection: 'outgoing',
       },
@@ -58,8 +60,11 @@ describe('getAllowedDocLinkRoles', () => {
   it('summarizes the pair-aware relationship table as a deduplicated role list', () => {
     expect(getAllowedDocLinkRoles('REQ', 'TC')).toEqual(['verifies'])
     expect(getAllowedDocLinkRoles('REQ', 'DES')).toEqual(['satisfies', 'implements', 'references'])
+    expect(getAllowedDocLinkRoles('REQ', 'SPEC')).toEqual(['derives_from', 'refines', 'references'])
     expect(getAllowedDocLinkRoles('TC', 'DES')).toEqual([])
-    expect(getAllowedDocLinkRoles('TCO', 'SPEC')).toEqual(['verifies', 'references'])
+    expect(getAllowedDocLinkRoles('CPT', 'SPEC')).toEqual(['covers', 'verifies', 'references'])
+    expect(getAllowedDocLinkRoles('CMP', 'REQ')).toEqual(['covers', 'references'])
+    expect(getAllowedDocLinkRoles('TS', 'REQ')).toEqual(['covers', 'references'])
   })
 
   it('returns no roles for unknown document kinds', () => {
@@ -84,5 +89,7 @@ describe('getDocLinkRoleLabel', () => {
     expect(getDocLinkRoleLabel('derives_from', 'outgoing')).toBe('derives from')
     expect(getDocLinkRoleLabel('derives_from', 'incoming')).toBe('derived by')
     expect(getDocLinkRoleLabel('references', 'incoming')).toBe('referenced by')
+    expect(getDocLinkRoleLabel('covers', 'incoming')).toBe('covered by')
+    expect(getDocLinkRoleLabel('contains', 'incoming')).toBe('contained by')
   })
 })

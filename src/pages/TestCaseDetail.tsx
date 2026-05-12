@@ -1,4 +1,5 @@
 import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   type TcsRow,
@@ -8,13 +9,18 @@ import {
 } from '../api/client'
 import { TcsArteTable } from '../components/TcsArteTable'
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
+import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import { normalizeTcsRows } from '../utils/tcs'
-import { Pencil, UserCheck, UserCog } from 'lucide-react'
+import { Pencil, UserCheck, UserCog, Trash2 } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
 import { docEditUrl } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocDetailShell, { MetaItem, SectionCard } from '../components/DocDetailShell'
 import { useAuth } from '../contexts/AuthContext'
+import {
+  membershipLinksForCampaigns,
+  membershipLinksForSuites,
+} from '../lib/membershipLinks'
 
 function normalizeSteps(steps: unknown): TcsRow[] {
   return normalizeTcsRows(steps) as TcsRow[]
@@ -23,15 +29,6 @@ function normalizeSteps(steps: unknown): TcsRow[] {
 function resolveUserName(users: Array<{ id: number; full_name: string }> | undefined, userId: number | null) {
   if (!userId) return 'Unassigned'
   return users?.find((u) => u.id === userId)?.full_name || `User #${userId}`
-}
-
-function MembershipPanel({ title, countLabel, emptyText, children }: { title: string; countLabel: string; emptyText: string; children: React.ReactNode }) {
-  const hasChildren = Array.isArray(children) ? children.length > 0 : Boolean(children)
-  return (
-    <SectionCard title={title} actions={<span className="text-sm text-muted-foreground">{countLabel}</span>}>
-      {hasChildren ? <div className="divide-y divide-border -mx-6 -mb-6">{children}</div> : <p className="text-muted-foreground">{emptyText}</p>}
-    </SectionCard>
-  )
 }
 
 function ExecutionBadge({ status }: { status: string }) {
@@ -71,10 +68,29 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
     queryFn: usersApi.list,
   })
 
+  const derivedMembershipLinks = useMemo(() => {
+    if (!testCase) return []
+    return [
+      ...membershipLinksForSuites(
+        testCase.suite_memberships,
+        'TC',
+        testCase.id,
+        testCase.project_id,
+      ),
+      ...membershipLinksForCampaigns(
+        testCase.campaign_memberships,
+        'TC',
+        testCase.id,
+        testCase.project_id,
+      ),
+    ]
+  }, [testCase])
+
   const markReviewedMutation = useMutation({
     mutationFn: (reviewedById: number) => testCasesApi.setReviewed(tcId, reviewedById),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['testCase', tcId] })
+      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'test-case', tcId] })
     },
   })
 
@@ -82,6 +98,19 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
     mutationFn: (approvedById: number) => testCasesApi.setApproved(tcId, approvedById),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['testCase', tcId] })
+      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'test-case', tcId] })
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => testCasesApi.delete(tcId),
+    onSuccess: () => {
+      if (!testCase) return
+      queryClient.invalidateQueries({ queryKey: ['testCases', testCase.project_id] })
+      queryClient.invalidateQueries({ queryKey: ['all-docs', prefix] })
+      queryClient.invalidateQueries({ queryKey: ['project', testCase.project_id] })
+      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'test-case', tcId] })
+      navigate(docRegistryListUrl(prefix!, 'TC'))
     },
   })
 
@@ -113,13 +142,27 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
       title={testCase.title}
       status={testCase.status}
       actions={canEditDocs ? (
-        <button
-          onClick={() => navigate(`${editUrl}?type=TC`)}
-          className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
-        >
-          <Pencil className="h-4 w-4 mr-2" />
-          Edit
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate(`${editUrl}?type=TC`)}
+            className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
+          >
+            <Pencil className="h-4 w-4 mr-2" />
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!window.confirm(`Delete test case ${testCase.tc_id}?`)) return
+              deleteMutation.mutate()
+            }}
+            disabled={deleteMutation.isPending}
+            className="inline-flex items-center gap-1.5 px-4 py-2 border border-destructive/30 text-destructive rounded-md hover:bg-destructive/10 disabled:opacity-50 text-sm"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </button>
+        </div>
       ) : undefined}
       rightRail={
         <>
@@ -216,43 +259,18 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
         <TcsArteTable rows={tcsRows} onChange={() => {}} editable={false} />
       )}
 
+      <DocumentActivityPanel artefactType="test-case" artefactId={tcId} />
+
       {project && (
         <DocumentLinksPanel
           projectId={testCase.project_id}
           projectPrefix={project.prefix}
           sourceType="TC"
           sourceId={testCase.id}
+          derivedLinks={derivedMembershipLinks}
         />
       )}
 
-      <MembershipPanel
-        title="Contained In Suites"
-        countLabel={`${testCase.suite_memberships?.length || 0} suite${(testCase.suite_memberships?.length || 0) !== 1 ? 's' : ''}`}
-        emptyText="This test case is not part of any suite yet."
-      >
-        {testCase.suite_memberships?.map((suite) => (
-          <div key={suite.id} className="px-6 py-4 flex items-center justify-between">
-            <div>
-              <div className="font-mono text-sm text-primary">{suite.suite_id}</div>
-              <div className="text-foreground mt-1">{suite.name}</div>
-            </div>
-            <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">{suite.status}</span>
-          </div>
-        ))}
-      </MembershipPanel>
-
-      <MembershipPanel
-        title="Included In Campaign Scopes"
-        countLabel={`${testCase.campaign_memberships?.length || 0} campaign${(testCase.campaign_memberships?.length || 0) !== 1 ? 's' : ''}`}
-        emptyText="This test case is not included in any campaign scope yet."
-      >
-        {testCase.campaign_memberships?.map((campaign) => (
-          <div key={campaign.id} className="px-6 py-4 flex items-center justify-between">
-            <div className="text-foreground">{campaign.name}</div>
-            <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">{campaign.status}</span>
-          </div>
-        ))}
-      </MembershipPanel>
     </DocDetailShell>
   )
 }
