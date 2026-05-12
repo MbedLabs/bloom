@@ -200,6 +200,7 @@ function ExecutionBadge({ status }: { status: string | null }) {
 }
 
 export default function Documents() {
+  const { prefix } = useParams<{ prefix: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
   const [filtersOpen, setFiltersOpen] = useState(false)
   const typeFilters = useMemo(

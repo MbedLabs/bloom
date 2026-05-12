@@ -1,0 +1,32 @@
+Bloom UI diff inventory: f91dbac (A) -> 61bc403 / origin/main (B)
+Generated for consensus workflow. Tags: UI | API | DEPS | TEST
+
+.gitignore                    DEPS
+package-lock.json             DEPS
+package.json                  DEPS
+vite.config.ts                DEPS + TEST harness
+src/api/client.ts             API
+src/components/DocumentLinksPanel.tsx  UI
+src/components/Layout.tsx     UI
+src/lib/docRegistryParams.ts  UI + routing
+src/pages/ArtefactDetail.tsx  UI
+src/pages/CampaignDetail.tsx  UI
+src/pages/DocCreate.tsx       UI
+src/pages/Documents.tsx       UI
+src/pages/ProjectDetail.tsx   UI
+src/pages/RequirementDetail.tsx  UI
+src/pages/SuiteDetail.tsx     UI
+src/pages/TestCaseDetail.tsx  UI
+src/types/doc.ts              UI + contracts
+src/test/doc-registry-params.test.ts  TEST
+src/test/pages-smoke.test.tsx TEST
+src/test/vitest-setup.ts      TEST
+
+--- Consensus ledger (ui-consensus branch) ---
+docRegistryParams.ts, types/doc.ts, client.ts, *Detail (except Artefact): Keep (B) — no code change.
+Layout.tsx: Merge — Keep B + fix Suites crumb TS; New/Edit type labels; TS in TYPE_PAGE_TITLE.
+Documents.tsx: Merge — Keep B sort/session + direct New links; type-specific empty state; TS in options.
+DocCreate.tsx: Keep (B) — no change.
+ArtefactDetail.tsx: Merge — defect overview plain description.
+ProjectDetail.tsx: Keep (A) behaviors — legacy ?tab= redirect + defects query/tile restored.
+CampaignDetail.tsx diff (B removes lines): Keep (B) — unchanged.
