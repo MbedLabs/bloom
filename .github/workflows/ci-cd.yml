@@ -88,6 +88,7 @@ jobs:
           SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
           ENABLE_DOCS: "false"
           BLOOM_DOTENV_DISABLED: "1"
+          BLOOM_DISABLE_RATE_LIMIT: "1"
         run: |
           pytest --cov=app --cov-report=xml --cov-report=term-missing tests/ -v
 
