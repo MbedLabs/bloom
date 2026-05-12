@@ -25,6 +25,7 @@ from app.models import (
     TestCampaign,
     TestCase,
     TestConcept,
+    TestSuite,
 )
 from app.models.user import User, UserRole
 from app.schemas import ArtefactLinkCreate, ArtefactLinkResponse
@@ -37,9 +38,10 @@ ARTEFACT_MODELS = {
     "DES": DesignItem,
     "RSK": RiskItem,
     "CHG": ChangeRequest,
-    "TCO": TestConcept,
+    "CPT": TestConcept,
     "DEF": Defect,
     "CMP": TestCampaign,
+    "TS": TestSuite,
 }
 
 

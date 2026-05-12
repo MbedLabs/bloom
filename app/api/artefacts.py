@@ -5,12 +5,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
+    artefact_public_id,
     build_activity_response,
     build_related_response,
-    build_status_summary,
     get_allowed_transitions,
     get_artefact_or_404,
     log_artefact_activity,
+    log_workflow_status_transition,
 )
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
@@ -144,12 +145,14 @@ async def transition_status(
     current_status = artefact.status
     artefact.status = data.status
     await db.flush()
-    await log_artefact_activity(
+    await log_workflow_status_transition(
         db,
-        artefact_type,
-        artefact_id,
-        "status_changed",
-        build_status_summary(current_user, current_status, data.status),
+        artefact_type=artefact_type,
+        artefact_id=artefact_id,
+        public_id=artefact_public_id(artefact_type, artefact),
+        actor=current_user,
+        previous_status=current_status,
+        next_status=data.status,
     )
     return {
         "status": artefact.status,

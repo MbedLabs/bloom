@@ -4,7 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.artefact_utils import log_artefact_activity
+from app.api.artefact_utils import (
+    log_artefact_activity,
+    log_document_workflow_activity_from_patch,
+    should_log_generic_document_update,
+)
 from app.api.link_read_utils import merged_linked_requirement_ids_for_test_concept
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
@@ -62,7 +66,7 @@ async def create_test_concept(
         raise HTTPException(status_code=404, detail="Project not found")
 
     concept_id = await next_doc_id(
-        db, TestConcept, TestConcept.concept_id, data.project_id, project.prefix, "TCO"
+        db, TestConcept, TestConcept.concept_id, data.project_id, project.prefix, "CPT"
     )
 
     existing = await db.execute(
@@ -123,18 +127,32 @@ async def update_test_concept(
     if not item:
         raise HTTPException(status_code=404, detail="Test concept not found")
 
+    fields_set = data.model_fields_set
+    previous_status = item.status if "status" in fields_set else None
+
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(item, field, value)
 
     await db.flush()
     await db.refresh(item)
-    await log_artefact_activity(
+    await log_document_workflow_activity_from_patch(
         db,
-        "test-concept",
-        item.id,
-        "updated",
-        f"{current_user.full_name} updated test concept {item.concept_id}",
+        artefact_type="test-concept",
+        artefact_id=item.id,
+        public_id=item.concept_id,
+        actor=current_user,
+        fields_set=fields_set,
+        previous_status=previous_status,
+        next_status=item.status,
     )
+    if should_log_generic_document_update(fields_set):
+        await log_artefact_activity(
+            db,
+            "test-concept",
+            item.id,
+            "updated",
+            f"{current_user.full_name} updated test concept {item.concept_id}",
+        )
     return await _response(db, item)
 
 

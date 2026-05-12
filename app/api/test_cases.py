@@ -8,6 +8,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.artefact_utils import (
+    log_artefact_activity,
+    log_document_workflow_activity_from_patch,
+    should_log_generic_document_update,
+)
 from app.api.link_read_utils import (
     VERIFY_LINK_ROLE,
     VERIFY_SOURCE_TYPE,
@@ -228,7 +233,7 @@ async def list_test_cases(
 async def create_test_case(
     data: TestCaseCreate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     """
     Create a new test case; server assigns tc_id.
@@ -265,6 +270,13 @@ async def create_test_case(
     db.add(test_case)
     await db.flush()
     await db.refresh(test_case)
+    await log_artefact_activity(
+        db,
+        "test-case",
+        test_case.id,
+        "created",
+        f"{current_user.full_name} created test case {test_case.tc_id}",
+    )
 
     return await _build_test_case_response(test_case, db)
 
@@ -292,7 +304,7 @@ async def update_test_case(
     test_case_id: int,
     data: TestCaseUpdate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     """
     Update a test case.
@@ -302,6 +314,9 @@ async def update_test_case(
 
     if not test_case:
         raise HTTPException(status_code=404, detail="Test case not found")
+
+    fields_set = data.model_fields_set
+    previous_status = test_case.status if "status" in fields_set else None
 
     if data.title is not None:
         test_case.title = data.title
@@ -313,7 +328,6 @@ async def update_test_case(
         test_case.steps = data.steps
     if data.status is not None:
         test_case.status = data.status
-    fields_set = data.model_fields_set
 
     if "reviewer_id" in fields_set:
         if data.reviewer_id is None:
@@ -362,6 +376,24 @@ async def update_test_case(
 
     await db.flush()
     await db.refresh(test_case)
+    await log_document_workflow_activity_from_patch(
+        db,
+        artefact_type="test-case",
+        artefact_id=test_case.id,
+        public_id=test_case.tc_id,
+        actor=current_user,
+        fields_set=fields_set,
+        previous_status=previous_status,
+        next_status=test_case.status,
+    )
+    if should_log_generic_document_update(fields_set):
+        await log_artefact_activity(
+            db,
+            "test-case",
+            test_case.id,
+            "updated",
+            f"{current_user.full_name} updated test case {test_case.tc_id}",
+        )
 
     return await _build_test_case_response(test_case, db)
 
@@ -370,7 +402,7 @@ async def update_test_case(
 async def delete_test_case(
     test_case_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     """
     Delete a test case.
@@ -381,4 +413,11 @@ async def delete_test_case(
     if not test_case:
         raise HTTPException(status_code=404, detail="Test case not found")
 
+    await log_artefact_activity(
+        db,
+        "test-case",
+        test_case.id,
+        "deleted",
+        f"{current_user.full_name} deleted test case {test_case.tc_id}",
+    )
     await db.delete(test_case)

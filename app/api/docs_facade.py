@@ -44,6 +44,8 @@ class DocShellResponse(BaseModel):
     title: str
     status: str
     priority: str | None = None
+    req_type: str | None = None
+    req_origin: str | None = None
     project_id: int
     reviewer_id: int | None = None
     incoming_links: int = 0
@@ -79,7 +81,7 @@ TYPE_MAP = {
     "DES": (DesignItem, "design_id", "designs"),
     "RSK": (RiskItem, "risk_id", "risks"),
     "CHG": (ChangeRequest, "change_id", "changes"),
-    "TCO": (TestConcept, "concept_id", "test-concepts"),
+    "CPT": (TestConcept, "concept_id", "test-concepts"),
     "DEF": (Defect, "defect_id", "defects"),
     "CMP": (TestCampaign, "campaign_id", "campaigns"),
     "TS": (TestSuite, "suite_id", "test-suites"),
@@ -214,6 +216,8 @@ async def list_all_docs(
                     title=title_val,
                     status=row.status,
                     priority=_get_priority(model, row),
+                    req_type=row.req_type if type_code == "REQ" else None,
+                    req_origin=row.req_origin if type_code == "REQ" else None,
                     project_id=project.id,
                     reviewer_id=_get_reviewer_id(model, row),
                     incoming_links=lc["incoming"],

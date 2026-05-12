@@ -9,7 +9,11 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.artefact_utils import log_artefact_activity
+from app.api.artefact_utils import (
+    log_artefact_activity,
+    log_document_workflow_activity_from_patch,
+    should_log_generic_document_update,
+)
 from app.core.database import get_db
 from app.core.external_issue import validate_external_fields
 from app.core.id_generator import next_doc_id
@@ -126,6 +130,8 @@ async def update_defect(
     if not item:
         raise HTTPException(status_code=404, detail="Defect not found")
 
+    fields_set = data.model_fields_set
+    previous_status = item.status if "status" in fields_set else None
     updates = data.model_dump(exclude_unset=True)
 
     merged_tracker = updates.get("external_tracker", item.external_tracker)
@@ -148,13 +154,24 @@ async def update_defect(
 
     await db.flush()
     await db.refresh(item)
-    await log_artefact_activity(
+    await log_document_workflow_activity_from_patch(
         db,
-        "defect",
-        item.id,
-        "updated",
-        f"{current_user.full_name} updated defect {item.defect_id}",
+        artefact_type="defect",
+        artefact_id=item.id,
+        public_id=item.defect_id,
+        actor=current_user,
+        fields_set=fields_set,
+        previous_status=previous_status,
+        next_status=item.status,
     )
+    if should_log_generic_document_update(fields_set):
+        await log_artefact_activity(
+            db,
+            "defect",
+            item.id,
+            "updated",
+            f"{current_user.full_name} updated defect {item.defect_id}",
+        )
 
     syncable_fields = {"title", "status", "description"}
     changed_sync_fields = {k: v for k, v in updates.items() if k in syncable_fields}

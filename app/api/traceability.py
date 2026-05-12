@@ -3,6 +3,7 @@ Traceability API endpoints: matrix, impact analysis, coverage gaps.
 Cross-requirement relationships use POST /api/links (ArtefactLink).
 """
 
+import re
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -30,6 +31,10 @@ from app.schemas import (
 )
 
 router = APIRouter()
+
+
+def _req_id_sort_key(req_id: str) -> list:
+    return [int(part) if part.isdigit() else part.casefold() for part in re.split(r"(\d+)", req_id)]
 
 
 async def _build_req_response(req: Requirement, db: AsyncSession) -> RequirementResponse:
@@ -148,11 +153,21 @@ async def get_traceability_matrix(
     coverage_order = {"Uncovered": 0, "Partial": 1, "Covered": 2}
 
     if sort_by == "priority":
-        items.sort(key=lambda i: priority_order.get(i.requirement.priority, 99))
+        items.sort(
+            key=lambda i: (
+                priority_order.get(i.requirement.priority, 99),
+                _req_id_sort_key(i.requirement.req_id),
+            )
+        )
     elif sort_by == "coverage":
-        items.sort(key=lambda i: coverage_order.get(i.coverage_status, 99))
+        items.sort(
+            key=lambda i: (
+                coverage_order.get(i.coverage_status, 99),
+                _req_id_sort_key(i.requirement.req_id),
+            )
+        )
     else:
-        items.sort(key=lambda i: i.requirement.req_id)
+        items.sort(key=lambda i: _req_id_sort_key(i.requirement.req_id))
 
     return items
 

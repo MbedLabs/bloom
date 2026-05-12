@@ -122,12 +122,12 @@ async def iter_req_req_outgoing_neighbors(req_id: int, project_id: int, db: Asyn
 async def merged_linked_requirement_ids_for_test_concept(
     db: AsyncSession, concept_id: int, stored_ids: list | None
 ) -> list[int]:
-    """REQ ids linked to a test concept via artefact_links (TCO->REQ) plus legacy JSON column."""
+    """REQ ids linked to a test concept via artefact_links (CPT->REQ) plus legacy JSON column."""
     from_links = (
         (
             await db.execute(
                 select(ArtefactLink.target_id).where(
-                    ArtefactLink.source_type == "TCO",
+                    ArtefactLink.source_type == "CPT",
                     ArtefactLink.source_id == concept_id,
                     ArtefactLink.target_type == "REQ",
                 )

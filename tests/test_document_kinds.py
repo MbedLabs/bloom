@@ -26,7 +26,7 @@ class _RowsResult:
 def test_normalize_document_kind_maps_legacy_values_to_canonical_codes():
     assert normalize_document_kind("DOC") == "SPEC"
     assert normalize_document_kind("Specification") == "SPEC"
-    assert normalize_document_kind("Protocol") == "PROT"
+    assert normalize_document_kind("Protocol") == "PRT"
     assert normalize_document_kind("Report") == "RPT"
     assert normalize_document_kind("External Standard") == "STD"
     assert normalize_document_kind(None) == "SPEC"
@@ -34,7 +34,7 @@ def test_normalize_document_kind_maps_legacy_values_to_canonical_codes():
 
 def test_require_document_kind_accepts_canonical_codes_and_rejects_unknown_values():
     assert require_document_kind("SPEC") == "SPEC"
-    assert require_document_kind("PROT") == "PROT"
+    assert require_document_kind("PRT") == "PRT"
 
     for invalid_value in ("Protocol", "DOC", "OTHER", None):
         with pytest.raises(HTTPException) as exc:
@@ -47,7 +47,7 @@ def test_require_document_kind_accepts_canonical_codes_and_rejects_unknown_value
 
 def test_document_kind_from_slug_maps_shared_document_routes():
     assert document_kind_from_slug("specifications") == "SPEC"
-    assert document_kind_from_slug("protocols") == "PROT"
+    assert document_kind_from_slug("protocols") == "PRT"
     assert document_kind_from_slug("reports") == "RPT"
     assert document_kind_from_slug("standards") == "STD"
 

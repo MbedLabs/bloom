@@ -132,7 +132,7 @@ async def _build_suite_detail(suite: TestSuite, db: AsyncSession) -> TestSuiteDe
         for campaign in campaigns
     ]
 
-    # Related concepts: find TCOs linked to any TC in this suite via ArtefactLink
+    # Related concepts: find CPTs linked to any TC in this suite via ArtefactLink
     tc_ids = [item.test_case_id for item in items]
     related_concepts: list[TestConceptSummary] = []
     if tc_ids:
@@ -141,7 +141,7 @@ async def _build_suite_detail(suite: TestSuite, db: AsyncSession) -> TestSuiteDe
                 await db.execute(
                     select(ArtefactLink.source_id)
                     .where(
-                        ArtefactLink.source_type == "TCO",
+                        ArtefactLink.source_type == "CPT",
                         ArtefactLink.target_type == "TC",
                         ArtefactLink.target_id.in_(tc_ids),
                     )
