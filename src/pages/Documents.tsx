@@ -1,9 +1,8 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import {
-  ArrowLeft,
   ArrowUpDown,
   BookOpen,
   Calendar,
@@ -17,16 +16,16 @@ import {
 } from 'lucide-react'
 
 import { docsApi, type DocShell, usersApi } from '../api/client'
+import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import {
   readStoredSort,
   writeStoredSort,
-  registrySortScope,
   DEFAULT_SORT_FIELD,
   DEFAULT_SORT_DIR,
   type RegistrySortField,
   type RegistrySortDir,
 } from '../lib/docRegistryParams'
-import { docCreateUrl, docUrl, normalizeDocTypeParam, DOC_TYPE_LABELS, type DocType } from '../types/doc'
+import { docCreateUrl, docUrl, normalizeDocTypeParam, type DocType } from '../types/doc'
 import { formatDateTime } from '../test/date-utils'
 
 const TYPE_BADGES: Record<DocType, { label: string; color: string }> = {
@@ -56,7 +55,6 @@ const DOC_TYPE_OPTIONS: { code: DocType; label: string }[] = [
   { code: 'CHG', label: 'Changes' },
   { code: 'DEF', label: 'Defects' },
   { code: 'CMP', label: 'Campaigns' },
-  { code: 'TS', label: 'Test Suites' },
   { code: 'RPT', label: 'Reports' },
   { code: 'STD', label: 'Standards' },
 ]
@@ -201,13 +199,11 @@ function ExecutionBadge({ status }: { status: string | null }) {
 
 export default function Documents() {
   const { prefix } = useParams<{ prefix: string }>()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const { data: project } = useProjectByPrefix(prefix)
+  const [createMenuOpen, setCreateMenuOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const typeFilters = useMemo(
-    () => unique(readListParam(searchParams, 'type').map((value) => normalizeDocTypeParam(value)).filter(Boolean) as DocType[]),
-    [searchParams]
-  )
-  const sortScope = useMemo(() => registrySortScope(typeFilters), [typeFilters])
   const dirParam = searchParams.get('dir')
   const sortDir: SortDir = dirParam === 'asc' || dirParam === 'desc' ? dirParam : 'desc'
 
@@ -223,15 +219,12 @@ export default function Documents() {
     if (!prefix) return
     const urlSort = searchParams.get('sort')
     const urlDir = searchParams.get('dir')
-    if (!sortScope) {
-      return
-    }
     if (urlSort || urlDir) {
       const field: RegistrySortField = isSortField(urlSort) ? urlSort as RegistrySortField : DEFAULT_SORT_FIELD
       const dir: RegistrySortDir = urlDir === 'asc' || urlDir === 'desc' ? urlDir : DEFAULT_SORT_DIR
-      writeStoredSort(prefix, sortScope, { field, dir })
+      writeStoredSort(prefix, { field, dir })
     } else {
-      const stored = readStoredSort(prefix, sortScope)
+      const stored = readStoredSort(prefix)
       if (stored && (stored.field !== DEFAULT_SORT_FIELD || stored.dir !== DEFAULT_SORT_DIR)) {
         const params = new URLSearchParams(searchParams)
         if (stored.field !== DEFAULT_SORT_FIELD) params.set('sort', stored.field)
@@ -239,8 +232,12 @@ export default function Documents() {
         setSearchParams(params, { replace: true })
       }
     }
-  }, [prefix, searchParams, setSearchParams, sortScope])
+  }, [prefix, searchParams, setSearchParams])
 
+  const typeFilters = useMemo(
+    () => unique(readListParam(searchParams, 'type').map((value) => normalizeDocTypeParam(value)).filter(Boolean) as DocType[]),
+    [searchParams]
+  )
   const statusFilters = useMemo(() => readListParam(searchParams, 'status'), [searchParams])
   const search = searchParams.get('q') || ''
   const priorityFilter = searchParams.get('priority') || ''
@@ -337,12 +334,8 @@ export default function Documents() {
     if (nextDir !== 'desc') params.set('dir', nextDir)
     else params.delete('dir')
 
-    const scopeAfter = registrySortScope(nextTypes)
-    if (prefix && scopeAfter) {
-      writeStoredSort(prefix, scopeAfter, {
-        field: nextSort as RegistrySortField,
-        dir: nextDir as RegistrySortDir,
-      })
+    if (prefix) {
+      writeStoredSort(prefix, { field: nextSort as RegistrySortField, dir: nextDir as RegistrySortDir })
     }
 
     setSearchParams(params, { replace: true })
@@ -501,10 +494,8 @@ export default function Documents() {
   )
   const hasSortOverride = sortField !== 'updated_at' || sortDir !== 'desc'
   const createTypes = typeFilters.length === 1 ? DOC_TYPE_OPTIONS.filter((type) => type.code === typeFilters[0]) : DOC_TYPE_OPTIONS
-  const soleDocType = typeFilters.length === 1 ? typeFilters[0] : null
-  const createReturnState = { returnTo: `/projects/${prefix}/docs?${searchParams.toString()}` }
-  const docCreateLinkClass =
-    'inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors'
+  const createButtonLabel = createTypes.length === 1 ? `New ${TYPE_BADGES[createTypes[0].code].label}` : 'New Document'
+  const totalDocs = docs?.length ?? 0
 
   const SortHeader = ({ field, children, compact = false }: { field: SortField; children: React.ReactNode; compact?: boolean }) => (
     <th
@@ -525,13 +516,18 @@ export default function Documents() {
   return (
     <div className="space-y-3.5 animate-fade-in">
       <div className="flex flex-col gap-2.5 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex items-start gap-2.5 min-w-0">
-          <Link to={`/projects/${prefix}`} className="p-1 hover:bg-accent/50 rounded-md shrink-0 mt-0.5" aria-label="Back to project">
-            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-          </Link>
-          <div className="min-w-0">
-            <h2 className="text-base font-bold text-foreground">{pageTitle}</h2>
+        <div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+            <Link to={`/projects/${prefix}`} className="hover:text-primary transition-colors">
+              {project?.name || prefix}
+            </Link>
+            <span>/</span>
+            <span className="text-foreground">{pageTitle}</span>
           </div>
+          <h2 className="text-base font-bold text-foreground">{pageTitle}</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {sorted.length} of {totalDocs} controlled item{totalDocs !== 1 ? 's' : ''} shown
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -542,31 +538,33 @@ export default function Documents() {
             <Upload className="h-4 w-4" />
             Import
           </Link>
-          {createTypes.length === 1 ? (
-            <Link
-              to={docCreateUrl(prefix!, createTypes[0].code)}
-              state={createReturnState}
-              className={`${docCreateLinkClass} bg-primary text-primary-foreground hover:bg-primary/90`}
+          <div className="relative">
+            <button
+              onClick={() => setCreateMenuOpen((open) => !open)}
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-all"
             >
               <Plus className="h-4 w-4" />
-              New {TYPE_BADGES[createTypes[0].code].label}
-            </Link>
-          ) : (
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {createTypes.map((type) => (
-                <Link
-                  key={type.code}
-                  to={docCreateUrl(prefix!, type.code)}
-                  state={createReturnState}
-                  className={`${docCreateLinkClass} border border-border bg-background text-foreground hover:bg-accent`}
-                >
-                  <Plus className="h-4 w-4 shrink-0" />
-                  <span>New {TYPE_BADGES[type.code].label}</span>
-                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${TYPE_BADGES[type.code].color}`}>{type.code}</span>
-                </Link>
-              ))}
-            </div>
-          )}
+              {createButtonLabel}
+              <ChevronDown className={`h-4 w-4 transition-transform ${createMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {createMenuOpen && (
+              <div className="absolute right-0 top-full z-20 mt-2 w-56 overflow-hidden rounded-lg border border-border bg-card shadow-elegant">
+                {createTypes.map((type) => (
+                  <button
+                    key={type.code}
+                    onClick={() => {
+                      setCreateMenuOpen(false)
+                      navigate(docCreateUrl(prefix!, type.code))
+                    }}
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-accent"
+                  >
+                    <span>New {TYPE_BADGES[type.code].label}</span>
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${TYPE_BADGES[type.code].color}`}>{type.code}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -767,20 +765,10 @@ export default function Documents() {
             <BookOpen className="h-9 w-9 text-primary/40" />
           </div>
           <h3 className="text-sm font-semibold text-foreground mb-2">
-            {hasActiveFilters
-              ? soleDocType
-                ? `No ${TYPE_PAGE_TITLE[soleDocType]} match your filters`
-                : 'No documents found'
-              : soleDocType
-                ? `No ${TYPE_PAGE_TITLE[soleDocType]} yet`
-                : 'No documents yet'}
+            {hasActiveFilters ? 'No documents found' : 'No Controlled Documents Yet'}
           </h3>
           <p className="text-sm text-muted-foreground mb-3 max-w-md mx-auto">
-            {hasActiveFilters
-              ? 'Try a different filter combination.'
-              : soleDocType
-                ? `Create your first ${DOC_TYPE_LABELS[soleDocType]} to get started.`
-                : 'Create a Requirement, Specification, Protocol, or Test Case to get started.'}
+            {hasActiveFilters ? 'Try a different filter combination.' : 'Create a Requirement, Specification, Protocol, or Test Case to get started.'}
           </p>
         </div>
       ) : (

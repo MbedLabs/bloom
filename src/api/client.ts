@@ -227,7 +227,6 @@ export interface TestSuiteSummary {
 
 export interface TestCampaignSummary {
   id: number
-  campaign_id: string
   name: string
   status: string
 }
@@ -384,6 +383,14 @@ export interface CoverageGapReport {
   gaps: CoverageGap[]
 }
 
+export interface RequirementLinkResponse {
+  id: number
+  source_id: number
+  target_id: number
+  link_type: string
+  created_at: string
+}
+
 export interface DesignItem {
   id: number
   project_id: number
@@ -395,6 +402,7 @@ export interface DesignItem {
   status: string
   priority: string
   design_type: string
+  linked_requirement_id: number | null
   source_ref?: string | null
   source_project_id?: number | null
   created_at: string
@@ -414,6 +422,7 @@ export interface RiskItem {
   probability: string
   mitigation: string | null
   risk_category: string
+  linked_requirement_id: number | null
   source_ref?: string | null
   source_project_id?: number | null
   created_at: string
@@ -629,6 +638,7 @@ export const requirementsApi = {
 
   create: async (data: {
     project_id: number
+    req_id: string
     title: string
     description?: string
     priority?: string
@@ -689,6 +699,7 @@ export const testCasesApi = {
 
   create: async (data: {
     project_id: number
+    tc_id: string
     title: string
     description?: string
     preconditions?: string
@@ -748,6 +759,21 @@ export const traceabilityApi = {
     const response = await api.get<CoverageGapReport>(`/traceability/coverage-gaps/${projectId}`)
     return response.data
   },
+
+  createRequirementLink: async (sourceId: number, data: { target_id: number; link_type: string }) => {
+    const response = await api.post<RequirementLinkResponse>(`/traceability/requirement-links?source_id=${sourceId}`, data)
+    return response.data
+  },
+
+  deleteRequirementLink: async (linkId: number) => {
+    await api.delete(`/traceability/requirement-links/${linkId}`)
+  },
+
+  getRequirementLinks: async (requirementId: number, direction?: string) => {
+    const query = direction ? `?direction=${direction}` : ''
+    const response = await api.get<RequirementLinkResponse[]>(`/traceability/requirement-links/${requirementId}${query}`)
+    return response.data
+  },
 }
 
 export interface Document {
@@ -794,7 +820,7 @@ export const documentsApi = {
     const response = await api.get<DocumentDetail>(`/documents/${documentId}`)
     return response.data
   },
-  create: async (data: { project_id: number; title: string; doc_type?: string; description?: string; content_json?: Record<string, unknown> | null; content_html?: string | null }) => {
+  create: async (data: { project_id: number; doc_id: string; title: string; doc_type?: string; description?: string; content_json?: Record<string, unknown> | null; content_html?: string | null }) => {
     const response = await api.post<Document>('/projects/' + data.project_id + '/documents', data)
     return response.data
   },
@@ -851,6 +877,17 @@ export const projectVariablesApi = {
   },
 }
 
+export interface TestConfiguration {
+  id: number
+  project_id: number
+  name: string
+  description: string | null
+  environment: string | null
+  parameters: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+}
+
 export interface TestSuiteItem {
   id: number
   suite_id: number
@@ -890,7 +927,7 @@ export interface TestCampaignItem {
 export interface TestCampaign {
   id: number
   project_id: number
-  campaign_id: string
+  configuration_id: number | null
   suite_id: number | null
   bud_run_id: number | null
   bud_run_url: string | null
@@ -907,6 +944,7 @@ export interface TestCampaign {
   failed: number
   blocked: number
   pending: number
+  configuration: TestConfiguration | null
   suite: TestSuiteSummary | null
   suites: TestSuiteSummary[]
 }
@@ -949,12 +987,12 @@ export const campaignsApi = {
     return response.data
   },
 
-  create: async (data: { project_id: number; name: string; description?: string; suite_id?: number; suite_ids?: number[]; status?: string; bud_run_id?: number; bud_run_url?: string; bud_run_status?: string; test_case_ids?: number[] }) => {
+  create: async (data: { project_id: number; name: string; description?: string; configuration_id?: number; suite_id?: number; suite_ids?: number[]; status?: string; bud_run_id?: number; bud_run_url?: string; bud_run_status?: string; test_case_ids?: number[] }) => {
     const response = await api.post<TestCampaignDetail>('/campaigns', data)
     return response.data
   },
 
-  update: async (campaignId: number, data: Partial<Pick<TestCampaign, 'name' | 'description' | 'status' | 'bud_run_id' | 'bud_run_url' | 'bud_run_status'>> & { suite_id?: number | null; suite_ids?: number[] }) => {
+  update: async (campaignId: number, data: Partial<Pick<TestCampaign, 'name' | 'description' | 'status' | 'bud_run_id' | 'bud_run_url' | 'bud_run_status'>> & { configuration_id?: number; suite_id?: number | null; suite_ids?: number[] }) => {
     const response = await api.patch<TestCampaign>(`/campaigns/${campaignId}`, data)
     return response.data
   },
@@ -979,6 +1017,16 @@ export const campaignsApi = {
 
   scopeLinks: async (campaignId: number) => {
     const response = await api.get<ArtefactLink[]>(`/campaigns/${campaignId}/scope-links`)
+    return response.data
+  },
+
+  listConfigurations: async (projectId: number) => {
+    const response = await api.get<TestConfiguration[]>(`/campaigns/configurations?project_id=${projectId}`)
+    return response.data
+  },
+
+  createConfiguration: async (data: { project_id: number; name: string; description?: string; environment?: string; parameters?: Record<string, unknown> }) => {
+    const response = await api.post<TestConfiguration>('/campaigns/configurations', data)
     return response.data
   },
 }
@@ -1037,11 +1085,13 @@ export const designsApi = {
   },
   create: async (data: {
     project_id: number
+    design_id: string
     title: string
     description?: string | null
     status?: string
     priority?: string
     design_type?: string
+    linked_requirement_id?: number | null
   }) => {
     const response = await api.post<DesignItem>('/designs', data)
     return response.data
@@ -1066,6 +1116,7 @@ export const risksApi = {
   },
   create: async (data: {
     project_id: number
+    risk_id: string
     title: string
     description?: string | null
     status?: string
@@ -1073,6 +1124,7 @@ export const risksApi = {
     probability?: string
     mitigation?: string | null
     risk_category?: string
+    linked_requirement_id?: number | null
   }) => {
     const response = await api.post<RiskItem>('/risks', data)
     return response.data
@@ -1095,16 +1147,7 @@ export const changesApi = {
     const response = await api.get<ChangeRequest>(`/changes/${id}`)
     return response.data
   },
-  create: async (data: {
-    project_id: number
-    title: string
-    description?: string | null
-    status?: string
-    priority?: string
-    change_type?: string
-    impact_assessment?: string | null
-    justification?: string | null
-  }) => {
+  create: async (data: Omit<ChangeRequest, 'id' | 'created_at' | 'updated_at'>) => {
     const response = await api.post<ChangeRequest>('/changes', data)
     return response.data
   },
@@ -1241,7 +1284,7 @@ export const testConceptsApi = {
     const response = await api.get<TestConcept>(`/test-concepts/${id}`)
     return response.data
   },
-  create: async (data: { project_id: number; name: string; description?: string | null; status?: string; coverage?: number }) => {
+  create: async (data: { project_id: number; concept_id: string; name: string; description?: string | null; status?: string; coverage?: number }) => {
     const response = await api.post<TestConcept>('/test-concepts', data)
     return response.data
   },

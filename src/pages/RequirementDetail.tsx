@@ -480,17 +480,10 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
           {requirement.campaign_backlinks && requirement.campaign_backlinks.length > 0 ? (
             <div className="space-y-3">
               {requirement.campaign_backlinks.map((campaign) => (
-                <Link
-                  key={campaign.id}
-                  to={docUrl(projectPrefix, 'CMP', campaign.campaign_id)}
-                  className="flex items-center justify-between hover:bg-accent/40 -mx-2 px-2 py-1 rounded"
-                >
-                  <div>
-                    <div className="font-mono text-xs text-primary">{campaign.campaign_id}</div>
-                    <div className="text-foreground">{campaign.name}</div>
-                  </div>
+                <div key={campaign.id} className="flex items-center justify-between">
+                  <div className="text-foreground">{campaign.name}</div>
                   <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">{campaign.status}</span>
-                </Link>
+                </div>
               ))}
             </div>
           ) : (
