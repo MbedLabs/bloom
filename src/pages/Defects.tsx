@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { defectsApi, Defect, extractApiErrorMessage } from '../api/client'
-import { ArrowUpDown, ChevronDown, ChevronUp, Plus, Bug, ExternalLink, Search } from 'lucide-react'
+import { ArrowLeft, ArrowUpDown, ChevronDown, ChevronUp, Plus, Bug, ExternalLink, Search } from 'lucide-react'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { useAuth } from '../contexts/AuthContext'
 import { formatDateTime } from '../test/date-utils'
@@ -170,19 +170,17 @@ export default function Defects() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-            <Link to={`/projects/${prefix}`} className="hover:text-primary transition-colors">
-              {project.name}
-            </Link>
-            <span>/</span>
-            <span className="text-foreground">Defects</span>
-          </div>
+        <div className="flex items-center space-x-4">
+          <Link to={`/projects/${prefix}`} className="p-2 hover:bg-accent/50 rounded-md">
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+          </Link>
+          <div>
           <h2 className="text-xl font-bold text-foreground">Defects</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
             {shown} of {totalFromApi} defect{totalFromApi !== 1 ? 's' : ''} shown
             {search.trim() ? ' (filtered)' : ''}
           </p>
+          </div>
         </div>
         {canEdit && (
           <button

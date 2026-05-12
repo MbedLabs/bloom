@@ -3,7 +3,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { APP_VERSION, projectsApi } from '../api/client'
 import { normalizeDocTypeParam } from '../types/doc'
-import { docRegistryListUrl } from '../lib/docRegistryParams'
+import { docRegistryListUrl, syncRegistryProjectContext } from '../lib/docRegistryParams'
 import { useAuth } from '../contexts/AuthContext'
 import { PageMetaProvider, usePageMeta } from '../contexts/PageMetaContext'
 import {
@@ -63,8 +63,8 @@ const projectNav = [
   { name: 'Risks', icon: AlertTriangle, tab: '', href: 'docs' as const, filter: 'type:RSK' },
   { name: 'Changes', icon: GitPullRequest, tab: '', href: 'docs' as const, filter: 'type:CHG' },
   { name: 'Test Concepts', icon: Beaker, tab: '', href: 'docs' as const, filter: 'type:TCO' },
-  { name: 'Defects', icon: Bug, tab: '', href: 'docs' as const, filter: 'type:DEF' },
-  { name: 'Test Campaigns', icon: FlaskConical, tab: '', href: 'docs' as const, filter: 'type:CMP' },
+  { name: 'Defects', icon: Bug, tab: '', href: 'defects' as const },
+  { name: 'Test Campaigns', icon: FlaskConical, tab: '', href: 'campaigns' as const },
   { name: 'Traceability', icon: GitBranch, tab: '', href: 'traceability' as const },
   { name: 'Parameters', icon: SlidersHorizontal, tab: '', href: 'parameters' as const },
 ]
@@ -141,6 +141,10 @@ function LayoutInner() {
 
   const isInProject = location.pathname.startsWith('/projects/')
   const currentProjectSlug = isInProject ? location.pathname.split('/')[2] : null
+
+  useEffect(() => {
+    syncRegistryProjectContext(currentProjectSlug)
+  }, [currentProjectSlug])
   const currentProjectName = currentProjectSlug
     ? projects?.find((p) => p.prefix === currentProjectSlug || String(p.id) === currentProjectSlug)?.name || currentProjectSlug
     : null
@@ -549,10 +553,10 @@ function getBreadcrumbs(location: ReturnType<typeof useLocation>, projects: Arra
         crumbs.push({ label: docLabel })
       }
     } else if (sub === 'campaigns' && parts[4]) {
-      crumbs.push({ label: 'Campaigns', href: docRegistryListUrl(slug, 'CMP') })
+      crumbs.push({ label: 'Campaigns', href: `/projects/${slug}/campaigns` })
       crumbs.push({ label: pageCrumbLabel || parts[4] })
     } else if (sub === 'suites' && parts[4]) {
-      crumbs.push({ label: 'Suites', href: docRegistryListUrl(slug, 'CMP') })
+      crumbs.push({ label: 'Suites', href: docRegistryListUrl(slug, 'TS') })
       crumbs.push({ label: pageCrumbLabel || parts[4] })
     } else if (subMap[sub]) {
       crumbs.push({ label: subMap[sub] })

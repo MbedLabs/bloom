@@ -69,7 +69,9 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
     onSuccess: (campaign) => {
       queryClient.invalidateQueries({ queryKey: ['campaigns', projectId] })
       queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
-      window.location.href = `/projects/${prefix}/docs/campaigns/${campaign.id}`
+      navigate(`/projects/${prefix}/campaigns/${campaign.id}`, {
+        state: { returnTo: `/projects/${prefix}/suites/${suiteId}` },
+      })
     },
   })
 
@@ -270,7 +272,12 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
           ) : (
             <div className="divide-y divide-border">
               {suite.linked_campaigns.map((campaign) => (
-                <Link key={campaign.id} to={`/projects/${prefix}/docs/campaigns/${campaign.id}`} className="block px-6 py-4 hover:bg-accent/40">
+                <Link
+                  key={campaign.id}
+                  to={`/projects/${prefix}/campaigns/${campaign.id}`}
+                  state={{ returnTo: `/projects/${prefix}/suites/${suiteId}` }}
+                  className="block px-6 py-4 hover:bg-accent/40"
+                >
                   <div className="font-medium text-foreground">{campaign.name}</div>
                   <div className="text-xs text-muted-foreground mt-1">{campaign.status}</div>
                 </Link>

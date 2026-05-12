@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useSearchParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, PanelRightOpen, PanelRightClose } from 'lucide-react'
 import { DocEditor } from '../components/editor'
@@ -19,6 +19,7 @@ import {
   normalizeDocTypeParam,
 } from '../types/doc'
 import { useAuth } from '../contexts/AuthContext'
+import { docRegistryBackUrl, docRegistryListLabel } from '../lib/docRegistryParams'
 
 interface DocCreateProps {
   editMode?: boolean
@@ -29,7 +30,9 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const { prefix, kind, docId: docIdStr } = useParams<{ prefix: string; kind?: string; docId: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo
 
   const rawRequestedDocType = normalizeDocTypeParam(searchParams.get('type')) || 'REQ'
   const requestedDocType = rawRequestedDocType in DOC_CONFIGS ? rawRequestedDocType : 'REQ'
@@ -61,6 +64,11 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const docType = ((editMode && editDocFacade?.doc_type) || requestedDocType) as DocType
   const config = DOC_CONFIGS[docType]
   const resolvedDocId = editMode ? editDocFacade?.id : undefined
+  const listBackUrl = prefix ? docRegistryBackUrl(prefix, docType, returnTo ?? null) : '/projects'
+  const backNavLabel =
+    typeof returnTo === 'string' && returnTo.trim() !== ''
+      ? 'Back'
+      : `Back to ${docRegistryListLabel(docType)}`
   const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
   const normalizedDocId = docId.trim().toUpperCase()
   const expectedDocIdExample = project ? `${project.prefix}-${config.typeCode}-001` : `PRJ-${config.typeCode}-001`
@@ -245,11 +253,11 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           <h3 className="text-lg font-semibold text-foreground mb-2">You do not have edit access</h3>
           <p className="text-sm text-muted-foreground mb-4">Only admins and maintainers can create or edit documents.</p>
           <Link
-            to={prefix ? `/projects/${prefix}` : '/projects'}
+            to={listBackUrl}
             className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back
+            {backNavLabel}
           </Link>
         </div>
       </div>
@@ -262,11 +270,11 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-card shrink-0">
         <div className="flex items-center gap-3">
           <Link
-            to={`/projects/${prefix}`}
+            to={listBackUrl}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to project
+            {backNavLabel}
           </Link>
           <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${DOC_TYPE_COLORS[docType]}`}>
             {DOC_TYPE_LABELS[docType]}
@@ -286,7 +294,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
             {sidebarOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
           </button>
           <button
-            onClick={() => navigate(`/projects/${prefix}`)}
+            onClick={() => navigate(listBackUrl)}
             className="px-3 py-1.5 text-sm text-muted-foreground border border-border rounded-md hover:bg-accent transition-colors"
           >
             Discard
