@@ -30,3 +30,7 @@ DocCreate.tsx: Keep (B) — no change.
 ArtefactDetail.tsx: Merge — defect overview plain description.
 ProjectDetail.tsx: Keep (A) behaviors — legacy ?tab= redirect + defects query/tile restored.
 CampaignDetail.tsx diff (B removes lines): Keep (B) — unchanged.
+
+Phase 1 re-run: f91dbac..origin/main — 61bc403; UI name-only list matches above.
+RequirementDetail.tsx, TestCaseDetail.tsx, SuiteDetail.tsx: Keep (B) — registry/back URLs only; no extra patch on ui-consensus.
+DocumentLinksPanel.tsx: Keep (B) — minor; unchanged on ui-consensus.
