@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import {
   ArrowLeft,
@@ -26,7 +26,7 @@ import {
   type RegistrySortField,
   type RegistrySortDir,
 } from '../lib/docRegistryParams'
-import { docCreateUrl, docUrl, normalizeDocTypeParam, type DocType } from '../types/doc'
+import { docCreateUrl, docUrl, normalizeDocTypeParam, DOC_TYPE_LABELS, type DocType } from '../types/doc'
 import { formatDateTime } from '../test/date-utils'
 
 const TYPE_BADGES: Record<DocType, { label: string; color: string }> = {
@@ -56,6 +56,7 @@ const DOC_TYPE_OPTIONS: { code: DocType; label: string }[] = [
   { code: 'CHG', label: 'Changes' },
   { code: 'DEF', label: 'Defects' },
   { code: 'CMP', label: 'Campaigns' },
+  { code: 'TS', label: 'Test Suites' },
   { code: 'RPT', label: 'Reports' },
   { code: 'STD', label: 'Standards' },
 ]
@@ -199,10 +200,7 @@ function ExecutionBadge({ status }: { status: string | null }) {
 }
 
 export default function Documents() {
-  const { prefix } = useParams<{ prefix: string }>()
-  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [createMenuOpen, setCreateMenuOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const typeFilters = useMemo(
     () => unique(readListParam(searchParams, 'type').map((value) => normalizeDocTypeParam(value)).filter(Boolean) as DocType[]),
@@ -502,7 +500,10 @@ export default function Documents() {
   )
   const hasSortOverride = sortField !== 'updated_at' || sortDir !== 'desc'
   const createTypes = typeFilters.length === 1 ? DOC_TYPE_OPTIONS.filter((type) => type.code === typeFilters[0]) : DOC_TYPE_OPTIONS
-  const createButtonLabel = createTypes.length === 1 ? `New ${TYPE_BADGES[createTypes[0].code].label}` : 'New Document'
+  const soleDocType = typeFilters.length === 1 ? typeFilters[0] : null
+  const createReturnState = { returnTo: `/projects/${prefix}/docs?${searchParams.toString()}` }
+  const docCreateLinkClass =
+    'inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors'
 
   const SortHeader = ({ field, children, compact = false }: { field: SortField; children: React.ReactNode; compact?: boolean }) => (
     <th
@@ -540,35 +541,31 @@ export default function Documents() {
             <Upload className="h-4 w-4" />
             Import
           </Link>
-          <div className="relative">
-            <button
-              onClick={() => setCreateMenuOpen((open) => !open)}
-              className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-all"
+          {createTypes.length === 1 ? (
+            <Link
+              to={docCreateUrl(prefix!, createTypes[0].code)}
+              state={createReturnState}
+              className={`${docCreateLinkClass} bg-primary text-primary-foreground hover:bg-primary/90`}
             >
               <Plus className="h-4 w-4" />
-              {createButtonLabel}
-              <ChevronDown className={`h-4 w-4 transition-transform ${createMenuOpen ? 'rotate-180' : ''}`} />
-            </button>
-            {createMenuOpen && (
-              <div className="absolute right-0 top-full z-20 mt-2 w-56 overflow-hidden rounded-lg border border-border bg-card shadow-elegant">
-                {createTypes.map((type) => (
-                  <button
-                    key={type.code}
-                    onClick={() => {
-                      setCreateMenuOpen(false)
-                      navigate(docCreateUrl(prefix!, type.code), {
-                        state: { returnTo: `/projects/${prefix}/docs?${searchParams.toString()}` },
-                      })
-                    }}
-                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-accent"
-                  >
-                    <span>New {TYPE_BADGES[type.code].label}</span>
-                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${TYPE_BADGES[type.code].color}`}>{type.code}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+              New {TYPE_BADGES[createTypes[0].code].label}
+            </Link>
+          ) : (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {createTypes.map((type) => (
+                <Link
+                  key={type.code}
+                  to={docCreateUrl(prefix!, type.code)}
+                  state={createReturnState}
+                  className={`${docCreateLinkClass} border border-border bg-background text-foreground hover:bg-accent`}
+                >
+                  <Plus className="h-4 w-4 shrink-0" />
+                  <span>New {TYPE_BADGES[type.code].label}</span>
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${TYPE_BADGES[type.code].color}`}>{type.code}</span>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -769,10 +766,20 @@ export default function Documents() {
             <BookOpen className="h-9 w-9 text-primary/40" />
           </div>
           <h3 className="text-sm font-semibold text-foreground mb-2">
-            {hasActiveFilters ? 'No documents found' : 'No documents yet'}
+            {hasActiveFilters
+              ? soleDocType
+                ? `No ${TYPE_PAGE_TITLE[soleDocType]} match your filters`
+                : 'No documents found'
+              : soleDocType
+                ? `No ${TYPE_PAGE_TITLE[soleDocType]} yet`
+                : 'No documents yet'}
           </h3>
           <p className="text-sm text-muted-foreground mb-3 max-w-md mx-auto">
-            {hasActiveFilters ? 'Try a different filter combination.' : 'Create a Requirement, Specification, Protocol, or Test Case to get started.'}
+            {hasActiveFilters
+              ? 'Try a different filter combination.'
+              : soleDocType
+                ? `Create your first ${DOC_TYPE_LABELS[soleDocType]} to get started.`
+                : 'Create a Requirement, Specification, Protocol, or Test Case to get started.'}
           </p>
         </div>
       ) : (
