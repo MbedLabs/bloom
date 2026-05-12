@@ -3,31 +3,25 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   DEFAULT_SORT_DIR,
   DEFAULT_SORT_FIELD,
+  clearRegistrySortSession,
+  docRegistryBackUrl,
+  docRegistryListLabel,
   docRegistryListUrl,
   isRegistrySortDir,
   isRegistrySortField,
   readStoredSort,
+  registrySortScope,
   sortSearchString,
+  syncRegistryProjectContext,
   writeStoredSort,
 } from '../lib/docRegistryParams'
 
-const store = new Map<string, string>()
-const fakeStorage = {
-  getItem: (key: string) => store.get(key) ?? null,
-  setItem: (key: string, val: string) => { store.set(key, val) },
-  removeItem: (key: string) => { store.delete(key) },
-  clear: () => { store.clear() },
-  get length() { return store.size },
-  key: () => null as string | null,
-}
-
 beforeEach(() => {
-  store.clear()
-  Object.defineProperty(globalThis, 'localStorage', { value: fakeStorage, writable: true, configurable: true })
+  syncRegistryProjectContext(null)
 })
 
 afterEach(() => {
-  store.clear()
+  syncRegistryProjectContext(null)
 })
 
 describe('defaults', () => {
@@ -37,6 +31,21 @@ describe('defaults', () => {
 
   it('default sort direction is desc (most recent first)', () => {
     expect(DEFAULT_SORT_DIR).toBe('desc')
+  })
+})
+
+describe('registrySortScope', () => {
+  it('returns all for no type filters', () => {
+    expect(registrySortScope([])).toBe('all')
+  })
+
+  it('returns the type for a single filter', () => {
+    expect(registrySortScope(['REQ'])).toBe('REQ')
+    expect(registrySortScope(['DEF'])).toBe('DEF')
+  })
+
+  it('returns null for multi-type filter (no session)', () => {
+    expect(registrySortScope(['REQ', 'DEF'])).toBeNull()
   })
 })
 
@@ -66,36 +75,70 @@ describe('isRegistrySortDir', () => {
   })
 })
 
-describe('readStoredSort / writeStoredSort', () => {
+describe('session read/write (per type)', () => {
   it('returns null when nothing stored', () => {
-    expect(readStoredSort('VCU')).toBeNull()
+    syncRegistryProjectContext('VCU')
+    expect(readStoredSort('VCU', 'REQ')).toBeNull()
   })
 
-  it('round-trips a stored sort', () => {
-    writeStoredSort('VCU', { field: 'doc_id', dir: 'asc' })
-    expect(readStoredSort('VCU')).toEqual({ field: 'doc_id', dir: 'asc' })
+  it('round-trips per scope', () => {
+    syncRegistryProjectContext('VCU')
+    writeStoredSort('VCU', 'REQ', { field: 'doc_id', dir: 'asc' })
+    expect(readStoredSort('VCU', 'REQ')).toEqual({ field: 'doc_id', dir: 'asc' })
   })
 
-  it('project-scoped: different projects are independent', () => {
-    writeStoredSort('VCU', { field: 'doc_id', dir: 'asc' })
-    writeStoredSort('ECU', { field: 'title', dir: 'desc' })
-    expect(readStoredSort('VCU')).toEqual({ field: 'doc_id', dir: 'asc' })
-    expect(readStoredSort('ECU')).toEqual({ field: 'title', dir: 'desc' })
+  it('REQ and DEF are independent in one project', () => {
+    syncRegistryProjectContext('VCU')
+    writeStoredSort('VCU', 'REQ', { field: 'doc_id', dir: 'asc' })
+    writeStoredSort('VCU', 'DEF', { field: 'title', dir: 'desc' })
+    expect(readStoredSort('VCU', 'REQ')).toEqual({ field: 'doc_id', dir: 'asc' })
+    expect(readStoredSort('VCU', 'DEF')).toEqual({ field: 'title', dir: 'desc' })
   })
 
-  it('project switch: new project has no memory (returns null)', () => {
-    writeStoredSort('VCU', { field: 'doc_id', dir: 'asc' })
-    expect(readStoredSort('NEW')).toBeNull()
+  it('all bucket is independent from REQ', () => {
+    syncRegistryProjectContext('VCU')
+    writeStoredSort('VCU', 'all', { field: 'created_at', dir: 'asc' })
+    writeStoredSort('VCU', 'REQ', { field: 'doc_id', dir: 'desc' })
+    expect(readStoredSort('VCU', 'all')).toEqual({ field: 'created_at', dir: 'asc' })
+    expect(readStoredSort('VCU', 'REQ')).toEqual({ field: 'doc_id', dir: 'desc' })
   })
 
-  it('ignores corrupt localStorage data', () => {
-    store.set('bloom:docs-registry-sort:BAD', '{invalid json')
-    expect(readStoredSort('BAD')).toBeNull()
+  it('different projects are independent', () => {
+    syncRegistryProjectContext('VCU')
+    writeStoredSort('VCU', 'REQ', { field: 'doc_id', dir: 'asc' })
+    syncRegistryProjectContext('ECU')
+    writeStoredSort('ECU', 'REQ', { field: 'title', dir: 'desc' })
+    expect(readStoredSort('ECU', 'REQ')).toEqual({ field: 'title', dir: 'desc' })
+    syncRegistryProjectContext('VCU')
+    expect(readStoredSort('VCU', 'REQ')).toBeNull()
+  })
+})
+
+describe('reset on project switch / leave', () => {
+  it('switching project clears previous project session', () => {
+    syncRegistryProjectContext('VCU')
+    writeStoredSort('VCU', 'REQ', { field: 'doc_id', dir: 'asc' })
+    syncRegistryProjectContext('ECU')
+    expect(readStoredSort('VCU', 'REQ')).toBeNull()
+    syncRegistryProjectContext('VCU')
+    expect(readStoredSort('VCU', 'REQ')).toBeNull()
   })
 
-  it('ignores stored data with invalid field/dir', () => {
-    store.set('bloom:docs-registry-sort:BAD2', '{"field":"bogus","dir":"up"}')
-    expect(readStoredSort('BAD2')).toBeNull()
+  it('leaving project (null context) clears that project session', () => {
+    syncRegistryProjectContext('VCU')
+    writeStoredSort('VCU', 'REQ', { field: 'doc_id', dir: 'asc' })
+    syncRegistryProjectContext(null)
+    syncRegistryProjectContext('VCU')
+    expect(readStoredSort('VCU', 'REQ')).toBeNull()
+  })
+
+  it('clearRegistrySortSession removes all scopes for a prefix', () => {
+    syncRegistryProjectContext('VCU')
+    writeStoredSort('VCU', 'REQ', { field: 'doc_id', dir: 'asc' })
+    writeStoredSort('VCU', 'DEF', { field: 'title', dir: 'asc' })
+    clearRegistrySortSession('VCU')
+    expect(readStoredSort('VCU', 'REQ')).toBeNull()
+    expect(readStoredSort('VCU', 'DEF')).toBeNull()
   })
 })
 
@@ -121,28 +164,68 @@ describe('sortSearchString', () => {
 
 describe('docRegistryListUrl', () => {
   it('returns base docs URL with no stored sort', () => {
+    syncRegistryProjectContext('VCU')
     expect(docRegistryListUrl('VCU')).toBe('/projects/VCU/docs')
   })
 
   it('returns typed URL with no stored sort', () => {
+    syncRegistryProjectContext('VCU')
     expect(docRegistryListUrl('VCU', 'REQ')).toBe('/projects/VCU/docs?type=requirements')
   })
 
-  it('includes remembered sort in the URL', () => {
-    writeStoredSort('VCU', { field: 'doc_id', dir: 'asc' })
+  it('includes remembered sort only for active project', () => {
+    syncRegistryProjectContext('VCU')
+    writeStoredSort('VCU', 'REQ', { field: 'doc_id', dir: 'asc' })
     const url = docRegistryListUrl('VCU', 'REQ')
     expect(url).toContain('type=requirements')
     expect(url).toContain('sort=doc_id')
     expect(url).toContain('dir=asc')
   })
 
-  it('omits default sort params from URL', () => {
-    writeStoredSort('VCU', { field: 'updated_at', dir: 'desc' })
+  it('does not apply another project sort when viewing a different active project', () => {
+    syncRegistryProjectContext('VCU')
+    writeStoredSort('VCU', 'REQ', { field: 'doc_id', dir: 'asc' })
+    syncRegistryProjectContext('ECU')
     expect(docRegistryListUrl('VCU', 'REQ')).toBe('/projects/VCU/docs?type=requirements')
   })
 
-  it('uses project-scoped sort, not another project', () => {
-    writeStoredSort('VCU', { field: 'doc_id', dir: 'asc' })
-    expect(docRegistryListUrl('ECU', 'REQ')).toBe('/projects/ECU/docs?type=requirements')
+  it('omits default sort params from URL', () => {
+    syncRegistryProjectContext('VCU')
+    writeStoredSort('VCU', 'REQ', { field: 'updated_at', dir: 'desc' })
+    expect(docRegistryListUrl('VCU', 'REQ')).toBe('/projects/VCU/docs?type=requirements')
+  })
+})
+
+describe('docRegistryListLabel', () => {
+  it('returns Documents when no doc type', () => {
+    expect(docRegistryListLabel()).toBe('Documents')
+    expect(docRegistryListLabel(undefined)).toBe('Documents')
+  })
+
+  it('returns plural list title per DocType', () => {
+    expect(docRegistryListLabel('REQ')).toBe('Requirements')
+    expect(docRegistryListLabel('TC')).toBe('Test Cases')
+    expect(docRegistryListLabel('CMP')).toBe('Campaigns')
+    expect(docRegistryListLabel('TS')).toBe('Test Suites')
+  })
+})
+
+describe('docRegistryBackUrl', () => {
+  it('uses returnTo when provided', () => {
+    expect(docRegistryBackUrl('VCU', 'REQ', '/projects/VCU/docs?type=requirements&sort=doc_id')).toBe(
+      '/projects/VCU/docs?type=requirements&sort=doc_id',
+    )
+  })
+
+  it('ignores whitespace-only returnTo', () => {
+    syncRegistryProjectContext('VCU')
+    expect(docRegistryBackUrl('VCU', 'REQ', '   ')).toBe('/projects/VCU/docs?type=requirements')
+  })
+
+  it('falls back to sort-aware docRegistryListUrl', () => {
+    syncRegistryProjectContext('VCU')
+    writeStoredSort('VCU', 'REQ', { field: 'doc_id', dir: 'asc' })
+    expect(docRegistryBackUrl('VCU', 'REQ')).toContain('type=requirements')
+    expect(docRegistryBackUrl('VCU', 'REQ')).toContain('sort=doc_id')
   })
 })
