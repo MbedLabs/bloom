@@ -14,3 +14,4 @@ build/
 .venv/
 .coverage
 coverage.xml
+.worktrees/
