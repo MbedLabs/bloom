@@ -11,6 +11,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.link_read_utils import (
+    VERIFY_LINK_ROLE,
+    VERIFY_SOURCE_TYPE,
+    VERIFY_TARGET_TYPE,
     get_verifying_test_case_links_for_requirement,
     iter_req_req_incoming_neighbors,
     iter_req_req_outgoing_neighbors,
@@ -37,15 +40,72 @@ def _req_id_sort_key(req_id: str) -> list:
     return [int(part) if part.isdigit() else part.casefold() for part in re.split(r"(\d+)", req_id)]
 
 
-async def _build_req_response(req: Requirement, db: AsyncSession) -> RequirementResponse:
-    tc_count = len(await get_verifying_test_case_links_for_requirement(req.id, db))
+from collections import defaultdict
 
-    children_result = await db.execute(select(Requirement).where(Requirement.parent_id == req.id))
-    children = children_result.scalars().all()
+from app.models import ArtefactLink
 
-    children_responses = []
-    for child in children:
-        children_responses.append(await _build_req_response(child, db))
+
+class TraceabilityContext:
+    def __init__(self):
+        self.children_by_parent: dict[int, list[Requirement]] = defaultdict(list)
+        self.linked_tcs_by_req: dict[int, list[TestCaseResponse]] = defaultdict(list)
+        self.linked_trs_by_req: dict[int, list[TestRunLinkResponse]] = defaultdict(list)
+
+
+async def _build_traceability_context(
+    project_id: int, req_ids: list[int], db: AsyncSession
+) -> TraceabilityContext:
+    ctx = TraceabilityContext()
+
+    reqs = (
+        (await db.execute(select(Requirement).where(Requirement.project_id == project_id)))
+        .scalars()
+        .all()
+    )
+    for req in reqs:
+        if req.parent_id is not None:
+            ctx.children_by_parent[req.parent_id].append(req)
+
+    if not req_ids:
+        return ctx
+
+    links_result = await db.execute(
+        select(ArtefactLink, TestCase)
+        .join(TestCase, TestCase.id == ArtefactLink.source_id)
+        .where(
+            ArtefactLink.source_type == VERIFY_SOURCE_TYPE,
+            ArtefactLink.target_type == VERIFY_TARGET_TYPE,
+            ArtefactLink.target_id.in_(req_ids),
+            ArtefactLink.role == VERIFY_LINK_ROLE,
+        )
+        .order_by(ArtefactLink.created_at.desc(), TestCase.tc_id)
+    )
+    for link, tc in links_result.all():
+        ctx.linked_tcs_by_req[link.target_id].append(await _build_tc_response(tc))
+
+    tr_links_result = await db.execute(
+        select(TestRunLink).where(TestRunLink.requirement_id.in_(req_ids))
+    )
+    for tr in tr_links_result.scalars().all():
+        ctx.linked_trs_by_req[tr.requirement_id].append(
+            TestRunLinkResponse(
+                id=tr.id,
+                requirement_id=tr.requirement_id,
+                test_run_id=tr.test_run_id,
+                test_run_name=tr.test_run_name,
+                teststation_url=tr.teststation_url,
+                status=tr.status,
+                created_at=tr.created_at,
+            )
+        )
+
+    return ctx
+
+
+def _build_req_response_sync(req: Requirement, ctx: TraceabilityContext) -> RequirementResponse:
+    tc_count = len(ctx.linked_tcs_by_req.get(req.id, []))
+    children = ctx.children_by_parent.get(req.id, [])
+    children_responses = [_build_req_response_sync(child, ctx) for child in children]
 
     return RequirementResponse(
         id=req.id,
@@ -128,12 +188,15 @@ async def get_traceability_matrix(
     result = await db.execute(select(Requirement).where(Requirement.project_id == project_id))
     requirements = result.scalars().all()
 
+    req_ids = [req.id for req in requirements]
+    ctx = await _build_traceability_context(project_id, req_ids, db)
+
     items = []
     for req in requirements:
-        linked_tcs = await _get_linked_test_cases(req.id, db)
-        linked_trs = await _get_linked_test_runs(req.id, db)
+        linked_tcs = ctx.linked_tcs_by_req.get(req.id, [])
+        linked_trs = ctx.linked_trs_by_req.get(req.id, [])
         coverage_status = _compute_coverage(linked_tcs)
-        req_resp = await _build_req_response(req, db)
+        req_resp = _build_req_response_sync(req, ctx)
 
         items.append(
             TraceabilityItem(
@@ -184,8 +247,19 @@ async def get_impact_analysis(
     if not root:
         raise HTTPException(status_code=404, detail="Requirement not found")
 
-    root_resp = await _build_req_response(root, db)
-    project_id = root.project_id
+    ctx = await _build_traceability_context(
+        project_id,
+        [
+            req.id
+            for req in (
+                await db.execute(select(Requirement).where(Requirement.project_id == project_id))
+            )
+            .scalars()
+            .all()
+        ],
+        db,
+    )
+    root_resp = _build_req_response_sync(root, ctx)
 
     async def _build_upstream(req_id: int, current_depth: int, visited: set) -> list:
         if current_depth > depth or req_id in visited:
@@ -197,7 +271,7 @@ async def get_impact_analysis(
             src_result = await db.execute(select(Requirement).where(Requirement.id == src_id))
             src = src_result.scalar_one_or_none()
             if src and src.id not in visited:
-                src_resp = await _build_req_response(src, db)
+                src_resp = _build_req_response_sync(src, ctx)
                 children = await _build_upstream(src.id, current_depth + 1, visited.copy())
                 nodes.append(
                     ImpactNode(
@@ -220,7 +294,7 @@ async def get_impact_analysis(
             tgt_result = await db.execute(select(Requirement).where(Requirement.id == tgt_id))
             tgt = tgt_result.scalar_one_or_none()
             if tgt and tgt.id not in visited:
-                tgt_resp = await _build_req_response(tgt, db)
+                tgt_resp = _build_req_response_sync(tgt, ctx)
                 children = await _build_downstream(tgt.id, current_depth + 1, visited.copy())
                 nodes.append(
                     ImpactNode(
@@ -232,8 +306,7 @@ async def get_impact_analysis(
                     )
                 )
 
-        for tc_link, tc in await get_verifying_test_case_links_for_requirement(req_id, db):
-            tc_resp = await _build_tc_response(tc)
+        for tc_resp in ctx.linked_tcs_by_req.get(req_id, []):
             nodes.append(
                 ImpactNode(
                     requirement=RequirementResponse(
@@ -252,7 +325,7 @@ async def get_impact_analysis(
                         children=[],
                         test_case_count=0,
                     ),
-                    link_type=tc_link.role,
+                    link_type=VERIFY_LINK_ROLE,
                     direction="downstream",
                     depth=current_depth,
                     children=[],
@@ -279,12 +352,15 @@ async def get_coverage_gaps(
     result = await db.execute(select(Requirement).where(Requirement.project_id == project_id))
     requirements = result.scalars().all()
 
+    req_ids = [req.id for req in requirements]
+    ctx = await _build_traceability_context(project_id, req_ids, db)
+
     gaps = []
     covered = 0
     partial = 0
     uncovered = 0
     for req in requirements:
-        linked_tcs = await _get_linked_test_cases(req.id, db)
+        linked_tcs = ctx.linked_tcs_by_req.get(req.id, [])
 
         tc_count = len(linked_tcs)
         all_draft = tc_count > 0 and all(tc.status == "Draft" for tc in linked_tcs)
@@ -305,7 +381,7 @@ async def get_coverage_gaps(
             covered += 1
 
         if gap_type != "none":
-            req_resp = await _build_req_response(req, db)
+            req_resp = _build_req_response_sync(req, ctx)
             gaps.append(
                 CoverageGap(
                     requirement=req_resp,

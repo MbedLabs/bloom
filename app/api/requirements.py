@@ -79,83 +79,150 @@ async def _get_verified_by(
     ]
 
 
-async def _build_requirement_response(req: Requirement, db: AsyncSession) -> RequirementResponse:
-    verified_by = await _get_verified_by(req.id, db)
+from collections import defaultdict
+
+
+class ReqPrefetchContext:
+    def __init__(self):
+        self.children_by_parent: dict[int, list[Requirement]] = defaultdict(list)
+        self.verified_by_by_req: dict[int, list[RequirementVerifiedByLinkResponse]] = defaultdict(
+            list
+        )
+        self.test_run_links_by_req: dict[int, list[TestRunLink]] = defaultdict(list)
+        self.tc_suite_summaries: dict[int, list[TestSuiteSummary]] = defaultdict(list)
+        self.tc_campaign_summaries: dict[int, list[TestCampaignSummary]] = defaultdict(list)
+
+
+async def _build_prefetch_context(root_req_id: int, db: AsyncSession) -> ReqPrefetchContext:
+    ctx = ReqPrefetchContext()
+
+    # 1. Fetch all descendants using a recursive CTE
+    hierarchy = (
+        select(Requirement)
+        .where(Requirement.id == root_req_id)
+        .cte(name="hierarchy", recursive=True)
+    )
+    hierarchy = hierarchy.union_all(
+        select(Requirement).where(Requirement.parent_id == hierarchy.c.id)
+    )
+    from sqlalchemy.orm import aliased
+
+    req_alias = aliased(Requirement)
+    descendants_query = select(req_alias).join(hierarchy, req_alias.id == hierarchy.c.id)
+    all_reqs = (await db.execute(descendants_query)).scalars().all()
+    req_ids = [r.id for r in all_reqs]
+
+    for req in all_reqs:
+        if req.parent_id is not None:
+            ctx.children_by_parent[req.parent_id].append(req)
+
+    # 2. Fetch all verified_by links
+    if req_ids:
+        links_result = await db.execute(
+            select(ArtefactLink, TestCase)
+            .join(TestCase, TestCase.id == ArtefactLink.source_id)
+            .where(
+                ArtefactLink.source_type == VERIFY_SOURCE_TYPE,
+                ArtefactLink.target_type == VERIFY_TARGET_TYPE,
+                ArtefactLink.target_id.in_(req_ids),
+                ArtefactLink.role == VERIFY_LINK_ROLE,
+            )
+            .order_by(ArtefactLink.created_at.desc(), TestCase.tc_id)
+        )
+        all_links = links_result.all()
+        for link, tc in all_links:
+            ctx.verified_by_by_req[link.target_id].append(
+                RequirementVerifiedByLinkResponse(
+                    id=link.id,
+                    link_type=link.role,
+                    created_at=link.created_at,
+                    test_case=_build_test_case_summary(tc),
+                )
+            )
+
+        # 3. Fetch all test run links
+        tr_links_result = await db.execute(
+            select(TestRunLink)
+            .where(TestRunLink.requirement_id.in_(req_ids))
+            .order_by(TestRunLink.created_at.desc())
+        )
+        for tr_link in tr_links_result.scalars().all():
+            ctx.test_run_links_by_req[tr_link.requirement_id].append(tr_link)
+
+    # 4. Fetch Suite/Campaign backlinks for all involved TestCases
+    tc_ids = []
+    for links in ctx.verified_by_by_req.values():
+        for link in links:
+            tc_ids.append(link.test_case.id)
+
+    if tc_ids:
+        # Suites
+        suite_items_result = await db.execute(
+            select(TestSuiteItem, TestSuite)
+            .join(TestSuite, TestSuite.id == TestSuiteItem.suite_id)
+            .where(TestSuiteItem.test_case_id.in_(tc_ids))
+        )
+        for item, suite in suite_items_result.all():
+            ctx.tc_suite_summaries[item.test_case_id].append(
+                TestSuiteSummary(
+                    id=suite.id,
+                    suite_id=suite.suite_id,
+                    name=suite.name,
+                    status=suite.status,
+                )
+            )
+
+        # Campaigns
+        campaign_items_result = await db.execute(
+            select(TestCampaignItem, TestCampaign)
+            .join(TestCampaign, TestCampaign.id == TestCampaignItem.campaign_id)
+            .where(TestCampaignItem.test_case_id.in_(tc_ids))
+        )
+        for item, campaign in campaign_items_result.all():
+            ctx.tc_campaign_summaries[item.test_case_id].append(
+                TestCampaignSummary(
+                    id=campaign.id,
+                    campaign_id=campaign.campaign_id or "",
+                    name=campaign.name,
+                    status=campaign.status,
+                )
+            )
+
+    return ctx
+
+
+async def _build_requirement_response(
+    req: Requirement, db: AsyncSession, ctx: Optional[ReqPrefetchContext] = None
+) -> RequirementResponse:
+    if ctx is None:
+        ctx = await _build_prefetch_context(req.id, db)
+
+    verified_by = ctx.verified_by_by_req.get(req.id, [])
     tc_count = len(verified_by)
 
-    children_result = await db.execute(select(Requirement).where(Requirement.parent_id == req.id))
-    children = children_result.scalars().all()
-
+    children = ctx.children_by_parent.get(req.id, [])
     children_responses = []
     for child in children:
-        child_resp = await _build_requirement_response(child, db)
+        child_resp = await _build_requirement_response(child, db, ctx)
         children_responses.append(child_resp)
 
-    linked_test_runs = (
-        (
-            await db.execute(
-                select(TestRunLink)
-                .where(TestRunLink.requirement_id == req.id)
-                .order_by(TestRunLink.created_at.desc())
-            )
-        )
-        .scalars()
-        .all()
-    )
+    linked_test_runs = ctx.test_run_links_by_req.get(req.id, [])
 
-    linked_tc_ids = [link.test_case.id for link in verified_by]
     suite_backlinks = []
     campaign_backlinks = []
     seen_suite_ids = set()
     seen_campaign_ids = set()
-    if linked_tc_ids:
-        suite_items = (
-            (
-                await db.execute(
-                    select(TestSuiteItem).where(TestSuiteItem.test_case_id.in_(linked_tc_ids))
-                )
-            )
-            .scalars()
-            .all()
-        )
-        for item in suite_items:
-            suite = (
-                await db.execute(select(TestSuite).where(TestSuite.id == item.suite_id))
-            ).scalar_one_or_none()
-            if suite and suite.id not in seen_suite_ids:
-                seen_suite_ids.add(suite.id)
-                suite_backlinks.append(
-                    TestSuiteSummary(
-                        id=suite.id,
-                        suite_id=suite.suite_id,
-                        name=suite.name,
-                        status=suite.status,
-                    )
-                )
 
-        campaign_items = (
-            (
-                await db.execute(
-                    select(TestCampaignItem).where(TestCampaignItem.test_case_id.in_(linked_tc_ids))
-                )
-            )
-            .scalars()
-            .all()
-        )
-        for item in campaign_items:
-            campaign = (
-                await db.execute(select(TestCampaign).where(TestCampaign.id == item.campaign_id))
-            ).scalar_one_or_none()
-            if campaign and campaign.id not in seen_campaign_ids:
-                seen_campaign_ids.add(campaign.id)
-                campaign_backlinks.append(
-                    TestCampaignSummary(
-                        id=campaign.id,
-                        campaign_id=campaign.campaign_id or "",
-                        name=campaign.name,
-                        status=campaign.status,
-                    )
-                )
+    for link in verified_by:
+        tc_id = link.test_case.id
+        for suite_summary in ctx.tc_suite_summaries.get(tc_id, []):
+            if suite_summary.id not in seen_suite_ids:
+                seen_suite_ids.add(suite_summary.id)
+                suite_backlinks.append(suite_summary)
+        for campaign_summary in ctx.tc_campaign_summaries.get(tc_id, []):
+            if campaign_summary.id not in seen_campaign_ids:
+                seen_campaign_ids.add(campaign_summary.id)
+                campaign_backlinks.append(campaign_summary)
 
     return RequirementResponse(
         id=req.id,
