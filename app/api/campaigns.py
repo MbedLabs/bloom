@@ -473,21 +473,15 @@ async def _build_campaign_response(
 
     # Build suites list from CampaignSuite join table
     cs_rows = (
-        (
-            await db.execute(
-                select(CampaignSuite)
-                .where(CampaignSuite.campaign_id == campaign.id)
-                .order_by(CampaignSuite.id)
-            )
+        await db.execute(
+            select(CampaignSuite, TestSuite)
+            .join(TestSuite, TestSuite.id == CampaignSuite.suite_id)
+            .where(CampaignSuite.campaign_id == campaign.id)
+            .order_by(CampaignSuite.id)
         )
-        .scalars()
-        .all()
-    )
+    ).all()
     suites_list: list[TestSuiteSummary] = []
-    for cs in cs_rows:
-        suite = (
-            await db.execute(select(TestSuite).where(TestSuite.id == cs.suite_id))
-        ).scalar_one_or_none()
+    for _cs, suite in cs_rows:
         if suite:
             suites_list.append(
                 TestSuiteSummary(
@@ -536,15 +530,58 @@ async def _build_campaign_detail(
     )
     items = items_result.scalars().all()
 
-    item_responses = []
+    # Pre-fetch all TestCases for these items
+    tc_ids = [item.test_case_id for item in items]
+    test_cases_map = {}
+    if tc_ids:
+        tc_result = await db.execute(select(TestCase).where(TestCase.id.in_(tc_ids)))
+        test_cases_map = {tc.id: tc for tc in tc_result.scalars().all()}
+
+    # Pre-fetch all requirement links for these TestCases
+    linked_reqs_by_tc: dict[int, list[RequirementSummary]] = {}
     requirement_ids = set()
+    if tc_ids:
+        links_result = await db.execute(
+            select(ArtefactLink, Requirement)
+            .join(Requirement, Requirement.id == ArtefactLink.target_id)
+            .where(
+                ArtefactLink.source_type == "TC",
+                ArtefactLink.target_type == "REQ",
+                ArtefactLink.source_id.in_(tc_ids),
+                ArtefactLink.role == "verifies",
+            )
+            .order_by(ArtefactLink.created_at.desc(), Requirement.req_id)
+        )
+        for link, req in links_result.all():
+            summary = RequirementSummary(
+                id=req.id, req_id=req.req_id, title=req.title, status=req.status
+            )
+            linked_reqs_by_tc.setdefault(link.source_id, []).append(summary)
+            requirement_ids.add(req.id)
+
+    item_responses = []
     for item in items:
-        tc_result = await db.execute(select(TestCase).where(TestCase.id == item.test_case_id))
-        tc = tc_result.scalar_one_or_none()
+        tc = test_cases_map.get(item.test_case_id)
         tc_resp = None
         if tc:
-            tc_resp = await _build_test_case_response(tc, db)
-            requirement_ids.update(req.id for req in tc_resp.linked_requirements)
+            linked_requirements = linked_reqs_by_tc.get(tc.id, [])
+            tc_resp = TestCaseResponse(
+                id=tc.id,
+                project_id=tc.project_id,
+                tc_id=tc.tc_id,
+                title=tc.title,
+                description=tc.description,
+                preconditions=tc.preconditions,
+                steps=tc.steps,
+                status=tc.status,
+                created_at=tc.created_at,
+                updated_at=tc.updated_at,
+                requirement_count=len(linked_requirements),
+                linked_requirements=linked_requirements,
+                verifies=[],
+                suite_memberships=[],
+            )
+
         item_responses.append(
             TestCampaignItemResponse(
                 id=item.id,
@@ -614,35 +651,22 @@ async def _build_campaign_detail(
     claimed_tc_ids: set[int] = set()
     suite_scopes: list[TestCampaignSuiteScope] = []
 
-    cs_rows = (
-        (
-            await db.execute(
-                select(CampaignSuite)
-                .where(CampaignSuite.campaign_id == campaign.id)
-                .order_by(CampaignSuite.id)
-            )
-        )
-        .scalars()
-        .all()
+    suite_items_result = await db.execute(
+        select(TestSuiteItem, TestSuite)
+        .join(TestSuite, TestSuite.id == TestSuiteItem.suite_id)
+        .join(CampaignSuite, CampaignSuite.suite_id == TestSuite.id)
+        .where(CampaignSuite.campaign_id == campaign.id)
     )
 
-    for cs in cs_rows:
-        suite_result = await db.execute(select(TestSuite).where(TestSuite.id == cs.suite_id))
-        suite = suite_result.scalar_one_or_none()
-        if not suite:
-            continue
+    suite_tc_ids_map: dict[int, set[int]] = {}
+    suite_by_id: dict[int, TestSuite] = {}
 
-        si_rows = (
-            (
-                await db.execute(
-                    select(TestSuiteItem.test_case_id).where(TestSuiteItem.suite_id == suite.id)
-                )
-            )
-            .scalars()
-            .all()
-        )
-        suite_tc_ids = set(si_rows)
+    for si, suite in suite_items_result.all():
+        suite_by_id[suite.id] = suite
+        suite_tc_ids_map.setdefault(suite.id, set()).add(si.test_case_id)
 
+    for suite_id, suite in suite_by_id.items():
+        suite_tc_ids = suite_tc_ids_map[suite_id]
         scope_items = [item_by_tc_id[tc_id] for tc_id in suite_tc_ids if tc_id in item_by_tc_id]
         claimed_tc_ids.update(tc_id for tc_id in suite_tc_ids if tc_id in item_by_tc_id)
 
