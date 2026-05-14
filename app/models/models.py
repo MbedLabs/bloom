@@ -96,8 +96,10 @@ class Requirement(Base):
     __tablename__ = "requirements"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
-    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("requirements.id"), nullable=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    parent_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("requirements.id"), nullable=True, index=True
+    )
     req_id: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -146,7 +148,7 @@ class TestCase(Base):
     __tablename__ = "test_cases"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
     tc_id: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
