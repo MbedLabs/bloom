@@ -78,23 +78,17 @@ async def _build_test_case_response(tc: TestCase, db: AsyncSession) -> TestCaseR
             )
         )
 
-    suite_items = (
-        (
-            await db.execute(
-                select(TestSuiteItem)
-                .where(TestSuiteItem.test_case_id == tc.id)
-                .order_by(TestSuiteItem.created_at.desc())
-            )
-        )
-        .scalars()
-        .all()
+    suite_items_result = await db.execute(
+        select(TestSuiteItem, TestSuite)
+        .join(TestSuite, TestSuite.id == TestSuiteItem.suite_id)
+        .where(TestSuiteItem.test_case_id == tc.id)
+        .order_by(TestSuiteItem.created_at.desc())
     )
     suite_memberships = []
-    for item in suite_items:
-        suite = (
-            await db.execute(select(TestSuite).where(TestSuite.id == item.suite_id))
-        ).scalar_one_or_none()
-        if suite:
+    seen_suite_ids: set[int] = set()
+    for item, suite in suite_items_result.all():
+        if suite.id not in seen_suite_ids:
+            seen_suite_ids.add(suite.id)
             suite_memberships.append(
                 TestSuiteSummary(
                     id=suite.id,
@@ -104,24 +98,16 @@ async def _build_test_case_response(tc: TestCase, db: AsyncSession) -> TestCaseR
                 )
             )
 
-    campaign_items = (
-        (
-            await db.execute(
-                select(TestCampaignItem)
-                .where(TestCampaignItem.test_case_id == tc.id)
-                .order_by(TestCampaignItem.created_at.desc())
-            )
-        )
-        .scalars()
-        .all()
+    campaign_items_result = await db.execute(
+        select(TestCampaignItem, TestCampaign)
+        .join(TestCampaign, TestCampaign.id == TestCampaignItem.campaign_id)
+        .where(TestCampaignItem.test_case_id == tc.id)
+        .order_by(TestCampaignItem.created_at.desc())
     )
     campaign_memberships = []
-    seen_campaign_ids = set()
-    for item in campaign_items:
-        campaign = (
-            await db.execute(select(TestCampaign).where(TestCampaign.id == item.campaign_id))
-        ).scalar_one_or_none()
-        if campaign and campaign.id not in seen_campaign_ids:
+    seen_campaign_ids: set[int] = set()
+    for item, campaign in campaign_items_result.all():
+        if campaign.id not in seen_campaign_ids:
             seen_campaign_ids.add(campaign.id)
             campaign_memberships.append(
                 TestCampaignSummary(

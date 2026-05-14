@@ -64,36 +64,31 @@ async def _build_suite_response(suite: TestSuite, db: AsyncSession) -> TestSuite
 
 async def _build_suite_detail(suite: TestSuite, db: AsyncSession) -> TestSuiteDetailResponse:
     base = await _build_suite_response(suite, db)
-    items = (
-        (
-            await db.execute(
-                select(TestSuiteItem)
-                .where(TestSuiteItem.suite_id == suite.id)
-                .order_by(TestSuiteItem.order, TestSuiteItem.created_at)
-            )
-        )
-        .scalars()
-        .all()
+    items_result = await db.execute(
+        select(TestSuiteItem, TestCase)
+        .join(TestCase, TestCase.id == TestSuiteItem.test_case_id)
+        .where(TestSuiteItem.suite_id == suite.id)
+        .order_by(TestSuiteItem.order, TestSuiteItem.created_at)
     )
 
     item_responses = []
-    requirement_ids: set[int] = set()
-    for item in items:
-        tc = (
-            await db.execute(select(TestCase).where(TestCase.id == item.test_case_id))
-        ).scalar_one_or_none()
-        if tc:
-            item_responses.append(
-                TestSuiteItemResponse(
-                    id=item.id,
-                    suite_id=item.suite_id,
-                    test_case_id=item.test_case_id,
-                    order=item.order,
-                    created_at=item.created_at,
-                    test_case=_test_case_summary(tc),
-                )
+    tc_ids = []
+    for item, tc in items_result.all():
+        item_responses.append(
+            TestSuiteItemResponse(
+                id=item.id,
+                suite_id=item.suite_id,
+                test_case_id=item.test_case_id,
+                order=item.order,
+                created_at=item.created_at,
+                test_case=_test_case_summary(tc),
             )
-            requirement_ids.update(await get_requirement_ids_verified_by_test_cases([tc.id], db))
+        )
+        tc_ids.append(tc.id)
+
+    requirement_ids: set[int] = set()
+    if tc_ids:
+        requirement_ids.update(await get_requirement_ids_verified_by_test_cases(tc_ids, db))
 
     requirements = []
     if requirement_ids:
