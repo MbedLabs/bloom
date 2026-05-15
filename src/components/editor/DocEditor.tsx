@@ -40,6 +40,7 @@ interface DocEditorProps {
   showOutline?: boolean
   onOutlineToggle?: (open: boolean) => void
   mentionItems?: MentionSuggestion[]
+  userMentionItems?: MentionSuggestion[]
 }
 
 export default function DocEditor({
@@ -54,12 +55,18 @@ export default function DocEditor({
   showOutline = false,
   onOutlineToggle,
   mentionItems = [],
+  userMentionItems = [],
 }: DocEditorProps) {
   const mentionItemsRef = useRef(mentionItems)
+  const userMentionItemsRef = useRef(userMentionItems)
 
   useEffect(() => {
     mentionItemsRef.current = mentionItems
   }, [mentionItems])
+
+  useEffect(() => {
+    userMentionItemsRef.current = userMentionItems
+  }, [userMentionItems])
 
   const renderParameterMentionList = useCallback(() => {
     let component: ReactRenderer<MentionListRef> | null = null
@@ -115,7 +122,59 @@ export default function DocEditor({
     }
   }, [])
 
-  const parameterMentionItems = mentionItemsRef.current
+  const renderUserMentionList = useCallback(() => {
+    let component: ReactRenderer<MentionListRef> | null = null
+    let popup: HTMLDivElement | null = null
+
+    const destroy = () => {
+      component?.destroy()
+      component = null
+      popup?.remove()
+      popup = null
+    }
+
+    const position = (clientRect: (() => DOMRect | null) | null | undefined) => {
+      if (!popup || !clientRect) return
+      const rect = clientRect()
+      if (!rect) return
+      popup.style.left = `${rect.left}px`
+      popup.style.top = `${rect.bottom + 8}px`
+    }
+
+    return {
+      onStart: (props: { editor: typeof editor; items: MentionSuggestion[]; command: (item: MentionSuggestion) => void; clientRect?: (() => DOMRect | null) | null }) => {
+        component = new ReactRenderer(MentionList, {
+          editor: props.editor,
+          props: {
+            items: props.items,
+            command: props.command,
+            triggerPrefix: '@',
+            triggerSuffix: '',
+          },
+          as: 'div',
+          className: 'mention-suggestion-popover',
+        })
+
+        popup = document.createElement('div')
+        popup.style.position = 'fixed'
+        popup.style.zIndex = '50'
+        popup.appendChild(component.element)
+        document.body.appendChild(popup)
+        position(props.clientRect)
+      },
+      onUpdate: (props: { items: MentionSuggestion[]; command: (item: MentionSuggestion) => void; clientRect?: (() => DOMRect | null) | null }) => {
+        component?.updateProps({
+          items: props.items,
+          command: props.command,
+          triggerPrefix: '@',
+          triggerSuffix: '',
+        })
+        position(props.clientRect)
+      },
+      onKeyDown: (props: { event: KeyboardEvent }) => component?.ref?.onKeyDown(props) ?? false,
+      onExit: destroy,
+    }
+  }, [])
 
   const editor = useEditor({
     extensions: [
@@ -125,13 +184,19 @@ export default function DocEditor({
       }),
       Mention.configure({
         HTMLAttributes: { class: 'mention' },
-        renderText: ({ node }) => `{{${String(node.attrs.label ?? node.attrs.id)}}}`,
-        renderHTML: ({ node }) => ['span', { 'data-type': 'mention', class: 'mention' }, `{{${String(node.attrs.label ?? node.attrs.id)}}}`],
+        renderText: ({ node }) => node.attrs.mentionSuggestionChar === '@'
+          ? `@${String(node.attrs.label ?? node.attrs.id)}`
+          : `{{${String(node.attrs.label ?? node.attrs.id)}}}`,
+        renderHTML: ({ node }) => [
+          'span',
+          { 'data-type': 'mention', class: node.attrs.mentionSuggestionChar === '@' ? 'mention-user text-blue-500 font-medium' : 'mention' },
+          node.attrs.mentionSuggestionChar === '@' ? `@${String(node.attrs.label ?? node.attrs.id)}` : `{{${String(node.attrs.label ?? node.attrs.id)}}}`
+        ],
         suggestions: [
           {
             char: PARAMETER_MENTION_TRIGGER,
             allowedPrefixes: null,
-            items: ({ query }) => parameterMentionItems.filter((item) => {
+            items: ({ query }) => mentionItemsRef.current.filter((item) => {
               const normalizedQuery = query.trim().toLowerCase()
               if (!normalizedQuery) return true
               return item.label.toLowerCase().includes(normalizedQuery)
@@ -147,6 +212,26 @@ export default function DocEditor({
               }).run()
             },
             render: renderParameterMentionList,
+          },
+          {
+            char: '@',
+            allowedPrefixes: null,
+            items: ({ query }) => userMentionItemsRef.current.filter((item) => {
+              const normalizedQuery = query.trim().toLowerCase()
+              if (!normalizedQuery) return true
+              return item.label.toLowerCase().includes(normalizedQuery)
+            }),
+            command: ({ editor: mentionEditor, range, props }) => {
+              mentionEditor.chain().focus().insertContentAt(range, {
+                type: 'mention',
+                attrs: {
+                  id: String(props.id),
+                  label: props.label,
+                  mentionSuggestionChar: '@',
+                },
+              }).run()
+            },
+            render: renderUserMentionList,
           },
         ],
       }),
