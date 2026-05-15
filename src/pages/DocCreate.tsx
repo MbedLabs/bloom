@@ -533,6 +533,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                   mentionItems={(projectVariables ?? [])
                     .filter((variable) => variable.kind === 'parameter')
                     .map((variable) => ({ id: variable.id, label: variable.key }))}
+                  userMentionItems={(users ?? []).map((u) => ({ id: u.id, label: u.full_name }))}
                 />
               )}
             </div>
