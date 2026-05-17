@@ -55,7 +55,7 @@ async def test_delete_user_cleans_known_user_references_before_delete():
         email="target@example.com",
         full_name="Target User",
         hashed_password=get_password_hash("targetpass"),
-        role=UserRole.reviewer,
+        role=UserRole.external,
         is_active=True,
     )
     db = SimpleNamespace(
@@ -126,7 +126,7 @@ async def test_delete_user_maps_integrity_errors_to_conflict_response():
         email="target@example.com",
         full_name="Target User",
         hashed_password=get_password_hash("targetpass"),
-        role=UserRole.reviewer,
+        role=UserRole.external,
         is_active=True,
     )
 
@@ -158,7 +158,7 @@ async def test_forgot_password_existing_user_returns_generic_message_and_sends_e
         email="reviewer@example.com",
         full_name="Reviewer",
         hashed_password=get_password_hash("reviewerpass"),
-        role=UserRole.reviewer,
+        role=UserRole.external,
         is_active=True,
     )
     db = SimpleNamespace(execute=AsyncMock(return_value=_ScalarResult(user)), flush=AsyncMock())

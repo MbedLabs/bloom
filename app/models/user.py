@@ -17,7 +17,7 @@ from app.core.database import Base
 class UserRole(str, enum.Enum):
     admin = "admin"
     maintainer = "maintainer"
-    reviewer = "reviewer"
+    external = "external"
 
 
 class User(Base):
@@ -28,7 +28,7 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(
-        SaEnum(UserRole), default=UserRole.reviewer, nullable=False
+        SaEnum(UserRole), default=UserRole.external, nullable=False
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     invited_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
