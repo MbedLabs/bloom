@@ -222,7 +222,7 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
                         <span className="text-xs text-muted-foreground">{scope.items.length} TC{scope.items.length !== 1 ? 's' : ''}</span>
                         <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">{scope.suite.status}</span>
                         <Link
-                          to={`/projects/${prefix}/docs/test-suites/${scope.suite.suite_id}`}
+                          to={`/projects/${prefix}/suites/${scope.suite.id}`}
                           onClick={(e) => e.stopPropagation()}
                           className="p-1 rounded hover:bg-accent/50 text-muted-foreground hover:text-primary"
                           title="Open suite detail"
@@ -280,7 +280,7 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
       <div className="bg-card rounded-lg shadow-elegant p-5">
         <div className="flex items-center justify-between mb-3">
           <span className="text-sm font-medium text-foreground">Bud Execution Link</span>
-          {campaign.bud_run_status && <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">{campaign.bud_run_status}</span>}
+          {campaign.bud_run_status && <RunStatusBadge status={campaign.bud_run_status} />}
         </div>
         {campaign.bud_run_url ? (
           <a href={campaign.bud_run_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-3 py-2 rounded-md bg-primary text-white hover:bg-primary/90 text-sm">
@@ -359,6 +359,21 @@ function CampaignStatusBadge({ status }: { status: string }) {
   }
   const cfg = config[status] || config.Planned
   return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cfg.colors}`}>{status}</span>
+}
+
+function RunStatusBadge({ status }: { status: string }) {
+  const config: Record<string, string> = {
+    Completed: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400',
+    Failed: 'bg-red-500/10 text-red-700 dark:text-red-400',
+    Running: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
+    Pending: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400',
+    Cancelled: 'bg-muted text-muted-foreground',
+  }
+  return (
+    <span className={`px-2 py-1 rounded-full text-xs font-medium ${config[status] || 'bg-muted text-muted-foreground'}`}>
+      {status}
+    </span>
+  )
 }
 
 function ResultBadge({ result }: { result: string }) {
