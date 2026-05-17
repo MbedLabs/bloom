@@ -7,7 +7,7 @@ import { UserPlus, Edit2, Trash2, X, Shield, Wrench, Eye, Copy, Check } from 'lu
 const ROLE_CONFIG = {
   admin: { label: 'Admin', color: 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400', icon: Shield },
   maintainer: { label: 'Maintainer', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400', icon: Wrench },
-  reviewer: { label: 'Reviewer', color: 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400', icon: Eye },
+  external: { label: 'External', color: 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400', icon: Eye },
 }
 
 export default function UsersPage() {
@@ -114,13 +114,13 @@ export default function UsersPage() {
                     {editingUser === u.id ? (
                       <select
                         defaultValue={u.role}
-                        onChange={(e) => updateMutation.mutate({ id: u.id, data: { role: e.target.value as 'maintainer' | 'reviewer' } })}
+                        onChange={(e) => updateMutation.mutate({ id: u.id, data: { role: e.target.value as 'maintainer' | 'external' } })}
                         className="px-2 py-1 text-xs border border-input rounded bg-background text-foreground"
                         title="Select role"
                         autoFocus
                       >
                         <option value="maintainer">Maintainer</option>
-                        <option value="reviewer">Reviewer</option>
+                        <option value="external">External</option>
                       </select>
                     ) : (
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold ${roleConf?.color || ''}`}>
@@ -210,7 +210,7 @@ function InviteUserModal({ onClose, onSubmit, isLoading, error }: {
 }) {
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
-  const [role, setRole] = useState('reviewer')
+  const [role, setRole] = useState('external')
   const [inviteLink, setInviteLink] = useState<string | null>(null)
   const [invitedEmail, setInvitedEmail] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -283,7 +283,7 @@ function InviteUserModal({ onClose, onSubmit, isLoading, error }: {
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Role</label>
             <select value={role} onChange={(e) => setRole(e.target.value)} title="Role" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground">
-              <option value="reviewer">Reviewer</option>
+              <option value="external">External</option>
               <option value="maintainer">Maintainer</option>
               <option value="admin">Admin</option>
             </select>

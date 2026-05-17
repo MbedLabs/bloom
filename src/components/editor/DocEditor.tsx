@@ -196,11 +196,14 @@ export default function DocEditor({
           {
             char: PARAMETER_MENTION_TRIGGER,
             allowedPrefixes: null,
-            items: ({ query }) => mentionItemsRef.current.filter((item) => {
-              const normalizedQuery = query.trim().toLowerCase()
-              if (!normalizedQuery) return true
-              return item.label.toLowerCase().includes(normalizedQuery)
-            }),
+            items: ({ query }) => {
+              console.log('{{ trigger called! mentionItemsRef.current:', mentionItemsRef.current);
+              return mentionItemsRef.current.filter((item) => {
+                const normalizedQuery = query.trim().toLowerCase()
+                if (!normalizedQuery) return true
+                return item.label.toLowerCase().includes(normalizedQuery)
+              })
+            },
             command: ({ editor: mentionEditor, range, props }) => {
               mentionEditor.chain().focus().insertContentAt(range, {
                 type: 'mention',
