@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.models.project_membership import ProjectMembership
 from app.models.user import User, UserRole
 
 ALGORITHM = "HS256"
@@ -87,3 +88,62 @@ def require_role(*roles: UserRole):
         return current_user
 
     return role_checker
+
+
+async def _get_project_membership(
+    db: AsyncSession, user_id: int, project_id: int
+) -> Optional[ProjectMembership]:
+    result = await db.execute(
+        select(ProjectMembership).where(
+            ProjectMembership.user_id == user_id,
+            ProjectMembership.project_id == project_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+class _ProjectRoleChecker:
+    """Callable dependency that checks project-scoped roles.
+
+    Admin always passes (global).
+    Maintainer and external must have a project_memberships row for the project."""
+
+    def __init__(self, *roles: str) -> None:
+        self._roles = set(roles)  # 'admin','maintainer','external'
+
+    async def __call__(
+        self,
+        project_id: int,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+    ) -> User:
+        if current_user.role == UserRole.admin:
+            return current_user
+        if current_user.role.value not in self._roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Role '{current_user.role.value}' not authorized for this project.",
+            )
+        membership = await _get_project_membership(db, current_user.id, project_id)
+        if membership is None or membership.role != current_user.role.value:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"User is not assigned to this project with role '{current_user.role.value}'.",
+            )
+        return current_user
+
+
+def require_project_role(*roles: str):
+    """FastAPI dependency: user has the given role AND a project_membership row.
+
+    Args:
+        roles: 'admin', 'maintainer', 'external'
+
+    Usage:
+        @router.post("/{project_id}/items")
+        async def create_item(
+            project_id: int,
+            current_user: User = Depends(require_project_role("admin", "maintainer")),
+        ): ...
+    """
+    return _ProjectRoleChecker(*roles)
