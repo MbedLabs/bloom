@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { DOC_TYPE_LABELS, DOC_TYPE_COLORS, type DocType } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
@@ -107,17 +107,26 @@ export default function DocDetailShell({
   backTo,
 }: DocDetailShellProps) {
   const location = useLocation()
+  const navigate = useNavigate()
   const returnTo = backTo
     || (location.state as { returnTo?: string } | null)?.returnTo
     || docRegistryListUrl(projectPrefix, docType)
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1)
+    } else {
+      navigate(returnTo)
+    }
+  }
 
   return (
     <div className="animate-fade-in space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
-          <Link to={returnTo} className="p-2 hover:bg-accent/50 rounded-md">
+          <button onClick={handleBack} className="p-2 hover:bg-accent/50 rounded-md" aria-label="Go back">
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-          </Link>
+          </button>
           <div>
             <div className="flex items-center gap-3 flex-wrap mb-1">
               <span className="font-mono text-sm text-primary font-semibold">{docCode}</span>

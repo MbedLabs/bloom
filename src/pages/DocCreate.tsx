@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { useParams, useSearchParams, useNavigate, Link, useLocation } from 'react-router-dom'
+import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { ArrowLeft, PanelRightOpen, PanelRightClose, Trash2 } from 'lucide-react'
 import { DocEditor } from '../components/editor'
@@ -16,7 +16,7 @@ import {
   DOC_CONFIGS,
   DOC_TYPE_LABELS,
   DOC_TYPE_COLORS,
-  docUrl,
+  DOC_TYPE_SLUGS,
   normalizeDocTypeParam,
 } from '../types/doc'
 import { useAuth } from '../contexts/AuthContext'
@@ -122,6 +122,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const [outlineOpen, setOutlineOpen] = useState(() => editMode)
   const [headingNumbered, setHeadingNumbered] = useState(true)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveSuccess, setSaveSuccess] = useState(false)
 
   const { data: project, isLoading: isProjectLoading, isError: isProjectError } = useQuery({
     queryKey: ['project-by-prefix', prefix],
@@ -150,6 +151,14 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const expectedDocIdExample = project ? `${project.prefix}-${config.typeCode}-001` : `PRJ-${config.typeCode}-001`
   const serverAssignedId = !editMode && isServerAssignedDocIdOnCreate(docType)
   const docIdIsValid = editMode || serverAssignedId
+
+  const handleBack = useCallback(() => {
+    if (window.history.length > 1) {
+      navigate(-1)
+    } else {
+      navigate(listBackUrl)
+    }
+  }, [navigate, listBackUrl])
 
   const { data: users } = useQuery({
     queryKey: ['users'],
@@ -271,7 +280,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
         SPEC: 'doc_id', PRT: 'doc_id', RPT: 'doc_id', STD: 'doc_id',
       }
       const newDocId = record[docIdFieldMap[docType]] || record.id
-      navigate(docUrl(prefix!, docType, String(newDocId)))
+      const kindSlug = DOC_TYPE_SLUGS[docType]
+      navigate(`/projects/${prefix}/docs/${kindSlug}/${newDocId}/edit`, { replace: true })
     },
     onError: (error) => {
       setSaveError(extractApiErrorMessage(error, 'Could not save document'))
@@ -312,7 +322,10 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
         queryClient.invalidateQueries({ queryKey: ['artefactActivity', activityType, resolvedDocId] })
       }
       invalidateDocumentQueries(queryClient, projectId, prefix, resolvedDocId, kind, docIdStr)
-      navigate(docUrl(prefix!, docType, docIdStr!))
+      setSaveError(null)
+      setSaveSuccess(true)
+      const timer = setTimeout(() => setSaveSuccess(false), 2000)
+      return () => clearTimeout(timer)
     },
     onError: (error) => {
       setSaveError(extractApiErrorMessage(error, 'Could not save document'))
@@ -347,6 +360,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
     if (editMode && !resolvedDocId) return
 
     setSaveError(null)
+    setSaveSuccess(false)
     if (editMode) {
       updateMutation.mutate()
     } else {
@@ -391,6 +405,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           <Link
             to={listBackUrl}
             className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+            onClick={(e) => { e.preventDefault(); handleBack() }}
           >
             <ArrowLeft className="h-4 w-4" />
             {backNavLabel}
@@ -405,13 +420,14 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       {/* Top bar */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-card shrink-0">
         <div className="flex items-center gap-3">
-          <Link
-            to={listBackUrl}
+          <button
+            onClick={handleBack}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Go back"
           >
             <ArrowLeft className="h-4 w-4" />
             {backNavLabel}
-          </Link>
+          </button>
           <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${DOC_TYPE_COLORS[docType]}`}>
             {DOC_TYPE_LABELS[docType]}
           </span>
@@ -430,7 +446,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
             {sidebarOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
           </button>
           <button
-            onClick={() => navigate(listBackUrl)}
+            onClick={handleBack}
             className="px-3 py-1.5 text-sm text-muted-foreground border border-border rounded-md hover:bg-accent transition-colors"
           >
             Discard
@@ -452,10 +468,14 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           ) : null}
           <button
             onClick={handleSave}
-            disabled={!canSave || isPending}
-            className="px-4 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            disabled={(!canSave || isPending) && !saveSuccess}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              saveSuccess
+                ? 'bg-emerald-500 text-white'
+                : 'bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50'
+            }`}
           >
-            {isPending ? 'Saving...' : 'Save'}
+            {saveSuccess ? 'Saved' : isPending ? 'Saving...' : 'Save'}
           </button>
         </div>
       </div>
@@ -467,9 +487,9 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       ) : null}
 
       {/* Document frame */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-auto">
         {/* Editor area with outline */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col">
           {/* Document header inside frame */}
           <div className={`${docType === 'TC' ? 'max-w-none' : 'max-w-4xl mx-auto'} w-full px-8 pt-8 pb-0`}>
             {/* Document header metadata bar */}
@@ -515,8 +535,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           </div>
 
           {/* Editor body */}
-          <div className="flex-1 overflow-hidden">
-            <div className={`${docType === 'TC' ? 'max-w-none' : 'max-w-4xl mx-auto'} w-full px-4 py-4 h-full`}>
+          <div className="flex-1 overflow-auto">
+            <div className={`${docType === 'TC' ? 'max-w-none' : 'max-w-4xl mx-auto'} w-full px-4 py-4`}>
               {docType === 'TC' ? (
                 <TcsArteTable rows={tcRows} onChange={setTcRows} editable />
               ) : (

@@ -319,7 +319,7 @@ export default function DocEditor({
         open={showOutline}
         onToggle={() => onOutlineToggle?.(!showOutline)}
       />
-      <div className={`flex-1 flex flex-col overflow-hidden border border-border rounded-lg bg-background ${className}`}>
+      <div className={`flex-1 flex flex-col overflow-auto border border-border rounded-lg bg-background ${className}`}>
         {editable && (
           <DocEditorToolbar
             editor={editor}
@@ -367,7 +367,7 @@ export default function DocEditor({
           </BubbleMenu>
         )}
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1">
           <EditorContent editor={editor} />
         </div>
       </div>
