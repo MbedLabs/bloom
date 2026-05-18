@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import {
   ArrowLeft,
@@ -232,6 +232,7 @@ function ExecutionBadge({ status }: { status: string | null }) {
 export default function Documents() {
   const { prefix } = useParams<{ prefix: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const [filtersOpen, setFiltersOpen] = useState(false)
   const typeFilters = useMemo(
     () => unique(readListParam(searchParams, 'type').map((value) => normalizeDocTypeParam(value)).filter(Boolean) as DocType[]),
@@ -602,9 +603,19 @@ export default function Documents() {
     <div className="space-y-3.5 animate-fade-in">
       <div className="flex flex-col gap-2.5 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-start gap-2.5 min-w-0">
-          <Link to={`/projects/${prefix}`} className="p-1 hover:bg-accent/50 rounded-md shrink-0 mt-0.5" aria-label="Back to project">
+          <button
+            onClick={() => {
+              if (window.history.length > 1) {
+                navigate(-1)
+              } else {
+                navigate(`/projects/${prefix}`)
+              }
+            }}
+            className="p-1 hover:bg-accent/50 rounded-md shrink-0 mt-0.5"
+            aria-label="Go back"
+          >
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-          </Link>
+          </button>
           <div className="min-w-0">
             <h2 className="text-base font-bold text-foreground">{pageTitle}</h2>
           </div>
