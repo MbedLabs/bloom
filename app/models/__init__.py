@@ -26,6 +26,7 @@ from app.models.models import (
     TestSuite,
     TestSuiteItem,
 )
+from app.models.project_membership import ProjectExternalDocType, ProjectMembership
 from app.models.user import User, UserRole
 from app.models.user_token import UserToken, UserTokenPurpose
 
@@ -58,4 +59,6 @@ __all__ = [
     "ArtefactComment",
     "ArtefactActivity",
     "ArtefactLink",
+    "ProjectMembership",
+    "ProjectExternalDocType",
 ]
