@@ -367,7 +367,7 @@ function LayoutInner() {
           </Link>
           {!sidebarCollapsed && (
             <div className="pt-2 pb-1 px-3 text-center">
-              <a href="https://www.embedlabs.de/en" target="_blank" rel="noopener noreferrer" className="text-xs text-teal-300/50 hover:text-teal-200 transition-colors">
+              <a href="https://www.embedlabs.net" target="_blank" rel="noopener noreferrer" className="text-xs text-teal-300/50 hover:text-teal-200 transition-colors">
                 by EmbedLabs
               </a>
               <p className="text-xs text-teal-300/30 mt-1">v{APP_VERSION}</p>
