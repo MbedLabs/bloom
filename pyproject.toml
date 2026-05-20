@@ -41,7 +41,7 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://wwww.embedlabs.de"
+Homepage = "https://www.embedlabs.net"
 Repository = "https://github.com/MbedLabs/bloom-app-backend"
 [tool.setuptools.packages.find]
 where = ["."]

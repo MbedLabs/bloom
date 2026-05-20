@@ -30,6 +30,7 @@ from app.api import (
     import_service,
     integrations,
     links,
+    project_memberships,
     project_variables,
     projects,
     requirements,
@@ -257,6 +258,11 @@ app.include_router(auth_api.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(users_api.router, prefix="/api/users", tags=["Users"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
+app.include_router(
+    project_memberships.router,
+    prefix="/api/projects",
+    tags=["Project Members"],
+)
 app.include_router(
     project_variables.router,
     prefix="/api/project-variables",

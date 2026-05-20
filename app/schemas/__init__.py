@@ -1,5 +1,11 @@
 """Schemas package initialization."""
 
+from app.schemas.memberships import (
+    ProjectMemberResponse,
+    ProjectMembershipCreate,
+    ProjectMembershipResponse,
+    ProjectMembershipUpdate,
+)
 from app.schemas.schemas import (
     ALMIntegrationSettings,
     ArtefactActivityResponse,
@@ -91,6 +97,10 @@ __all__ = [
     "ProjectVariableCreate",
     "ProjectVariableUpdate",
     "ProjectVariableResponse",
+    "ProjectMembershipCreate",
+    "ProjectMembershipUpdate",
+    "ProjectMembershipResponse",
+    "ProjectMemberResponse",
     "RequirementSummary",
     "TestCaseSummary",
     "TestSuiteSummary",
