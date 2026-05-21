@@ -7,6 +7,7 @@ import { campaignsApi, testCasesApi, testSuitesApi } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { docUrl } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
+import DocumentActivityPanel from '../components/DocumentActivityPanel'
 
 const SUITE_STATUSES = ['Draft', 'Active', 'Archived']
 
@@ -334,6 +335,11 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
           </div>
         </div>
       )}
+
+      {/* Activity */}
+      <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
+        <DocumentActivityPanel artefactType="test-suite" artefactId={parsedSuiteId} />
+      </div>
     </div>
   )
 }

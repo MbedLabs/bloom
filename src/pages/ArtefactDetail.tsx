@@ -42,7 +42,7 @@ const SOURCE_TYPE_CODES: Record<ArtefactKind, string> = {
 
 const configs = {
   design: {
-    singular: 'Design Item',
+    singular: 'Design',
     docType: 'DES' as DocType,
     queryKey: 'design',
     listKey: 'designs',

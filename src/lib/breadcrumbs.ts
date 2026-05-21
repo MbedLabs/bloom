@@ -13,7 +13,7 @@ const TYPE_PAGE_TITLE: Record<string, string> = {
   REQ: 'Requirements',
   SPEC: 'Specifications',
   TC: 'Test Cases',
-  DES: 'Design Items',
+  DES: 'Designs',
   RSK: 'Risks',
   CHG: 'Changes',
   CPT: docRegistryListLabel('CPT'),

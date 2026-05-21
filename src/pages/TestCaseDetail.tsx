@@ -239,9 +239,6 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
 
           <SectionCard title="Metadata">
             <div className="space-y-4">
-              <MetaItem label="Execution" value={testCase.last_execution_status || 'Not executed'} />
-              <MetaItem label="Last Executed" value={testCase.last_executed_at ? formatDateTime(testCase.last_executed_at) : 'Not executed'} />
-              <MetaItem label="Bud Run" value={testCase.last_bud_run_id ? `Run ${testCase.last_bud_run_id}` : 'Not recorded'} />
               <MetaItem label="Created" value={formatDateTime(testCase.created_at) + ' ago'} />
               <MetaItem label="Updated" value={formatDateTime(testCase.updated_at) + ' ago'} />
             </div>

@@ -71,7 +71,7 @@ const TYPE_PAGE_TITLE: Record<DocType, string> = {
   CMP: docRegistryListLabel('CMP'),
   TS: 'Test Suites',
   PRT: docRegistryListLabel('PRT'),
-  DES: 'Design Items',
+  DES: 'Designs',
   RSK: 'Risks',
   CHG: 'Changes',
   RPT: 'Reports',
