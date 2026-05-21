@@ -55,7 +55,7 @@ def test_requirements_crud_roundtrip(api_client: TestClient):
     assert got.status_code == 200
     assert got.json()["req_id"] == body["req_id"]
 
-    updated = api_client.put(
+    updated = api_client.patch(
         f"/api/requirements/{body['id']}",
         json={"title": "Updated title"},
         headers=headers,
