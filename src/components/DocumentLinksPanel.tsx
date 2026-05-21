@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Bug, FileText, FlaskConical, Layers, Link2, Search, X } from 'lucide-react'
+import { Link2, Search, X } from 'lucide-react'
 import {
   type ArtefactLink,
   type DocShell,
@@ -11,12 +11,10 @@ import {
   linksApi,
   testSuitesApi,
 } from '../api/client'
-import { formatDateTime } from '../test/date-utils'
 import {
   docUrl,
   DOC_TYPE_LABELS,
   getDocLinkOptions,
-  getDocLinkRoleLabel,
   normalizeDocTypeParam,
   type DocType,
 } from '../types/doc'
@@ -52,12 +50,6 @@ function docShellToTarget(doc: DocShell): LinkTarget | null {
   }
 }
 
-const TYPE_ICONS: Partial<Record<DocType, React.ComponentType<{ className?: string }>>> = {
-  DEF: Bug,
-  CMP: FlaskConical,
-  TS: Layers,
-}
-
 function DocumentLinkRow({
   link,
   target,
@@ -73,29 +65,17 @@ function DocumentLinkRow({
 }) {
   const otherType = (direction === 'outgoing' ? link.target_type : link.source_type) as DocType
   const otherId = direction === 'outgoing' ? link.target_id : link.source_id
-  const Icon = TYPE_ICONS[otherType] ?? FileText
   const fallbackLabel = `${otherType} #${otherId}`
   return (
-    <div className="flex items-center justify-between px-6 py-4 hover:bg-accent/50 transition-colors">
-      <Link to={targetUrl(projectPrefix, otherType, target)} className="min-w-0 flex items-center">
-        <Icon className="h-5 w-5 text-primary mr-3 shrink-0" />
-        <div className="min-w-0">
-          <div>
-            <span className="font-mono text-sm text-primary mr-2">{target?.doc_id || fallbackLabel}</span>
-            <span className="text-foreground">{target?.title || `Linked ${DOC_TYPE_LABELS[otherType]?.toLowerCase() ?? 'artefact'}`}</span>
-          </div>
-          <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-            <span>{direction === 'incoming' ? 'Incoming' : 'Outgoing'}</span>
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">{getDocLinkRoleLabel(link.role, direction)}</span>
-            {link.suspect && <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-amber-700 dark:text-amber-400">suspect</span>}
-            <span>{formatDateTime(link.created_at)} ago</span>
-          </div>
-        </div>
+    <div className="flex items-center justify-between px-4 py-3 hover:bg-accent/50 transition-colors">
+      <Link to={targetUrl(projectPrefix, otherType, target)} className="min-w-0 flex items-center gap-2">
+        <span className="font-mono text-sm text-primary">{target?.doc_id || fallbackLabel}</span>
+        {link.suspect && <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-400">!</span>}
       </Link>
       {onDelete && (
         <button
           onClick={onDelete}
-          className="ml-3 p-1.5 rounded text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+          className="ml-2 p-1 rounded text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
           title="Remove link"
         >
           <X className="h-4 w-4" />
