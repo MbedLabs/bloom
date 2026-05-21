@@ -24,49 +24,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "project_memberships",
-        sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
-        sa.Column(
-            "project_id", sa.Integer(), sa.ForeignKey("projects.id"), nullable=False
-        ),
-        sa.Column(
-            "role", sa.String(20), nullable=False, server_default="external"
-        ),
-        sa.Column(
-            "created_at",
-            sa.DateTime(),
-            nullable=False,
-            server_default=sa.text("NOW()"),
-        ),
-        sa.Column(
-            "updated_at",
-            sa.DateTime(),
-            nullable=False,
-            server_default=sa.text("NOW()"),
-        ),
-        sa.UniqueConstraint(
-            "user_id", "project_id", name="uq_project_membership_user_project"
-        ),
-    )
-
-    op.create_table(
-        "project_external_doc_types",
-        sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column(
-            "membership_id",
-            sa.Integer(),
-            sa.ForeignKey("project_memberships.id"),
-            nullable=False,
-        ),
-        sa.Column("doc_type", sa.String(30), nullable=False),
-        sa.UniqueConstraint(
-            "membership_id", "doc_type", name="uq_external_doc_type_membership"
-        ),
-    )
+    # Base schema is managed by SQLAlchemy create_tables() (models are source of truth).
+    # This migration exists to anchor the revision chain.
+    pass
 
 
 def downgrade() -> None:
-    op.drop_table("project_external_doc_types")
-    op.drop_table("project_memberships")
+    pass
+
