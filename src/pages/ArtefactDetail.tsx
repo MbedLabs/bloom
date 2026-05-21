@@ -581,12 +581,10 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <SectionCard title={`Requirements (${related?.linked_requirements.length ?? 0})`}>
             {!related || related.linked_requirements.length === 0 ? <p className="text-muted-foreground">No linked requirements.</p> : (
-              <div className="space-y-3">
+              <div className="flex flex-wrap gap-1">
                 {related.linked_requirements.map((item) => (
-                  <Link key={item.id} to={docUrl(projectPrefix, 'REQ', item.req_id)} className="block rounded-lg border border-border p-3 hover:bg-accent/40 transition-colors">
-                    <div className="font-mono text-xs text-primary">{item.req_id}</div>
-                    <div className="font-medium text-foreground mt-1">{item.title}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{item.status}</div>
+                  <Link key={item.id} to={docUrl(projectPrefix, 'REQ', item.req_id)} className="font-mono text-xs text-primary hover:underline">
+                    {item.req_id}
                   </Link>
                 ))}
               </div>
@@ -594,12 +592,10 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
           </SectionCard>
           <SectionCard title={`Test Cases (${related?.related_test_cases.length ?? 0})`}>
             {!related || related.related_test_cases.length === 0 ? <p className="text-muted-foreground">No related test cases.</p> : (
-              <div className="space-y-3">
+              <div className="flex flex-wrap gap-1">
                 {related.related_test_cases.map((item) => (
-                  <Link key={item.id} to={docUrl(projectPrefix, 'TC', item.tc_id)} className="block rounded-lg border border-border p-3 hover:bg-accent/40 transition-colors">
-                    <div className="font-mono text-xs text-primary">{item.tc_id}</div>
-                    <div className="font-medium text-foreground mt-1">{item.title}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{item.status}</div>
+                  <Link key={item.id} to={docUrl(projectPrefix, 'TC', item.tc_id)} className="font-mono text-xs text-primary hover:underline">
+                    {item.tc_id}
                   </Link>
                 ))}
               </div>
@@ -607,16 +603,14 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
           </SectionCard>
           <SectionCard title={`Documents (${related?.related_documents.length ?? 0})`}>
             {!related || related.related_documents.length === 0 ? <p className="text-muted-foreground">No related documents.</p> : (
-              <div className="space-y-3">
+              <div className="flex flex-wrap gap-1">
                 {related.related_documents.map((item) => (
                   <Link
                     key={item.id}
                     to={item.doc_id ? docUrl(projectPrefix, item.doc_type as DocType, item.doc_id) : '#'}
-                    className="block rounded-lg border border-border p-3 hover:bg-accent/40 transition-colors"
+                    className="font-mono text-xs text-primary hover:underline"
                   >
-                    <div className="font-medium text-foreground">{item.title}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{item.doc_type} · {item.status}</div>
-                    {item.matched_sections.length > 0 && <div className="text-xs text-primary mt-2">Sections: {item.matched_sections.join(', ')}</div>}
+                    {item.doc_id || item.title}
                   </Link>
                 ))}
               </div>
