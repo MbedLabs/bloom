@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import or_, select, text
@@ -225,8 +226,9 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     await create_tables()
     await migrate_user_columns()
-    await normalize_document_kinds_and_ids()
-    await backfill_campaign_public_ids()
+    if settings.RUN_STARTUP_DATA_REPAIR:
+        await normalize_document_kinds_and_ids()
+        await backfill_campaign_public_ids()
     await seed_admin_user()
     yield
 
@@ -245,6 +247,7 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,

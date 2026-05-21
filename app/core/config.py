@@ -86,6 +86,12 @@ class Settings(BaseSettings):
         default=False, validation_alias=AliasChoices("BLOOM_ENABLE_DOCS", "ENABLE_DOCS")
     )
 
+    # Run legacy startup data repair (prefer Alembic in production)
+    RUN_STARTUP_DATA_REPAIR: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("BLOOM_RUN_STARTUP_DATA_REPAIR", "RUN_STARTUP_DATA_REPAIR"),
+    )
+
     ADMIN_EMAIL: str = Field(
         default="admin@example.com",
         validation_alias=AliasChoices("BLOOM_ADMIN_EMAIL", "ADMIN_EMAIL"),

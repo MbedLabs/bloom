@@ -142,11 +142,7 @@ async def list_campaigns(
     result = await db.execute(query)
     campaigns = result.scalars().all()
 
-    responses = []
-    for c in campaigns:
-        resp = await _build_campaign_response(c, db)
-        responses.append(resp)
-    return responses
+    return await _build_campaign_responses_batch(campaigns, db)
 
 
 @router.post("", response_model=TestCampaignDetailResponse, status_code=201)
@@ -219,16 +215,27 @@ async def create_campaign(
         )
         selected_test_case_ids.update(item.test_case_id for item in suite_items)
 
-    for tc_id in selected_test_case_ids:
-        tc_result = await db.execute(select(TestCase).where(TestCase.id == tc_id))
-        tc = tc_result.scalar_one_or_none()
-        if tc and tc.project_id == data.project_id:
-            item = TestCampaignItem(
-                campaign_id=campaign.id,
-                test_case_id=tc_id,
-                status="Pending",
+    if selected_test_case_ids:
+        tc_rows = (
+            (
+                await db.execute(
+                    select(TestCase).where(
+                        TestCase.id.in_(selected_test_case_ids),
+                        TestCase.project_id == data.project_id,
+                    )
+                )
             )
-            db.add(item)
+            .scalars()
+            .all()
+        )
+        for tc in tc_rows:
+            db.add(
+                TestCampaignItem(
+                    campaign_id=campaign.id,
+                    test_case_id=tc.id,
+                    status="Pending",
+                )
+            )
 
     await db.flush()
     await db.refresh(campaign)
@@ -458,6 +465,75 @@ async def update_campaign_item(
 
 
 # ==================== Helpers ====================
+
+
+async def _build_campaign_responses_batch(
+    campaigns: list[TestCampaign], db: AsyncSession
+) -> list[TestCampaignResponse]:
+    if not campaigns:
+        return []
+
+    campaign_ids = [c.id for c in campaigns]
+    totals_result = await db.execute(
+        select(TestCampaignItem.campaign_id, func.count(TestCampaignItem.id))
+        .where(TestCampaignItem.campaign_id.in_(campaign_ids))
+        .group_by(TestCampaignItem.campaign_id)
+    )
+    totals_by_campaign = {row[0]: row[1] for row in totals_result.all()}
+
+    cs_rows = (
+        await db.execute(
+            select(CampaignSuite, TestSuite)
+            .join(TestSuite, TestSuite.id == CampaignSuite.suite_id)
+            .where(CampaignSuite.campaign_id.in_(campaign_ids))
+            .order_by(CampaignSuite.campaign_id, CampaignSuite.id)
+        )
+    ).all()
+    suites_by_campaign: dict[int, list[TestSuiteSummary]] = {cid: [] for cid in campaign_ids}
+    for cs, suite in cs_rows:
+        if suite:
+            suites_by_campaign.setdefault(cs.campaign_id, []).append(
+                TestSuiteSummary(
+                    id=suite.id, suite_id=suite.suite_id, name=suite.name, status=suite.status
+                )
+            )
+
+    responses: list[TestCampaignResponse] = []
+    for campaign in campaigns:
+        total = totals_by_campaign.get(campaign.id, 0)
+        suites_list = suites_by_campaign.get(campaign.id, [])
+        suite_resp = suites_list[0] if suites_list else None
+        public_id = campaign.campaign_id or ""
+        if not public_id:
+            raise ValueError(
+                f"Campaign {campaign.id} missing campaign_id; ensure startup backfill ran"
+            )
+        responses.append(
+            TestCampaignResponse(
+                id=campaign.id,
+                project_id=campaign.project_id,
+                campaign_id=public_id,
+                suite_id=campaign.suite_id,
+                bud_run_id=campaign.bud_run_id,
+                bud_run_url=campaign.bud_run_url,
+                bud_run_status=campaign.bud_run_status,
+                name=campaign.name,
+                description=campaign.description,
+                status=campaign.status,
+                started_at=campaign.started_at,
+                completed_at=campaign.completed_at,
+                created_at=campaign.created_at,
+                updated_at=campaign.updated_at,
+                total_items=total,
+                passed=0,
+                failed=0,
+                blocked=0,
+                pending=total,
+                suite=suite_resp,
+                suites=suites_list,
+            )
+        )
+    return responses
 
 
 async def _build_campaign_response(
