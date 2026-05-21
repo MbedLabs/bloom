@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import dashboard_stats_cache
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models import (
@@ -29,6 +30,10 @@ async def get_dashboard_stats(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
+    cached = dashboard_stats_cache.get("dashboard:stats")
+    if cached is not None:
+        return cached
+
     total_projects = await db.scalar(select(func.count(Project.id)))
     active_projects = await db.scalar(
         select(func.count(Project.id)).where(Project.status == "Active")
@@ -141,7 +146,7 @@ async def get_dashboard_stats(
         for r in project_rows
     ]
 
-    return {
+    payload = {
         "total_projects": total_projects or 0,
         "active_projects": active_projects or 0,
         "total_requirements": total_requirements or 0,
@@ -159,3 +164,5 @@ async def get_dashboard_stats(
         "defect_status_distribution": defect_status_dist,
         "projects": projects,
     }
+    dashboard_stats_cache.set("dashboard:stats", payload)
+    return payload

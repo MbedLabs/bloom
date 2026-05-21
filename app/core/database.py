@@ -19,6 +19,11 @@ engine = create_async_engine(
     DATABASE_URL,
     echo=False,
     future=True,
+    **(
+        dict(pool_size=10, max_overflow=20, pool_pre_ping=True)
+        if "postgresql" in DATABASE_URL
+        else {}
+    ),
 )
 
 async_session_maker = async_sessionmaker(
