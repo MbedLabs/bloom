@@ -104,16 +104,9 @@ jobs:
           BLOOM_DOTENV_DISABLED: "1"
           BLOOM_DISABLE_RATE_LIMIT: "1"
         run: |
-          pytest --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=50 tests/ -v
-
-      - name: Alembic upgrade head (fresh schema)
-        env:
-          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_bloom
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-        run: |
           pip install alembic
           alembic upgrade head
+          pytest --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=50 tests/ -v
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v4
