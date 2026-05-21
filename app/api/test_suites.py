@@ -128,7 +128,6 @@ async def _build_suite_detail(suite: TestSuite, db: AsyncSession) -> TestSuiteDe
     ]
 
     # Related concepts: find CPTs linked to any TC in this suite via ArtefactLink
-    tc_ids = [item.test_case_id for item in items]
     related_concepts: list[TestConceptSummary] = []
     if tc_ids:
         concept_links = (

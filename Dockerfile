@@ -18,6 +18,10 @@ RUN pip install --no-cache-dir .
 # Copy application source
 COPY app/ app/
 
+# Copy Alembic migrations
+COPY alembic/ alembic/
+COPY alembic.ini ./
+
 # Create non-root user
 RUN useradd -m appuser
 USER appuser
