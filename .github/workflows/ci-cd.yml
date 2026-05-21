@@ -96,6 +96,30 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
+      - name: Create tables (model-driven base schema)
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_bloom
+          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
+          BLOOM_DOTENV_DISABLED: "1"
+          BLOOM_DISABLE_RATE_LIMIT: "1"
+        run: |
+          python -c "
+          import asyncio
+          from app.core.database import create_tables
+          from app.core.config import settings
+          asyncio.run(create_tables())
+          print('Base tables created from models.')
+          "
+
+      - name: Alembic upgrade (data migrations + indexes)
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_bloom
+          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
+          BLOOM_DOTENV_DISABLED: "1"
+        run: |
+          pip install alembic
+          alembic upgrade head
+
       - name: Run tests with coverage
         env:
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_bloom
@@ -104,8 +128,6 @@ jobs:
           BLOOM_DOTENV_DISABLED: "1"
           BLOOM_DISABLE_RATE_LIMIT: "1"
         run: |
-          pip install alembic
-          alembic upgrade head
           pytest --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=50 tests/ -v
 
       - name: Upload coverage reports
