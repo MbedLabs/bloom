@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignsApi, type ArtefactLink, type TestCampaignItem } from '../api/client'
 import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Pencil, Trash2, X } from 'lucide-react'
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
+import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import { usePageMeta } from '../contexts/PageMetaContext'
 import { docUrl } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
@@ -312,6 +313,11 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
         sourceId={campaign.id}
         derivedLinks={scopeLinks}
       />
+
+      {/* Activity */}
+      <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
+        <DocumentActivityPanel artefactType="campaign" artefactId={campId} />
+      </div>
     </div>
   )
 }

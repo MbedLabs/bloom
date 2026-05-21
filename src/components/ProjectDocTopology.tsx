@@ -665,7 +665,7 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
                   {DOC_TYPE_LABELS[hoveredEdge.target]}
                 </span>
                 {hoveredEdge.isSyntheticInverse && (
-                  <span className="text-[10px] text-muted-foreground/70 italic font-normal">(inverse)</span>
+                  <span className="text-[10px] text-muted-foreground/70 italic font-normal"></span>
                 )}
               </div>
               <div className="mt-1 space-y-0.5">

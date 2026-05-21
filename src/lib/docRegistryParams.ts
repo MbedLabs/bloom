@@ -102,7 +102,7 @@ const TYPE_LIST_LABELS: Record<DocType, string> = {
   REQ: 'Requirements',
   SPEC: 'Specifications',
   TC: 'Test Cases',
-  DES: 'Design Items',
+  DES: 'Designs',
   RSK: 'Risks',
   CHG: 'Changes',
   CPT: 'Test Concepts',

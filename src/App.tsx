@@ -26,6 +26,7 @@ import UnifiedDocDetail from './pages/UnifiedDocDetail'
 import Defects from './pages/Defects'
 import ArtefactDetail from './pages/ArtefactDetail'
 import VerifyEmail from './pages/VerifyEmail'
+import ErrorBoundary from './components/ErrorBoundary'
 
 function NotFound() {
   return (
@@ -58,13 +59,13 @@ function App() {
         <Route path="projects/:prefix/docs" element={<Documents />} />
         <Route path="projects/:prefix/docs/new" element={<DocCreate />} />
         <Route path="projects/:prefix/docs/:kind/:docId/edit" element={<DocCreate editMode />} />
-        <Route path="projects/:prefix/docs/:kind/:docId" element={<UnifiedDocDetail />} />
+        <Route path="projects/:prefix/docs/:kind/:docId" element={<ErrorBoundary><UnifiedDocDetail /></ErrorBoundary>} />
         <Route path="projects/:prefix/parameters" element={<ProjectParameters />} />
         <Route path="projects/:prefix/defects" element={<Defects />} />
         <Route path="projects/:prefix/defects/:itemId" element={<ArtefactDetail kind="defect" />} />
         <Route path="projects/:prefix/campaigns" element={<TestCampaigns />} />
         <Route path="projects/:prefix/suites/:suiteId" element={<SuiteDetail />} />
-        <Route path="projects/:prefix/campaigns/:campaignId" element={<CampaignDetail />} />
+        <Route path="projects/:prefix/campaigns/:campaignId" element={<ErrorBoundary><CampaignDetail /></ErrorBoundary>} />
         <Route path="projects/:prefix/traceability" element={<TraceabilityMatrix />} />
         <Route path="projects/:prefix/impact-analysis/:requirementId" element={<ImpactAnalysis />} />
         <Route path="projects/:prefix/baselines" element={<Baselines />} />
