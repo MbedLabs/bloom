@@ -433,11 +433,12 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null)
   const [layoutToken, setLayoutToken] = useState(0)
 
-  const { data: docs, isLoading: docsLoading } = useQuery({
+  const { data: docsData, isLoading: docsLoading } = useQuery({
     queryKey: ['project-docs-shell', prefix],
     queryFn: () => docsApi.list(prefix, { includeLinkCounts: true }),
     enabled: !!prefix,
   })
+  const docs = useMemo(() => docsData?.items ?? [], [docsData])
 
   const { data: links, isLoading: linksLoading } = useQuery({
     queryKey: ['project-links', projectId],

@@ -33,6 +33,13 @@ api.interceptors.response.use(
   }
 )
 
+export interface PaginatedResponse<T> {
+  items: T[]
+  total: number
+  skip: number
+  limit: number
+}
+
 export interface User {
   id: number
   email: string
@@ -618,14 +625,16 @@ export interface DocDetailFacade extends DocShell {
 }
 
 export const docsApi = {
-  list: async (projectRef: string, params?: { type?: string[]; status?: string; q?: string; includeLinkCounts?: boolean }) => {
+  list: async (projectRef: string, params?: { type?: string[]; status?: string; q?: string; includeLinkCounts?: boolean; skip?: number; limit?: number }) => {
     const query = new URLSearchParams()
     if (params?.type) params.type.forEach(t => query.append('type', t))
     if (params?.status) query.set('status', params.status)
     if (params?.q) query.set('q', params.q)
     if (params?.includeLinkCounts !== undefined) query.set('include_link_counts', String(params.includeLinkCounts))
+    if (params?.skip !== undefined) query.set('skip', String(params.skip))
+    if (params?.limit !== undefined) query.set('limit', String(params.limit))
     const qs = query.toString()
-    const response = await api.get<DocShell[]>(`/projects/${projectRef}/docs${qs ? '?' + qs : ''}`)
+    const response = await api.get<PaginatedResponse<DocShell>>(`/projects/${projectRef}/docs${qs ? '?' + qs : ''}`)
     return response.data
   },
   get: async (projectRef: string, kind: string | DocType, docId: string) => {
@@ -638,8 +647,8 @@ export const docsApi = {
 }
 
 export const requirementsApi = {
-  list: async (projectId: number) => {
-    const response = await api.get<Requirement[]>(`/requirements`, { params: { project_id: projectId } })
+  list: async (projectId: number, params?: { skip?: number; limit?: number }) => {
+    const response = await api.get<PaginatedResponse<Requirement>>(`/requirements`, { params: { project_id: projectId, ...params } })
     return response.data
   },
 
@@ -698,8 +707,8 @@ export const requirementsApi = {
 }
 
 export const testCasesApi = {
-  list: async (projectId: number) => {
-    const response = await api.get<TestCase[]>(`/test-cases`, { params: { project_id: projectId } })
+  list: async (projectId: number, params?: { skip?: number; limit?: number }) => {
+    const response = await api.get<PaginatedResponse<TestCase>>(`/test-cases`, { params: { project_id: projectId, ...params } })
     return response.data
   },
 
@@ -971,10 +980,12 @@ export interface ArtefactLink {
 }
 
 export const campaignsApi = {
-  list: async (projectId: number, status?: string) => {
-    const params = new URLSearchParams({ project_id: String(projectId) })
-    if (status) params.set('status', status)
-    const response = await api.get<TestCampaign[]>(`/campaigns?${params}`)
+  list: async (projectId: number, status?: string, params?: { skip?: number; limit?: number }) => {
+    const query = new URLSearchParams({ project_id: String(projectId) })
+    if (status) query.set('status', status)
+    if (params?.skip !== undefined) query.set('skip', String(params.skip))
+    if (params?.limit !== undefined) query.set('limit', String(params.limit))
+    const response = await api.get<PaginatedResponse<TestCampaign>>(`/campaigns?${query}`)
     return response.data
   },
 
@@ -1028,8 +1039,8 @@ export const campaignsApi = {
 }
 
 export const testSuitesApi = {
-  list: async (projectId: number) => {
-    const response = await api.get<TestSuite[]>('/test-suites', { params: { project_id: projectId } })
+  list: async (projectId: number, params?: { skip?: number; limit?: number }) => {
+    const response = await api.get<PaginatedResponse<TestSuite>>('/test-suites', { params: { project_id: projectId, ...params } })
     return response.data
   },
   get: async (suiteId: number) => {
@@ -1071,8 +1082,8 @@ export const linksApi = {
 }
 
 export const designsApi = {
-  list: async (projectId: number) => {
-    const response = await api.get<DesignItem[]>('/designs', { params: { project_id: projectId } })
+  list: async (projectId: number, params?: { skip?: number; limit?: number }) => {
+    const response = await api.get<PaginatedResponse<DesignItem>>('/designs', { params: { project_id: projectId, ...params } })
     return response.data
   },
   get: async (id: number) => {
@@ -1100,8 +1111,8 @@ export const designsApi = {
 }
 
 export const risksApi = {
-  list: async (projectId: number) => {
-    const response = await api.get<RiskItem[]>('/risks', { params: { project_id: projectId } })
+  list: async (projectId: number, params?: { skip?: number; limit?: number }) => {
+    const response = await api.get<PaginatedResponse<RiskItem>>('/risks', { params: { project_id: projectId, ...params } })
     return response.data
   },
   get: async (id: number) => {
@@ -1131,8 +1142,8 @@ export const risksApi = {
 }
 
 export const changesApi = {
-  list: async (projectId: number) => {
-    const response = await api.get<ChangeRequest[]>('/changes', { params: { project_id: projectId } })
+  list: async (projectId: number, params?: { skip?: number; limit?: number }) => {
+    const response = await api.get<PaginatedResponse<ChangeRequest>>('/changes', { params: { project_id: projectId, ...params } })
     return response.data
   },
   get: async (id: number) => {
@@ -1153,8 +1164,8 @@ export const changesApi = {
 }
 
 export const defectsApi = {
-  list: async (projectId: number, params?: { status?: string; severity?: string }) => {
-    const response = await api.get<Defect[]>('/defects', { params: { project_id: projectId, ...params } })
+  list: async (projectId: number, listParams?: { status?: string; severity?: string; skip?: number; limit?: number }) => {
+    const response = await api.get<PaginatedResponse<Defect>>('/defects', { params: { project_id: projectId, ...listParams } })
     return response.data
   },
   get: async (id: number) => {
@@ -1268,8 +1279,8 @@ export const baselinesApi = {
 }
 
 export const testConceptsApi = {
-  list: async (projectId: number) => {
-    const response = await api.get<TestConcept[]>('/test-concepts', { params: { project_id: projectId } })
+  list: async (projectId: number, params?: { skip?: number; limit?: number }) => {
+    const response = await api.get<PaginatedResponse<TestConcept>>('/test-concepts', { params: { project_id: projectId, ...params } })
     return response.data
   },
   get: async (id: number) => {

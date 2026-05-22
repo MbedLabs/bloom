@@ -290,29 +290,33 @@ export function DocumentLinksPanel({
   const hasDerived = (derivedLinks?.length || 0) > 0
   const enabled = !!projectId && (showModal || directLinkCount > 0 || hasDerived)
 
-  const { data: docs } = useQuery({
+  const { data: docsData } = useQuery({
     queryKey: ['all-docs', projectPrefix, 'link-targets'],
     queryFn: () => docsApi.list(projectPrefix, { includeLinkCounts: false }),
     enabled: !!projectPrefix && enabled,
   })
+  const docs = useMemo(() => docsData?.items ?? [], [docsData])
 
-  const { data: defects } = useQuery({
+  const { data: defectsData } = useQuery({
     queryKey: ['defects', projectId, 'link-targets'],
     queryFn: () => defectsApi.list(projectId),
     enabled,
   })
+  const defects = useMemo(() => defectsData?.items ?? [], [defectsData])
 
-  const { data: campaigns } = useQuery({
+  const { data: campaignsData } = useQuery({
     queryKey: ['campaigns', projectId, 'link-targets'],
     queryFn: () => campaignsApi.list(projectId),
     enabled,
   })
+  const campaigns = useMemo(() => campaignsData?.items ?? [], [campaignsData])
 
-  const { data: suites } = useQuery({
+  const { data: suitesData } = useQuery({
     queryKey: ['test-suites', projectId, 'link-targets'],
     queryFn: () => testSuitesApi.list(projectId),
     enabled,
   })
+  const suites = useMemo(() => suitesData?.items ?? [], [suitesData])
 
   const targets = useMemo<LinkTarget[]>(() => {
     const items: LinkTarget[] = []

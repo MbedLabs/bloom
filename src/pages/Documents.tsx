@@ -287,7 +287,7 @@ export default function Documents() {
   const pageTitle = typeFilters.length === 1 ? TYPE_PAGE_TITLE[typeFilters[0]] : 'Documents'
   const showExecColumn = typeFilters.length === 0 || typeFilters.includes('TC')
 
-  const { data: docs, isLoading } = useQuery({
+  const { data: docsData, isLoading } = useQuery({
     queryKey: ['all-docs', prefix, typeFilters],
     queryFn: () => docsApi.list(prefix!, {
       type: typeFilters.length > 0 ? typeFilters : undefined,
@@ -295,6 +295,7 @@ export default function Documents() {
     }),
     enabled: !!prefix,
   })
+  const docs = useMemo(() => docsData?.items ?? [], [docsData])
 
   const { data: users } = useQuery({
     queryKey: ['users'],
@@ -547,6 +548,13 @@ export default function Documents() {
   const searchPlaceholder = soleDocType
     ? 'Search name, ID, status, reviewer, dates, links...'
     : 'Search name, ID, kind, status, reviewer, dates, links...'
+
+  const PAGE_SIZE = 30
+  const [page, setPage] = useState(0)
+  useEffect(() => { setPage(0) }, [typeFilters, statusFilters, search, priorityFilter, reviewerFilter, linkFilter, createdFrom, createdTo, updatedFrom, updatedTo])
+  const totalPages = Math.ceil(sorted.length / PAGE_SIZE)
+  const paginated = sorted.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
+
   const createReturnState = { returnTo: `/projects/${prefix}/docs?${searchParams.toString()}` }
   const docCreateLinkClass =
     'inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors'
@@ -863,7 +871,7 @@ export default function Documents() {
                 </tr>
               </thead>
               <tbody className="bg-card divide-y divide-border">
-                {sorted.map((doc: DocShell) => {
+                {paginated.map((doc: DocShell) => {
                   const detailUrl = docUrl(prefix!, doc.doc_type as DocType, doc.doc_id)
                   const listState = { returnTo: `/projects/${prefix}/docs?${searchParams.toString()}` }
                   return (
@@ -928,6 +936,32 @@ export default function Documents() {
               </tbody>
             </table>
           </div>
+          {sorted.length > PAGE_SIZE && (
+            <div className="border-t border-border px-4 py-3 flex items-center justify-between text-sm bg-muted/20">
+              <span className="text-muted-foreground">
+                Showing {page * PAGE_SIZE + 1}&ndash;{Math.min((page + 1) * PAGE_SIZE, sorted.length)} of {sorted.length}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="px-3 py-1 border border-border rounded hover:bg-accent/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Prev
+                </button>
+                <span className="px-2 text-muted-foreground">
+                  {page + 1} / {totalPages || 1}
+                </span>
+                <button
+                  disabled={page >= totalPages - 1}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="px-3 py-1 border border-border rounded hover:bg-accent/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

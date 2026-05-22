@@ -36,7 +36,7 @@ export default function ImportWizard() {
     enabled: !!projectId,
   })
 
-  const { data: sourceDocs, isLoading: sourceDocsLoading } = useQuery({
+  const { data: sourceDocsData, isLoading: sourceDocsLoading } = useQuery({
     queryKey: ['import-docs', sourceProject?.prefix, docType],
     queryFn: () => docsApi.list(sourceProject!.prefix, {
       type: [docType],
@@ -44,6 +44,7 @@ export default function ImportWizard() {
     }),
     enabled: !!sourceProject?.prefix && step >= 3,
   })
+  const sourceDocs = sourceDocsData?.items
 
   const importMutation = useMutation({
     mutationFn: () =>

@@ -32,11 +32,12 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
     enabled: !!parsedSuiteId,
   })
 
-  const { data: testCases } = useQuery({
+  const { data: testCasesData } = useQuery({
     queryKey: ['testCases', projectId],
     queryFn: () => testCasesApi.list(projectId),
     enabled: !!projectId,
   })
+  const testCases = testCasesData?.items
 
   const addItemMutation = useMutation({
     mutationFn: (testCaseId: number) => testSuitesApi.addItem(parsedSuiteId, testCaseId),

@@ -60,13 +60,14 @@ export default function ProjectDetail() {
 
   const projectId = project?.id || 0
 
-  const { data: docs } = useQuery({
+  const { data: docsData } = useQuery({
     queryKey: ['project-docs-shell', prefix],
     queryFn: () => docsApi.list(prefix!, { includeLinkCounts: true }),
     enabled: !!prefix,
   })
+  const docs = docsData?.items
 
-  const specCount = useMemo(() => docs?.filter((d) => d.doc_type === 'SPEC').length ?? 0, [docs])
+  const specCount = useMemo(() => (docs || []).filter((d) => d.doc_type === 'SPEC').length, [docs])
 
   if (projectLoading) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>

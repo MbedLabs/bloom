@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { defectsApi, Defect, extractApiErrorMessage } from '../api/client'
@@ -58,7 +58,7 @@ export default function Defects() {
     external_issue_url: '',
   })
 
-  const { data: defects, isLoading } = useQuery({
+  const { data: defectsData, isLoading } = useQuery({
     queryKey: ['defects', projectId, filterStatus, filterSeverity],
     queryFn: () =>
       defectsApi.list(projectId, {
@@ -67,9 +67,10 @@ export default function Defects() {
       }),
     enabled: !!projectId,
   })
+  const defects = useMemo(() => defectsData?.items ?? [], [defectsData])
 
   const sortedFiltered = useMemo(() => {
-    let list = defects ?? []
+    let list = defects
     const q = search.trim().toLowerCase()
     if (q) {
       list = list.filter(
@@ -96,6 +97,12 @@ export default function Defects() {
       return mult * a.severity.localeCompare(b.severity)
     })
   }, [defects, search, sortField, sortDir])
+
+  const PAGE_SIZE = 30
+  const [page, setPage] = useState(0)
+  useEffect(() => { setPage(0) }, [search, filterStatus, filterSeverity])
+  const totalPages = Math.ceil(sortedFiltered.length / PAGE_SIZE)
+  const paginated = sortedFiltered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -400,7 +407,7 @@ export default function Defects() {
                 </tr>
               </thead>
               <tbody className="bg-card divide-y divide-border">
-                {sortedFiltered.map((defect: Defect) => (
+                {paginated.map((defect: Defect) => (
                   <tr
                     key={defect.id}
                     onClick={() => navigate(`/projects/${prefix}/defects/${defect.id}`)}
@@ -444,6 +451,32 @@ export default function Defects() {
               </tbody>
             </table>
           </div>
+          {sortedFiltered.length > PAGE_SIZE && (
+            <div className="border-t border-border px-6 py-3 flex items-center justify-between text-sm bg-muted/20">
+              <span className="text-muted-foreground">
+                Showing {page * PAGE_SIZE + 1}&ndash;{Math.min((page + 1) * PAGE_SIZE, sortedFiltered.length)} of {sortedFiltered.length}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="px-3 py-1 border border-border rounded hover:bg-accent/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Prev
+                </button>
+                <span className="px-2 text-muted-foreground">
+                  {page + 1} / {totalPages || 1}
+                </span>
+                <button
+                  disabled={page >= totalPages - 1}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="px-3 py-1 border border-border rounded hover:bg-accent/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
