@@ -578,39 +578,42 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
       )}
 
       {activeTab === 'related' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <SectionCard title={`Requirements (${related?.linked_requirements.length ?? 0})`}>
+        <div className="space-y-4">
+          <SectionCard title={`Linked Requirements (${related?.linked_requirements.length ?? 0})`}>
             {!related || related.linked_requirements.length === 0 ? <p className="text-muted-foreground">No linked requirements.</p> : (
-              <div className="flex flex-wrap gap-1">
+              <div className="divide-y divide-border">
                 {related.linked_requirements.map((item) => (
-                  <Link key={item.id} to={docUrl(projectPrefix, 'REQ', item.req_id)} className="font-mono text-xs text-primary hover:underline">
-                    {item.req_id}
+                  <Link key={item.id} to={docUrl(projectPrefix, 'REQ', item.req_id)} className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50">
+                    <span className="font-mono text-sm text-primary shrink-0">{item.req_id}</span>
+                    <span className="text-sm text-foreground truncate">{item.title}</span>
                   </Link>
                 ))}
               </div>
             )}
           </SectionCard>
-          <SectionCard title={`Test Cases (${related?.related_test_cases.length ?? 0})`}>
+          <SectionCard title={`Related Test Cases (${related?.related_test_cases.length ?? 0})`}>
             {!related || related.related_test_cases.length === 0 ? <p className="text-muted-foreground">No related test cases.</p> : (
-              <div className="flex flex-wrap gap-1">
+              <div className="divide-y divide-border">
                 {related.related_test_cases.map((item) => (
-                  <Link key={item.id} to={docUrl(projectPrefix, 'TC', item.tc_id)} className="font-mono text-xs text-primary hover:underline">
-                    {item.tc_id}
+                  <Link key={item.id} to={docUrl(projectPrefix, 'TC', item.tc_id)} className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50">
+                    <span className="font-mono text-sm text-primary shrink-0">{item.tc_id}</span>
+                    <span className="text-sm text-foreground truncate">{item.title}</span>
                   </Link>
                 ))}
               </div>
             )}
           </SectionCard>
-          <SectionCard title={`Documents (${related?.related_documents.length ?? 0})`}>
+          <SectionCard title={`Related Documents (${related?.related_documents.length ?? 0})`}>
             {!related || related.related_documents.length === 0 ? <p className="text-muted-foreground">No related documents.</p> : (
-              <div className="flex flex-wrap gap-1">
+              <div className="divide-y divide-border">
                 {related.related_documents.map((item) => (
                   <Link
                     key={item.id}
                     to={item.doc_id ? docUrl(projectPrefix, item.doc_type as DocType, item.doc_id) : '#'}
-                    className="font-mono text-xs text-primary hover:underline"
+                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50"
                   >
-                    {item.doc_id || item.title}
+                    <span className="font-mono text-sm text-primary shrink-0">{item.doc_id || `#${item.id}`}</span>
+                    <span className="text-sm text-foreground truncate">{item.title}</span>
                   </Link>
                 ))}
               </div>

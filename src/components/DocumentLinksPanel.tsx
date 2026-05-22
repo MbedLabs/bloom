@@ -14,8 +14,11 @@ import {
 import {
   docUrl,
   DOC_TYPE_LABELS,
+  DOC_LINK_ROLE_COLORS,
   getDocLinkOptions,
+  getDocLinkRoleLabel,
   normalizeDocTypeParam,
+  type DocLinkRole,
   type DocType,
 } from '../types/doc'
 import { SectionCard } from './DocDetailShell'
@@ -66,16 +69,38 @@ function DocumentLinkRow({
   const otherType = (direction === 'outgoing' ? link.target_type : link.source_type) as DocType
   const otherId = direction === 'outgoing' ? link.target_id : link.source_id
   const fallbackLabel = `${otherType} #${otherId}`
+  const role = link.role as DocLinkRole
+  const roleLabel = getDocLinkRoleLabel(link.role, direction)
+  const roleColor = DOC_LINK_ROLE_COLORS[role] || 'bg-muted text-muted-foreground'
+
   return (
-    <div className="flex items-center justify-between px-4 py-3 hover:bg-accent/50 transition-colors">
-      <Link to={targetUrl(projectPrefix, otherType, target)} className="min-w-0 flex items-center gap-2">
-        <span className="font-mono text-sm text-primary">{target?.doc_id || fallbackLabel}</span>
-        {link.suspect && <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-400">!</span>}
+    <div className="flex items-center justify-between px-4 py-2.5 hover:bg-accent/50 transition-colors">
+      <Link
+        to={targetUrl(projectPrefix, otherType, target)}
+        className="min-w-0 flex items-center gap-3 flex-1"
+      >
+        <span
+          className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ${roleColor}`}
+          title={roleLabel}
+        >
+          {roleLabel}
+        </span>
+        <span className="font-mono text-sm text-primary shrink-0">
+          {target?.doc_id || fallbackLabel}
+        </span>
+        <span className="text-sm text-foreground truncate">
+          {target?.title || `Linked ${DOC_TYPE_LABELS[otherType]?.toLowerCase() ?? 'artefact'}`}
+        </span>
+        {link.suspect && (
+          <span className="shrink-0 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+            suspect
+          </span>
+        )}
       </Link>
       {onDelete && (
         <button
           onClick={onDelete}
-          className="ml-2 p-1 rounded text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+          className="ml-2 p-1 rounded text-muted-foreground hover:text-red-500 hover:bg-red-500/10 shrink-0"
           title="Remove link"
         >
           <X className="h-4 w-4" />
