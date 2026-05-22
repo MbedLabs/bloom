@@ -45,28 +45,31 @@ export default function TestCampaigns() {
     setSearchParams(params, { replace: true })
   }
 
-  const { data: campaigns, isLoading } = useQuery({
+  const { data: campaignsData, isLoading } = useQuery({
     queryKey: ['campaigns', projectId],
     queryFn: () => campaignsApi.list(projectId),
     enabled: !!projectId,
   })
+  const campaigns = useMemo(() => campaignsData?.items ?? [], [campaignsData])
 
   const { data: suites } = useQuery({
     queryKey: ['testSuites', projectId],
     queryFn: () => testSuitesApi.list(projectId),
     enabled: !!projectId,
   })
+  const suiteItems = suites?.items ?? []
 
-  const { data: testCases } = useQuery({
+  const { data: testCasesData } = useQuery({
     queryKey: ['projectTestCases', projectId],
     queryFn: () => testCasesApi.list(projectId),
     enabled: !!projectId && showCreateSuite,
   })
+  const testCases = testCasesData?.items ?? []
 
-  const hasSuites = (suites?.length || 0) > 0
+  const hasSuites = (suiteItems.length || 0) > 0
 
   const filteredCampaigns = useMemo(() => {
-    let list = campaigns ?? []
+    let list = campaigns
     const q = search.trim().toLowerCase()
     if (q) {
       list = list.filter((c) =>
@@ -197,13 +200,13 @@ export default function TestCampaigns() {
               <h3 className="text-lg font-semibold text-foreground">Suites</h3>
               <p className="text-sm text-muted-foreground mt-1">Reusable collections of test cases.</p>
             </div>
-            <span className="text-sm text-muted-foreground">{suites?.length || 0}</span>
+            <span className="text-sm text-muted-foreground">{suiteItems?.length || 0}</span>
           </div>
-          {!suites || suites.length === 0 ? (
+          {!suiteItems || suiteItems.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">No suites defined yet.</div>
           ) : (
             <div className="divide-y divide-border">
-              {suites.map((suite) => (
+              {suiteItems.map((suite) => (
                 <Link key={suite.id} to={`/projects/${prefix}/suites/${suite.id}`} className="block px-6 py-4 hover:bg-accent/40">
                   <div className="flex items-center justify-between gap-4">
                     <div>
@@ -330,8 +333,8 @@ export default function TestCampaigns() {
                     Campaign Suites ({selectedSuiteIds.length} selected)
                   </label>
                   <div className="border border-input rounded-md max-h-48 overflow-y-auto">
-                    {(suites || []).length > 0 ? (
-                      (suites || []).map((suite) => (
+                    {(suiteItems || []).length > 0 ? (
+                      (suiteItems || []).map((suite) => (
                         <label key={suite.id} className="flex items-center px-3 py-2 hover:bg-accent/30 cursor-pointer border-b border-border last:border-b-0">
                           <input
                             type="checkbox"
