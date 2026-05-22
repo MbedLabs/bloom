@@ -1,7 +1,7 @@
 """Risk items API endpoints."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
@@ -14,7 +14,7 @@ from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import Project, RiskItem
 from app.models.user import User, UserRole
-from app.schemas import RiskItemCreate, RiskItemResponse, RiskItemUpdate
+from app.schemas import PaginatedResponse, RiskItemCreate, RiskItemResponse, RiskItemUpdate
 
 router = APIRouter()
 
@@ -23,18 +23,21 @@ def _risk_response(item: RiskItem) -> RiskItemResponse:
     return RiskItemResponse.model_validate(item)
 
 
-@router.get("", response_model=list[RiskItemResponse])
+@router.get("", response_model=PaginatedResponse[RiskItemResponse])
 async def list_risk_items(
     project_id: int = Query(..., description="Filter by project ID"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(
-        select(RiskItem)
-        .where(RiskItem.project_id == project_id)
-        .order_by(RiskItem.created_at.desc())
-    )
-    return [_risk_response(item) for item in result.scalars().all()]
+    base = select(RiskItem).where(RiskItem.project_id == project_id)
+    total_q = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(total_q)).scalar() or 0
+    query = base.order_by(RiskItem.created_at.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
+    items = [_risk_response(item) for item in result.scalars().all()]
+    return PaginatedResponse(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.post("", response_model=RiskItemResponse, status_code=201)

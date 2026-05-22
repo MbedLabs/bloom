@@ -21,6 +21,7 @@ from app.models import (
 )
 from app.models.user import User, UserRole
 from app.schemas import (
+    PaginatedResponse,
     RequirementSummary,
     TestCampaignSummary,
     TestCaseSummary,
@@ -165,24 +166,27 @@ async def _build_suite_detail(suite: TestSuite, db: AsyncSession) -> TestSuiteDe
     )
 
 
-@router.get("", response_model=list[TestSuiteResponse])
+@router.get("", response_model=PaginatedResponse[TestSuiteResponse])
 async def list_suites(
     project_id: int = Query(...),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
-    suites = (
-        (
-            await db.execute(
-                select(TestSuite)
-                .where(TestSuite.project_id == project_id)
-                .order_by(TestSuite.created_at.desc())
-            )
-        )
-        .scalars()
-        .all()
+    base = select(TestSuite).where(TestSuite.project_id == project_id)
+    total_q = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(total_q)).scalar() or 0
+
+    query = base.order_by(TestSuite.created_at.desc()).offset(skip).limit(limit)
+    suites = (await db.execute(query)).scalars().all()
+
+    return PaginatedResponse(
+        items=[await _build_suite_response(item, db) for item in suites],
+        total=total,
+        skip=skip,
+        limit=limit,
     )
-    return [await _build_suite_response(item, db) for item in suites]
 
 
 @router.post("", response_model=TestSuiteDetailResponse, status_code=201)

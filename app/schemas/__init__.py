@@ -9,6 +9,7 @@ from app.schemas.memberships import (
 from app.schemas.schemas import (
     ALMIntegrationSettings,
     ArtefactActivityResponse,
+    PaginatedResponse,
     ArtefactCommentCreate,
     ArtefactCommentResponse,
     ArtefactLinkCreate,
@@ -91,6 +92,7 @@ from app.schemas.schemas import (
 )
 
 __all__ = [
+    "PaginatedResponse",
     "ProjectCreate",
     "ProjectUpdate",
     "ProjectResponse",

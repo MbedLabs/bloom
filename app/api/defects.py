@@ -6,7 +6,7 @@ from datetime import datetime
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
@@ -20,7 +20,7 @@ from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import Defect, IntegrationSetting, Project
 from app.models.user import User, UserRole
-from app.schemas import DefectCreate, DefectResponse, DefectUpdate
+from app.schemas import DefectCreate, DefectResponse, DefectUpdate, PaginatedResponse
 
 logger = logging.getLogger(__name__)
 
@@ -33,22 +33,30 @@ def _defect_response(item: Defect) -> DefectResponse:
     return DefectResponse.model_validate(item)
 
 
-@router.get("", response_model=list[DefectResponse])
+@router.get("", response_model=PaginatedResponse[DefectResponse])
 async def list_defects(
     project_id: int = Query(..., description="Filter by project ID"),
     status: str | None = Query(None),
     severity: str | None = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
-    query = select(Defect).where(Defect.project_id == project_id)
+    base = select(Defect).where(Defect.project_id == project_id)
     if status:
-        query = query.where(Defect.status == status)
+        base = base.where(Defect.status == status)
     if severity:
-        query = query.where(Defect.severity == severity)
-    query = query.order_by(Defect.created_at.desc())
+        base = base.where(Defect.severity == severity)
+
+    total_q = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(total_q)).scalar() or 0
+
+    query = base.order_by(Defect.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
-    return [_defect_response(item) for item in result.scalars().all()]
+    items = [_defect_response(item) for item in result.scalars().all()]
+
+    return PaginatedResponse(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.post("", response_model=DefectResponse, status_code=201)

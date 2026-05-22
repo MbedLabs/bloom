@@ -36,6 +36,7 @@ from app.models.user import User
 from app.models.user import User as UserModel
 from app.models.user import UserRole
 from app.schemas import (
+    PaginatedResponse,
     RequirementSummary,
     TestCampaignSummary,
     TestCaseCreate,
@@ -177,20 +178,23 @@ def _build_test_case_list_response(tc: TestCase, requirement_count: int = 0) -> 
     )
 
 
-@router.get("", response_model=list[TestCaseResponse])
+@router.get("", response_model=PaginatedResponse[TestCaseResponse])
 async def list_test_cases(
     project_id: int = Query(..., description="Filter by project ID"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
     """
-    List test cases for a project.
+    List test cases for a project with pagination.
     """
-    result = await db.execute(
-        select(TestCase)
-        .where(TestCase.project_id == project_id)
-        .order_by(TestCase.created_at.desc())
-    )
+    base = select(TestCase).where(TestCase.project_id == project_id)
+    total_q = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(total_q)).scalar() or 0
+
+    query = base.order_by(TestCase.created_at.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
     test_cases = result.scalars().all()
     test_case_ids = [tc.id for tc in test_cases]
 
@@ -210,9 +214,12 @@ async def list_test_cases(
         ).all()
         requirement_counts.update({tc_id: count for tc_id, count in count_rows})
 
-    return [
-        _build_test_case_list_response(tc, requirement_counts.get(tc.id, 0)) for tc in test_cases
-    ]
+    return PaginatedResponse(
+        items=[_build_test_case_list_response(tc, requirement_counts.get(tc.id, 0)) for tc in test_cases],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.post("", response_model=TestCaseResponse, status_code=201)

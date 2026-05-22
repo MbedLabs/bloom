@@ -4,9 +4,18 @@ Pydantic schemas for API request/response validation.
 
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generic, List, Optional, TypeVar
 
 from pydantic import BaseModel, Field, field_serializer, field_validator
+
+T = TypeVar("T")
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    items: list[T]
+    total: int
+    skip: int
+    limit: int
 
 from app.core.id_generator import normalize_doc_id
 
