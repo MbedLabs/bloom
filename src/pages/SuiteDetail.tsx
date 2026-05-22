@@ -211,7 +211,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-card rounded-lg shadow-elegant p-6 max-w-sm w-full mx-4">
             <h3 className="text-lg font-semibold text-foreground mb-2">Delete Suite?</h3>
-            <p className="text-sm text-muted-foreground mb-4">This action cannot be undone. All suite items will be removed.</p>
+            <p className="text-sm text-muted-foreground mb-4">This action cannot be undone. All suite test cases will be removed.</p>
             <div className="flex justify-end gap-2">
               <button onClick={() => setConfirmDelete(false)} className="px-4 py-2 border border-input rounded-md text-foreground hover:bg-accent/50 text-sm">Cancel</button>
               <button onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending} className="px-4 py-2 bg-destructive text-white rounded-md hover:bg-destructive/90 disabled:opacity-50 text-sm">{deleteMutation.isPending ? 'Deleting...' : 'Delete'}</button>
@@ -221,7 +221,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <SummaryCard label="Suite Items" value={suite.total_items} />
+        <SummaryCard label="Test Cases" value={suite.total_items} />
         <SummaryCard label="Related Requirements" value={suite.related_requirements.length} />
         <SummaryCard label="Linked Campaigns" value={suite.linked_campaigns.length} />
       </div>
