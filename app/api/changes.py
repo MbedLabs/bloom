@@ -14,7 +14,12 @@ from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import ChangeRequest, Project
 from app.models.user import User, UserRole
-from app.schemas import ChangeRequestCreate, ChangeRequestResponse, ChangeRequestUpdate, PaginatedResponse
+from app.schemas import (
+    ChangeRequestCreate,
+    ChangeRequestResponse,
+    ChangeRequestUpdate,
+    PaginatedResponse,
+)
 
 router = APIRouter()
 

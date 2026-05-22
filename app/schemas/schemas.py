@@ -17,6 +17,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
     skip: int
     limit: int
 
+
 from app.core.id_generator import normalize_doc_id
 
 # ==================== Project Schemas ====================

@@ -215,7 +215,10 @@ async def list_test_cases(
         requirement_counts.update({tc_id: count for tc_id, count in count_rows})
 
     return PaginatedResponse(
-        items=[_build_test_case_list_response(tc, requirement_counts.get(tc.id, 0)) for tc in test_cases],
+        items=[
+            _build_test_case_list_response(tc, requirement_counts.get(tc.id, 0))
+            for tc in test_cases
+        ],
         total=total,
         skip=skip,
         limit=limit,
