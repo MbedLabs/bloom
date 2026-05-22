@@ -88,9 +88,6 @@ function DocumentLinkRow({
         <span className="font-mono text-sm text-primary shrink-0">
           {target?.doc_id || fallbackLabel}
         </span>
-        <span className="text-sm text-foreground truncate">
-          {target?.title || `Linked ${DOC_TYPE_LABELS[otherType]?.toLowerCase() ?? 'artefact'}`}
-        </span>
         {link.suspect && (
           <span className="shrink-0 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
             suspect
