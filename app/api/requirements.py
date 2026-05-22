@@ -38,6 +38,7 @@ from app.models.user import User
 from app.models.user import User as UserModel
 from app.models.user import UserRole
 from app.schemas import (
+    PaginatedResponse,
     RequirementCreate,
     RequirementResponse,
     RequirementUpdate,
@@ -285,22 +286,26 @@ def _build_requirement_list_response(
     )
 
 
-@router.get("", response_model=list[RequirementResponse])
+@router.get("", response_model=PaginatedResponse[RequirementResponse])
 async def list_requirements(
     project_id: int = Query(..., description="Filter by project ID"),
     status: Optional[str] = Query(None, description="Filter by status"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
     """
-    List requirements for a project with optional status filter.
+    List requirements for a project with optional status filter and pagination.
     """
-    query = select(Requirement).where(Requirement.project_id == project_id)
-
+    base = select(Requirement).where(Requirement.project_id == project_id)
     if status:
-        query = query.where(Requirement.status == status)
+        base = base.where(Requirement.status == status)
 
-    query = query.order_by(Requirement.created_at.desc())
+    total_q = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(total_q)).scalar() or 0
+
+    query = base.order_by(Requirement.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     requirements = result.scalars().all()
     requirement_ids = [req.id for req in requirements]
@@ -321,10 +326,15 @@ async def list_requirements(
         ).all()
         test_case_counts.update({req_id: count for req_id, count in count_rows})
 
-    return [
-        _build_requirement_list_response(req, test_case_counts.get(req.id, 0))
-        for req in requirements
-    ]
+    return PaginatedResponse(
+        items=[
+            _build_requirement_list_response(req, test_case_counts.get(req.id, 0))
+            for req in requirements
+        ],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.post("", response_model=RequirementResponse, status_code=201)

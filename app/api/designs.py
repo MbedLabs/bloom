@@ -1,7 +1,7 @@
 """Design items API endpoints."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
@@ -14,7 +14,7 @@ from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_role
 from app.models import DesignItem, Project
 from app.models.user import User, UserRole
-from app.schemas import DesignItemCreate, DesignItemResponse, DesignItemUpdate
+from app.schemas import DesignItemCreate, DesignItemResponse, DesignItemUpdate, PaginatedResponse
 
 router = APIRouter()
 
@@ -23,18 +23,21 @@ def _design_response(item: DesignItem) -> DesignItemResponse:
     return DesignItemResponse.model_validate(item)
 
 
-@router.get("", response_model=list[DesignItemResponse])
+@router.get("", response_model=PaginatedResponse[DesignItemResponse])
 async def list_design_items(
     project_id: int = Query(..., description="Filter by project ID"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(
-        select(DesignItem)
-        .where(DesignItem.project_id == project_id)
-        .order_by(DesignItem.created_at.desc())
-    )
-    return [_design_response(item) for item in result.scalars().all()]
+    base = select(DesignItem).where(DesignItem.project_id == project_id)
+    total_q = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(total_q)).scalar() or 0
+    query = base.order_by(DesignItem.created_at.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
+    items = [_design_response(item) for item in result.scalars().all()]
+    return PaginatedResponse(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.post("", response_model=DesignItemResponse, status_code=201)

@@ -26,6 +26,7 @@ from app.models import (
 from app.models.user import User, UserRole
 from app.schemas import (
     ArtefactLinkResponse,
+    PaginatedResponse,
     RequirementSummary,
     SyncResultsRequest,
     SyncResultsResponse,
@@ -128,21 +129,32 @@ async def sync_results_global(
     return SyncResultsResponse(updated=updated_count, not_found=not_found)
 
 
-@router.get("", response_model=list[TestCampaignResponse])
+@router.get("", response_model=PaginatedResponse[TestCampaignResponse])
 async def list_campaigns(
     project_id: int = Query(...),
     status: Optional[str] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
-    query = select(TestCampaign).where(TestCampaign.project_id == project_id)
+    base = select(TestCampaign).where(TestCampaign.project_id == project_id)
     if status:
-        query = query.where(TestCampaign.status == status)
-    query = query.order_by(TestCampaign.created_at.desc())
+        base = base.where(TestCampaign.status == status)
+
+    total_q = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(total_q)).scalar() or 0
+
+    query = base.order_by(TestCampaign.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     campaigns = result.scalars().all()
 
-    return await _build_campaign_responses_batch(campaigns, db)
+    return PaginatedResponse(
+        items=await _build_campaign_responses_batch(campaigns, db),
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.post("", response_model=TestCampaignDetailResponse, status_code=201)

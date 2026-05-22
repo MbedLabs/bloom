@@ -25,23 +25,27 @@ from app.schemas import (
     DocumentSectionResponse,
     DocumentSectionUpdate,
     DocumentUpdate,
+    PaginatedResponse,
     SectionReorder,
 )
 
 router = APIRouter()
 
 
-@router.get("/projects/{project_id}/documents", response_model=list[DocumentResponse])
+@router.get("/projects/{project_id}/documents", response_model=PaginatedResponse[DocumentResponse])
 async def list_documents(
     project_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(
-        select(Document)
-        .where(Document.project_id == project_id)
-        .order_by(Document.created_at.desc())
-    )
+    base_q = select(Document).where(Document.project_id == project_id)
+    total_q = select(func.count()).select_from(base_q.subquery())
+    total = (await db.execute(total_q)).scalar() or 0
+
+    query = base_q.order_by(Document.created_at.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
     documents = result.scalars().all()
 
     response = []
@@ -69,7 +73,7 @@ async def list_documents(
             )
         )
 
-    return response
+    return PaginatedResponse(items=response, total=total, skip=skip, limit=limit)
 
 
 @router.post("/projects/{project_id}/documents", response_model=DocumentResponse, status_code=201)
