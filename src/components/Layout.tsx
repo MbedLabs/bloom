@@ -171,7 +171,7 @@ function LayoutInner() {
     : 'U'
 
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen flex overflow-hidden">
       {/* Sidebar */}
       <aside className={`${sidebarCollapsed ? 'w-14' : 'w-60'} sidebar-scrollbar bg-gradient-sidebar text-white flex flex-col fixed inset-y-0 left-0 z-30 overflow-y-auto transition-all duration-200`}>
         {/* Logo */}
@@ -388,7 +388,7 @@ function LayoutInner() {
       </button>
 
       {/* Main content */}
-      <div className={`flex-1 flex flex-col min-w-0 ${sidebarCollapsed ? 'ml-14' : 'ml-60'} transition-all duration-200`}>
+      <div className={`flex-1 flex flex-col min-w-0 min-h-0 ${sidebarCollapsed ? 'ml-14' : 'ml-60'} transition-all duration-200`}>
         {/* Header */}
         <header className="glass border-b border-border sticky top-0 z-20">
           <div className="px-3 py-2 flex items-center gap-3 min-w-0">
@@ -484,7 +484,7 @@ function LayoutInner() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 bg-background overflow-auto">
+        <main className="p-4 bg-background flex flex-col flex-1 min-h-0 overflow-auto">
           <Outlet />
         </main>
       </div>

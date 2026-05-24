@@ -14,11 +14,10 @@ import {
 import {
   docUrl,
   DOC_TYPE_LABELS,
-  DOC_LINK_ROLE_COLORS,
+  DOC_TYPE_COLORS,
   getDocLinkOptions,
   getDocLinkRoleLabel,
   normalizeDocTypeParam,
-  type DocLinkRole,
   type DocType,
 } from '../types/doc'
 import { SectionCard } from './DocDetailShell'
@@ -69,41 +68,37 @@ function DocumentLinkRow({
   const otherType = (direction === 'outgoing' ? link.target_type : link.source_type) as DocType
   const otherId = direction === 'outgoing' ? link.target_id : link.source_id
   const fallbackLabel = `${otherType} #${otherId}`
-  const role = link.role as DocLinkRole
   const roleLabel = getDocLinkRoleLabel(link.role, direction)
-  const roleColor = DOC_LINK_ROLE_COLORS[role] || 'bg-muted text-muted-foreground'
+  const typeColor = DOC_TYPE_COLORS[otherType] || 'bg-muted text-muted-foreground'
 
   return (
-    <div className="flex items-center justify-between px-4 py-2.5 hover:bg-accent/50 transition-colors">
+    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs border border-border/60 hover:border-border ${typeColor}`}>
+      <span title={roleLabel} className="shrink-0">
+        {roleLabel}
+      </span>
+      <span className="text-muted-foreground shrink-0 select-none">&middot;</span>
       <Link
         to={targetUrl(projectPrefix, otherType, target)}
-        className="min-w-0 flex items-center gap-3 flex-1"
+        className="font-mono text-[11px] hover:underline"
+        title={target?.title}
       >
-        <span
-          className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ${roleColor}`}
-          title={roleLabel}
-        >
-          {roleLabel}
-        </span>
-        <span className="font-mono text-sm text-primary shrink-0">
-          {target?.doc_id || fallbackLabel}
-        </span>
-        {link.suspect && (
-          <span className="shrink-0 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
-            suspect
-          </span>
-        )}
+        {target?.doc_id || fallbackLabel}
       </Link>
+      {link.suspect && (
+        <span className="shrink-0 rounded-full bg-amber-500/10 px-1 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+          !
+        </span>
+      )}
       {onDelete && (
         <button
           onClick={onDelete}
-          className="ml-2 p-1 rounded text-muted-foreground hover:text-red-500 hover:bg-red-500/10 shrink-0"
+          className="ml-0.5 p-0.5 rounded text-muted-foreground hover:text-red-500 hover:bg-red-500/10 shrink-0"
           title="Remove link"
         >
-          <X className="h-4 w-4" />
+          <X className="h-3 w-3" />
         </button>
       )}
-    </div>
+    </span>
   )
 }
 
@@ -397,7 +392,13 @@ export function DocumentLinksPanel({
     return derivedLinks.filter((l) => !directIds.has(l.id))
   }, [derivedLinks, outgoingLinks, incomingLinks])
 
-  const totalCount = directLinkCount + filteredDerivedLinks.length
+  const allLinks = useMemo(() => {
+    const items: { link: ArtefactLink; direction: 'outgoing' | 'incoming'; isDerived: boolean }[] = []
+    ;(outgoingLinks || []).forEach((link) => items.push({ link, direction: 'outgoing', isDerived: false }))
+    ;(incomingLinks || []).forEach((link) => items.push({ link, direction: 'incoming', isDerived: false }))
+    ;filteredDerivedLinks.forEach((link) => items.push({ link, direction: 'incoming', isDerived: true }))
+    return items
+  }, [outgoingLinks, incomingLinks, filteredDerivedLinks])
 
   return (
     <SectionCard
@@ -413,39 +414,24 @@ export function DocumentLinksPanel({
       ) : undefined}
     >
       <p className="text-xs text-muted-foreground mb-3">Typed links to requirements, specifications, designs, risks, defects, campaigns, test suites, and other controlled documents.</p>
-      {totalCount === 0 ? (
+      {allLinks.length === 0 ? (
         <p className="text-muted-foreground">No links yet.</p>
       ) : (
-        <div className="divide-y divide-border -mx-6 -mb-6">
-          {(outgoingLinks || []).map((link) => (
-            <DocumentLinkRow
-              key={`out-${link.id}`}
-              link={link}
-              target={targetLookup.get(docKey(link.target_type, link.target_id))}
-              projectPrefix={projectPrefix}
-              direction="outgoing"
-              onDelete={canEditDocs ? () => deleteMutation.mutate(link.id) : undefined}
-            />
-          ))}
-          {(incomingLinks || []).map((link) => (
-            <DocumentLinkRow
-              key={`in-${link.id}`}
-              link={link}
-              target={targetLookup.get(docKey(link.source_type, link.source_id))}
-              projectPrefix={projectPrefix}
-              direction="incoming"
-              onDelete={canEditDocs ? () => deleteMutation.mutate(link.id) : undefined}
-            />
-          ))}
-          {filteredDerivedLinks.map((link) => (
-            <DocumentLinkRow
-              key={`derived-${link.id}`}
-              link={link}
-              target={targetLookup.get(docKey(link.source_type, link.source_id))}
-              projectPrefix={projectPrefix}
-              direction="incoming"
-            />
-          ))}
+        <div className="flex flex-wrap gap-1.5 -mx-6 -mb-6 px-6 pb-6">
+          {allLinks.map(({ link, direction, isDerived }) => {
+            const targetType = (direction === 'outgoing' ? link.target_type : link.source_type) as DocType
+            const targetId = direction === 'outgoing' ? link.target_id : link.source_id
+            return (
+              <DocumentLinkRow
+                key={`${isDerived ? 'derived' : 'direct'}-${link.id}`}
+                link={link}
+                target={targetLookup.get(docKey(targetType, targetId))}
+                projectPrefix={projectPrefix}
+                direction={direction}
+                onDelete={canEditDocs && !isDerived ? () => deleteMutation.mutate(link.id) : undefined}
+              />
+            )
+          })}
         </div>
       )}
 

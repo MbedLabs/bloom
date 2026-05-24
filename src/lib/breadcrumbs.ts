@@ -1,5 +1,5 @@
 import { docRegistryListLabel, docRegistryListUrl } from './docRegistryParams'
-import { DOC_TYPE_LABELS, normalizeDocTypeParam, type DocType } from '../types/doc'
+import { normalizeDocTypeParam } from '../types/doc'
 
 export type BreadcrumbProject = { id: number; name: string; prefix: string }
 
@@ -22,11 +22,6 @@ const TYPE_PAGE_TITLE: Record<string, string> = {
   STD: 'Standards',
   DEF: 'Defects',
   CMP: docRegistryListLabel('CMP'),
-}
-
-function newDocCrumbLabel(docType: DocType | null): string {
-  if (!docType) return 'New document'
-  return `New ${DOC_TYPE_LABELS[docType]}`
 }
 
 export function getBreadcrumbs(
@@ -82,18 +77,9 @@ export function getBreadcrumbs(
       const docsHref = resolvedDocType
         ? docRegistryListUrl(slug, resolvedDocType)
         : docRegistryListUrl(slug)
-      if (parts[4] === 'new') {
+      if (parts[4] === 'new' || parts[6] === 'edit') {
         crumbs.push({ label: docLabel, href: docsHref, emphasize: true })
-        crumbs.push({ label: newDocCrumbLabel(resolvedDocType), emphasize: true })
       } else if (parts[4] && parts[5]) {
-        crumbs.push({ label: docLabel, href: docsHref })
-        if (parts[6] === 'edit') {
-          crumbs.push({ label: parts[5], href: `/projects/${slug}/docs/${parts[4]}/${parts[5]}` })
-          crumbs.push({ label: 'Edit' })
-        } else {
-          crumbs.push({ label: parts[5] })
-        }
-      } else {
         crumbs.push({ label: docLabel })
       }
     } else if (sub === 'campaigns' && parts[4]) {

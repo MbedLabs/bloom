@@ -117,7 +117,7 @@ function TcsViewRow({ row, hasChildren }: { row: TcsRow; hasChildren: boolean })
           )}
           <div className="min-w-0">
             <div className={`inline-flex min-h-6 items-center rounded border px-2 py-0.5 text-[11px] font-semibold ${styles.chip}`}>
-              {row.label || styles.label}
+              {styles.label}
             </div>
           </div>
         </div>

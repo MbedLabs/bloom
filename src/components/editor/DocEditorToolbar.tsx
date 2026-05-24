@@ -5,7 +5,7 @@ import {
   Code, Minus, Image as ImageIcon, Link2, Table as TableIcon,
   Undo2, Redo2, RemoveFormatting, AlignLeft, AlignCenter,
   AlignRight, Superscript, Subscript, ChevronDown, Palette,
-  ListTree, Hash
+  ListTree, Hash, AlignVerticalSpaceAround
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 
@@ -27,13 +27,16 @@ export default function DocEditorToolbar({
 }: DocEditorToolbarProps) {
   const [headingOpen, setHeadingOpen] = useState(false)
   const [colorOpen, setColorOpen] = useState(false)
+  const [lineHeightOpen, setLineHeightOpen] = useState(false)
   const headingRef = useRef<HTMLDivElement>(null)
   const colorRef = useRef<HTMLDivElement>(null)
+  const lineHeightRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (headingRef.current && !headingRef.current.contains(e.target as Node)) setHeadingOpen(false)
       if (colorRef.current && !colorRef.current.contains(e.target as Node)) setColorOpen(false)
+      if (lineHeightRef.current && !lineHeightRef.current.contains(e.target as Node)) setLineHeightOpen(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -249,6 +252,34 @@ export default function DocEditorToolbar({
         icon={<AlignRight className="h-4 w-4" />}
         title="Align right"
       />
+
+      {/* Line height dropdown */}
+      <div className="relative" ref={lineHeightRef}>
+        <ToolbarButton
+          onClick={() => setLineHeightOpen(!lineHeightOpen)}
+          icon={<AlignVerticalSpaceAround className="h-4 w-4" />}
+          title="Line spacing"
+        />
+        {lineHeightOpen && (
+          <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-lg shadow-elegant overflow-hidden z-50 min-w-[100px]">
+            <HeadingOption
+              label="1.0"
+              active={!editor.storage.lineHeight || editor.storage.lineHeight === '1'}
+              onClick={() => { editor.chain().focus().setLineHeight('1').run(); setLineHeightOpen(false) }}
+            />
+            <HeadingOption
+              label="1.5"
+              active={editor.storage.lineHeight === '1.5'}
+              onClick={() => { editor.chain().focus().setLineHeight('1.5').run(); setLineHeightOpen(false) }}
+            />
+            <HeadingOption
+              label="2.0"
+              active={editor.storage.lineHeight === '2'}
+              onClick={() => { editor.chain().focus().setLineHeight('2').run(); setLineHeightOpen(false) }}
+            />
+          </div>
+        )}
+      </div>
 
       <Separator />
 

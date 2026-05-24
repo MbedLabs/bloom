@@ -1,11 +1,12 @@
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   type TcsRow,
   projectsApi,
   testCasesApi,
   usersApi,
+  extractApiErrorMessage,
 } from '../api/client'
 import { TcsArteTable } from '../components/TcsArteTable'
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
@@ -51,6 +52,14 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
   const queryClient = useQueryClient()
   const navigate = useNavigate()
 
+  const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' | 'info' } | null>(null)
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), 4000)
+    return () => clearTimeout(timer)
+  }, [toast])
+
   const { data: testCase, isLoading, error } = useQuery({
     queryKey: ['testCase', tcId],
     queryFn: () => testCasesApi.get(tcId),
@@ -91,6 +100,10 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['testCase', tcId] })
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'test-case', tcId] })
+      setToast({ message: 'Test case marked as reviewed', variant: 'success' })
+    },
+    onError: (err: unknown) => {
+      setToast({ message: extractApiErrorMessage(err) || 'Review failed', variant: 'error' })
     },
   })
 
@@ -99,9 +112,14 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['testCase', tcId] })
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'test-case', tcId] })
+      setToast({ message: 'Test case approved', variant: 'success' })
+    },
+    onError: (err: unknown) => {
+      setToast({ message: extractApiErrorMessage(err) || 'Approval failed', variant: 'error' })
     },
   })
 
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
   const deleteMutation = useMutation({
     mutationFn: () => testCasesApi.delete(tcId),
     onSuccess: () => {
@@ -110,7 +128,14 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
       queryClient.invalidateQueries({ queryKey: ['all-docs', prefix] })
       queryClient.invalidateQueries({ queryKey: ['project', testCase.project_id] })
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'test-case', tcId] })
-      navigate(docRegistryListUrl(prefix!, 'TC'))
+      setToast({ message: 'Test case deleted', variant: 'success' })
+      setTimeout(() => {
+        navigate(docRegistryListUrl(prefix!, 'TC'))
+      }, 800)
+    },
+    onError: (err: unknown) => {
+      setToast({ message: extractApiErrorMessage(err) || 'Delete failed', variant: 'error' })
+      setDeleteConfirm(false)
     },
   })
 
@@ -135,6 +160,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
   const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
 
   return (
+    <>
     <DocDetailShell
       projectPrefix={projectPrefix}
       docType="TC"
@@ -150,18 +176,30 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
             <Pencil className="h-4 w-4 mr-2" />
             Edit
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (!window.confirm(`Delete test case ${testCase.tc_id}?`)) return
-              deleteMutation.mutate()
-            }}
-            disabled={deleteMutation.isPending}
-            className="inline-flex items-center gap-1.5 px-4 py-2 border border-destructive/30 text-destructive rounded-md hover:bg-destructive/10 disabled:opacity-50 text-sm"
-          >
-            <Trash2 className="h-4 w-4" />
-            Delete
-          </button>
+          {!deleteConfirm ? (
+            <button
+              type="button"
+              onClick={() => setDeleteConfirm(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 border border-red-300 text-red-600 rounded-md hover:bg-red-50 text-sm"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Are you sure?</span>
+              <button
+                onClick={() => { setDeleteConfirm(false); deleteMutation.mutate(); }}
+                disabled={deleteMutation.isPending}
+                className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm disabled:opacity-50"
+              >
+                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+              </button>
+              <button onClick={() => setDeleteConfirm(false)} className="px-3 py-1.5 border border-input rounded-md text-sm hover:bg-accent/40">
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
       ) : undefined}
       rightRail={
@@ -269,5 +307,20 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
       )}
 
     </DocDetailShell>
+    {toast && (
+      <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-md shadow-lg text-sm border"
+        style={{
+          background: toast.variant === 'success' ? 'var(--color-emerald-50, #ecfdf5)' : toast.variant === 'error' ? 'var(--color-red-50, #fef2f2)' : 'var(--color-blue-50, #eff6ff)',
+          borderColor: toast.variant === 'success' ? 'var(--color-emerald-200, #a7f3d0)' : toast.variant === 'error' ? 'var(--color-red-200, #fecaca)' : 'var(--color-blue-200, #bfdbfe)',
+        }}
+      >
+        <div className={`w-2 h-2 rounded-full ${toast.variant === 'success' ? 'bg-emerald-500' : toast.variant === 'error' ? 'bg-red-500' : 'bg-blue-500'}`} />
+        <span className={toast.variant === 'success' ? 'text-emerald-800' : toast.variant === 'error' ? 'text-red-800' : 'text-blue-800'}>
+          {toast.message}
+        </span>
+        <button onClick={() => setToast(null)} className="ml-3 text-xs underline opacity-60 hover:opacity-100">Dismiss</button>
+      </div>
+    )}
+    </>
   )
 }
