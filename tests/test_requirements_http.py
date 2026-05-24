@@ -35,7 +35,7 @@ def test_requirements_crud_roundtrip(api_client: TestClient):
 
     empty = api_client.get("/api/requirements", params={"project_id": pid}, headers=headers)
     assert empty.status_code == 200
-    assert empty.json() == []
+    assert empty.json()["items"] == []
 
     created = api_client.post(
         "/api/requirements",
@@ -49,7 +49,7 @@ def test_requirements_crud_roundtrip(api_client: TestClient):
 
     listed = api_client.get("/api/requirements", params={"project_id": pid}, headers=headers)
     assert listed.status_code == 200
-    assert len(listed.json()) == 1
+    assert len(listed.json()["items"]) == 1
 
     got = api_client.get(f"/api/requirements/{body['id']}", headers=headers)
     assert got.status_code == 200
