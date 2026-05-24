@@ -72,7 +72,7 @@ export function migrateOldSteps(oldSteps: Array<{ step_number?: number; action?:
   return oldSteps.map((step) => ({
     id: generateId(),
     row_type: 'step',
-    label: step.step_number ? `Step ${step.step_number}` : 'Step',
+    label: 'Step',
     description: step.action || '',
     expected_result: step.expected_result || '',
     indent_level: 0,

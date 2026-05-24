@@ -1,7 +1,7 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { documentsApi, projectsApi, DocumentSection } from '../api/client'
+import { documentsApi, projectsApi, DocumentSection, extractApiErrorMessage } from '../api/client'
 import { Trash2, ChevronRight, FileText, FileEdit } from 'lucide-react'
 import { DocEditor } from '../components/editor'
 import DocDetailShell, { MetaItem, SectionCard } from '../components/DocDetailShell'
@@ -47,6 +47,14 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
+  const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' | 'info' } | null>(null)
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), 4000)
+    return () => clearTimeout(timer)
+  }, [toast])
+
   const resolvedDocType = kindSlugToType(kind || '')
   const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
 
@@ -64,16 +72,26 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
 
   const projectPrefix = prefix || project?.prefix || ''
 
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
   const deleteDocumentMutation = useMutation({
     mutationFn: () => documentsApi.delete(docId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'document', docId] })
+      setToast({ message: 'Document deleted', variant: 'success' })
       if (projectPrefix) {
         queryClient.invalidateQueries({ queryKey: ['documents', doc?.project_id] })
-        navigate(`/projects/${projectPrefix}/docs`)
+        setTimeout(() => {
+          navigate(`/projects/${projectPrefix}/docs`)
+        }, 800)
       } else {
-        navigate('/projects')
+        setTimeout(() => {
+          navigate('/projects')
+        }, 800)
       }
+    },
+    onError: (err: unknown) => {
+      setToast({ message: extractApiErrorMessage(err) || 'Delete failed', variant: 'error' })
+      setDeleteConfirm(false)
     },
   })
 
@@ -110,6 +128,7 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
   const editUrl = docEditUrl(projectPrefix, resolvedDocType, doc.doc_id || String(docId))
 
   return (
+    <>
     <DocDetailShell
       projectPrefix={projectPrefix}
       docType={resolvedDocType}
@@ -125,13 +144,30 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
             <FileEdit className="h-4 w-4 mr-2" />
             Edit
           </button>
-          <button
-            onClick={() => { if (window.confirm(`Delete document "${doc.title}"?`)) deleteDocumentMutation.mutate() }}
-            disabled={deleteDocumentMutation.isPending}
-            className="inline-flex items-center gap-2 px-3 py-2 border border-red-500/50 text-red-600 rounded-md text-sm hover:bg-red-500/10 disabled:opacity-50"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {!deleteConfirm ? (
+            <button
+              onClick={() => setDeleteConfirm(true)}
+              disabled={deleteDocumentMutation.isPending}
+              className="inline-flex items-center gap-2 px-3 py-2 border border-red-300 text-red-600 rounded-md text-sm hover:bg-red-50 disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Are you sure?</span>
+              <button
+                onClick={() => { setDeleteConfirm(false); deleteDocumentMutation.mutate(); }}
+                disabled={deleteDocumentMutation.isPending}
+                className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm disabled:opacity-50"
+              >
+                {deleteDocumentMutation.isPending ? 'Deleting...' : 'Delete'}
+              </button>
+              <button onClick={() => setDeleteConfirm(false)} className="px-3 py-1.5 border border-input rounded-md text-sm hover:bg-accent/40">
+                Cancel
+              </button>
+            </div>
+          )}
         </>
       ) : undefined}
       rightRail={
@@ -206,5 +242,20 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
         sourceId={docId}
       />
     </DocDetailShell>
+    {toast && (
+      <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-md shadow-lg text-sm border"
+        style={{
+          background: toast.variant === 'success' ? 'var(--color-emerald-50, #ecfdf5)' : toast.variant === 'error' ? 'var(--color-red-50, #fef2f2)' : 'var(--color-blue-50, #eff6ff)',
+          borderColor: toast.variant === 'success' ? 'var(--color-emerald-200, #a7f3d0)' : toast.variant === 'error' ? 'var(--color-red-200, #fecaca)' : 'var(--color-blue-200, #bfdbfe)',
+        }}
+      >
+        <div className={`w-2 h-2 rounded-full ${toast.variant === 'success' ? 'bg-emerald-500' : toast.variant === 'error' ? 'bg-red-500' : 'bg-blue-500'}`} />
+        <span className={toast.variant === 'success' ? 'text-emerald-800' : toast.variant === 'error' ? 'text-red-800' : 'text-blue-800'}>
+          {toast.message}
+        </span>
+        <button onClick={() => setToast(null)} className="ml-3 text-xs underline opacity-60 hover:opacity-100">Dismiss</button>
+      </div>
+    )}
+    </>
   )
 }

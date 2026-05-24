@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { campaignsApi, type ArtefactLink, type TestCampaignItem } from '../api/client'
+import { campaignsApi, type ArtefactLink, type TestCampaignItem, extractApiErrorMessage } from '../api/client'
 import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Pencil, Trash2, X } from 'lucide-react'
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
@@ -19,6 +19,14 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
   const backUrl = (location.state as { returnTo?: string } | null)?.returnTo
     || docRegistryListUrl(prefix!, 'CMP')
   const queryClient = useQueryClient()
+
+  const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' | 'info' } | null>(null)
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), 4000)
+    return () => clearTimeout(timer)
+  }, [toast])
 
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', description: '', status: '' })
@@ -47,6 +55,10 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['campaign', campId] })
       setEditOpen(false)
+      setToast({ message: 'Campaign updated', variant: 'success' })
+    },
+    onError: (err: unknown) => {
+      setToast({ message: extractApiErrorMessage(err) || 'Save failed', variant: 'error' })
     },
   })
 
@@ -54,7 +66,14 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
     mutationFn: () => campaignsApi.delete(campId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['campaigns'] })
-      navigate(docRegistryListUrl(prefix!, 'CMP'))
+      setToast({ message: 'Campaign deleted', variant: 'success' })
+      setTimeout(() => {
+        navigate(docRegistryListUrl(prefix!, 'CMP'))
+      }, 800)
+    },
+    onError: (err: unknown) => {
+      setToast({ message: extractApiErrorMessage(err) || 'Delete failed', variant: 'error' })
+      setConfirmDelete(false)
     },
   })
 
@@ -114,6 +133,7 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
   const adHocItems = campaign.ad_hoc_items ?? []
 
   return (
+    <>
     <div className="animate-fade-in space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -319,6 +339,21 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
         <DocumentActivityPanel artefactType="campaign" artefactId={campId} />
       </div>
     </div>
+    {toast && (
+      <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-md shadow-lg text-sm border"
+        style={{
+          background: toast.variant === 'success' ? 'var(--color-emerald-50, #ecfdf5)' : toast.variant === 'error' ? 'var(--color-red-50, #fef2f2)' : 'var(--color-blue-50, #eff6ff)',
+          borderColor: toast.variant === 'success' ? 'var(--color-emerald-200, #a7f3d0)' : toast.variant === 'error' ? 'var(--color-red-200, #fecaca)' : 'var(--color-blue-200, #bfdbfe)',
+        }}
+      >
+        <div className={`w-2 h-2 rounded-full ${toast.variant === 'success' ? 'bg-emerald-500' : toast.variant === 'error' ? 'bg-red-500' : 'bg-blue-500'}`} />
+        <span className={toast.variant === 'success' ? 'text-emerald-800' : toast.variant === 'error' ? 'text-red-800' : 'text-blue-800'}>
+          {toast.message}
+        </span>
+        <button onClick={() => setToast(null)} className="ml-3 text-xs underline opacity-60 hover:opacity-100">Dismiss</button>
+      </div>
+    )}
+    </>
   )
 }
 

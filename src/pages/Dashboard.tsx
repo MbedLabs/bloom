@@ -147,7 +147,7 @@ export default function Dashboard() {
                       <tr key={project.id} className="transition-colors hover:bg-accent/50">
                         <Td>
                           <div className="min-w-0">
-                            <Link to={`/projects/${project.prefix}/docs`} className="font-medium text-foreground hover:text-primary">
+                            <Link to={`/projects/${project.prefix}`} className="font-medium text-foreground hover:text-primary">
                               {project.name}
                             </Link>
                             <div className="mt-0.5 font-mono text-xs text-muted-foreground">{project.prefix}</div>
@@ -160,8 +160,8 @@ export default function Dashboard() {
                         <Td>{projectKindCounts.RSK + projectKindCounts.CHG}</Td>
                         <Td>
                           <Link
-                            to={`/projects/${project.prefix}/docs`}
-                            aria-label={`Open ${project.name} documents`}
+                            to={`/projects/${project.prefix}`}
+                            aria-label={`Open ${project.name} overview`}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                           >
                             <ArrowRight className="h-4 w-4" />

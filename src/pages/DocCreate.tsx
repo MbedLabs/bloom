@@ -416,7 +416,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   }
 
   return (
-    <div className="animate-fade-in -m-6 flex flex-col min-h-[calc(100vh-4rem)]">
+    <div className="animate-fade-in -m-6 flex flex-col flex-1 min-h-0">
       {/* Top bar */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-card shrink-0">
         <div className="flex items-center gap-3">
@@ -431,8 +431,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${DOC_TYPE_COLORS[docType]}`}>
             {DOC_TYPE_LABELS[docType]}
           </span>
-          {project && (
-            <span className="text-xs text-muted-foreground">
+          {project && !editMode && (
+            <span className="text-xs font-mono text-muted-foreground">
               {expectedDocIdExample}
             </span>
           )}
@@ -487,9 +487,9 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       ) : null}
 
       {/* Document frame */}
-      <div className="flex flex-1 overflow-auto">
+      <div className="flex">
         {/* Editor area with outline */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           {/* Document header inside frame */}
           <div className={`${docType === 'TC' ? 'max-w-none' : 'max-w-4xl mx-auto'} w-full px-8 pt-8 pb-0`}>
             {/* Document header metadata bar */}
@@ -504,7 +504,9 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                       {editDocFacade?.doc_id || docIdStr}
                     </span>
                   ) : (
-                    <span className="text-xs font-mono text-muted-foreground">Auto-assigned on save</span>
+                    <span className="text-xs font-mono text-muted-foreground">
+                      {expectedDocIdExample}
+                    </span>
                   )}
                 </>
               )}
@@ -535,7 +537,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           </div>
 
           {/* Editor body */}
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1">
             <div className={`${docType === 'TC' ? 'max-w-none' : 'max-w-4xl mx-auto'} w-full px-4 py-4`}>
               {docType === 'TC' ? (
                 <TcsArteTable rows={tcRows} onChange={setTcRows} editable />
@@ -580,6 +582,21 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                 </select>
               </MetaField>
 
+              {/* Assigned to */}
+              <MetaField label="Assigned to">
+                <select
+                  value={metadata.reviewer_id || ''}
+                  onChange={(e) => setMetadata({ ...metadata, reviewer_id: e.target.value })}
+                  title="Select reviewer"
+                  className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
+                >
+                  <option value="">Unassigned</option>
+                  {users?.map((u) => (
+                    <option key={u.id} value={u.id}>{u.full_name}</option>
+                  ))}
+                </select>
+              </MetaField>
+
               {/* Priority (if applicable) */}
               {config.priorityOptions && (
                 <MetaField label="Priority">
@@ -596,29 +613,9 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                 </MetaField>
               )}
 
-              {/* Assigned to */}
-              <MetaField label="Assigned to">
-                <select
-                  value={metadata.reviewer_id || ''}
-                  onChange={(e) => setMetadata({ ...metadata, reviewer_id: e.target.value })}
-                  title="Select reviewer"
-                  className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
-                >
-                  <option value="">Unassigned</option>
-                  {users?.map((u) => (
-                    <option key={u.id} value={u.id}>{u.full_name}</option>
-                  ))}
-                </select>
-              </MetaField>
-
               {/* Type-specific fields */}
               {visibleConfigFields.length > 0 && (
                 <>
-                  <div className="h-px bg-border" />
-                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Document Metadata
-                  </h3>
-
                   {visibleConfigFields.filter((field) => field.type !== 'textarea').map((field) => (
                     <MetaField key={field.key} label={field.label}>
                       {field.type === 'select' && field.options ? (

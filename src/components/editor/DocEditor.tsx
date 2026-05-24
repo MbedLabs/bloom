@@ -20,6 +20,7 @@ import Typography from '@tiptap/extension-typography'
 import Superscript from '@tiptap/extension-superscript'
 import Subscript from '@tiptap/extension-subscript'
 import { common, createLowlight } from 'lowlight'
+import { LineHeight } from './LineHeight'
 import DocEditorToolbar from './DocEditorToolbar'
 import OutlineSidebar from './OutlineSidebar'
 import MentionList, { type MentionListRef, type MentionSuggestion } from './MentionList'
@@ -259,6 +260,7 @@ export default function DocEditor({
       Typography,
       Superscript,
       Subscript,
+      LineHeight,
     ],
     content: content as Record<string, unknown> | undefined,
     editable,
@@ -267,7 +269,7 @@ export default function DocEditor({
     },
     editorProps: {
       attributes: {
-        class: `prose prose-sm dark:prose-invert max-w-none focus:outline-none ${minHeight} px-6 py-4 ${headingNumbered ? 'heading-numbered' : ''}`,
+        class: `prose prose-sm dark:prose-invert max-w-none focus:outline-none ${minHeight} px-6 pt-4 ${headingNumbered ? 'heading-numbered' : ''}`,
       },
     },
   })
@@ -313,13 +315,13 @@ export default function DocEditor({
   if (!editor) return null
 
   return (
-    <div className="flex flex-1 overflow-hidden">
+    <div className="flex flex-1">
       <OutlineSidebar
         editor={editor}
         open={showOutline}
         onToggle={() => onOutlineToggle?.(!showOutline)}
       />
-      <div className={`flex-1 flex flex-col overflow-auto border border-border rounded-lg bg-background ${className}`}>
+      <div className={`flex-1 flex flex-col border border-border rounded-lg bg-background min-h-0 ${className}`}>
         {editable && (
           <DocEditorToolbar
             editor={editor}
@@ -367,7 +369,7 @@ export default function DocEditor({
           </BubbleMenu>
         )}
 
-        <div className="flex-1">
+        <div className="flex-1 flex flex-col">
           <EditorContent editor={editor} />
         </div>
       </div>
