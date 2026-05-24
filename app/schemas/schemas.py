@@ -6,9 +6,15 @@ import re
 from datetime import datetime
 from typing import Any, Dict, Generic, List, Optional, TypeVar
 
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 T = TypeVar("T")
+
+
+class StrictModel(BaseModel):
+    """Base model that forbids extra fields — user-supplied IDs get rejected loudly."""
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class PaginatedResponse(BaseModel, Generic[T]):
@@ -37,7 +43,7 @@ def normalize_project_prefix(value: str) -> str:
     return normalized
 
 
-class ProjectCreate(BaseModel):
+class ProjectCreate(StrictModel):
     """Schema for creating a project."""
 
     name: str = Field(..., min_length=1, max_length=255)
@@ -51,7 +57,7 @@ class ProjectCreate(BaseModel):
         return normalize_project_prefix(value)
 
 
-class ProjectUpdate(BaseModel):
+class ProjectUpdate(StrictModel):
     """Schema for updating a project."""
 
     name: Optional[str] = Field(None, min_length=1, max_length=255)
@@ -96,7 +102,7 @@ class ProjectResponse(BaseModel):
         from_attributes = True
 
 
-class ProjectVariableCreate(BaseModel):
+class ProjectVariableCreate(StrictModel):
     project_id: int
     kind: str = Field(default="variable", pattern="^(parameter|variable)$")
     key: str = Field(..., min_length=1, max_length=100)
@@ -104,7 +110,7 @@ class ProjectVariableCreate(BaseModel):
     description: Optional[str] = None
 
 
-class ProjectVariableUpdate(BaseModel):
+class ProjectVariableUpdate(StrictModel):
     kind: Optional[str] = Field(default=None, pattern="^(parameter|variable)$")
     key: Optional[str] = Field(None, min_length=1, max_length=100)
     value: Optional[str] = Field(None, min_length=1)
@@ -189,7 +195,7 @@ class TestCaseVerifiesLinkResponse(BaseModel):
 # ==================== Requirement Schemas ====================
 
 
-class RequirementCreate(BaseModel):
+class RequirementCreate(StrictModel):
     """Schema for creating a requirement."""
 
     project_id: int
@@ -204,7 +210,7 @@ class RequirementCreate(BaseModel):
     approver_id: Optional[int] = None
 
 
-class RequirementUpdate(BaseModel):
+class RequirementUpdate(StrictModel):
     """Schema for updating a requirement."""
 
     title: Optional[str] = Field(None, min_length=1, max_length=500)
@@ -262,7 +268,7 @@ class RequirementResponse(BaseModel):
 # ==================== TestCase Schemas ====================
 
 
-class TestCaseCreate(BaseModel):
+class TestCaseCreate(StrictModel):
     """Schema for creating a test case."""
 
     project_id: int
@@ -275,7 +281,7 @@ class TestCaseCreate(BaseModel):
     approver_id: Optional[int] = None
 
 
-class TestCaseUpdate(BaseModel):
+class TestCaseUpdate(StrictModel):
     """Schema for updating a test case."""
 
     title: Optional[str] = Field(None, min_length=1, max_length=500)
@@ -334,7 +340,7 @@ class TestCaseResponse(BaseModel):
         from_attributes = True
 
 
-class TestRunLinkCreate(BaseModel):
+class TestRunLinkCreate(StrictModel):
     """Schema for linking a test run to a requirement."""
 
     test_run_id: int
@@ -422,7 +428,7 @@ class VersionResponse(BaseModel):
     api_version: str = "v1"
 
 
-class DocumentCreate(BaseModel):
+class DocumentCreate(StrictModel):
     project_id: int
     title: str = Field(..., min_length=1, max_length=500)
     doc_type: str = Field(default="SPEC", pattern="^(SPEC|PRT|RPT|STD)$")
@@ -431,7 +437,7 @@ class DocumentCreate(BaseModel):
     content_html: Optional[str] = None
 
 
-class DocumentUpdate(BaseModel):
+class DocumentUpdate(StrictModel):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
     doc_type: Optional[str] = Field(None, pattern="^(SPEC|PRT|RPT|STD)$")
     status: Optional[str] = None
@@ -441,7 +447,7 @@ class DocumentUpdate(BaseModel):
     content_html: Optional[str] = None
 
 
-class DocumentSectionCreate(BaseModel):
+class DocumentSectionCreate(StrictModel):
     title: str = Field(..., min_length=1, max_length=500)
     content: Optional[str] = None
     section_type: str = "text"
@@ -449,7 +455,7 @@ class DocumentSectionCreate(BaseModel):
     parent_section_id: Optional[int] = None
 
 
-class DocumentSectionUpdate(BaseModel):
+class DocumentSectionUpdate(StrictModel):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
     content: Optional[str] = None
     section_type: Optional[str] = None
@@ -530,7 +536,7 @@ class SectionReorder(BaseModel):
 # ==================== Test Campaign Schemas ====================
 
 
-class TestSuiteCreate(BaseModel):
+class TestSuiteCreate(StrictModel):
     project_id: int
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
@@ -538,7 +544,7 @@ class TestSuiteCreate(BaseModel):
     test_case_ids: List[int] = []
 
 
-class TestSuiteUpdate(BaseModel):
+class TestSuiteUpdate(StrictModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     status: Optional[str] = None
@@ -586,7 +592,7 @@ class TestSuiteDetailResponse(TestSuiteResponse):
     related_concepts: List[TestConceptSummary] = []
 
 
-class TestCampaignCreate(BaseModel):
+class TestCampaignCreate(StrictModel):
     project_id: int
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
@@ -598,7 +604,7 @@ class TestCampaignCreate(BaseModel):
     test_case_ids: List[int] = []
 
 
-class TestCampaignUpdate(BaseModel):
+class TestCampaignUpdate(StrictModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     suite_id: Optional[int] = None
@@ -672,11 +678,11 @@ class TestCampaignDetailResponse(TestCampaignResponse):
     related_concepts: List[TestConceptSummary] = []
 
 
-class TestCampaignItemUpdate(BaseModel):
+class TestCampaignItemUpdate(StrictModel):
     comment: Optional[str] = None
 
 
-class ArtefactLinkCreate(BaseModel):
+class ArtefactLinkCreate(StrictModel):
     project_id: int
     source_type: str
     source_id: int
@@ -718,7 +724,7 @@ class ArtefactLinkResponse(BaseModel):
 # ==================== Design Schemas ====================
 
 
-class DesignItemCreate(BaseModel):
+class DesignItemCreate(StrictModel):
     project_id: int
     title: str = Field(..., min_length=1, max_length=500)
     description: Optional[str] = None
@@ -727,7 +733,7 @@ class DesignItemCreate(BaseModel):
     design_type: str = "Architecture"
 
 
-class DesignItemUpdate(BaseModel):
+class DesignItemUpdate(StrictModel):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
     description: Optional[str] = None
     status: Optional[str] = None
@@ -758,7 +764,7 @@ class DesignItemResponse(BaseModel):
 # ==================== Risk Schemas ====================
 
 
-class RiskItemCreate(BaseModel):
+class RiskItemCreate(StrictModel):
     project_id: int
     title: str = Field(..., min_length=1, max_length=500)
     description: Optional[str] = None
@@ -769,7 +775,7 @@ class RiskItemCreate(BaseModel):
     risk_category: str = "Technical"
 
 
-class RiskItemUpdate(BaseModel):
+class RiskItemUpdate(StrictModel):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
     description: Optional[str] = None
     status: Optional[str] = None
@@ -804,7 +810,7 @@ class RiskItemResponse(BaseModel):
 # ==================== Change Request Schemas ====================
 
 
-class ChangeRequestCreate(BaseModel):
+class ChangeRequestCreate(StrictModel):
     project_id: int
     title: str = Field(..., min_length=1, max_length=500)
     description: Optional[str] = None
@@ -815,7 +821,7 @@ class ChangeRequestCreate(BaseModel):
     justification: Optional[str] = None
 
 
-class ChangeRequestUpdate(BaseModel):
+class ChangeRequestUpdate(StrictModel):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
     description: Optional[str] = None
     status: Optional[str] = None
@@ -850,7 +856,7 @@ class ChangeRequestResponse(BaseModel):
 # ==================== Defect Schemas ====================
 
 
-class DefectCreate(BaseModel):
+class DefectCreate(StrictModel):
     project_id: int
     title: str = Field(..., min_length=1, max_length=500)
     description: Optional[str] = None
@@ -870,7 +876,7 @@ class DefectCreate(BaseModel):
     external_issue_state: Optional[str] = None
 
 
-class DefectUpdate(BaseModel):
+class DefectUpdate(StrictModel):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
     description: Optional[str] = None
     status: Optional[str] = None
@@ -930,14 +936,14 @@ class DefectResponse(BaseModel):
 # ==================== Baseline Schemas ====================
 
 
-class BaselineCreate(BaseModel):
+class BaselineCreate(StrictModel):
     project_id: int
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     baseline_type: str = "Milestone"
 
 
-class BaselineUpdate(BaseModel):
+class BaselineUpdate(StrictModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     status: Optional[str] = None
@@ -966,7 +972,7 @@ class BaselineResponse(BaseModel):
 # ==================== Test Concept Schemas ====================
 
 
-class TestConceptCreate(BaseModel):
+class TestConceptCreate(StrictModel):
     project_id: int
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
@@ -974,7 +980,7 @@ class TestConceptCreate(BaseModel):
     coverage: float = 0
 
 
-class TestConceptUpdate(BaseModel):
+class TestConceptUpdate(StrictModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     status: Optional[str] = None
@@ -1004,7 +1010,7 @@ class TestConceptResponse(BaseModel):
 # ==================== Artefact Detail Schemas ====================
 
 
-class ArtefactCommentCreate(BaseModel):
+class ArtefactCommentCreate(StrictModel):
     body: str = Field(..., min_length=1)
 
 

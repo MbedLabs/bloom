@@ -8,6 +8,7 @@ from app.api.artefact_utils import (
     log_artefact_activity,
     log_document_workflow_activity_from_patch,
     should_log_generic_document_update,
+    updated_summary,
 )
 from app.api.link_read_utils import merged_linked_requirement_ids_for_test_concept
 from app.core.database import get_db
@@ -158,7 +159,7 @@ async def update_test_concept(
             "test-concept",
             item.id,
             "updated",
-            f"{current_user.full_name} updated test concept {item.concept_id}",
+            updated_summary(current_user.full_name, "test concept", item.concept_id, fields_set),
         )
     return await _response(db, item)
 

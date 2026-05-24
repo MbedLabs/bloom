@@ -2,7 +2,7 @@
 Documents API endpoints.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +10,7 @@ from app.api.artefact_utils import (
     log_artefact_activity,
     log_document_workflow_activity_from_patch,
     should_log_generic_document_update,
+    updated_summary,
 )
 from app.core.database import get_db
 from app.core.document_kinds import normalize_document_kind, require_document_kind
@@ -260,7 +261,7 @@ async def update_document(
             "document",
             document.id,
             "updated",
-            f"{current_user.full_name} updated document {document.doc_id}",
+            updated_summary(current_user.full_name, "document", document.doc_id, fields_set),
         )
 
     section_count_result = await db.execute(

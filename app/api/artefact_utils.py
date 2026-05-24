@@ -248,6 +248,39 @@ def should_log_generic_document_update(fields_set: set[str]) -> bool:
     return not fields_set.issubset(WORKFLOW_ACTIVITY_FIELDS)
 
 
+FIELD_LABELS: dict[str, str] = {
+    "title": "title",
+    "description": "description",
+    "content_json": "content",
+    "content_html": "content",
+    "priority": "priority",
+    "severity": "severity",
+    "req_type": "type",
+    "req_origin": "origin",
+    "design_type": "design type",
+    "category": "category",
+    "change_type": "change type",
+    "probability": "probability",
+    "coverage": "coverage",
+    "resolution_summary": "resolution",
+    "reviewed_by_id": "reviewer",
+    "approved_by_id": "approver",
+}
+
+
+def updated_summary(
+    actor_full_name: str, artefact_label: str, public_id: str, fields_set: set[str]
+) -> str:
+    """Build activity summary with field names: "User changed title, status on REQ-001"."""
+    changed = sorted(
+        FIELD_LABELS.get(f, f) for f in fields_set if f not in WORKFLOW_ACTIVITY_FIELDS
+    )
+    if not changed:
+        return f"{actor_full_name} updated {artefact_label} {public_id}"
+    field_list = ", ".join(changed)
+    return f"{actor_full_name} changed {field_list} on {artefact_label} {public_id}"
+
+
 def build_activity_response(activity: ArtefactActivity) -> ArtefactActivityResponse:
     return ArtefactActivityResponse.model_validate(activity)
 
