@@ -63,7 +63,7 @@ def test_requirement_docs_list_includes_type_and_origin(
         params={"type": "REQ"},
     )
     assert listed.status_code == 200, listed.text
-    rows = listed.json()
+    rows = listed.json()["items"]
     match = next(
         (row for row in rows if row["doc_type"] == "REQ" and row["title"] == "Typed requirement"),
         None,
