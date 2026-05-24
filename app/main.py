@@ -58,9 +58,9 @@ from app.models import (
     Requirement,
     RiskItem,
     TestCampaign,
+    TestCase,
     TestConcept,
     TestSuite,
-    TestCase,
 )
 from app.models.user import User, UserRole
 
@@ -252,11 +252,7 @@ async def normalize_non_document_public_ids() -> None:
             for model, col_name, type_code, _label in TABLE_REPAIRS:
                 id_col = getattr(model, col_name)
                 rows = (
-                    (
-                        await session.execute(
-                            select(model).where(model.project_id == project.id)
-                        )
-                    )
+                    (await session.execute(select(model).where(model.project_id == project.id)))
                     .scalars()
                     .all()
                 )
@@ -266,13 +262,19 @@ async def normalize_non_document_public_ids() -> None:
                 # First pass: collect correct IDs
                 for row in rows:
                     current = str(getattr(row, col_name) or "")
-                    if current.startswith(correct_prefix) and current[len(correct_prefix):].isdigit():
+                    if (
+                        current.startswith(correct_prefix)
+                        and current[len(correct_prefix) :].isdigit()
+                    ):
                         existing_ids.append(current)
 
                 # Second pass: repair malformed IDs
                 for row in rows:
                     current = str(getattr(row, col_name) or "")
-                    if current.startswith(correct_prefix) and current[len(correct_prefix):].isdigit():
+                    if (
+                        current.startswith(correct_prefix)
+                        and current[len(correct_prefix) :].isdigit()
+                    ):
                         continue
 
                     # Try to extract numeric suffix from PRJ-OLDCODE-NNN
