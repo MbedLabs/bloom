@@ -13,6 +13,7 @@ from app.api.artefact_utils import (
     log_artefact_activity,
     log_document_workflow_activity_from_patch,
     should_log_generic_document_update,
+    updated_summary,
 )
 from app.api.link_read_utils import (
     VERIFY_LINK_ROLE,
@@ -541,7 +542,7 @@ async def update_requirement(
             "requirement",
             requirement.id,
             "updated",
-            f"{current_user.full_name} updated requirement {requirement.req_id}",
+            updated_summary(current_user.full_name, "requirement", requirement.req_id, fields_set),
         )
 
     return await _build_requirement_response(requirement, db)

@@ -12,6 +12,7 @@ from app.api.artefact_utils import (
     log_artefact_activity,
     log_document_workflow_activity_from_patch,
     should_log_generic_document_update,
+    updated_summary,
 )
 from app.api.link_read_utils import (
     VERIFY_LINK_ROLE,
@@ -388,7 +389,7 @@ async def update_test_case(
             "test-case",
             test_case.id,
             "updated",
-            f"{current_user.full_name} updated test case {test_case.tc_id}",
+            updated_summary(current_user.full_name, "test case", test_case.tc_id, fields_set),
         )
 
     return await _build_test_case_response(test_case, db)

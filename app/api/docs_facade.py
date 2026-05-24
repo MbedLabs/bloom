@@ -1,5 +1,5 @@
 """
-Unified docs facade: Polarion-style lookup by string doc_id across all type tables,
+Unified docs facade: PLM-style lookup by string doc_id across all type tables,
 and a unified list endpoint for all doc types within a project.
 """
 
@@ -33,6 +33,7 @@ from app.models import (
     TestSuite,
 )
 from app.models.user import User
+from app.schemas import PaginatedResponse
 
 router = APIRouter()
 
@@ -163,13 +164,15 @@ async def _count_links(
     return result
 
 
-@router.get("/projects/{project_ref}/docs", response_model=List[DocShellResponse])
+@router.get("/projects/{project_ref}/docs", response_model=PaginatedResponse[DocShellResponse])
 async def list_all_docs(
     project_ref: str,
     type: Optional[List[str]] = Query(None),
     status: Optional[str] = None,
     q: Optional[str] = None,
     include_link_counts: bool = Query(True),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(200, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
@@ -290,7 +293,9 @@ async def list_all_docs(
             )
 
     results.sort(key=lambda r: r.updated_at, reverse=True)
-    return results
+    total = len(results)
+    sliced = results[skip : skip + limit]
+    return PaginatedResponse(items=sliced, total=total, skip=skip, limit=limit)
 
 
 @router.get(

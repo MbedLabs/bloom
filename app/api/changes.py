@@ -8,6 +8,7 @@ from app.api.artefact_utils import (
     log_artefact_activity,
     log_document_workflow_activity_from_patch,
     should_log_generic_document_update,
+    updated_summary,
 )
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
@@ -145,7 +146,7 @@ async def update_change_request(
             "change",
             item.id,
             "updated",
-            f"{current_user.full_name} updated change request {item.change_id}",
+            updated_summary(current_user.full_name, "change request", item.change_id, fields_set),
         )
     return _change_response(item)
 

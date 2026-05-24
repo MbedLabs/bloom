@@ -13,6 +13,7 @@ from app.api.artefact_utils import (
     log_artefact_activity,
     log_document_workflow_activity_from_patch,
     should_log_generic_document_update,
+    updated_summary,
 )
 from app.core.database import get_db
 from app.core.external_issue import validate_external_fields
@@ -178,7 +179,7 @@ async def update_defect(
             "defect",
             item.id,
             "updated",
-            f"{current_user.full_name} updated defect {item.defect_id}",
+            updated_summary(current_user.full_name, "defect", item.defect_id, fields_set),
         )
 
     syncable_fields = {"title", "status", "description"}

@@ -48,7 +48,20 @@ from app.core.deps import limiter
 from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS, normalize_document_kind
 from app.core.id_generator import compute_next_id, next_doc_id
 from app.core.security import get_password_hash
-from app.models import ArtefactLink, Document, Project, TestCampaign
+from app.models import (
+    ArtefactLink,
+    ChangeRequest,
+    Defect,
+    DesignItem,
+    Document,
+    Project,
+    Requirement,
+    RiskItem,
+    TestCampaign,
+    TestConcept,
+    TestSuite,
+    TestCase,
+)
 from app.models.user import User, UserRole
 
 # Configure logging
@@ -221,6 +234,67 @@ async def backfill_campaign_public_ids() -> None:
         await session.commit()
 
 
+async def normalize_non_document_public_ids() -> None:
+    """Repair malformed IDs (wrong type code, non-numeric suffix) across all artefact tables."""
+    TABLE_REPAIRS: list[tuple[type, str, str, str]] = [
+        (ChangeRequest, "change_id", "CHG", "change request"),
+        (Defect, "defect_id", "DEF", "defect"),
+        (DesignItem, "design_id", "DES", "design item"),
+        (RiskItem, "risk_id", "RSK", "risk item"),
+        (TestCampaign, "campaign_id", "CMP", "campaign"),
+        (TestConcept, "concept_id", "CPT", "test concept"),
+        (TestSuite, "suite_id", "TS", "test suite"),
+    ]
+
+    async with async_session_maker() as session:
+        projects = (await session.execute(select(Project).order_by(Project.id))).scalars().all()
+        for project in projects:
+            for model, col_name, type_code, _label in TABLE_REPAIRS:
+                id_col = getattr(model, col_name)
+                rows = (
+                    (
+                        await session.execute(
+                            select(model).where(model.project_id == project.id)
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+
+                correct_prefix = f"{project.prefix}-{type_code}-"
+                existing_ids: list[str] = [correct_prefix]
+                # First pass: collect correct IDs
+                for row in rows:
+                    current = str(getattr(row, col_name) or "")
+                    if current.startswith(correct_prefix) and current[len(correct_prefix):].isdigit():
+                        existing_ids.append(current)
+
+                # Second pass: repair malformed IDs
+                for row in rows:
+                    current = str(getattr(row, col_name) or "")
+                    if current.startswith(correct_prefix) and current[len(correct_prefix):].isdigit():
+                        continue
+
+                    # Try to extract numeric suffix from PRJ-OLDCODE-NNN
+                    match = re.match(r"^[A-Z0-9]+-[A-Z]+-(\d+)$", current)
+                    new_id = None
+                    if match:
+                        candidate = f"{correct_prefix}{int(match.group(1)):03d}"
+                        if candidate not in existing_ids:
+                            new_id = candidate
+
+                    if new_id is None:
+                        new_id = compute_next_id(existing_ids, project.prefix, type_code)
+
+                    setattr(row, col_name, new_id)
+                    existing_ids.append(new_id)
+                    logging.getLogger(__name__).info(
+                        "repair %s id: %s -> %s", _label, current, new_id
+                    )
+
+        await session.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
@@ -229,6 +303,7 @@ async def lifespan(app: FastAPI):
     if settings.RUN_STARTUP_DATA_REPAIR:
         await normalize_document_kinds_and_ids()
         await backfill_campaign_public_ids()
+        await normalize_non_document_public_ids()
     await seed_admin_user()
     yield
 
