@@ -34,6 +34,7 @@ import {
 
 import { docsApi, linksApi } from '../api/client'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
+import { fetchAllTopologyDocs } from '../lib/projectTopology'
 import { DOC_TYPE_LABELS, type DocType } from '../types/doc'
 import TopologyLinkEdge, { type TopologyLinkData } from './TopologyLinkEdge'
 
@@ -435,10 +436,10 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
 
   const { data: docsData, isLoading: docsLoading } = useQuery({
     queryKey: ['project-docs-shell', prefix],
-    queryFn: () => docsApi.list(prefix, { includeLinkCounts: true }),
+    queryFn: () => fetchAllTopologyDocs(prefix, docsApi.list),
     enabled: !!prefix,
   })
-  const docs = useMemo(() => docsData?.items ?? [], [docsData])
+  const docs = useMemo(() => docsData ?? [], [docsData])
 
   const { data: links, isLoading: linksLoading } = useQuery({
     queryKey: ['project-links', projectId],
