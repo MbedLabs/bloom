@@ -549,11 +549,12 @@ export default function Documents() {
     ? 'Search name, ID, status, reviewer, dates, links...'
     : 'Search name, ID, kind, status, reviewer, dates, links...'
 
-  const PAGE_SIZE = 30
+  const PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100]
+  const [pageSize, setPageSize] = useState(30)
   const [page, setPage] = useState(0)
-  useEffect(() => { setPage(0) }, [typeFilters, statusFilters, search, priorityFilter, reviewerFilter, linkFilter, createdFrom, createdTo, updatedFrom, updatedTo])
-  const totalPages = Math.ceil(sorted.length / PAGE_SIZE)
-  const paginated = sorted.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
+  useEffect(() => { setPage(0) }, [typeFilters, statusFilters, search, priorityFilter, reviewerFilter, linkFilter, createdFrom, createdTo, updatedFrom, updatedTo, pageSize])
+  const totalPages = Math.ceil(sorted.length / pageSize)
+  const paginated = sorted.slice(page * pageSize, page * pageSize + pageSize)
 
   const createReturnState = { returnTo: `/projects/${prefix}/docs?${searchParams.toString()}` }
   const docCreateLinkClass =
@@ -936,11 +937,25 @@ export default function Documents() {
               </tbody>
             </table>
           </div>
-          {sorted.length > PAGE_SIZE && (
+          {sorted.length > 0 && (
             <div className="border-t border-border px-4 py-3 flex items-center justify-between text-sm bg-muted/20">
-              <span className="text-muted-foreground">
-                Showing {page * PAGE_SIZE + 1}&ndash;{Math.min((page + 1) * PAGE_SIZE, sorted.length)} of {sorted.length}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-muted-foreground">
+                  {page * pageSize + 1}&ndash;{Math.min((page + 1) * pageSize, sorted.length)} of {sorted.length}
+                </span>
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <span className="text-xs">Rows:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="text-xs border border-border rounded bg-background px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   disabled={page === 0}

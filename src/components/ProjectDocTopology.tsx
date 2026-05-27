@@ -435,7 +435,7 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
   const [layoutToken, setLayoutToken] = useState(0)
 
   const { data: docsData, isLoading: docsLoading } = useQuery({
-    queryKey: ['project-docs-shell', prefix],
+    queryKey: ['project-docs-topology', prefix],
     queryFn: () => fetchAllTopologyDocs(prefix, docsApi.list),
     enabled: !!prefix,
   })
