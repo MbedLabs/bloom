@@ -240,7 +240,7 @@ async def get_suite(
     return await _build_suite_detail(suite, db)
 
 
-@router.patch("/{suite_id}", response_model=TestSuiteResponse)
+@router.patch("/{suite_id}", response_model=TestSuiteDetailResponse)
 async def update_suite(
     suite_id: int,
     data: TestSuiteUpdate,
@@ -258,7 +258,7 @@ async def update_suite(
 
     await db.flush()
     await db.refresh(suite)
-    return await _build_suite_response(suite, db)
+    return await _build_suite_detail(suite, db)
 
 
 @router.delete("/{suite_id}", status_code=204)
