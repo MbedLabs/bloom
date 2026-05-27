@@ -42,7 +42,7 @@ import TopologyLinkEdge, { type TopologyLinkData } from './TopologyLinkEdge'
 // Type-level visual config
 // ────────────────────────────────────────────────────────────────────────────
 
-const TYPE_ORDER: DocType[] = ['REQ', 'SPEC', 'STD', 'DES', 'RSK', 'CHG', 'CPT', 'TC', 'PRT', 'RPT']
+const TYPE_ORDER: DocType[] = ['REQ', 'SPEC', 'STD', 'DES', 'RSK', 'CHG', 'CPT', 'TC', 'TS', 'CMP', 'DEF', 'PRT', 'RPT']
 
 interface TypeStyle {
   icon: LucideIcon
