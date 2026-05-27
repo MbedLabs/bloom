@@ -1052,7 +1052,7 @@ export const testSuitesApi = {
     return response.data
   },
   update: async (suiteId: number, data: { name?: string; description?: string; status?: string }) => {
-    const response = await api.patch<TestSuite>(`/test-suites/${suiteId}`, data)
+    const response = await api.patch<TestSuiteDetail>(`/test-suites/${suiteId}`, data)
     return response.data
   },
   delete: async (suiteId: number) => {
