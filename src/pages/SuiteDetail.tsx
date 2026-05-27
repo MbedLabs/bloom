@@ -254,8 +254,6 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <SummaryCard label="Test Cases" value={suite.total_items} />
-        <SummaryCard label="Related Requirements" value={suite.related_requirements.length} />
-        <SummaryCard label="Linked Campaigns" value={suite.linked_campaigns.length} />
       </div>
 
       <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
@@ -269,7 +267,6 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
             {suite.items.map((item) => (
               <div key={item.id} className="px-6 py-4 flex items-center justify-between gap-4">
                 <div>
-                  <div className="text-xs text-muted-foreground">#{item.order + 1}</div>
                   {item.test_case && (
                     <>
                       <Link to={docUrl(prefix!, 'TC', item.test_case.tc_id)} className="font-mono text-sm text-primary hover:text-primary/80">
@@ -291,49 +288,6 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
             ))}
           </div>
         )}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
-          <div className="px-6 py-4 border-b border-border">
-            <h3 className="text-lg font-semibold">Related Requirements</h3>
-          </div>
-          {suite.related_requirements.length === 0 ? (
-            <div className="p-6 text-center text-muted-foreground">No requirements mapped via suite test cases.</div>
-          ) : (
-            <div className="divide-y divide-border">
-              {suite.related_requirements.map((req) => (
-                <Link key={req.id} to={docUrl(prefix!, 'REQ', req.req_id)} className="block px-6 py-4 hover:bg-accent/40">
-                  <div className="font-mono text-sm text-primary">{req.req_id}</div>
-                  <div className="text-foreground mt-1">{req.title}</div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
-          <div className="px-6 py-4 border-b border-border">
-            <h3 className="text-lg font-semibold">Linked Campaigns</h3>
-          </div>
-          {suite.linked_campaigns.length === 0 ? (
-            <div className="p-6 text-center text-muted-foreground">No campaigns created from this suite yet.</div>
-          ) : (
-            <div className="divide-y divide-border">
-              {suite.linked_campaigns.map((campaign) => (
-                <Link
-                  key={campaign.id}
-                  to={`/projects/${prefix}/campaigns/${campaign.id}`}
-                  state={{ returnTo: `/projects/${prefix}/suites/${suiteId}` }}
-                  className="block px-6 py-4 hover:bg-accent/40"
-                >
-                  <div className="font-medium text-foreground">{campaign.name}</div>
-                  <div className="text-xs text-muted-foreground mt-1">{campaign.status}</div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
       {budRuns.length > 0 && (
@@ -500,12 +454,6 @@ function SuiteRunResults({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className="font-mono text-xs text-primary">{r.test_class}</span>
-              {((r.test_metadata || {}) as Record<string, unknown>).test_case_id !==
-                undefined && (
-                <span className="text-[10px] text-muted-foreground">
-                  TC#{(r.test_metadata as Record<string, unknown>).test_case_id as number}
-                </span>
-              )}
             </div>
             <div className="text-sm text-foreground truncate mt-0.5">{r.test_method}</div>
             {r.error_message && (
