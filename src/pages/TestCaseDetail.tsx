@@ -97,7 +97,8 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
 
   const markReviewedMutation = useMutation({
     mutationFn: (reviewedById: number) => testCasesApi.setReviewed(tcId, reviewedById),
-    onSuccess: () => {
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['testCase', tcId], updated)
       queryClient.invalidateQueries({ queryKey: ['testCase', tcId] })
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'test-case', tcId] })
       setToast({ message: 'Test case marked as reviewed', variant: 'success' })
@@ -109,7 +110,8 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
 
   const markApprovedMutation = useMutation({
     mutationFn: (approvedById: number) => testCasesApi.setApproved(tcId, approvedById),
-    onSuccess: () => {
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['testCase', tcId], updated)
       queryClient.invalidateQueries({ queryKey: ['testCase', tcId] })
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'test-case', tcId] })
       setToast({ message: 'Test case approved', variant: 'success' })

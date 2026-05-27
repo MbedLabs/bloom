@@ -54,7 +54,8 @@ export default function ProjectParameters() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Parameters<typeof projectVariablesApi.update>[1] }) =>
       projectVariablesApi.update(id, data),
-    onSuccess: () => {
+    onSuccess: (_updated) => {
+      void _updated
       queryClient.invalidateQueries({ queryKey: ['projectVariables', projectId] })
       setEditingId(null)
     },

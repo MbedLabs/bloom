@@ -55,8 +55,9 @@ export default function ProjectEdit() {
       }),
     onSuccess: (updated) => {
       setFormError('')
+      queryClient.setQueryData(['projects'], (old: unknown) => old)
       queryClient.invalidateQueries({ queryKey: ['projects'] })
-      queryClient.invalidateQueries({ queryKey: ['project-by-prefix', prefix] })
+      queryClient.setQueryData(['project-by-prefix', updated.prefix], updated)
       queryClient.invalidateQueries({ queryKey: ['project-by-prefix', updated.prefix] })
       if (updated.prefix !== prefix) {
         navigate(`/projects/${updated.prefix}/edit`, { replace: true })
