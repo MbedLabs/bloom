@@ -271,7 +271,12 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
   const transitionMutation = useMutation({
     mutationFn: (status: string) => artefactsApi.transition(kind, recordId, status),
     onSuccess: (updated) => {
-      queryClient.setQueryData([config.queryKey, recordId], (old: unknown) => ({ ...(old as object), status: (updated as { status: string }).status, allowed_transitions: (updated as { allowed_transitions: string[] }).allowed_transitions }))
+      queryClient.setQueryData([config.queryKey, recordId], (old: unknown) => {
+        if (old && typeof old === 'object') {
+          return { ...(old as object), ...(updated as object) }
+        }
+        return updated
+      })
       queryClient.invalidateQueries({ queryKey: [config.queryKey, recordId] })
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', kind, recordId] })
       if (artefact) {
@@ -287,7 +292,12 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
   const refreshExternalMutation = useMutation({
     mutationFn: () => integrationsApi.refreshExternal(recordId),
     onSuccess: (updated) => {
-      queryClient.setQueryData([config.queryKey, recordId], updated)
+      queryClient.setQueryData([config.queryKey, recordId], (old: unknown) => {
+        if (old && typeof old === 'object') {
+          return { ...(old as object), ...(updated as object) }
+        }
+        return updated
+      })
       queryClient.invalidateQueries({ queryKey: [config.queryKey, recordId] })
       queryClient.invalidateQueries({ queryKey: ['syncEvents', recordId] })
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', kind, recordId] })

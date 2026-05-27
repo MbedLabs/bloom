@@ -123,7 +123,12 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
     mutationFn: (data: { name?: string; description?: string; status?: string }) =>
       testSuitesApi.update(parsedSuiteId, data),
     onSuccess: (updated: unknown) => {
-      queryClient.setQueryData(['testSuite', parsedSuiteId], updated)
+      queryClient.setQueryData(['testSuite', parsedSuiteId], (old: unknown) => {
+        if (old && typeof old === 'object') {
+          return { ...(old as object), ...(updated as object) }
+        }
+        return updated
+      })
       queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
       queryClient.invalidateQueries({ queryKey: ['testSuites', projectId] })
       setEditing(false)

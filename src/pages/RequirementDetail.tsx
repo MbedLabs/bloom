@@ -147,7 +147,12 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
   const updateMutation = useMutation({
     mutationFn: (data: Parameters<typeof requirementsApi.update>[1]) => requirementsApi.update(reqId, data),
     onSuccess: (updated) => {
-      queryClient.setQueryData(['requirement', reqId], updated)
+      queryClient.setQueryData(['requirement', reqId], (old: unknown) => {
+        if (old && typeof old === 'object') {
+          return { ...(old as object), ...(updated as object) }
+        }
+        return updated
+      })
       queryClient.invalidateQueries({ queryKey: ['requirement', reqId] })
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'requirement', reqId] })
       setIsEditing(false)
@@ -181,7 +186,12 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
   const markReviewedMutation = useMutation({
     mutationFn: (reviewedById: number) => requirementsApi.setReviewed(reqId, reviewedById),
     onSuccess: (updated) => {
-      queryClient.setQueryData(['requirement', reqId], updated)
+      queryClient.setQueryData(['requirement', reqId], (old: unknown) => {
+        if (old && typeof old === 'object') {
+          return { ...(old as object), ...(updated as object) }
+        }
+        return updated
+      })
       queryClient.invalidateQueries({ queryKey: ['requirement', reqId] })
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'requirement', reqId] })
       setToast({ message: 'Requirement marked as reviewed', variant: 'success' })
@@ -194,7 +204,12 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
   const markApprovedMutation = useMutation({
     mutationFn: (approvedById: number) => requirementsApi.setApproved(reqId, approvedById),
     onSuccess: (updated) => {
-      queryClient.setQueryData(['requirement', reqId], updated)
+      queryClient.setQueryData(['requirement', reqId], (old: unknown) => {
+        if (old && typeof old === 'object') {
+          return { ...(old as object), ...(updated as object) }
+        }
+        return updated
+      })
       queryClient.invalidateQueries({ queryKey: ['requirement', reqId] })
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'requirement', reqId] })
       setToast({ message: 'Requirement approved', variant: 'success' })

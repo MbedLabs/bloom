@@ -98,7 +98,12 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
   const markReviewedMutation = useMutation({
     mutationFn: (reviewedById: number) => testCasesApi.setReviewed(tcId, reviewedById),
     onSuccess: (updated) => {
-      queryClient.setQueryData(['testCase', tcId], updated)
+      queryClient.setQueryData(['testCase', tcId], (old: unknown) => {
+        if (old && typeof old === 'object') {
+          return { ...(old as object), ...(updated as object) }
+        }
+        return updated
+      })
       queryClient.invalidateQueries({ queryKey: ['testCase', tcId] })
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'test-case', tcId] })
       setToast({ message: 'Test case marked as reviewed', variant: 'success' })
@@ -111,7 +116,12 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
   const markApprovedMutation = useMutation({
     mutationFn: (approvedById: number) => testCasesApi.setApproved(tcId, approvedById),
     onSuccess: (updated) => {
-      queryClient.setQueryData(['testCase', tcId], updated)
+      queryClient.setQueryData(['testCase', tcId], (old: unknown) => {
+        if (old && typeof old === 'object') {
+          return { ...(old as object), ...(updated as object) }
+        }
+        return updated
+      })
       queryClient.invalidateQueries({ queryKey: ['testCase', tcId] })
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'test-case', tcId] })
       setToast({ message: 'Test case approved', variant: 'success' })
