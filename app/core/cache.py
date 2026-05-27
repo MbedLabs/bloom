@@ -30,6 +30,6 @@ class TTLCache(Generic[T]):
         self._store = {k: v for k, v in self._store.items() if not k.startswith(prefix)}
 
 
-dashboard_stats_cache: TTLCache[dict[str, Any]] = TTLCache(ttl_seconds=60)
+dashboard_stats_cache: TTLCache[dict[str, Any]] = TTLCache(ttl_seconds=3)
 traceability_cache: TTLCache[Any] = TTLCache(ttl_seconds=120)
-docs_facade_cache: TTLCache[Any] = TTLCache(ttl_seconds=30)
+docs_facade_cache: TTLCache[Any] = TTLCache(ttl_seconds=10)
