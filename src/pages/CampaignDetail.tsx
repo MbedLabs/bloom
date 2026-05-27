@@ -52,7 +52,8 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
   const updateMutation = useMutation({
     mutationFn: (data: { name?: string; description?: string; status?: string }) =>
       campaignsApi.update(campId, data),
-    onSuccess: () => {
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['campaign', campId], updated)
       queryClient.invalidateQueries({ queryKey: ['campaign', campId] })
       setEditOpen(false)
       setToast({ message: 'Campaign updated', variant: 'success' })

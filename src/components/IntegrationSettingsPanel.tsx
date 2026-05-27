@@ -119,7 +119,8 @@ export default function IntegrationSettingsPanel({ projectId }: { projectId: num
         enabled,
       })
     },
-    onSuccess: () => {
+    onSuccess: (_updated) => {
+      void _updated
       queryClient.invalidateQueries({ queryKey: ['integrationSettings', projectId] })
       setToken('')
       setDirty(false)

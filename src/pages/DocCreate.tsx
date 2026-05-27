@@ -316,7 +316,14 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       }
       return api.update(resolvedDocId, payload)
     },
-    onSuccess: () => {
+    onSuccess: (updated) => {
+      if (resolvedDocId) {
+        const record = updated as Record<string, unknown>
+        queryClient.setQueryData(['document', resolvedDocId], record)
+        if (prefix && kind && docIdStr) {
+          queryClient.setQueryData(['doc-facade', prefix, kind, docIdStr], record)
+        }
+      }
       const activityType = artefactActivityTypeForDocType(docType)
       if (activityType && resolvedDocId) {
         queryClient.invalidateQueries({ queryKey: ['artefactActivity', activityType, resolvedDocId] })
