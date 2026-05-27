@@ -64,7 +64,6 @@ function DocumentLinkRow({
 }) {
   const otherType = (direction === 'outgoing' ? link.target_type : link.source_type) as DocType
   const otherId = direction === 'outgoing' ? link.target_id : link.source_id
-  const fallbackLabel = `${otherType} #${otherId}`
   const roleLabel = getDocLinkRoleLabel(link.role, direction)
   const typeColor = DOC_TYPE_COLORS[otherType] || 'bg-muted text-muted-foreground'
 
@@ -73,10 +72,13 @@ function DocumentLinkRow({
       <Link
         to={targetUrl(projectPrefix, otherType, target)}
         className="font-mono text-[11px] hover:underline"
-        title={roleLabel + ': ' + (target?.title || fallbackLabel)}
+        title={roleLabel + ': ' + (target?.title || `${otherType} ${otherId}`)}
       >
-        {target?.doc_id || fallbackLabel}
+        {target?.doc_id || otherId}
       </Link>
+      <span className="shrink-0 text-[10px] text-muted-foreground/70 select-none" title={roleLabel}>
+        {roleLabel}
+      </span>
       {link.suspect && (
         <span className="shrink-0 rounded-full bg-amber-500/10 px-1 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
           !
@@ -345,10 +347,18 @@ export function DocumentLinksPanel({
   }, [derivedLinks, outgoingLinks, incomingLinks])
 
   const allLinks = useMemo(() => {
+    const seen = new Set<string>()
     const items: { link: ArtefactLink; direction: 'outgoing' | 'incoming'; isDerived: boolean }[] = []
-    ;(outgoingLinks || []).forEach((link) => items.push({ link, direction: 'outgoing', isDerived: false }))
-    ;(incomingLinks || []).forEach((link) => items.push({ link, direction: 'incoming', isDerived: false }))
-    ;filteredDerivedLinks.forEach((link) => items.push({ link, direction: 'incoming', isDerived: true }))
+    const addIfUnique = (item: typeof items[0]) => {
+      const key = `${item.link.source_type}:${item.link.source_id}:${item.link.target_type}:${item.link.target_id}:${item.link.role}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        items.push(item)
+      }
+    }
+    ;(outgoingLinks || []).forEach((link) => addIfUnique({ link, direction: 'outgoing', isDerived: false }))
+    ;(incomingLinks || []).forEach((link) => addIfUnique({ link, direction: 'incoming', isDerived: false }))
+    ;filteredDerivedLinks.forEach((link) => addIfUnique({ link, direction: 'incoming', isDerived: true }))
     return items
   }, [outgoingLinks, incomingLinks, filteredDerivedLinks])
 
