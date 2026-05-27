@@ -63,8 +63,8 @@ const projectNav = [
   { name: 'Risks', icon: AlertTriangle, tab: '', href: 'docs' as const, filter: 'type:RSK' },
   { name: 'Changes', icon: GitPullRequest, tab: '', href: 'docs' as const, filter: 'type:CHG' },
   { name: docRegistryListLabel('CPT'), icon: Beaker, tab: '', href: 'docs' as const, filter: 'type:CPT' },
-  { name: 'Defects', icon: Bug, tab: '', href: 'defects' as const },
-  { name: 'Test Campaigns', icon: FlaskConical, tab: '', href: 'campaigns' as const },
+  { name: 'Defects', icon: Bug, tab: '', href: 'docs' as const, filter: 'type:DEF' },
+  { name: 'Test Campaigns', icon: FlaskConical, tab: '', href: 'docs' as const, filter: 'type:CMP' },
   { name: 'Traceability', icon: GitBranch, tab: '', href: 'traceability' as const },
   { name: 'Parameters', icon: SlidersHorizontal, tab: '', href: 'parameters' as const },
 ]

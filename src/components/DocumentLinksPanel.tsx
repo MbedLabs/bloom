@@ -5,11 +5,8 @@ import { Link2, Search, X } from 'lucide-react'
 import {
   type ArtefactLink,
   type DocShell,
-  campaignsApi,
-  defectsApi,
   docsApi,
   linksApi,
-  testSuitesApi,
 } from '../api/client'
 import {
   docUrl,
@@ -73,14 +70,10 @@ function DocumentLinkRow({
 
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs border border-border/60 hover:border-border ${typeColor}`}>
-      <span title={roleLabel} className="shrink-0">
-        {roleLabel}
-      </span>
-      <span className="text-muted-foreground shrink-0 select-none">&middot;</span>
       <Link
         to={targetUrl(projectPrefix, otherType, target)}
         className="font-mono text-[11px] hover:underline"
-        title={target?.title}
+        title={roleLabel + ': ' + (target?.title || fallbackLabel)}
       >
         {target?.doc_id || fallbackLabel}
       </Link>
@@ -314,62 +307,21 @@ export function DocumentLinksPanel({
   })
   const docs = useMemo(() => docsData?.items ?? [], [docsData])
 
-  const { data: defectsData } = useQuery({
-    queryKey: ['defects', projectId, 'link-targets'],
-    queryFn: () => defectsApi.list(projectId),
-    enabled,
-  })
-  const defects = useMemo(() => defectsData?.items ?? [], [defectsData])
-
-  const { data: campaignsData } = useQuery({
-    queryKey: ['campaigns', projectId, 'link-targets'],
-    queryFn: () => campaignsApi.list(projectId),
-    enabled,
-  })
-  const campaigns = useMemo(() => campaignsData?.items ?? [], [campaignsData])
-
-  const { data: suitesData } = useQuery({
-    queryKey: ['test-suites', projectId, 'link-targets'],
-    queryFn: () => testSuitesApi.list(projectId),
-    enabled,
-  })
-  const suites = useMemo(() => suitesData?.items ?? [], [suitesData])
-
   const targets = useMemo<LinkTarget[]>(() => {
+    const seen = new Set<string>()
     const items: LinkTarget[] = []
     ;(docs || []).forEach((doc) => {
       const target = docShellToTarget(doc)
-      if (target) items.push(target)
+      if (target) {
+        const key = docKey(target.doc_type, target.id)
+        if (!seen.has(key)) {
+          seen.add(key)
+          items.push(target)
+        }
+      }
     })
-    ;(defects || []).forEach((defect) =>
-      items.push({
-        id: defect.id,
-        doc_id: defect.defect_id,
-        doc_type: 'DEF',
-        title: defect.title,
-        status: defect.status,
-      })
-    )
-    ;(campaigns || []).forEach((campaign) =>
-      items.push({
-        id: campaign.id,
-        doc_id: campaign.campaign_id || `CMP-${campaign.id}`,
-        doc_type: 'CMP',
-        title: campaign.name,
-        status: campaign.status,
-      })
-    )
-    ;(suites || []).forEach((suite) =>
-      items.push({
-        id: suite.id,
-        doc_id: suite.suite_id,
-        doc_type: 'TS',
-        title: suite.name,
-        status: suite.status,
-      })
-    )
     return items
-  }, [docs, defects, campaigns, suites])
+  }, [docs])
 
   const deleteMutation = useMutation({
     mutationFn: linksApi.delete,
