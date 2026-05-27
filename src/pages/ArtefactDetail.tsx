@@ -224,6 +224,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
   const updateMutation = useMutation({
     mutationFn: (payload: Partial<ArtefactRecord>) => config.update(recordId, payload as never) as Promise<ArtefactRecord>,
     onSuccess: (updated: ArtefactRecord) => {
+      queryClient.setQueryData([config.queryKey, recordId], updated)
       queryClient.invalidateQueries({ queryKey: [config.queryKey, recordId] })
       queryClient.invalidateQueries({ queryKey: [config.listKey, updated.project_id] })
       queryClient.invalidateQueries({ queryKey: ['project', updated.project_id] })
