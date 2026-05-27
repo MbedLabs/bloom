@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { APP_VERSION, projectsApi } from '../api/client'
-import { docRegistryListLabel, docRegistryListUrl, syncRegistryProjectContext } from '../lib/docRegistryParams'
+import { docRegistryListUrl, syncRegistryProjectContext } from '../lib/docRegistryParams'
 import { getBreadcrumbs } from '../lib/breadcrumbs'
 import { useAuth } from '../contexts/AuthContext'
 import { PageMetaProvider, usePageMeta } from '../contexts/PageMetaContext'
@@ -56,13 +56,13 @@ const projectNav = [
   { name: 'Requirements', icon: FileText, tab: '', href: 'docs' as const, filter: 'type:REQ' },
   { name: 'Test Cases', icon: CheckSquare, tab: '', href: 'docs' as const, filter: 'type:TC' },
   { name: 'Specifications', icon: FileText, tab: '', href: 'docs' as const, filter: 'type:SPEC' },
-  { name: docRegistryListLabel('PRT'), icon: BookOpen, tab: '', href: 'docs' as const, filter: 'type:PRT' },
+  { name: 'Protocols', icon: BookOpen, tab: '', href: 'docs' as const, filter: 'type:PRT' },
   { name: 'Reports', icon: Layers, tab: '', href: 'docs' as const, filter: 'type:RPT' },
   { name: 'Standards', icon: BookOpen, tab: '', href: 'docs' as const, filter: 'type:STD' },
   { name: 'Design', icon: PenTool, tab: '', href: 'docs' as const, filter: 'type:DES' },
   { name: 'Risks', icon: AlertTriangle, tab: '', href: 'docs' as const, filter: 'type:RSK' },
   { name: 'Changes', icon: GitPullRequest, tab: '', href: 'docs' as const, filter: 'type:CHG' },
-  { name: docRegistryListLabel('CPT'), icon: Beaker, tab: '', href: 'docs' as const, filter: 'type:CPT' },
+  { name: 'Test Concepts', icon: Beaker, tab: '', href: 'docs' as const, filter: 'type:CPT' },
   { name: 'Defects', icon: Bug, tab: '', href: 'docs' as const, filter: 'type:DEF' },
   { name: 'Test Campaigns', icon: FlaskConical, tab: '', href: 'docs' as const, filter: 'type:CMP' },
   { name: 'Traceability', icon: GitBranch, tab: '', href: 'traceability' as const },
