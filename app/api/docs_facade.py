@@ -172,7 +172,7 @@ async def list_all_docs(
     q: Optional[str] = None,
     include_link_counts: bool = Query(True),
     skip: int = Query(0, ge=0),
-    limit: int = Query(200, ge=1, le=500),
+    limit: int | None = Query(None, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
@@ -294,6 +294,8 @@ async def list_all_docs(
 
     results.sort(key=lambda r: r.updated_at, reverse=True)
     total = len(results)
+    if limit is None:
+        return PaginatedResponse(items=results, total=total, skip=0, limit=total)
     sliced = results[skip : skip + limit]
     return PaginatedResponse(items=sliced, total=total, skip=skip, limit=limit)
 
