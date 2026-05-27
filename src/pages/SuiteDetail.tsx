@@ -9,6 +9,7 @@ import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { docUrl } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
+import { usePageMeta } from '../contexts/PageMetaContext'
 
 const SUITE_STATUSES = ['Draft', 'Active', 'Archived']
 
@@ -22,6 +23,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
   const location = useLocation()
   const backUrl = (location.state as { returnTo?: string } | null)?.returnTo
     || docRegistryListUrl(prefix!, 'CMP')
+  const { setCrumbLabel } = usePageMeta()
   const [showAddCase, setShowAddCase] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', description: '', status: '' })
@@ -40,6 +42,11 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
     queryFn: () => testSuitesApi.get(parsedSuiteId),
     enabled: !!parsedSuiteId,
   })
+
+  useEffect(() => {
+    if (suite?.name) setCrumbLabel(suite.name)
+    return () => setCrumbLabel(undefined)
+  }, [suite?.name, setCrumbLabel])
 
   const { data: testCasesData } = useQuery({
     queryKey: ['testCases', projectId],
