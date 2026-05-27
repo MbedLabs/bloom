@@ -47,7 +47,6 @@ export default function Defects() {
   const [sortField, setSortField] = useState<SortField>('updated_at')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [form, setForm] = useState({
-    defect_id: '',
     title: '',
     description: '',
     severity: 'Medium',
@@ -120,7 +119,6 @@ export default function Defects() {
       queryClient.invalidateQueries({ queryKey: ['defects', projectId] })
       setShowCreate(false)
       setForm({
-        defect_id: '',
         title: '',
         description: '',
         severity: 'Medium',
@@ -248,17 +246,6 @@ export default function Defects() {
           <h3 className="text-lg font-semibold text-foreground mb-4">Create defect</h3>
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Defect ID</label>
-                <input
-                  required
-                  value={form.defect_id}
-                  onChange={(e) => setForm({ ...form, defect_id: e.target.value })}
-                  placeholder={`${prefix}-DEF-001`}
-                  title="Defect ID"
-                  className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm"
-                />
-              </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Title</label>
                 <input
