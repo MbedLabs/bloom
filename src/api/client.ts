@@ -624,35 +624,18 @@ export interface DocDetailFacade extends DocShell {
   content_html: string | null
 }
 
-const DOCS_PAGE_SIZE = 500
-
 export const docsApi = {
   list: async (projectRef: string, params?: { type?: string[]; status?: string; q?: string; includeLinkCounts?: boolean; skip?: number; limit?: number }) => {
-    const explicitLimit = params?.limit !== undefined
-    const effectiveLimit = explicitLimit ? params!.limit! : DOCS_PAGE_SIZE
-    let skip = params?.skip ?? 0
-    const allItems: DocShell[] = []
-    let total = 0
-
-    do {
-      const query = new URLSearchParams()
-      if (params?.type) params.type.forEach(t => query.append('type', t))
-      if (params?.status) query.set('status', params.status)
-      if (params?.q) query.set('q', params.q)
-      if (params?.includeLinkCounts !== undefined) query.set('include_link_counts', String(params.includeLinkCounts))
-      query.set('skip', String(skip))
-      query.set('limit', String(effectiveLimit))
-      const qs = query.toString()
-      const response = await api.get<PaginatedResponse<DocShell>>(`/projects/${projectRef}/docs${qs ? '?' + qs : ''}`)
-      const page = response.data
-      allItems.push(...page.items)
-      total = page.total
-      skip += page.items.length
-
-      if (explicitLimit) break
-    } while (allItems.length < total)
-
-    return { items: allItems, total, skip: 0, limit: allItems.length } as PaginatedResponse<DocShell>
+    const query = new URLSearchParams()
+    if (params?.type) params.type.forEach(t => query.append('type', t))
+    if (params?.status) query.set('status', params.status)
+    if (params?.q) query.set('q', params.q)
+    if (params?.includeLinkCounts !== undefined) query.set('include_link_counts', String(params.includeLinkCounts))
+    if (params?.skip !== undefined) query.set('skip', String(params.skip))
+    if (params?.limit !== undefined) query.set('limit', String(params.limit))
+    const qs = query.toString()
+    const response = await api.get<PaginatedResponse<DocShell>>(`/projects/${projectRef}/docs${qs ? '?' + qs : ''}`)
+    return response.data
   },
   get: async (projectRef: string, kind: string | DocType, docId: string) => {
     const kindSlug = Object.prototype.hasOwnProperty.call(DOC_TYPE_SLUGS, kind)
