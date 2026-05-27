@@ -115,7 +115,8 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
   const updateMutation = useMutation({
     mutationFn: (data: { name?: string; description?: string; status?: string }) =>
       testSuitesApi.update(parsedSuiteId, data),
-    onSuccess: () => {
+    onSuccess: (updated: unknown) => {
+      queryClient.setQueryData(['testSuite', parsedSuiteId], updated)
       queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
       queryClient.invalidateQueries({ queryKey: ['testSuites', projectId] })
       setEditing(false)
