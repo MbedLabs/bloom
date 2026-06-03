@@ -20,6 +20,20 @@ from app.models import (
 )
 
 OPEN_DEFECT_STATUSES = ("Open", "Triaged", "In Progress", "Resolved", "Verified")
+
+VALID_DOCUMENT_STATUSES = {
+    "Draft",
+    "Review",
+    "Approved",
+    "Active",
+    "Final",
+    "Implemented",
+    "Verified",
+    "Rejected",
+    "Obsolete",
+    "Deprecated",
+    "Superseded",
+}
 from app.models.user import User
 
 router = APIRouter()
@@ -44,12 +58,16 @@ async def get_dashboard_stats(
     req_status_result = await db.execute(
         select(Requirement.status, func.count(Requirement.id)).group_by(Requirement.status)
     )
-    req_status_dist = {row[0]: row[1] for row in req_status_result}
+    req_status_dist = {
+        row[0]: row[1] for row in req_status_result if row[0] in VALID_DOCUMENT_STATUSES
+    }
 
     tc_status_result = await db.execute(
         select(TestCase.status, func.count(TestCase.id)).group_by(TestCase.status)
     )
-    tc_status_dist = {row[0]: row[1] for row in tc_status_result}
+    tc_status_dist = {
+        row[0]: row[1] for row in tc_status_result if row[0] in VALID_DOCUMENT_STATUSES
+    }
 
     covered_reqs = await db.scalar(
         select(func.count(func.distinct(ArtefactLink.target_id))).where(
