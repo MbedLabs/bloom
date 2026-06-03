@@ -413,7 +413,7 @@ const DOC_LINK_RULE_ROWS: DocLinkRuleRow[] = [
   { sourceType: 'CMP', targetType: 'DEF', roles: ['references'] },
 ]
 
-const DOC_LINK_ROLE_LABELS: Record<DocLinkRole, [string, string]> = {
+export const DOC_LINK_ROLE_LABELS: Record<DocLinkRole, [string, string]> = {
   derives_from: ['derives from', 'derived by'],
   refines: ['refines', 'refined by'],
   satisfies: ['satisfies', 'satisfied by'],
