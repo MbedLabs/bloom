@@ -12,6 +12,7 @@ import {
   docUrl,
   DOC_TYPE_LABELS,
   DOC_TYPE_COLORS,
+  DOC_LINK_ROLE_LABELS,
   getDocLinkOptions,
   getDocLinkRoleLabel,
   normalizeDocTypeParam,
@@ -349,8 +350,18 @@ export function DocumentLinksPanel({
   const allLinks = useMemo(() => {
     const seen = new Set<string>()
     const items: { link: ArtefactLink; direction: 'outgoing' | 'incoming'; isDerived: boolean }[] = []
+    const isValidRole = (role: string): boolean => role in DOC_LINK_ROLE_LABELS
+    const directionalKey = (link: ArtefactLink): string => {
+      const [t1, i1, t2, i2] =
+        link.source_type < link.target_type ||
+        (link.source_type === link.target_type && link.source_id < link.target_id)
+          ? [link.source_type, link.source_id, link.target_type, link.target_id]
+          : [link.target_type, link.target_id, link.source_type, link.source_id]
+      return `${t1}:${i1}:${t2}:${i2}:${link.role}`
+    }
     const addIfUnique = (item: typeof items[0]) => {
-      const key = `${item.link.source_type}:${item.link.source_id}:${item.link.target_type}:${item.link.target_id}:${item.link.role}`
+      if (!isValidRole(item.link.role)) return
+      const key = directionalKey(item.link)
       if (!seen.has(key)) {
         seen.add(key)
         items.push(item)
