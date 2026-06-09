@@ -12,7 +12,7 @@ from app.api.artefact_utils import (
 )
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, require_project_access, require_role
 from app.models import ChangeRequest, Project
 from app.models.user import User, UserRole
 from app.schemas import (
@@ -35,8 +35,10 @@ async def list_change_requests(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
+    await require_project_access(db, current_user, project_id)
+
     base = select(ChangeRequest).where(ChangeRequest.project_id == project_id)
     total_q = select(func.count()).select_from(base.subquery())
     total = (await db.execute(total_q)).scalar() or 0
@@ -57,6 +59,13 @@ async def create_change_request(
     ).scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    await require_project_access(
+        db,
+        current_user,
+        data.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     change_id = await next_doc_id(
         db, ChangeRequest, ChangeRequest.change_id, data.project_id, project.prefix, "CHG"
@@ -99,13 +108,14 @@ async def create_change_request(
 async def get_change_request(
     change_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     item = (
         await db.execute(select(ChangeRequest).where(ChangeRequest.id == change_id))
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Change request not found")
+    await require_project_access(db, current_user, item.project_id)
     return _change_response(item)
 
 
@@ -121,6 +131,13 @@ async def update_change_request(
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Change request not found")
+
+    await require_project_access(
+        db,
+        current_user,
+        item.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     fields_set = data.model_fields_set
     previous_status = item.status if "status" in fields_set else None
@@ -162,6 +179,12 @@ async def delete_change_request(
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Change request not found")
+    await require_project_access(
+        db,
+        current_user,
+        item.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
     await log_artefact_activity(
         db,
         "change",

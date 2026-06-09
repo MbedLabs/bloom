@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.link_read_utils import get_requirement_ids_verified_by_test_cases
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, require_project_access, require_role
 from app.models import (
     ArtefactLink,
     CampaignSuite,
@@ -172,8 +172,10 @@ async def list_suites(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
+    await require_project_access(db, current_user, project_id)
+
     base = select(TestSuite).where(TestSuite.project_id == project_id)
     total_q = select(func.count()).select_from(base.subquery())
     total = (await db.execute(total_q)).scalar() or 0
@@ -193,13 +195,20 @@ async def list_suites(
 async def create_suite(
     data: TestSuiteCreate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     project = (
         await db.execute(select(Project).where(Project.id == data.project_id))
     ).scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    await require_project_access(
+        db,
+        current_user,
+        data.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     suite_id = await next_doc_id(
         db, TestSuite, TestSuite.suite_id, data.project_id, project.prefix, "TS"
@@ -230,13 +239,14 @@ async def create_suite(
 async def get_suite(
     suite_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     suite = (
         await db.execute(select(TestSuite).where(TestSuite.id == suite_id))
     ).scalar_one_or_none()
     if not suite:
         raise HTTPException(status_code=404, detail="Test suite not found")
+    await require_project_access(db, current_user, suite.project_id)
     return await _build_suite_detail(suite, db)
 
 
@@ -245,13 +255,20 @@ async def update_suite(
     suite_id: int,
     data: TestSuiteUpdate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     suite = (
         await db.execute(select(TestSuite).where(TestSuite.id == suite_id))
     ).scalar_one_or_none()
     if not suite:
         raise HTTPException(status_code=404, detail="Test suite not found")
+
+    await require_project_access(
+        db,
+        current_user,
+        suite.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(suite, field, value)
@@ -265,13 +282,19 @@ async def update_suite(
 async def delete_suite(
     suite_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     suite = (
         await db.execute(select(TestSuite).where(TestSuite.id == suite_id))
     ).scalar_one_or_none()
     if not suite:
         raise HTTPException(status_code=404, detail="Test suite not found")
+    await require_project_access(
+        db,
+        current_user,
+        suite.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
     await db.delete(suite)
 
 
@@ -280,13 +303,19 @@ async def add_suite_item(
     suite_id: int,
     test_case_id: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     suite = (
         await db.execute(select(TestSuite).where(TestSuite.id == suite_id))
     ).scalar_one_or_none()
     if not suite:
         raise HTTPException(status_code=404, detail="Test suite not found")
+    await require_project_access(
+        db,
+        current_user,
+        suite.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
     tc = (
         await db.execute(select(TestCase).where(TestCase.id == test_case_id))
     ).scalar_one_or_none()
@@ -327,8 +356,19 @@ async def remove_suite_item(
     suite_id: int,
     item_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
+    suite = (
+        await db.execute(select(TestSuite).where(TestSuite.id == suite_id))
+    ).scalar_one_or_none()
+    if not suite:
+        raise HTTPException(status_code=404, detail="Test suite not found")
+    await require_project_access(
+        db,
+        current_user,
+        suite.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
     item = (
         await db.execute(
             select(TestSuiteItem).where(

@@ -12,7 +12,7 @@ from app.api.artefact_utils import (
 )
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, require_project_access, require_role
 from app.models import Project, RiskItem
 from app.models.user import User, UserRole
 from app.schemas import (
@@ -35,8 +35,10 @@ async def list_risk_items(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
+    await require_project_access(db, current_user, project_id)
+
     base = select(RiskItem).where(RiskItem.project_id == project_id)
     total_q = select(func.count()).select_from(base.subquery())
     total = (await db.execute(total_q)).scalar() or 0
@@ -57,6 +59,13 @@ async def create_risk_item(
     ).scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    await require_project_access(
+        db,
+        current_user,
+        data.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     risk_id = await next_doc_id(
         db, RiskItem, RiskItem.risk_id, data.project_id, project.prefix, "RSK"
@@ -100,11 +109,12 @@ async def create_risk_item(
 async def get_risk_item(
     risk_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     item = (await db.execute(select(RiskItem).where(RiskItem.id == risk_id))).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Risk item not found")
+    await require_project_access(db, current_user, item.project_id)
     return _risk_response(item)
 
 
@@ -118,6 +128,13 @@ async def update_risk_item(
     item = (await db.execute(select(RiskItem).where(RiskItem.id == risk_id))).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Risk item not found")
+
+    await require_project_access(
+        db,
+        current_user,
+        item.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     fields_set = data.model_fields_set
     previous_status = item.status if "status" in fields_set else None
@@ -157,6 +174,12 @@ async def delete_risk_item(
     item = (await db.execute(select(RiskItem).where(RiskItem.id == risk_id))).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Risk item not found")
+    await require_project_access(
+        db,
+        current_user,
+        item.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
     await log_artefact_activity(
         db,
         "risk",
