@@ -31,6 +31,42 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 API docs available at `http://localhost:8000/api/docs`
 
+## Production bootstrap
+
+Bloom now rejects unsafe bootstrap defaults in production mode.
+
+Set at least these values before starting a release deployment:
+
+```env
+BLOOM_ENV=production
+SECRET_KEY=<strong-random-secret-at-least-32-chars>
+ADMIN_EMAIL=<real-admin-email>
+ADMIN_PASSWORD=<strong-admin-password-at-least-16-chars>
+```
+
+Startup fails in production if any of these are still using bootstrap defaults:
+
+- `ADMIN_EMAIL=admin@example.com`
+- `ADMIN_PASSWORD=changeme123`
+- admin password shorter than 16 characters
+
+### First admin bootstrap
+
+1. Set `BLOOM_ENV=production` and the admin variables above.
+2. Start the backend once.
+3. The startup seed promotes or creates the configured admin user.
+4. Sign in as that admin and create invitation-based user accounts for maintainers and externals.
+
+### Password rotation
+
+Rotate the bootstrap admin password by:
+
+1. generating a new strong password,
+2. updating `ADMIN_PASSWORD` in the deployment secret or environment,
+3. restarting the backend so the seeded admin account is updated,
+4. verifying login with the new credential,
+5. revoking or removing any old shared storage of the previous password.
+
 ## Invitation and SMTP configuration
 
 Bloom now supports admin-only invitations with separate password setup and email verification.
