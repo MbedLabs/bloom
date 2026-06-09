@@ -15,7 +15,7 @@ from app.api.artefact_utils import (
 from app.core.database import get_db
 from app.core.document_kinds import normalize_document_kind, require_document_kind
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, require_project_access, require_role
 from app.models import Document, DocumentSection
 from app.models.user import User, UserRole
 from app.schemas import (
@@ -39,8 +39,10 @@ async def list_documents(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
+    await require_project_access(db, current_user, project_id)
+
     base_q = select(Document).where(Document.project_id == project_id)
     total_q = select(func.count()).select_from(base_q.subquery())
     total = (await db.execute(total_q)).scalar() or 0
@@ -91,6 +93,13 @@ async def create_document(
     ).scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    await require_project_access(
+        db,
+        current_user,
+        project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     if data.project_id != project_id:
         raise HTTPException(status_code=400, detail="project_id must match URL path")
@@ -148,13 +157,15 @@ async def create_document(
 async def get_document(
     document_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(Document).where(Document.id == document_id))
     document = result.scalar_one_or_none()
 
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    await require_project_access(db, current_user, document.project_id)
 
     sections_result = await db.execute(
         select(DocumentSection)
@@ -224,6 +235,13 @@ async def update_document(
 
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    await require_project_access(
+        db,
+        current_user,
+        document.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     fields_set = data.model_fields_set
     previous_status = document.status if "status" in fields_set else None
@@ -298,6 +316,13 @@ async def delete_document(
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    await require_project_access(
+        db,
+        current_user,
+        document.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
+
     await log_artefact_activity(
         db,
         "document",
@@ -317,13 +342,20 @@ async def create_section(
     document_id: int,
     data: DocumentSectionCreate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     result = await db.execute(select(Document).where(Document.id == document_id))
     document = result.scalar_one_or_none()
 
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    await require_project_access(
+        db,
+        current_user,
+        document.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     section = DocumentSection(
         document_id=document_id,
@@ -357,13 +389,25 @@ async def update_section(
     section_id: int,
     data: DocumentSectionUpdate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     result = await db.execute(select(DocumentSection).where(DocumentSection.id == section_id))
     section = result.scalar_one_or_none()
 
     if not section:
         raise HTTPException(status_code=404, detail="Section not found")
+
+    document = (
+        await db.execute(select(Document).where(Document.id == section.document_id))
+    ).scalar_one_or_none()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    await require_project_access(
+        db,
+        current_user,
+        document.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     if data.title is not None:
         section.title = data.title
@@ -417,13 +461,25 @@ async def update_section(
 async def delete_section(
     section_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     result = await db.execute(select(DocumentSection).where(DocumentSection.id == section_id))
     section = result.scalar_one_or_none()
 
     if not section:
         raise HTTPException(status_code=404, detail="Section not found")
+
+    document = (
+        await db.execute(select(Document).where(Document.id == section.document_id))
+    ).scalar_one_or_none()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    await require_project_access(
+        db,
+        current_user,
+        document.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     await db.delete(section)
 
@@ -433,13 +489,20 @@ async def reorder_sections(
     document_id: int,
     data: SectionReorder,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     result = await db.execute(select(Document).where(Document.id == document_id))
     document = result.scalar_one_or_none()
 
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    await require_project_access(
+        db,
+        current_user,
+        document.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     for item in data.section_orders:
         section_result = await db.execute(

@@ -12,7 +12,7 @@ from app.core.link_rules import (
     is_known_linkable_type,
     normalize_linkable_type,
 )
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, require_project_access, require_role
 from app.models import (
     ArtefactLink,
     ChangeRequest,
@@ -82,8 +82,10 @@ async def list_links(
     target_type: str | None = Query(None),
     target_id: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
+    await require_project_access(db, current_user, project_id)
+
     query = select(ArtefactLink).where(ArtefactLink.project_id == project_id)
     if source_type:
         query = query.where(ArtefactLink.source_type == normalize_linkable_type(source_type))
@@ -101,7 +103,7 @@ async def list_links(
 async def create_link(
     data: ArtefactLinkCreate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     data.source_type = normalize_linkable_type(data.source_type)
     data.target_type = normalize_linkable_type(data.target_type)
@@ -111,6 +113,12 @@ async def create_link(
     ).scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+    await require_project_access(
+        db,
+        current_user,
+        data.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
     if not is_known_linkable_type(data.source_type) or not is_known_linkable_type(data.target_type):
         raise HTTPException(status_code=422, detail="Unsupported relationship document kind")
     if data.source_type == data.target_type and data.source_id == data.target_id:
@@ -165,11 +173,17 @@ async def create_link(
 async def delete_link(
     link_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     link = (
         await db.execute(select(ArtefactLink).where(ArtefactLink.id == link_id))
     ).scalar_one_or_none()
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
+    await require_project_access(
+        db,
+        current_user,
+        link.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
     await db.delete(link)
