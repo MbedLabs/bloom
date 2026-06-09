@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import log_artefact_activity
 from app.core.database import get_db
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, require_project_access, require_role
 from app.models import Defect, DefectSyncEvent, IntegrationSetting, Project
 from app.models.user import User, UserRole
 
@@ -89,8 +89,10 @@ def _setting_response(s: IntegrationSetting) -> IntegrationSettingResponse:
 async def list_integration_settings(
     project_id: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
+    await require_project_access(db, current_user, project_id)
+
     rows = (
         (
             await db.execute(
@@ -109,13 +111,20 @@ async def list_integration_settings(
 async def create_integration_setting(
     data: IntegrationSettingCreate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin)),
+    current_user: User = Depends(require_role(UserRole.admin)),
 ):
     project = (
         await db.execute(select(Project).where(Project.id == data.project_id))
     ).scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    await require_project_access(
+        db,
+        current_user,
+        data.project_id,
+        roles={UserRole.admin.value},
+    )
 
     existing = (
         await db.execute(
@@ -150,13 +159,20 @@ async def update_integration_setting(
     setting_id: int,
     data: IntegrationSettingUpdate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin)),
+    current_user: User = Depends(require_role(UserRole.admin)),
 ):
     setting = (
         await db.execute(select(IntegrationSetting).where(IntegrationSetting.id == setting_id))
     ).scalar_one_or_none()
     if not setting:
         raise HTTPException(status_code=404, detail="Integration setting not found")
+
+    await require_project_access(
+        db,
+        current_user,
+        setting.project_id,
+        roles={UserRole.admin.value},
+    )
 
     if data.base_url is not None:
         setting.base_url = data.base_url
@@ -176,13 +192,19 @@ async def update_integration_setting(
 async def delete_integration_setting(
     setting_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin)),
+    current_user: User = Depends(require_role(UserRole.admin)),
 ):
     setting = (
         await db.execute(select(IntegrationSetting).where(IntegrationSetting.id == setting_id))
     ).scalar_one_or_none()
     if not setting:
         raise HTTPException(status_code=404, detail="Integration setting not found")
+    await require_project_access(
+        db,
+        current_user,
+        setting.project_id,
+        roles={UserRole.admin.value},
+    )
     await db.delete(setting)
 
 
@@ -193,8 +215,13 @@ async def delete_integration_setting(
 async def list_sync_events(
     defect_id: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
+    defect = (await db.execute(select(Defect).where(Defect.id == defect_id))).scalar_one_or_none()
+    if not defect:
+        raise HTTPException(status_code=404, detail="Defect not found")
+    await require_project_access(db, current_user, defect.project_id)
+
     rows = (
         (
             await db.execute(
