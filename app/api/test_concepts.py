@@ -13,7 +13,7 @@ from app.api.artefact_utils import (
 from app.api.link_read_utils import merged_linked_requirement_ids_for_test_concept
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, require_project_access, require_role
 from app.models import Project, TestConcept
 from app.models.user import User, UserRole
 from app.schemas import (
@@ -50,8 +50,10 @@ async def list_test_concepts(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
+    await require_project_access(db, current_user, project_id)
+
     base = select(TestConcept).where(TestConcept.project_id == project_id)
     total_q = select(func.count()).select_from(base.subquery())
     total = (await db.execute(total_q)).scalar() or 0
@@ -72,6 +74,13 @@ async def create_test_concept(
     ).scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    await require_project_access(
+        db,
+        current_user,
+        data.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     concept_id = await next_doc_id(
         db, TestConcept, TestConcept.concept_id, data.project_id, project.prefix, "CPT"
@@ -112,13 +121,14 @@ async def create_test_concept(
 async def get_test_concept(
     concept_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     item = (
         await db.execute(select(TestConcept).where(TestConcept.id == concept_id))
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Test concept not found")
+    await require_project_access(db, current_user, item.project_id)
     return await _response(db, item)
 
 
@@ -134,6 +144,13 @@ async def update_test_concept(
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Test concept not found")
+
+    await require_project_access(
+        db,
+        current_user,
+        item.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     fields_set = data.model_fields_set
     previous_status = item.status if "status" in fields_set else None
@@ -175,6 +192,12 @@ async def delete_test_concept(
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Test concept not found")
+    await require_project_access(
+        db,
+        current_user,
+        item.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
     await log_artefact_activity(
         db,
         "test-concept",

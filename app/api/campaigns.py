@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.link_read_utils import get_verified_requirement_links_for_test_case
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, require_project_access, require_role
 from app.models import (
     ArtefactLink,
     CampaignSuite,
@@ -136,8 +136,10 @@ async def list_campaigns(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
+    await require_project_access(db, current_user, project_id)
+
     base = select(TestCampaign).where(TestCampaign.project_id == project_id)
     if status:
         base = base.where(TestCampaign.status == status)
@@ -161,12 +163,18 @@ async def list_campaigns(
 async def create_campaign(
     data: TestCampaignCreate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     proj_row = await db.execute(select(Project).where(Project.id == data.project_id))
     project = proj_row.scalar_one_or_none()
     if not project:
         raise HTTPException(404, "Project not found")
+    await require_project_access(
+        db,
+        current_user,
+        data.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     # Resolve suite_ids: prefer new field, fall back to legacy suite_id
     resolved_suite_ids = list(data.suite_ids) if data.suite_ids else []
@@ -258,12 +266,13 @@ async def create_campaign(
 async def get_campaign(
     campaign_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
     campaign = result.scalar_one_or_none()
     if not campaign:
         raise HTTPException(404, "Campaign not found")
+    await require_project_access(db, current_user, campaign.project_id)
     return await _build_campaign_detail(campaign, db)
 
 
@@ -272,12 +281,18 @@ async def update_campaign(
     campaign_id: int,
     data: TestCampaignUpdate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     result = await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
     campaign = result.scalar_one_or_none()
     if not campaign:
         raise HTTPException(404, "Campaign not found")
+    await require_project_access(
+        db,
+        current_user,
+        campaign.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     if data.name is not None:
         campaign.name = data.name
@@ -327,12 +342,18 @@ async def update_campaign(
 async def delete_campaign(
     campaign_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     result = await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
     campaign = result.scalar_one_or_none()
     if not campaign:
         raise HTTPException(404, "Campaign not found")
+    await require_project_access(
+        db,
+        current_user,
+        campaign.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
     await db.delete(campaign)
 
 
@@ -340,12 +361,14 @@ async def delete_campaign(
 async def get_campaign_scope_links(
     campaign_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Return all ArtefactLinks involving test cases that belong to this campaign."""
     result = await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
-    if not result.scalar_one_or_none():
+    campaign = result.scalar_one_or_none()
+    if not campaign:
         raise HTTPException(404, "Campaign not found")
+    await require_project_access(db, current_user, campaign.project_id)
 
     tc_ids = (
         (
@@ -385,14 +408,24 @@ async def add_campaign_item(
     campaign_id: int,
     test_case_id: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     result = await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
-    if not result.scalar_one_or_none():
+    campaign = result.scalar_one_or_none()
+    if not campaign:
         raise HTTPException(404, "Campaign not found")
+    await require_project_access(
+        db,
+        current_user,
+        campaign.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     tc_result = await db.execute(select(TestCase).where(TestCase.id == test_case_id))
-    if not tc_result.scalar_one_or_none():
+    test_case = tc_result.scalar_one_or_none()
+    if not test_case:
+        raise HTTPException(404, "Test case not found")
+    if test_case.project_id != campaign.project_id:
         raise HTTPException(404, "Test case not found")
 
     existing = await db.execute(
@@ -420,8 +453,19 @@ async def remove_campaign_item(
     campaign_id: int,
     item_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
+    campaign = (
+        await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
+    ).scalar_one_or_none()
+    if not campaign:
+        raise HTTPException(404, "Campaign not found")
+    await require_project_access(
+        db,
+        current_user,
+        campaign.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
     result = await db.execute(
         select(TestCampaignItem).where(
             TestCampaignItem.id == item_id,
@@ -440,8 +484,19 @@ async def update_campaign_item(
     item_id: int,
     data: TestCampaignItemUpdate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
+    campaign = (
+        await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
+    ).scalar_one_or_none()
+    if not campaign:
+        raise HTTPException(404, "Campaign not found")
+    await require_project_access(
+        db,
+        current_user,
+        campaign.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
     item = (
         await db.execute(
             select(TestCampaignItem).where(

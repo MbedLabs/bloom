@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, require_project_access, require_role
 from app.models import (
     Baseline,
     ChangeRequest,
@@ -82,11 +82,15 @@ async def _build_snapshot(db: AsyncSession, project_id: int) -> dict:
 async def list_baselines(
     project_id: int | None = Query(None, description="Optional project filter"),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
+    if project_id is not None:
+        await require_project_access(db, current_user, project_id)
     query = select(Baseline).order_by(Baseline.created_at.desc())
     if project_id:
         query = query.where(Baseline.project_id == project_id)
+    elif current_user.role != UserRole.admin:
+        raise HTTPException(status_code=400, detail="project_id is required for non-admin users")
     result = await db.execute(query)
     return [_baseline_response(item) for item in result.scalars().all()]
 
@@ -95,13 +99,20 @@ async def list_baselines(
 async def create_baseline(
     data: BaselineCreate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     project = (
         await db.execute(select(Project).where(Project.id == data.project_id))
     ).scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    await require_project_access(
+        db,
+        current_user,
+        data.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     baseline_id = await next_doc_id(
         db, Baseline, Baseline.baseline_id, data.project_id, project.prefix, "BL"
@@ -124,13 +135,14 @@ async def create_baseline(
 async def get_baseline(
     baseline_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     item = (
         await db.execute(select(Baseline).where(Baseline.id == baseline_id))
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Baseline not found")
+    await require_project_access(db, current_user, item.project_id)
     return _baseline_response(item)
 
 
@@ -139,13 +151,20 @@ async def update_baseline(
     baseline_id: int,
     data: BaselineUpdate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     item = (
         await db.execute(select(Baseline).where(Baseline.id == baseline_id))
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Baseline not found")
+
+    await require_project_access(
+        db,
+        current_user,
+        item.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(item, field, value)
@@ -159,11 +178,17 @@ async def update_baseline(
 async def delete_baseline(
     baseline_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     item = (
         await db.execute(select(Baseline).where(Baseline.id == baseline_id))
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Baseline not found")
+    await require_project_access(
+        db,
+        current_user,
+        item.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
     await db.delete(item)

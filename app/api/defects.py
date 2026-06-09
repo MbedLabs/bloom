@@ -18,7 +18,7 @@ from app.api.artefact_utils import (
 from app.core.database import get_db
 from app.core.external_issue import validate_external_fields
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, require_project_access, require_role
 from app.models import Defect, IntegrationSetting, Project
 from app.models.user import User, UserRole
 from app.schemas import DefectCreate, DefectResponse, DefectUpdate, PaginatedResponse
@@ -42,8 +42,10 @@ async def list_defects(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
+    await require_project_access(db, current_user, project_id)
+
     base = select(Defect).where(Defect.project_id == project_id)
     if status:
         base = base.where(Defect.status == status)
@@ -71,6 +73,13 @@ async def create_defect(
     ).scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    await require_project_access(
+        db,
+        current_user,
+        data.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     defect_id = await next_doc_id(db, Defect, Defect.defect_id, project.id, project.prefix, "DEF")
 
@@ -120,11 +129,12 @@ async def create_defect(
 async def get_defect(
     defect_pk: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     item = (await db.execute(select(Defect).where(Defect.id == defect_pk))).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Defect not found")
+    await require_project_access(db, current_user, item.project_id)
     return _defect_response(item)
 
 
@@ -138,6 +148,13 @@ async def update_defect(
     item = (await db.execute(select(Defect).where(Defect.id == defect_pk))).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Defect not found")
+
+    await require_project_access(
+        db,
+        current_user,
+        item.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     fields_set = data.model_fields_set
     previous_status = item.status if "status" in fields_set else None
@@ -201,6 +218,12 @@ async def delete_defect(
     item = (await db.execute(select(Defect).where(Defect.id == defect_pk))).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Defect not found")
+    await require_project_access(
+        db,
+        current_user,
+        item.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
     await log_artefact_activity(
         db,
         "defect",
@@ -234,6 +257,12 @@ async def refresh_external_issue(
     item = (await db.execute(select(Defect).where(Defect.id == defect_pk))).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Defect not found")
+    await require_project_access(
+        db,
+        current_user,
+        item.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
     if (
         not item.external_tracker
         or not item.external_repo_full_name

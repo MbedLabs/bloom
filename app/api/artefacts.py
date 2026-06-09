@@ -14,7 +14,7 @@ from app.api.artefact_utils import (
     log_workflow_status_transition,
 )
 from app.core.database import get_db
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, require_project_access, require_role
 from app.models import ArtefactActivity, ArtefactComment
 from app.models.user import User, UserRole
 from app.schemas import (
@@ -36,9 +36,10 @@ async def list_comments(
     artefact_type: str,
     artefact_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    await get_artefact_or_404(db, artefact_type, artefact_id)
+    artefact = await get_artefact_or_404(db, artefact_type, artefact_id)
+    await require_project_access(db, current_user, artefact.project_id)
     comments = (
         (
             await db.execute(
@@ -68,7 +69,8 @@ async def create_comment(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    await get_artefact_or_404(db, artefact_type, artefact_id)
+    artefact = await get_artefact_or_404(db, artefact_type, artefact_id)
+    await require_project_access(db, current_user, artefact.project_id)
     comment = ArtefactComment(
         artefact_type=artefact_type,
         artefact_id=artefact_id,
@@ -96,9 +98,10 @@ async def list_activity(
     artefact_type: str,
     artefact_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    await get_artefact_or_404(db, artefact_type, artefact_id)
+    artefact = await get_artefact_or_404(db, artefact_type, artefact_id)
+    await require_project_access(db, current_user, artefact.project_id)
     rows = (
         (
             await db.execute(
@@ -121,8 +124,10 @@ async def get_related_items(
     artefact_type: str,
     artefact_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
+    artefact = await get_artefact_or_404(db, artefact_type, artefact_id)
+    await require_project_access(db, current_user, artefact.project_id)
     return await build_related_response(db, artefact_type, artefact_id)
 
 
@@ -135,6 +140,12 @@ async def transition_status(
     current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     artefact = await get_artefact_or_404(db, artefact_type, artefact_id)
+    await require_project_access(
+        db,
+        current_user,
+        artefact.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
     allowed = get_allowed_transitions(artefact_type, artefact.status)
     if data.status not in allowed:
         raise HTTPException(
