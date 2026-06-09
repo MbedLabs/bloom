@@ -72,5 +72,4 @@ def test_login_me_and_projects_roundtrip(api_client: TestClient):
     assert isinstance(projects.json(), list)
 
     links_empty = api_client.get("/api/links", headers=headers, params={"project_id": 999999999})
-    assert links_empty.status_code == 200
-    assert links_empty.json() == []
+    assert links_empty.status_code == 404

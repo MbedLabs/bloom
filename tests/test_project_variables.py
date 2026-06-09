@@ -8,6 +8,7 @@ from fastapi import HTTPException
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characters-long")
 
 from app.api import project_variables as project_variables_api
+from app.models.user import UserRole
 from app.schemas import ProjectVariableUpdate
 
 
@@ -33,6 +34,7 @@ async def test_update_project_variable_updates_kind_key_value_and_description():
         execute=AsyncMock(side_effect=[_ScalarResult(item), _ScalarResult(None)]),
         flush=AsyncMock(),
         refresh=AsyncMock(),
+        get=AsyncMock(return_value=SimpleNamespace(id=7)),
     )
 
     response = await project_variables_api.update_project_variable(
@@ -44,7 +46,7 @@ async def test_update_project_variable_updates_kind_key_value_and_description():
             description=None,
         ),
         db=db,
-        _current_user=SimpleNamespace(),
+        current_user=SimpleNamespace(role=UserRole.admin),
     )
 
     assert response is item
@@ -71,6 +73,7 @@ async def test_update_project_variable_rejects_duplicate_kind_key_combination():
         execute=AsyncMock(side_effect=[_ScalarResult(item), _ScalarResult(duplicate)]),
         flush=AsyncMock(),
         refresh=AsyncMock(),
+        get=AsyncMock(return_value=SimpleNamespace(id=7)),
     )
 
     with pytest.raises(HTTPException) as exc:
@@ -78,7 +81,7 @@ async def test_update_project_variable_rejects_duplicate_kind_key_combination():
             item_id=item.id,
             data=ProjectVariableUpdate(kind="parameter", key="API_BASE_URL"),
             db=db,
-            _current_user=SimpleNamespace(),
+            current_user=SimpleNamespace(role=UserRole.admin),
         )
 
     assert exc.value.status_code == 400
