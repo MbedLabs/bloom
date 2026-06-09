@@ -156,14 +156,17 @@ async def get_dashboard_stats(
         )
     )
 
-    campaign_item_result = await db.execute(
-        _restrict(
-            select(TestCampaignItem.result, func.count(TestCampaignItem.id))
-            .where(TestCampaignItem.result.isnot(None))
-            .group_by(TestCampaignItem.result),
-            TestCampaignItem,
-        )
+    campaign_item_query = (
+        select(TestCampaignItem.result, func.count(TestCampaignItem.id))
+        .join(TestCampaign, TestCampaign.id == TestCampaignItem.campaign_id)
+        .where(TestCampaignItem.result.isnot(None))
+        .group_by(TestCampaignItem.result)
     )
+    if accessible_project_ids is not None:
+        campaign_item_query = campaign_item_query.where(
+            TestCampaign.project_id.in_(accessible_project_ids)
+        )
+    campaign_item_result = await db.execute(campaign_item_query)
     campaign_result_dist = {row[0]: row[1] for row in campaign_item_result}
 
     total_defects = await db.scalar(_restrict(select(func.count(Defect.id)), Defect))
