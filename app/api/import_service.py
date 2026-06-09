@@ -10,9 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import require_role
+from app.core.security import require_project_access, require_role
 from app.models import Project, Requirement, TestCase
-from app.models.user import UserRole
+from app.models.user import User, UserRole
 
 router = APIRouter()
 
@@ -43,7 +43,7 @@ async def import_docs(
     project_id: int,
     data: ImportRequest,
     db: AsyncSession = Depends(get_db),
-    _current_user=Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     target_project = (
         await db.execute(select(Project).where(Project.id == project_id))
@@ -59,6 +59,16 @@ async def import_docs(
 
     if project_id == data.source_project_id:
         raise HTTPException(status_code=400, detail="Cannot import from the same project")
+
+    await require_project_access(
+        db, current_user, target_project.id, roles={UserRole.admin.value, UserRole.maintainer.value}
+    )
+    await require_project_access(
+        db,
+        current_user,
+        source_project.id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     result = ImportResult(imported=0, skipped=0, new_ids=[], errors=[])
 

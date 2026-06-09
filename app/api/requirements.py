@@ -23,7 +23,7 @@ from app.api.link_read_utils import (
 )
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, require_project_access, require_role
 from app.models import (
     ArtefactLink,
     Project,
@@ -294,11 +294,13 @@ async def list_requirements(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """
     List requirements for a project with optional status filter and pagination.
     """
+    await require_project_access(db, current_user, project_id)
+
     base = select(Requirement).where(Requirement.project_id == project_id)
     if status:
         base = base.where(Requirement.status == status)
@@ -353,6 +355,13 @@ async def create_requirement(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
+    await require_project_access(
+        db,
+        current_user,
+        data.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
+
     if data.parent_id is not None:
         parent_result = await db.execute(
             select(Requirement).where(Requirement.id == data.parent_id)
@@ -360,6 +369,10 @@ async def create_requirement(
         parent = parent_result.scalar_one_or_none()
         if not parent:
             raise HTTPException(status_code=404, detail="Parent requirement not found")
+        if parent.project_id != data.project_id:
+            raise HTTPException(
+                status_code=400, detail="Parent requirement must belong to same project"
+            )
 
     if data.reviewer_id is not None:
         reviewer = (
@@ -420,7 +433,7 @@ async def create_requirement(
 async def get_requirement(
     requirement_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Get a requirement by ID, including children and linked test cases.
@@ -430,6 +443,8 @@ async def get_requirement(
 
     if not requirement:
         raise HTTPException(status_code=404, detail="Requirement not found")
+
+    await require_project_access(db, current_user, requirement.project_id)
 
     return await _build_requirement_response(requirement, db)
 
@@ -449,6 +464,13 @@ async def update_requirement(
 
     if not requirement:
         raise HTTPException(status_code=404, detail="Requirement not found")
+
+    await require_project_access(
+        db,
+        current_user,
+        requirement.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     fields_set = data.model_fields_set
     previous_status = requirement.status if "status" in fields_set else None
@@ -478,6 +500,10 @@ async def update_requirement(
             parent = parent_result.scalar_one_or_none()
             if not parent:
                 raise HTTPException(status_code=404, detail="Parent requirement not found")
+            if parent.project_id != requirement.project_id:
+                raise HTTPException(
+                    status_code=400, detail="Parent requirement must belong to same project"
+                )
             requirement.parent_id = data.parent_id
     if "reviewer_id" in fields_set:
         if data.reviewer_id is None:
@@ -563,6 +589,13 @@ async def delete_requirement(
     if not requirement:
         raise HTTPException(status_code=404, detail="Requirement not found")
 
+    await require_project_access(
+        db,
+        current_user,
+        requirement.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
+
     await log_artefact_activity(
         db,
         "requirement",
@@ -592,6 +625,13 @@ async def link_test_run(
     if not requirement:
         raise HTTPException(status_code=404, detail="Requirement not found")
 
+    await require_project_access(
+        db,
+        _current_user,
+        requirement.project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
+
     link = TestRunLink(
         requirement_id=requirement_id,
         test_run_id=data.test_run_id,
@@ -614,7 +654,7 @@ async def link_test_run(
 async def get_linked_test_runs(
     requirement_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Get all test runs linked to a requirement.
@@ -623,6 +663,8 @@ async def get_linked_test_runs(
     requirement = req_result.scalar_one_or_none()
     if not requirement:
         raise HTTPException(status_code=404, detail="Requirement not found")
+
+    await require_project_access(db, current_user, requirement.project_id)
 
     result = await db.execute(
         select(TestRunLink)

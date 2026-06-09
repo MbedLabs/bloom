@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.models import Project
 from app.models.project_membership import ProjectMembership
 from app.models.user import User, UserRole
 
@@ -100,6 +101,46 @@ async def _get_project_membership(
         )
     )
     return result.scalar_one_or_none()
+
+
+async def user_can_access_project(
+    db: AsyncSession, current_user: User, project_id: int, *, roles: Optional[set[str]] = None
+) -> bool:
+    if current_user.role == UserRole.admin:
+        return True
+    membership = await _get_project_membership(db, current_user.id, project_id)
+    if membership is None:
+        return False
+    if roles is None:
+        return True
+    return membership.role in roles and current_user.role.value in roles
+
+
+async def require_project_access(
+    db: AsyncSession,
+    current_user: User,
+    project_id: int,
+    *,
+    roles: Optional[set[str]] = None,
+) -> ProjectMembership | None:
+    if current_user.role == UserRole.admin:
+        project = await db.get(Project, project_id)
+        if project is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+        return None
+
+    membership = await _get_project_membership(db, current_user.id, project_id)
+    if membership is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not assigned to this project.",
+        )
+    if roles is not None and (membership.role not in roles or current_user.role.value not in roles):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"User is not assigned to this project with one of: {sorted(roles)}.",
+        )
+    return membership
 
 
 class _ProjectRoleChecker:
