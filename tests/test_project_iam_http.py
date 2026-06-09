@@ -1,143 +1,189 @@
-import os
-import uuid
+import asyncio
+from dataclasses import dataclass
 
-os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characters-long")
-
+import pytest
+from fastapi import HTTPException, status
 from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
+
+from app.core.cache import dashboard_stats_cache
+from app.core.database import Base, get_db
+from app.core.security import get_current_user, get_password_hash
+from app.main import app
+from app.models import Project, ProjectMembership, Requirement, User
+from app.models.user import UserRole
 
 
-def _login_headers(client: TestClient, email: str, password: str) -> dict[str, str]:
-    login = client.post("/api/auth/login", json={"email": email, "password": password})
-    assert login.status_code == 200, login.text
-    return {"Authorization": f"Bearer {login.json()['access_token']}"}
+@dataclass
+class IamHttpHarness:
+    client: TestClient
+    session_maker: async_sessionmaker[AsyncSession]
+    actor_id: dict[str, int | None]
+
+    def act_as(self, user: User) -> None:
+        self.actor_id["value"] = user.id
+
+    def run(self, coro):
+        return asyncio.run(coro)
 
 
-def _admin_headers(client: TestClient) -> dict[str, str]:
-    from app.core.config import settings
+@pytest.fixture
+def iam_http_harness():
+    from app import models  # noqa: F401
 
-    return _login_headers(client, settings.ADMIN_EMAIL, settings.ADMIN_PASSWORD)
-
-
-def _create_project(client: TestClient, headers: dict[str, str], name: str, prefix: str) -> dict:
-    resp = client.post(
-        "/api/projects",
-        json={"name": name, "prefix": prefix, "description": "IAM regression"},
-        headers=headers,
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
     )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
+    session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    actor_id = {"value": None}
+
+    async def _create_schema() -> None:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+    async def _override_get_db():
+        async with session_maker() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+    async def _override_get_current_user() -> User:
+        user_id = actor_id["value"]
+        if user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="No test user selected",
+            )
+
+        async with session_maker() as session:
+            user = await session.get(User, user_id)
+            if user is None:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Selected test user no longer exists",
+                )
+            return user
+
+    asyncio.run(_create_schema())
+    app.dependency_overrides[get_db] = _override_get_db
+    app.dependency_overrides[get_current_user] = _override_get_current_user
+    dashboard_stats_cache._store.clear()
+
+    client = TestClient(app, base_url="http://test")
+    harness = IamHttpHarness(client=client, session_maker=session_maker, actor_id=actor_id)
+
+    try:
+        yield harness
+    finally:
+        client.close()
+        app.dependency_overrides.clear()
+        dashboard_stats_cache._store.clear()
+        asyncio.run(engine.dispose())
 
 
-def _create_user(
-    client: TestClient,
-    headers: dict[str, str],
-    *,
-    email: str,
-    password: str,
-    role: str = "maintainer",
-) -> dict:
-    resp = client.post(
-        "/api/users",
-        headers=headers,
-        json={
-            "email": email,
-            "full_name": "Scoped User",
-            "password": password,
-            "role": role,
-        },
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
+async def _seed_iam_fixture_data(session_maker: async_sessionmaker[AsyncSession]):
+    async with session_maker() as session:
+        admin = User(
+            email="admin@example.com",
+            full_name="Admin User",
+            hashed_password=get_password_hash("unused-admin-password"),
+            role=UserRole.admin,
+            is_active=True,
+        )
+        maintainer = User(
+            email="maintainer@example.com",
+            full_name="Scoped Maintainer",
+            hashed_password=get_password_hash("unused-maintainer-password"),
+            role=UserRole.maintainer,
+            is_active=True,
+        )
+        session.add_all([admin, maintainer])
+        await session.flush()
+
+        allowed = Project(name="Allowed Project", prefix="ALW", description="Visible")
+        blocked = Project(name="Blocked Project", prefix="BLK", description="Hidden")
+        session.add_all([allowed, blocked])
+        await session.flush()
+
+        session.add(
+            ProjectMembership(
+                user_id=maintainer.id,
+                project_id=allowed.id,
+                role=UserRole.maintainer.value,
+            )
+        )
+
+        blocked_requirement = Requirement(
+            project_id=blocked.id,
+            req_id="BLK-REQ-001",
+            title="Blocked requirement",
+            description="Should not leak across projects",
+            status="Draft",
+            priority="Medium",
+            req_type="Functional",
+            req_origin="System",
+        )
+        session.add(blocked_requirement)
+        await session.commit()
+        await session.refresh(admin)
+        await session.refresh(maintainer)
+        await session.refresh(allowed)
+        await session.refresh(blocked)
+        await session.refresh(blocked_requirement)
+
+        return {
+            "admin": admin,
+            "maintainer": maintainer,
+            "allowed": allowed,
+            "blocked": blocked,
+            "blocked_requirement": blocked_requirement,
+        }
 
 
-def _add_membership(
-    client: TestClient,
-    headers: dict[str, str],
-    *,
-    project_id: int,
-    user_id: int,
-    role: str = "maintainer",
-) -> dict:
-    resp = client.post(
-        f"/api/projects/{project_id}/members",
-        headers=headers,
-        json={"user_id": user_id, "role": role},
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
+def test_unassigned_maintainer_cannot_access_other_project_data(iam_http_harness: IamHttpHarness):
+    seeded = iam_http_harness.run(_seed_iam_fixture_data(iam_http_harness.session_maker))
+    iam_http_harness.act_as(seeded["maintainer"])
 
-
-def test_unassigned_maintainer_cannot_access_other_project_data(api_client: TestClient):
-    admin_headers = _admin_headers(api_client)
-    suffix = uuid.uuid4().hex[:8]
-
-    allowed = _create_project(
-        api_client, admin_headers, f"Allowed {suffix}", f"A{suffix[:2].upper()}"
-    )
-    blocked = _create_project(
-        api_client, admin_headers, f"Blocked {suffix}", f"B{suffix[:2].upper()}"
-    )
-
-    created_requirement = api_client.post(
-        "/api/requirements",
-        headers=admin_headers,
-        json={"project_id": blocked["id"], "title": f"Blocked requirement {suffix}"},
-    )
-    assert created_requirement.status_code == 201, created_requirement.text
-    requirement_id = created_requirement.json()["id"]
-
-    user_password = "maintainer-password-123"
-    user = _create_user(
-        api_client,
-        admin_headers,
-        email=f"maintainer-{suffix}@example.com",
-        password=user_password,
-    )
-    _add_membership(
-        api_client,
-        admin_headers,
-        project_id=allowed["id"],
-        user_id=user["id"],
-    )
-
-    maintainer_headers = _login_headers(api_client, user["email"], user_password)
-
-    projects = api_client.get("/api/projects", headers=maintainer_headers)
+    projects = iam_http_harness.client.get("/api/projects")
     assert projects.status_code == 200
     project_ids = {project["id"] for project in projects.json()}
-    assert project_ids == {allowed["id"]}
+    assert project_ids == {seeded["allowed"].id}
 
-    blocked_list = api_client.get(
+    blocked_list = iam_http_harness.client.get(
         "/api/requirements",
-        params={"project_id": blocked["id"]},
-        headers=maintainer_headers,
+        params={"project_id": seeded["blocked"].id},
     )
     assert blocked_list.status_code == 403
 
-    blocked_get = api_client.get(
-        f"/api/requirements/{requirement_id}",
-        headers=maintainer_headers,
+    blocked_get = iam_http_harness.client.get(
+        f"/api/requirements/{seeded['blocked_requirement'].id}"
     )
     assert blocked_get.status_code == 403
 
-    blocked_traceability = api_client.get(
-        f"/api/traceability/coverage-gaps/{blocked['id']}",
-        headers=maintainer_headers,
+    blocked_traceability = iam_http_harness.client.get(
+        "/api/traceability",
+        params={"project_id": seeded["blocked"].id},
     )
     assert blocked_traceability.status_code == 403
 
-    dashboard = api_client.get("/api/dashboard/stats", headers=maintainer_headers)
+    dashboard = iam_http_harness.client.get("/api/dashboard/stats")
     assert dashboard.status_code == 200
     dashboard_project_ids = {project["id"] for project in dashboard.json()["projects"]}
-    assert blocked["id"] not in dashboard_project_ids
+    assert seeded["blocked"].id not in dashboard_project_ids
+    assert dashboard_project_ids == {seeded["allowed"].id}
 
-    blocked_import = api_client.post(
-        f"/api/projects/{allowed['id']}/import",
-        headers=maintainer_headers,
+    blocked_import = iam_http_harness.client.post(
+        f"/api/projects/{seeded['allowed'].id}/import",
         json={
-            "source_project_id": blocked["id"],
+            "source_project_id": seeded["blocked"].id,
             "doc_type": "REQ",
-            "doc_ids": [requirement_id],
+            "doc_ids": [seeded["blocked_requirement"].id],
             "include_links": True,
         },
     )
