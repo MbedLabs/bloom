@@ -17,6 +17,7 @@ CONFIG_ENV_KEYS = [
     "BLOOM_APP_BASE_URL",
     "BLOOM_CORS_ORIGINS",
     "BLOOM_DATABASE_URL",
+    "BLOOM_ENV",
     "BLOOM_EMAIL_VERIFICATION_TOKEN_TTL_HOURS",
     "BLOOM_ENABLE_DOCS",
     "BLOOM_FRONTEND_BASE_URL",
@@ -37,6 +38,7 @@ CONFIG_ENV_KEYS = [
     "BLOOM_TESTSTATION_APP_URL",
     "CORS_ORIGINS",
     "DATABASE_URL",
+    "APP_ENV",
     "EMAIL_VERIFICATION_TOKEN_TTL_HOURS",
     "ENABLE_DOCS",
     "FRONTEND_BASE_URL",
@@ -151,3 +153,59 @@ def test_settings_prefers_bloom_prefixed_env(monkeypatch):
 
     assert settings.SECRET_KEY == "b" * 32
     assert settings.SMTP_HOST == "smtp.bloom-prefixed.example.com"
+
+
+def test_production_rejects_default_admin_email(monkeypatch):
+    clear_config_env(monkeypatch)
+
+    monkeypatch.setenv("BLOOM_ENV", "production")
+    monkeypatch.setenv("BLOOM_SECRET_KEY", "b" * 32)
+    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "admin@example.com")
+    monkeypatch.setenv("BLOOM_ADMIN_PASSWORD", "this-is-a-long-password")
+
+    import pytest
+
+    with pytest.raises(ValueError, match="ADMIN_EMAIL"):
+        Settings(_env_file=None)
+
+
+def test_production_rejects_default_admin_password(monkeypatch):
+    clear_config_env(monkeypatch)
+
+    monkeypatch.setenv("BLOOM_ENV", "production")
+    monkeypatch.setenv("BLOOM_SECRET_KEY", "b" * 32)
+    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@embedlabs.de")
+    monkeypatch.setenv("BLOOM_ADMIN_PASSWORD", "changeme123")
+
+    import pytest
+
+    with pytest.raises(ValueError, match="ADMIN_PASSWORD"):
+        Settings(_env_file=None)
+
+
+def test_production_rejects_short_admin_password(monkeypatch):
+    clear_config_env(monkeypatch)
+
+    monkeypatch.setenv("BLOOM_ENV", "production")
+    monkeypatch.setenv("BLOOM_SECRET_KEY", "b" * 32)
+    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@embedlabs.de")
+    monkeypatch.setenv("BLOOM_ADMIN_PASSWORD", "short-password")
+
+    import pytest
+
+    with pytest.raises(ValueError, match="at least 16"):
+        Settings(_env_file=None)
+
+
+def test_development_allows_bootstrap_defaults(monkeypatch):
+    clear_config_env(monkeypatch)
+
+    monkeypatch.setenv("BLOOM_ENV", "development")
+    monkeypatch.setenv("BLOOM_SECRET_KEY", "b" * 32)
+    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "admin@example.com")
+    monkeypatch.setenv("BLOOM_ADMIN_PASSWORD", "changeme123")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.ADMIN_EMAIL == "admin@example.com"
+    assert settings.ADMIN_PASSWORD == "changeme123"

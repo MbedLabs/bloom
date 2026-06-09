@@ -19,7 +19,7 @@ from app.api.link_read_utils import (
     iter_req_req_outgoing_neighbors,
 )
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_project_access
 from app.models import Requirement, TestCase, TestRunLink
 from app.models.user import User
 from app.schemas import (
@@ -183,8 +183,9 @@ async def get_traceability_matrix(
     priority_filter: Optional[str] = Query(None, description="Filter by priority"),
     sort_by: Optional[str] = Query("req_id", description="Sort: req_id, priority, coverage"),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
+    await require_project_access(db, current_user, project_id)
     result = await db.execute(select(Requirement).where(Requirement.project_id == project_id))
     requirements = result.scalars().all()
 
@@ -240,12 +241,14 @@ async def get_impact_analysis(
     requirement_id: int,
     depth: int = Query(5, description="Max traversal depth"),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(Requirement).where(Requirement.id == requirement_id))
     root = result.scalar_one_or_none()
     if not root:
         raise HTTPException(status_code=404, detail="Requirement not found")
+    project_id = root.project_id
+    await require_project_access(db, current_user, project_id)
 
     ctx = await _build_traceability_context(
         project_id,
@@ -347,8 +350,9 @@ async def get_impact_analysis(
 async def get_coverage_gaps(
     project_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
+    await require_project_access(db, current_user, project_id)
     result = await db.execute(select(Requirement).where(Requirement.project_id == project_id))
     requirements = result.scalars().all()
 

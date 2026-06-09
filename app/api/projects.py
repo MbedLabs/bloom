@@ -7,7 +7,7 @@ from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, require_project_access, require_role
 from app.models import (
     ArtefactLink,
     Baseline,
@@ -32,6 +32,7 @@ from app.models import (
     TestSuite,
     TestSuiteItem,
 )
+from app.models.project_membership import ProjectMembership
 from app.models.user import User, UserRole
 from app.schemas import ProjectCreate, ProjectResponse, ProjectUpdate
 
@@ -144,12 +145,20 @@ async def _project_counts(db: AsyncSession, project_id: int) -> dict[str, int]:
 @router.get("", response_model=list[ProjectResponse])
 async def list_projects(
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """
     List all projects with requirement and test case counts.
     """
-    result = await db.execute(select(Project).order_by(Project.created_at.desc()))
+    query = select(Project).order_by(Project.created_at.desc())
+    if current_user.role != UserRole.admin:
+        query = (
+            select(Project)
+            .join(ProjectMembership, ProjectMembership.project_id == Project.id)
+            .where(ProjectMembership.user_id == current_user.id)
+            .order_by(Project.created_at.desc())
+        )
+    result = await db.execute(query)
     projects = result.scalars().all()
 
     response = []
@@ -223,7 +232,7 @@ async def create_project(
 async def get_project_by_prefix(
     prefix: str,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Get a project by its unique prefix.
@@ -233,6 +242,8 @@ async def get_project_by_prefix(
 
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    await require_project_access(db, current_user, project.id)
 
     counts = await _project_counts(db, project.id)
 
@@ -252,16 +263,15 @@ async def get_project_by_prefix(
 async def get_project(
     project_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Get a project by ID.
     """
-    result = await db.execute(select(Project).where(Project.id == project_id))
-    project = result.scalar_one_or_none()
-
-    if not project:
+    project = await db.get(Project, project_id)
+    if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
+    await require_project_access(db, current_user, project_id)
 
     counts = await _project_counts(db, project.id)
 
