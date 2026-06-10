@@ -218,6 +218,19 @@ export interface Project {
   updated_at: string
 }
 
+export type ProjectMemberRole = 'maintainer' | 'external'
+
+export interface ProjectMember {
+  id: number
+  user_id: number
+  email: string
+  full_name: string
+  role: ProjectMemberRole
+  doc_types: string[]
+  created_at: string
+  updated_at: string
+}
+
 export interface RequirementSummary {
   id: number
   req_id: string
@@ -596,6 +609,34 @@ export const projectsApi = {
 
   delete: async (id: number) => {
     await api.delete(`/projects/${id}`)
+  },
+}
+
+export const projectMembersApi = {
+  list: async (projectId: number): Promise<ProjectMember[]> => {
+    const response = await api.get<ProjectMember[]>(`/projects/${projectId}/members`)
+    return response.data
+  },
+  create: async (
+    projectId: number,
+    data: { user_id: number; role: ProjectMemberRole; doc_types?: string[] }
+  ): Promise<ProjectMember> => {
+    const response = await api.post<ProjectMember>(`/projects/${projectId}/members`, data)
+    return response.data
+  },
+  update: async (
+    projectId: number,
+    membershipId: number,
+    data: { role?: ProjectMemberRole; doc_types?: string[] }
+  ): Promise<ProjectMember> => {
+    const response = await api.patch<ProjectMember>(
+      `/projects/${projectId}/members/${membershipId}`,
+      data
+    )
+    return response.data
+  },
+  remove: async (projectId: number, membershipId: number): Promise<void> => {
+    await api.delete(`/projects/${projectId}/members/${membershipId}`)
   },
 }
 

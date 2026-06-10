@@ -2,7 +2,14 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { extractApiErrorMessage, projectsApi } from '../api/client'
+import {
+  extractApiErrorMessage,
+  projectMembersApi,
+  projectsApi,
+  type ProjectMember,
+  type ProjectMemberRole,
+  usersApi,
+} from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import {
@@ -15,6 +22,7 @@ const PROJECT_PREFIX_PATTERN = /^[A-Z]{3}$/
 const PROJECT_PREFIX_ERROR = 'Use exactly three uppercase letters, e.g. PRJ.'
 
 const STATUS_OPTIONS = ['Active', 'Archived', 'Draft'] as const
+const EXTERNAL_DOC_TYPES = ['REQ', 'SPEC', 'TC', 'DES', 'RSK', 'CHG', 'CPT', 'DEF', 'CMP', 'TS', 'PRT', 'RPT', 'STD'] as const
 
 export default function ProjectEdit() {
   const { prefix } = useParams<{ prefix: string }>()
@@ -85,6 +93,18 @@ export default function ProjectEdit() {
   const { data: projectList } = useQuery({
     queryKey: ['projects'],
     queryFn: projectsApi.list,
+    enabled: isAdmin,
+  })
+
+  const { data: projectMembers } = useQuery({
+    queryKey: ['project-members', project?.id],
+    queryFn: () => projectMembersApi.list(project!.id),
+    enabled: isAdmin && !!project?.id,
+  })
+
+  const { data: users } = useQuery({
+    queryKey: ['users'],
+    queryFn: usersApi.list,
     enabled: isAdmin,
   })
 
@@ -314,6 +334,294 @@ export default function ProjectEdit() {
       )}
 
       <IntegrationSettingsPanel projectId={project.id} />
+      <ProjectMembersPanel
+        projectId={project.id}
+        members={projectMembers ?? []}
+        users={users ?? []}
+      />
+    </div>
+  )
+}
+
+function ProjectMembersPanel({
+  projectId,
+  members,
+  users,
+}: {
+  projectId: number
+  members: ProjectMember[]
+  users: Array<{ id: number; email: string; full_name: string; role: 'admin' | 'maintainer' | 'external' }>
+}) {
+  const queryClient = useQueryClient()
+  const [selectedUserId, setSelectedUserId] = useState('')
+  const [selectedRole, setSelectedRole] = useState<ProjectMemberRole>('external')
+  const [selectedDocTypes, setSelectedDocTypes] = useState<string[]>(['REQ', 'TC', 'CPT', 'CMP'])
+  const [error, setError] = useState('')
+
+  const availableUsers = users.filter(
+    (user) => user.role !== 'admin' && !members.some((member) => member.user_id === user.id)
+  )
+
+  const createMutation = useMutation({
+    mutationFn: () =>
+      projectMembersApi.create(projectId, {
+        user_id: Number(selectedUserId),
+        role: selectedRole,
+        doc_types: selectedRole === 'external' ? selectedDocTypes : undefined,
+      }),
+    onSuccess: () => {
+      setError('')
+      setSelectedUserId('')
+      setSelectedRole('external')
+      setSelectedDocTypes(['REQ', 'TC', 'CPT', 'CMP'])
+      queryClient.invalidateQueries({ queryKey: ['project-members', projectId] })
+    },
+    onError: (mutationError) => {
+      setError(extractApiErrorMessage(mutationError, 'Could not add project member'))
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({
+      membershipId,
+      role,
+      docTypes,
+    }: {
+      membershipId: number
+      role: ProjectMemberRole
+      docTypes: string[]
+    }) =>
+      projectMembersApi.update(projectId, membershipId, {
+        role,
+        doc_types: role === 'external' ? docTypes : [],
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project-members', projectId] })
+    },
+  })
+
+  const removeMutation = useMutation({
+    mutationFn: (membershipId: number) => projectMembersApi.remove(projectId, membershipId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project-members', projectId] })
+    },
+  })
+
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    if (!selectedUserId) {
+      setError('Select a user to add to this project.')
+      return
+    }
+    createMutation.mutate()
+  }
+
+  return (
+    <section className="rounded-lg border border-border bg-card p-6 shadow-elegant">
+      <div className="mb-4">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">Project members</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Manage per-project access for maintainers and external users.
+        </p>
+      </div>
+
+      {error && (
+        <div className="mb-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600">
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={handleCreate} className="mb-6 space-y-4 rounded-lg border border-border bg-background/40 p-4">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              User
+            </label>
+            <select
+              value={selectedUserId}
+              onChange={(e) => setSelectedUserId(e.target.value)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              title="Select user to add"
+            >
+              <option value="">Select a user</option>
+              {availableUsers.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.full_name} ({user.email})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Role
+            </label>
+            <select
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value as ProjectMemberRole)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              title="Project role"
+            >
+              <option value="external">External</option>
+              <option value="maintainer">Maintainer</option>
+            </select>
+          </div>
+        </div>
+
+        {selectedRole === 'external' && (
+          <DocTypePicker
+            label="External document visibility"
+            selected={selectedDocTypes}
+            onToggle={(docType, checked) => {
+              setSelectedDocTypes((current) =>
+                checked ? [...current, docType] : current.filter((value) => value !== docType)
+              )
+            }}
+          />
+        )}
+
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            disabled={createMutation.isPending || !selectedUserId}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {createMutation.isPending ? 'Adding...' : 'Add member'}
+          </button>
+        </div>
+      </form>
+
+      <div className="space-y-3">
+        {members.length === 0 ? (
+          <div className="rounded-md border border-border bg-background/40 px-4 py-3 text-sm text-muted-foreground">
+            No explicit project members yet.
+          </div>
+        ) : (
+          members.map((member) => (
+            <ProjectMemberRow
+              key={member.id}
+              member={member}
+              onSave={(role, docTypes) =>
+                updateMutation.mutate({ membershipId: member.id, role, docTypes })
+              }
+              onRemove={() => removeMutation.mutate(member.id)}
+              isSaving={updateMutation.isPending}
+              isRemoving={removeMutation.isPending}
+            />
+          ))
+        )}
+      </div>
+    </section>
+  )
+}
+
+function ProjectMemberRow({
+  member,
+  onSave,
+  onRemove,
+  isSaving,
+  isRemoving,
+}: {
+  member: ProjectMember
+  onSave: (role: ProjectMemberRole, docTypes: string[]) => void
+  onRemove: () => void
+  isSaving: boolean
+  isRemoving: boolean
+}) {
+  const [role, setRole] = useState<ProjectMemberRole>(member.role)
+  const [docTypes, setDocTypes] = useState<string[]>(member.doc_types)
+
+  return (
+    <div className="rounded-lg border border-border bg-background/40 p-4">
+      <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-medium text-foreground">{member.full_name}</p>
+          <p className="text-xs text-muted-foreground">{member.email}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onRemove}
+          disabled={isRemoving}
+          className="rounded-md border border-red-500/30 px-3 py-1.5 text-sm text-red-600 hover:bg-red-500/10 disabled:opacity-50"
+        >
+          Remove
+        </button>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-[180px_1fr]">
+        <div>
+          <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Role
+          </label>
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value as ProjectMemberRole)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            title={`Project role for ${member.full_name}`}
+          >
+            <option value="external">External</option>
+            <option value="maintainer">Maintainer</option>
+          </select>
+        </div>
+
+        {role === 'external' ? (
+          <DocTypePicker
+            label="External document visibility"
+            selected={docTypes}
+            onToggle={(docType, checked) => {
+              setDocTypes((current) =>
+                checked ? [...current, docType] : current.filter((value) => value !== docType)
+              )
+            }}
+          />
+        ) : (
+          <div className="rounded-md border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
+            Maintainers can access the full project surface.
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 flex justify-end">
+        <button
+          type="button"
+          onClick={() => onSave(role, docTypes)}
+          disabled={isSaving}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        >
+          Save member settings
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function DocTypePicker({
+  label,
+  selected,
+  onToggle,
+}: {
+  label: string
+  selected: string[]
+  onToggle: (docType: string, checked: boolean) => void
+}) {
+  return (
+    <div>
+      <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {EXTERNAL_DOC_TYPES.map((docType) => (
+          <label key={docType} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+            <input
+              type="checkbox"
+              checked={selected.includes(docType)}
+              onChange={(e) => onToggle(docType, e.target.checked)}
+            />
+            <span>{docType}</span>
+          </label>
+        ))}
+      </div>
     </div>
   )
 }
