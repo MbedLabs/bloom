@@ -18,13 +18,15 @@ from app.core.document_kinds import (
     normalize_document_kind,
 )
 from app.core.security import (
+    apply_external_visibility_filter,
+    external_doc_type_allowed,
     get_current_user,
     get_external_doc_types,
-    require_external_doc_type_access,
     require_project_access,
 )
 from app.models import (
     ArtefactLink,
+    ArtefactVisibility,
     ChangeRequest,
     Defect,
     DesignItem,
@@ -36,6 +38,7 @@ from app.models import (
     TestCase,
     TestConcept,
     TestSuite,
+    UserRole,
 )
 from app.models.user import User
 from app.schemas import PaginatedResponse
@@ -49,6 +52,7 @@ class DocShellResponse(BaseModel):
     doc_type: str
     title: str
     status: str
+    visibility: str = ArtefactVisibility.internal.value
     priority: str | None = None
     req_type: str | None = None
     req_origin: str | None = None
@@ -192,13 +196,14 @@ async def list_all_docs(
     for type_code, (model, id_col_name, _table) in TYPE_MAP.items():
         if type_filter and type_code not in type_filter:
             continue
-        if allowed_doc_types is not None and type_code not in allowed_doc_types:
+        if not external_doc_type_allowed(current_user, allowed_doc_types, type_code):
             continue
 
         id_col = getattr(model, id_col_name)
         title_col = model.title if hasattr(model, "title") else model.name
 
         query = select(model).where(model.project_id == project.id)
+        query = apply_external_visibility_filter(query, model, current_user)
 
         if status:
             query = query.where(model.status == status)
@@ -227,6 +232,7 @@ async def list_all_docs(
                     doc_type=type_code,
                     title=title_val,
                     status=row.status,
+                    visibility=getattr(row, "visibility", ArtefactVisibility.internal.value),
                     priority=_get_priority(model, row),
                     req_type=row.req_type if type_code == "REQ" else None,
                     req_origin=row.req_origin if type_code == "REQ" else None,
@@ -247,7 +253,7 @@ async def list_all_docs(
         if type_filter
         else list(CANONICAL_DOCUMENT_KINDS)
     )
-    if allowed_doc_types is not None:
+    if current_user.role == UserRole.external and allowed_doc_types is not None:
         document_type_filter = [t for t in document_type_filter if t in allowed_doc_types]
 
     if document_type_filter:
@@ -255,6 +261,7 @@ async def list_all_docs(
             Document.project_id == project.id,
             Document.doc_type.in_(document_type_filter),
         )
+        document_query = apply_external_visibility_filter(document_query, Document, current_user)
         if status:
             document_query = document_query.where(Document.status == status)
         if q:
@@ -293,6 +300,7 @@ async def list_all_docs(
                     doc_type=doc_type,
                     title=row.title,
                     status=row.status,
+                    visibility=row.visibility,
                     priority=_get_priority(Document, row),
                     project_id=project.id,
                     reviewer_id=_get_reviewer_id(Document, row),
@@ -332,15 +340,18 @@ async def get_doc_by_kind_and_string_id(
     else:
         requested_kind = document_kind_from_slug(kind_slug)
 
+    allowed_doc_types = await get_external_doc_types(db, current_user, project.id)
+
     if requested_kind in CANONICAL_DOCUMENT_KINDS:
-        await require_external_doc_type_access(db, current_user, project.id, requested_kind)
-        result = await db.execute(
-            select(Document).where(
-                Document.project_id == project.id,
-                Document.doc_type == requested_kind,
-                Document.doc_id == doc_id_str,
-            )
+        if not external_doc_type_allowed(current_user, allowed_doc_types, requested_kind):
+            raise HTTPException(status_code=404, detail="Document not found")
+        document_query = select(Document).where(
+            Document.project_id == project.id,
+            Document.doc_type == requested_kind,
+            Document.doc_id == doc_id_str,
         )
+        document_query = apply_external_visibility_filter(document_query, Document, current_user)
+        result = await db.execute(document_query)
         row = result.scalar_one_or_none()
         if row:
             link_data = (await _count_links(db, project.id, requested_kind, [row.id])).get(
@@ -352,6 +363,7 @@ async def get_doc_by_kind_and_string_id(
                 doc_type=requested_kind,
                 title=row.title,
                 status=row.status,
+                visibility=row.visibility,
                 priority=_get_priority(Document, row),
                 project_id=project.id,
                 reviewer_id=_get_reviewer_id(Document, row),
@@ -369,7 +381,8 @@ async def get_doc_by_kind_and_string_id(
             if slug != kind_slug:
                 continue
 
-            await require_external_doc_type_access(db, current_user, project.id, type_code)
+            if not external_doc_type_allowed(current_user, allowed_doc_types, type_code):
+                continue
             id_col = getattr(model, id_col_name)
             if id_col_name == "id":
                 try:
@@ -378,12 +391,12 @@ async def get_doc_by_kind_and_string_id(
                     continue
             else:
                 id_filter = id_col == doc_id_str
-            result = await db.execute(
-                select(model).where(
-                    model.project_id == project.id,
-                    id_filter,
-                )
+            typed_query = select(model).where(
+                model.project_id == project.id,
+                id_filter,
             )
+            typed_query = apply_external_visibility_filter(typed_query, model, current_user)
+            result = await db.execute(typed_query)
             row = result.scalar_one_or_none()
             if row:
                 doc_id_val = getattr(row, id_col_name)
@@ -401,6 +414,7 @@ async def get_doc_by_kind_and_string_id(
                     doc_type=resolved_type,
                     title=title_val,
                     status=row.status,
+                    visibility=getattr(row, "visibility", ArtefactVisibility.internal.value),
                     priority=_get_priority(model, row),
                     project_id=project.id,
                     reviewer_id=_get_reviewer_id(model, row),

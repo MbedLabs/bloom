@@ -29,6 +29,7 @@ from app.core.id_generator import normalize_doc_id
 # ==================== Project Schemas ====================
 
 PROJECT_PREFIX_PATTERN = re.compile(r"^[A-Z]{3}$")
+ARTEFACT_VISIBILITY_PATTERN = r"^(internal|customer)$"
 PROJECT_PREFIX_ERROR = (
     "Project prefix must be exactly three uppercase letters so generated IDs follow " "PRJ-TYP-001."
 )
@@ -203,6 +204,7 @@ class RequirementCreate(StrictModel):
     title: str = Field(..., min_length=1, max_length=500)
     description: Optional[str] = None
     status: str = "Draft"
+    visibility: str = Field(default="internal", pattern=ARTEFACT_VISIBILITY_PATTERN)
     priority: str = "Medium"
     req_type: str = "Functional"
     req_origin: str = "Internal"
@@ -216,6 +218,7 @@ class RequirementUpdate(StrictModel):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
     description: Optional[str] = None
     status: Optional[str] = None
+    visibility: Optional[str] = Field(default=None, pattern=ARTEFACT_VISIBILITY_PATTERN)
     priority: Optional[str] = None
     req_type: Optional[str] = None
     req_origin: Optional[str] = None
@@ -238,6 +241,7 @@ class RequirementResponse(BaseModel):
     title: str
     description: Optional[str] = None
     status: str
+    visibility: str = "internal"
     priority: str
     req_type: str
     req_origin: str
@@ -432,6 +436,7 @@ class DocumentCreate(StrictModel):
     project_id: int
     title: str = Field(..., min_length=1, max_length=500)
     doc_type: str = Field(default="SPEC", pattern="^(SPEC|PRT|RPT|STD)$")
+    visibility: str = Field(default="internal", pattern=ARTEFACT_VISIBILITY_PATTERN)
     description: Optional[str] = None
     content_json: Optional[Dict[str, Any]] = None
     content_html: Optional[str] = None
@@ -440,6 +445,7 @@ class DocumentCreate(StrictModel):
 class DocumentUpdate(StrictModel):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
     doc_type: Optional[str] = Field(None, pattern="^(SPEC|PRT|RPT|STD)$")
+    visibility: Optional[str] = Field(default=None, pattern=ARTEFACT_VISIBILITY_PATTERN)
     status: Optional[str] = None
     version: Optional[str] = None
     description: Optional[str] = None
@@ -489,6 +495,7 @@ class DocumentResponse(BaseModel):
     doc_id: Optional[str] = None
     title: str
     doc_type: str
+    visibility: str = "internal"
     status: str
     version: str
     description: Optional[str] = None
@@ -512,6 +519,7 @@ class DocumentDetailResponse(BaseModel):
     doc_id: Optional[str] = None
     title: str
     doc_type: str
+    visibility: str = "internal"
     status: str
     version: str
     description: Optional[str] = None

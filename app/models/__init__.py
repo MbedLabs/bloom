@@ -4,6 +4,7 @@ from app.models.models import (
     ArtefactActivity,
     ArtefactComment,
     ArtefactLink,
+    ArtefactVisibility,
     Baseline,
     CampaignSuite,
     ChangeRequest,
@@ -32,6 +33,7 @@ from app.models.user_token import UserToken, UserTokenPurpose
 
 __all__ = [
     "Project",
+    "ArtefactVisibility",
     "Requirement",
     "TestCase",
     "RequirementLink",
