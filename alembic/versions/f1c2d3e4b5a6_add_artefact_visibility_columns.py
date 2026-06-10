@@ -32,18 +32,26 @@ TABLES = (
 
 
 def upgrade() -> None:
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
     for table in TABLES:
-        op.add_column(
-            table,
-            sa.Column(
-                "visibility",
-                sa.String(length=20),
-                nullable=False,
-                server_default="internal",
-            ),
-        )
+        columns = [c["name"] for c in inspector.get_columns(table)]
+        if "visibility" not in columns:
+            op.add_column(
+                table,
+                sa.Column(
+                    "visibility",
+                    sa.String(length=20),
+                    nullable=False,
+                    server_default="internal",
+                ),
+            )
 
 
 def downgrade() -> None:
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
     for table in reversed(TABLES):
-        op.drop_column(table, "visibility")
+        columns = [c["name"] for c in inspector.get_columns(table)]
+        if "visibility" in columns:
+            op.drop_column(table, "visibility")
