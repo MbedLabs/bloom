@@ -1,7 +1,6 @@
 """
 Security utilities: password hashing, JWT token creation/verification, auth dependencies.
 """
-
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -15,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.models import Project
-from app.models.project_membership import ProjectMembership
+from app.models.project_membership import ProjectExternalDocType, ProjectMembership
 from app.models.user import User, UserRole
 
 ALGORITHM = "HS256"
@@ -101,6 +100,52 @@ async def _get_project_membership(
         )
     )
     return result.scalar_one_or_none()
+
+
+async def get_external_doc_types(
+    db: AsyncSession, current_user: User, project_id: int
+) -> Optional[set[str]]:
+    """Return allowed document types for an external member.
+
+    Admins and maintainers return ``None`` to mean unrestricted document types
+    after project membership access is validated. External users return the
+    explicit allowlist stored for their project membership. Missing membership
+    is rejected deny-by-default.
+    """
+    if current_user.role == UserRole.admin:
+        return None
+
+    membership = await _get_project_membership(db, current_user.id, project_id)
+    if membership is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not assigned to this project.",
+        )
+
+    if current_user.role != UserRole.external:
+        return None
+
+    result = await db.execute(
+        select(ProjectExternalDocType.doc_type).where(
+            ProjectExternalDocType.membership_id == membership.id
+        )
+    )
+    return set(result.scalars().all())
+
+
+async def require_external_doc_type_access(
+    db: AsyncSession,
+    current_user: User,
+    project_id: int,
+    doc_type: str,
+) -> None:
+    """Enforce the external member document-type allowlist for a project."""
+    allowed = await get_external_doc_types(db, current_user, project_id)
+    if allowed is not None and doc_type not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"External user is not authorized for document type '{doc_type}'.",
+        )
 
 
 async def user_can_access_project(
