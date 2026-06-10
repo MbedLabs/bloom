@@ -10,11 +10,14 @@ import { docUrl } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import { usePageMeta } from '../contexts/PageMetaContext'
+import { useAuth } from '../contexts/AuthContext'
 
 const SUITE_STATUSES = ['Draft', 'Active', 'Archived']
 
 export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}) {
+  const { user } = useAuth()
   const { prefix, suiteId } = useParams<{ prefix: string; suiteId: string }>()
+  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
   const { data: project } = useProjectByPrefix(prefix)
   const projectId = project?.id || 0
   const parsedSuiteId = resolvedId || Number(suiteId)
@@ -201,32 +204,34 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
             {suite.description && <p className="text-muted-foreground mt-1">{suite.description}</p>}
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={startEdit} className="inline-flex items-center px-3 py-1.5 border border-input text-foreground rounded-md hover:bg-accent/50 text-sm">
-            <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
-          </button>
-          <button onClick={() => setConfirmDelete(true)} className="inline-flex items-center px-3 py-1.5 border border-destructive/30 text-destructive rounded-md hover:bg-destructive/10 text-sm">
-            <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete
-          </button>
-          <button
-            onClick={() => setShowAddCase(true)}
-            className="inline-flex items-center px-4 py-2 border border-input rounded-md text-foreground hover:bg-accent/50 text-sm"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Test Case
-          </button>
-          <button
-            onClick={() => launchCampaignMutation.mutate()}
-            disabled={launchCampaignMutation.isPending}
-            className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm disabled:opacity-50"
-          >
-            <Layers3 className="h-4 w-4 mr-2" />
-            Create Campaign Scope
-          </button>
-        </div>
+        {canEditDocs && (
+          <div className="flex items-center gap-3">
+            <button onClick={startEdit} className="inline-flex items-center px-3 py-1.5 border border-input text-foreground rounded-md hover:bg-accent/50 text-sm">
+              <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
+            </button>
+            <button onClick={() => setConfirmDelete(true)} className="inline-flex items-center px-3 py-1.5 border border-destructive/30 text-destructive rounded-md hover:bg-destructive/10 text-sm">
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete
+            </button>
+            <button
+              onClick={() => setShowAddCase(true)}
+              className="inline-flex items-center px-4 py-2 border border-input rounded-md text-foreground hover:bg-accent/50 text-sm"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Test Case
+            </button>
+            <button
+              onClick={() => launchCampaignMutation.mutate()}
+              disabled={launchCampaignMutation.isPending}
+              className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm disabled:opacity-50"
+            >
+              <Layers3 className="h-4 w-4 mr-2" />
+              Create Campaign Scope
+            </button>
+          </div>
+        )}
       </div>
 
-      {editing && (
+      {canEditDocs && editing && (
         <div className="bg-card rounded-lg shadow-elegant p-5">
           <h3 className="text-sm font-medium text-muted-foreground mb-3">Edit Suite</h3>
           <form onSubmit={handleEditSubmit} className="space-y-3">
@@ -252,7 +257,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
         </div>
       )}
 
-      {confirmDelete && (
+      {canEditDocs && confirmDelete && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-card rounded-lg shadow-elegant p-6 max-w-sm w-full mx-4">
             <h3 className="text-lg font-semibold text-foreground mb-2">Delete Suite?</h3>

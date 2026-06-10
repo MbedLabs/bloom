@@ -29,6 +29,7 @@ import {
 } from '../lib/docRegistryParams'
 import { docCreateUrl, docUrl, normalizeDocTypeParam, DOC_TYPE_LABELS, type DocType } from '../types/doc'
 import { formatDateTime } from '../test/date-utils'
+import { useAuth } from '../contexts/AuthContext'
 
 const TYPE_BADGES: Record<DocType, { label: string; color: string }> = {
   REQ: { label: 'Requirement', color: 'bg-amber-500/10 text-amber-700 dark:text-amber-400' },
@@ -230,7 +231,9 @@ function ExecutionBadge({ status }: { status: string | null }) {
 }
 
 export default function Documents() {
+  const { user } = useAuth()
   const { prefix } = useParams<{ prefix: string }>()
+  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -630,25 +633,27 @@ export default function Documents() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Link
-            to={`/projects/${prefix}/import`}
-            className="inline-flex items-center gap-2 px-2.5 py-1.5 border border-input bg-background text-foreground rounded-md text-sm font-medium hover:bg-accent transition-colors"
-          >
-            <Upload className="h-4 w-4" />
-            Import
-          </Link>
-          {soleDocType ? (
+        {canEditDocs && (
+          <div className="flex items-center gap-2">
             <Link
-              to={docCreateUrl(prefix!, soleDocType)}
-              state={createReturnState}
-              className={`${docCreateLinkClass} bg-primary text-primary-foreground hover:bg-primary/90`}
+              to={`/projects/${prefix}/import`}
+              className="inline-flex items-center gap-2 px-2.5 py-1.5 border border-input bg-background text-foreground rounded-md text-sm font-medium hover:bg-accent transition-colors"
             >
-              <Plus className="h-4 w-4" />
-              New {TYPE_BADGES[soleDocType].label}
+              <Upload className="h-4 w-4" />
+              Import
             </Link>
-          ) : null}
-        </div>
+            {soleDocType ? (
+              <Link
+                to={docCreateUrl(prefix!, soleDocType)}
+                state={createReturnState}
+                className={`${docCreateLinkClass} bg-primary text-primary-foreground hover:bg-primary/90`}
+              >
+                <Plus className="h-4 w-4" />
+                New {TYPE_BADGES[soleDocType].label}
+              </Link>
+            ) : null}
+          </div>
+        )}
       </div>
 
       <section className="rounded-lg border border-border bg-card">
