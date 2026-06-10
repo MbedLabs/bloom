@@ -107,6 +107,45 @@ Frontend public routes expected by email links:
 - `/verify-email?token=...`
 - `/reset-password?token=...`
 
+## Upgrade
+
+When upgrading an existing Bloom deployment:
+
+1. pull the new application image or package version,
+2. keep the existing PostgreSQL database,
+3. preserve the same `DATABASE_URL`, `SECRET_KEY`, and production environment variables,
+4. run Alembic before serving traffic:
+
+```bash
+alembic upgrade head
+```
+
+5. restart the backend and verify:
+
+```bash
+curl -sf http://<bloom-backend-host>:8000/api/health
+curl -sf http://<bloom-backend-host>:8000/api/version
+```
+
+## Backup and restore
+
+Bloom stores durable state in PostgreSQL. Back up the database before upgrades.
+
+Example backup:
+
+```bash
+pg_dump "$DATABASE_URL" > bloom-backup.sql
+```
+
+Example restore into a fresh database:
+
+```bash
+psql "$DATABASE_URL" < bloom-backup.sql
+alembic upgrade head
+```
+
+After restore, start the backend and verify `/api/health` before reopening the app to users.
+
 ## API Endpoints
 
 | Path | Description |
