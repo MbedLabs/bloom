@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { type DocType, DOC_TYPE_SLUGS } from '../types/doc'
+import { clearAuthToken, getAuthToken } from '../lib/tokenStorage'
 import packageJson from '../../package.json'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api'
@@ -12,7 +13,7 @@ export const api = axios.create({
 })
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('bloom_token')
+  const token = getAuthToken()
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -23,7 +24,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('bloom_token')
+      clearAuthToken()
       const publicPaths = ['/login', '/accept-invite', '/verify-email', '/forgot-password', '/reset-password']
       if (!publicPaths.includes(window.location.pathname)) {
         window.location.href = '/login'
