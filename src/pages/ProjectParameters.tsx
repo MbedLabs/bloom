@@ -5,9 +5,12 @@ import { ArrowLeft, Edit2, Plus, SlidersHorizontal, Trash2, X } from 'lucide-rea
 
 import { projectVariablesApi, ProjectVariable } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function ProjectParameters() {
+  const { user } = useAuth()
   const { prefix } = useParams<{ prefix: string }>()
+  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
   const { data: project, isLoading: projectLoading } = useProjectByPrefix(prefix)
   const projectId = project?.id || 0
   const queryClient = useQueryClient()
@@ -122,16 +125,18 @@ export default function ProjectParameters() {
             <p className="text-muted-foreground">{project.name}</p>
           </div>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Item
-        </button>
+        {canEditDocs && (
+          <button
+            onClick={() => setShowCreate(true)}
+            className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Item
+          </button>
+        )}
       </div>
 
-      {showCreate && (
+      {canEditDocs && showCreate && (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-5">
           <h3 className="font-semibold text-foreground mb-4">New Parameter / Variable</h3>
           <form onSubmit={onCreate} className="space-y-4">
@@ -255,24 +260,26 @@ export default function ProjectParameters() {
                         />
                       </Td>
                       <Td>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={onEdit}
-                            disabled={updateMutation.isPending}
-                            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-primary text-white hover:bg-primary/90 disabled:opacity-50"
-                          >
-                            Save
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingId(null)}
-                            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-input text-foreground hover:bg-accent/50"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                            Cancel
-                          </button>
-                        </div>
+                        {canEditDocs && (
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={onEdit}
+                              disabled={updateMutation.isPending}
+                              className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-primary text-white hover:bg-primary/90 disabled:opacity-50"
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingId(null)}
+                              className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-input text-foreground hover:bg-accent/50"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                              Cancel
+                            </button>
+                          </div>
+                        )}
                       </Td>
                     </tr>
                   ) : (
@@ -282,22 +289,24 @@ export default function ProjectParameters() {
                       <Td><span className="font-mono text-xs text-muted-foreground">{item.value}</span></Td>
                       <Td>{item.description || '-'}</Td>
                       <Td>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setEditingId(item.id)}
-                            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-input text-foreground hover:bg-accent/50"
-                          >
-                            <Edit2 className="h-3.5 w-3.5" />
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => deleteMutation.mutate(item.id)}
-                            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-red-500/50 text-red-600 hover:bg-red-500/10"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            Delete
-                          </button>
-                        </div>
+                        {canEditDocs && (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setEditingId(item.id)}
+                              className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-input text-foreground hover:bg-accent/50"
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => deleteMutation.mutate(item.id)}
+                              className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-red-500/50 text-red-600 hover:bg-red-500/10"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Delete
+                            </button>
+                          </div>
+                        )}
                       </Td>
                     </tr>
                   )

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignsApi, extractApiErrorMessage, testCasesApi, testSuitesApi } from '../api/client'
 import { ArrowLeft, Plus, Clock, FlaskConical, Layers3, Search, ChevronUp, ChevronDown } from 'lucide-react'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
+import { useAuth } from '../contexts/AuthContext'
 
 type CampaignSortField = 'name' | 'status' | 'updated_at'
 type SortDir = 'asc' | 'desc'
@@ -15,7 +16,9 @@ const SORT_OPTIONS: { field: CampaignSortField; label: string }[] = [
 ]
 
 export default function TestCampaigns() {
+  const { user } = useAuth()
   const { prefix } = useParams<{ prefix: string }>()
+  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
   const [searchParams, setSearchParams] = useSearchParams()
   const { data: project } = useProjectByPrefix(prefix)
   const projectId = project?.id || 0
@@ -175,22 +178,24 @@ export default function TestCampaigns() {
             <p className="text-muted-foreground">Traceability scopes mapped to Bud execution runs</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowCreateSuite(true)}
-            className="inline-flex items-center px-4 py-2 border border-input text-foreground rounded-md hover:bg-accent/50 transition-all duration-200 text-sm font-medium"
-          >
-            <Layers3 className="h-4 w-4 mr-2" />
-            New Suite
-          </button>
-          <button
-            onClick={openCreateCampaign}
-            className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 hover:shadow-glow transition-all duration-200 text-sm font-medium"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Campaign
-          </button>
-        </div>
+        {canEditDocs && (
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowCreateSuite(true)}
+              className="inline-flex items-center px-4 py-2 border border-input text-foreground rounded-md hover:bg-accent/50 transition-all duration-200 text-sm font-medium"
+            >
+              <Layers3 className="h-4 w-4 mr-2" />
+              New Suite
+            </button>
+            <button
+              onClick={openCreateCampaign}
+              className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 hover:shadow-glow transition-all duration-200 text-sm font-medium"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Campaign
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6">
@@ -277,13 +282,15 @@ export default function TestCampaigns() {
               <p className="text-muted-foreground max-w-md mx-auto mb-5">
                 Build a campaign scope from a test suite, then link the Bud run.
               </p>
-              <button
-                onClick={openCreateCampaign}
-                className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm font-medium"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create First Campaign
-              </button>
+              {canEditDocs && (
+                <button
+                  onClick={openCreateCampaign}
+                  className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm font-medium"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create First Campaign
+                </button>
+              )}
             </div>
           ) : filteredCampaigns.length === 0 ? (
             <div className="bg-card rounded-lg shadow-elegant p-12 text-center text-muted-foreground">
@@ -299,7 +306,7 @@ export default function TestCampaigns() {
         </div>
       </div>
 
-      {showCreate && (
+      {canEditDocs && showCreate && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-card rounded-lg shadow-elegant max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
             <div className="px-6 py-4 border-b border-border">
@@ -387,7 +394,7 @@ export default function TestCampaigns() {
         </div>
       )}
 
-      {showCreateSuite && (
+      {canEditDocs && showCreateSuite && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-card rounded-lg shadow-elegant max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
             <div className="px-6 py-4 border-b border-border">
