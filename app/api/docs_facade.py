@@ -17,7 +17,12 @@ from app.core.document_kinds import (
     document_kind_from_slug,
     normalize_document_kind,
 )
-from app.core.security import get_current_user
+from app.core.security import (
+    get_current_user,
+    get_external_doc_types,
+    require_external_doc_type_access,
+    require_project_access,
+)
 from app.models import (
     ArtefactLink,
     ChangeRequest,
@@ -174,16 +179,20 @@ async def list_all_docs(
     skip: int = Query(0, ge=0),
     limit: int | None = Query(None, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """List all docs across all types for a project."""
     project = await resolve_project(db, project_ref)
+    await require_project_access(db, current_user, project.id)
+    allowed_doc_types = await get_external_doc_types(db, current_user, project.id)
     results = []
 
     type_filter = [t.upper() for t in type] if type else None
 
     for type_code, (model, id_col_name, _table) in TYPE_MAP.items():
         if type_filter and type_code not in type_filter:
+            continue
+        if allowed_doc_types is not None and type_code not in allowed_doc_types:
             continue
 
         id_col = getattr(model, id_col_name)
@@ -238,6 +247,9 @@ async def list_all_docs(
         if type_filter
         else list(CANONICAL_DOCUMENT_KINDS)
     )
+    if allowed_doc_types is not None:
+        document_type_filter = [t for t in document_type_filter if t in allowed_doc_types]
+
     if document_type_filter:
         document_query = select(Document).where(
             Document.project_id == project.id,
@@ -308,10 +320,11 @@ async def get_doc_by_kind_and_string_id(
     kind_slug: str,
     doc_id_str: str,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Look up a doc by its kind-aware slug and human-readable string ID."""
     project = await resolve_project(db, project_ref)
+    await require_project_access(db, current_user, project.id)
     kind_slug = LEGACY_TYPE_SLUG_ALIASES.get(kind_slug, kind_slug)
     requested_kind = None
     if kind_slug in {slug for _, (_, _, slug) in TYPE_MAP.items()}:
@@ -320,6 +333,7 @@ async def get_doc_by_kind_and_string_id(
         requested_kind = document_kind_from_slug(kind_slug)
 
     if requested_kind in CANONICAL_DOCUMENT_KINDS:
+        await require_external_doc_type_access(db, current_user, project.id, requested_kind)
         result = await db.execute(
             select(Document).where(
                 Document.project_id == project.id,
@@ -355,6 +369,7 @@ async def get_doc_by_kind_and_string_id(
             if slug != kind_slug:
                 continue
 
+            await require_external_doc_type_access(db, current_user, project.id, type_code)
             id_col = getattr(model, id_col_name)
             if id_col_name == "id":
                 try:
