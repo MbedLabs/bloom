@@ -408,6 +408,7 @@ async def create_requirement(
         title=data.title,
         description=data.description,
         status=data.status,
+        visibility=data.visibility,
         priority=data.priority,
         req_type=data.req_type,
         req_origin=data.req_origin,

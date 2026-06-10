@@ -1,6 +1,7 @@
 """
 Security utilities: password hashing, JWT token creation/verification, auth dependencies.
 """
+
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -13,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models import Project
+from app.models import ArtefactVisibility, Project
 from app.models.project_membership import ProjectExternalDocType, ProjectMembership
 from app.models.user import User, UserRole
 
@@ -146,6 +147,22 @@ async def require_external_doc_type_access(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"External user is not authorized for document type '{doc_type}'.",
         )
+
+
+def external_doc_type_allowed(
+    current_user: User,
+    allowed_doc_types: Optional[set[str]],
+    doc_type: str,
+) -> bool:
+    if current_user.role != UserRole.external:
+        return True
+    return allowed_doc_types is None or doc_type in allowed_doc_types
+
+
+def apply_external_visibility_filter(query, model, current_user: User):
+    if current_user.role == UserRole.external:
+        query = query.where(model.visibility == ArtefactVisibility.customer.value)
+    return query
 
 
 async def user_can_access_project(

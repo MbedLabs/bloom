@@ -120,6 +120,7 @@ async def create_document(
         doc_id=doc_id,
         title=data.title,
         doc_type=type_code,
+        visibility=data.visibility,
         description=data.description,
         content_json=data.content_json,
         content_html=data.content_html,
