@@ -22,7 +22,12 @@ from app.api.link_read_utils import (
 )
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_project_access, require_role
+from app.core.security import (
+    apply_external_visibility_filter,
+    get_current_user,
+    require_project_access,
+    require_role,
+)
 from app.models import (
     ArtefactLink,
     Project,
@@ -129,6 +134,7 @@ async def _build_test_case_response(tc: TestCase, db: AsyncSession) -> TestCaseR
         preconditions=tc.preconditions,
         steps=tc.steps,
         status=tc.status,
+        visibility=tc.visibility,
         reviewer_id=tc.reviewer_id,
         approver_id=tc.approver_id,
         reviewed_by_id=tc.reviewed_by_id,
@@ -159,6 +165,7 @@ def _build_test_case_list_response(tc: TestCase, requirement_count: int = 0) -> 
         preconditions=tc.preconditions,
         steps=tc.steps,
         status=tc.status,
+        visibility=tc.visibility,
         reviewer_id=tc.reviewer_id,
         approver_id=tc.approver_id,
         reviewed_by_id=tc.reviewed_by_id,
@@ -193,6 +200,7 @@ async def list_test_cases(
     await require_project_access(db, current_user, project_id)
 
     base = select(TestCase).where(TestCase.project_id == project_id)
+    base = apply_external_visibility_filter(base, TestCase, current_user)
     total_q = select(func.count()).select_from(base.subquery())
     total = (await db.execute(total_q)).scalar() or 0
 
@@ -269,6 +277,7 @@ async def create_test_case(
         preconditions=data.preconditions,
         steps=data.steps,
         status=data.status,
+        visibility=data.visibility,
         reviewer_id=data.reviewer_id,
         approver_id=data.approver_id,
     )
@@ -296,13 +305,17 @@ async def get_test_case(
     """
     Get a test case by ID.
     """
-    result = await db.execute(select(TestCase).where(TestCase.id == test_case_id))
+    result = await db.execute(
+        apply_external_visibility_filter(
+            select(TestCase).where(TestCase.id == test_case_id),
+            TestCase,
+            current_user,
+        )
+    )
     test_case = result.scalar_one_or_none()
 
     if not test_case:
         raise HTTPException(status_code=404, detail="Test case not found")
-
-    await require_project_access(db, current_user, test_case.project_id)
 
     return await _build_test_case_response(test_case, db)
 
@@ -343,6 +356,8 @@ async def update_test_case(
         test_case.steps = data.steps
     if data.status is not None:
         test_case.status = data.status
+    if data.visibility is not None:
+        test_case.visibility = data.visibility
 
     if "reviewer_id" in fields_set:
         if data.reviewer_id is None:

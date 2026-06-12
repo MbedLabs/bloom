@@ -1,55 +1,27 @@
-"""HTTP tests for dashboard stats (TST-005)."""
-
 import asyncio
-import os
 from dataclasses import dataclass
-
-os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characters-long")
 
 from fastapi import HTTPException, status
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from app.core.cache import dashboard_stats_cache
 from app.core.database import Base, get_db
 from app.core.security import get_current_user, get_password_hash
 from app.main import app
-from app.models import Project, ProjectMembership, Requirement, TestCase, User
+from app.models import (
+    ArtefactLink,
+    Project,
+    ProjectMembership,
+    Requirement,
+    TestCase,
+    User,
+)
 from app.models.user import UserRole
 
 
-def test_dashboard_stats_shape(api_client: TestClient):
-    from app.core.config import settings
-
-    login = api_client.post(
-        "/api/auth/login",
-        json={"email": settings.ADMIN_EMAIL, "password": settings.ADMIN_PASSWORD},
-    )
-    assert login.status_code == 200
-    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
-
-    resp = api_client.get("/api/dashboard/stats", headers=headers)
-    assert resp.status_code == 200
-    data = resp.json()
-    for key in (
-        "total_projects",
-        "total_requirements",
-        "total_test_cases",
-        "coverage_percent",
-        "projects",
-    ):
-        assert key in data
-    assert isinstance(data["projects"], list)
-
-    # Cached second call should match
-    resp2 = api_client.get("/api/dashboard/stats", headers=headers)
-    assert resp2.status_code == 200
-    assert resp2.json()["total_projects"] == data["total_projects"]
-
-
 @dataclass
-class DashboardVisibilityHarness:
+class LinksVisibilityHarness:
     client: TestClient
     session_maker: async_sessionmaker[AsyncSession]
     actor_id: dict[str, int | None]
@@ -61,7 +33,7 @@ class DashboardVisibilityHarness:
         return asyncio.run(coro)
 
 
-def _build_dashboard_harness():
+def _build_harness():
     from app import models  # noqa: F401
 
     engine = create_async_engine(
@@ -104,16 +76,13 @@ def _build_dashboard_harness():
     asyncio.run(_create_schema())
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_current_user] = _override_get_current_user
-    dashboard_stats_cache._store.clear()
 
     client = TestClient(app, base_url="http://test")
-    harness = DashboardVisibilityHarness(
-        client=client, session_maker=session_maker, actor_id=actor_id
-    )
+    harness = LinksVisibilityHarness(client=client, session_maker=session_maker, actor_id=actor_id)
     return harness, engine
 
 
-async def _seed_dashboard_visibility_data(session_maker: async_sessionmaker[AsyncSession]):
+async def _seed_links_visibility_data(session_maker: async_sessionmaker[AsyncSession]):
     async with session_maker() as session:
         external = User(
             email="external@example.com",
@@ -125,7 +94,7 @@ async def _seed_dashboard_visibility_data(session_maker: async_sessionmaker[Asyn
         session.add(external)
         await session.flush()
 
-        project = Project(name="Dashboard Visibility", prefix="DSV", description="Visibility")
+        project = Project(name="Links Visibility", prefix="LKV", description="Visibility")
         session.add(project)
         await session.flush()
 
@@ -137,66 +106,100 @@ async def _seed_dashboard_visibility_data(session_maker: async_sessionmaker[Asyn
             )
         )
 
+        customer_requirement = Requirement(
+            project_id=project.id,
+            req_id="LKV-REQ-001",
+            title="Customer requirement",
+            status="Draft",
+            visibility="customer",
+            priority="Medium",
+            req_type="Functional",
+            req_origin="Customer",
+        )
+        internal_requirement = Requirement(
+            project_id=project.id,
+            req_id="LKV-REQ-002",
+            title="Internal requirement",
+            status="Draft",
+            visibility="internal",
+            priority="Medium",
+            req_type="Functional",
+            req_origin="Internal",
+        )
+        customer_test_case = TestCase(
+            project_id=project.id,
+            tc_id="LKV-TC-001",
+            title="Customer test case",
+            status="Approved",
+            visibility="customer",
+        )
+        internal_test_case = TestCase(
+            project_id=project.id,
+            tc_id="LKV-TC-002",
+            title="Internal test case",
+            status="Approved",
+            visibility="internal",
+        )
         session.add_all(
             [
-                Requirement(
+                customer_requirement,
+                internal_requirement,
+                customer_test_case,
+                internal_test_case,
+            ]
+        )
+        await session.flush()
+
+        session.add_all(
+            [
+                ArtefactLink(
                     project_id=project.id,
-                    req_id="DSV-REQ-001",
-                    title="Customer requirement",
-                    status="Draft",
-                    visibility="customer",
-                    priority="Medium",
-                    req_type="Functional",
-                    req_origin="Customer",
+                    source_type="TC",
+                    source_id=customer_test_case.id,
+                    target_type="REQ",
+                    target_id=customer_requirement.id,
+                    role="verifies",
                 ),
-                Requirement(
+                ArtefactLink(
                     project_id=project.id,
-                    req_id="DSV-REQ-002",
-                    title="Internal requirement",
-                    status="Draft",
-                    visibility="internal",
-                    priority="Medium",
-                    req_type="Functional",
-                    req_origin="Internal",
+                    source_type="TC",
+                    source_id=customer_test_case.id,
+                    target_type="REQ",
+                    target_id=internal_requirement.id,
+                    role="verifies",
                 ),
-                TestCase(
+                ArtefactLink(
                     project_id=project.id,
-                    tc_id="DSV-TC-001",
-                    title="Customer test case",
-                    status="Draft",
-                    visibility="customer",
-                ),
-                TestCase(
-                    project_id=project.id,
-                    tc_id="DSV-TC-002",
-                    title="Internal test case",
-                    status="Draft",
-                    visibility="internal",
+                    source_type="TC",
+                    source_id=internal_test_case.id,
+                    target_type="REQ",
+                    target_id=customer_requirement.id,
+                    role="verifies",
                 ),
             ]
         )
         await session.commit()
         await session.refresh(external)
         await session.refresh(project)
-
         return {"external": external, "project": project}
 
 
-def test_external_dashboard_ignores_internal_artefacts():
-    harness, engine = _build_dashboard_harness()
+def test_external_link_list_hides_links_with_hidden_endpoints():
+    harness, engine = _build_harness()
     try:
-        seeded = harness.run(_seed_dashboard_visibility_data(harness.session_maker))
+        seeded = harness.run(_seed_links_visibility_data(harness.session_maker))
         harness.act_as(seeded["external"])
 
-        response = harness.client.get("/api/dashboard/stats")
+        response = harness.client.get(
+            "/api/links",
+            params={"project_id": seeded["project"].id},
+        )
         assert response.status_code == 200, response.text
         body = response.json()
-        assert body["total_requirements"] == 1
-        assert body["total_test_cases"] == 1
-        assert body["uncovered_requirements"] == 1
-        assert body["projects"][0]["uncovered_requirement_count"] == 1
+        assert len(body) == 1
+        assert body[0]["source_type"] == "TC"
+        assert body[0]["target_type"] == "REQ"
     finally:
         harness.client.close()
         app.dependency_overrides.clear()
-        dashboard_stats_cache._store.clear()
         asyncio.run(engine.dispose())

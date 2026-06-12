@@ -19,7 +19,11 @@ from app.api.link_read_utils import (
     iter_req_req_outgoing_neighbors,
 )
 from app.core.database import get_db
-from app.core.security import get_current_user, require_project_access
+from app.core.security import (
+    apply_external_visibility_filter,
+    get_current_user,
+    require_project_access,
+)
 from app.models import Requirement, TestCase, TestRunLink
 from app.models.user import User
 from app.schemas import (
@@ -53,12 +57,13 @@ class TraceabilityContext:
 
 
 async def _build_traceability_context(
-    project_id: int, req_ids: list[int], db: AsyncSession
+    project_id: int, req_ids: list[int], db: AsyncSession, current_user: User
 ) -> TraceabilityContext:
     ctx = TraceabilityContext()
 
+    req_query = select(Requirement).where(Requirement.project_id == project_id)
     reqs = (
-        (await db.execute(select(Requirement).where(Requirement.project_id == project_id)))
+        (await db.execute(apply_external_visibility_filter(req_query, Requirement, current_user)))
         .scalars()
         .all()
     )
@@ -69,7 +74,7 @@ async def _build_traceability_context(
     if not req_ids:
         return ctx
 
-    links_result = await db.execute(
+    links_query = (
         select(ArtefactLink, TestCase)
         .join(TestCase, TestCase.id == ArtefactLink.source_id)
         .where(
@@ -79,6 +84,9 @@ async def _build_traceability_context(
             ArtefactLink.role == VERIFY_LINK_ROLE,
         )
         .order_by(ArtefactLink.created_at.desc(), TestCase.tc_id)
+    )
+    links_result = await db.execute(
+        apply_external_visibility_filter(links_query, TestCase, current_user)
     )
     for link, tc in links_result.all():
         ctx.linked_tcs_by_req[link.target_id].append(await _build_tc_response(tc))
@@ -115,6 +123,7 @@ def _build_req_response_sync(req: Requirement, ctx: TraceabilityContext) -> Requ
         title=req.title,
         description=req.description,
         status=req.status,
+        visibility=req.visibility,
         priority=req.priority,
         req_type=req.req_type,
         req_origin=req.req_origin,
@@ -135,6 +144,13 @@ async def _build_tc_response(tc: TestCase) -> TestCaseResponse:
         preconditions=tc.preconditions,
         steps=tc.steps,
         status=tc.status,
+        visibility=tc.visibility,
+        reviewer_id=tc.reviewer_id,
+        approver_id=tc.approver_id,
+        reviewed_by_id=tc.reviewed_by_id,
+        approved_by_id=tc.approved_by_id,
+        reviewed_at=tc.reviewed_at,
+        approved_at=tc.approved_at,
         created_at=tc.created_at,
         updated_at=tc.updated_at,
         requirement_count=0,
@@ -186,11 +202,17 @@ async def get_traceability_matrix(
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)
-    result = await db.execute(select(Requirement).where(Requirement.project_id == project_id))
+    result = await db.execute(
+        apply_external_visibility_filter(
+            select(Requirement).where(Requirement.project_id == project_id),
+            Requirement,
+            current_user,
+        )
+    )
     requirements = result.scalars().all()
 
     req_ids = [req.id for req in requirements]
-    ctx = await _build_traceability_context(project_id, req_ids, db)
+    ctx = await _build_traceability_context(project_id, req_ids, db, current_user)
 
     items = []
     for req in requirements:
@@ -243,7 +265,13 @@ async def get_impact_analysis(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Requirement).where(Requirement.id == requirement_id))
+    result = await db.execute(
+        apply_external_visibility_filter(
+            select(Requirement).where(Requirement.id == requirement_id),
+            Requirement,
+            current_user,
+        )
+    )
     root = result.scalar_one_or_none()
     if not root:
         raise HTTPException(status_code=404, detail="Requirement not found")
@@ -255,12 +283,19 @@ async def get_impact_analysis(
         [
             req.id
             for req in (
-                await db.execute(select(Requirement).where(Requirement.project_id == project_id))
+                await db.execute(
+                    apply_external_visibility_filter(
+                        select(Requirement).where(Requirement.project_id == project_id),
+                        Requirement,
+                        current_user,
+                    )
+                )
             )
             .scalars()
             .all()
         ],
         db,
+        current_user,
     )
     root_resp = _build_req_response_sync(root, ctx)
 
@@ -271,7 +306,13 @@ async def get_impact_analysis(
 
         nodes = []
         async for src_id, role in iter_req_req_incoming_neighbors(req_id, project_id, db):
-            src_result = await db.execute(select(Requirement).where(Requirement.id == src_id))
+            src_result = await db.execute(
+                apply_external_visibility_filter(
+                    select(Requirement).where(Requirement.id == src_id),
+                    Requirement,
+                    current_user,
+                )
+            )
             src = src_result.scalar_one_or_none()
             if src and src.id not in visited:
                 src_resp = _build_req_response_sync(src, ctx)
@@ -294,7 +335,13 @@ async def get_impact_analysis(
 
         nodes = []
         async for tgt_id, role in iter_req_req_outgoing_neighbors(req_id, project_id, db):
-            tgt_result = await db.execute(select(Requirement).where(Requirement.id == tgt_id))
+            tgt_result = await db.execute(
+                apply_external_visibility_filter(
+                    select(Requirement).where(Requirement.id == tgt_id),
+                    Requirement,
+                    current_user,
+                )
+            )
             tgt = tgt_result.scalar_one_or_none()
             if tgt and tgt.id not in visited:
                 tgt_resp = _build_req_response_sync(tgt, ctx)
@@ -313,18 +360,25 @@ async def get_impact_analysis(
             nodes.append(
                 ImpactNode(
                     requirement=RequirementResponse(
-                        id=tc.id,
-                        project_id=tc.project_id,
+                        id=tc_resp.id,
+                        project_id=tc_resp.project_id,
                         parent_id=None,
-                        req_id=tc.tc_id,
-                        title=tc.title,
-                        description=tc.description,
-                        status=tc.status,
+                        req_id=tc_resp.tc_id,
+                        title=tc_resp.title,
+                        description=tc_resp.description,
+                        status=tc_resp.status,
+                        visibility=tc_resp.visibility,
                         priority="N/A",
                         req_type="test_case",
                         req_origin="N/A",
-                        created_at=tc.created_at,
-                        updated_at=tc.updated_at,
+                        reviewer_id=tc_resp.reviewer_id,
+                        approver_id=tc_resp.approver_id,
+                        reviewed_by_id=tc_resp.reviewed_by_id,
+                        approved_by_id=tc_resp.approved_by_id,
+                        reviewed_at=tc_resp.reviewed_at,
+                        approved_at=tc_resp.approved_at,
+                        created_at=tc_resp.created_at,
+                        updated_at=tc_resp.updated_at,
                         children=[],
                         test_case_count=0,
                     ),
@@ -353,11 +407,17 @@ async def get_coverage_gaps(
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)
-    result = await db.execute(select(Requirement).where(Requirement.project_id == project_id))
+    result = await db.execute(
+        apply_external_visibility_filter(
+            select(Requirement).where(Requirement.project_id == project_id),
+            Requirement,
+            current_user,
+        )
+    )
     requirements = result.scalars().all()
 
     req_ids = [req.id for req in requirements]
-    ctx = await _build_traceability_context(project_id, req_ids, db)
+    ctx = await _build_traceability_context(project_id, req_ids, db, current_user)
 
     gaps = []
     covered = 0

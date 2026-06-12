@@ -18,7 +18,12 @@ from app.api.artefact_utils import (
 from app.core.database import get_db
 from app.core.external_issue import validate_external_fields
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_project_access, require_role
+from app.core.security import (
+    apply_external_visibility_filter,
+    get_current_user,
+    require_project_access,
+    require_role,
+)
 from app.models import Defect, IntegrationSetting, Project
 from app.models.user import User, UserRole
 from app.schemas import DefectCreate, DefectResponse, DefectUpdate, PaginatedResponse
@@ -47,6 +52,7 @@ async def list_defects(
     await require_project_access(db, current_user, project_id)
 
     base = select(Defect).where(Defect.project_id == project_id)
+    base = apply_external_visibility_filter(base, Defect, current_user)
     if status:
         base = base.where(Defect.status == status)
     if severity:
@@ -111,6 +117,7 @@ async def create_defect(
         external_issue_number=data.external_issue_number,
         external_issue_url=data.external_issue_url,
         external_issue_state=data.external_issue_state,
+        visibility=data.visibility,
     )
     db.add(item)
     await db.flush()
@@ -131,7 +138,13 @@ async def get_defect(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    item = (await db.execute(select(Defect).where(Defect.id == defect_pk))).scalar_one_or_none()
+    item = (
+        await db.execute(
+            apply_external_visibility_filter(
+                select(Defect).where(Defect.id == defect_pk), Defect, current_user
+            )
+        )
+    ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Defect not found")
     await require_project_access(db, current_user, item.project_id)

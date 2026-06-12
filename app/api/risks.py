@@ -12,7 +12,12 @@ from app.api.artefact_utils import (
 )
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_project_access, require_role
+from app.core.security import (
+    apply_external_visibility_filter,
+    get_current_user,
+    require_project_access,
+    require_role,
+)
 from app.models import Project, RiskItem
 from app.models.user import User, UserRole
 from app.schemas import (
@@ -40,6 +45,7 @@ async def list_risk_items(
     await require_project_access(db, current_user, project_id)
 
     base = select(RiskItem).where(RiskItem.project_id == project_id)
+    base = apply_external_visibility_filter(base, RiskItem, current_user)
     total_q = select(func.count()).select_from(base.subquery())
     total = (await db.execute(total_q)).scalar() or 0
     query = base.order_by(RiskItem.created_at.desc()).offset(skip).limit(limit)
@@ -90,6 +96,7 @@ async def create_risk_item(
         probability=data.probability,
         mitigation=data.mitigation,
         risk_category=data.risk_category,
+        visibility=data.visibility,
         linked_requirement_id=None,
     )
     db.add(item)
@@ -111,7 +118,13 @@ async def get_risk_item(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    item = (await db.execute(select(RiskItem).where(RiskItem.id == risk_id))).scalar_one_or_none()
+    item = (
+        await db.execute(
+            apply_external_visibility_filter(
+                select(RiskItem).where(RiskItem.id == risk_id), RiskItem, current_user
+            )
+        )
+    ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Risk item not found")
     await require_project_access(db, current_user, item.project_id)

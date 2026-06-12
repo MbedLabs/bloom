@@ -281,6 +281,7 @@ class TestCaseCreate(StrictModel):
     preconditions: Optional[str] = None
     steps: Optional[List[Dict[str, Any]]] = None
     status: str = "Draft"
+    visibility: str = Field(default="internal", pattern=ARTEFACT_VISIBILITY_PATTERN)
     reviewer_id: Optional[int] = None
     approver_id: Optional[int] = None
 
@@ -293,6 +294,7 @@ class TestCaseUpdate(StrictModel):
     preconditions: Optional[str] = None
     steps: Optional[List[Dict[str, Any]]] = None
     status: Optional[str] = None
+    visibility: Optional[str] = Field(default=None, pattern=ARTEFACT_VISIBILITY_PATTERN)
     reviewer_id: Optional[int] = None
     approver_id: Optional[int] = None
     reviewed_by_id: Optional[int] = None
@@ -312,6 +314,7 @@ class TestCaseResponse(BaseModel):
     preconditions: Optional[str] = None
     steps: Optional[List[Dict[str, Any]]]
     status: str
+    visibility: str = "internal"
     reviewer_id: Optional[int] = None
     approver_id: Optional[int] = None
     reviewed_by_id: Optional[int] = None
@@ -549,6 +552,7 @@ class TestSuiteCreate(StrictModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     status: str = "Draft"
+    visibility: str = Field(default="internal", pattern=ARTEFACT_VISIBILITY_PATTERN)
     test_case_ids: List[int] = []
 
 
@@ -556,6 +560,7 @@ class TestSuiteUpdate(StrictModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     status: Optional[str] = None
+    visibility: Optional[str] = Field(default=None, pattern=ARTEFACT_VISIBILITY_PATTERN)
 
 
 class TestSuiteItemResponse(BaseModel):
@@ -581,6 +586,7 @@ class TestSuiteResponse(BaseModel):
     name: str
     description: Optional[str] = None
     status: str
+    visibility: str = "internal"
     created_at: datetime
     updated_at: datetime
     total_items: int = 0
@@ -604,6 +610,7 @@ class TestCampaignCreate(StrictModel):
     project_id: int
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
+    visibility: str = Field(default="internal", pattern=ARTEFACT_VISIBILITY_PATTERN)
     suite_id: Optional[int] = None
     suite_ids: List[int] = []
     bud_run_id: Optional[int] = None
@@ -615,6 +622,7 @@ class TestCampaignCreate(StrictModel):
 class TestCampaignUpdate(StrictModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
+    visibility: Optional[str] = Field(default=None, pattern=ARTEFACT_VISIBILITY_PATTERN)
     suite_id: Optional[int] = None
     suite_ids: Optional[List[int]] = None
     bud_run_id: Optional[int] = None
@@ -653,6 +661,7 @@ class TestCampaignResponse(BaseModel):
     name: str
     description: Optional[str] = None
     status: str
+    visibility: str = "internal"
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     created_at: datetime
@@ -739,6 +748,7 @@ class DesignItemCreate(StrictModel):
     status: str = "Draft"
     priority: str = "Medium"
     design_type: str = "Architecture"
+    visibility: str = Field(default="internal", pattern=ARTEFACT_VISIBILITY_PATTERN)
 
 
 class DesignItemUpdate(StrictModel):
@@ -747,6 +757,7 @@ class DesignItemUpdate(StrictModel):
     status: Optional[str] = None
     priority: Optional[str] = None
     design_type: Optional[str] = None
+    visibility: Optional[str] = Field(default=None, pattern=ARTEFACT_VISIBILITY_PATTERN)
 
 
 class DesignItemResponse(BaseModel):
@@ -758,6 +769,7 @@ class DesignItemResponse(BaseModel):
     status: str
     priority: str
     design_type: str
+    visibility: str = "internal"
     created_at: datetime
     updated_at: datetime
 
@@ -781,6 +793,7 @@ class RiskItemCreate(StrictModel):
     probability: str = "Medium"
     mitigation: Optional[str] = None
     risk_category: str = "Technical"
+    visibility: str = Field(default="internal", pattern=ARTEFACT_VISIBILITY_PATTERN)
 
 
 class RiskItemUpdate(StrictModel):
@@ -791,6 +804,7 @@ class RiskItemUpdate(StrictModel):
     probability: Optional[str] = None
     mitigation: Optional[str] = None
     risk_category: Optional[str] = None
+    visibility: Optional[str] = Field(default=None, pattern=ARTEFACT_VISIBILITY_PATTERN)
 
 
 class RiskItemResponse(BaseModel):
@@ -804,6 +818,7 @@ class RiskItemResponse(BaseModel):
     probability: str
     mitigation: Optional[str] = None
     risk_category: str
+    visibility: str = "internal"
     created_at: datetime
     updated_at: datetime
 
@@ -827,6 +842,7 @@ class ChangeRequestCreate(StrictModel):
     change_type: str = "Enhancement"
     impact_assessment: Optional[str] = None
     justification: Optional[str] = None
+    visibility: str = Field(default="internal", pattern=ARTEFACT_VISIBILITY_PATTERN)
 
 
 class ChangeRequestUpdate(StrictModel):
@@ -837,6 +853,7 @@ class ChangeRequestUpdate(StrictModel):
     change_type: Optional[str] = None
     impact_assessment: Optional[str] = None
     justification: Optional[str] = None
+    visibility: Optional[str] = Field(default=None, pattern=ARTEFACT_VISIBILITY_PATTERN)
 
 
 class ChangeRequestResponse(BaseModel):
@@ -850,6 +867,7 @@ class ChangeRequestResponse(BaseModel):
     change_type: str
     impact_assessment: Optional[str] = None
     justification: Optional[str] = None
+    visibility: str = "internal"
     created_at: datetime
     updated_at: datetime
 
@@ -882,6 +900,7 @@ class DefectCreate(StrictModel):
     external_issue_number: Optional[int] = None
     external_issue_url: Optional[str] = None
     external_issue_state: Optional[str] = None
+    visibility: str = Field(default="internal", pattern=ARTEFACT_VISIBILITY_PATTERN)
 
 
 class DefectUpdate(StrictModel):
@@ -901,6 +920,7 @@ class DefectUpdate(StrictModel):
     external_issue_number: Optional[int] = None
     external_issue_url: Optional[str] = None
     external_issue_state: Optional[str] = None
+    visibility: Optional[str] = Field(default=None, pattern=ARTEFACT_VISIBILITY_PATTERN)
 
 
 class DefectResponse(BaseModel):
@@ -923,6 +943,7 @@ class DefectResponse(BaseModel):
     external_issue_number: Optional[int] = None
     external_issue_url: Optional[str] = None
     external_issue_state: Optional[str] = None
+    visibility: str = "internal"
     closed_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
@@ -986,6 +1007,7 @@ class TestConceptCreate(StrictModel):
     description: Optional[str] = None
     status: str = "Draft"
     coverage: float = 0
+    visibility: str = Field(default="internal", pattern=ARTEFACT_VISIBILITY_PATTERN)
 
 
 class TestConceptUpdate(StrictModel):
@@ -993,6 +1015,7 @@ class TestConceptUpdate(StrictModel):
     description: Optional[str] = None
     status: Optional[str] = None
     coverage: Optional[float] = None
+    visibility: Optional[str] = Field(default=None, pattern=ARTEFACT_VISIBILITY_PATTERN)
 
 
 class TestConceptResponse(BaseModel):
@@ -1002,6 +1025,7 @@ class TestConceptResponse(BaseModel):
     name: str
     description: Optional[str] = None
     status: str
+    visibility: str = "internal"
     linked_requirement_ids: List[int] = []
     coverage: float
     created_at: datetime

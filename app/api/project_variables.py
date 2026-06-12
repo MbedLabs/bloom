@@ -21,7 +21,7 @@ router = APIRouter()
 async def list_project_variables(
     project_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     project = (
         await db.execute(select(Project).where(Project.id == project_id))
@@ -29,7 +29,12 @@ async def list_project_variables(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    await require_project_access(db, current_user, project_id)
+    await require_project_access(
+        db,
+        current_user,
+        project_id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
 
     result = await db.execute(
         select(ProjectVariable)

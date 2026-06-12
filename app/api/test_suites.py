@@ -7,7 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.link_read_utils import get_requirement_ids_verified_by_test_cases
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_project_access, require_role
+from app.core.security import (
+    apply_external_visibility_filter,
+    get_current_user,
+    require_project_access,
+    require_role,
+)
 from app.models import (
     ArtefactLink,
     CampaignSuite,
@@ -57,20 +62,26 @@ async def _build_suite_response(suite: TestSuite, db: AsyncSession) -> TestSuite
         name=suite.name,
         description=suite.description,
         status=suite.status,
+        visibility=suite.visibility,
         created_at=suite.created_at,
         updated_at=suite.updated_at,
         total_items=total_items,
     )
 
 
-async def _build_suite_detail(suite: TestSuite, db: AsyncSession) -> TestSuiteDetailResponse:
+async def _build_suite_detail(
+    suite: TestSuite, db: AsyncSession, current_user: User | None = None
+) -> TestSuiteDetailResponse:
     base = await _build_suite_response(suite, db)
-    items_result = await db.execute(
+    items_query = (
         select(TestSuiteItem, TestCase)
         .join(TestCase, TestCase.id == TestSuiteItem.test_case_id)
         .where(TestSuiteItem.suite_id == suite.id)
         .order_by(TestSuiteItem.order, TestSuiteItem.created_at)
     )
+    if current_user is not None:
+        items_query = apply_external_visibility_filter(items_query, TestCase, current_user)
+    items_result = await db.execute(items_query)
 
     item_responses = []
     tc_ids = []
@@ -96,9 +107,13 @@ async def _build_suite_detail(suite: TestSuite, db: AsyncSession) -> TestSuiteDe
         reqs = (
             (
                 await db.execute(
-                    select(Requirement)
-                    .where(Requirement.id.in_(requirement_ids))
-                    .order_by(Requirement.req_id)
+                    apply_external_visibility_filter(
+                        select(Requirement)
+                        .where(Requirement.id.in_(requirement_ids))
+                        .order_by(Requirement.req_id),
+                        Requirement,
+                        current_user,
+                    )
                 )
             )
             .scalars()
@@ -109,10 +124,14 @@ async def _build_suite_detail(suite: TestSuite, db: AsyncSession) -> TestSuiteDe
     campaigns = (
         (
             await db.execute(
-                select(TestCampaign)
-                .join(CampaignSuite, CampaignSuite.campaign_id == TestCampaign.id)
-                .where(CampaignSuite.suite_id == suite.id)
-                .order_by(TestCampaign.created_at.desc())
+                apply_external_visibility_filter(
+                    select(TestCampaign)
+                    .join(CampaignSuite, CampaignSuite.campaign_id == TestCampaign.id)
+                    .where(CampaignSuite.suite_id == suite.id)
+                    .order_by(TestCampaign.created_at.desc()),
+                    TestCampaign,
+                    current_user,
+                )
             )
         )
         .scalars()
@@ -148,7 +167,15 @@ async def _build_suite_detail(suite: TestSuite, db: AsyncSession) -> TestSuiteDe
         )
         if concept_links:
             concepts = (
-                (await db.execute(select(TestConcept).where(TestConcept.id.in_(concept_links))))
+                (
+                    await db.execute(
+                        apply_external_visibility_filter(
+                            select(TestConcept).where(TestConcept.id.in_(concept_links)),
+                            TestConcept,
+                            current_user,
+                        )
+                    )
+                )
                 .scalars()
                 .all()
             )
@@ -177,6 +204,7 @@ async def list_suites(
     await require_project_access(db, current_user, project_id)
 
     base = select(TestSuite).where(TestSuite.project_id == project_id)
+    base = apply_external_visibility_filter(base, TestSuite, current_user)
     total_q = select(func.count()).select_from(base.subquery())
     total = (await db.execute(total_q)).scalar() or 0
 
@@ -219,6 +247,7 @@ async def create_suite(
         name=data.name,
         description=data.description,
         status=data.status,
+        visibility=data.visibility,
     )
     db.add(suite)
     await db.flush()
@@ -232,7 +261,7 @@ async def create_suite(
             db.add(TestSuiteItem(suite_id=suite.id, test_case_id=test_case_id, order=index))
 
     await db.flush()
-    return await _build_suite_detail(suite, db)
+    return await _build_suite_detail(suite, db, current_user)
 
 
 @router.get("/{suite_id}", response_model=TestSuiteDetailResponse)
@@ -242,12 +271,18 @@ async def get_suite(
     current_user: User = Depends(get_current_user),
 ):
     suite = (
-        await db.execute(select(TestSuite).where(TestSuite.id == suite_id))
+        await db.execute(
+            apply_external_visibility_filter(
+                select(TestSuite).where(TestSuite.id == suite_id),
+                TestSuite,
+                current_user,
+            )
+        )
     ).scalar_one_or_none()
     if not suite:
         raise HTTPException(status_code=404, detail="Test suite not found")
     await require_project_access(db, current_user, suite.project_id)
-    return await _build_suite_detail(suite, db)
+    return await _build_suite_detail(suite, db, current_user)
 
 
 @router.patch("/{suite_id}", response_model=TestSuiteDetailResponse)
@@ -275,7 +310,7 @@ async def update_suite(
 
     await db.flush()
     await db.refresh(suite)
-    return await _build_suite_detail(suite, db)
+    return await _build_suite_detail(suite, db, current_user)
 
 
 @router.delete("/{suite_id}", status_code=204)
