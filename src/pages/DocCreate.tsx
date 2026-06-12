@@ -163,12 +163,13 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const { data: users } = useQuery({
     queryKey: ['users'],
     queryFn: usersApi.list,
+    enabled: canEditDocs,
   })
 
   const { data: projectVariables } = useQuery({
     queryKey: ['projectVariables', projectId],
     queryFn: () => projectVariablesApi.list(projectId),
-    enabled: !!projectId,
+    enabled: canEditDocs && !!projectId,
   })
 
   const apiForType = useCallback((type: DocType) => {

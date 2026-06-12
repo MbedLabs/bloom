@@ -75,6 +75,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
   const { data: users } = useQuery({
     queryKey: ['users'],
     queryFn: usersApi.list,
+    enabled: user?.role === 'admin' || user?.role === 'maintainer',
   })
 
   const derivedMembershipLinks = useMemo(() => {
@@ -255,7 +256,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
                 {testCase.reviewed_at && <div className="text-xs text-muted-foreground mt-0.5">{formatDateTime(testCase.reviewed_at)}</div>}
               </div>
               <button
-                disabled={!testCase.reviewer_id || markReviewedMutation.isPending}
+                disabled={!canEditDocs || !testCase.reviewer_id || markReviewedMutation.isPending}
                 onClick={() => testCase.reviewer_id && markReviewedMutation.mutate(testCase.reviewer_id)}
                 className="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-amber-500/90 text-white text-xs font-medium hover:bg-amber-500 disabled:opacity-50"
               >
@@ -277,7 +278,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
                 {testCase.approved_at && <div className="text-xs text-muted-foreground mt-0.5">{formatDateTime(testCase.approved_at)}</div>}
               </div>
               <button
-                disabled={!testCase.approver_id || markApprovedMutation.isPending}
+                disabled={!canEditDocs || !testCase.approver_id || markApprovedMutation.isPending}
                 onClick={() => testCase.approver_id && markApprovedMutation.mutate(testCase.approver_id)}
                 className="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-500 disabled:opacity-50"
               >

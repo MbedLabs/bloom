@@ -23,7 +23,7 @@ export default function ProjectParameters() {
   const { data: variables, isLoading: variablesLoading } = useQuery({
     queryKey: ['projectVariables', projectId],
     queryFn: () => projectVariablesApi.list(projectId),
-    enabled: !!projectId,
+    enabled: canEditDocs && !!projectId,
   })
 
   const createMutation = useMutation({
@@ -109,6 +109,25 @@ export default function ProjectParameters() {
         <Link to="/projects" className="mt-4 inline-block text-primary hover:text-primary/80">
           &larr; Back to Projects
         </Link>
+      </div>
+    )
+  }
+
+  if (!canEditDocs) {
+    return (
+      <div className="animate-fade-in space-y-6">
+        <div className="flex items-center gap-4">
+          <Link to={`/projects/${prefix}`} className="p-2 hover:bg-accent/50 rounded-md">
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+          </Link>
+          <div>
+            <h2 className="text-2xl font-bold text-foreground">Project Parameters</h2>
+            <p className="text-muted-foreground">{project.name}</p>
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">
+          Only admins and maintainers can view or edit project parameters.
+        </div>
       </div>
     )
   }

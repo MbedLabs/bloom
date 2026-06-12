@@ -303,6 +303,7 @@ export default function Documents() {
   const { data: users } = useQuery({
     queryKey: ['users'],
     queryFn: usersApi.list,
+    enabled: canEditDocs,
   })
 
   const userMap = useMemo(() => {

@@ -1,24 +1,36 @@
 import { useMemo, useState } from 'react'
+import { useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Layers, Plus, GitCompareArrows } from 'lucide-react'
 
 import { baselinesApi, projectsApi } from '../api/client'
+import { useAuth } from '../contexts/AuthContext'
+import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { formatDateTime } from '../test/date-utils'
 
 export default function Baselines() {
+  const { user } = useAuth()
+  const { prefix } = useParams<{ prefix?: string }>()
+  const { data: project } = useProjectByPrefix(prefix)
   const queryClient = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [form, setForm] = useState({ project_id: '', name: '', description: '', baseline_type: 'Milestone' })
+  const isAdmin = user?.role === 'admin'
+  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const scopedProjectId = project?.id ?? null
+  const canListBaselines = isAdmin || scopedProjectId !== null
 
   const { data: baselines, isLoading } = useQuery({
-    queryKey: ['baselines'],
-    queryFn: () => baselinesApi.list(),
+    queryKey: ['baselines', scopedProjectId ?? 'global'],
+    queryFn: () => baselinesApi.list(scopedProjectId ?? undefined),
+    enabled: canListBaselines,
   })
 
   const { data: projects } = useQuery({
     queryKey: ['projects'],
     queryFn: projectsApi.list,
+    enabled: isAdmin,
   })
 
   const createMutation = useMutation({
@@ -26,7 +38,12 @@ export default function Baselines() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['baselines'] })
       setShowCreate(false)
-      setForm({ project_id: '', name: '', description: '', baseline_type: 'Milestone' })
+      setForm({
+        project_id: scopedProjectId ? String(scopedProjectId) : '',
+        name: '',
+        description: '',
+        baseline_type: 'Milestone',
+      })
     },
   })
 
@@ -45,6 +62,23 @@ export default function Baselines() {
     })
   }
 
+  if (!canListBaselines) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div>
+          <h2 className="text-2xl font-bold text-foreground">Baselines</h2>
+          <p className="text-muted-foreground">
+            Open baselines from a specific project workspace, or use this page as an administrator.
+          </p>
+        </div>
+        <div className="bg-card rounded-lg border border-border shadow-elegant p-6 text-sm text-muted-foreground">
+          This global baselines view is only available to administrators. For project-scoped access,
+          open <span className="font-mono text-foreground">/projects/:prefix/baselines</span>.
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center gap-4">
@@ -52,10 +86,21 @@ export default function Baselines() {
           <h2 className="text-2xl font-bold text-foreground">Baselines</h2>
           <p className="text-muted-foreground">Snapshot and compare project artefacts at specific points in time</p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90">
-          <Plus className="h-4 w-4" />
-          New Baseline
-        </button>
+        {canEditDocs ? (
+          <button
+            onClick={() => {
+              setForm((current) => ({
+                ...current,
+                project_id: scopedProjectId ? String(scopedProjectId) : current.project_id,
+              }))
+              setShowCreate(true)
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4" />
+            New Baseline
+          </button>
+        ) : null}
       </div>
 
       {isLoading ? (
@@ -129,7 +174,7 @@ export default function Baselines() {
         </div>
       )}
 
-      {showCreate && (
+      {canEditDocs && showCreate && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-card border border-border rounded-xl shadow-glow max-w-md w-full">
             <div className="px-6 py-4 border-b border-border">
@@ -138,12 +183,20 @@ export default function Baselines() {
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Project</label>
-                <select value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md" required>
-                  <option value="">Select project</option>
-                  {(projects ?? []).map((project) => (
-                    <option key={project.id} value={project.id}>{project.name}</option>
-                  ))}
-                </select>
+                {scopedProjectId ? (
+                  <input
+                    value={project?.name ?? `Project #${scopedProjectId}`}
+                    className="w-full px-3 py-2 bg-muted border border-input rounded-md text-muted-foreground"
+                    disabled
+                  />
+                ) : (
+                  <select value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md" required>
+                    <option value="">Select project</option>
+                    {(projects ?? []).map((projectOption) => (
+                      <option key={projectOption.id} value={projectOption.id}>{projectOption.name}</option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Name</label>

@@ -127,6 +127,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
   const { data: users } = useQuery({
     queryKey: ['users'],
     queryFn: usersApi.list,
+    enabled: user?.role === 'admin' || user?.role === 'maintainer',
   })
 
   useEffect(() => {
@@ -322,7 +323,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
                 {requirement.reviewed_at && <div className="text-xs text-muted-foreground mt-0.5">{formatDateTime(requirement.reviewed_at)}</div>}
               </div>
               <button
-                disabled={!requirement.reviewer_id || markReviewedMutation.isPending}
+                disabled={!canEditDocs || !requirement.reviewer_id || markReviewedMutation.isPending}
                 onClick={() => requirement.reviewer_id && markReviewedMutation.mutate(requirement.reviewer_id)}
                 className="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-amber-500/90 text-white text-xs font-medium hover:bg-amber-500 disabled:opacity-50"
               >
@@ -344,7 +345,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
                 {requirement.approved_at && <div className="text-xs text-muted-foreground mt-0.5">{formatDateTime(requirement.approved_at)}</div>}
               </div>
               <button
-                disabled={!requirement.approver_id || markApprovedMutation.isPending}
+                disabled={!canEditDocs || !requirement.approver_id || markApprovedMutation.isPending}
                 onClick={() => requirement.approver_id && markApprovedMutation.mutate(requirement.approver_id)}
                 className="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-500 disabled:opacity-50"
               >
