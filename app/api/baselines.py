@@ -23,8 +23,11 @@ from app.schemas import BaselineCreate, BaselineResponse, BaselineUpdate
 router = APIRouter()
 
 
-def _baseline_response(item: Baseline) -> BaselineResponse:
-    return BaselineResponse.model_validate(item)
+def _baseline_response(item: Baseline, current_user: User) -> BaselineResponse:
+    response = BaselineResponse.model_validate(item)
+    if current_user.role == UserRole.external:
+        response.snapshot = None
+    return response
 
 
 async def _build_snapshot(db: AsyncSession, project_id: int) -> dict:
@@ -92,7 +95,7 @@ async def list_baselines(
     elif current_user.role != UserRole.admin:
         raise HTTPException(status_code=400, detail="project_id is required for non-admin users")
     result = await db.execute(query)
-    return [_baseline_response(item) for item in result.scalars().all()]
+    return [_baseline_response(item, current_user) for item in result.scalars().all()]
 
 
 @router.post("", response_model=BaselineResponse, status_code=201)
@@ -128,7 +131,7 @@ async def create_baseline(
     db.add(item)
     await db.flush()
     await db.refresh(item)
-    return _baseline_response(item)
+    return _baseline_response(item, current_user)
 
 
 @router.get("/{baseline_id}", response_model=BaselineResponse)
@@ -143,7 +146,7 @@ async def get_baseline(
     if not item:
         raise HTTPException(status_code=404, detail="Baseline not found")
     await require_project_access(db, current_user, item.project_id)
-    return _baseline_response(item)
+    return _baseline_response(item, current_user)
 
 
 @router.patch("/{baseline_id}", response_model=BaselineResponse)
@@ -171,7 +174,7 @@ async def update_baseline(
 
     await db.flush()
     await db.refresh(item)
-    return _baseline_response(item)
+    return _baseline_response(item, current_user)
 
 
 @router.delete("/{baseline_id}", status_code=204)

@@ -12,9 +12,16 @@ from app.core.link_rules import (
     is_known_linkable_type,
     normalize_linkable_type,
 )
-from app.core.security import get_current_user, require_project_access, require_role
+from app.core.security import (
+    external_doc_type_allowed,
+    get_current_user,
+    get_external_doc_types,
+    require_project_access,
+    require_role,
+)
 from app.models import (
     ArtefactLink,
+    ArtefactVisibility,
     ChangeRequest,
     Defect,
     DesignItem,
@@ -74,6 +81,55 @@ async def _artefact_exists_in_project(
     return False
 
 
+async def _link_endpoint_visible_to_current_user(
+    db: AsyncSession,
+    project_id: int,
+    artefact_type: str,
+    artefact_id: int,
+    current_user: User,
+    allowed_doc_types: set[str] | None,
+) -> bool:
+    normalized_type = normalize_linkable_type(artefact_type)
+
+    if normalized_type in ARTEFACT_MODELS:
+        model = ARTEFACT_MODELS[normalized_type]
+        row = (
+            await db.execute(
+                select(model).where(model.project_id == project_id, model.id == artefact_id)
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            return False
+        if current_user.role == UserRole.external:
+            return getattr(row, "visibility", None) == ArtefactVisibility.customer.value
+        return True
+
+    if normalized_type in CANONICAL_DOCUMENT_KINDS:
+        row = (
+            await db.execute(
+                select(Document).where(
+                    Document.project_id == project_id,
+                    Document.id == artefact_id,
+                    Document.doc_type == normalized_type,
+                )
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            return False
+        if current_user.role == UserRole.external:
+            return (
+                row.visibility == ArtefactVisibility.customer.value
+                and external_doc_type_allowed(
+                    current_user,
+                    allowed_doc_types,
+                    normalized_type,
+                )
+            )
+        return True
+
+    return False
+
+
 @router.get("", response_model=list[ArtefactLinkResponse])
 async def list_links(
     project_id: int = Query(...),
@@ -85,6 +141,7 @@ async def list_links(
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)
+    allowed_doc_types = await get_external_doc_types(db, current_user, project_id)
 
     query = select(ArtefactLink).where(ArtefactLink.project_id == project_id)
     if source_type:
@@ -96,6 +153,35 @@ async def list_links(
     if target_id is not None:
         query = query.where(ArtefactLink.target_id == target_id)
     rows = (await db.execute(query.order_by(ArtefactLink.created_at.desc()))).scalars().all()
+
+    if current_user.role == UserRole.external:
+        visible_rows = []
+        for row in rows:
+            source_visible = await _link_endpoint_visible_to_current_user(
+                db,
+                project_id,
+                row.source_type,
+                row.source_id,
+                current_user,
+                allowed_doc_types,
+            )
+            if not source_visible:
+                continue
+
+            target_visible = await _link_endpoint_visible_to_current_user(
+                db,
+                project_id,
+                row.target_type,
+                row.target_id,
+                current_user,
+                allowed_doc_types,
+            )
+            if not target_visible:
+                continue
+
+            visible_rows.append(row)
+        rows = visible_rows
+
     return [ArtefactLinkResponse.model_validate(row) for row in rows]
 
 

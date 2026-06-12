@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.link_read_utils import get_test_case_ids_verifying_requirements
 from app.core.document_kinds import normalize_document_kind
+from app.core.security import apply_external_visibility_filter
 from app.models import (
     ArtefactActivity,
     ArtefactLink,
@@ -88,12 +89,21 @@ WORKFLOW_TRANSITIONS = {
 }
 
 
-async def get_artefact_or_404(db: AsyncSession, artefact_type: str, artefact_id: int):
+async def get_artefact_or_404(
+    db: AsyncSession,
+    artefact_type: str,
+    artefact_id: int,
+    current_user: User | None = None,
+):
     model = ARTEFACT_MODELS.get(artefact_type)
     if not model:
         raise HTTPException(status_code=404, detail="Unsupported artefact type")
 
-    artefact = (await db.execute(select(model).where(model.id == artefact_id))).scalar_one_or_none()
+    query = select(model).where(model.id == artefact_id)
+    if current_user is not None and hasattr(model, "visibility"):
+        query = apply_external_visibility_filter(query, model, current_user)
+
+    artefact = (await db.execute(query)).scalar_one_or_none()
     if not artefact:
         raise HTTPException(status_code=404, detail="Artefact not found")
     return artefact
@@ -326,9 +336,9 @@ async def _get_related_requirement_ids_from_links(
 
 
 async def build_related_response(
-    db: AsyncSession, artefact_type: str, artefact_id: int
+    db: AsyncSession, artefact_type: str, artefact_id: int, current_user: User
 ) -> ArtefactRelatedResponse:
-    artefact = await get_artefact_or_404(db, artefact_type, artefact_id)
+    artefact = await get_artefact_or_404(db, artefact_type, artefact_id, current_user)
     project = (
         await db.execute(select(Project).where(Project.id == artefact.project_id))
     ).scalar_one()
@@ -341,25 +351,32 @@ async def build_related_response(
 
     requirements = []
     if requirement_ids:
+        requirements_query = (
+            select(Requirement)
+            .where(Requirement.id.in_(requirement_ids))
+            .order_by(Requirement.req_id)
+        )
         requirements = (
             (
                 await db.execute(
-                    select(Requirement)
-                    .where(Requirement.id.in_(requirement_ids))
-                    .order_by(Requirement.req_id)
+                    apply_external_visibility_filter(requirements_query, Requirement, current_user)
                 )
             )
             .scalars()
             .all()
         )
+        requirement_ids = [req.id for req in requirements]
 
     test_case_ids = await get_test_case_ids_verifying_requirements(requirement_ids, db)
     test_cases = []
     if test_case_ids:
+        test_case_query = (
+            select(TestCase).where(TestCase.id.in_(test_case_ids)).order_by(TestCase.tc_id)
+        )
         test_cases = (
             (
                 await db.execute(
-                    select(TestCase).where(TestCase.id.in_(test_case_ids)).order_by(TestCase.tc_id)
+                    apply_external_visibility_filter(test_case_query, TestCase, current_user)
                 )
             )
             .scalars()
@@ -384,7 +401,13 @@ async def build_related_response(
     for section in sections:
         if section.document_id not in documents_by_id:
             document = (
-                await db.execute(select(Document).where(Document.id == section.document_id))
+                await db.execute(
+                    apply_external_visibility_filter(
+                        select(Document).where(Document.id == section.document_id),
+                        Document,
+                        current_user,
+                    )
+                )
             ).scalar_one_or_none()
             if document:
                 documents_by_id[section.document_id] = {

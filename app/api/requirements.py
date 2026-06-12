@@ -23,7 +23,12 @@ from app.api.link_read_utils import (
 )
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_project_access, require_role
+from app.core.security import (
+    apply_external_visibility_filter,
+    get_current_user,
+    require_project_access,
+    require_role,
+)
 from app.models import (
     ArtefactLink,
     Project,
@@ -234,6 +239,7 @@ async def _build_requirement_response(
         title=req.title,
         description=req.description,
         status=req.status,
+        visibility=req.visibility,
         priority=req.priority,
         req_type=req.req_type,
         req_origin=req.req_origin,
@@ -266,6 +272,7 @@ def _build_requirement_list_response(
         title=req.title,
         description=req.description,
         status=req.status,
+        visibility=req.visibility,
         priority=req.priority,
         req_type=req.req_type,
         req_origin=req.req_origin,
@@ -302,6 +309,7 @@ async def list_requirements(
     await require_project_access(db, current_user, project_id)
 
     base = select(Requirement).where(Requirement.project_id == project_id)
+    base = apply_external_visibility_filter(base, Requirement, current_user)
     if status:
         base = base.where(Requirement.status == status)
 
@@ -439,13 +447,17 @@ async def get_requirement(
     """
     Get a requirement by ID, including children and linked test cases.
     """
-    result = await db.execute(select(Requirement).where(Requirement.id == requirement_id))
+    result = await db.execute(
+        apply_external_visibility_filter(
+            select(Requirement).where(Requirement.id == requirement_id),
+            Requirement,
+            current_user,
+        )
+    )
     requirement = result.scalar_one_or_none()
 
     if not requirement:
         raise HTTPException(status_code=404, detail="Requirement not found")
-
-    await require_project_access(db, current_user, requirement.project_id)
 
     return await _build_requirement_response(requirement, db)
 
@@ -488,6 +500,8 @@ async def update_requirement(
         requirement.req_type = data.req_type
     if data.req_origin is not None:
         requirement.req_origin = data.req_origin
+    if data.visibility is not None:
+        requirement.visibility = data.visibility
 
     if "parent_id" in fields_set:
         if data.parent_id is None:

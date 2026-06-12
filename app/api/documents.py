@@ -15,7 +15,12 @@ from app.api.artefact_utils import (
 from app.core.database import get_db
 from app.core.document_kinds import normalize_document_kind, require_document_kind
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_project_access, require_role
+from app.core.security import (
+    apply_external_visibility_filter,
+    get_current_user,
+    require_project_access,
+    require_role,
+)
 from app.models import Document, DocumentSection
 from app.models.user import User, UserRole
 from app.schemas import (
@@ -44,6 +49,7 @@ async def list_documents(
     await require_project_access(db, current_user, project_id)
 
     base_q = select(Document).where(Document.project_id == project_id)
+    base_q = apply_external_visibility_filter(base_q, Document, current_user)
     total_q = select(func.count()).select_from(base_q.subquery())
     total = (await db.execute(total_q)).scalar() or 0
 
@@ -143,6 +149,7 @@ async def create_document(
         doc_id=document.doc_id,
         title=document.title,
         doc_type=normalize_document_kind(document.doc_type),
+        visibility=document.visibility,
         status=document.status,
         version=document.version,
         description=document.description,
@@ -160,13 +167,17 @@ async def get_document(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Document).where(Document.id == document_id))
+    result = await db.execute(
+        apply_external_visibility_filter(
+            select(Document).where(Document.id == document_id),
+            Document,
+            current_user,
+        )
+    )
     document = result.scalar_one_or_none()
 
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
-
-    await require_project_access(db, current_user, document.project_id)
 
     sections_result = await db.execute(
         select(DocumentSection)
@@ -213,6 +224,7 @@ async def get_document(
         doc_id=document.doc_id,
         title=document.title,
         doc_type=normalize_document_kind(document.doc_type),
+        visibility=document.visibility,
         status=document.status,
         version=document.version,
         description=document.description,
@@ -251,6 +263,8 @@ async def update_document(
         document.title = data.title
     if data.doc_type is not None:
         document.doc_type = require_document_kind(data.doc_type)
+    if data.visibility is not None:
+        document.visibility = data.visibility
     if data.status is not None:
         document.status = data.status
     if data.version is not None:
@@ -294,6 +308,7 @@ async def update_document(
         doc_id=document.doc_id,
         title=document.title,
         doc_type=normalize_document_kind(document.doc_type),
+        visibility=document.visibility,
         status=document.status,
         version=document.version,
         description=document.description,

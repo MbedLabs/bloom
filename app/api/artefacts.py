@@ -38,7 +38,7 @@ async def list_comments(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    artefact = await get_artefact_or_404(db, artefact_type, artefact_id)
+    artefact = await get_artefact_or_404(db, artefact_type, artefact_id, current_user)
     await require_project_access(db, current_user, artefact.project_id)
     comments = (
         (
@@ -69,7 +69,7 @@ async def create_comment(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    artefact = await get_artefact_or_404(db, artefact_type, artefact_id)
+    artefact = await get_artefact_or_404(db, artefact_type, artefact_id, current_user)
     await require_project_access(db, current_user, artefact.project_id)
     comment = ArtefactComment(
         artefact_type=artefact_type,
@@ -100,7 +100,7 @@ async def list_activity(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    artefact = await get_artefact_or_404(db, artefact_type, artefact_id)
+    artefact = await get_artefact_or_404(db, artefact_type, artefact_id, current_user)
     await require_project_access(db, current_user, artefact.project_id)
     rows = (
         (
@@ -126,9 +126,9 @@ async def get_related_items(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    artefact = await get_artefact_or_404(db, artefact_type, artefact_id)
+    artefact = await get_artefact_or_404(db, artefact_type, artefact_id, current_user)
     await require_project_access(db, current_user, artefact.project_id)
-    return await build_related_response(db, artefact_type, artefact_id)
+    return await build_related_response(db, artefact_type, artefact_id, current_user)
 
 
 @router.post("/{artefact_type}/{artefact_id}/transition")
@@ -139,7 +139,7 @@ async def transition_status(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    artefact = await get_artefact_or_404(db, artefact_type, artefact_id)
+    artefact = await get_artefact_or_404(db, artefact_type, artefact_id, current_user)
     await require_project_access(
         db,
         current_user,

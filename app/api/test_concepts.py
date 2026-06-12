@@ -13,7 +13,12 @@ from app.api.artefact_utils import (
 from app.api.link_read_utils import merged_linked_requirement_ids_for_test_concept
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_project_access, require_role
+from app.core.security import (
+    apply_external_visibility_filter,
+    get_current_user,
+    require_project_access,
+    require_role,
+)
 from app.models import Project, TestConcept
 from app.models.user import User, UserRole
 from app.schemas import (
@@ -37,6 +42,7 @@ async def _response(db: AsyncSession, item: TestConcept) -> TestConceptResponse:
         name=item.name,
         description=item.description,
         status=item.status,
+        visibility=item.visibility,
         linked_requirement_ids=merged,
         coverage=item.coverage,
         created_at=item.created_at,
@@ -55,6 +61,7 @@ async def list_test_concepts(
     await require_project_access(db, current_user, project_id)
 
     base = select(TestConcept).where(TestConcept.project_id == project_id)
+    base = apply_external_visibility_filter(base, TestConcept, current_user)
     total_q = select(func.count()).select_from(base.subquery())
     total = (await db.execute(total_q)).scalar() or 0
     query = base.order_by(TestConcept.created_at.desc()).offset(skip).limit(limit)
@@ -101,6 +108,7 @@ async def create_test_concept(
         name=data.name,
         description=data.description,
         status=data.status,
+        visibility=data.visibility,
         linked_requirement_ids=None,
         coverage=data.coverage,
     )
@@ -124,7 +132,13 @@ async def get_test_concept(
     current_user: User = Depends(get_current_user),
 ):
     item = (
-        await db.execute(select(TestConcept).where(TestConcept.id == concept_id))
+        await db.execute(
+            apply_external_visibility_filter(
+                select(TestConcept).where(TestConcept.id == concept_id),
+                TestConcept,
+                current_user,
+            )
+        )
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Test concept not found")

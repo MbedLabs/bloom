@@ -1,55 +1,20 @@
-"""HTTP tests for dashboard stats (TST-005)."""
-
 import asyncio
-import os
 from dataclasses import dataclass
-
-os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characters-long")
 
 from fastapi import HTTPException, status
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from app.core.cache import dashboard_stats_cache
 from app.core.database import Base, get_db
 from app.core.security import get_current_user, get_password_hash
 from app.main import app
-from app.models import Project, ProjectMembership, Requirement, TestCase, User
+from app.models import IntegrationSetting, Project, ProjectMembership, User
 from app.models.user import UserRole
 
 
-def test_dashboard_stats_shape(api_client: TestClient):
-    from app.core.config import settings
-
-    login = api_client.post(
-        "/api/auth/login",
-        json={"email": settings.ADMIN_EMAIL, "password": settings.ADMIN_PASSWORD},
-    )
-    assert login.status_code == 200
-    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
-
-    resp = api_client.get("/api/dashboard/stats", headers=headers)
-    assert resp.status_code == 200
-    data = resp.json()
-    for key in (
-        "total_projects",
-        "total_requirements",
-        "total_test_cases",
-        "coverage_percent",
-        "projects",
-    ):
-        assert key in data
-    assert isinstance(data["projects"], list)
-
-    # Cached second call should match
-    resp2 = api_client.get("/api/dashboard/stats", headers=headers)
-    assert resp2.status_code == 200
-    assert resp2.json()["total_projects"] == data["total_projects"]
-
-
 @dataclass
-class DashboardVisibilityHarness:
+class IntegrationSettingsHarness:
     client: TestClient
     session_maker: async_sessionmaker[AsyncSession]
     actor_id: dict[str, int | None]
@@ -61,7 +26,7 @@ class DashboardVisibilityHarness:
         return asyncio.run(coro)
 
 
-def _build_dashboard_harness():
+def _build_harness():
     from app import models  # noqa: F401
 
     engine = create_async_engine(
@@ -104,16 +69,15 @@ def _build_dashboard_harness():
     asyncio.run(_create_schema())
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_current_user] = _override_get_current_user
-    dashboard_stats_cache._store.clear()
 
     client = TestClient(app, base_url="http://test")
-    harness = DashboardVisibilityHarness(
+    harness = IntegrationSettingsHarness(
         client=client, session_maker=session_maker, actor_id=actor_id
     )
     return harness, engine
 
 
-async def _seed_dashboard_visibility_data(session_maker: async_sessionmaker[AsyncSession]):
+async def _seed_integration_settings_data(session_maker: async_sessionmaker[AsyncSession]):
     async with session_maker() as session:
         external = User(
             email="external@example.com",
@@ -125,7 +89,7 @@ async def _seed_dashboard_visibility_data(session_maker: async_sessionmaker[Asyn
         session.add(external)
         await session.flush()
 
-        project = Project(name="Dashboard Visibility", prefix="DSV", description="Visibility")
+        project = Project(name="Integration Visibility", prefix="IGV", description="Visibility")
         session.add(project)
         await session.flush()
 
@@ -137,66 +101,40 @@ async def _seed_dashboard_visibility_data(session_maker: async_sessionmaker[Asyn
             )
         )
 
-        session.add_all(
-            [
-                Requirement(
-                    project_id=project.id,
-                    req_id="DSV-REQ-001",
-                    title="Customer requirement",
-                    status="Draft",
-                    visibility="customer",
-                    priority="Medium",
-                    req_type="Functional",
-                    req_origin="Customer",
-                ),
-                Requirement(
-                    project_id=project.id,
-                    req_id="DSV-REQ-002",
-                    title="Internal requirement",
-                    status="Draft",
-                    visibility="internal",
-                    priority="Medium",
-                    req_type="Functional",
-                    req_origin="Internal",
-                ),
-                TestCase(
-                    project_id=project.id,
-                    tc_id="DSV-TC-001",
-                    title="Customer test case",
-                    status="Draft",
-                    visibility="customer",
-                ),
-                TestCase(
-                    project_id=project.id,
-                    tc_id="DSV-TC-002",
-                    title="Internal test case",
-                    status="Draft",
-                    visibility="internal",
-                ),
-            ]
+        session.add(
+            IntegrationSetting(
+                project_id=project.id,
+                tracker="github",
+                base_url=None,
+                token_encrypted="secret-token",
+                webhook_secret="top-secret-webhook",
+                enabled=True,
+            )
         )
         await session.commit()
         await session.refresh(external)
         await session.refresh(project)
-
         return {"external": external, "project": project}
 
 
-def test_external_dashboard_ignores_internal_artefacts():
-    harness, engine = _build_dashboard_harness()
+def test_integration_settings_redact_webhook_secret():
+    harness, engine = _build_harness()
     try:
-        seeded = harness.run(_seed_dashboard_visibility_data(harness.session_maker))
+        seeded = harness.run(_seed_integration_settings_data(harness.session_maker))
         harness.act_as(seeded["external"])
 
-        response = harness.client.get("/api/dashboard/stats")
+        response = harness.client.get(
+            "/api/integrations/settings",
+            params={"project_id": seeded["project"].id},
+        )
         assert response.status_code == 200, response.text
         body = response.json()
-        assert body["total_requirements"] == 1
-        assert body["total_test_cases"] == 1
-        assert body["uncovered_requirements"] == 1
-        assert body["projects"][0]["uncovered_requirement_count"] == 1
+        assert len(body) == 1
+        assert body[0]["tracker"] == "github"
+        assert body[0]["has_token"] is True
+        assert body[0]["has_webhook_secret"] is True
+        assert "webhook_secret" not in body[0]
     finally:
         harness.client.close()
         app.dependency_overrides.clear()
-        dashboard_stats_cache._store.clear()
         asyncio.run(engine.dispose())

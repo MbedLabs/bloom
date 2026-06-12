@@ -40,7 +40,7 @@ class IntegrationSettingResponse(BaseModel):
     tracker: str
     base_url: Optional[str] = None
     has_token: bool
-    webhook_secret: Optional[str] = None
+    has_webhook_secret: bool
     enabled: bool
     created_at: datetime
     updated_at: datetime
@@ -78,7 +78,7 @@ def _setting_response(s: IntegrationSetting) -> IntegrationSettingResponse:
         tracker=s.tracker,
         base_url=s.base_url,
         has_token=bool(s.token_encrypted),
-        webhook_secret=s.webhook_secret,
+        has_webhook_secret=bool(s.webhook_secret),
         enabled=s.enabled,
         created_at=s.created_at,
         updated_at=s.updated_at,

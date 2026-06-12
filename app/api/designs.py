@@ -12,7 +12,12 @@ from app.api.artefact_utils import (
 )
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_project_access, require_role
+from app.core.security import (
+    apply_external_visibility_filter,
+    get_current_user,
+    require_project_access,
+    require_role,
+)
 from app.models import DesignItem, Project
 from app.models.user import User, UserRole
 from app.schemas import (
@@ -40,6 +45,7 @@ async def list_design_items(
     await require_project_access(db, current_user, project_id)
 
     base = select(DesignItem).where(DesignItem.project_id == project_id)
+    base = apply_external_visibility_filter(base, DesignItem, current_user)
     total_q = select(func.count()).select_from(base.subquery())
     total = (await db.execute(total_q)).scalar() or 0
     query = base.order_by(DesignItem.created_at.desc()).offset(skip).limit(limit)
@@ -88,6 +94,7 @@ async def create_design_item(
         status=data.status,
         priority=data.priority,
         design_type=data.design_type,
+        visibility=data.visibility,
         linked_requirement_id=None,
     )
     db.add(item)
@@ -110,7 +117,11 @@ async def get_design_item(
     current_user: User = Depends(get_current_user),
 ):
     item = (
-        await db.execute(select(DesignItem).where(DesignItem.id == design_id))
+        await db.execute(
+            apply_external_visibility_filter(
+                select(DesignItem).where(DesignItem.id == design_id), DesignItem, current_user
+            )
+        )
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Design item not found")
