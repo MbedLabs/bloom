@@ -57,15 +57,14 @@ export default function IntegrationSettingsPanel({ projectId }: { projectId: num
     const cur = activeFromServer === 'github' ? githubSetting : activeFromServer === 'gitlab' ? gitlabSetting : null
     setBaseUrl(cur?.base_url ?? '')
     setToken('')
-    setWebhookSecret(cur?.webhook_secret ?? '')
+    setWebhookSecret('')
     setEnabled(cur?.enabled ?? true)
     setError(null)
     setDirty(false)
   }, [settings, activeFromServer, githubSetting, gitlabSetting])
 
-  const confirmRemove = (row: { has_token: boolean; webhook_secret: string | null; base_url: string | null }) => {
-    const hasData =
-      row.has_token || (row.webhook_secret && row.webhook_secret.length > 0) || (row.base_url && row.base_url.length > 0)
+  const confirmRemove = (row: { has_token: boolean; has_webhook_secret: boolean; base_url: string | null }) => {
+    const hasData = row.has_token || row.has_webhook_secret || (row.base_url && row.base_url.length > 0)
     if (!hasData) return true
     return window.confirm('This removes the stored integration (token and webhook settings) for this project. Continue?')
   }
@@ -78,7 +77,7 @@ export default function IntegrationSettingsPanel({ projectId }: { projectId: num
           const hasData = rows.some(
             (r) =>
               r.has_token ||
-              (r.webhook_secret && r.webhook_secret.length > 0) ||
+              r.has_webhook_secret ||
               (r.base_url && r.base_url.length > 0)
           )
           if (hasData && !window.confirm('Remove all external tracker configuration for this project?')) {
@@ -148,7 +147,7 @@ export default function IntegrationSettingsPanel({ projectId }: { projectId: num
     const row = next === 'github' ? githubSetting : gitlabSetting
     setBaseUrl(row?.base_url ?? '')
     setToken('')
-    setWebhookSecret(row?.webhook_secret ?? '')
+    setWebhookSecret('')
     setEnabled(row?.enabled ?? true)
   }
 
@@ -239,7 +238,11 @@ export default function IntegrationSettingsPanel({ projectId }: { projectId: num
                 />
               </div>
               <div>
-                <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">Webhook secret</label>
+                <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                  {currentRow?.has_webhook_secret
+                    ? 'Replace webhook secret (leave empty to keep current)'
+                    : 'Webhook secret'}
+                </label>
                 <input
                   value={webhookSecret}
                   onChange={(e) => {

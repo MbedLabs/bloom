@@ -160,6 +160,7 @@ function LayoutInner() {
     : user?.role === 'maintainer'
     ? 'bg-blue-500/10 text-blue-400'
     : 'bg-green-500/10 text-green-400'
+  const canEditProjectParameters = user?.role === 'admin' || user?.role === 'maintainer'
 
   const handleLogout = () => {
     logout()
@@ -275,7 +276,9 @@ function LayoutInner() {
           {/* Project Context Nav (shown when inside a project) */}
           {isInProject && (
             <div className="space-y-0.5 mt-2">
-              {projectNav.map((item) => {
+              {projectNav
+                .filter((item) => item.href !== 'parameters' || canEditProjectParameters)
+                .map((item) => {
                 const projSlug = location.pathname.split('/')[2]
                 let to = ''
                 if (item.tab) {

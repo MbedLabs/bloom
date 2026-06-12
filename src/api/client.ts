@@ -1251,7 +1251,7 @@ export interface IntegrationSetting {
   tracker: string
   base_url: string | null
   has_token: boolean
-  webhook_secret: string | null
+  has_webhook_secret: boolean
   enabled: boolean
   created_at: string
   updated_at: string

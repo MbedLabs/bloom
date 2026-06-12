@@ -6,12 +6,14 @@ import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Pencil, Trash2, X }
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import { usePageMeta } from '../contexts/PageMetaContext'
+import { useAuth } from '../contexts/AuthContext'
 import { docUrl } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 
 const CAMPAIGN_STATUSES = ['Planned', 'Scope', 'In Progress', 'Completed', 'Aborted']
 
 export default function CampaignDetail({ resolvedId }: { resolvedId?: number } = {}) {
+  const { user } = useAuth()
   const { prefix, campaignId } = useParams<{ prefix: string; campaignId: string }>()
   const campId = resolvedId || parseInt(campaignId || '0')
   const navigate = useNavigate()
@@ -135,6 +137,7 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
     )
   }
 
+  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
   const suiteScopes = campaign.suite_scopes ?? []
   const adHocItems = campaign.ad_hoc_items ?? []
 
@@ -155,18 +158,20 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
             {campaign.description && <p className="text-muted-foreground mt-0.5">{campaign.description}</p>}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={openEdit} className="inline-flex items-center px-3 py-1.5 border border-input text-foreground rounded-md hover:bg-accent/50 text-sm">
-            <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
-          </button>
-          <button onClick={() => setConfirmDelete(true)} className="inline-flex items-center px-3 py-1.5 border border-destructive/30 text-destructive rounded-md hover:bg-destructive/10 text-sm">
-            <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete
-          </button>
-        </div>
+        {canEditDocs ? (
+          <div className="flex items-center gap-2">
+            <button onClick={openEdit} className="inline-flex items-center px-3 py-1.5 border border-input text-foreground rounded-md hover:bg-accent/50 text-sm">
+              <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
+            </button>
+            <button onClick={() => setConfirmDelete(true)} className="inline-flex items-center px-3 py-1.5 border border-destructive/30 text-destructive rounded-md hover:bg-destructive/10 text-sm">
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {/* Edit modal */}
-      {editOpen && (
+      {canEditDocs && editOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" onKeyDown={handleEditKeyDown}>
           <div className="bg-card rounded-lg shadow-elegant p-6 max-w-md w-full mx-4">
             <div className="flex items-center justify-between mb-4">
@@ -200,7 +205,7 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
       )}
 
       {/* Delete confirmation modal */}
-      {confirmDelete && (
+      {canEditDocs && confirmDelete && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-card rounded-lg shadow-elegant p-6 max-w-sm w-full mx-4">
             <h3 className="text-lg font-semibold text-foreground mb-2">Delete Campaign?</h3>
