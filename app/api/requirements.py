@@ -459,6 +459,8 @@ async def get_requirement(
     if not requirement:
         raise HTTPException(status_code=404, detail="Requirement not found")
 
+    await require_project_access(db, current_user, requirement.project_id)
+
     return await _build_requirement_response(requirement, db)
 
 

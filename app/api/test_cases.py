@@ -317,6 +317,8 @@ async def get_test_case(
     if not test_case:
         raise HTTPException(status_code=404, detail="Test case not found")
 
+    await require_project_access(db, current_user, test_case.project_id)
+
     return await _build_test_case_response(test_case, db)
 
 

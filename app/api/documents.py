@@ -179,6 +179,8 @@ async def get_document(
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    await require_project_access(db, current_user, document.project_id)
+
     sections_result = await db.execute(
         select(DocumentSection)
         .where(
