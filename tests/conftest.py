@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import os
+import socket
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pytest
 from fastapi.testclient import TestClient
@@ -49,9 +51,32 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characte
 os.environ.setdefault("BLOOM_DISABLE_RATE_LIMIT", "1")
 
 
+def _postgres_available_from_env() -> bool:
+    database_url = os.environ.get("DATABASE_URL") or os.environ.get("BLOOM_DATABASE_URL")
+    if not database_url:
+        return False
+
+    normalized = database_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+    parsed = urlparse(normalized)
+    if parsed.scheme not in {"postgres", "postgresql"}:
+        return True
+
+    host = parsed.hostname or "localhost"
+    port = parsed.port or 5432
+
+    try:
+        with socket.create_connection((host, port), timeout=1.0):
+            return True
+    except OSError:
+        return False
+
+
 @pytest.fixture(scope="session")
 def api_client():
     """One TestClient per pytest session — avoids asyncpg teardown across HTTP modules."""
+    if not _postgres_available_from_env():
+        pytest.skip("api_client tests require reachable Postgres for app lifespan startup")
+
     from app.main import app
 
     with TestClient(app, base_url="http://test") as client:
