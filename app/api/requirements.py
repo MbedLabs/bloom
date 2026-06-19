@@ -72,9 +72,11 @@ def _build_test_case_summary(tc: TestCase) -> TestCaseSummary:
 
 
 async def _get_verified_by(
-    req_id: int, db: AsyncSession
+    req_id: int,
+    db: AsyncSession,
+    current_user: User | None = None,
 ) -> list[RequirementVerifiedByLinkResponse]:
-    link_rows = await get_verifying_test_case_links_for_requirement(req_id, db)
+    link_rows = await get_verifying_test_case_links_for_requirement(req_id, db, current_user)
     return [
         RequirementVerifiedByLinkResponse(
             id=link.id,
@@ -100,7 +102,11 @@ class ReqPrefetchContext:
         self.tc_campaign_summaries: dict[int, list[TestCampaignSummary]] = defaultdict(list)
 
 
-async def _build_prefetch_context(root_req_id: int, db: AsyncSession) -> ReqPrefetchContext:
+async def _build_prefetch_context(
+    root_req_id: int,
+    db: AsyncSession,
+    current_user: User | None = None,
+) -> ReqPrefetchContext:
     ctx = ReqPrefetchContext()
 
     # 1. Fetch all descendants using a recursive CTE
@@ -116,6 +122,10 @@ async def _build_prefetch_context(root_req_id: int, db: AsyncSession) -> ReqPref
 
     req_alias = aliased(Requirement)
     descendants_query = select(req_alias).join(hierarchy, req_alias.id == hierarchy.c.id)
+    if current_user is not None:
+        descendants_query = apply_external_visibility_filter(
+            descendants_query, req_alias, current_user
+        )
     all_reqs = (await db.execute(descendants_query)).scalars().all()
     req_ids = [r.id for r in all_reqs]
 
@@ -125,7 +135,7 @@ async def _build_prefetch_context(root_req_id: int, db: AsyncSession) -> ReqPref
 
     # 2. Fetch all verified_by links
     if req_ids:
-        links_result = await db.execute(
+        verified_by_query = (
             select(ArtefactLink, TestCase)
             .join(TestCase, TestCase.id == ArtefactLink.source_id)
             .where(
@@ -136,6 +146,11 @@ async def _build_prefetch_context(root_req_id: int, db: AsyncSession) -> ReqPref
             )
             .order_by(ArtefactLink.created_at.desc(), TestCase.tc_id)
         )
+        if current_user is not None:
+            verified_by_query = apply_external_visibility_filter(
+                verified_by_query, TestCase, current_user
+            )
+        links_result = await db.execute(verified_by_query)
         all_links = links_result.all()
         for link, tc in all_links:
             ctx.verified_by_by_req[link.target_id].append(
@@ -164,11 +179,14 @@ async def _build_prefetch_context(root_req_id: int, db: AsyncSession) -> ReqPref
 
     if tc_ids:
         # Suites
-        suite_items_result = await db.execute(
+        suite_query = (
             select(TestSuiteItem, TestSuite)
             .join(TestSuite, TestSuite.id == TestSuiteItem.suite_id)
             .where(TestSuiteItem.test_case_id.in_(tc_ids))
         )
+        if current_user is not None:
+            suite_query = apply_external_visibility_filter(suite_query, TestSuite, current_user)
+        suite_items_result = await db.execute(suite_query)
         for item, suite in suite_items_result.all():
             ctx.tc_suite_summaries[item.test_case_id].append(
                 TestSuiteSummary(
@@ -180,11 +198,16 @@ async def _build_prefetch_context(root_req_id: int, db: AsyncSession) -> ReqPref
             )
 
         # Campaigns
-        campaign_items_result = await db.execute(
+        campaign_query = (
             select(TestCampaignItem, TestCampaign)
             .join(TestCampaign, TestCampaign.id == TestCampaignItem.campaign_id)
             .where(TestCampaignItem.test_case_id.in_(tc_ids))
         )
+        if current_user is not None:
+            campaign_query = apply_external_visibility_filter(
+                campaign_query, TestCampaign, current_user
+            )
+        campaign_items_result = await db.execute(campaign_query)
         for item, campaign in campaign_items_result.all():
             ctx.tc_campaign_summaries[item.test_case_id].append(
                 TestCampaignSummary(
@@ -199,10 +222,13 @@ async def _build_prefetch_context(root_req_id: int, db: AsyncSession) -> ReqPref
 
 
 async def _build_requirement_response(
-    req: Requirement, db: AsyncSession, ctx: Optional[ReqPrefetchContext] = None
+    req: Requirement,
+    db: AsyncSession,
+    ctx: Optional[ReqPrefetchContext] = None,
+    current_user: User | None = None,
 ) -> RequirementResponse:
     if ctx is None:
-        ctx = await _build_prefetch_context(req.id, db)
+        ctx = await _build_prefetch_context(req.id, db, current_user)
 
     verified_by = ctx.verified_by_by_req.get(req.id, [])
     tc_count = len(verified_by)
@@ -210,7 +236,7 @@ async def _build_requirement_response(
     children = ctx.children_by_parent.get(req.id, [])
     children_responses = []
     for child in children:
-        child_resp = await _build_requirement_response(child, db, ctx)
+        child_resp = await _build_requirement_response(child, db, ctx, current_user)
         children_responses.append(child_resp)
 
     linked_test_runs = ctx.test_run_links_by_req.get(req.id, [])
@@ -435,7 +461,7 @@ async def create_requirement(
         f"{current_user.full_name} created requirement {requirement.req_id}",
     )
 
-    return await _build_requirement_response(requirement, db)
+    return await _build_requirement_response(requirement, db, current_user=current_user)
 
 
 @router.get("/{requirement_id}", response_model=RequirementResponse)
@@ -461,7 +487,7 @@ async def get_requirement(
 
     await require_project_access(db, current_user, requirement.project_id)
 
-    return await _build_requirement_response(requirement, db)
+    return await _build_requirement_response(requirement, db, current_user=current_user)
 
 
 @router.patch("/{requirement_id}", response_model=RequirementResponse)
@@ -588,7 +614,7 @@ async def update_requirement(
             updated_summary(current_user.full_name, "requirement", requirement.req_id, fields_set),
         )
 
-    return await _build_requirement_response(requirement, db)
+    return await _build_requirement_response(requirement, db, current_user=current_user)
 
 
 @router.delete("/{requirement_id}", status_code=204)

@@ -67,8 +67,12 @@ def _build_requirement_summary(req: Requirement) -> RequirementSummary:
     return RequirementSummary(id=req.id, req_id=req.req_id, title=req.title, status=req.status)
 
 
-async def _build_test_case_response(tc: TestCase, db: AsyncSession) -> TestCaseResponse:
-    link_rows = await get_verified_requirement_links_for_test_case(tc.id, db)
+async def _build_test_case_response(
+    tc: TestCase,
+    db: AsyncSession,
+    current_user: User | None = None,
+) -> TestCaseResponse:
+    link_rows = await get_verified_requirement_links_for_test_case(tc.id, db, current_user)
     req_count = len(link_rows)
 
     verifies = []
@@ -85,12 +89,15 @@ async def _build_test_case_response(tc: TestCase, db: AsyncSession) -> TestCaseR
             )
         )
 
-    suite_items_result = await db.execute(
+    suite_query = (
         select(TestSuiteItem, TestSuite)
         .join(TestSuite, TestSuite.id == TestSuiteItem.suite_id)
         .where(TestSuiteItem.test_case_id == tc.id)
         .order_by(TestSuiteItem.created_at.desc())
     )
+    if current_user is not None:
+        suite_query = apply_external_visibility_filter(suite_query, TestSuite, current_user)
+    suite_items_result = await db.execute(suite_query)
     suite_memberships = []
     seen_suite_ids: set[int] = set()
     for item, suite in suite_items_result.all():
@@ -105,12 +112,17 @@ async def _build_test_case_response(tc: TestCase, db: AsyncSession) -> TestCaseR
                 )
             )
 
-    campaign_items_result = await db.execute(
+    campaign_query = (
         select(TestCampaignItem, TestCampaign)
         .join(TestCampaign, TestCampaign.id == TestCampaignItem.campaign_id)
         .where(TestCampaignItem.test_case_id == tc.id)
         .order_by(TestCampaignItem.created_at.desc())
     )
+    if current_user is not None:
+        campaign_query = apply_external_visibility_filter(
+            campaign_query, TestCampaign, current_user
+        )
+    campaign_items_result = await db.execute(campaign_query)
     campaign_memberships = []
     seen_campaign_ids: set[int] = set()
     for item, campaign in campaign_items_result.all():
@@ -293,7 +305,7 @@ async def create_test_case(
         f"{current_user.full_name} created test case {test_case.tc_id}",
     )
 
-    return await _build_test_case_response(test_case, db)
+    return await _build_test_case_response(test_case, db, current_user)
 
 
 @router.get("/{test_case_id}", response_model=TestCaseResponse)
@@ -319,7 +331,7 @@ async def get_test_case(
 
     await require_project_access(db, current_user, test_case.project_id)
 
-    return await _build_test_case_response(test_case, db)
+    return await _build_test_case_response(test_case, db, current_user)
 
 
 @router.patch("/{test_case_id}", response_model=TestCaseResponse)
@@ -427,7 +439,7 @@ async def update_test_case(
             updated_summary(current_user.full_name, "test case", test_case.tc_id, fields_set),
         )
 
-    return await _build_test_case_response(test_case, db)
+    return await _build_test_case_response(test_case, db, current_user)
 
 
 @router.delete("/{test_case_id}", status_code=204)
