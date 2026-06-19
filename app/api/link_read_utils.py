@@ -3,7 +3,9 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import apply_external_visibility_filter
 from app.models import ArtefactLink, Requirement, TestCase
+from app.models.user import User
 
 VERIFY_LINK_ROLE = "verifies"
 VERIFY_SOURCE_TYPE = "TC"
@@ -20,9 +22,11 @@ LEGACY_REQ_LINK_TYPE_TO_ROLE = {
 
 
 async def get_verifying_test_case_links_for_requirement(
-    requirement_id: int, db: AsyncSession
+    requirement_id: int,
+    db: AsyncSession,
+    current_user: User | None = None,
 ) -> list[tuple[ArtefactLink, TestCase]]:
-    result = await db.execute(
+    query = (
         select(ArtefactLink, TestCase)
         .join(TestCase, TestCase.id == ArtefactLink.source_id)
         .where(
@@ -33,13 +37,18 @@ async def get_verifying_test_case_links_for_requirement(
         )
         .order_by(ArtefactLink.created_at.desc(), TestCase.tc_id)
     )
+    if current_user is not None:
+        query = apply_external_visibility_filter(query, TestCase, current_user)
+    result = await db.execute(query)
     return list(result.all())
 
 
 async def get_verified_requirement_links_for_test_case(
-    test_case_id: int, db: AsyncSession
+    test_case_id: int,
+    db: AsyncSession,
+    current_user: User | None = None,
 ) -> list[tuple[ArtefactLink, Requirement]]:
-    result = await db.execute(
+    query = (
         select(ArtefactLink, Requirement)
         .join(Requirement, Requirement.id == ArtefactLink.target_id)
         .where(
@@ -50,6 +59,9 @@ async def get_verified_requirement_links_for_test_case(
         )
         .order_by(ArtefactLink.created_at.desc(), Requirement.req_id)
     )
+    if current_user is not None:
+        query = apply_external_visibility_filter(query, Requirement, current_user)
+    result = await db.execute(query)
     return list(result.all())
 
 

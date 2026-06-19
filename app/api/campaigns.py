@@ -531,7 +531,7 @@ async def update_campaign_item(
     tc = (
         await db.execute(select(TestCase).where(TestCase.id == item.test_case_id))
     ).scalar_one_or_none()
-    tc_resp = await _build_test_case_response(tc, db) if tc else None
+    tc_resp = await _build_test_case_response(tc, db, current_user) if tc else None
     return TestCampaignItemResponse(
         id=item.id,
         campaign_id=item.campaign_id,
@@ -714,7 +714,7 @@ async def _build_campaign_detail(
     linked_reqs_by_tc: dict[int, list[RequirementSummary]] = {}
     requirement_ids = set()
     if tc_ids:
-        links_result = await db.execute(
+        requirement_links_query = (
             select(ArtefactLink, Requirement)
             .join(Requirement, Requirement.id == ArtefactLink.target_id)
             .where(
@@ -725,6 +725,11 @@ async def _build_campaign_detail(
             )
             .order_by(ArtefactLink.created_at.desc(), Requirement.req_id)
         )
+        if current_user is not None:
+            requirement_links_query = apply_external_visibility_filter(
+                requirement_links_query, Requirement, current_user
+            )
+        links_result = await db.execute(requirement_links_query)
         for link, req in links_result.all():
             summary = RequirementSummary(
                 id=req.id, req_id=req.req_id, title=req.title, status=req.status
@@ -898,9 +903,13 @@ async def _build_campaign_detail(
     )
 
 
-async def _build_test_case_response(tc: TestCase, db: AsyncSession) -> TestCaseResponse:
+async def _build_test_case_response(
+    tc: TestCase,
+    db: AsyncSession,
+    current_user: User | None = None,
+) -> TestCaseResponse:
     linked_requirements = []
-    for _link, req in await get_verified_requirement_links_for_test_case(tc.id, db):
+    for _link, req in await get_verified_requirement_links_for_test_case(tc.id, db, current_user):
         linked_requirements.append(
             RequirementSummary(id=req.id, req_id=req.req_id, title=req.title, status=req.status)
         )
