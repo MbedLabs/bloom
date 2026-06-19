@@ -300,13 +300,13 @@ async def normalize_non_document_public_ids() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
-    await create_tables()
-    await migrate_user_columns()
     if settings.RUN_STARTUP_DATA_REPAIR:
+        await create_tables()
+        await migrate_user_columns()
         await normalize_document_kinds_and_ids()
         await backfill_campaign_public_ids()
         await normalize_non_document_public_ids()
-    await seed_admin_user()
+        await seed_admin_user()
     yield
 
 
