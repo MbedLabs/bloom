@@ -10,6 +10,7 @@ function makeDoc(id: number, docType: string): DocShell {
     doc_type: docType,
     title: `${docType} ${id}`,
     status: 'draft',
+    visibility: 'internal',
     priority: null,
     req_type: null,
     req_origin: null,

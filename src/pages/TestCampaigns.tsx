@@ -5,6 +5,7 @@ import { campaignsApi, extractApiErrorMessage, testCasesApi, testSuitesApi } fro
 import { ArrowLeft, Plus, Clock, FlaskConical, Layers3, Search, ChevronUp, ChevronDown } from 'lucide-react'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { useAuth } from '../contexts/AuthContext'
+import { VisibilityBadge } from '../components/DocDetailShell'
 
 type CampaignSortField = 'name' | 'status' | 'updated_at'
 type SortDir = 'asc' | 'desc'
@@ -25,8 +26,8 @@ export default function TestCampaigns() {
   const queryClient = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
   const [showCreateSuite, setShowCreateSuite] = useState(false)
-  const [form, setForm] = useState({ name: '', description: '' })
-  const [suiteForm, setSuiteForm] = useState({ name: '', description: '' })
+  const [form, setForm] = useState({ name: '', description: '', visibility: 'internal' })
+  const [suiteForm, setSuiteForm] = useState({ name: '', description: '', visibility: 'internal' })
   const [selectedTcIds, setSelectedTcIds] = useState<number[]>([])
   const [selectedSuiteIds, setSelectedSuiteIds] = useState<number[]>([])
   const [createError, setCreateError] = useState('')
@@ -92,6 +93,7 @@ export default function TestCampaigns() {
 
   const openCreateCampaign = () => {
     setCreateError('')
+    setForm({ name: '', description: '', visibility: 'internal' })
     setSelectedTcIds([])
     setSelectedSuiteIds([])
     setShowCreate(true)
@@ -105,7 +107,7 @@ export default function TestCampaigns() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['campaigns', projectId] })
       setShowCreate(false)
-      setForm({ name: '', description: '' })
+      setForm({ name: '', description: '', visibility: 'internal' })
       setSelectedTcIds([])
       setSelectedSuiteIds([])
     },
@@ -120,7 +122,7 @@ export default function TestCampaigns() {
       queryClient.invalidateQueries({ queryKey: ['testSuites', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       setShowCreateSuite(false)
-      setSuiteForm({ name: '', description: '' })
+      setSuiteForm({ name: '', description: '', visibility: 'internal' })
       setSelectedTcIds([])
       setSelectedSuiteIds((prev) => [...prev, suite.id])
     },
@@ -142,6 +144,7 @@ export default function TestCampaigns() {
       project_id: projectId,
       name: form.name,
       description: form.description || undefined,
+      visibility: form.visibility === 'customer' ? 'customer' : 'internal',
       suite_ids: selectedSuiteIds,
     })
   }
@@ -152,6 +155,7 @@ export default function TestCampaigns() {
       project_id: projectId,
       name: suiteForm.name,
       description: suiteForm.description || undefined,
+      visibility: suiteForm.visibility === 'customer' ? 'customer' : 'internal',
       test_case_ids: selectedTcIds,
     })
   }
@@ -181,7 +185,11 @@ export default function TestCampaigns() {
         {canEditDocs && (
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setShowCreateSuite(true)}
+              onClick={() => {
+                setSuiteForm({ name: '', description: '', visibility: 'internal' })
+                setSelectedTcIds([])
+                setShowCreateSuite(true)
+              }}
               className="inline-flex items-center px-4 py-2 border border-input text-foreground rounded-md hover:bg-accent/50 transition-all duration-200 text-sm font-medium"
             >
               <Layers3 className="h-4 w-4 mr-2" />
@@ -216,7 +224,10 @@ export default function TestCampaigns() {
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <div className="font-mono text-xs text-primary">{suite.suite_id}</div>
-                      <div className="font-medium text-foreground mt-1">{suite.name}</div>
+                      <div className="mt-1 flex items-center gap-2">
+                        <div className="font-medium text-foreground">{suite.name}</div>
+                        <VisibilityBadge visibility={suite.visibility} />
+                      </div>
                       {suite.description && <div className="text-sm text-muted-foreground mt-1">{suite.description}</div>}
                     </div>
                     <div className="text-right">
@@ -336,6 +347,17 @@ export default function TestCampaigns() {
                   />
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Visibility</label>
+                  <select
+                    value={form.visibility}
+                    onChange={(e) => setForm({ ...form, visibility: e.target.value })}
+                    className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
+                  >
+                    <option value="internal">Internal Only</option>
+                    <option value="customer">Customer Visible</option>
+                  </select>
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-foreground mb-1">
                     Campaign Suites ({selectedSuiteIds.length} selected)
                   </label>
@@ -376,7 +398,13 @@ export default function TestCampaigns() {
               <div className="px-6 py-4 border-t border-border flex justify-end space-x-3">
                 <button
                   type="button"
-                  onClick={() => { setShowCreate(false); setCreateError(''); setSelectedTcIds([]); setSelectedSuiteIds([]) }}
+                  onClick={() => {
+                    setShowCreate(false)
+                    setCreateError('')
+                    setSelectedTcIds([])
+                    setSelectedSuiteIds([])
+                    setForm({ name: '', description: '', visibility: 'internal' })
+                  }}
                   className="px-4 py-2 border border-input rounded-md text-foreground hover:bg-accent/50"
                 >
                   Cancel
@@ -422,6 +450,17 @@ export default function TestCampaigns() {
                   />
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Visibility</label>
+                  <select
+                    value={suiteForm.visibility}
+                    onChange={(e) => setSuiteForm({ ...suiteForm, visibility: e.target.value })}
+                    className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
+                  >
+                    <option value="internal">Internal Only</option>
+                    <option value="customer">Customer Visible</option>
+                  </select>
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-foreground mb-1">
                     Select Test Cases ({selectedTcIds.length} selected)
                   </label>
@@ -441,7 +480,17 @@ export default function TestCampaigns() {
                 </div>
               </div>
               <div className="px-6 py-4 border-t border-border flex justify-end space-x-3">
-                <button type="button" onClick={() => { setShowCreateSuite(false); setSelectedTcIds([]) }} className="px-4 py-2 border border-input rounded-md text-foreground hover:bg-accent/50">Cancel</button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateSuite(false)
+                    setSelectedTcIds([])
+                    setSuiteForm({ name: '', description: '', visibility: 'internal' })
+                  }}
+                  className="px-4 py-2 border border-input rounded-md text-foreground hover:bg-accent/50"
+                >
+                  Cancel
+                </button>
                 <button type="submit" disabled={createSuiteMutation.isPending} className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50">
                   {createSuiteMutation.isPending ? 'Creating...' : 'Create Suite'}
                 </button>
@@ -465,7 +514,10 @@ function CampaignCard({ campaign, prefix }: { campaign: import('../api/client').
     >
       <div className="flex items-start justify-between mb-3">
         <div>
-          <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">{campaign.name}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">{campaign.name}</h3>
+            <VisibilityBadge visibility={campaign.visibility} />
+          </div>
           {campaign.description && (
             <p className="text-sm text-muted-foreground mt-0.5 line-clamp-1">{campaign.description}</p>
           )}

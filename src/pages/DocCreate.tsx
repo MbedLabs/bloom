@@ -10,6 +10,7 @@ import {
   risksApi, changesApi, testConceptsApi, documentsApi, usersApi, projectVariablesApi,
   defectsApi,
   extractApiErrorMessage,
+  type ArtefactVisibility,
 } from '../api/client'
 import type { DocType } from '../types/doc'
 import {
@@ -42,6 +43,8 @@ function sharedDocumentCreatePayload(
   metadata: Record<string, string>,
   statusOptions: string[],
 ) {
+  const visibility: ArtefactVisibility =
+    metadata.visibility === 'customer' ? 'customer' : 'internal'
   return {
     title,
     doc_type: docType,
@@ -49,6 +52,7 @@ function sharedDocumentCreatePayload(
     content_json: contentJson,
     content_html: contentHtml || undefined,
     status: metadata.status || statusOptions[0],
+    visibility,
   }
 }
 
@@ -60,6 +64,8 @@ function sharedDocumentUpdatePayload(
   metadata: Record<string, string>,
   statusOptions: string[],
 ) {
+  const visibility: ArtefactVisibility =
+    metadata.visibility === 'customer' ? 'customer' : 'internal'
   return {
     title,
     doc_type: docType,
@@ -67,6 +73,7 @@ function sharedDocumentUpdatePayload(
     content_json: contentJson,
     content_html: contentHtml || null,
     status: metadata.status || statusOptions[0],
+    visibility,
   }
 }
 
@@ -182,7 +189,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   }, [])
 
   useEffect(() => {
-    if (editMode || !prefix) return
+      if (editMode || !prefix) return
     if (docType === 'CMP') {
       navigate(`/projects/${prefix}/campaigns`, { replace: true })
       return
@@ -205,6 +212,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       const meta: Record<string, string> = {}
       if (editDocFacade.description) meta.description = editDocFacade.description
       if (editDocFacade.status) meta.status = editDocFacade.status
+      if (editDocFacade.visibility) meta.visibility = editDocFacade.visibility
       setMetadata(meta)
       return
     }
@@ -220,6 +228,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           meta[field.key] = String(data[field.key])
         }
       }
+      if (typeof data.visibility === 'string') meta.visibility = data.visibility
       if (data.status) meta.status = data.status as string
       setMetadata(meta)
     }).catch(() => {
@@ -244,6 +253,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           preconditions: metadata.preconditions || undefined,
           steps: tcRows.length > 0 ? tcRows : undefined,
           status: metadata.status || config.statusOptions[0],
+          visibility: metadata.visibility === 'customer' ? 'customer' : 'internal',
           reviewer_id: metadata.reviewer_id ? Number(metadata.reviewer_id) : undefined,
         })
       }
@@ -258,6 +268,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           project_id: projectId,
           title,
           description: metadata.description || undefined,
+          visibility: metadata.visibility === 'customer' ? 'customer' : 'internal',
           severity: metadata.severity || undefined,
           priority: metadata.priority || undefined,
         })
@@ -299,6 +310,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           preconditions: metadata.preconditions || null,
           steps: tcRows.length > 0 ? tcRows : null,
           status: metadata.status || config.statusOptions[0],
+          visibility: metadata.visibility === 'customer' ? 'customer' : 'internal',
           reviewer_id: metadata.reviewer_id ? Number(metadata.reviewer_id) : null,
         })
       }
@@ -597,6 +609,18 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                   {config.statusOptions.map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
+                </select>
+              </MetaField>
+
+              <MetaField label="Visibility">
+                <select
+                  value={metadata.visibility || 'internal'}
+                  onChange={(e) => setMetadata({ ...metadata, visibility: e.target.value })}
+                  title="Select visibility"
+                  className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
+                >
+                  <option value="internal">Internal Only</option>
+                  <option value="customer">Customer Visible</option>
                 </select>
               </MetaField>
 

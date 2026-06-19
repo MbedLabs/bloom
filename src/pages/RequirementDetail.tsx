@@ -117,6 +117,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
     title: '',
     description: '',
     status: '',
+    visibility: 'internal',
     priority: '',
     req_type: '',
     req_origin: '',
@@ -136,6 +137,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
         title: requirement.title,
         description: requirement.description || '',
         status: requirement.status,
+        visibility: requirement.visibility,
         priority: requirement.priority,
         req_type: requirement.req_type,
         req_origin: requirement.req_origin,
@@ -226,6 +228,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
       title: editForm.title,
       description: editForm.description || null,
       status: editForm.status,
+      visibility: editForm.visibility === 'customer' ? 'customer' : 'internal',
       priority: editForm.priority,
       req_type: editForm.req_type,
       req_origin: editForm.req_origin,
@@ -259,6 +262,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
       docCode={requirement.req_id}
       title={requirement.title}
       status={requirement.status}
+      visibility={requirement.visibility}
       priority={requirement.priority}
       actions={canEditDocs ? (
         <div className="flex items-center gap-2">
@@ -306,6 +310,10 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
                 <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Origin</div>
                 <OriginBadge origin={requirement.req_origin} />
               </div>
+              <MetaItem
+                label="Visibility"
+                value={requirement.visibility === 'customer' ? 'Customer Visible' : 'Internal Only'}
+              />
               <MetaItem label="Created" value={formatDateTime(requirement.created_at) + ' ago'} />
               <MetaItem label="Updated" value={formatDateTime(requirement.updated_at) + ' ago'} />
             </div>
@@ -402,6 +410,17 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
                   <option>Implemented</option>
                   <option>Verified</option>
                   <option>Rejected</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Visibility</label>
+                <select
+                  value={editForm.visibility}
+                  onChange={(e) => setEditForm({ ...editForm, visibility: e.target.value })}
+                  className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
+                >
+                  <option value="internal">Internal Only</option>
+                  <option value="customer">Customer Visible</option>
                 </select>
               </div>
               <div>

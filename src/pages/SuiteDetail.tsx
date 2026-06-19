@@ -11,6 +11,7 @@ import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import { usePageMeta } from '../contexts/PageMetaContext'
 import { useAuth } from '../contexts/AuthContext'
+import { VisibilityBadge } from '../components/DocDetailShell'
 
 const SUITE_STATUSES = ['Draft', 'Active', 'Archived']
 
@@ -29,7 +30,12 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
   const { setCrumbLabel } = usePageMeta()
   const [showAddCase, setShowAddCase] = useState(false)
   const [editing, setEditing] = useState(false)
-  const [editForm, setEditForm] = useState({ name: '', description: '', status: '' })
+  const [editForm, setEditForm] = useState({
+    name: '',
+    description: '',
+    status: '',
+    visibility: 'internal',
+  })
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' | 'info' } | null>(null)
@@ -108,6 +114,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
       description: `Traceability scope campaign from suite ${suite?.suite_id || ''}`,
       suite_ids: [parsedSuiteId],
       status: 'Scope',
+      visibility: suite?.visibility === 'customer' ? 'customer' : 'internal',
     }),
     onSuccess: (campaign) => {
       queryClient.invalidateQueries({ queryKey: ['campaigns', projectId] })
@@ -123,7 +130,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: { name?: string; description?: string; status?: string }) =>
+    mutationFn: (data: { name?: string; description?: string; status?: string; visibility?: 'internal' | 'customer' }) =>
       testSuitesApi.update(parsedSuiteId, data),
     onSuccess: (updated: unknown) => {
       queryClient.setQueryData(['testSuite', parsedSuiteId], (old: unknown) => {
@@ -159,7 +166,12 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
 
   const startEdit = () => {
     if (!suite) return
-    setEditForm({ name: suite.name, description: suite.description || '', status: suite.status })
+    setEditForm({
+      name: suite.name,
+      description: suite.description || '',
+      status: suite.status,
+      visibility: suite.visibility,
+    })
     setEditing(true)
   }
 
@@ -169,6 +181,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
       name: editForm.name,
       description: editForm.description || undefined,
       status: editForm.status,
+      visibility: editForm.visibility === 'customer' ? 'customer' : 'internal',
     })
   }
 
@@ -200,7 +213,10 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
           </Link>
           <div>
             <div className="font-mono text-sm text-primary">{suite.suite_id}</div>
-            <h2 className="text-2xl font-bold text-foreground mt-1">{suite.name}</h2>
+            <div className="mt-1 flex items-center gap-3">
+              <h2 className="text-2xl font-bold text-foreground">{suite.name}</h2>
+              <VisibilityBadge visibility={suite.visibility} />
+            </div>
             {suite.description && <p className="text-muted-foreground mt-1">{suite.description}</p>}
           </div>
         </div>
@@ -247,6 +263,17 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
               <label className="block text-sm font-medium text-foreground mb-1">Status</label>
               <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring">
                 {SUITE_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Visibility</label>
+              <select
+                value={editForm.visibility}
+                onChange={(e) => setEditForm({ ...editForm, visibility: e.target.value })}
+                className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring"
+              >
+                <option value="internal">Internal Only</option>
+                <option value="customer">Customer Visible</option>
               </select>
             </div>
             <div className="flex justify-end gap-2">
