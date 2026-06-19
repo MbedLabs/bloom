@@ -56,6 +56,7 @@ const configs = {
     fields: [
       { key: 'design_type', label: 'Design Type', options: ['Architecture', 'Interface', 'Component', 'Data'] },
       { key: 'priority', label: 'Priority', options: ['Low', 'Medium', 'High', 'Critical'] },
+      { key: 'visibility', label: 'Visibility', options: ['internal', 'customer'] },
       { key: 'status', label: 'Status', options: ['Draft', 'Review', 'Approved'] },
     ],
   },
@@ -75,6 +76,7 @@ const configs = {
       { key: 'risk_category', label: 'Category', options: ['Technical', 'Business', 'Compliance', 'Schedule', 'Security'] },
       { key: 'severity', label: 'Severity', options: ['Low', 'Medium', 'High', 'Critical'] },
       { key: 'probability', label: 'Probability', options: ['Low', 'Medium', 'High'] },
+      { key: 'visibility', label: 'Visibility', options: ['internal', 'customer'] },
       { key: 'status', label: 'Status', options: ['Open', 'Monitoring', 'Mitigated', 'Closed'] },
     ],
   },
@@ -93,6 +95,7 @@ const configs = {
     fields: [
       { key: 'change_type', label: 'Change Type', options: ['Enhancement', 'Bug Fix', 'Refactor', 'Compliance'] },
       { key: 'priority', label: 'Priority', options: ['Low', 'Medium', 'High', 'Critical'] },
+      { key: 'visibility', label: 'Visibility', options: ['internal', 'customer'] },
       { key: 'status', label: 'Status', options: ['Submitted', 'Analysis', 'Approved', 'Implemented', 'Rejected'] },
     ],
   },
@@ -110,6 +113,7 @@ const configs = {
     statusOptions: ['Draft', 'Review', 'Approved'],
     fields: [
       { key: 'coverage', label: 'Coverage' },
+      { key: 'visibility', label: 'Visibility', options: ['internal', 'customer'] },
       { key: 'status', label: 'Status', options: ['Draft', 'Review', 'Approved'] },
     ],
   },
@@ -128,6 +132,7 @@ const configs = {
     fields: [
       { key: 'severity', label: 'Severity', options: ['Low', 'Medium', 'High', 'Critical'] },
       { key: 'priority', label: 'Priority', options: ['Low', 'Medium', 'High', 'Critical'] },
+      { key: 'visibility', label: 'Visibility', options: ['internal', 'customer'] },
       { key: 'status', label: 'Status', options: ['Open', 'Triaged', 'In Progress', 'Resolved', 'Verified', 'Closed', 'Rejected', 'Duplicate'] },
     ],
   },
@@ -343,6 +348,11 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
       docCode={code}
       title={title}
       status={String(artefact.status)}
+      visibility={
+        artefactRecord.visibility === 'internal' || artefactRecord.visibility === 'customer'
+          ? artefactRecord.visibility
+          : undefined
+      }
       actions={canEditDocs ? (
         <>
           <button onClick={() => {

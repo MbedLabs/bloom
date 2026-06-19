@@ -135,6 +135,7 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
       docCode={doc.doc_id || String(docId)}
       title={doc.title}
       status={doc.status}
+      visibility={doc.visibility}
       actions={canEditDocs ? (
         <>
           <button
@@ -174,6 +175,10 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
         <SectionCard title="Metadata">
           <div className="space-y-4">
             <MetaItem label="ID" value={doc.doc_id || String(docId)} mono />
+            <MetaItem
+              label="Visibility"
+              value={doc.visibility === 'customer' ? 'Customer Visible' : 'Internal Only'}
+            />
             <MetaItem label="Version" value={`v${doc.version}`} />
             <MetaItem label="Created" value={formatDateTime(doc.created_at) + ' ago'} />
             <MetaItem label="Updated" value={formatDateTime(doc.updated_at) + ' ago'} />

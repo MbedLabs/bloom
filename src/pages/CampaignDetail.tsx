@@ -9,6 +9,7 @@ import { usePageMeta } from '../contexts/PageMetaContext'
 import { useAuth } from '../contexts/AuthContext'
 import { docUrl } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
+import { VisibilityBadge } from '../components/DocDetailShell'
 
 const CAMPAIGN_STATUSES = ['Planned', 'Scope', 'In Progress', 'Completed', 'Aborted']
 
@@ -31,7 +32,12 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
   }, [toast])
 
   const [editOpen, setEditOpen] = useState(false)
-  const [editForm, setEditForm] = useState({ name: '', description: '', status: '' })
+  const [editForm, setEditForm] = useState({
+    name: '',
+    description: '',
+    status: '',
+    visibility: 'internal',
+  })
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [expandedSuites, setExpandedSuites] = useState<Set<number>>(new Set())
   const [adHocExpanded, setAdHocExpanded] = useState(false)
@@ -52,7 +58,7 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: { name?: string; description?: string; status?: string }) =>
+    mutationFn: (data: { name?: string; description?: string; status?: string; visibility?: 'internal' | 'customer' }) =>
       campaignsApi.update(campId, data),
     onSuccess: (updated) => {
       queryClient.setQueryData(['campaign', campId], (old: unknown) => {
@@ -96,7 +102,12 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
 
   const openEdit = () => {
     if (!campaign) return
-    setEditForm({ name: campaign.name, description: campaign.description || '', status: campaign.status })
+    setEditForm({
+      name: campaign.name,
+      description: campaign.description || '',
+      status: campaign.status,
+      visibility: campaign.visibility,
+    })
     setEditOpen(true)
   }
 
@@ -106,6 +117,7 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
       name: editForm.name,
       description: editForm.description || undefined,
       status: editForm.status,
+      visibility: editForm.visibility === 'customer' ? 'customer' : 'internal',
     })
   }
 
@@ -154,6 +166,7 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
             <div className="flex items-center space-x-3">
               <h2 className="text-2xl font-bold text-foreground">{campaign.name}</h2>
               <CampaignStatusBadge status={campaign.status} />
+              <VisibilityBadge visibility={campaign.visibility} />
             </div>
             {campaign.description && <p className="text-muted-foreground mt-0.5">{campaign.description}</p>}
           </div>
@@ -193,6 +206,18 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
                 <label htmlFor="edit-status" className="block text-sm font-medium text-foreground mb-1">Status</label>
                 <select id="edit-status" value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring">
                   {CAMPAIGN_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="edit-visibility" className="block text-sm font-medium text-foreground mb-1">Visibility</label>
+                <select
+                  id="edit-visibility"
+                  value={editForm.visibility}
+                  onChange={(e) => setEditForm({ ...editForm, visibility: e.target.value })}
+                  className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring"
+                >
+                  <option value="internal">Internal Only</option>
+                  <option value="customer">Customer Visible</option>
                 </select>
               </div>
               <div className="flex justify-end gap-2 pt-2">

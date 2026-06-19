@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { DOC_TYPE_LABELS, DOC_TYPE_COLORS, type DocType } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
+import type { ArtefactVisibility } from '../api/client'
 
 const STATUS_COLORS: Record<string, string> = {
   Draft: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
@@ -50,6 +51,20 @@ export function PriorityBadge({ priority }: { priority: string | null | undefine
   )
 }
 
+export function VisibilityBadge({ visibility }: { visibility: ArtefactVisibility | null | undefined }) {
+  if (!visibility) return null
+  const label = visibility === 'customer' ? 'Customer Visible' : 'Internal Only'
+  const color =
+    visibility === 'customer'
+      ? 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400'
+      : 'bg-slate-500/10 text-slate-700 dark:text-slate-400'
+  return (
+    <span className={`px-2 py-1 rounded-full text-xs font-medium ${color}`}>
+      {label}
+    </span>
+  )
+}
+
 export function DocTypeBadge({ docType }: { docType: DocType }) {
   const label = DOC_TYPE_LABELS[docType] || docType
   const color = DOC_TYPE_COLORS[docType] || 'bg-muted text-muted-foreground'
@@ -87,6 +102,7 @@ interface DocDetailShellProps {
   docCode: string
   title: string
   status: string
+  visibility?: ArtefactVisibility | null
   priority?: string | null
   actions?: ReactNode
   rightRail?: ReactNode
@@ -100,6 +116,7 @@ export default function DocDetailShell({
   docCode,
   title,
   status,
+  visibility,
   priority,
   actions,
   rightRail,
@@ -132,6 +149,7 @@ export default function DocDetailShell({
               <span className="font-mono text-sm text-primary font-semibold">{docCode}</span>
               <DocTypeBadge docType={docType} />
               <StatusBadge status={status} />
+              {visibility && <VisibilityBadge visibility={visibility} />}
               {priority && <PriorityBadge priority={priority} />}
             </div>
             <h2 className="text-2xl font-bold text-foreground">{title}</h2>

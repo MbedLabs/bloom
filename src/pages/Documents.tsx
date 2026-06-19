@@ -30,6 +30,7 @@ import {
 import { docCreateUrl, docUrl, normalizeDocTypeParam, DOC_TYPE_LABELS, type DocType } from '../types/doc'
 import { formatDateTime } from '../test/date-utils'
 import { useAuth } from '../contexts/AuthContext'
+import { VisibilityBadge } from '../components/DocDetailShell'
 
 const TYPE_BADGES: Record<DocType, { label: string; color: string }> = {
   REQ: { label: 'Requirement', color: 'bg-amber-500/10 text-amber-700 dark:text-amber-400' },
@@ -894,9 +895,12 @@ export default function Documents() {
                     </td>
                     )}
                     <td className="px-3 py-2 max-w-sm truncate">
-                      <Link to={detailUrl} state={listState} className="text-foreground hover:text-primary/80 font-medium">
-                        {doc.title}
-                      </Link>
+                      <div className="space-y-1">
+                        <Link to={detailUrl} state={listState} className="text-foreground hover:text-primary/80 font-medium">
+                          {doc.title}
+                        </Link>
+                        <VisibilityBadge visibility={doc.visibility} />
+                      </div>
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       <StatusBadge status={doc.status} />

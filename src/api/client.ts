@@ -41,6 +41,8 @@ export interface PaginatedResponse<T> {
   limit: number
 }
 
+export type ArtefactVisibility = 'internal' | 'customer'
+
 export interface User {
   id: number
   email: string
@@ -293,6 +295,7 @@ export interface Requirement {
   content_json?: Record<string, unknown> | null
   content_html?: string | null
   status: string
+  visibility: ArtefactVisibility
   priority: string
   req_type: string
   req_origin: string
@@ -326,6 +329,7 @@ export interface TestCase {
   preconditions: string | null
   steps: Step[] | TcsRow[] | null
   status: string
+  visibility: ArtefactVisibility
   reviewer_id: number | null
   approver_id: number | null
   reviewed_by_id: number | null
@@ -431,6 +435,7 @@ export interface DesignItem {
   content_json?: Record<string, unknown> | null
   content_html?: string | null
   status: string
+  visibility: ArtefactVisibility
   priority: string
   design_type: string
   linked_requirement_id: number | null
@@ -449,6 +454,7 @@ export interface RiskItem {
   content_json?: Record<string, unknown> | null
   content_html?: string | null
   status: string
+  visibility: ArtefactVisibility
   severity: string
   probability: string
   mitigation: string | null
@@ -469,6 +475,7 @@ export interface ChangeRequest {
   content_json?: Record<string, unknown> | null
   content_html?: string | null
   status: string
+  visibility: ArtefactVisibility
   priority: string
   change_type: string
   impact_assessment: string | null
@@ -486,6 +493,7 @@ export interface Defect {
   title: string
   description: string | null
   status: string
+  visibility: ArtefactVisibility
   severity: string
   priority: string
   source_type: string | null
@@ -525,6 +533,7 @@ export interface TestConcept {
   content_json?: Record<string, unknown> | null
   content_html?: string | null
   status: string
+  visibility: ArtefactVisibility
   linked_requirement_ids: number[]
   coverage: number
   source_ref?: string | null
@@ -646,6 +655,7 @@ export interface DocShell {
   doc_type: string
   title: string
   status: string
+  visibility: ArtefactVisibility
   priority: string | null
   req_type: string | null
   req_origin: string | null
@@ -703,6 +713,7 @@ export const requirementsApi = {
     project_id: number
     title: string
     description?: string
+    visibility?: ArtefactVisibility
     priority?: string
     req_type?: string
     req_origin?: string
@@ -766,6 +777,7 @@ export const testCasesApi = {
     preconditions?: string
     steps?: Step[] | TcsRow[]
     status?: string
+    visibility?: ArtefactVisibility
     reviewer_id?: number
     approver_id?: number
   }) => {
@@ -829,6 +841,7 @@ export interface Document {
   title: string
   doc_type: string
   status: string
+  visibility: ArtefactVisibility
   version: string
   description: string | null
   content_json?: Record<string, unknown> | null
@@ -859,14 +872,14 @@ export interface DocumentDetail extends Omit<Document, 'section_count'> {
 
 export const documentsApi = {
   list: async (projectId: number) => {
-    const response = await api.get<Document[]>(`/projects/${projectId}/documents`)
+    const response = await api.get<PaginatedResponse<Document>>(`/projects/${projectId}/documents`)
     return response.data
   },
   get: async (documentId: number) => {
     const response = await api.get<DocumentDetail>(`/documents/${documentId}`)
     return response.data
   },
-  create: async (data: { project_id: number; title: string; doc_type?: string; description?: string; content_json?: Record<string, unknown> | null; content_html?: string | null }) => {
+  create: async (data: { project_id: number; title: string; doc_type?: string; description?: string; content_json?: Record<string, unknown> | null; content_html?: string | null; visibility?: ArtefactVisibility }) => {
     const response = await api.post<Document>('/projects/' + data.project_id + '/documents', data)
     return response.data
   },
@@ -946,6 +959,7 @@ export interface TestSuiteItem {
 export interface TestSuite extends TestSuiteSummary {
   project_id: number
   description: string | null
+  visibility: ArtefactVisibility
   created_at: string
   updated_at: string
   total_items: number
@@ -982,6 +996,7 @@ export interface TestCampaign {
   name: string
   description: string | null
   status: string
+  visibility: ArtefactVisibility
   started_at: string | null
   completed_at: string | null
   created_at: string
@@ -1036,12 +1051,12 @@ export const campaignsApi = {
     return response.data
   },
 
-  create: async (data: { project_id: number; name: string; description?: string; configuration_id?: number; suite_id?: number; suite_ids?: number[]; status?: string; bud_run_id?: number; bud_run_url?: string; bud_run_status?: string; test_case_ids?: number[] }) => {
+  create: async (data: { project_id: number; name: string; description?: string; configuration_id?: number; suite_id?: number; suite_ids?: number[]; status?: string; visibility?: ArtefactVisibility; bud_run_id?: number; bud_run_url?: string; bud_run_status?: string; test_case_ids?: number[] }) => {
     const response = await api.post<TestCampaignDetail>('/campaigns', data)
     return response.data
   },
 
-  update: async (campaignId: number, data: Partial<Pick<TestCampaign, 'name' | 'description' | 'status' | 'bud_run_id' | 'bud_run_url' | 'bud_run_status'>> & { configuration_id?: number; suite_id?: number | null; suite_ids?: number[] }) => {
+  update: async (campaignId: number, data: Partial<Pick<TestCampaign, 'name' | 'description' | 'status' | 'visibility' | 'bud_run_id' | 'bud_run_url' | 'bud_run_status'>> & { configuration_id?: number; suite_id?: number | null; suite_ids?: number[] }) => {
     const response = await api.patch<TestCampaign>(`/campaigns/${campaignId}`, data)
     return response.data
   },
@@ -1089,11 +1104,11 @@ export const testSuitesApi = {
     const response = await api.get<TestSuiteDetail>(`/test-suites/${suiteId}`)
     return response.data
   },
-  create: async (data: { project_id: number; name: string; description?: string; status?: string; test_case_ids?: number[] }) => {
+  create: async (data: { project_id: number; name: string; description?: string; status?: string; visibility?: ArtefactVisibility; test_case_ids?: number[] }) => {
     const response = await api.post<TestSuiteDetail>('/test-suites', data)
     return response.data
   },
-  update: async (suiteId: number, data: { name?: string; description?: string; status?: string }) => {
+  update: async (suiteId: number, data: { name?: string; description?: string; status?: string; visibility?: ArtefactVisibility }) => {
     const response = await api.patch<TestSuiteDetail>(`/test-suites/${suiteId}`, data)
     return response.data
   },
@@ -1137,6 +1152,7 @@ export const designsApi = {
     title: string
     description?: string | null
     status?: string
+    visibility?: ArtefactVisibility
     priority?: string
     design_type?: string
   }) => {
@@ -1166,6 +1182,7 @@ export const risksApi = {
     title: string
     description?: string | null
     status?: string
+    visibility?: ArtefactVisibility
     severity?: string
     probability?: string
     mitigation?: string | null
@@ -1219,6 +1236,7 @@ export const defectsApi = {
     title: string
     description?: string | null
     status?: string
+    visibility?: ArtefactVisibility
     severity?: string
     priority?: string
     source_type?: string | null
@@ -1329,7 +1347,7 @@ export const testConceptsApi = {
     const response = await api.get<TestConcept>(`/test-concepts/${id}`)
     return response.data
   },
-  create: async (data: { project_id: number; name: string; description?: string | null; status?: string; coverage?: number }) => {
+  create: async (data: { project_id: number; name: string; description?: string | null; status?: string; visibility?: ArtefactVisibility; coverage?: number }) => {
     const response = await api.post<TestConcept>('/test-concepts', data)
     return response.data
   },

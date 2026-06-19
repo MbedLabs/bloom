@@ -180,6 +180,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
       docCode={testCase.tc_id}
       title={testCase.title}
       status={testCase.status}
+      visibility={testCase.visibility}
       actions={canEditDocs ? (
         <div className="flex items-center gap-2">
           <button
@@ -290,6 +291,10 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
 
           <SectionCard title="Metadata">
             <div className="space-y-4">
+              <MetaItem
+                label="Visibility"
+                value={testCase.visibility === 'customer' ? 'Customer Visible' : 'Internal Only'}
+              />
               <MetaItem label="Created" value={formatDateTime(testCase.created_at) + ' ago'} />
               <MetaItem label="Updated" value={formatDateTime(testCase.updated_at) + ' ago'} />
             </div>
