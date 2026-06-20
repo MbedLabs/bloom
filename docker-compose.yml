@@ -1,0 +1,47 @@
+services:
+  bloom:
+    build:
+      context: .
+    image: ghcr.io/mbedlabs/bloom:1.0.0
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      SECRET_KEY: ${SECRET_KEY}
+      APP_BASE_URL: ${APP_BASE_URL}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL}
+      BUD_APP_URL: ${BUD_APP_URL}
+      BLOOM_APP_URL: ${BLOOM_APP_URL}
+      TESTSTATION_APP_URL: ${TESTSTATION_APP_URL}
+      BLOOM_ENV: ${BLOOM_ENV}
+      RUN_STARTUP_DATA_REPAIR: ${RUN_STARTUP_DATA_REPAIR}
+      AUTO_SEED_ADMIN: ${AUTO_SEED_ADMIN}
+      ENABLE_DOCS: ${ENABLE_DOCS}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_FULL_NAME: ${ADMIN_FULL_NAME}
+      BLOOM_DOTENV_DISABLED: ${BLOOM_DOTENV_DISABLED}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8080"
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bloom_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bloom_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+    volumes:
+      - bloom-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  bloom-postgres-data:
