@@ -306,6 +306,7 @@ async def lifespan(app: FastAPI):
         await normalize_document_kinds_and_ids()
         await backfill_campaign_public_ids()
         await normalize_non_document_public_ids()
+    if settings.AUTO_SEED_ADMIN:
         await seed_admin_user()
     yield
 
