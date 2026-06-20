@@ -5,3 +5,8 @@ __pycache__
 *.md
 .env
 .env.*
+.venv
+.pytest_cache
+coverage.xml
+frontend/node_modules
+frontend/dist

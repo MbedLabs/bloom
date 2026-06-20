@@ -13,8 +13,7 @@ from pydantic import AliasChoices, EmailStr, Field, field_validator, model_valid
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-WORKSPACE_DIR = BACKEND_DIR.parent
-ENV_FILES = (WORKSPACE_DIR / ".env", BACKEND_DIR / ".env")
+ENV_FILES = (BACKEND_DIR / ".env",)
 
 
 class Settings(BaseSettings):
@@ -59,19 +58,19 @@ class Settings(BaseSettings):
     )
 
     BLOOM_APP_NAME: str = "EmbedLabs Bloom"
-    BLOOM_APP_VERSION: str = "0.2.0"
+    BLOOM_APP_VERSION: str = "1.0.0"
 
     APP_BASE_URL: str = Field(
         default="http://localhost:8000",
         validation_alias=AliasChoices("BLOOM_APP_BASE_URL", "APP_BASE_URL"),
     )
     FRONTEND_BASE_URL: str = Field(
-        default="http://localhost:5173",
+        default="http://localhost:8000",
         validation_alias=AliasChoices("BLOOM_FRONTEND_BASE_URL", "FRONTEND_BASE_URL"),
     )
 
     TESTSTATION_APP_URL: str = Field(
-        default="http://localhost:5173",
+        default="http://localhost:8001",
         validation_alias=AliasChoices("BLOOM_TESTSTATION_APP_URL", "TESTSTATION_APP_URL"),
     )
 
@@ -81,6 +80,8 @@ class Settings(BaseSettings):
             "http://localhost:3000",
             "http://localhost:5173",
             "http://localhost:5174",
+            "http://localhost:8000",
+            "http://localhost:8001",
         ],
         validation_alias=AliasChoices("BLOOM_CORS_ORIGINS", "CORS_ORIGINS"),
     )
