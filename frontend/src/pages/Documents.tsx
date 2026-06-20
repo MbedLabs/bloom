@@ -1,0 +1,1033 @@
+import { useMemo, useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom'
+import { format } from 'date-fns'
+import {
+  ArrowLeft,
+  ArrowUpDown,
+  BookOpen,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+  Filter,
+  Plus,
+  Search,
+  Upload,
+  X,
+} from 'lucide-react'
+
+import { docsApi, type DocShell, usersApi } from '../api/client'
+import {
+  readStoredSort,
+  writeStoredSort,
+  registrySortScope,
+  DEFAULT_SORT_FIELD,
+  DEFAULT_SORT_DIR,
+  docRegistryListLabel,
+  type RegistrySortField,
+  type RegistrySortDir,
+} from '../lib/docRegistryParams'
+import { docCreateUrl, docUrl, normalizeDocTypeParam, DOC_TYPE_LABELS, type DocType } from '../types/doc'
+import { formatDateTime } from '../test/date-utils'
+import { useAuth } from '../contexts/AuthContext'
+import { VisibilityBadge } from '../components/DocDetailShell'
+
+const TYPE_BADGES: Record<DocType, { label: string; color: string }> = {
+  REQ: { label: 'Requirement', color: 'bg-amber-500/10 text-amber-700 dark:text-amber-400' },
+  SPEC: { label: 'Specification', color: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400' },
+  TC: { label: 'Test Case', color: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400' },
+  DES: { label: 'Design', color: 'bg-violet-500/10 text-violet-700 dark:text-violet-400' },
+  RSK: { label: 'Risk', color: 'bg-red-500/10 text-red-700 dark:text-red-400' },
+  CHG: { label: 'Change Request', color: 'bg-blue-500/10 text-blue-700 dark:text-blue-400' },
+  CPT: { label: DOC_TYPE_LABELS.CPT, color: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' },
+  DEF: { label: 'Defect', color: 'bg-rose-500/10 text-rose-700 dark:text-rose-400' },
+  CMP: { label: 'Campaign', color: 'bg-sky-500/10 text-sky-700 dark:text-sky-400' },
+  TS: { label: 'Test Suite', color: 'bg-lime-500/10 text-lime-700 dark:text-lime-400' },
+  PRT: { label: DOC_TYPE_LABELS.PRT, color: 'bg-teal-500/10 text-teal-700 dark:text-teal-400' },
+  RPT: { label: 'Report', color: 'bg-slate-500/10 text-slate-700 dark:text-slate-400' },
+  STD: { label: 'External Standard', color: 'bg-orange-500/10 text-orange-700 dark:text-orange-400' },
+}
+
+const DOC_TYPE_OPTIONS: { code: DocType; label: string }[] = [
+  { code: 'REQ', label: 'Requirements' },
+  { code: 'SPEC', label: 'Specifications' },
+  { code: 'TC', label: 'Test Cases' },
+  { code: 'CPT', label: docRegistryListLabel('CPT') },
+  { code: 'PRT', label: docRegistryListLabel('PRT') },
+  { code: 'DES', label: 'Design' },
+  { code: 'RSK', label: 'Risks' },
+  { code: 'CHG', label: 'Changes' },
+  { code: 'DEF', label: 'Defects' },
+  { code: 'CMP', label: 'Campaigns' },
+  { code: 'TS', label: 'Test Suites' },
+  { code: 'RPT', label: 'Reports' },
+  { code: 'STD', label: 'Standards' },
+]
+
+const TYPE_PAGE_TITLE: Record<DocType, string> = {
+  REQ: 'Requirements',
+  SPEC: 'Specifications',
+  TC: 'Test Cases',
+  CPT: docRegistryListLabel('CPT'),
+  DEF: 'Defects',
+  CMP: docRegistryListLabel('CMP'),
+  TS: 'Test Suites',
+  PRT: docRegistryListLabel('PRT'),
+  DES: 'Designs',
+  RSK: 'Risks',
+  CHG: 'Changes',
+  RPT: 'Reports',
+  STD: 'Standards',
+}
+
+const STATUS_OPTIONS = [
+  'Draft',
+  'Review',
+  'Approved',
+  'Rejected',
+  'Obsolete',
+  'Open',
+  'Mitigated',
+  'Submitted',
+  'Implemented',
+  'Active',
+  'Final',
+  'Superseded',
+  'Planned',
+  'Running',
+  'Completed',
+  'Scope',
+  'In Progress',
+  'Aborted',
+]
+
+const PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Critical']
+
+const LINK_FILTER_OPTIONS = [
+  { code: '', label: 'Any link state' },
+  { code: 'linked', label: 'Has any links' },
+  { code: 'unlinked', label: 'No links' },
+  { code: 'incoming', label: 'Has incoming links' },
+  { code: 'outgoing', label: 'Has outgoing links' },
+  { code: 'suspect', label: 'Has suspect links' },
+  { code: 'clean', label: 'No suspect links' },
+] as const
+
+type LinkFilter = typeof LINK_FILTER_OPTIONS[number]['code']
+type SortField =
+  | 'updated_at'
+  | 'created_at'
+  | 'doc_id'
+  | 'doc_type'
+  | 'status'
+  | 'title'
+  | 'priority'
+  | 'reviewer'
+  | 'req_type'
+  | 'req_origin'
+type SortDir = 'asc' | 'desc'
+
+const SORT_OPTIONS: { field: SortField; label: string }[] = [
+  { field: 'updated_at', label: 'Updated Time' },
+  { field: 'created_at', label: 'Created Time' },
+  { field: 'doc_id', label: 'ID' },
+  { field: 'doc_type', label: 'Kind' },
+  { field: 'status', label: 'Status' },
+  { field: 'title', label: 'Name / Title' },
+  { field: 'priority', label: 'Priority' },
+  { field: 'reviewer', label: 'Reviewer' },
+  { field: 'req_type', label: 'Type' },
+  { field: 'req_origin', label: 'Origin' },
+]
+
+function isDocType(value: string): value is DocType {
+  return DOC_TYPE_OPTIONS.some((option) => option.code === value)
+}
+
+function isSortField(value: string | null): value is SortField {
+  return SORT_OPTIONS.some((option) => option.field === value)
+}
+
+function isLinkFilter(value: string | null): value is LinkFilter {
+  return LINK_FILTER_OPTIONS.some((option) => option.code === value)
+}
+
+function unique<T>(values: T[]): T[] {
+  return Array.from(new Set(values))
+}
+
+function readListParam(params: URLSearchParams, key: string): string[] {
+  return unique(
+    params
+      .getAll(key)
+      .flatMap((value) => value.split(','))
+      .map((value) => value.trim())
+      .filter(Boolean)
+  )
+}
+
+function writeListParam(params: URLSearchParams, key: string, values: string[]) {
+  params.delete(key)
+  values.forEach((value) => params.append(key, value))
+}
+
+function TypeBadge({ type }: { type: string }) {
+  const cfg = isDocType(type) ? TYPE_BADGES[type] : { label: type, color: 'bg-muted text-muted-foreground' }
+  return <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${cfg.color}`}>{cfg.label}</span>
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const colors: Record<string, string> = {
+    Draft: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+    Review: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
+    Approved: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+    Active: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+    Open: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+    Submitted: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
+    Implemented: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+    Mitigated: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+    Final: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+    Obsolete: 'bg-muted text-muted-foreground',
+    Rejected: 'bg-red-500/10 text-red-700 dark:text-red-400',
+    Superseded: 'bg-muted text-muted-foreground',
+  }
+  return <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${colors[status] || 'bg-muted text-muted-foreground'}`}>{status}</span>
+}
+
+function ReqTypeBadge({ reqType }: { reqType: string }) {
+  return (
+    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/10 text-purple-700 dark:text-purple-400">
+      {reqType}
+    </span>
+  )
+}
+
+function ReqOriginBadge({ origin }: { origin: string }) {
+  const colors: Record<string, string> = {
+    Internal: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
+    Customer: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400',
+    Compliance: 'bg-violet-500/10 text-violet-700 dark:text-violet-400',
+    Regulatory: 'bg-rose-500/10 text-rose-700 dark:text-rose-400',
+    Legal: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400',
+    Business: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+    Technical: 'bg-teal-500/10 text-teal-700 dark:text-teal-400',
+  }
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colors[origin] || 'bg-gray-500/10 text-gray-700 dark:text-gray-400'}`}>
+      {origin}
+    </span>
+  )
+}
+
+function ExecutionBadge({ status }: { status: string | null }) {
+  if (!status) {
+    return <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">Not executed</span>
+  }
+  const colors: Record<string, string> = {
+    Passed: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+    Failed: 'bg-red-500/10 text-red-700 dark:text-red-400',
+    Skipped: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
+  }
+  return <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[status] || 'bg-muted text-muted-foreground'}`}>{status}</span>
+}
+
+export default function Documents() {
+  const { user } = useAuth()
+  const { prefix } = useParams<{ prefix: string }>()
+  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const typeFilters = useMemo(
+    () => unique(readListParam(searchParams, 'type').map((value) => normalizeDocTypeParam(value)).filter(Boolean) as DocType[]),
+    [searchParams]
+  )
+  const sortScope = useMemo(() => registrySortScope(typeFilters), [typeFilters])
+  const dirParam = searchParams.get('dir')
+  const sortDir: SortDir = dirParam === 'asc' || dirParam === 'desc' ? dirParam : 'desc'
+
+  useEffect(() => {
+    const sortFromUrl = searchParams.get('sort')
+    if (sortFromUrl && !isSortField(sortFromUrl)) {
+      const params = new URLSearchParams(searchParams)
+      params.delete('sort')
+      params.delete('dir')
+      setSearchParams(params, { replace: true })
+      return
+    }
+    if (!prefix) return
+    const urlSort = searchParams.get('sort')
+    const urlDir = searchParams.get('dir')
+    if (!sortScope) {
+      return
+    }
+    if (urlSort || urlDir) {
+      const field: RegistrySortField = isSortField(urlSort) ? urlSort as RegistrySortField : DEFAULT_SORT_FIELD
+      const dir: RegistrySortDir = urlDir === 'asc' || urlDir === 'desc' ? urlDir : DEFAULT_SORT_DIR
+      writeStoredSort(prefix, sortScope, { field, dir })
+    } else {
+      const stored = readStoredSort(prefix, sortScope)
+      if (stored && (stored.field !== DEFAULT_SORT_FIELD || stored.dir !== DEFAULT_SORT_DIR)) {
+        const params = new URLSearchParams(searchParams)
+        if (stored.field !== DEFAULT_SORT_FIELD) params.set('sort', stored.field)
+        if (stored.dir !== DEFAULT_SORT_DIR) params.set('dir', stored.dir)
+        setSearchParams(params, { replace: true })
+      }
+    }
+  }, [prefix, searchParams, setSearchParams, sortScope])
+
+  const statusFilters = useMemo(() => readListParam(searchParams, 'status'), [searchParams])
+  const search = searchParams.get('q') || ''
+  const priorityFilter = searchParams.get('priority') || ''
+  const reviewerFilter = searchParams.get('reviewer') || ''
+  const linkParam = searchParams.get('links')
+  const linkFilter: LinkFilter = isLinkFilter(linkParam) ? linkParam : ''
+  const createdFrom = searchParams.get('created_from') || ''
+  const createdTo = searchParams.get('created_to') || ''
+  const updatedFrom = searchParams.get('updated_from') || ''
+  const updatedTo = searchParams.get('updated_to') || ''
+  const sortParam = searchParams.get('sort')
+  const sortField: SortField = isSortField(sortParam) ? sortParam : 'updated_at'
+  const pageTitle = typeFilters.length === 1 ? TYPE_PAGE_TITLE[typeFilters[0]] : 'Documents'
+  const showExecColumn = typeFilters.length === 0 || typeFilters.includes('TC')
+
+  const { data: docsData, isLoading } = useQuery({
+    queryKey: ['all-docs', prefix, typeFilters],
+    queryFn: () => docsApi.list(prefix!, {
+      type: typeFilters.length > 0 ? typeFilters : undefined,
+      includeLinkCounts: true,
+    }),
+    enabled: !!prefix,
+  })
+  const docs = useMemo(() => docsData?.items ?? [], [docsData])
+
+  const { data: users } = useQuery({
+    queryKey: ['users'],
+    queryFn: usersApi.list,
+    enabled: canEditDocs,
+  })
+
+  const userMap = useMemo(() => {
+    const m = new Map<number, string>()
+    users?.forEach((user) => m.set(user.id, user.full_name))
+    return m
+  }, [users])
+
+  const updateRegistryParams = (next: {
+    types?: DocType[]
+    statuses?: string[]
+    q?: string
+    priority?: string
+    reviewer?: string
+    links?: LinkFilter
+    createdFrom?: string
+    createdTo?: string
+    updatedFrom?: string
+    updatedTo?: string
+    sort?: SortField
+    dir?: SortDir
+  }) => {
+    const params = new URLSearchParams(searchParams)
+    const nextTypes = next.types ?? typeFilters
+    const nextStatuses = next.statuses ?? statusFilters
+    const nextQuery = next.q ?? search
+    const nextPriority = next.priority ?? priorityFilter
+    const nextReviewer = next.reviewer ?? reviewerFilter
+    const nextLinks = next.links ?? linkFilter
+    const nextCreatedFrom = next.createdFrom ?? createdFrom
+    const nextCreatedTo = next.createdTo ?? createdTo
+    const nextUpdatedFrom = next.updatedFrom ?? updatedFrom
+    const nextUpdatedTo = next.updatedTo ?? updatedTo
+    const nextSort = next.sort ?? sortField
+    const nextDir = next.dir ?? sortDir
+
+    writeListParam(params, 'type', nextTypes)
+    writeListParam(params, 'status', nextStatuses)
+
+    if (nextQuery.trim()) params.set('q', nextQuery)
+    else params.delete('q')
+
+    if (nextPriority) params.set('priority', nextPriority)
+    else params.delete('priority')
+
+    if (nextReviewer) params.set('reviewer', nextReviewer)
+    else params.delete('reviewer')
+
+    if (nextLinks) params.set('links', nextLinks)
+    else params.delete('links')
+
+    if (nextCreatedFrom) params.set('created_from', nextCreatedFrom)
+    else params.delete('created_from')
+
+    if (nextCreatedTo) params.set('created_to', nextCreatedTo)
+    else params.delete('created_to')
+
+    if (nextUpdatedFrom) params.set('updated_from', nextUpdatedFrom)
+    else params.delete('updated_from')
+
+    if (nextUpdatedTo) params.set('updated_to', nextUpdatedTo)
+    else params.delete('updated_to')
+
+    if (nextSort !== 'updated_at') params.set('sort', nextSort)
+    else params.delete('sort')
+
+    if (nextDir !== 'desc') params.set('dir', nextDir)
+    else params.delete('dir')
+
+    const scopeAfter = registrySortScope(nextTypes)
+    if (prefix && scopeAfter) {
+      writeStoredSort(prefix, scopeAfter, {
+        field: nextSort as RegistrySortField,
+        dir: nextDir as RegistrySortDir,
+      })
+    }
+
+    setSearchParams(params, { replace: true })
+  }
+
+  const clearFilters = () => {
+    const params = new URLSearchParams()
+    typeFilters.forEach((t) => params.append('type', t))
+    if (sortField !== 'updated_at') params.set('sort', sortField)
+    if (sortDir !== 'desc') params.set('dir', sortDir)
+    setSearchParams(params, { replace: true })
+  }
+
+  const toggleType = (type: DocType) => {
+    updateRegistryParams({
+      types: typeFilters.includes(type)
+        ? typeFilters.filter((value) => value !== type)
+        : [...typeFilters, type],
+    })
+  }
+
+  const toggleStatus = (status: string) => {
+    updateRegistryParams({
+      statuses: statusFilters.includes(status)
+        ? statusFilters.filter((value) => value !== status)
+        : [...statusFilters, status],
+    })
+  }
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      const nextDir = sortDir === 'asc' ? 'desc' : 'asc'
+      updateRegistryParams({ dir: nextDir })
+    } else {
+      const defaultDir = field === 'updated_at' || field === 'created_at' ? 'desc' : 'asc'
+      updateRegistryParams({ sort: field, dir: defaultDir })
+    }
+  }
+
+  const filtered = useMemo(() => {
+    let result = docs || []
+
+    if (search.trim()) {
+      const query = search.toLowerCase()
+      result = result.filter((doc) => {
+        const reviewerName = doc.reviewer_id ? userMap.get(doc.reviewer_id) || '' : ''
+        const kindLabel = isDocType(doc.doc_type) ? TYPE_BADGES[doc.doc_type].label : doc.doc_type
+        const searchable = [
+          doc.doc_id,
+          doc.title,
+          doc.doc_type,
+          kindLabel,
+          doc.status,
+          doc.priority || '',
+          doc.req_type || '',
+          doc.req_origin || '',
+          reviewerName,
+          format(new Date(doc.created_at), 'yyyy-MM-dd MMM d yyyy'),
+          format(new Date(doc.updated_at), 'yyyy-MM-dd MMM d yyyy'),
+        ].join(' ').toLowerCase()
+        return searchable.includes(query)
+      })
+    }
+
+    if (statusFilters.length > 0) {
+      result = result.filter((doc) => statusFilters.includes(doc.status))
+    }
+
+    if (priorityFilter) {
+      result = result.filter((doc) => (doc.priority || '') === priorityFilter)
+    }
+
+    if (reviewerFilter === 'assigned') {
+      result = result.filter((doc) => doc.reviewer_id !== null)
+    } else if (reviewerFilter === 'unassigned') {
+      result = result.filter((doc) => doc.reviewer_id === null)
+    } else if (reviewerFilter) {
+      result = result.filter((doc) => String(doc.reviewer_id || '') === reviewerFilter)
+    }
+
+    if (linkFilter === 'linked') {
+      result = result.filter((doc) => doc.incoming_links + doc.outgoing_links > 0)
+    } else if (linkFilter === 'unlinked') {
+      result = result.filter((doc) => doc.incoming_links + doc.outgoing_links === 0)
+    } else if (linkFilter === 'incoming') {
+      result = result.filter((doc) => doc.incoming_links > 0)
+    } else if (linkFilter === 'outgoing') {
+      result = result.filter((doc) => doc.outgoing_links > 0)
+    } else if (linkFilter === 'suspect') {
+      result = result.filter((doc) => doc.suspect_links > 0)
+    } else if (linkFilter === 'clean') {
+      result = result.filter((doc) => doc.suspect_links === 0)
+    }
+
+    if (createdFrom) {
+      const from = new Date(`${createdFrom}T00:00:00`).getTime()
+      result = result.filter((doc) => new Date(doc.created_at).getTime() >= from)
+    }
+
+    if (createdTo) {
+      const to = new Date(`${createdTo}T23:59:59`).getTime()
+      result = result.filter((doc) => new Date(doc.created_at).getTime() <= to)
+    }
+
+    if (updatedFrom) {
+      const from = new Date(`${updatedFrom}T00:00:00`).getTime()
+      result = result.filter((doc) => new Date(doc.updated_at).getTime() >= from)
+    }
+
+    if (updatedTo) {
+      const to = new Date(`${updatedTo}T23:59:59`).getTime()
+      result = result.filter((doc) => new Date(doc.updated_at).getTime() <= to)
+    }
+
+    return result
+  }, [createdFrom, createdTo, docs, linkFilter, priorityFilter, reviewerFilter, search, statusFilters, updatedFrom, updatedTo, userMap])
+
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      let cmp = 0
+      switch (sortField) {
+        case 'updated_at':
+        case 'created_at':
+          cmp = new Date(a[sortField]).getTime() - new Date(b[sortField]).getTime()
+          break
+        case 'doc_id':
+        case 'doc_type':
+        case 'status':
+        case 'title':
+          cmp = a[sortField].localeCompare(b[sortField], undefined, { numeric: true, sensitivity: 'base' })
+          break
+        case 'priority':
+          cmp = (a.priority || '').localeCompare(b.priority || '', undefined, { sensitivity: 'base' })
+          break
+        case 'req_type':
+          cmp = (a.req_type || '').localeCompare(b.req_type || '', undefined, { sensitivity: 'base' })
+          break
+        case 'req_origin':
+          cmp = (a.req_origin || '').localeCompare(b.req_origin || '', undefined, { sensitivity: 'base' })
+          break
+        case 'reviewer':
+          cmp = (a.reviewer_id ? userMap.get(a.reviewer_id) || '' : '').localeCompare(
+            b.reviewer_id ? userMap.get(b.reviewer_id) || '' : '',
+            undefined,
+            { sensitivity: 'base' }
+          )
+          break
+      }
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [filtered, sortDir, sortField, userMap])
+
+  const sortLabel = SORT_OPTIONS.find((option) => option.field === sortField)?.label || 'Updated'
+  const hasActiveFilters = Boolean(
+    statusFilters.length ||
+    search ||
+    priorityFilter ||
+    reviewerFilter ||
+    linkFilter ||
+    createdFrom ||
+    createdTo ||
+    updatedFrom ||
+    updatedTo
+  )
+  const hasSortOverride = sortField !== 'updated_at' || sortDir !== 'desc'
+  const soleDocType = typeFilters.length === 1 ? typeFilters[0] : null
+  const showKindColumn = !soleDocType
+  const showReqColumns = soleDocType === 'REQ'
+  const visibleSortOptions = SORT_OPTIONS.filter((option) => showKindColumn || option.field !== 'doc_type')
+  const showFilterSummary = hasActiveFilters || hasSortOverride
+  const searchPlaceholder = soleDocType
+    ? 'Search name, ID, status, reviewer, dates, links...'
+    : 'Search name, ID, kind, status, reviewer, dates, links...'
+
+  const PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100]
+  const [pageSize, setPageSize] = useState(30)
+  const [page, setPage] = useState(0)
+  useEffect(() => { setPage(0) }, [typeFilters, statusFilters, search, priorityFilter, reviewerFilter, linkFilter, createdFrom, createdTo, updatedFrom, updatedTo, pageSize])
+  const totalPages = Math.ceil(sorted.length / pageSize)
+  const paginated = sorted.slice(page * pageSize, page * pageSize + pageSize)
+
+  const createReturnState = { returnTo: `/projects/${prefix}/docs?${searchParams.toString()}` }
+  const docCreateLinkClass =
+    'inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors'
+
+  const SortHeader = ({ field, children, compact = false }: { field: SortField; children: React.ReactNode; compact?: boolean }) => (
+    <th
+      className={`${compact ? 'px-3' : 'px-5'} py-2.5 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer select-none hover:text-foreground transition-colors`}
+      onClick={() => toggleSort(field)}
+    >
+      <div className="flex items-center gap-1">
+        {children}
+        {sortField === field ? (
+          sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-30" />
+        )}
+      </div>
+    </th>
+  )
+
+  const filterSummaryChips = (
+    <>
+      <FilterChip label={`Sort: ${sortLabel}`} muted={!hasSortOverride} />
+      {search && <FilterChip label={`Search: ${search}`} />}
+      {showKindColumn && typeFilters.map((type) => <FilterChip key={type} label={`Kind: ${type}`} />)}
+      {statusFilters.map((status) => <FilterChip key={status} label={`Status: ${status}`} />)}
+      {priorityFilter && <FilterChip label={`Priority: ${priorityFilter}`} />}
+      {reviewerFilter && (
+        <FilterChip
+          label={`Reviewer: ${
+            reviewerFilter === 'assigned'
+              ? 'assigned'
+              : reviewerFilter === 'unassigned'
+                ? 'unassigned'
+                : userMap.get(Number(reviewerFilter)) || reviewerFilter
+          }`}
+        />
+      )}
+      {linkFilter && <FilterChip label={`Links: ${LINK_FILTER_OPTIONS.find((option) => option.code === linkFilter)?.label}`} />}
+      {createdFrom && <FilterChip label={`Created from: ${createdFrom}`} />}
+      {createdTo && <FilterChip label={`Created to: ${createdTo}`} />}
+      {updatedFrom && <FilterChip label={`Updated from: ${updatedFrom}`} />}
+      {updatedTo && <FilterChip label={`Updated to: ${updatedTo}`} />}
+      {hasActiveFilters && (
+        <button onClick={clearFilters} className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
+          <X className="h-3.5 w-3.5" />
+          Clear all
+        </button>
+      )}
+    </>
+  )
+
+  return (
+    <div className="space-y-3.5 animate-fade-in">
+      <div className="flex flex-col gap-2.5 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex items-start gap-2.5 min-w-0">
+          <button
+            onClick={() => {
+              if (window.history.length > 1) {
+                navigate(-1)
+              } else {
+                navigate(`/projects/${prefix}`)
+              }
+            }}
+            className="p-1 hover:bg-accent/50 rounded-md shrink-0 mt-0.5"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+          </button>
+          <div className="min-w-0">
+            <h2 className="text-base font-bold text-foreground">{pageTitle}</h2>
+          </div>
+        </div>
+
+        {canEditDocs && (
+          <div className="flex items-center gap-2">
+            <Link
+              to={`/projects/${prefix}/import`}
+              className="inline-flex items-center gap-2 px-2.5 py-1.5 border border-input bg-background text-foreground rounded-md text-sm font-medium hover:bg-accent transition-colors"
+            >
+              <Upload className="h-4 w-4" />
+              Import
+            </Link>
+            {soleDocType ? (
+              <Link
+                to={docCreateUrl(prefix!, soleDocType)}
+                state={createReturnState}
+                className={`${docCreateLinkClass} bg-primary text-primary-foreground hover:bg-primary/90`}
+              >
+                <Plus className="h-4 w-4" />
+                New {TYPE_BADGES[soleDocType].label}
+              </Link>
+            ) : null}
+          </div>
+        )}
+      </div>
+
+      <section className="rounded-lg border border-border bg-card">
+        <div className="grid grid-cols-1 gap-2 border-b border-border p-3 xl:grid-cols-[minmax(220px,1fr)_190px_auto]">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder={searchPlaceholder}
+              value={search}
+              onChange={(event) => updateRegistryParams({ q: event.target.value })}
+              className="w-full rounded-md border border-input bg-background py-1.5 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring"
+            />
+          </div>
+          <select
+            value={sortField}
+            onChange={(event) => {
+              const nextSort = event.target.value as SortField
+              const defaultDir = nextSort === 'updated_at' || nextSort === 'created_at' ? 'desc' : 'asc'
+              updateRegistryParams({ sort: nextSort, dir: defaultDir })
+            }}
+            className="rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
+          >
+            {visibleSortOptions.map((option) => (
+              <option key={option.field} value={option.field}>Sort by {option.label}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((open) => !open)}
+            className={`inline-flex items-center justify-center gap-2 rounded-md border px-2.5 py-1.5 text-sm font-medium transition-colors ${
+              filtersOpen || hasActiveFilters
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-input bg-background text-foreground hover:bg-accent'
+            }`}
+            aria-expanded={filtersOpen}
+            aria-controls="documents-filter-panel"
+          >
+            <Filter className="h-4 w-4" />
+            Filters
+            {hasActiveFilters && (
+              <span className="rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">On</span>
+            )}
+          </button>
+        </div>
+
+        {showFilterSummary && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
+            {filterSummaryChips}
+          </div>
+        )}
+
+        {filtersOpen && (
+        <div id="documents-filter-panel" className="space-y-3 border-t border-border p-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Filter className="h-4 w-4 text-primary" />
+            Filters
+          </div>
+
+          {showKindColumn && (
+          <div className="space-y-2">
+            <div className="text-xs font-medium uppercase text-muted-foreground">Kind</div>
+            <div className="flex flex-wrap gap-2">
+              {DOC_TYPE_OPTIONS.map((type) => (
+                <button
+                  key={type.code}
+                  onClick={() => toggleType(type.code)}
+                  className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                    typeFilters.includes(type.code)
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border bg-background text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {type.code}
+                </button>
+              ))}
+            </div>
+          </div>
+          )}
+
+          <div className="space-y-2">
+            <div className="text-xs font-medium uppercase text-muted-foreground">Status</div>
+            <div className="flex flex-wrap gap-2">
+              {STATUS_OPTIONS.map((status) => (
+                <button
+                  key={status}
+                  onClick={() => toggleStatus(status)}
+                  className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                    statusFilters.includes(status)
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border bg-background text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {status}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
+            <label className="space-y-1">
+              <span className="text-xs font-medium uppercase text-muted-foreground">Priority / Severity</span>
+              <select
+                value={priorityFilter}
+                onChange={(event) => updateRegistryParams({ priority: event.target.value })}
+                className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
+              >
+                <option value="">Any priority</option>
+                {PRIORITY_OPTIONS.map((priority) => (
+                  <option key={priority} value={priority}>{priority}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-xs font-medium uppercase text-muted-foreground">Reviewer</span>
+              <select
+                value={reviewerFilter}
+                onChange={(event) => updateRegistryParams({ reviewer: event.target.value })}
+                className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
+              >
+                <option value="">Any reviewer</option>
+                <option value="assigned">Any assigned</option>
+                <option value="unassigned">Unassigned</option>
+                {users?.map((user) => (
+                  <option key={user.id} value={user.id}>{user.full_name}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-xs font-medium uppercase text-muted-foreground">Links</span>
+              <select
+                value={linkFilter}
+                onChange={(event) => updateRegistryParams({ links: event.target.value as LinkFilter })}
+                className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
+              >
+                {LINK_FILTER_OPTIONS.map((option) => (
+                  <option key={option.code} value={option.code}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
+            <DatePickerField
+              label="Created From"
+              value={createdFrom}
+              emptyLabel="Any start date"
+              onChange={(value) => updateRegistryParams({ createdFrom: value })}
+            />
+
+            <DatePickerField
+              label="Created To"
+              value={createdTo}
+              emptyLabel="Any end date"
+              onChange={(value) => updateRegistryParams({ createdTo: value })}
+            />
+
+            <DatePickerField
+              label="Updated From"
+              value={updatedFrom}
+              emptyLabel="Any start date"
+              onChange={(value) => updateRegistryParams({ updatedFrom: value })}
+            />
+
+            <DatePickerField
+              label="Updated To"
+              value={updatedTo}
+              emptyLabel="Any end date"
+              onChange={(value) => updateRegistryParams({ updatedTo: value })}
+            />
+          </div>
+        </div>
+        )}
+      </section>
+
+      {isLoading ? (
+        <div className="bg-card rounded-lg border border-border shadow-elegant p-5 text-center text-muted-foreground">
+          Loading...
+        </div>
+      ) : sorted.length === 0 ? (
+        <div className="bg-card rounded-lg border border-border shadow-elegant p-10 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
+            <BookOpen className="h-9 w-9 text-primary/40" />
+          </div>
+          <h3 className="text-sm font-semibold text-foreground mb-2">
+            {hasActiveFilters
+              ? soleDocType
+                ? `No ${TYPE_PAGE_TITLE[soleDocType]} match your filters`
+                : 'No documents found'
+              : soleDocType
+                ? `No ${TYPE_PAGE_TITLE[soleDocType]} yet`
+                : 'No documents yet'}
+          </h3>
+          <p className="text-sm text-muted-foreground mb-3 max-w-md mx-auto">
+            {hasActiveFilters
+              ? 'Try a different filter combination.'
+              : soleDocType
+                ? `Create your first ${DOC_TYPE_LABELS[soleDocType]} to get started.`
+                : 'Use Import to add items from a file, or open a specific document type from the sidebar to create one.'}
+          </p>
+        </div>
+      ) : (
+        <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-border">
+              <thead className="bg-muted/50">
+                <tr>
+                  <SortHeader field="doc_id">ID</SortHeader>
+                  {showKindColumn && <SortHeader field="doc_type">Kind</SortHeader>}
+                  <SortHeader field="title">Name / Title</SortHeader>
+                  <SortHeader field="status">Status</SortHeader>
+                  {showReqColumns && <SortHeader field="req_type">Type</SortHeader>}
+                  {showReqColumns && <SortHeader field="req_origin">Origin</SortHeader>}
+                  {showExecColumn && <SortHeader field="updated_at">Execution</SortHeader>}
+                  <SortHeader field="priority" compact>Priority</SortHeader>
+                  <SortHeader field="reviewer" compact>Reviewer</SortHeader>
+                  <SortHeader field="created_at">Created</SortHeader>
+                  <SortHeader field="updated_at">Updated</SortHeader>
+                </tr>
+              </thead>
+              <tbody className="bg-card divide-y divide-border">
+                {paginated.map((doc: DocShell) => {
+                  const detailUrl = docUrl(prefix!, doc.doc_type as DocType, doc.doc_id)
+                  const listState = { returnTo: `/projects/${prefix}/docs?${searchParams.toString()}` }
+                  return (
+                  <tr key={`${doc.doc_type}-${doc.id}`} className="hover:bg-accent/50">
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <Link to={detailUrl} state={listState} className="text-primary font-mono text-sm font-medium">
+                        {doc.doc_id}
+                      </Link>
+                    </td>
+                    {showKindColumn && (
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <TypeBadge type={doc.doc_type} />
+                    </td>
+                    )}
+                    <td className="px-3 py-2 max-w-sm truncate">
+                      <div className="space-y-1">
+                        <Link to={detailUrl} state={listState} className="text-foreground hover:text-primary/80 font-medium">
+                          {doc.title}
+                        </Link>
+                        <VisibilityBadge visibility={doc.visibility} />
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <StatusBadge status={doc.status} />
+                    </td>
+                    {showReqColumns && (
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {doc.req_type ? <ReqTypeBadge reqType={doc.req_type} /> : <span className="text-xs text-muted-foreground">-</span>}
+                    </td>
+                    )}
+                    {showReqColumns && (
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {doc.req_origin ? <ReqOriginBadge origin={doc.req_origin} /> : <span className="text-xs text-muted-foreground">-</span>}
+                    </td>
+                    )}
+                    {showExecColumn && (
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {doc.doc_type === 'TC' ? (
+                          <div className="space-y-1">
+                            <ExecutionBadge status={doc.last_execution_status} />
+                            <div className="text-xs text-muted-foreground">
+                              {doc.last_executed_at ? formatDateTime(doc.last_executed_at) : 'No execution yet'}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </td>
+                    )}
+                    <td className="px-2.5 py-2 whitespace-nowrap text-xs text-muted-foreground">
+                      {doc.priority || '-'}
+                    </td>
+                    <td className="px-2.5 py-2 whitespace-nowrap text-xs text-muted-foreground">
+                      {doc.reviewer_id ? userMap.get(doc.reviewer_id) || '-' : '-'}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">
+                      {format(new Date(doc.created_at), 'MMM d, yyyy')}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">
+                      {format(new Date(doc.updated_at), 'MMM d, yyyy')}
+                    </td>
+                  </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          {sorted.length > 0 && (
+            <div className="border-t border-border px-4 py-3 flex items-center justify-between text-sm bg-muted/20">
+              <div className="flex items-center gap-3">
+                <span className="text-muted-foreground">
+                  {page * pageSize + 1}&ndash;{Math.min((page + 1) * pageSize, sorted.length)} of {sorted.length}
+                </span>
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <span className="text-xs">Rows:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="text-xs border border-border rounded bg-background px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="px-3 py-1 border border-border rounded hover:bg-accent/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Prev
+                </button>
+                <span className="px-2 text-muted-foreground">
+                  {page + 1} / {totalPages || 1}
+                </span>
+                <button
+                  disabled={page >= totalPages - 1}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="px-3 py-1 border border-border rounded hover:bg-accent/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function FilterChip({ label, muted = false }: { label: string; muted?: boolean }) {
+  return (
+    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs ${muted ? 'border-border text-muted-foreground' : 'border-primary/20 bg-primary/10 text-primary'}`}>
+      {label}
+    </span>
+  )
+}
+
+function DatePickerField({
+  label,
+  value,
+  emptyLabel,
+  onChange,
+}: {
+  label: string
+  value: string
+  emptyLabel: string
+  onChange: (value: string) => void
+}) {
+  const displayValue = value ? format(new Date(`${value}T00:00:00`), 'MMM d, yyyy') : emptyLabel
+
+  return (
+    <label className="space-y-1">
+      <span className="text-xs font-medium uppercase text-muted-foreground">{label}</span>
+      <span className="relative flex w-full items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-accent/40 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring">
+        <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <span className={value ? 'text-foreground' : 'text-muted-foreground'}>{displayValue}</span>
+        <input
+          type="date"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          aria-label={label}
+        />
+      </span>
+    </label>
+  )
+}
