@@ -96,6 +96,12 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("BLOOM_RUN_STARTUP_DATA_REPAIR", "RUN_STARTUP_DATA_REPAIR"),
     )
 
+    # Explicit startup admin bootstrap; defaults on in development, off in production.
+    AUTO_SEED_ADMIN: bool | None = Field(
+        default=None,
+        validation_alias=AliasChoices("BLOOM_AUTO_SEED_ADMIN", "AUTO_SEED_ADMIN"),
+    )
+
     ADMIN_EMAIL: str = Field(
         default="admin@example.com",
         validation_alias=AliasChoices("BLOOM_ADMIN_EMAIL", "ADMIN_EMAIL"),
@@ -176,6 +182,12 @@ class Settings(BaseSettings):
                 f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}"
                 f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
             )
+        return self
+
+    @model_validator(mode="after")
+    def default_auto_seed_admin(self):
+        if self.AUTO_SEED_ADMIN is None:
+            self.AUTO_SEED_ADMIN = self.BLOOM_ENV.lower() != "production"
         return self
 
     @model_validator(mode="after")
