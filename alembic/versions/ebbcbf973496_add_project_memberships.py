@@ -13,9 +13,9 @@ Project-scoped role assignments:
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 revision: str = "ebbcbf973496"
 down_revision: Union[str, Sequence[str], None] = None
@@ -24,11 +24,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Base schema is managed by SQLAlchemy create_tables() (models are source of truth).
-    # This migration exists to anchor the revision chain.
-    pass
+    import app.models  # noqa: F401
+    from app.core.database import Base
+
+    bind = op.get_bind()
+    Base.metadata.create_all(bind=bind)
 
 
 def downgrade() -> None:
     pass
-
