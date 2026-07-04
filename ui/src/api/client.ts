@@ -245,8 +245,8 @@ export interface TestCaseSummary {
   tc_id: string
   title: string
   status: string
-  last_execution_status: string | null
-  last_executed_at: string | null
+  last_execution_status?: string | null
+  last_executed_at?: string | null
   last_bud_run_id: number | null
 }
 
@@ -255,6 +255,9 @@ export interface TestSuiteSummary {
   suite_id: string
   name: string
   status: string
+  last_execution_status?: string | null
+  last_executed_at?: string | null
+  last_bud_run_id?: number | null
 }
 
 export interface TestCampaignSummary {
@@ -262,6 +265,8 @@ export interface TestCampaignSummary {
   campaign_id?: string
   name: string
   status: string
+  last_execution_status?: string | null
+  last_executed_at?: string | null
 }
 
 export interface TestConceptSummary {
@@ -336,8 +341,8 @@ export interface TestCase {
   approved_by_id: number | null
   reviewed_at: string | null
   approved_at: string | null
-  last_execution_status: string | null
-  last_executed_at: string | null
+  last_execution_status?: string | null
+  last_executed_at?: string | null
   last_execution_comment: string | null
   last_bud_run_id: number | null
   source_ref?: string | null
@@ -666,6 +671,7 @@ export interface DocShell {
   suspect_links: number
   last_execution_status: string | null
   last_executed_at: string | null
+  last_bud_run_id: number | null
   created_at: string
   updated_at: string
 }
@@ -963,6 +969,9 @@ export interface TestSuite extends TestSuiteSummary {
   created_at: string
   updated_at: string
   total_items: number
+  last_execution_status: string | null
+  last_executed_at: string | null
+  last_bud_run_id: number | null
 }
 
 export interface TestSuiteDetail extends TestSuite {
@@ -1006,6 +1015,8 @@ export interface TestCampaign {
   failed: number
   blocked: number
   pending: number
+  last_execution_status: string | null
+  last_executed_at: string | null
   configuration: TestConfiguration | null
   suite: TestSuiteSummary | null
   suites: TestSuiteSummary[]

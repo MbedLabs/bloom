@@ -1,5 +1,6 @@
 import asyncio
 from dataclasses import dataclass
+from datetime import datetime
 
 from fastapi import HTTPException, status
 from fastapi.testclient import TestClient
@@ -186,7 +187,11 @@ async def _seed_campaign_visibility_data(session_maker: async_sessionmaker[Async
                 CampaignSuite(campaign_id=visible_campaign.id, suite_id=visible_suite.id),
                 CampaignSuite(campaign_id=visible_campaign.id, suite_id=hidden_suite.id),
                 TestCampaignItem(
-                    campaign_id=visible_campaign.id, test_case_id=visible_tc.id, status="Pending"
+                    campaign_id=visible_campaign.id,
+                    test_case_id=visible_tc.id,
+                    status="Executed",
+                    result="Passed",
+                    executed_at=datetime(2026, 7, 2, 11, 15, 0),
                 ),
                 TestCampaignItem(
                     campaign_id=visible_campaign.id, test_case_id=hidden_tc.id, status="Pending"
@@ -224,8 +229,99 @@ def test_external_campaign_list_and_detail_hide_internal_campaign_and_items():
         assert visible.status_code == 200, visible.text
         body = visible.json()
         assert body["visibility"] == "customer"
+        assert body["total_items"] == 1
+        assert body["last_execution_status"] == "Passed"
+        assert body["last_executed_at"].startswith("2026-07-02T11:15:00")
         assert [item["test_case"]["tc_id"] for item in body["items"]] == ["CPV-TC-001"]
         assert [suite["suite"]["suite_id"] for suite in body["suite_scopes"]] == ["CPV-TS-001"]
+    finally:
+        harness.client.close()
+        app.dependency_overrides.clear()
+        asyncio.run(engine.dispose())
+
+
+def test_campaign_list_includes_latest_execution_timestamp():
+    harness, engine = _build_harness()
+    try:
+        seeded = harness.run(_seed_campaign_visibility_data(harness.session_maker))
+        harness.act_as(seeded["external"])
+
+        listed = harness.client.get(f"/api/campaigns?project_id={seeded['project'].id}")
+
+        assert listed.status_code == 200, listed.text
+        items = listed.json()["items"]
+        assert len(items) == 1
+        assert items[0]["campaign_id"] == "CPV-CMP-001"
+        assert items[0]["total_items"] == 1
+        assert items[0]["last_execution_status"] == "Passed"
+        assert items[0]["last_executed_at"].startswith("2026-07-02T11:15:00")
+    finally:
+        harness.client.close()
+        app.dependency_overrides.clear()
+        asyncio.run(engine.dispose())
+
+
+async def _seed_campaign_sync_maintainer(
+    session_maker: async_sessionmaker[AsyncSession],
+    project_id: int,
+):
+    async with session_maker() as session:
+        maintainer = User(
+            email="campaign-sync-maintainer@example.com",
+            full_name="Campaign Sync Maintainer",
+            hashed_password=get_password_hash("unused-maintainer-password"),
+            role=UserRole.maintainer,
+            is_active=True,
+        )
+        session.add(maintainer)
+        await session.flush()
+
+        session.add(
+            ProjectMembership(
+                user_id=maintainer.id,
+                project_id=project_id,
+                role=UserRole.maintainer.value,
+            )
+        )
+        await session.commit()
+        return maintainer
+
+
+def test_sync_results_updates_items_without_inventing_campaign_run_id():
+    harness, engine = _build_harness()
+    try:
+        seeded = harness.run(_seed_campaign_visibility_data(harness.session_maker))
+        maintainer = harness.run(
+            _seed_campaign_sync_maintainer(
+                harness.session_maker,
+                seeded["project"].id,
+            )
+        )
+        harness.act_as(maintainer)
+
+        response = harness.client.post(
+            "/api/campaigns/sync-results",
+            json={
+                "results": [
+                    {
+                        "tc_id": "CPV-TC-001",
+                        "status": "Passed",
+                        "comment": "Last result from Bud run 123",
+                        "executed_at": "2026-07-04T10:45:00",
+                        "bud_run_id": 123,
+                    }
+                ]
+            },
+        )
+
+        assert response.status_code == 200, response.text
+        visible = harness.client.get(f"/api/campaigns/{seeded['visible_campaign'].id}")
+        assert visible.status_code == 200, visible.text
+        body = visible.json()
+        assert body["bud_run_id"] is None
+        assert body["bud_run_url"] is None
+        assert body["items"][0]["result"] == "Passed"
+        assert body["items"][0]["executed_at"].startswith("2026-07-04T10:45:00")
     finally:
         harness.client.close()
         app.dependency_overrides.clear()

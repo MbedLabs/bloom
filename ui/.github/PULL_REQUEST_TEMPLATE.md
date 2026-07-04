@@ -1,6 +1,6 @@
 ## Summary
 
-## Checklist (frontend)
+## Checklist (UI)
 
 - [ ] `npm run lint` and `npx tsc --noEmit` pass
 - [ ] Vitest added/updated for new UI behavior

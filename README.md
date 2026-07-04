@@ -1,33 +1,28 @@
 # Bloom
 
-Bloom is the combined product repo for the EmbedLabs product lifecycle management app. It keeps the FastAPI backend at the repo root, the React frontend under [`frontend/`](frontend), and ships a single product image that serves both the UI and the `/api` surface.
+Bloom is an open source product lifecycle management platform for teams that need requirements, documents, verification assets, and traceability in one place.
 
-## What is in this repo
+## What you can do with Bloom
 
-- Backend API and Alembic migrations at the root
-- Frontend application in [`frontend/`](frontend)
-- One combined Docker image build from the root `Dockerfile`
-- One product CI workflow in [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml)
+- Manage requirements, shared documents, test cases, suites, campaigns, and baselines from one workspace
+- Track traceability and coverage across specification and verification assets
+- Organize project data with stable human-readable IDs and change history
+- Share controlled project views with internal teams and external stakeholders
+- Connect lifecycle records with Bud execution workflows
 
-## Version
+## Self-host Bloom
 
-This combined product repo is currently at `1.0.0`.
+Bloom ships as a combined product repo with a FastAPI backend at the repository top level, a React UI in [`ui/`](ui), and one product image that serves both the UI and the `/api` surface.
 
-## Quick start
+Bloom requires PostgreSQL plus runtime configuration for database access, application secrets, public URLs, admin access, and email delivery. Run `alembic upgrade head` before serving traffic.
 
-```bash
-cp .env.example .env
-docker compose up -d postgres
-docker compose run --rm bloom alembic upgrade head
-docker compose up -d bloom
-curl -sf http://localhost:8000/api/health
-```
+## Get Started
 
-Open `http://localhost:8000`.
+- Review [`docker-compose.yml`](docker-compose.yml) for a reference self-host layout
+- Use [`Dockerfile`](Dockerfile) if you want to build the combined product image directly
+- Verify the deployed instance through the `/api/health` endpoint on your Bloom URL
 
-For the first admin bootstrap, temporarily set `AUTO_SEED_ADMIN=true` in `.env`, start Bloom once, sign in, then set it back to `false`.
-
-## Local development
+## Local Development
 
 Backend:
 
@@ -38,10 +33,10 @@ pip install -e ".[dev]"
 uvicorn app.main:app --reload --port 8000
 ```
 
-Frontend:
+UI:
 
 ```bash
-cd frontend
+cd ui
 npm ci
 npm run dev
 ```
@@ -56,10 +51,10 @@ isort --profile black --check-only --diff app/ tests/
 pytest --cov=app --cov-report=term-missing --cov-fail-under=50 tests/ -v
 ```
 
-Frontend checks:
+UI checks:
 
 ```bash
-cd frontend
+cd ui
 npm run lint
 npx tsc --noEmit
 npm run test -- --coverage
@@ -69,20 +64,12 @@ Combined image:
 
 ```bash
 docker build -t bloom:1.0.0 .
-docker run --rm -p 8000:8080 bloom:1.0.0
 ```
 
-## IAM and invitation model
+## Resources
 
-- Admins invite users and maintainers through the app.
-- External users are read-only and should only see permitted project data.
-- Bud integrations should point `BUD_APP_URL` at the Bud product repo deployment, `http://localhost:8001` by default in local combined-repo development.
-
-## Production notes
-
-- `BLOOM_ENV=production` rejects unsafe bootstrap defaults.
-- `RUN_STARTUP_DATA_REPAIR` defaults off in production.
-- `AUTO_SEED_ADMIN` defaults off in production and should only be enabled for controlled bootstrap or rotation windows.
+- [`CHANGELOG.md`](CHANGELOG.md)
+- [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
 ## License
 

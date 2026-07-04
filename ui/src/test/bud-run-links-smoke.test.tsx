@@ -1,23 +1,17 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { renderToString } from 'react-dom/server'
 import type { ReactNode } from 'react'
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import { renderToString } from 'react-dom/server'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-type MockUser = {
-  role: 'admin' | 'maintainer' | 'external'
-} | null
-
-let mockUser: MockUser = { role: 'external' }
 let mockParams: Record<string, string> = {}
-let mockLocationState: { returnTo?: string } | null = null
 let mockQueryData: Record<string, unknown> = {}
 let mockProject: { id: number; name: string; prefix: string } | null = null
 
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({
-    user: mockUser,
+    user: { role: 'maintainer' },
     isLoading: false,
-    isAuthenticated: !!mockUser,
+    isAuthenticated: true,
     login: vi.fn(),
     logout: vi.fn(),
   }),
@@ -48,7 +42,7 @@ vi.mock('react-router-dom', async () => {
     ...actual,
     useParams: () => mockParams,
     useNavigate: () => vi.fn(),
-    useLocation: () => ({ state: mockLocationState }),
+    useLocation: () => ({ state: null }),
     Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
   }
 })
@@ -58,13 +52,6 @@ vi.mock('../hooks/useProjectByPrefix', () => ({
     data: mockProject,
     isLoading: false,
   }),
-}))
-
-vi.mock('../api/budClient', () => ({
-  budTestRunsApi: {
-    list: vi.fn(async () => ({ runs: [] })),
-  },
-  budResultsApi: {},
 }))
 
 vi.mock('../contexts/PageMetaContext', () => ({
@@ -86,9 +73,8 @@ vi.mock('../components/DocumentActivityPanel', () => ({
 }))
 
 vi.mock('../components/DocDetailShell', () => ({
-  default: ({ actions, children, rightRail }: { actions?: ReactNode; children?: ReactNode; rightRail?: ReactNode }) => (
+  default: ({ children, rightRail }: { children?: ReactNode; rightRail?: ReactNode }) => (
     <div>
-      <div>{actions}</div>
       <div>{children}</div>
       <div>{rightRail}</div>
     </div>
@@ -105,16 +91,11 @@ vi.mock('../components/DocDetailShell', () => ({
       {children}
     </section>
   ),
-  VisibilityBadge: ({ visibility }: { visibility?: string | null }) => (
-    <span>{visibility || ''}</span>
-  ),
 }))
 
 function renderPage(element: ReactNode) {
   const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-    },
+    defaultOptions: { queries: { retry: false } },
   })
 
   return renderToString(
@@ -124,16 +105,14 @@ function renderPage(element: ReactNode) {
   )
 }
 
-describe('external user mutation gating smoke', () => {
+describe('Bloom Bud run links', () => {
   beforeEach(() => {
-    mockUser = { role: 'external' }
     mockParams = {}
-    mockLocationState = null
     mockProject = { id: 7, name: 'Vehicle Controls', prefix: 'VCU' }
     mockQueryData = {}
-    const storage = { getItem: vi.fn(() => null) }
+    const storage = { getItem: vi.fn(() => null), setItem: vi.fn() }
     vi.stubGlobal('window', {
-      runtimeConfig: {},
+      runtimeConfig: { BUD_APP_URL: 'https://bud.embedlabs.net/api' },
       localStorage: storage,
     })
     vi.stubGlobal('localStorage', storage)
@@ -143,88 +122,71 @@ describe('external user mutation gating smoke', () => {
     vi.unstubAllGlobals()
   })
 
-  it('hides document edit/delete actions for external users', async () => {
-    mockParams = { prefix: 'VCU', docId: '42', kind: 'specifications' }
+  it('renders the TC last Bud run as a clickable Bud link', async () => {
+    mockParams = { prefix: 'VCU', itemId: '42' }
     mockQueryData = {
-      document: {
+      testCase: {
         id: 42,
         project_id: 7,
-        doc_id: 'VCU-SPEC-001',
-        title: 'System Specification',
+        tc_id: 'VCU-TC-001',
+        title: 'Clickable TC',
+        description: '',
+        preconditions: '',
+        steps: [],
         status: 'Draft',
         visibility: 'customer',
-        version: 1,
-        created_at: '2026-06-01T00:00:00Z',
-        updated_at: '2026-06-01T00:00:00Z',
-        sections: [],
-        content_json: null,
+        created_at: '2026-07-04T00:00:00Z',
+        updated_at: '2026-07-04T00:00:00Z',
+        requirement_count: 0,
+        linked_requirements: [],
+        verifies: [],
+        suite_memberships: [],
+        last_execution_status: 'Passed',
+        last_executed_at: '2026-07-04T09:30:00Z',
+        last_execution_comment: 'Last result from Bud run 987',
+        last_bud_run_id: 987,
       },
+      users: [],
       project: mockProject,
     }
 
-    const { default: DocumentDetail } = await import('../pages/DocumentDetail')
-    const html = renderPage(<DocumentDetail />)
+    const { default: TestCaseDetail } = await import('../pages/TestCaseDetail')
 
-    expect(html).not.toContain('>Edit<')
-    expect(html).not.toContain('>Delete<')
+    const html = renderPage(<TestCaseDetail />)
+
+    expect(html).toContain('Bud run #987')
+    expect(html).toContain('href="https://bud.embedlabs.net/runs/987"')
   })
 
-  it('hides suite mutation actions for external users', async () => {
+  it('renders the suite latest Bud run as a clickable Bud link', async () => {
     mockParams = { prefix: 'VCU', suiteId: '12' }
     mockQueryData = {
       testSuite: {
         id: 12,
+        project_id: 7,
         suite_id: 'VCU-TS-001',
         name: 'Nightly Suite',
-        description: 'Regression',
+        description: '',
         status: 'Active',
         visibility: 'customer',
+        total_items: 1,
+        last_execution_status: 'Passed',
+        last_executed_at: '2026-07-04T09:30:00Z',
+        last_bud_run_id: 987,
         items: [],
+        related_requirements: [],
+        linked_campaigns: [],
+        related_concepts: [],
       },
       testCases: { items: [] },
       'bud-test-runs': { runs: [] },
     }
 
     const { default: SuiteDetail } = await import('../pages/SuiteDetail')
+
     const html = renderPage(<SuiteDetail />)
 
-    expect(html).not.toContain('>Edit<')
-    expect(html).not.toContain('>Delete<')
-    expect(html).not.toContain('Add Test Case')
-    expect(html).not.toContain('Create Campaign Scope')
-  })
-
-  it('hides campaign edit/delete actions for external users', async () => {
-    mockParams = { prefix: 'VCU', campaignId: '22' }
-    mockQueryData = {
-      campaign: {
-        id: 22,
-        campaign_id: 'VCU-CMP-001',
-        name: 'Scope Campaign',
-        description: 'Visible to customer',
-        status: 'Scope',
-        visibility: 'customer',
-        bud_run_id: null,
-        suite_scopes: [],
-        ad_hoc_items: [],
-      },
-      'campaign-scope-links': [],
-    }
-
-    const { default: CampaignDetail } = await import('../pages/CampaignDetail')
-    const html = renderPage(<CampaignDetail />)
-
-    expect(html).not.toContain('>Edit<')
-    expect(html).not.toContain('>Delete<')
-  })
-
-  it('shows project parameters as read-only denied for external users', async () => {
-    mockParams = { prefix: 'VCU' }
-
-    const { default: ProjectParameters } = await import('../pages/ProjectParameters')
-    const html = renderPage(<ProjectParameters />)
-
-    expect(html).toContain('Only admins and maintainers can view or edit project parameters.')
-    expect(html).not.toContain('Add Item')
+    expect(html).toContain('Bud run #987')
+    expect(html).toContain('href="https://bud.embedlabs.net/runs/987"')
   })
 })

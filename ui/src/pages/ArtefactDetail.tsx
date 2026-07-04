@@ -348,11 +348,6 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
       docCode={code}
       title={title}
       status={String(artefact.status)}
-      visibility={
-        artefactRecord.visibility === 'internal' || artefactRecord.visibility === 'customer'
-          ? artefactRecord.visibility
-          : undefined
-      }
       actions={canEditDocs ? (
         <>
           <button onClick={() => {

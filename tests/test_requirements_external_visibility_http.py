@@ -173,3 +173,47 @@ def test_external_requirement_detail_returns_404_for_internal():
         harness.client.close()
         app.dependency_overrides.clear()
         asyncio.run(engine.dispose())
+
+
+def test_requirement_origin_customer_sets_customer_visibility():
+    harness, engine = _build_harness()
+    try:
+        seeded = harness.run(_seed_requirement_visibility_data(harness.session_maker))
+        harness.act_as(seeded["admin"])
+
+        response = harness.client.post(
+            "/api/requirements",
+            json={
+                "project_id": seeded["project"].id,
+                "title": "Customer-origin requirement",
+                "req_origin": "Customer",
+            },
+        )
+        assert response.status_code == 201, response.text
+        body = response.json()
+        assert body["req_origin"] == "Customer"
+        assert body["visibility"] == "customer"
+    finally:
+        harness.client.close()
+        app.dependency_overrides.clear()
+        asyncio.run(engine.dispose())
+
+
+def test_requirement_origin_internal_removes_customer_visibility():
+    harness, engine = _build_harness()
+    try:
+        seeded = harness.run(_seed_requirement_visibility_data(harness.session_maker))
+        harness.act_as(seeded["admin"])
+
+        response = harness.client.patch(
+            f"/api/requirements/{seeded['customer_requirement'].id}",
+            json={"req_origin": "Internal"},
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["req_origin"] == "Internal"
+        assert body["visibility"] == "internal"
+    finally:
+        harness.client.close()
+        app.dependency_overrides.clear()
+        asyncio.run(engine.dispose())

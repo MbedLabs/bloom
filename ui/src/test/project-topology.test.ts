@@ -21,6 +21,7 @@ function makeDoc(id: number, docType: string): DocShell {
     suspect_links: 0,
     last_execution_status: null,
     last_executed_at: null,
+    last_bud_run_id: null,
     created_at: '2026-05-27T00:00:00Z',
     updated_at: '2026-05-27T00:00:00Z',
   }

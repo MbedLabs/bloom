@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from app.models.user import UserRole
 
 # ── Doc types exposed to external visibility configuration ──────────────
-# Mirrors the frontend DocType union in bloom-app-frontend/src/types/doc.ts
+# Mirrors the UI DocType union in ui/src/types/doc.ts
 EXTERNAL_DOC_TYPES = {
     "REQ",
     "SPEC",

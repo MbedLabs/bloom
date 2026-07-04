@@ -59,6 +59,10 @@ from app.schemas import (
 router = APIRouter()
 
 
+def _visibility_for_requirement_origin(req_origin: str | None) -> str:
+    return "customer" if (req_origin or "").strip().lower() == "customer" else "internal"
+
+
 def _normalize_datetime(value):
     if value is None:
         return None
@@ -442,7 +446,7 @@ async def create_requirement(
         title=data.title,
         description=data.description,
         status=data.status,
-        visibility=data.visibility,
+        visibility=_visibility_for_requirement_origin(data.req_origin),
         priority=data.priority,
         req_type=data.req_type,
         req_origin=data.req_origin,
@@ -530,6 +534,7 @@ async def update_requirement(
         requirement.req_origin = data.req_origin
     if data.visibility is not None:
         requirement.visibility = data.visibility
+    requirement.visibility = _visibility_for_requirement_origin(requirement.req_origin)
 
     if "parent_id" in fields_set:
         if data.parent_id is None:

@@ -49,12 +49,35 @@ def _requirement_summary(req: Requirement) -> RequirementSummary:
     return RequirementSummary(id=req.id, req_id=req.req_id, title=req.title, status=req.status)
 
 
-async def _build_suite_response(suite: TestSuite, db: AsyncSession) -> TestSuiteResponse:
-    total_items = (
-        await db.execute(
-            select(func.count(TestSuiteItem.id)).where(TestSuiteItem.suite_id == suite.id)
+async def _build_suite_response(
+    suite: TestSuite, db: AsyncSession, current_user: User | None = None
+) -> TestSuiteResponse:
+    total_items_query = (
+        select(func.count(TestSuiteItem.id))
+        .join(TestCase, TestCase.id == TestSuiteItem.test_case_id)
+        .where(TestSuiteItem.suite_id == suite.id)
+    )
+    if current_user is not None:
+        total_items_query = apply_external_visibility_filter(
+            total_items_query, TestCase, current_user
         )
-    ).scalar() or 0
+    total_items = (await db.execute(total_items_query)).scalar() or 0
+    latest_execution_query = (
+        select(
+            TestCase.last_execution_status,
+            TestCase.last_executed_at,
+            TestCase.last_bud_run_id,
+        )
+        .join(TestSuiteItem, TestSuiteItem.test_case_id == TestCase.id)
+        .where(TestSuiteItem.suite_id == suite.id, TestCase.last_executed_at.is_not(None))
+        .order_by(TestCase.last_executed_at.desc(), TestCase.id.desc())
+        .limit(1)
+    )
+    if current_user is not None:
+        latest_execution_query = apply_external_visibility_filter(
+            latest_execution_query, TestCase, current_user
+        )
+    latest_execution = (await db.execute(latest_execution_query)).one_or_none()
     return TestSuiteResponse(
         id=suite.id,
         project_id=suite.project_id,
@@ -66,13 +89,16 @@ async def _build_suite_response(suite: TestSuite, db: AsyncSession) -> TestSuite
         created_at=suite.created_at,
         updated_at=suite.updated_at,
         total_items=total_items,
+        last_execution_status=latest_execution[0] if latest_execution else None,
+        last_executed_at=latest_execution[1] if latest_execution else None,
+        last_bud_run_id=latest_execution[2] if latest_execution else None,
     )
 
 
 async def _build_suite_detail(
     suite: TestSuite, db: AsyncSession, current_user: User | None = None
 ) -> TestSuiteDetailResponse:
-    base = await _build_suite_response(suite, db)
+    base = await _build_suite_response(suite, db, current_user)
     items_query = (
         select(TestSuiteItem, TestCase)
         .join(TestCase, TestCase.id == TestSuiteItem.test_case_id)
@@ -212,7 +238,7 @@ async def list_suites(
     suites = (await db.execute(query)).scalars().all()
 
     return PaginatedResponse(
-        items=[await _build_suite_response(item, db) for item in suites],
+        items=[await _build_suite_response(item, db, current_user) for item in suites],
         total=total,
         skip=skip,
         limit=limit,

@@ -1,6 +1,6 @@
 # EmbedLabs Bloom - Product Lifecycle Management
 
-Frontend for **Bloom**, EmbedLabs' requirements and lifecycle management platform. A PLM interface for managing requirements, test cases, and traceability across the product lifecycle.
+UI for **Bloom**, EmbedLabs' requirements and lifecycle management platform. A PLM interface for managing requirements, test cases, and traceability across the product lifecycle.
 
 ## Features
 
@@ -30,7 +30,7 @@ App runs at `http://localhost:3001` with API proxy to `localhost:8000`.
 
 ## Deployment
 
-This frontend is designed to be environment-agnostic using runtime configuration injection.
+This UI is designed to be environment-agnostic using runtime configuration injection.
 
 ### Environment Variables
 
@@ -43,19 +43,19 @@ This frontend is designed to be environment-agnostic using runtime configuration
 ### Docker
 
 ```bash
-docker build -t bloom-app-frontend .
+docker build -t bloom-ui .
 
 # Run with custom upstream and cross-links
 docker run -p 8081:80 \
   -e BACKEND_UPSTREAM=backend:8000 \
   -e BUD_APP_URL=https://bud.example.com \
-  bloom-app-frontend
+  bloom-ui
 ```
 
 ## Part of EmbedLabs Suite
 
-- **[Bud](https://github.com/MbedLabs/bud-app-frontend)** - Test Station Manager (test execution platform)
-- **[Bloom](https://github.com/MbedLabs/bloom-app-frontend)** - PLM (this repo)
+- **Bud** - Test Station Manager (test execution platform)
+- **Bloom** - PLM (this product repo)
 
 ## License
 

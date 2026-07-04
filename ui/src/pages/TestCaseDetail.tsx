@@ -18,6 +18,7 @@ import { docEditUrl } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocDetailShell, { MetaItem, SectionCard } from '../components/DocDetailShell'
 import { useAuth } from '../contexts/AuthContext'
+import BudRunLink from '../components/BudRunLink'
 import {
   membershipLinksForCampaigns,
   membershipLinksForSuites,
@@ -180,7 +181,6 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
       docCode={testCase.tc_id}
       title={testCase.title}
       status={testCase.status}
-      visibility={testCase.visibility}
       actions={canEditDocs ? (
         <div className="flex items-center gap-2">
           <button
@@ -231,7 +231,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
                 />
                 <MetaItem
                   label="Bud Run"
-                  value={testCase.last_bud_run_id ? `Run ${testCase.last_bud_run_id}` : 'Not recorded'}
+                  value={<BudRunLink runId={testCase.last_bud_run_id} />}
                 />
                 {testCase.last_execution_comment && (
                   <div>
@@ -293,7 +293,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
             <div className="space-y-4">
               <MetaItem
                 label="Visibility"
-                value={testCase.visibility === 'customer' ? 'Customer Visible' : 'Internal Only'}
+                value={testCase.visibility === 'customer' ? 'Customer' : 'Internal'}
               />
               <MetaItem label="Created" value={formatDateTime(testCase.created_at) + ' ago'} />
               <MetaItem label="Updated" value={formatDateTime(testCase.updated_at) + ' ago'} />
