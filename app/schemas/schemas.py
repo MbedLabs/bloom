@@ -155,6 +155,13 @@ class TestSuiteSummary(BaseModel):
     suite_id: str
     name: str
     status: str
+    last_execution_status: Optional[str] = None
+    last_executed_at: Optional[datetime] = None
+    last_bud_run_id: Optional[int] = None
+
+    @field_serializer("last_executed_at")
+    def serialize_dt(self, dt: Optional[datetime], _info):
+        return f"{dt.isoformat()}Z" if dt else None
 
 
 class TestCampaignSummary(BaseModel):
@@ -162,6 +169,12 @@ class TestCampaignSummary(BaseModel):
     campaign_id: str
     name: str
     status: str
+    last_execution_status: Optional[str] = None
+    last_executed_at: Optional[datetime] = None
+
+    @field_serializer("last_executed_at")
+    def serialize_dt(self, dt: Optional[datetime], _info):
+        return f"{dt.isoformat()}Z" if dt else None
 
 
 class TestConceptSummary(BaseModel):
@@ -590,10 +603,13 @@ class TestSuiteResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     total_items: int = 0
+    last_execution_status: Optional[str] = None
+    last_executed_at: Optional[datetime] = None
+    last_bud_run_id: Optional[int] = None
 
-    @field_serializer("created_at", "updated_at")
-    def serialize_dt(self, dt: datetime, _info):
-        return f"{dt.isoformat()}Z"
+    @field_serializer("created_at", "updated_at", "last_executed_at")
+    def serialize_dt(self, dt: Optional[datetime], _info):
+        return f"{dt.isoformat()}Z" if dt else None
 
     class Config:
         from_attributes = True
@@ -671,10 +687,12 @@ class TestCampaignResponse(BaseModel):
     failed: int = 0
     blocked: int = 0
     pending: int = 0
+    last_execution_status: Optional[str] = None
+    last_executed_at: Optional[datetime] = None
     suite: Optional[TestSuiteSummary] = None
     suites: List[TestSuiteSummary] = []
 
-    @field_serializer("started_at", "completed_at", "created_at", "updated_at")
+    @field_serializer("started_at", "completed_at", "created_at", "updated_at", "last_executed_at")
     def serialize_dt(self, dt: Optional[datetime], _info):
         return f"{dt.isoformat()}Z" if dt else None
 

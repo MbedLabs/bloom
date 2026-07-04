@@ -5,7 +5,8 @@ import { campaignsApi, extractApiErrorMessage, testCasesApi, testSuitesApi } fro
 import { ArrowLeft, Plus, Clock, FlaskConical, Layers3, Search, ChevronUp, ChevronDown } from 'lucide-react'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { useAuth } from '../contexts/AuthContext'
-import { VisibilityBadge } from '../components/DocDetailShell'
+import { formatDateTime } from '../test/date-utils'
+import BudRunLink from '../components/BudRunLink'
 
 type CampaignSortField = 'name' | 'status' | 'updated_at'
 type SortDir = 'asc' | 'desc'
@@ -224,11 +225,21 @@ export default function TestCampaigns() {
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <div className="font-mono text-xs text-primary">{suite.suite_id}</div>
-                      <div className="mt-1 flex items-center gap-2">
-                        <div className="font-medium text-foreground">{suite.name}</div>
-                        <VisibilityBadge visibility={suite.visibility} />
-                      </div>
+                      <div className="mt-1 font-medium text-foreground">{suite.name}</div>
                       {suite.description && <div className="text-sm text-muted-foreground mt-1">{suite.description}</div>}
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {suite.last_executed_at
+                          ? `${suite.last_execution_status || 'Executed'} · ${formatDateTime(suite.last_executed_at)}`
+                          : 'Not executed'}
+                      </div>
+                      {suite.last_bud_run_id && (
+                        <div className="mt-1">
+                          <BudRunLink
+                            runId={suite.last_bud_run_id}
+                            className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80"
+                          />
+                        </div>
+                      )}
                     </div>
                     <div className="text-right">
                       <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">{suite.status}</span>
@@ -353,8 +364,8 @@ export default function TestCampaigns() {
                     onChange={(e) => setForm({ ...form, visibility: e.target.value })}
                     className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
                   >
-                    <option value="internal">Internal Only</option>
-                    <option value="customer">Customer Visible</option>
+                    <option value="internal">Internal</option>
+                    <option value="customer">Customer</option>
                   </select>
                 </div>
                 <div>
@@ -456,8 +467,8 @@ export default function TestCampaigns() {
                     onChange={(e) => setSuiteForm({ ...suiteForm, visibility: e.target.value })}
                     className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
                   >
-                    <option value="internal">Internal Only</option>
-                    <option value="customer">Customer Visible</option>
+                    <option value="internal">Internal</option>
+                    <option value="customer">Customer</option>
                   </select>
                 </div>
                 <div>
@@ -516,7 +527,6 @@ function CampaignCard({ campaign, prefix }: { campaign: import('../api/client').
         <div>
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">{campaign.name}</h3>
-            <VisibilityBadge visibility={campaign.visibility} />
           </div>
           {campaign.description && (
             <p className="text-sm text-muted-foreground mt-0.5 line-clamp-1">{campaign.description}</p>
@@ -555,6 +565,11 @@ function CampaignCard({ campaign, prefix }: { campaign: import('../api/client').
               {campaign.bud_run_id && <span className="text-foreground">Bud run #{campaign.bud_run_id}</span>}
             </div>
             <span className="text-xs text-muted-foreground">{campaign.bud_run_status || 'Not linked'}</span>
+          </div>
+          <div className="text-xs text-muted-foreground mb-2">
+            {campaign.last_executed_at
+              ? `${campaign.last_execution_status || 'Executed'} · ${formatDateTime(campaign.last_executed_at)}`
+              : 'Not executed'}
           </div>
           <div className="w-full bg-border rounded-full h-1.5">
             <div className="h-1.5 rounded-full bg-gradient-to-r from-primary to-cyan-500 transition-all duration-500" style={{ width: `${progress}%` }} />

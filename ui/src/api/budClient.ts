@@ -1,11 +1,9 @@
 import axios from 'axios'
 
-const budBaseUrl = window.runtimeConfig?.BUD_APP_URL
-    || import.meta.env.VITE_TESTSTATION_APP_URL
-    || 'http://localhost:3000'
+import { getBudApiBaseUrl } from '../lib/budLinks'
 
 const budApi = axios.create({
-    baseURL: budBaseUrl,
+    baseURL: getBudApiBaseUrl(),
     headers: { 'Content-Type': 'application/json' },
 })
 
@@ -43,7 +41,7 @@ export interface BudTestResult {
 }
 
 export const budTestRunsApi = {
-    list: async (params?: { status?: string; limit?: number }) => {
+    list: async (params?: { status?: string; limit?: number; latest_per_suite?: boolean }) => {
         const response = await budApi.get<{ runs: BudTestRun[]; total: number }>(
             '/api/test-runs',
             { params },
@@ -55,7 +53,7 @@ export const budTestRunsApi = {
 export const budResultsApi = {
     list: async (testRunId: number) => {
         const response = await budApi.get<BudTestResult[]>(
-            `/api/test-runs/results/${testRunId}`,
+            `/api/results/${testRunId}`,
         )
         return response.data
     },

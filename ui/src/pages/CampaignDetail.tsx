@@ -9,7 +9,8 @@ import { usePageMeta } from '../contexts/PageMetaContext'
 import { useAuth } from '../contexts/AuthContext'
 import { docUrl } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
-import { VisibilityBadge } from '../components/DocDetailShell'
+import { formatDateTime } from '../test/date-utils'
+import { buildBudRunUrl } from '../lib/budLinks'
 
 const CAMPAIGN_STATUSES = ['Planned', 'Scope', 'In Progress', 'Completed', 'Aborted']
 
@@ -152,6 +153,7 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
   const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
   const suiteScopes = campaign.suite_scopes ?? []
   const adHocItems = campaign.ad_hoc_items ?? []
+  const campaignBudRunUrl = campaign.bud_run_url || (campaign.bud_run_id ? buildBudRunUrl(campaign.bud_run_id) : null)
 
   return (
     <>
@@ -166,7 +168,6 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
             <div className="flex items-center space-x-3">
               <h2 className="text-2xl font-bold text-foreground">{campaign.name}</h2>
               <CampaignStatusBadge status={campaign.status} />
-              <VisibilityBadge visibility={campaign.visibility} />
             </div>
             {campaign.description && <p className="text-muted-foreground mt-0.5">{campaign.description}</p>}
           </div>
@@ -216,8 +217,8 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
                   onChange={(e) => setEditForm({ ...editForm, visibility: e.target.value })}
                   className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring"
                 >
-                  <option value="internal">Internal Only</option>
-                  <option value="customer">Customer Visible</option>
+                  <option value="internal">Internal</option>
+                  <option value="customer">Customer</option>
                 </select>
               </div>
               <div className="flex justify-end gap-2 pt-2">
@@ -244,10 +245,15 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
       )}
 
       {/* Stats row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <StatCard label="Suites" value={suiteScopes.length} color="text-primary" />
         <StatCard label="Bud Run" value={campaign.bud_run_id || '-'} color="text-foreground" />
         <StatCard label="Status" value={campaign.status} color="text-foreground" />
+        <StatCard
+          label="Last Executed"
+          value={campaign.last_executed_at ? formatDateTime(campaign.last_executed_at) : '-'}
+          color="text-foreground"
+        />
       </div>
 
       {/* Suites — expandable inline list */}
@@ -339,12 +345,12 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
           <span className="text-sm font-medium text-foreground">Bud Execution Link</span>
           {campaign.bud_run_status && <RunStatusBadge status={campaign.bud_run_status} />}
         </div>
-        {campaign.bud_run_url ? (
-          <a href={campaign.bud_run_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-3 py-2 rounded-md bg-primary text-white hover:bg-primary/90 text-sm">
+        {campaignBudRunUrl ? (
+          <a href={campaignBudRunUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-3 py-2 rounded-md bg-primary text-white hover:bg-primary/90 text-sm">
             Open in Bud TMP
           </a>
         ) : (
-          <div className="text-sm text-muted-foreground">NA</div>
+          <div className="text-sm text-muted-foreground">No campaign-specific Bud run linked.</div>
         )}
       </div>
 
@@ -412,6 +418,9 @@ function CampaignItemRow({ item, prefix }: { item: TestCampaignItem; prefix: str
         <ResultBadge result={item.result || item.status || 'Pending'} />
         {item.result && item.status && item.result !== item.status && (
           <span className="text-xs text-muted-foreground">{item.status}</span>
+        )}
+        {item.executed_at && (
+          <span className="text-xs text-muted-foreground">{formatDateTime(item.executed_at)}</span>
         )}
       </div>
     </div>

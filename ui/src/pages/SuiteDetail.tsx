@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { type ReactNode, useState, useEffect, useMemo } from 'react'
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, FlaskConical, Layers3, Pencil, Plus, Trash2 } from 'lucide-react'
@@ -11,7 +11,8 @@ import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import { usePageMeta } from '../contexts/PageMetaContext'
 import { useAuth } from '../contexts/AuthContext'
-import { VisibilityBadge } from '../components/DocDetailShell'
+import { formatDateTime } from '../test/date-utils'
+import BudRunLink from '../components/BudRunLink'
 
 const SUITE_STATUSES = ['Draft', 'Active', 'Archived']
 
@@ -66,7 +67,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
 
   const { data: budRunsData } = useQuery({
     queryKey: ['bud-test-runs'],
-    queryFn: () => budTestRunsApi.list({ limit: 100 }),
+    queryFn: () => budTestRunsApi.list({ limit: 100, latest_per_suite: true }),
     staleTime: 30000,
   })
   const budRuns = useMemo(() => budRunsData?.runs ?? [], [budRunsData])
@@ -215,7 +216,6 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
             <div className="font-mono text-sm text-primary">{suite.suite_id}</div>
             <div className="mt-1 flex items-center gap-3">
               <h2 className="text-2xl font-bold text-foreground">{suite.name}</h2>
-              <VisibilityBadge visibility={suite.visibility} />
             </div>
             {suite.description && <p className="text-muted-foreground mt-1">{suite.description}</p>}
           </div>
@@ -272,8 +272,8 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
                 onChange={(e) => setEditForm({ ...editForm, visibility: e.target.value })}
                 className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring"
               >
-                <option value="internal">Internal Only</option>
-                <option value="customer">Customer Visible</option>
+                <option value="internal">Internal</option>
+                <option value="customer">Customer</option>
               </select>
             </div>
             <div className="flex justify-end gap-2">
@@ -297,8 +297,14 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <SummaryCard label="Test Cases" value={suite.total_items} />
+        <SummaryCard
+          label="Last Executed"
+          value={suite.last_executed_at ? formatDateTime(suite.last_executed_at) : 'Not executed'}
+        />
+        <SummaryCard label="Last Result" value={suite.last_execution_status || '-'} />
+        <SummaryCard label="Bud Run" value={<BudRunLink runId={suite.last_bud_run_id} />} />
       </div>
 
       <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
@@ -431,7 +437,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
   )
 }
 
-function SummaryCard({ label, value }: { label: string; value: number }) {
+function SummaryCard({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="bg-card rounded-lg border border-border shadow-elegant p-4">
       <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>

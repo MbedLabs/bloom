@@ -1,5 +1,6 @@
 import asyncio
 from dataclasses import dataclass
+from datetime import datetime
 
 from fastapi import HTTPException, status
 from fastapi.testclient import TestClient
@@ -115,6 +116,9 @@ async def _seed_suite_visibility_data(session_maker: async_sessionmaker[AsyncSes
             title="Visible test case",
             status="Draft",
             visibility="customer",
+            last_execution_status="Passed",
+            last_executed_at=datetime(2026, 7, 2, 10, 30, 0),
+            last_bud_run_id=456,
         )
         hidden_tc = TestCase(
             project_id=project.id,
@@ -188,7 +192,33 @@ def test_external_suite_list_and_detail_hide_internal_suite_and_items():
         assert visible.status_code == 200, visible.text
         body = visible.json()
         assert body["visibility"] == "customer"
+        assert body["total_items"] == 1
+        assert body["last_execution_status"] == "Passed"
+        assert body["last_executed_at"].startswith("2026-07-02T10:30:00")
+        assert body["last_bud_run_id"] == 456
         assert [item["test_case"]["tc_id"] for item in body["items"]] == ["TSV-TC-001"]
+    finally:
+        harness.client.close()
+        app.dependency_overrides.clear()
+        asyncio.run(engine.dispose())
+
+
+def test_suite_list_includes_latest_execution_timestamp():
+    harness, engine = _build_harness()
+    try:
+        seeded = harness.run(_seed_suite_visibility_data(harness.session_maker))
+        harness.act_as(seeded["external"])
+
+        listed = harness.client.get(f"/api/test-suites?project_id={seeded['project'].id}")
+
+        assert listed.status_code == 200, listed.text
+        items = listed.json()["items"]
+        assert len(items) == 1
+        assert items[0]["suite_id"] == "TSV-TS-001"
+        assert items[0]["total_items"] == 1
+        assert items[0]["last_execution_status"] == "Passed"
+        assert items[0]["last_executed_at"].startswith("2026-07-02T10:30:00")
+        assert items[0]["last_bud_run_id"] == 456
     finally:
         harness.client.close()
         app.dependency_overrides.clear()

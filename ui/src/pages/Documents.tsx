@@ -30,7 +30,7 @@ import {
 import { docCreateUrl, docUrl, normalizeDocTypeParam, DOC_TYPE_LABELS, type DocType } from '../types/doc'
 import { formatDateTime } from '../test/date-utils'
 import { useAuth } from '../contexts/AuthContext'
-import { VisibilityBadge } from '../components/DocDetailShell'
+import BudRunLink from '../components/BudRunLink'
 
 const TYPE_BADGES: Record<DocType, { label: string; color: string }> = {
   REQ: { label: 'Requirement', color: 'bg-amber-500/10 text-amber-700 dark:text-amber-400' },
@@ -895,12 +895,9 @@ export default function Documents() {
                     </td>
                     )}
                     <td className="px-3 py-2 max-w-sm truncate">
-                      <div className="space-y-1">
-                        <Link to={detailUrl} state={listState} className="text-foreground hover:text-primary/80 font-medium">
-                          {doc.title}
-                        </Link>
-                        <VisibilityBadge visibility={doc.visibility} />
-                      </div>
+                      <Link to={detailUrl} state={listState} className="text-foreground hover:text-primary/80 font-medium">
+                        {doc.title}
+                      </Link>
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       <StatusBadge status={doc.status} />
@@ -923,6 +920,12 @@ export default function Documents() {
                             <div className="text-xs text-muted-foreground">
                               {doc.last_executed_at ? formatDateTime(doc.last_executed_at) : 'No execution yet'}
                             </div>
+                            {doc.last_bud_run_id && (
+                              <BudRunLink
+                                runId={doc.last_bud_run_id}
+                                className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80"
+                              />
+                            )}
                           </div>
                         ) : (
                           <span className="text-xs text-muted-foreground">-</span>

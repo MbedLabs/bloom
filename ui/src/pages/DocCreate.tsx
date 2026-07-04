@@ -35,6 +35,10 @@ function isControlledSharedDocument(docType: DocType): boolean {
   return docType === 'SPEC' || docType === 'PRT' || docType === 'RPT' || docType === 'STD'
 }
 
+function requirementVisibilityFromOrigin(origin: string | undefined): ArtefactVisibility {
+  return origin === 'Customer' ? 'customer' : 'internal'
+}
+
 function sharedDocumentCreatePayload(
   docType: DocType,
   title: string,
@@ -280,6 +284,9 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
         content_html: contentHtml,
         ...metadata,
       }
+      if (docType === 'REQ') {
+        payload.visibility = requirementVisibilityFromOrigin(metadata.req_origin)
+      }
       return (api as unknown as { create: (data: Record<string, unknown>) => Promise<Record<string, unknown>> }).create(payload)
     },
     onSuccess: (data) => {
@@ -326,6 +333,9 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
         content_json: contentJson,
         content_html: contentHtml,
         ...metadata,
+      }
+      if (docType === 'REQ') {
+        payload.visibility = requirementVisibilityFromOrigin(metadata.req_origin)
       }
       return api.update(resolvedDocId, payload)
     },
@@ -612,6 +622,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                 </select>
               </MetaField>
 
+              {docType !== 'REQ' && (
               <MetaField label="Visibility">
                 <select
                   value={metadata.visibility || 'internal'}
@@ -619,10 +630,11 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                   title="Select visibility"
                   className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
                 >
-                  <option value="internal">Internal Only</option>
-                  <option value="customer">Customer Visible</option>
+                  <option value="internal">Internal</option>
+                  <option value="customer">Customer</option>
                 </select>
               </MetaField>
+              )}
 
               {/* Assigned to */}
               <MetaField label="Assigned to">

@@ -94,11 +94,11 @@ def test_settings_reads_bloom_prefixed_env(monkeypatch):
     monkeypatch.setenv("BLOOM_SMTP_USERNAME", "smtp-user")
     monkeypatch.setenv("BLOOM_SMTP_PASSWORD", "smtp-password")
     monkeypatch.setenv("BLOOM_SMTP_FROM_EMAIL", "noreply@example.com")
-    monkeypatch.setenv("BLOOM_SMTP_FROM_NAME", "Bloom Mailer")
     monkeypatch.setenv("BLOOM_SMTP_REPLY_TO", "reply@example.com")
     monkeypatch.setenv("BLOOM_SMTP_STARTTLS", "false")
     monkeypatch.setenv("BLOOM_SMTP_SSL", "true")
     monkeypatch.setenv("BLOOM_SMTP_TIMEOUT_SECONDS", "9")
+    monkeypatch.setenv("BLOOM_SMTP_FROM_NAME", "Attempted Override")
 
     settings = Settings(_env_file=None)
 
@@ -122,11 +122,11 @@ def test_settings_reads_bloom_prefixed_env(monkeypatch):
     assert settings.SMTP_USERNAME == "smtp-user"
     assert settings.SMTP_PASSWORD == "smtp-password"
     assert str(settings.SMTP_FROM_EMAIL) == "noreply@example.com"
-    assert settings.SMTP_FROM_NAME == "Bloom Mailer"
     assert str(settings.SMTP_REPLY_TO) == "reply@example.com"
     assert settings.SMTP_STARTTLS is False
     assert settings.SMTP_SSL is True
     assert settings.SMTP_TIMEOUT_SECONDS == 9
+    assert not hasattr(settings, "SMTP_FROM_NAME")
 
 
 def test_settings_falls_back_to_unprefixed_env(monkeypatch):

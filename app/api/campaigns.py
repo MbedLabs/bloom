@@ -555,12 +555,40 @@ async def _build_campaign_responses_batch(
         return []
 
     campaign_ids = [c.id for c in campaigns]
-    totals_result = await db.execute(
+    totals_query = (
         select(TestCampaignItem.campaign_id, func.count(TestCampaignItem.id))
+        .join(TestCase, TestCase.id == TestCampaignItem.test_case_id)
         .where(TestCampaignItem.campaign_id.in_(campaign_ids))
         .group_by(TestCampaignItem.campaign_id)
     )
+    if current_user is not None:
+        totals_query = apply_external_visibility_filter(totals_query, TestCase, current_user)
+    totals_result = await db.execute(totals_query)
     totals_by_campaign = {row[0]: row[1] for row in totals_result.all()}
+    latest_query = (
+        select(
+            TestCampaignItem.campaign_id,
+            TestCampaignItem.result,
+            TestCampaignItem.status,
+            TestCampaignItem.executed_at,
+        )
+        .join(TestCase, TestCase.id == TestCampaignItem.test_case_id)
+        .where(
+            TestCampaignItem.campaign_id.in_(campaign_ids),
+            TestCampaignItem.executed_at.is_not(None),
+        )
+        .order_by(
+            TestCampaignItem.campaign_id,
+            TestCampaignItem.executed_at.desc(),
+            TestCampaignItem.id.desc(),
+        )
+    )
+    if current_user is not None:
+        latest_query = apply_external_visibility_filter(latest_query, TestCase, current_user)
+    latest_result = await db.execute(latest_query)
+    latest_by_campaign: dict[int, tuple[str | None, str, object]] = {}
+    for campaign_id, result, status, executed_at in latest_result.all():
+        latest_by_campaign.setdefault(campaign_id, (result, status, executed_at))
 
     cs_rows = (
         await db.execute(
@@ -586,6 +614,7 @@ async def _build_campaign_responses_batch(
     responses: list[TestCampaignResponse] = []
     for campaign in campaigns:
         total = totals_by_campaign.get(campaign.id, 0)
+        latest_execution = latest_by_campaign.get(campaign.id)
         suites_list = suites_by_campaign.get(campaign.id, [])
         suite_resp = suites_list[0] if suites_list else None
         public_id = campaign.campaign_id or ""
@@ -615,6 +644,10 @@ async def _build_campaign_responses_batch(
                 failed=0,
                 blocked=0,
                 pending=total,
+                last_execution_status=(
+                    latest_execution[0] or latest_execution[1] if latest_execution else None
+                ),
+                last_executed_at=latest_execution[2] if latest_execution else None,
                 suite=suite_resp,
                 suites=suites_list,
             )
@@ -625,13 +658,27 @@ async def _build_campaign_responses_batch(
 async def _build_campaign_response(
     campaign: TestCampaign, db: AsyncSession, current_user: User | None = None
 ) -> TestCampaignResponse:
-    total = (
-        await db.execute(
-            select(func.count(TestCampaignItem.id)).where(
-                TestCampaignItem.campaign_id == campaign.id
-            )
+    total_query = (
+        select(func.count(TestCampaignItem.id))
+        .join(TestCase, TestCase.id == TestCampaignItem.test_case_id)
+        .where(TestCampaignItem.campaign_id == campaign.id)
+    )
+    if current_user is not None:
+        total_query = apply_external_visibility_filter(total_query, TestCase, current_user)
+    total = (await db.execute(total_query)).scalar() or 0
+    latest_query = (
+        select(TestCampaignItem.result, TestCampaignItem.status, TestCampaignItem.executed_at)
+        .join(TestCase, TestCase.id == TestCampaignItem.test_case_id)
+        .where(
+            TestCampaignItem.campaign_id == campaign.id,
+            TestCampaignItem.executed_at.is_not(None),
         )
-    ).scalar() or 0
+        .order_by(TestCampaignItem.executed_at.desc(), TestCampaignItem.id.desc())
+        .limit(1)
+    )
+    if current_user is not None:
+        latest_query = apply_external_visibility_filter(latest_query, TestCase, current_user)
+    latest_execution = (await db.execute(latest_query)).one_or_none()
 
     # Build suites list from CampaignSuite join table
     cs_rows = (
@@ -682,6 +729,10 @@ async def _build_campaign_response(
         failed=0,
         blocked=0,
         pending=total,
+        last_execution_status=(
+            latest_execution[0] or latest_execution[1] if latest_execution else None
+        ),
+        last_executed_at=latest_execution[2] if latest_execution else None,
         suite=suite_resp,
         suites=suites_list,
     )

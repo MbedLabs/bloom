@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Security fixes are applied to the latest published image/build and the current `main` branch of `bloom-app-frontend`.
+Security fixes are applied to the latest published image/build and the current `main` branch of the Bloom product repo.
 
 ## Reporting a Vulnerability
 
