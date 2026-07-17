@@ -24,6 +24,7 @@ from app.schemas import (
     ArtefactRelatedResponse,
     ArtefactTransitionRequest,
 )
+from app.services.notification_service import notify
 
 router = APIRouter()
 
@@ -87,6 +88,28 @@ async def create_comment(
         "comment_added",
         f"{current_user.full_name} added a comment",
     )
+    # Notify the artefact's reviewer and approver (if any, skipping the author)
+    label = (
+        getattr(artefact, "req_id", None)
+        or getattr(artefact, "doc_id", None)
+        or getattr(artefact, "tc_id", None)
+        or getattr(artefact, "title", None)
+        or f"{artefact_type} #{artefact_id}"
+    )
+    for recipient_id in {
+        getattr(artefact, "reviewer_id", None),
+        getattr(artefact, "approver_id", None),
+    }:
+        if recipient_id:
+            await notify(
+                db,
+                user_id=recipient_id,
+                event_type="comment",
+                title=f"New comment on {label}",
+                body=f"{current_user.full_name}: {data.body[:200]}",
+                project_id=artefact.project_id,
+                actor=current_user,
+            )
     return ArtefactCommentResponse.model_validate(comment)
 
 

@@ -1428,6 +1428,46 @@ export interface SearchResponse {
   items: SearchResultItem[]
 }
 
+export interface Notification {
+  id: number
+  event_type: string
+  title: string
+  body: string | null
+  link_path: string | null
+  project_id: number | null
+  read_at: string | null
+  created_at: string
+}
+
+export interface NotificationList {
+  items: Notification[]
+  total: number
+  unread: number
+}
+
+export const notificationsApi = {
+  list: async (options?: { unreadOnly?: boolean; limit?: number }): Promise<NotificationList> => {
+    const response = await api.get<NotificationList>('/notifications', {
+      params: {
+        ...(options?.unreadOnly ? { unread_only: true } : {}),
+        ...(options?.limit ? { limit: options.limit } : {}),
+      },
+    })
+    return response.data
+  },
+  unreadCount: async (): Promise<number> => {
+    const response = await api.get<{ unread: number }>('/notifications/unread-count')
+    return response.data.unread
+  },
+  markRead: async (id: number): Promise<Notification> => {
+    const response = await api.post<Notification>(`/notifications/${id}/read`)
+    return response.data
+  },
+  markAllRead: async (): Promise<void> => {
+    await api.post('/notifications/read-all')
+  },
+}
+
 export const searchApi = {
   global: async (q: string, options?: { projectId?: number; limit?: number }): Promise<SearchResponse> => {
     const response = await api.get<SearchResponse>('/search', {
