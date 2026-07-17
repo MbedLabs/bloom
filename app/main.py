@@ -6,7 +6,6 @@ Main entry point for the backend API.
 
 import logging
 import re
-import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -48,6 +47,11 @@ from app.core.database import async_session_maker, create_tables, engine
 from app.core.deps import limiter
 from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS, normalize_document_kind
 from app.core.id_generator import compute_next_id, next_doc_id
+from app.core.observability import (
+    RequestObservabilityMiddleware,
+    metrics_router,
+    setup_logging,
+)
 from app.core.security import get_password_hash
 from app.models import (
     ArtefactLink,
@@ -65,12 +69,8 @@ from app.models import (
 )
 from app.models.user import User, UserRole
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
+# Structured logging: JSON lines in production, text in dev (see LOG_LEVEL/LOG_JSON)
+setup_logging(level=settings.LOG_LEVEL, json_logs=bool(settings.LOG_JSON))
 
 
 async def seed_admin_user():
@@ -327,6 +327,9 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Outermost middleware: request-id propagation, access logs, Prometheus metrics
+app.add_middleware(RequestObservabilityMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -336,6 +339,7 @@ app.add_middleware(
 )
 
 app.include_router(health.router, prefix="/api", tags=["Health"])
+app.include_router(metrics_router, prefix="/api", tags=["Observability"])
 app.include_router(auth_api.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(users_api.router, prefix="/api/users", tags=["Users"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])

@@ -101,7 +101,7 @@ jobs:
           BLOOM_DOTENV_DISABLED: "1"
           BLOOM_DISABLE_RATE_LIMIT: "1"
         run: |
-          pytest --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=50 tests/ -v
+          pytest --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=55 tests/ -v
 
       - name: Run UI checks
         run: |
@@ -175,3 +175,11 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64
+
+      - name: Generate SBOM (SPDX)
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: spdx-json
+          artifact-name: bloom-sbom.spdx.json
+

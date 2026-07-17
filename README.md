@@ -48,7 +48,7 @@ Backend checks:
 ```bash
 black --check --diff app/ tests/
 isort --profile black --check-only --diff app/ tests/
-pytest --cov=app --cov-report=term-missing --cov-fail-under=50 tests/ -v
+pytest --cov=app --cov-report=term-missing --cov-fail-under=55 tests/ -v
 ```
 
 UI checks:
@@ -68,6 +68,7 @@ docker build -t bloom:1.0.0 .
 
 ## Resources
 
+- [`docs/OPERATIONS.md`](docs/OPERATIONS.md) — production operations: logs, metrics, backup/restore, upgrades
 - [`CHANGELOG.md`](CHANGELOG.md)
 - [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
