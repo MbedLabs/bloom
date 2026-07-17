@@ -1385,9 +1385,58 @@ export interface ImportResult {
   errors: string[]
 }
 
+export interface ReqIFImportResult {
+  imported: number
+  skipped: number
+  links_created: number
+  specifications: number
+  new_ids: string[]
+  errors: string[]
+}
+
 export const importApi = {
   import: async (projectId: number, data: ImportRequest): Promise<ImportResult> => {
     const response = await api.post<ImportResult>(`/projects/${projectId}/import`, data)
+    return response.data
+  },
+  importReqif: async (projectId: number, file: File): Promise<ReqIFImportResult> => {
+    const form = new FormData()
+    form.append('file', file)
+    const response = await api.post<ReqIFImportResult>(
+      `/projects/${projectId}/import/reqif`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    )
+    return response.data
+  },
+}
+
+export interface SearchResultItem {
+  type: string
+  id: number
+  doc_id: string | null
+  title: string
+  status: string | null
+  project_id: number
+  project_prefix: string
+  project_name: string
+}
+
+export interface SearchResponse {
+  query: string
+  total: number
+  items: SearchResultItem[]
+}
+
+export const searchApi = {
+  global: async (q: string, options?: { projectId?: number; limit?: number }): Promise<SearchResponse> => {
+    const response = await api.get<SearchResponse>('/search', {
+      params: {
+        q,
+        ...(options?.projectId ? { project_id: options.projectId } : {}),
+        ...(options?.limit ? { limit: options.limit } : {}),
+      },
+    })
     return response.data
   },
 }
