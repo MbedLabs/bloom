@@ -29,6 +29,7 @@ dependencies = [
     "httpx>=0.25.0",
     "slowapi>=0.1.9",
     "alembic>=1.18.0",
+    "defusedxml>=0.7.1",
 ]
 
 [project.optional-dependencies]
