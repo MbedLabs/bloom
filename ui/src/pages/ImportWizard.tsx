@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Check, ChevronRight, Download, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Check, ChevronRight, Download, AlertCircle, FileUp } from 'lucide-react'
 import { docsApi, projectsApi, importApi } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
-import type { ImportResult } from '../api/client'
+import type { ImportResult, ReqIFImportResult } from '../api/client'
 
 type WizardStep = 1 | 2 | 3 | 4 | 5
+type ImportMode = 'project' | 'reqif'
 
 export default function ImportWizard() {
   const { prefix } = useParams<{ prefix: string }>()
@@ -16,11 +17,15 @@ export default function ImportWizard() {
   const queryClient = useQueryClient()
 
   const [step, setStep] = useState<WizardStep>(1)
+  const [mode, setMode] = useState<ImportMode>('project')
   const [sourceProjectId, setSourceProjectId] = useState<number | null>(null)
   const [docType, setDocType] = useState<'REQ' | 'TC'>('REQ')
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [includeLinks, setIncludeLinks] = useState(true)
   const [result, setResult] = useState<ImportResult | null>(null)
+  const [reqifFile, setReqifFile] = useState<File | null>(null)
+  const [reqifResult, setReqifResult] = useState<ReqIFImportResult | null>(null)
+  const [reqifError, setReqifError] = useState<string | null>(null)
 
   const { data: projects } = useQuery({
     queryKey: ['projects'],
@@ -64,6 +69,21 @@ export default function ImportWizard() {
     },
   })
 
+  const reqifMutation = useMutation({
+    mutationFn: (file: File) => importApi.importReqif(projectId, file),
+    onSuccess: (data) => {
+      setReqifResult(data)
+      setReqifError(null)
+      queryClient.invalidateQueries({ queryKey: ['requirements', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['all-docs', prefix] })
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+    },
+    onError: (error: { response?: { data?: { detail?: string } } }) => {
+      setReqifResult(null)
+      setReqifError(error.response?.data?.detail || 'Import failed. Check the file and try again.')
+    },
+  })
+
   const toggleId = (id: number) => {
     setSelectedIds((prev) => prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id])
   }
@@ -84,7 +104,26 @@ export default function ImportWizard() {
         </div>
       </div>
 
+      {/* Import source mode */}
+      <div className="flex gap-2">
+        {([
+          { key: 'project', label: 'From another project' },
+          { key: 'reqif', label: 'From ReqIF file' },
+        ] as const).map((m) => (
+          <button
+            key={m.key}
+            onClick={() => setMode(m.key)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              mode === m.key ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+
       {/* Step indicator */}
+      {mode === 'project' && (
       <div className="flex items-center gap-2">
         {steps.map((label, i) => (
           <div key={i} className="flex items-center gap-2">
@@ -100,7 +139,92 @@ export default function ImportWizard() {
           </div>
         ))}
       </div>
+      )}
 
+      {mode === 'reqif' && (
+      <div className="bg-card rounded-lg border border-border shadow-elegant p-6 space-y-4">
+        <h3 className="text-lg font-semibold text-foreground">Import from ReqIF</h3>
+        <p className="text-sm text-muted-foreground">
+          Upload a <span className="font-mono">.reqif</span> or <span className="font-mono">.reqifz</span> export
+          from DOORS, Polarion or Jama. Spec objects become requirements in {targetProject?.name || 'this project'},
+          with hierarchy and traceability links preserved. Re-importing the same file skips already-imported objects.
+        </p>
+
+        <label className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border p-8 cursor-pointer hover:border-primary/40 hover:bg-accent/30 transition-colors">
+          <FileUp className="h-6 w-6 text-muted-foreground" />
+          <span className="text-sm text-foreground font-medium">
+            {reqifFile ? reqifFile.name : 'Choose a ReqIF file'}
+          </span>
+          <span className="text-xs text-muted-foreground">.reqif or .reqifz, up to 25 MB</span>
+          <input
+            type="file"
+            accept=".reqif,.reqifz,.xml,application/xml,application/zip"
+            className="hidden"
+            onChange={(e) => {
+              setReqifFile(e.target.files?.[0] ?? null)
+              setReqifResult(null)
+              setReqifError(null)
+            }}
+          />
+        </label>
+
+        <div className="flex justify-end">
+          <button
+            onClick={() => reqifFile && reqifMutation.mutate(reqifFile)}
+            disabled={!reqifFile || reqifMutation.isPending}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50 inline-flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            {reqifMutation.isPending ? 'Importing...' : 'Import ReqIF'}
+          </button>
+        </div>
+
+        {reqifError && (
+          <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-4 flex items-center gap-2 text-sm text-red-700 dark:text-red-400">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {reqifError}
+          </div>
+        )}
+
+        {reqifResult && (
+          <div className="space-y-3">
+            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-4 space-y-2">
+              <div className="text-emerald-700 dark:text-emerald-400 font-medium">
+                {reqifResult.imported} requirement{reqifResult.imported !== 1 ? 's' : ''} imported
+                {reqifResult.links_created > 0 && ` · ${reqifResult.links_created} link${reqifResult.links_created !== 1 ? 's' : ''} created`}
+              </div>
+              {reqifResult.skipped > 0 && (
+                <div className="text-amber-700 dark:text-amber-400 text-sm">
+                  {reqifResult.skipped} already imported (skipped)
+                </div>
+              )}
+              {reqifResult.new_ids.length > 0 && (
+                <div className="text-sm text-muted-foreground">New IDs: {reqifResult.new_ids.join(', ')}</div>
+              )}
+            </div>
+            {reqifResult.errors.length > 0 && (
+              <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-4 space-y-1">
+                <div className="flex items-center gap-2 text-red-700 dark:text-red-400 font-medium">
+                  <AlertCircle className="h-4 w-4" />
+                  Warnings
+                </div>
+                {reqifResult.errors.map((err, i) => (
+                  <div key={i} className="text-sm text-red-600 dark:text-red-400">{err}</div>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={() => navigate(`/projects/${prefix}/docs`)}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90"
+            >
+              View imported requirements
+            </button>
+          </div>
+        )}
+      </div>
+      )}
+
+      {mode === 'project' && (
       <div className="bg-card rounded-lg border border-border shadow-elegant p-6">
         {step === 1 && (
           <div className="space-y-4">
@@ -297,6 +421,7 @@ export default function ImportWizard() {
           </div>
         )}
       </div>
+      )}
     </div>
   )
 }
