@@ -1428,6 +1428,28 @@ export interface SearchResponse {
   items: SearchResultItem[]
 }
 
+export const exportApi = {
+  /** Download a server-side export, preserving the backend's filename. */
+  download: async (
+    projectId: number,
+    kind: 'requirements' | 'traceability',
+    format?: 'csv' | 'pdf'
+  ): Promise<void> => {
+    const response = await api.get<Blob>(`/projects/${projectId}/export/${kind}`, {
+      params: format ? { format } : {},
+      responseType: 'blob',
+    })
+    const disposition = (response.headers['content-disposition'] as string | undefined) ?? ''
+    const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? `${kind}.${format ?? 'csv'}`
+    const url = URL.createObjectURL(response.data)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = filename
+    anchor.click()
+    URL.revokeObjectURL(url)
+  },
+}
+
 export interface Notification {
   id: number
   event_type: string

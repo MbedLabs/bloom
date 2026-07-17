@@ -29,6 +29,7 @@ dependencies = [
     "httpx>=0.25.0",
     "slowapi>=0.1.9",
     "prometheus-client>=0.19.0",
+    "fpdf2>=2.7.0",
     "alembic>=1.18.0",
     "defusedxml>=0.7.1",
 ]
