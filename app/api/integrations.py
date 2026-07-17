@@ -284,27 +284,31 @@ async def github_webhook(
     if not defect:
         return {"status": "ignored", "reason": "no matching defect"}
 
-    if x_hub_signature_256:
-        setting = (
-            await db.execute(
-                select(IntegrationSetting).where(
-                    IntegrationSetting.project_id == defect.project_id,
-                    IntegrationSetting.tracker == "github",
-                )
+    # When a webhook secret is configured, a valid signature is REQUIRED —
+    # a missing header must reject, otherwise omitting it bypasses auth.
+    setting = (
+        await db.execute(
+            select(IntegrationSetting).where(
+                IntegrationSetting.project_id == defect.project_id,
+                IntegrationSetting.tracker == "github",
             )
-        ).scalar_one_or_none()
-        if setting and setting.webhook_secret:
-            if not _verify_github_signature(body, setting.webhook_secret, x_hub_signature_256):
-                _log_sync_event(
-                    db,
-                    defect.id,
-                    "inbound",
-                    "github",
-                    "signature_failed",
-                    success=False,
-                    error="HMAC signature verification failed",
-                )
-                raise HTTPException(status_code=403, detail="Invalid signature")
+        )
+    ).scalar_one_or_none()
+    if setting and setting.webhook_secret:
+        if not x_hub_signature_256 or not _verify_github_signature(
+            body, setting.webhook_secret, x_hub_signature_256
+        ):
+            _log_sync_event(
+                db,
+                defect.id,
+                "inbound",
+                "github",
+                "signature_failed",
+                success=False,
+                error="Missing or invalid HMAC signature",
+            )
+            await db.flush()
+            raise HTTPException(status_code=403, detail="Invalid signature")
 
     if x_github_delivery:
         existing_event = (
@@ -388,27 +392,29 @@ async def gitlab_webhook(
     if not defect:
         return {"status": "ignored", "reason": "no matching defect"}
 
-    if x_gitlab_token:
-        setting = (
-            await db.execute(
-                select(IntegrationSetting).where(
-                    IntegrationSetting.project_id == defect.project_id,
-                    IntegrationSetting.tracker == "gitlab",
-                )
+    # When a webhook secret is configured, a valid token is REQUIRED —
+    # a missing header must reject, otherwise omitting it bypasses auth.
+    setting = (
+        await db.execute(
+            select(IntegrationSetting).where(
+                IntegrationSetting.project_id == defect.project_id,
+                IntegrationSetting.tracker == "gitlab",
             )
-        ).scalar_one_or_none()
-        if setting and setting.webhook_secret:
-            if not _verify_gitlab_token(setting.webhook_secret, x_gitlab_token):
-                _log_sync_event(
-                    db,
-                    defect.id,
-                    "inbound",
-                    "gitlab",
-                    "token_failed",
-                    success=False,
-                    error="GitLab token verification failed",
-                )
-                raise HTTPException(status_code=403, detail="Invalid token")
+        )
+    ).scalar_one_or_none()
+    if setting and setting.webhook_secret:
+        if not x_gitlab_token or not _verify_gitlab_token(setting.webhook_secret, x_gitlab_token):
+            _log_sync_event(
+                db,
+                defect.id,
+                "inbound",
+                "gitlab",
+                "token_failed",
+                success=False,
+                error="Missing or invalid GitLab token",
+            )
+            await db.flush()
+            raise HTTPException(status_code=403, detail="Invalid token")
 
     if x_gitlab_event_uuid:
         existing_event = (
