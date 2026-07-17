@@ -55,6 +55,7 @@ from app.schemas import (
     TestRunLinkResponse,
     TestSuiteSummary,
 )
+from app.services.notification_service import notify_assignment
 
 router = APIRouter()
 
@@ -464,6 +465,21 @@ async def create_requirement(
         "created",
         f"{current_user.full_name} created requirement {requirement.req_id}",
     )
+    link_path = f"/projects/{project.prefix}/docs/requirements/{requirement.req_id}"
+    for assignee_id, role_label in (
+        (requirement.reviewer_id, "reviewer"),
+        (requirement.approver_id, "approver"),
+    ):
+        await notify_assignment(
+            db,
+            assignee_id=assignee_id,
+            previous_assignee_id=None,
+            role_label=role_label,
+            artefact_label=f"requirement {requirement.req_id}",
+            project_id=requirement.project_id,
+            link_path=link_path,
+            actor=current_user,
+        )
 
     return await _build_requirement_response(requirement, db, current_user=current_user)
 
@@ -553,6 +569,8 @@ async def update_requirement(
                     status_code=400, detail="Parent requirement must belong to same project"
                 )
             requirement.parent_id = data.parent_id
+    previous_reviewer_id = requirement.reviewer_id
+    previous_approver_id = requirement.approver_id
     if "reviewer_id" in fields_set:
         if data.reviewer_id is None:
             requirement.reviewer_id = None
@@ -618,6 +636,29 @@ async def update_requirement(
             "updated",
             updated_summary(current_user.full_name, "requirement", requirement.req_id, fields_set),
         )
+
+    if (
+        requirement.reviewer_id != previous_reviewer_id
+        or requirement.approver_id != previous_approver_id
+    ):
+        prefix = (
+            await db.execute(select(Project.prefix).where(Project.id == requirement.project_id))
+        ).scalar_one()
+        link_path = f"/projects/{prefix}/docs/requirements/{requirement.req_id}"
+        for assignee_id, previous_id, role_label in (
+            (requirement.reviewer_id, previous_reviewer_id, "reviewer"),
+            (requirement.approver_id, previous_approver_id, "approver"),
+        ):
+            await notify_assignment(
+                db,
+                assignee_id=assignee_id,
+                previous_assignee_id=previous_id,
+                role_label=role_label,
+                artefact_label=f"requirement {requirement.req_id}",
+                project_id=requirement.project_id,
+                link_path=link_path,
+                actor=current_user,
+            )
 
     return await _build_requirement_response(requirement, db, current_user=current_user)
 

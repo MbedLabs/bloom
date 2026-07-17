@@ -679,3 +679,21 @@ class ArtefactActivity(Base):
     event_type: Mapped[str] = mapped_column(String(30), nullable=False)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Notification(Base):
+    """An in-app notification addressed to one user."""
+
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    project_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("projects.id"), nullable=True, index=True
+    )
+    event_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    body: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    link_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    read_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
