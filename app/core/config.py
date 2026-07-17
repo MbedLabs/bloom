@@ -91,6 +91,18 @@ class Settings(BaseSettings):
         default=False, validation_alias=AliasChoices("BLOOM_ENABLE_DOCS", "ENABLE_DOCS")
     )
 
+    # Observability
+    LOG_LEVEL: str = Field(
+        default="INFO", validation_alias=AliasChoices("BLOOM_LOG_LEVEL", "LOG_LEVEL")
+    )
+    # None -> JSON logs in production, human-readable text elsewhere
+    LOG_JSON: bool | None = Field(
+        default=None, validation_alias=AliasChoices("BLOOM_LOG_JSON", "LOG_JSON")
+    )
+    ENABLE_METRICS: bool = Field(
+        default=True, validation_alias=AliasChoices("BLOOM_ENABLE_METRICS", "ENABLE_METRICS")
+    )
+
     # Run legacy startup data repair (prefer Alembic in production)
     RUN_STARTUP_DATA_REPAIR: bool | None = Field(
         default=None,
@@ -188,6 +200,8 @@ class Settings(BaseSettings):
             self.RUN_STARTUP_DATA_REPAIR = self.BLOOM_ENV.lower() != "production"
         if self.AUTO_SEED_ADMIN is None:
             self.AUTO_SEED_ADMIN = self.BLOOM_ENV.lower() != "production"
+        if self.LOG_JSON is None:
+            self.LOG_JSON = self.BLOOM_ENV.lower() == "production"
         return self
 
     @model_validator(mode="after")
