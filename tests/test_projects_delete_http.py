@@ -13,6 +13,26 @@ def _random_prefix() -> str:
     return "".join(_LETTERS[(seed >> (5 * i)) % 26] for i in range(3))
 
 
+def _create_project_with_unique_prefix(
+    api_client: TestClient, headers: dict[str, str], *, name: str
+):
+    for _ in range(10):
+        create = api_client.post(
+            "/api/projects",
+            headers=headers,
+            json={"name": name, "prefix": _random_prefix()},
+        )
+        if create.status_code == 201:
+            return create
+        if (
+            create.status_code == 400
+            and create.json().get("detail") == "Project with this prefix already exists"
+        ):
+            continue
+        return create
+    return create
+
+
 def _admin_headers(api_client: TestClient) -> dict[str, str]:
     from app.core.config import settings
 
@@ -28,12 +48,7 @@ def _admin_headers(api_client: TestClient) -> dict[str, str]:
 def test_admin_can_delete_project(api_client: TestClient):
     headers = _admin_headers(api_client)
     suffix = uuid.uuid4().hex[:8]
-    prefix = _random_prefix()
-    create = api_client.post(
-        "/api/projects",
-        headers=headers,
-        json={"name": f"Delete Me {suffix}", "prefix": prefix},
-    )
+    create = _create_project_with_unique_prefix(api_client, headers, name=f"Delete Me {suffix}")
     assert create.status_code == 201
     project_id = create.json()["id"]
 
@@ -47,11 +62,8 @@ def test_admin_can_delete_project(api_client: TestClient):
 def test_admin_can_delete_project_with_requirements(api_client: TestClient):
     headers = _admin_headers(api_client)
     suffix = uuid.uuid4().hex[:8]
-    prefix = _random_prefix()
-    create = api_client.post(
-        "/api/projects",
-        headers=headers,
-        json={"name": f"Delete With Reqs {suffix}", "prefix": prefix},
+    create = _create_project_with_unique_prefix(
+        api_client, headers, name=f"Delete With Reqs {suffix}"
     )
     assert create.status_code == 201
     project_id = create.json()["id"]
@@ -73,12 +85,7 @@ def test_admin_can_delete_project_with_requirements(api_client: TestClient):
 def test_delete_project_requires_admin(api_client: TestClient):
     headers = _admin_headers(api_client)
     suffix = uuid.uuid4().hex[:8]
-    prefix = _random_prefix()
-    create = api_client.post(
-        "/api/projects",
-        headers=headers,
-        json={"name": f"Protected {suffix}", "prefix": prefix},
-    )
+    create = _create_project_with_unique_prefix(api_client, headers, name=f"Protected {suffix}")
     assert create.status_code == 201
     project_id = create.json()["id"]
 
