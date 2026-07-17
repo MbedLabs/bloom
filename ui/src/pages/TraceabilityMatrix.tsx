@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
-import { traceabilityApi, projectsApi } from '../api/client'
+import { traceabilityApi, projectsApi, exportApi } from '../api/client'
 import { docUrl } from '../types/doc'
-import { ArrowLeft, CheckCircle, AlertCircle, XCircle, ExternalLink, Shield, Filter, GitBranch, AlertTriangle, X } from 'lucide-react'
+import { ArrowLeft, CheckCircle, AlertCircle, XCircle, ExternalLink, Shield, Filter, GitBranch, AlertTriangle, X, Download } from 'lucide-react'
 
 const COVERAGE_OPTIONS = ['Covered', 'Partial', 'Uncovered'] as const
 const PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Critical']
@@ -116,6 +116,34 @@ export default function TraceabilityMatrix() {
             <p className="text-sm text-muted-foreground">{project?.name || `Project #${projId}`}</p>
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => projId && exportApi.download(projId, 'traceability')}
+            disabled={!projId}
+            title="Export the requirement-to-test-case matrix as CSV"
+            className="inline-flex items-center gap-1.5 px-3 py-2 border border-input text-foreground rounded-md text-sm font-medium hover:bg-accent/50 disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" />
+            Matrix CSV
+          </button>
+          <button
+            onClick={() => projId && exportApi.download(projId, 'requirements', 'csv')}
+            disabled={!projId}
+            title="Export all requirements as CSV"
+            className="inline-flex items-center gap-1.5 px-3 py-2 border border-input text-foreground rounded-md text-sm font-medium hover:bg-accent/50 disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" />
+            Reqs CSV
+          </button>
+          <button
+            onClick={() => projId && exportApi.download(projId, 'requirements', 'pdf')}
+            disabled={!projId}
+            title="Export the requirements specification as PDF"
+            className="inline-flex items-center gap-1.5 px-3 py-2 border border-input text-foreground rounded-md text-sm font-medium hover:bg-accent/50 disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" />
+            Spec PDF
+          </button>
         <button
           onClick={() => setShowGaps(!showGaps)}
           className={`inline-flex items-center px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
@@ -127,6 +155,7 @@ export default function TraceabilityMatrix() {
           <AlertTriangle className="h-4 w-4 mr-2" />
           {showGaps ? 'Hide Gap Report' : 'Coverage Gaps'}
         </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
