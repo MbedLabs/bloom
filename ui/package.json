@@ -35,7 +35,7 @@
     "@tiptap/extension-typography": "^3.22.3",
     "@tiptap/extension-underline": "^3.22.3",
     "@tiptap/pm": "^3.22.3",
-    "@tiptap/react": "^3.22.3",
+    "@tiptap/react": "^3.28.0",
     "@tiptap/starter-kit": "^3.22.3",
     "@types/dagre": "^0.7.54",
     "@xyflow/react": "^12.10.2",
