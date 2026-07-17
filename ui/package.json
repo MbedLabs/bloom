@@ -61,7 +61,7 @@
     "postcss": "^8.4.32",
     "tailwindcss": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",
-    "typescript": "^5.2.2",
+    "typescript": "^7.0.2",
     "vite": "^5.0.8",
     "vitest": "^3.2.4",
     "@vitest/coverage-v8": "^3.2.4"
