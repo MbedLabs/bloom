@@ -5,8 +5,7 @@ Parses OMG ReqIF (Requirements Interchange Format) 1.x exports into a normalized
 tool-agnostic structure that the import API maps onto Bloom requirements.
 
 Design notes:
-- Uses only the Python standard library (``xml.etree.ElementTree`` + ``zipfile``);
-  no third-party dependency is added.
+- Uses ``defusedxml`` + ``zipfile`` for safe XML parsing and archive extraction.
 - Matching is *namespace-agnostic*: elements are compared by their local name so
   that files from DOORS, Polarion, Jama and PTC (which use slightly different
   namespace URIs and prefixes) all parse the same way.
@@ -20,6 +19,8 @@ import zipfile
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 from xml.etree import ElementTree as ET
+
+from defusedxml import ElementTree as SafeET
 
 # Attribute long-names commonly used by tools for the requirement heading/title.
 TITLE_ATTRIBUTE_HINTS = (
@@ -265,7 +266,7 @@ def parse_reqif(data: bytes) -> ReqIFBundle:
 
     xml_bytes = _extract_bytes(data)
     try:
-        root = ET.fromstring(xml_bytes)
+        root = SafeET.fromstring(xml_bytes)
     except ET.ParseError as exc:
         raise ReqIFParseError(f"Not valid XML: {exc}") from exc
 
