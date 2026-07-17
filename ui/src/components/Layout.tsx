@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { APP_VERSION, projectsApi, searchApi } from '../api/client'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { APP_VERSION, notificationsApi, projectsApi, searchApi } from '../api/client'
 import { docRegistryListUrl, syncRegistryProjectContext } from '../lib/docRegistryParams'
 import { searchResultUrl } from '../lib/searchLinks'
 import { getBreadcrumbs } from '../lib/breadcrumbs'
@@ -9,7 +9,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { PageMetaProvider, usePageMeta } from '../contexts/PageMetaContext'
 import {
   LayoutDashboard, FolderKanban, FileText, CheckSquare,
-  GitBranch, BarChart3, Sun, Moon,
+  GitBranch, BarChart3, Sun, Moon, Bell,
   ExternalLink, ChevronDown, ChevronLeft, ChevronRight, Search, Flower2,
   BookOpen, Bug, Layers, FlaskConical, LogOut, Users, PenTool, AlertTriangle, GitPullRequest, Settings, SlidersHorizontal,
 } from 'lucide-react'
@@ -179,6 +179,49 @@ function LayoutInner() {
     setSearchQuery('')
     searchInputRef.current?.blur()
     navigate(searchResultUrl(item))
+  }
+
+  // Notifications: unread badge polls every 60s; list loads when the panel opens.
+  const queryClient = useQueryClient()
+  const [notifOpen, setNotifOpen] = useState(false)
+  const notifRef = useRef<HTMLDivElement>(null)
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ['notifications-unread'],
+    queryFn: notificationsApi.unreadCount,
+    refetchInterval: 60_000,
+  })
+  const { data: notifications } = useQuery({
+    queryKey: ['notifications-list'],
+    queryFn: () => notificationsApi.list({ limit: 15 }),
+    enabled: notifOpen,
+  })
+  const invalidateNotifications = () => {
+    queryClient.invalidateQueries({ queryKey: ['notifications-unread'] })
+    queryClient.invalidateQueries({ queryKey: ['notifications-list'] })
+  }
+  const markReadMutation = useMutation({
+    mutationFn: notificationsApi.markRead,
+    onSuccess: invalidateNotifications,
+  })
+  const markAllReadMutation = useMutation({
+    mutationFn: notificationsApi.markAllRead,
+    onSuccess: invalidateNotifications,
+  })
+
+  useEffect(() => {
+    function closeNotifOnOutsideClick(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', closeNotifOnOutsideClick)
+    return () => document.removeEventListener('mousedown', closeNotifOnOutsideClick)
+  }, [])
+
+  const openNotification = (id: number, linkPath: string | null, alreadyRead: boolean) => {
+    if (!alreadyRead) markReadMutation.mutate(id)
+    setNotifOpen(false)
+    if (linkPath) navigate(linkPath)
   }
 
   const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -537,6 +580,69 @@ function LayoutInner() {
 
             {/* Right side */}
             <div className="flex shrink-0 items-center gap-1.5">
+              {/* Notifications */}
+              <div className="relative" ref={notifRef}>
+                <button
+                  onClick={() => setNotifOpen((open) => !open)}
+                  className="relative p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                  aria-label={`Notifications${unreadCount ? ` (${unreadCount} unread)` : ''}`}
+                >
+                  <Bell className="h-4 w-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {notifOpen && (
+                  <div className="absolute right-0 top-full z-50 mt-2 w-96 max-w-[90vw] overflow-hidden rounded-lg border border-border bg-card shadow-elegant">
+                    <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+                      <span className="text-sm font-medium text-foreground">Notifications</span>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={() => markAllReadMutation.mutate()}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          Mark all read
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-96 overflow-y-auto">
+                      {(notifications?.items?.length ?? 0) === 0 && (
+                        <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                          No notifications yet
+                        </div>
+                      )}
+                      {notifications?.items?.map((n) => (
+                        <button
+                          key={n.id}
+                          onClick={() => openNotification(n.id, n.link_path, n.read_at !== null)}
+                          className={`block w-full border-b border-border px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-accent/50 ${
+                            n.read_at === null ? 'bg-primary/5' : ''
+                          }`}
+                        >
+                          <div className="flex items-start gap-2">
+                            {n.read_at === null && (
+                              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
+                            )}
+                            <div className="min-w-0">
+                              <div className="truncate text-sm text-foreground">{n.title}</div>
+                              {n.body && (
+                                <div className="truncate text-xs text-muted-foreground">{n.body}</div>
+                              )}
+                              <div className="mt-0.5 text-[10px] uppercase text-muted-foreground">
+                                {new Date(n.created_at + 'Z').toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Dark mode toggle */}
               <button
                 onClick={() => setDark(!dark)}
