@@ -107,7 +107,9 @@ SAMPLE_REQIF = """<?xml version="1.0" encoding="UTF-8"?>
     </REQ-IF-CONTENT>
   </CORE-CONTENT>
 </REQ-IF>
-""".encode("utf-8")
+""".encode(
+    "utf-8"
+)
 
 
 def test_parses_all_spec_objects():
