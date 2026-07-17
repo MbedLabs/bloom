@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { APP_VERSION, projectsApi } from '../api/client'
+import { APP_VERSION, projectsApi, searchApi } from '../api/client'
 import { docRegistryListUrl, syncRegistryProjectContext } from '../lib/docRegistryParams'
+import { searchResultUrl } from '../lib/searchLinks'
 import { getBreadcrumbs } from '../lib/breadcrumbs'
 import { useAuth } from '../contexts/AuthContext'
 import { PageMetaProvider, usePageMeta } from '../contexts/PageMetaContext'
@@ -92,6 +93,10 @@ function LayoutInner() {
   const [dark, setDark] = useDarkMode()
   const [projectDropdownOpen, setProjectDropdownOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchActiveIndex, setSearchActiveIndex] = useState(0)
+  const searchBoxRef = useRef<HTMLDivElement>(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('bloom-sidebar-collapsed')
@@ -138,6 +143,62 @@ function LayoutInner() {
     queryKey: ['projects'],
     queryFn: projectsApi.list,
   })
+
+  // Debounce global search keystrokes so we query at most ~4x/second.
+  useEffect(() => {
+    const handle = window.setTimeout(() => setDebouncedQuery(searchQuery.trim()), 250)
+    return () => window.clearTimeout(handle)
+  }, [searchQuery])
+
+  const { data: searchResults, isFetching: searchLoading } = useQuery({
+    queryKey: ['global-search', debouncedQuery],
+    queryFn: () => searchApi.global(debouncedQuery),
+    enabled: debouncedQuery.length >= 2,
+    staleTime: 30_000,
+  })
+  const searchItems = debouncedQuery.length >= 2 ? searchResults?.items ?? [] : []
+
+  useEffect(() => {
+    setSearchActiveIndex(0)
+  }, [debouncedQuery])
+
+  useEffect(() => {
+    function closeOnOutsideClick(e: MouseEvent) {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) {
+        setSearchOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', closeOnOutsideClick)
+    return () => document.removeEventListener('mousedown', closeOnOutsideClick)
+  }, [])
+
+  const openSearchResult = (index: number) => {
+    const item = searchItems[index]
+    if (!item) return
+    setSearchOpen(false)
+    setSearchQuery('')
+    searchInputRef.current?.blur()
+    navigate(searchResultUrl(item))
+  }
+
+  const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      setSearchOpen(false)
+      searchInputRef.current?.blur()
+      return
+    }
+    if (!searchItems.length) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setSearchActiveIndex((i) => Math.min(i + 1, searchItems.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setSearchActiveIndex((i) => Math.max(i - 1, 0))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      openSearchResult(searchActiveIndex)
+    }
+  }
 
   const isInProject = location.pathname.startsWith('/projects/')
   const currentProjectSlug = isInProject ? location.pathname.split('/')[2] : null
@@ -418,15 +479,20 @@ function LayoutInner() {
 
             {/* Inline search */}
             <div className="flex-1 min-w-0 flex justify-center">
-              <div className="relative w-full max-w-sm">
+              <div className="relative w-full max-w-sm" ref={searchBoxRef}>
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
                 <input
                   ref={searchInputRef}
                   type="search"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true) }}
+                  onFocus={() => setSearchOpen(true)}
+                  onKeyDown={onSearchKeyDown}
                   placeholder="Search requirements, test cases..."
                   title={`Focus search (${searchShortcutLabel})`}
+                  role="combobox"
+                  aria-expanded={searchOpen && searchItems.length > 0}
+                  aria-controls="global-search-results"
                   className="w-full rounded-md border border-input bg-background py-1.5 pl-9 pr-[5.25rem] text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
                 />
                 <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 select-none text-[10px] font-medium text-muted-foreground" aria-hidden>
@@ -434,6 +500,38 @@ function LayoutInner() {
                     {searchShortcutLabel}
                   </kbd>
                 </span>
+
+                {searchOpen && debouncedQuery.length >= 2 && (
+                  <div
+                    id="global-search-results"
+                    className="absolute left-0 right-0 top-full z-50 mt-1 max-h-96 overflow-y-auto rounded-md border border-border bg-card shadow-elegant"
+                  >
+                    {searchItems.length === 0 && (
+                      <div className="px-3 py-2.5 text-sm text-muted-foreground">
+                        {searchLoading ? 'Searching…' : `No results for “${debouncedQuery}”`}
+                      </div>
+                    )}
+                    {searchItems.map((item, index) => (
+                      <button
+                        key={`${item.type}-${item.id}`}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => openSearchResult(index)}
+                        onMouseEnter={() => setSearchActiveIndex(index)}
+                        className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${
+                          index === searchActiveIndex ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent/50'
+                        }`}
+                      >
+                        <span className="inline-flex h-5 min-w-[2.5rem] shrink-0 items-center justify-center rounded border border-border bg-muted px-1 text-[10px] font-semibold uppercase text-muted-foreground">
+                          {item.type}
+                        </span>
+                        <span className="shrink-0 font-mono text-xs text-primary">{item.doc_id}</span>
+                        <span className="min-w-0 flex-1 truncate text-foreground">{item.title}</span>
+                        <span className="shrink-0 text-[10px] uppercase text-muted-foreground">{item.project_prefix}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

@@ -36,6 +36,7 @@ from app.api import (
     projects,
     requirements,
     risks,
+    search,
     test_cases,
     test_concepts,
     test_suites,
@@ -365,6 +366,7 @@ app.include_router(test_concepts.router, prefix="/api/test-concepts", tags=["Tes
 app.include_router(artefacts.router, prefix="/api/artefacts", tags=["Artefacts"])
 app.include_router(links.router, prefix="/api/links", tags=["Links"])
 app.include_router(import_service.router, prefix="/api", tags=["Import"])
+app.include_router(search.router, prefix="/api/search", tags=["Search"])
 app.include_router(docs_facade.router, prefix="/api", tags=["Docs Facade"])
 
 
