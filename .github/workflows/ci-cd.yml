@@ -17,7 +17,7 @@ env:
 jobs:
   validate:
     name: Validate
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, ovh, bloom]
 
     services:
       postgres:
@@ -110,9 +110,9 @@ jobs:
           npm --prefix ui run test -- --coverage
 
   build-image:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push'
     name: Build Product Image
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, ovh, bloom]
     needs: validate
 
     permissions:
@@ -123,6 +123,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Validate release tag
+        if: startsWith(github.ref, 'refs/tags/v')
         id: release
         env:
           RELEASE_TAG: ${{ github.ref_name }}
@@ -161,6 +162,7 @@ jobs:
           flavor: |
             latest=false
           tags: |
+            type=ref,event=branch
             type=ref,event=tag
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}},enable=${{ steps.release.outputs.stable == 'true' }}

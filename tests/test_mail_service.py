@@ -64,4 +64,4 @@ def test_send_email_uses_fixed_bloom_sender_name(monkeypatch):
     assert smtp.started_tls is True
     assert smtp.logged_in == ("smtp-user", "smtp-password")
     assert len(smtp.messages) == 1
-    assert smtp.messages[0]["From"] == "Bloom By EmbedLabs <noreply@example.com>"
+    assert smtp.messages[0]["From"] == "Bloom PLM by EmbedLabs <noreply@example.com>"
