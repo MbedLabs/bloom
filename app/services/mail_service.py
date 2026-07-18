@@ -9,7 +9,7 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates" / "email"
-BLOOM_FROM_NAME = "Bloom By EmbedLabs"
+BLOOM_FROM_NAME = "Bloom PLM by EmbedLabs"
 
 
 class MailConfigurationError(Exception):

@@ -43,13 +43,16 @@ Edit `.env` before starting. At minimum:
 - replace `ADMIN_EMAIL` with a real address (production rejects `admin@example.com`);
 - set `APP_BASE_URL`, `FRONTEND_BASE_URL`, and `BLOOM_APP_URL` to the public HTTPS Bloom URL;
 - set `BUD_APP_URL` to the public Bud URL if the products are connected; and
-- leave `RUN_STARTUP_DATA_REPAIR=false` for a new production database.
+- leave `RUN_STARTUP_DATA_REPAIR=false` for a new production database; and
+- keep the shipped `AUTO_SEED_ADMIN=false` setting. For a new instance with an empty database, explicitly change it to `true` immediately before the one-time first-administrator startup.
 
 The required credential fields are intentionally empty. Compose enforces `POSTGRES_PASSWORD`, `SECRET_KEY`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` during configuration interpolation, so an unedited copy fails before any container starts.
 
 `SECRET_KEY` must be at least 32 characters and must be backed up in your secret store. Losing or changing it invalidates sessions, integration tokens, and pending invitation/reset links.
 
 ### 2. Pull and start Bloom
+
+For the initial startup of a new instance only, opt in to administrator creation by setting `AUTO_SEED_ADMIN=true` in `.env`. Do not enable it for an existing instance.
 
 ```bash
 docker compose pull
@@ -69,7 +72,7 @@ Open <http://localhost:8000> (or your configured HTTPS URL) and sign in with `AD
 
 ### 3. Finish the one-time administrator bootstrap
 
-`AUTO_SEED_ADMIN=true` creates the first administrator only when no account with `ADMIN_EMAIL` exists. Rotate the bootstrap password immediately through the authenticated API:
+If you opted in for the first startup, `AUTO_SEED_ADMIN=true` creates the first administrator only when no account with `ADMIN_EMAIL` exists. Rotate the bootstrap password immediately through the authenticated API:
 
 ```bash
 export BLOOM_URL=http://localhost:8000
@@ -93,7 +96,7 @@ curl --fail --silent --show-error \
 unset BOOTSTRAP_PASSWORD NEW_ADMIN_PASSWORD ACCESS_TOKEN
 ```
 
-Then set `AUTO_SEED_ADMIN=false` in `.env`, replace the now-unused `ADMIN_PASSWORD` value with a different random value, and recreate the service:
+Then immediately restore `AUTO_SEED_ADMIN=false` in `.env`, replace the now-unused `ADMIN_PASSWORD` value with a different random value, and recreate the service:
 
 ```bash
 docker compose up -d --force-recreate bloom
@@ -104,6 +107,8 @@ Keep the administrator credential and `SECRET_KEY` in a secret manager, not in s
 ## Public URLs, TLS, and email
 
 Put Bloom behind a TLS-terminating reverse proxy for an internet-facing deployment and proxy to host port `8000`. The public URL settings are used in browser links and email workflows:
+
+The email sender display name is fixed to `Bloom PLM by EmbedLabs` and is not configurable. Configure the SMTP sender address, server credentials, and optional reply-to address in `.env`.
 
 - `APP_BASE_URL`, `FRONTEND_BASE_URL`, and `BLOOM_APP_URL`: the externally reachable Bloom origin;
 - `BUD_APP_URL`: the externally reachable Bud origin used by Bloom's Bud navigation and cross-links;
