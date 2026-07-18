@@ -16,11 +16,21 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      # TipTap packages share strict peer dependencies and must be reviewed,
+      # installed, and tested as one coordinated editor update.
+      tiptap:
+        patterns:
+          - "@tiptap/*"
     ignore:
       # majors (react 19, router 7, tailwind 4, TS 7, eslint 9+, vitest 4)
       # are deliberate migrations, not bot merges
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # 0.5+ requires ESLint 9/10 and flat config; migrate the ESLint toolchain
+      # together instead of accepting an isolated plugin update.
+      - dependency-name: "eslint-plugin-react-refresh"
+        versions: [">=0.5.0"]
   - package-ecosystem: docker
     directory: "/"
     schedule:
