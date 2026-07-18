@@ -6,8 +6,10 @@ environment variables — see [`.env.example`](../.env.example) for the full lis
 
 ## Health checks
 
-- `GET /api/health` — liveness/readiness endpoint used by the container
-  `HEALTHCHECK` and suitable for load-balancer probes.
+- `GET /api/health` — process-liveness endpoint used by the container
+  `HEALTHCHECK`. It confirms that the web process responds but does not query
+  PostgreSQL. Combine it with PostgreSQL health and, where appropriate, a
+  synthetic database-backed Bloom request for readiness/availability probes.
 
 ## Logs
 

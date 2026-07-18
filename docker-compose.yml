@@ -1,26 +1,15 @@
 services:
   bloom:
-    build:
-      context: .
-    image: ghcr.io/mbedlabs/bloom:1.0.0
+    image: ghcr.io/mbedlabs/bloom:${BLOOM_VERSION:-latest}
+    restart: unless-stopped
     env_file:
-      - .env
+      - ${BLOOM_ENV_FILE:-.env}
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      SECRET_KEY: ${SECRET_KEY}
-      APP_BASE_URL: ${APP_BASE_URL}
-      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL}
-      BUD_APP_URL: ${BUD_APP_URL}
-      BLOOM_APP_URL: ${BLOOM_APP_URL}
-      TESTSTATION_APP_URL: ${TESTSTATION_APP_URL}
-      BLOOM_ENV: ${BLOOM_ENV}
-      RUN_STARTUP_DATA_REPAIR: ${RUN_STARTUP_DATA_REPAIR}
-      AUTO_SEED_ADMIN: ${AUTO_SEED_ADMIN}
-      ENABLE_DOCS: ${ENABLE_DOCS}
-      ADMIN_EMAIL: ${ADMIN_EMAIL}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
-      ADMIN_FULL_NAME: ${ADMIN_FULL_NAME}
-      BLOOM_DOTENV_DISABLED: ${BLOOM_DOTENV_DISABLED}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-bloom}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env before starting Bloom}@postgres:5432/${POSTGRES_DB:-bloom}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env before starting Bloom}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Set ADMIN_EMAIL in .env before starting Bloom}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env before starting Bloom}
+    command: ["/bin/sh", "-c", "alembic upgrade head && exec /usr/local/bin/start-product"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -29,17 +18,16 @@ services:
 
   postgres:
     image: postgres:16
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: bloom_db
+      POSTGRES_USER: ${POSTGRES_USER:-bloom}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env before starting Bloom}
+      POSTGRES_DB: ${POSTGRES_DB:-bloom}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d bloom_db"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
-    ports:
-      - "5432:5432"
     volumes:
       - bloom-postgres-data:/var/lib/postgresql/data
 
