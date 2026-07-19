@@ -4,64 +4,64 @@
 
 @layer base {
   :root {
+    /* Bloom brand: viola + gray */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 270 15% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 270 15% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 168 76% 36%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 210 40% 98%;
-    --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 98%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 98%;
-    --accent-foreground: 222.2 84% 4.9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 168 76% 36%;
+    --popover-foreground: 270 15% 12%;
+    --primary: 275 70% 48%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 270 10% 94%;
+    --secondary-foreground: 270 15% 12%;
+    --muted: 270 8% 94%;
+    --muted-foreground: 270 5% 45%;
+    --accent: 270 8% 92%;
+    --accent-foreground: 275 70% 35%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 270 10% 88%;
+    --input: 270 10% 88%;
+    --ring: 275 70% 48%;
     --radius: 0.5rem;
-    --chart-1: 168 76% 36%;
-    --chart-2: 160 84% 39%;
-    --chart-3: 156 100% 31%;
-    --chart-4: 158 64% 52%;
-    --chart-5: 166 78% 42%;
-    --sidebar-active: rgba(255, 255, 255, 0.12);
-    --sidebar-hover: rgba(255, 255, 255, 0.07);
-    --sidebar-border: rgba(20, 184, 166, 0.2);
+    --chart-1: 275 70% 48%;
+    --chart-2: 25 95% 55%;
+    --chart-3: 270 8% 45%;
+    --chart-4: 200 60% 45%;
+    --chart-5: 340 65% 55%;
+    --sidebar-background: 270 25% 10%;
+    --sidebar-foreground: 270 15% 90%;
+    --sidebar-active: 275 70% 40%;
+    --sidebar-hover: 270 20% 18%;
+    --sidebar-border: 270 20% 22%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 168 76% 36%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 168 76% 36%;
-    --chart-1: 168 76% 36%;
-    --chart-2: 160 84% 39%;
-    --chart-3: 156 100% 31%;
-    --chart-4: 158 64% 52%;
-    --chart-5: 166 78% 42%;
-    --sidebar-active: rgba(255, 255, 255, 0.15);
-    --sidebar-hover: rgba(255, 255, 255, 0.08);
-    --sidebar-border: rgba(20, 184, 166, 0.3);
+    --background: 270 20% 6%;
+    --foreground: 270 10% 96%;
+    --card: 270 20% 8%;
+    --card-foreground: 270 10% 96%;
+    --popover: 270 20% 8%;
+    --popover-foreground: 270 10% 96%;
+    --primary: 275 70% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 270 15% 16%;
+    --secondary-foreground: 270 10% 96%;
+    --muted: 270 15% 16%;
+    --muted-foreground: 270 8% 65%;
+    --accent: 270 15% 18%;
+    --accent-foreground: 275 60% 80%;
+    --destructive: 0 63% 35%;
+    --destructive-foreground: 270 10% 96%;
+    --border: 270 15% 18%;
+    --input: 270 15% 18%;
+    --ring: 275 70% 58%;
+    --chart-1: 275 70% 58%;
+    --chart-2: 25 95% 55%;
+    --chart-3: 270 8% 55%;
+    --chart-4: 200 60% 50%;
+    --chart-5: 340 65% 55%;
   }
 }
 
@@ -90,7 +90,7 @@
 @layer utilities {
   .sidebar-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: rgba(20, 184, 166, 0.25) transparent;
+    scrollbar-color: hsl(var(--sidebar-border) / 0.6) transparent;
   }
 
   .sidebar-scrollbar::-webkit-scrollbar {
@@ -98,26 +98,26 @@
   }
 
   .sidebar-scrollbar::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.04);
+    background: transparent;
   }
 
   .sidebar-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(20, 184, 166, 0.25);
+    background: hsl(var(--sidebar-border) / 0.6);
     border-radius: 3px;
   }
 
   .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(20, 184, 166, 0.45);
+    background: hsl(var(--sidebar-border) / 0.85);
   }
 
   .glass {
-    background: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
   }
 
   .dark .glass {
-    background: rgba(10, 17, 32, 0.8);
+    background: rgba(18, 12, 28, 0.85);
   }
 
   /*

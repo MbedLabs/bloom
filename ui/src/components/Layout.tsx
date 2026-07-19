@@ -10,7 +10,7 @@ import { PageMetaProvider, usePageMeta } from '../contexts/PageMetaContext'
 import {
   LayoutDashboard, FolderKanban, FileText, CheckSquare,
   GitBranch, BarChart3, Sun, Moon, Bell,
-  ExternalLink, ChevronDown, ChevronLeft, ChevronRight, Search, Flower2,
+  ExternalLink, ChevronDown, ChevronLeft, ChevronRight, Search,
   BookOpen, Bug, Layers, FlaskConical, LogOut, Users, PenTool, AlertTriangle, GitPullRequest, Settings, SlidersHorizontal,
 } from 'lucide-react'
 
@@ -262,7 +262,7 @@ function LayoutInner() {
   const roleBadgeColor = user?.role === 'admin'
     ? 'bg-red-500/10 text-red-400'
     : user?.role === 'maintainer'
-    ? 'bg-blue-500/10 text-blue-400'
+    ? 'bg-blue-500/10 text-violet-400'
     : 'bg-green-500/10 text-green-400'
   const canEditProjectParameters = user?.role === 'admin' || user?.role === 'maintainer'
 
@@ -282,13 +282,13 @@ function LayoutInner() {
         {/* Logo */}
         <div className={`${sidebarCollapsed ? 'px-2 pt-4 pb-2.5' : 'px-3 pt-4 pb-2.5'}`}>
           <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-2.5'}`}>
-            <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
-              <Flower2 className="h-5 w-5 text-teal-200" />
+            <div className="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center shrink-0 bg-white/10">
+              <img src="/favicon-96x96.png" alt="Bloom" className="w-full h-full object-contain" />
             </div>
             {!sidebarCollapsed && (
               <div className="min-w-0">
-                <h1 className="text-base font-bold text-teal-100 tracking-tight">Bloom</h1>
-                <p className="text-[10px] text-teal-300/60 font-medium uppercase tracking-wider leading-snug">Product Lifecycle Management</p>
+                <h1 className="text-base font-bold text-violet-100 tracking-tight">Bloom</h1>
+                <p className="text-[10px] text-violet-300/60 font-medium uppercase tracking-wider leading-snug">Product Lifecycle Management</p>
               </div>
             )}
           </div>
@@ -305,8 +305,8 @@ function LayoutInner() {
                 to={item.href}
                 className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-2 rounded-lg text-sm font-medium transition-all duration-200 group ${
                   isActive && !isInProject
-                    ? 'bg-[var(--sidebar-active)] text-white shadow-sm'
-                    : 'text-teal-100/70 hover:bg-[var(--sidebar-hover)] hover:text-white'
+                    ? 'bg-sidebar-active text-white shadow-sm'
+                    : 'text-violet-100/70 hover:bg-sidebar-hover hover:text-white'
                 }`}
                 title={sidebarCollapsed ? item.name : undefined}
                 onClick={() => {
@@ -316,7 +316,7 @@ function LayoutInner() {
                 }}
               >
                 <item.icon className={`h-[18px] w-[18px] shrink-0 transition-colors ${
-                  isActive && !isInProject ? 'text-teal-300' : 'text-teal-400/50 group-hover:text-teal-300'
+                  isActive && !isInProject ? 'text-violet-300' : 'text-violet-400/50 group-hover:text-violet-300'
                 }`} />
                 {!sidebarCollapsed && item.name}
                 {isActive && !isInProject && !sidebarCollapsed && (
@@ -328,7 +328,7 @@ function LayoutInner() {
           {user?.role === 'admin' && (
             <Link
               to="/users"
-              className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-2 rounded-lg text-sm font-medium text-teal-100/70 hover:bg-[var(--sidebar-hover)] hover:text-white transition-all duration-200 group`}
+              className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-2 rounded-lg text-sm font-medium text-violet-100/70 hover:bg-sidebar-hover hover:text-white transition-all duration-200 group`}
               title={sidebarCollapsed ? 'Users' : undefined}
               onClick={() => {
                 if (sidebarCollapsed && location.pathname !== '/users') {
@@ -336,7 +336,7 @@ function LayoutInner() {
                 }
               }}
             >
-              <Users className="h-[18px] w-[18px] shrink-0 text-teal-400/50 group-hover:text-teal-300" />
+              <Users className="h-[18px] w-[18px] shrink-0 text-violet-400/50 group-hover:text-violet-300" />
               {!sidebarCollapsed && 'Users'}
             </Link>
           )}
@@ -345,29 +345,29 @@ function LayoutInner() {
         {/* Project Section */}
         <div className={`mt-4 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}>
           <div className="h-px bg-white/10 mb-2" />
-          {!sidebarCollapsed && <p className="px-3 text-xs font-semibold text-teal-300/40 uppercase tracking-widest mb-2">Project</p>}
+          {!sidebarCollapsed && <p className="px-3 text-xs font-semibold text-violet-300/40 uppercase tracking-widest mb-2">Project</p>}
 
           {/* Project Selector */}
           {projects && projects.length > 0 && !sidebarCollapsed && (
             <div className="relative mb-2">
               <button
                 onClick={() => setProjectDropdownOpen(!projectDropdownOpen)}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm text-teal-100 transition-colors"
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm text-violet-100 transition-colors"
               >
                 <span className="truncate">
                   {isInProject ? currentProjectName : 'Select Project'}
                 </span>
-                <ChevronDown className={`h-4 w-4 text-teal-400/50 transition-transform ${projectDropdownOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-4 w-4 text-violet-400/50 transition-transform ${projectDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {projectDropdownOpen && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-[#0a3d3a] border border-teal-700/30 rounded-lg shadow-lg overflow-hidden z-50 max-h-48 overflow-y-auto sidebar-scrollbar">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-sidebar-active border border-violet-700/30 rounded-lg shadow-lg overflow-hidden z-50 max-h-48 overflow-y-auto sidebar-scrollbar">
                   {projects.map((p) => (
                     <Link
                       key={p.id}
                       to={`/projects/${p.prefix}`}
                       onClick={() => setProjectDropdownOpen(false)}
-                      className="block px-3 py-2 text-sm text-teal-100 hover:bg-white/10 truncate transition-colors"
+                      className="block px-3 py-2 text-sm text-violet-100 hover:bg-white/10 truncate transition-colors"
                     >
                       {p.name}
                     </Link>
@@ -399,7 +399,7 @@ function LayoutInner() {
                   <Link
                     key={item.name}
                     to={to}
-                    className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-1.5 rounded-lg text-[13px] font-medium text-teal-200/60 hover:bg-[var(--sidebar-hover)] hover:text-teal-100 transition-all duration-200 group`}
+                    className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-1.5 rounded-lg text-[13px] font-medium text-violet-200/60 hover:bg-sidebar-hover hover:text-violet-100 transition-all duration-200 group`}
                     title={sidebarCollapsed ? item.name : undefined}
                     onClick={() => {
                       if (sidebarCollapsed && location.pathname !== to) {
@@ -407,7 +407,7 @@ function LayoutInner() {
                       }
                     }}
                   >
-                    <item.icon className="h-4 w-4 shrink-0 text-teal-400/40 group-hover:text-teal-300" />
+                    <item.icon className="h-4 w-4 shrink-0 text-violet-400/40 group-hover:text-violet-300" />
                     {!sidebarCollapsed && item.name}
                   </Link>
                 )
@@ -420,7 +420,7 @@ function LayoutInner() {
         <div className={`${sidebarCollapsed ? 'px-2' : 'px-3'} mt-4 space-y-0.5`}>
           <Link
             to="/reports"
-            className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-1.5 rounded-lg text-[13px] font-medium text-teal-200/60 hover:bg-[var(--sidebar-hover)] hover:text-teal-100 transition-all duration-200 group`}
+            className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-1.5 rounded-lg text-[13px] font-medium text-violet-200/60 hover:bg-sidebar-hover hover:text-violet-100 transition-all duration-200 group`}
             title={sidebarCollapsed ? 'Reports' : undefined}
             onClick={() => {
               if (sidebarCollapsed && location.pathname !== '/reports') {
@@ -428,12 +428,12 @@ function LayoutInner() {
               }
             }}
           >
-            <BarChart3 className="h-4 w-4 shrink-0 text-teal-400/40 group-hover:text-teal-300" />
+            <BarChart3 className="h-4 w-4 shrink-0 text-violet-400/40 group-hover:text-violet-300" />
             {!sidebarCollapsed && 'Reports'}
           </Link>
           <Link
             to="/baselines"
-            className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-1.5 rounded-lg text-[13px] font-medium text-teal-200/60 hover:bg-[var(--sidebar-hover)] hover:text-teal-100 transition-all duration-200 group`}
+            className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-1.5 rounded-lg text-[13px] font-medium text-violet-200/60 hover:bg-sidebar-hover hover:text-violet-100 transition-all duration-200 group`}
             title={sidebarCollapsed ? 'Baselines' : undefined}
             onClick={() => {
               if (sidebarCollapsed && location.pathname !== '/baselines') {
@@ -441,7 +441,7 @@ function LayoutInner() {
               }
             }}
           >
-            <Layers className="h-4 w-4 shrink-0 text-teal-400/40 group-hover:text-teal-300" />
+            <Layers className="h-4 w-4 shrink-0 text-violet-400/40 group-hover:text-violet-300" />
             {!sidebarCollapsed && 'Baselines'}
           </Link>
         </div>
@@ -453,15 +453,15 @@ function LayoutInner() {
             href={TESTSTATION_APP_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-1.5 rounded-lg text-[13px] font-medium text-teal-100/70 hover:bg-[var(--sidebar-hover)] hover:text-white transition-all duration-200 group`}
+            className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-1.5 rounded-lg text-[13px] font-medium text-violet-100/70 hover:bg-sidebar-hover hover:text-white transition-all duration-200 group`}
             title={sidebarCollapsed ? 'Bud TMP' : undefined}
           >
-            <ExternalLink className="h-4 w-4 shrink-0 text-teal-400/50 group-hover:text-teal-300" />
+            <ExternalLink className="h-4 w-4 shrink-0 text-violet-400/50 group-hover:text-violet-300" />
             {!sidebarCollapsed && 'Bud TMP'}
           </a>
           <Link
             to="/settings"
-            className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-1.5 rounded-lg text-[13px] font-medium text-teal-100/70 hover:bg-[var(--sidebar-hover)] hover:text-white transition-all duration-200 group`}
+            className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-1.5 rounded-lg text-[13px] font-medium text-violet-100/70 hover:bg-sidebar-hover hover:text-white transition-all duration-200 group`}
             title={sidebarCollapsed ? 'Settings' : undefined}
             onClick={() => {
               if (sidebarCollapsed && location.pathname !== '/settings') {
@@ -469,15 +469,15 @@ function LayoutInner() {
               }
             }}
           >
-            <Settings className="h-4 w-4 shrink-0 text-teal-400/50 group-hover:text-teal-300" />
+            <Settings className="h-4 w-4 shrink-0 text-violet-400/50 group-hover:text-violet-300" />
             {!sidebarCollapsed && 'Settings'}
           </Link>
           {!sidebarCollapsed && (
             <div className="pt-2 pb-1 px-3 text-center">
-              <a href="https://www.embedlabs.net" target="_blank" rel="noopener noreferrer" className="text-xs text-teal-300/50 hover:text-teal-200 transition-colors">
+              <a href="https://www.embedlabs.net" target="_blank" rel="noopener noreferrer" className="text-xs text-violet-300/50 hover:text-violet-200 transition-colors">
                 by EmbedLabs
               </a>
-              <p className="text-xs text-teal-300/30 mt-1">v{APP_VERSION}</p>
+              <p className="text-xs text-violet-300/30 mt-1">v{APP_VERSION}</p>
             </div>
           )}
         </div>
@@ -657,7 +657,7 @@ function LayoutInner() {
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="flex items-center gap-2 p-1 rounded-lg hover:bg-accent transition-colors"
                 >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-teal-700 flex items-center justify-center text-white text-xs font-bold">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-violet-700 flex items-center justify-center text-white text-xs font-bold">
                     {userInitials}
                   </div>
                   <span className="text-sm text-foreground font-medium hidden sm:block max-w-[120px] truncate">

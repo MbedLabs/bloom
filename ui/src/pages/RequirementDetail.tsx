@@ -309,10 +309,6 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
                 <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Origin</div>
                 <OriginBadge origin={requirement.req_origin} />
               </div>
-              <MetaItem
-                label="Visibility"
-                value={requirement.visibility === 'customer' ? 'Customer' : 'Internal'}
-              />
               <MetaItem label="Created" value={formatDateTime(requirement.created_at) + ' ago'} />
               <MetaItem label="Updated" value={formatDateTime(requirement.updated_at) + ' ago'} />
             </div>

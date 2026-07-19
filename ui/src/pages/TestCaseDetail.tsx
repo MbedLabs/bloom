@@ -291,10 +291,6 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
 
           <SectionCard title="Metadata">
             <div className="space-y-4">
-              <MetaItem
-                label="Visibility"
-                value={testCase.visibility === 'customer' ? 'Customer' : 'Internal'}
-              />
               <MetaItem label="Created" value={formatDateTime(testCase.created_at) + ' ago'} />
               <MetaItem label="Updated" value={formatDateTime(testCase.updated_at) + ' ago'} />
             </div>
