@@ -412,7 +412,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
 
           <SectionCard title="Details">
             <div className="space-y-4">
-              {config.fields.filter((f) => f.key !== 'status').map((field) => (
+              {config.fields.filter((f) => f.key !== 'status' && f.key !== 'visibility').map((field) => (
                 <div key={field.key}>
                   <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{field.label}</div>
                   <div className="text-foreground text-sm">{String(artefactRecord[field.key] ?? '-')}</div>

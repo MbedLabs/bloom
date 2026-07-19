@@ -82,7 +82,7 @@ export default function AcceptInvite() {
   const canSubmit = !!inviteInfo?.valid && !submitting
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-900 via-teal-800 to-cyan-900 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1a1028] via-[#3b1d6e] to-[#6b7280] p-4">
       <div className="w-full max-w-md bg-card rounded-2xl shadow-2xl p-8 border border-border">
         {!submitMessage && (
           <>
@@ -158,7 +158,7 @@ export default function AcceptInvite() {
             <button
               type="submit"
               disabled={!canSubmit}
-              className="w-full py-2.5 px-4 bg-gradient-to-r from-primary to-teal-700 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-2.5 px-4 bg-gradient-to-r from-primary to-[#6b7280] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? 'Accepting invitation...' : 'Accept Invitation'}
             </button>
@@ -172,13 +172,13 @@ export default function AcceptInvite() {
         </div>
 
         <div className="text-center mt-6">
-          <p className="text-sm text-teal-200/60">Bloom PLM</p>
-          <p className="text-xs text-teal-300/50 mt-1">v{APP_VERSION}</p>
+          <p className="text-sm text-violet-100/70">Bloom PLM</p>
+          <p className="text-xs text-violet-200/50 mt-1">v{APP_VERSION}</p>
           <a
             href="https://www.embedlabs.net"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-teal-300/40 mt-1 inline-block hover:text-teal-200 transition-colors"
+            className="text-xs text-gray-300/50 mt-1 inline-block hover:text-gray-200 transition-colors"
           >
             by EmbedLabs
           </a>

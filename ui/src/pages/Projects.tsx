@@ -246,7 +246,7 @@ function ProjectCard({
       onClick={() => navigate(`/projects/${project.prefix}`)}
     >
       <div className={`h-1 ${
-        project.status === 'Active' ? 'bg-gradient-to-r from-primary via-teal-500 to-cyan-500' : 'bg-muted'
+        project.status === 'Active' ? 'bg-gradient-to-r from-primary via-[#7c3aed] to-[#6b7280]' : 'bg-muted'
       }`} />
 
       <div className="p-5">
