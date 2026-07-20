@@ -107,7 +107,7 @@ export default function Baselines() {
         <div className="bg-card rounded-lg shadow-elegant p-8 text-center text-muted-foreground">Loading...</div>
       ) : !baselines || baselines.length === 0 ? (
         <div className="bg-card rounded-lg shadow-elegant p-12 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-cyan-500/10 flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-4">
             <Layers className="h-8 w-8 text-primary/40" />
           </div>
           <h3 className="text-lg font-medium text-foreground mb-2">No Baselines Yet</h3>

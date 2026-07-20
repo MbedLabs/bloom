@@ -216,7 +216,7 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
 
       {!hasRichContent && !hasLegacySections && (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-16 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-cyan-500/10 flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-4">
             <FileText className="h-8 w-8 text-primary/40" />
           </div>
           <h3 className="text-lg font-semibold text-foreground mb-2">Empty Document</h3>

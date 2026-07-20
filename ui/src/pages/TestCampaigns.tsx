@@ -297,7 +297,7 @@ export default function TestCampaigns() {
 
           {!campaigns || campaigns.length === 0 ? (
             <div className="bg-card rounded-lg shadow-elegant p-12 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-cyan-500/10 flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-4">
                 <FlaskConical className="h-8 w-8 text-primary/40" />
               </div>
               <h3 className="text-lg font-medium text-foreground mb-2">No Campaign Scopes</h3>
@@ -572,7 +572,7 @@ function CampaignCard({ campaign, prefix }: { campaign: import('../api/client').
               : 'Not executed'}
           </div>
           <div className="w-full bg-border rounded-full h-1.5">
-            <div className="h-1.5 rounded-full bg-gradient-to-r from-primary to-cyan-500 transition-all duration-500" style={{ width: `${progress}%` }} />
+            <div className="h-1.5 rounded-full bg-gradient-to-r from-primary to-[#6b7280] transition-all duration-500" style={{ width: `${progress}%` }} />
           </div>
         </div>
       )}

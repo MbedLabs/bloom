@@ -192,7 +192,7 @@ export default function Dashboard() {
               Approved: 'bg-emerald-500',
               Active: 'bg-emerald-500',
               Final: 'bg-blue-500',
-              Implemented: 'bg-teal-500',
+              Implemented: 'bg-violet-500',
               Verified: 'bg-emerald-600',
               Rejected: 'bg-red-500',
               Obsolete: 'bg-slate-500',

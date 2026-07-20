@@ -449,7 +449,7 @@ function CampaignStatusBadge({ status }: { status: string }) {
 
 function RunStatusBadge({ status }: { status: string }) {
   const config: Record<string, string> = {
-    Completed: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400',
+    Completed: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
     Failed: 'bg-red-500/10 text-red-700 dark:text-red-400',
     Running: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
     Pending: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400',
@@ -470,7 +470,7 @@ function ResultBadge({ result }: { result: string }) {
     Planned: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
     Scope: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
     Pending: 'bg-gray-500/10 text-gray-700 dark:text-gray-400',
-    Linked: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400',
+    Linked: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
     Executed: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
   }
   return (

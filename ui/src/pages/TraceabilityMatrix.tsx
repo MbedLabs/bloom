@@ -546,7 +546,7 @@ function RequirementStatusBadge({ status }: { status: string }) {
     Draft: 'bg-gray-500/10 text-gray-700 dark:text-gray-400',
     Review: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
     Approved: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
-    Implemented: 'bg-teal-500/10 text-teal-700 dark:text-teal-400',
+    Implemented: 'bg-violet-500/10 text-violet-700 dark:text-violet-400',
     Verified: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
     Rejected: 'bg-red-500/10 text-red-700 dark:text-red-400',
   }

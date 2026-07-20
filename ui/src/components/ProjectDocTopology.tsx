@@ -72,11 +72,11 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
   },
   TC: {
     icon: CheckSquare,
-    borderTop: 'border-t-cyan-600',
-    surface: 'bg-gradient-to-br from-cyan-500/10 to-card ring-1 ring-cyan-500/10',
-    iconChip: 'bg-cyan-500/15 text-cyan-900 dark:text-cyan-200',
-    countText: 'text-cyan-900 dark:text-cyan-200',
-    accent: '#0891b2',
+    borderTop: 'border-t-sky-600',
+    surface: 'bg-gradient-to-br from-sky-500/10 to-card ring-1 ring-sky-500/10',
+    iconChip: 'bg-sky-500/15 text-sky-900 dark:text-sky-200',
+    countText: 'text-sky-900 dark:text-sky-200',
+    accent: '#0284c7',
   },
   CPT: {
     icon: Beaker,
@@ -88,11 +88,11 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
   },
   PRT: {
     icon: BookOpen,
-    borderTop: 'border-t-teal-600',
-    surface: 'bg-gradient-to-br from-teal-500/10 to-card ring-1 ring-teal-500/10',
-    iconChip: 'bg-teal-500/15 text-teal-900 dark:text-teal-200',
-    countText: 'text-teal-900 dark:text-teal-200',
-    accent: '#0d9488',
+    borderTop: 'border-t-violet-600',
+    surface: 'bg-gradient-to-br from-violet-500/10 to-card ring-1 ring-violet-500/10',
+    iconChip: 'bg-violet-500/15 text-violet-900 dark:text-violet-200',
+    countText: 'text-violet-900 dark:text-violet-200',
+    accent: '#7c3aed',
   },
   DES: {
     icon: PenTool,

@@ -320,7 +320,7 @@ function LayoutInner() {
                 }`} />
                 {!sidebarCollapsed && item.name}
                 {isActive && !isInProject && !sidebarCollapsed && (
-                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-teal-400" />
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-violet-400" />
                 )}
               </Link>
             )
