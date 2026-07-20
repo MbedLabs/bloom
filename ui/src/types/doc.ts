@@ -281,7 +281,7 @@ export const DOC_TYPE_LABELS: Record<DocType, string> = {
 export const DOC_TYPE_COLORS: Record<DocType, string> = {
   REQ: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
   SPEC: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400',
-  TC: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400',
+  TC: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
   DES: 'bg-violet-500/10 text-violet-700 dark:text-violet-400',
   RSK: 'bg-red-500/10 text-red-700 dark:text-red-400',
   CHG: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
@@ -289,7 +289,7 @@ export const DOC_TYPE_COLORS: Record<DocType, string> = {
   DEF: 'bg-rose-500/10 text-rose-700 dark:text-rose-400',
   CMP: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
   TS: 'bg-lime-500/10 text-lime-700 dark:text-lime-400',
-  PRT: 'bg-teal-500/10 text-teal-700 dark:text-teal-400',
+  PRT: 'bg-violet-500/10 text-violet-700 dark:text-violet-400',
   RPT: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
   STD: 'bg-orange-500/10 text-orange-700 dark:text-orange-400',
 }
@@ -432,9 +432,9 @@ export const DOC_LINK_ROLE_LABELS: Record<DocLinkRole, [string, string]> = {
 
 export const DOC_LINK_ROLE_COLORS: Record<DocLinkRole, string> = {
   derives_from: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400',
-  refines: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400',
+  refines: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
   satisfies: 'bg-green-500/10 text-green-700 dark:text-green-400',
-  implements: 'bg-teal-500/10 text-teal-700 dark:text-teal-400',
+  implements: 'bg-violet-500/10 text-violet-700 dark:text-violet-400',
   verifies: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
   mitigates: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
   depends_on: 'bg-orange-500/10 text-orange-700 dark:text-orange-400',

@@ -35,7 +35,7 @@ import BudRunLink from '../components/BudRunLink'
 const TYPE_BADGES: Record<DocType, { label: string; color: string }> = {
   REQ: { label: 'Requirement', color: 'bg-amber-500/10 text-amber-700 dark:text-amber-400' },
   SPEC: { label: 'Specification', color: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400' },
-  TC: { label: 'Test Case', color: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400' },
+  TC: { label: 'Test Case', color: 'bg-sky-500/10 text-sky-700 dark:text-sky-400' },
   DES: { label: 'Design', color: 'bg-violet-500/10 text-violet-700 dark:text-violet-400' },
   RSK: { label: 'Risk', color: 'bg-red-500/10 text-red-700 dark:text-red-400' },
   CHG: { label: 'Change Request', color: 'bg-blue-500/10 text-blue-700 dark:text-blue-400' },
@@ -43,7 +43,7 @@ const TYPE_BADGES: Record<DocType, { label: string; color: string }> = {
   DEF: { label: 'Defect', color: 'bg-rose-500/10 text-rose-700 dark:text-rose-400' },
   CMP: { label: 'Campaign', color: 'bg-sky-500/10 text-sky-700 dark:text-sky-400' },
   TS: { label: 'Test Suite', color: 'bg-lime-500/10 text-lime-700 dark:text-lime-400' },
-  PRT: { label: DOC_TYPE_LABELS.PRT, color: 'bg-teal-500/10 text-teal-700 dark:text-teal-400' },
+  PRT: { label: DOC_TYPE_LABELS.PRT, color: 'bg-violet-500/10 text-violet-700 dark:text-violet-400' },
   RPT: { label: 'Report', color: 'bg-slate-500/10 text-slate-700 dark:text-slate-400' },
   STD: { label: 'External Standard', color: 'bg-orange-500/10 text-orange-700 dark:text-orange-400' },
 }
@@ -205,12 +205,12 @@ function ReqTypeBadge({ reqType }: { reqType: string }) {
 function ReqOriginBadge({ origin }: { origin: string }) {
   const colors: Record<string, string> = {
     Internal: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
-    Customer: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400',
+    Customer: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
     Compliance: 'bg-violet-500/10 text-violet-700 dark:text-violet-400',
     Regulatory: 'bg-rose-500/10 text-rose-700 dark:text-rose-400',
     Legal: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400',
     Business: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-    Technical: 'bg-teal-500/10 text-teal-700 dark:text-teal-400',
+    Technical: 'bg-violet-500/10 text-violet-700 dark:text-violet-400',
   }
   return (
     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colors[origin] || 'bg-gray-500/10 text-gray-700 dark:text-gray-400'}`}>

@@ -85,7 +85,7 @@ export default function Reports() {
           value={s.total_test_cases}
           subtitle={`${s.total_campaigns} campaigns`}
           icon={CheckCircle}
-          color="text-cyan-600"
+          color="text-sky-600"
         />
       </div>
 

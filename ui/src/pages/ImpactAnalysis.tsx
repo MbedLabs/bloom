@@ -218,10 +218,10 @@ function LinkTypeBadge({ linkType }: { linkType: string }) {
   const config: Record<string, { colors: string; label: string }> = {
     verifies: { colors: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400', label: 'verifies' },
     traces_to: { colors: 'bg-blue-500/10 text-blue-700 dark:text-blue-400', label: 'traces to' },
-    exercises: { colors: 'bg-teal-500/10 text-teal-700 dark:text-teal-400', label: 'exercises' },
+    exercises: { colors: 'bg-violet-500/10 text-violet-700 dark:text-violet-400', label: 'exercises' },
     depends_on: { colors: 'bg-amber-500/10 text-amber-700 dark:text-amber-400', label: 'depends on' },
     derived_from: { colors: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400', label: 'derived from' },
-    refines: { colors: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400', label: 'refines' },
+    refines: { colors: 'bg-sky-500/10 text-sky-700 dark:text-sky-400', label: 'refines' },
     satisfies: { colors: 'bg-green-500/10 text-green-700 dark:text-green-400', label: 'satisfies' },
     copies: { colors: 'bg-gray-500/10 text-gray-700 dark:text-gray-400', label: 'copies' },
   }
