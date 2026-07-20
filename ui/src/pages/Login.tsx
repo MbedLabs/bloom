@@ -33,9 +33,14 @@ export default function Login() {
         <div className="bg-card rounded-2xl shadow-2xl p-8 border border-border">
           <div className="flex flex-col items-center mb-8">
             <img
+              src="/bloombg.png"
+              alt="Bloom by EmbedLabs"
+              className="h-24 w-auto max-w-full object-contain mb-4 hidden dark:block"
+            />
+            <img
               src="/bloomnobg.png"
               alt="Bloom by EmbedLabs"
-              className="h-24 w-auto max-w-full object-contain mb-4"
+              className="h-24 w-auto max-w-full object-contain mb-4 dark:hidden"
             />
             <h1 className="text-2xl font-bold text-foreground">Welcome to Bloom</h1>
             <p className="text-sm text-muted-foreground mt-1">Sign in to your account</p>
