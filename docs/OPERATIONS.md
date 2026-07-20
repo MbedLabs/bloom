@@ -6,10 +6,12 @@ environment variables — see [`.env.example`](../.env.example) for the full lis
 
 ## Health checks
 
-- `GET /api/health` — process-liveness endpoint used by the container
-  `HEALTHCHECK`. It confirms that the web process responds but does not query
-  PostgreSQL. Combine it with PostgreSQL health and, where appropriate, a
-  synthetic database-backed Bloom request for readiness/availability probes.
+- `GET /api/health` — **liveness**. Confirms the web process responds; it does not
+  query PostgreSQL, so it never claims a database connection it has not verified.
+- `GET /api/ready` — **readiness**. Runs `SELECT 1` against PostgreSQL and returns
+  `200` only when the database is reachable, `503` otherwise. This is what the
+  container `HEALTHCHECK` and `docker-compose` healthcheck probe, and it is the
+  right target for load-balancer / orchestrator readiness checks.
 
 ## Logs
 
@@ -72,8 +74,8 @@ Restore:
 pg_restore --clean --if-exists --no-owner --dbname "$DATABASE_URL" bloom-YYYY-MM-DD.dump
 ```
 
-Verify after restore: `GET /api/health`, then log in and confirm projects,
-requirements and traceability views load.
+Verify after restore: `GET /api/ready` (confirms the database is reachable),
+then log in and confirm projects, requirements and traceability views load.
 
 ## Upgrades
 
@@ -81,7 +83,8 @@ requirements and traceability views load.
 2. Pull the target image: `docker pull ghcr.io/mbedlabs/bloom:<version>`.
 3. Run migrations before serving traffic: `alembic upgrade head`
    (run inside the new image against the production `DATABASE_URL`).
-4. Restart the container. Confirm `/api/health` and the version shown in the UI.
+4. Restart the container. Confirm `/api/ready` returns `200` and check the
+   version shown in the UI.
 
 Rollback: restore the pre-upgrade database dump and start the previous image
 tag. Never run a newer schema against an older application version.
