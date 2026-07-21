@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { APP_VERSION, extractApiErrorMessage } from '../api/client'
+import { BLOOM_LOGO_DARK, BLOOM_LOGO_LIGHT } from '../brandAssets'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -33,12 +34,12 @@ export default function Login() {
         <div className="bg-card rounded-2xl shadow-2xl p-8 border border-border">
           <div className="flex flex-col items-center mb-8">
             <img
-              src="/bloombg.png"
+              src={BLOOM_LOGO_DARK}
               alt="Bloom by EmbedLabs"
               className="h-24 w-auto max-w-full object-contain mb-4 hidden dark:block"
             />
             <img
-              src="/bloomnobg.png"
+              src={BLOOM_LOGO_LIGHT}
               alt="Bloom by EmbedLabs"
               className="h-24 w-auto max-w-full object-contain mb-4 dark:hidden"
             />

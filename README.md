@@ -8,7 +8,7 @@ Bloom is a self-hosted product lifecycle management application for requirements
 - GitHub Packages page: [MbedLabs/bloom](https://github.com/orgs/MbedLabs/packages/container/package/bloom)
 - Supported platforms: `linux/amd64` and `linux/arm64`
 - Application port: container `8080` (the provided Compose file publishes it on host port `8000`)
-- Process-liveness endpoint: `GET /api/health`
+- Liveness endpoint: `GET /api/health` (process only); readiness endpoint: `GET /api/ready` (`SELECT 1`, used by the container healthcheck)
 
 Release tags publish immutable versioned images. For example, `v1.0.0-rc.1` publishes `v1.0.0-rc.1` and `1.0.0-rc.1`; `v1.0.0` publishes `v1.0.0`, `1.0.0`, `1.0`, `1`, and `latest`. Every release also has a `sha-...` tag. Pre-releases never move `latest` or the major/minor tags; a stable version with only `+build` metadata still does.
 
@@ -60,13 +60,13 @@ docker compose up -d
 docker compose logs -f bloom
 ```
 
-The Compose service waits for PostgreSQL, runs `alembic upgrade head`, and then starts Bloom. Check process liveness from the host:
+The Compose service waits for PostgreSQL, runs `alembic upgrade head`, and then starts Bloom. Check readiness from the host:
 
 ```bash
-curl --fail http://localhost:8000/api/health
+curl --fail http://localhost:8000/api/ready
 ```
 
-`/api/health` confirms that the Bloom web process is responding; it does not query PostgreSQL. For readiness or availability monitoring, combine it with PostgreSQL health and, where appropriate, a synthetic authenticated request that exercises a database-backed Bloom operation.
+`/api/ready` runs `SELECT 1` and returns `{"status":"ready","database":"connected"}` only once Bloom can reach PostgreSQL (`503` otherwise). `/api/health` is the cheaper liveness probe: it confirms the web process is responding but deliberately does not query PostgreSQL.
 
 Open <http://localhost:8000> (or your configured HTTPS URL) and sign in with `ADMIN_EMAIL` and the one-time `ADMIN_PASSWORD` from `.env`.
 
@@ -188,7 +188,7 @@ Pin `BLOOM_VERSION` in `.env` to the exact release you operate; use a full versi
 # Back up first, then edit BLOOM_VERSION in .env.
 docker compose pull bloom
 docker compose up -d bloom
-curl --fail http://localhost:8000/api/health
+curl --fail http://localhost:8000/api/ready
 ```
 
 Compose runs Alembic migrations before the upgraded application starts. Database migrations may not be backward compatible: restore the pre-upgrade database backup before starting an older image. Never run an older application against a schema migrated by a newer release unless that release explicitly documents support.
@@ -197,7 +197,7 @@ Compose runs Alembic migrations before the upgraded application starts. Database
 
 - `docker compose ps` shows container and health status.
 - `docker compose logs -f bloom` streams application, nginx, and migration output.
-- `GET /api/health` checks process liveness only; it does not prove PostgreSQL availability.
+- `GET /api/health` checks process liveness only; it does not prove PostgreSQL availability. `GET /api/ready` runs `SELECT 1` and returns `503` when the database is unreachable.
 - `GET /api/metrics` exposes Prometheus metrics when `ENABLE_METRICS=true`.
 - `LOG_JSON=true` emits structured production logs; use `X-Request-ID` to correlate requests.
 - If startup stops before the server begins, inspect the Bloom logs for configuration validation or Alembic errors.

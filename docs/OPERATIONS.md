@@ -4,12 +4,30 @@ A practical guide for running Bloom in production: monitoring, logs, backup and
 restore, upgrades, and disaster recovery. Runtime configuration lives in
 environment variables — see [`.env.example`](../.env.example) for the full list.
 
+## Image tags
+
+Images are published to `ghcr.io/mbedlabs/bloom`:
+
+| Tag | Moves? | Use for |
+|---|---|---|
+| `sha-<commit>` | immutable | exact reproducibility / debugging |
+| `1.2.3` (full semver) | immutable | **production — pin this** |
+| `1.2`, `1` | moving (stable releases) | tracking a minor/major line |
+| `stable` | moving → newest stable release | low-maintenance production |
+| `latest` | moving → newest `main` build | **development / staging only** |
+
+Set `BLOOM_VERSION` in `.env` to a pinned version (e.g. `1.2.3`) or `stable`.
+Never run `latest` in production — it is the rolling development build. `stable`
+starts existing once you publish your first `vX.Y.Z` release tag.
+
 ## Health checks
 
-- `GET /api/health` — process-liveness endpoint used by the container
-  `HEALTHCHECK`. It confirms that the web process responds but does not query
-  PostgreSQL. Combine it with PostgreSQL health and, where appropriate, a
-  synthetic database-backed Bloom request for readiness/availability probes.
+- `GET /api/health` — **liveness**. Confirms the web process responds; it does not
+  query PostgreSQL, so it never claims a database connection it has not verified.
+- `GET /api/ready` — **readiness**. Runs `SELECT 1` against PostgreSQL and returns
+  `200` only when the database is reachable, `503` otherwise. This is what the
+  container `HEALTHCHECK` and `docker-compose` healthcheck probe, and it is the
+  right target for load-balancer / orchestrator readiness checks.
 
 ## Logs
 
@@ -72,8 +90,8 @@ Restore:
 pg_restore --clean --if-exists --no-owner --dbname "$DATABASE_URL" bloom-YYYY-MM-DD.dump
 ```
 
-Verify after restore: `GET /api/health`, then log in and confirm projects,
-requirements and traceability views load.
+Verify after restore: `GET /api/ready` (confirms the database is reachable),
+then log in and confirm projects, requirements and traceability views load.
 
 ## Upgrades
 
@@ -81,7 +99,8 @@ requirements and traceability views load.
 2. Pull the target image: `docker pull ghcr.io/mbedlabs/bloom:<version>`.
 3. Run migrations before serving traffic: `alembic upgrade head`
    (run inside the new image against the production `DATABASE_URL`).
-4. Restart the container. Confirm `/api/health` and the version shown in the UI.
+4. Restart the container. Confirm `/api/ready` returns `200` and check the
+   version shown in the UI.
 
 Rollback: restore the pre-upgrade database dump and start the previous image
 tag. Never run a newer schema against an older application version.
