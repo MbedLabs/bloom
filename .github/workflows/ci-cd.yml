@@ -67,31 +67,24 @@ jobs:
       - name: Run backend security scans
         run: |
           bandit -r app/ -ll
-          pip-audit || true
+          # Blocking: audit the locked closure (constraints.txt), not the ambient
+          # runner tooling. Reviewed ignore: PYSEC-2026-1325 is an ecdsa timing
+          # side-channel with no fix release, transitive via python-jose. Bloom
+          # signs JWTs with HS256 (symmetric), so the affected ES* path is unused.
+          pip-audit -r constraints.txt --ignore-vuln PYSEC-2026-1325
 
-      - name: Create tables (model-driven base schema)
-        env:
-          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_bloom
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          BLOOM_DISABLE_RATE_LIMIT: "1"
-        run: |
-          python -c "
-          import asyncio
-          from app.core.database import create_tables
-          from app.core.config import settings
-          asyncio.run(create_tables())
-          print('Base tables created from models.')
-          "
-
-      - name: Alembic upgrade (data migrations + indexes)
+      # The documented fresh-install path (and what production compose actually
+      # runs): alembic alone must build the full schema on a truly EMPTY database.
+      # No create_tables() pre-step — that used to mask exactly this path.
+      - name: Alembic upgrade on an empty database
         env:
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_bloom
           SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
           BLOOM_DOTENV_DISABLED: "1"
         run: |
-          pip install alembic
           alembic upgrade head
+          alembic current
+          alembic current | grep -q "(head)" || { echo "database is not at alembic head" >&2; exit 1; }
 
       - name: Run backend tests
         env:

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { APP_VERSION, authApi, extractApiErrorMessage } from '../api/client'
+import { BLOOM_LOGO_DARK, BLOOM_LOGO_LIGHT } from '../brandAssets'
 
 export default function VerifyEmail() {
   const [searchParams] = useSearchParams()
@@ -42,6 +43,18 @@ export default function VerifyEmail() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1a1028] via-[#3b1d6e] to-[#6b7280] p-4">
       <div className="w-full max-w-md bg-card rounded-2xl shadow-2xl p-8 border border-border">
+        <div className="flex flex-col items-center mb-6">
+          <img
+            src={BLOOM_LOGO_DARK}
+            alt="Bloom by EmbedLabs"
+            className="h-16 w-auto max-w-full object-contain mb-3 hidden dark:block"
+          />
+          <img
+            src={BLOOM_LOGO_LIGHT}
+            alt="Bloom by EmbedLabs"
+            className="h-16 w-auto max-w-full object-contain mb-3 dark:hidden"
+          />
+        </div>
         <h1 className="text-2xl font-bold text-foreground mb-2">Verify Email</h1>
         <p className="text-sm text-muted-foreground mb-6">Confirming your email address for Bloom.</p>
 
