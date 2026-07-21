@@ -1,7 +1,10 @@
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
+
+from app.schemas import ProjectCreate
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "e2e_image_smoke.sh"
@@ -49,3 +52,13 @@ if args and args[0] == "run" and "--name" in args:
         if call[:3] == ["run", "-d", "--name"] and call[3].startswith("bloom-e2e-app-")
     )
     assert "ADMIN_FULL_NAME=E2E Admin" in app_run
+
+
+def test_project_payload_matches_current_create_contract():
+    script = SCRIPT.read_text(encoding="utf-8")
+    match = re.search(r"-d '(\{\"name\":\"E2E Project\",\"prefix\":\"[^\"]+\"\})'", script)
+
+    assert match is not None
+    payload = json.loads(match.group(1))
+    project = ProjectCreate.model_validate(payload)
+    assert project.prefix == payload["prefix"]
