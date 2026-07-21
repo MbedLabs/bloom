@@ -137,7 +137,7 @@ log "Creating a project (database write)"
 project_id="$(curl -fsS -X POST "${BASE}/api/projects" \
   -H "Authorization: Bearer ${token}" \
   -H 'Content-Type: application/json' \
-  -d '{"name":"E2E Project","prefix":"E2E"}' | json_field id)"
+  -d '{"name":"E2E Project","prefix":"EET"}' | json_field id)"
 [ -n "$project_id" ] || fail "project creation did not return an id"
 echo "    project id = ${project_id}"
 
