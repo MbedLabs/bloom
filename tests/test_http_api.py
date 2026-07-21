@@ -23,12 +23,22 @@ def test_health_and_root(api_client: TestClient):
     payload = h.json()
     assert payload.get("status") == "healthy"
     assert "version" in payload
+    # Liveness must never claim a database connection it has not verified.
+    assert payload.get("database") != "connected"
 
     r = api_client.get("/")
     assert r.status_code == 200
     body = r.json()
     assert "Bloom" in str(body.get("message", ""))
     assert "version" in body
+
+
+def test_ready_probe_confirms_database(api_client: TestClient):
+    resp = api_client.get("/api/ready")
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload.get("status") == "ready"
+    assert payload.get("database") == "connected"
 
 
 def test_docs_disabled_openapi_returns_404(api_client: TestClient):
