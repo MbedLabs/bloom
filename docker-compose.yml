@@ -1,6 +1,6 @@
 services:
   bloom:
-    image: ghcr.io/mbedlabs/bloom:${BLOOM_VERSION:-latest}
+    image: ghcr.io/mbedlabs/bloom:${BLOOM_VERSION:-stable}
     restart: unless-stopped
     env_file:
       - ${BLOOM_ENV_FILE:-.env}
