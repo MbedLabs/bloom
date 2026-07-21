@@ -112,11 +112,11 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
   },
   CHG: {
     icon: GitPullRequest,
-    borderTop: 'border-t-blue-600',
-    surface: 'bg-gradient-to-br from-blue-500/10 to-card ring-1 ring-blue-500/10',
-    iconChip: 'bg-blue-500/15 text-blue-900 dark:text-blue-200',
-    countText: 'text-blue-900 dark:text-blue-200',
-    accent: '#2563eb',
+    borderTop: 'border-t-purple-600',
+    surface: 'bg-gradient-to-br from-purple-500/10 to-card ring-1 ring-purple-500/10',
+    iconChip: 'bg-purple-500/15 text-purple-900 dark:text-purple-200',
+    countText: 'text-purple-900 dark:text-purple-200',
+    accent: '#9333ea',
   },
   RPT: {
     icon: Layers,
@@ -617,14 +617,18 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
       >
         <FitViewOnLayout layoutToken={layoutToken} />
         <Background variant={BackgroundVariant.Dots} gap={18} size={1.2} className="opacity-50" />
-        <Controls showInteractive={false} position="bottom-right" />
+        <Controls
+          showInteractive={false}
+          position="bottom-right"
+          className="!m-3 !overflow-hidden !rounded-lg !border !border-border !bg-card !shadow-sm [&>button]:!h-8 [&>button]:!w-8 [&>button]:!border-border [&>button]:!bg-card [&>button]:!fill-muted-foreground [&>button]:!text-muted-foreground hover:[&>button]:!bg-accent hover:[&>button]:!fill-foreground"
+        />
 
         {/* Top-left header / stats */}
         <Panel position="top-left" className="m-3">
           <div className="rounded-lg border border-border bg-card/95 backdrop-blur-sm shadow-sm px-3 py-2.5">
             <div className="flex items-center gap-2 text-foreground">
-              <GitBranch className="h-4 w-4 text-primary" />
-              <span className="text-sm font-semibold">Project Topology</span>
+              <GitBranch className="h-4 w-4 text-purple-500" />
+              <span className="text-sm font-semibold">Topology</span>
             </div>
             <div className="mt-1.5 flex items-center gap-3 text-[11px] text-muted-foreground">
               <span><span className="font-semibold text-foreground tabular-nums">{formatCount(totalDocs)}</span> docs</span>
