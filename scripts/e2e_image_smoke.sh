@@ -24,8 +24,8 @@ set -euo pipefail
 
 IMAGE="${1:?usage: e2e_image_smoke.sh <image-ref>}"
 PLATFORM="${E2E_PLATFORM:-linux/amd64}"
-APP_PORT="${E2E_APP_PORT:-18081}"
-BASE="http://127.0.0.1:${APP_PORT}"
+APP_PORT="${E2E_APP_PORT:-}"
+BASE=""
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FIXTURE="${SCRIPT_DIR}/e2e/sample.reqif"
@@ -71,6 +71,14 @@ trap cleanup EXIT
 
 json_field() { python3 -c 'import sys,json;print(json.load(sys.stdin)["'"$1"'"])'; }
 
+refresh_base() {
+  local port_binding
+  port_binding="$(docker port "$APP" 8080/tcp | head -n 1)"
+  APP_PORT="${port_binding##*:}"
+  [ -n "$APP_PORT" ] || fail "Docker did not allocate an application port"
+  BASE="http://127.0.0.1:${APP_PORT}"
+}
+
 login() {
   curl -fsS -X POST "${BASE}/api/auth/login" \
     -H 'Content-Type: application/json' \
@@ -103,11 +111,14 @@ docker exec "$PG" pg_isready -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1 \
   || fail "postgres never became ready"
 
 log "Booting the application container (builds schema on an empty DB)"
+PUBLISH_ADDR="127.0.0.1::8080"
+if [ -n "$APP_PORT" ]; then PUBLISH_ADDR="127.0.0.1:${APP_PORT}:8080"; fi
 docker run -d --name "$APP" --network "$NET" \
-  -p "127.0.0.1:${APP_PORT}:8080" \
+  -p "$PUBLISH_ADDR" \
   --platform "$PLATFORM" \
   "${ENV_ARGS[@]}" \
   "$IMAGE" >/dev/null
+refresh_base
 wait_ready "on first boot"
 
 log "Applying alembic upgrade head against the published image"
@@ -166,6 +177,7 @@ imported="$(printf '%s' "$import_result" | json_field imported)"
 
 log "Restarting the container to prove persistence"
 docker restart "$APP" >/dev/null
+refresh_base
 wait_ready "after restart"
 
 log "Re-importing the same ReqIF must be idempotent (proves the data persisted)"
