@@ -4,7 +4,7 @@
 
 ### Added
 
-- User-first deployment and operations guidance for the published Bloom by EmbedLabs container image.
+- User-first deployment and operations guidance for the published Bloom PLM by EmbedLabs container image.
 - Bounded ReqIF import processing: exactly one `.reqif` member, 25 MiB request and uncompressed-member limits, a 20:1 compression-ratio limit, and at most 100 archive entries.
 - ReqIF object, relation, and hierarchy-depth limits, plus a streamed request cap, processing timeout, per-user rate limit, and one active import per project.
 
@@ -26,5 +26,5 @@
 
 ## 1.0.0
 
-- Initial beta release of Bloom by EmbedLabs as a self-hosted product lifecycle management platform.
+- Initial beta release of Bloom PLM by EmbedLabs as a self-hosted product lifecycle management platform.
 - Published a multi-architecture container image with PostgreSQL-backed deployment, migrations, health checks, and persistent project data.
