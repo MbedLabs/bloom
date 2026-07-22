@@ -1,8 +1,8 @@
-# Bloom by EmbedLabs
+# Bloom PLM by EmbedLabs
 
-Bloom by EmbedLabs is a self-hosted product lifecycle management application for requirements, controlled documents, verification assets, test planning, and end-to-end traceability.
+Bloom PLM by EmbedLabs is a self-hosted product lifecycle management application for requirements, controlled documents, verification assets, test planning, and end-to-end traceability.
 
-Bloom is available under the **GNU Affero General Public License v3.0 only (AGPL-3.0-only)**. EmbedLabs also offers commercial licensing for use cases that cannot comply with the AGPL, plus paid **priority support** and **custom feature development**. Contact `dev@embedlabs.net`.
+Bloom is available under the **GNU Affero General Public License v3.0 only (AGPL-3.0-only)**. EmbedLabs also offers professional licensing for use cases that cannot comply with the AGPL, plus paid **priority support** and **custom feature development**. Contact `dev@embedlabs.net`.
 
 ## Run the published product image
 
@@ -237,4 +237,4 @@ Report vulnerabilities according to the [security policy](SECURITY.md). Communit
 
 ## License
 
-Bloom by EmbedLabs is licensed under the [GNU Affero General Public License v3.0 only (AGPL-3.0-only)](LICENSE). Commercial licenses are available from EmbedLabs for use cases that cannot comply with the AGPL. Deploying a modified network service under the AGPL requires offering its corresponding source to users; contact `dev@embedlabs.net` for commercial licensing.
+Bloom PLM by EmbedLabs is licensed under the [GNU Affero General Public License v3.0 only (AGPL-3.0-only)](LICENSE). Commercial/Professional licenses are available from EmbedLabs for use cases that cannot comply with the AGPL. Deploying a modified network service under the AGPL requires offering its corresponding source to users; contact `dev@embedlabs.net` for professional licensing.
