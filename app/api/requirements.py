@@ -2,6 +2,7 @@
 Requirements API endpoints.
 """
 
+from collections import defaultdict
 from datetime import timezone
 from typing import Optional
 
@@ -91,9 +92,6 @@ async def _get_verified_by(
         )
         for link, tc in link_rows
     ]
-
-
-from collections import defaultdict
 
 
 class ReqPrefetchContext:
@@ -707,7 +705,7 @@ async def link_test_run(
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     """
-    Link a test run (from the teststation app) to a requirement.
+    Link an externally hosted Bud test run to a requirement.
     """
     req_result = await db.execute(select(Requirement).where(Requirement.id == requirement_id))
     requirement = req_result.scalar_one_or_none()

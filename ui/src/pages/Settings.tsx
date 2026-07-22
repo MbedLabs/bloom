@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Sun, Moon, Monitor, Info, ExternalLink, Globe, ShieldCheck, Copy, Check, Loader2, RefreshCw } from 'lucide-react'
-import { APP_VERSION, authApi, extractApiErrorMessage } from '../api/client'
+import {
+  APP_VERSION,
+  extractApiErrorMessage,
+  serviceCredentialsApi,
+  type ServiceCredential,
+} from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 
 const COMMON_TIMEZONES = [
@@ -62,10 +67,16 @@ export default function Settings() {
   // Timezone state
   const [timezone, setTimezone] = useState(() => localStorage.getItem('bloom-timezone') || 'auto')
 
-  // Token Generation state
+  // Scoped Bud result-sync credential state
   const [generatedToken, setGeneratedToken] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [credentials, setCredentials] = useState<ServiceCredential[]>([])
+
+  useEffect(() => {
+    if (!isAdmin) return
+    serviceCredentialsApi.list().then(setCredentials).catch(() => setCredentials([]))
+  }, [isAdmin])
 
   const handleTimezoneChange = (newTz: string) => {
     setTimezone(newTz)
@@ -76,12 +87,36 @@ export default function Settings() {
   const handleGenerateToken = async () => {
     setIsGenerating(true)
     try {
-      const response = await authApi.generateToken()
-      setGeneratedToken(response.access_token)
+      const response = await serviceCredentialsApi.create()
+      setGeneratedToken(response.token)
+      setCredentials((current) => [response, ...current])
     } catch (error) {
       alert(`Error generating token: ${extractApiErrorMessage(error)}`)
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  const handleRotateToken = async (id: number) => {
+    setIsGenerating(true)
+    try {
+      const response = await serviceCredentialsApi.rotate(id)
+      setGeneratedToken(response.token)
+      setCredentials(await serviceCredentialsApi.list())
+    } catch (error) {
+      alert(`Error rotating token: ${extractApiErrorMessage(error)}`)
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const handleRevokeToken = async (id: number) => {
+    if (!window.confirm('Revoke this Bud result-sync credential?')) return
+    try {
+      await serviceCredentialsApi.revoke(id)
+      setCredentials(await serviceCredentialsApi.list())
+    } catch (error) {
+      alert(`Error revoking token: ${extractApiErrorMessage(error)}`)
     }
   }
 
@@ -150,17 +185,17 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* PLM Integration Token Management (Admin Only) */}
+      {/* Scoped Bud integration credentials (Admin Only) */}
       {isAdmin && (
         <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden border-primary/20">
           <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-primary/5">
             <ShieldCheck className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">PLM Integration Token Management</h3>
+            <h3 className="text-sm font-semibold text-foreground">Bud Result-Sync Credentials</h3>
           </div>
           <div className="p-5 space-y-4">
             <div className="space-y-2">
-              <p className="text-sm font-medium text-foreground">Generate API Token</p>
-              <p className="text-xs text-muted-foreground">Generate a long-lived JWT token for external integrations (e.g., Bud Platform).</p>
+              <p className="text-sm font-medium text-foreground">Scoped service credential</p>
+              <p className="text-xs text-muted-foreground">Creates a revocable 90-day credential that can only submit test-case results. It cannot access Bloom user, project, or admin APIs.</p>
             </div>
 
             {generatedToken ? (
@@ -197,8 +232,43 @@ export default function Settings() {
                   className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
                 >
                   {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                  Generate New Token
+                  Create Credential
                 </button>
+              </div>
+            )}
+
+            {credentials.length > 0 && (
+              <div className="space-y-2 border-t border-border pt-4">
+                {credentials.map((credential) => (
+                  <div key={credential.id} className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">{credential.name}</p>
+                      <p className="text-[11px] font-mono text-muted-foreground">
+                        {credential.token_prefix}… · {credential.scope} · expires {new Date(credential.expires_at).toLocaleDateString()}
+                      </p>
+                      {credential.revoked_at && <p className="text-[11px] text-destructive">Revoked</p>}
+                    </div>
+                    {!credential.revoked_at && (
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={isGenerating}
+                          onClick={() => handleRotateToken(credential.id)}
+                          className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+                        >
+                          Rotate
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRevokeToken(credential.id)}
+                          className="text-xs font-medium text-destructive hover:underline"
+                        >
+                          Revoke
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -213,8 +283,8 @@ export default function Settings() {
         </div>
         <div className="p-5">
           <div className="flex items-center gap-4 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-[#6b7280] flex items-center justify-center">
-              <span className="text-white font-bold text-sm">B</span>
+            <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-muted">
+              <img src="/favicon-96x96.png" alt="Bloom" className="w-full h-full object-contain" />
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">Bloom PLM</p>
@@ -231,6 +301,24 @@ export default function Settings() {
             >
               EmbedLabs
               <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+          <div className="mt-3 flex items-center gap-3 text-xs">
+            <a
+              href="https://github.com/MbedLabs/bloom"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:text-primary/80 transition-colors font-medium"
+            >
+              Source code
+            </a>
+            <a
+              href="https://github.com/MbedLabs/bloom/blob/main/LICENSE"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:text-primary/80 transition-colors font-medium"
+            >
+              AGPL-3.0 license
             </a>
           </div>
         </div>

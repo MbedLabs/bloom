@@ -34,12 +34,13 @@ You need Docker Engine with Docker Compose v2. The reference deployment runs Blo
 cp .env.example .env
 openssl rand -hex 32  # use for POSTGRES_PASSWORD
 openssl rand -hex 32  # use for SECRET_KEY
+openssl rand -hex 32  # use for SERVICE_TOKEN_PEPPER
 openssl rand -hex 24  # use for the one-time ADMIN_PASSWORD
 ```
 
 Edit `.env` before starting. At minimum:
 
-- replace `POSTGRES_PASSWORD`, `SECRET_KEY`, and `ADMIN_PASSWORD` with the generated values;
+- replace `POSTGRES_PASSWORD`, `SECRET_KEY`, `SERVICE_TOKEN_PEPPER`, and `ADMIN_PASSWORD` with independent generated values;
 - replace `ADMIN_EMAIL` with a real address (production rejects `admin@example.com`);
 - set `APP_BASE_URL`, `FRONTEND_BASE_URL`, and `BLOOM_APP_URL` to the public HTTPS Bloom URL;
 - set `BUD_APP_URL` to the public Bud URL if the products are connected; and
@@ -48,7 +49,7 @@ Edit `.env` before starting. At minimum:
 
 The required credential fields are intentionally empty. Compose enforces `POSTGRES_PASSWORD`, `SECRET_KEY`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` during configuration interpolation, so an unedited copy fails before any container starts.
 
-`SECRET_KEY` must be at least 32 characters and must be backed up in your secret store. Losing or changing it invalidates sessions, integration tokens, and pending invitation/reset links.
+`SECRET_KEY` and `SERVICE_TOKEN_PEPPER` must each be at least 32 characters and must be backed up in your secret store. Losing `SECRET_KEY` invalidates sessions and pending invitation/reset links; losing `SERVICE_TOKEN_PEPPER` invalidates Bud result-sync credentials.
 
 ### 2. Pull and start Bloom
 
@@ -127,18 +128,26 @@ After signing in:
 5. Create baselines when a controlled project state needs to be preserved.
 6. Configure a project's GitHub or GitLab integration if defects should link to an external issue tracker.
 
+### ReqIF imports
+
+Bloom accepts ZIP archives containing **exactly one `.reqif` member**. The request and uncompressed ReqIF member are each limited to **25 MiB**. Archives are limited to **100 entries** and a **20:1 compression ratio**. A single import is limited to 999 specification objects, 10,000 relations, and 100 hierarchy levels. Bloom enforces the request cap while streaming, runs parsing in a time-limited worker process, permits five attempts per user per 15 minutes, and permits one active import per project.
+
+These controls validate structure and resource use; they are not a malware scan. Do not advertise ReqIF imports as “security scanned” unless the deployment also connects an appropriate ClamAV or YARA scanning stage.
+
 ## Connect Bloom and Bud
 
 Bloom issues the token that Bud uses to post execution results:
 
 1. Sign in to Bloom as an administrator.
-2. Open **Settings → PLM Integration Token Management**.
-3. Select **Generate New Token** and copy the token immediately. Generating another token invalidates the previous integration token for that administrator.
+2. Open **Settings → Bud Result-Sync Credentials**.
+3. Create a credential and copy the `blm_sync_` token immediately; Bloom stores only its keyed hash and will not display it again.
 4. Sign in to Bud as an administrator and open **Settings → PLM Integration (Bloom)**.
-5. Enter the Bloom base URL and paste the generated token, then save.
+5. Enter the Bloom base URL and paste the scoped credential, then save. Bud encrypts it at rest and never returns it through settings APIs.
 6. Set Bloom's `BUD_APP_URL` to Bud's public origin so navigation and cross-links open the correct instance.
 
-The integration is intentionally limited to **test-case execution**. Bud sends results keyed by Bloom `tc_id`; Bloom updates matching test cases and their campaign line items. Bud does not create or synchronize Bloom campaigns, suites, requirements, or documents.
+The credential expires after 90 days, can be rotated or revoked independently, and has only the `test-results:write` scope. It cannot call user, project, or administration APIs.
+
+The integration is intentionally limited to **test-case execution results**. Bud sends outcomes keyed by Bloom `tc_id`; Bloom updates the matching test case and any line items in campaigns that already contain it. The endpoint lives under the campaigns router for historical API compatibility, but Bud does not create or synchronize campaigns, suites, requirements, or documents.
 
 ## Run without Compose
 
@@ -202,7 +211,7 @@ Compose runs Alembic migrations before the upgraded application starts. Database
 - `LOG_JSON=true` emits structured production logs; use `X-Request-ID` to correlate requests.
 - If startup stops before the server begins, inspect the Bloom logs for configuration validation or Alembic errors.
 - If sign-in fails on first boot, confirm the production admin email is not `admin@example.com`, the password is at least 16 characters, and `AUTO_SEED_ADMIN` was enabled for that first start.
-- If Bud results do not appear, verify the Bloom URL and token in Bud, confirm the token belongs to an active Bloom admin, and confirm Bud results contain matching `tc_id` metadata.
+- If Bud results do not appear, verify the Bloom URL and configured `blm_sync_` credential in Bud, rotate it if it expired or was revoked, and confirm Bud results contain matching `tc_id` metadata.
 
 The full monitoring, backup/restore, upgrade, and disaster-recovery reference is in [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
@@ -242,20 +251,13 @@ Then run the backend validation, schema setup, migrations, tests, and UI checks:
 black --check --diff app/ tests/
 isort --profile black --check-only --diff app/ tests/
 bandit -r app/ -ll
-pip-audit || true
+pip-audit -r constraints.txt --ignore-vuln PYSEC-2026-1325
 
 export DATABASE_URL=postgresql+asyncpg://test_user:test_password@localhost:5432/test_bloom
 export SECRET_KEY=test-secret-key-for-ci-at-least-32-characters-long
 export BLOOM_DOTENV_DISABLED=1
 export BLOOM_DISABLE_RATE_LIMIT=1
 
-python -c "
-import asyncio
-from app.core.database import create_tables
-asyncio.run(create_tables())
-print('Base tables created from models.')
-"
-pip install alembic
 alembic upgrade head
 
 export ENABLE_DOCS=false
@@ -293,8 +295,12 @@ docker build -t bloom:local .
 - [Contributor License Agreement](CLA.md)
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 - [Security policy](SECURITY.md)
-- [GNU Affero General Public License v3.0](LICENSE)
+- [GNU Affero General Public License v3.0 only](LICENSE)
+
+## Security and support
+
+Report vulnerabilities according to the [security policy](SECURITY.md). Community bug reports and feature proposals belong in GitHub Issues. EmbedLabs also offers paid **priority support** and **custom feature development** for teams that need response commitments, integration work, deployment assistance, or product extensions; contact `dev@embedlabs.net`.
 
 ## License
 
-Bloom is licensed under the [GNU Affero General Public License v3.0](LICENSE). Deploying a modified network service requires offering its corresponding source to users as required by the AGPL.
+Bloom is licensed under the [GNU Affero General Public License v3.0 only (AGPL-3.0-only)](LICENSE). Deploying a modified network service requires offering its corresponding source to users as required by the AGPL.

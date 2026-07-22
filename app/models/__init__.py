@@ -13,6 +13,7 @@ from app.models.models import (
     DesignItem,
     Document,
     DocumentSection,
+    ImportAttempt,
     IntegrationSetting,
     Notification,
     Project,
@@ -20,6 +21,7 @@ from app.models.models import (
     Requirement,
     RequirementLink,
     RiskItem,
+    ServiceCredential,
     TestCampaign,
     TestCampaignItem,
     TestCase,
@@ -27,6 +29,7 @@ from app.models.models import (
     TestRunLink,
     TestSuite,
     TestSuiteItem,
+    WebhookDelivery,
 )
 from app.models.project_membership import ProjectExternalDocType, ProjectMembership
 from app.models.user import User, UserRole
@@ -54,6 +57,7 @@ __all__ = [
     "Defect",
     "DefectSyncEvent",
     "IntegrationSetting",
+    "ImportAttempt",
     "DesignItem",
     "RiskItem",
     "ChangeRequest",
@@ -65,4 +69,6 @@ __all__ = [
     "ArtefactLink",
     "ProjectMembership",
     "ProjectExternalDocType",
+    "WebhookDelivery",
+    "ServiceCredential",
 ]

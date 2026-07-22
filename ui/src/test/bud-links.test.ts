@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   buildBudRunUrl,
-  getBudApiBaseUrl,
   getBudAppBaseUrl,
   normalizeBudAppBaseUrl,
 } from '../lib/budLinks'
@@ -26,6 +25,5 @@ describe('Bud link helpers', () => {
     vi.stubGlobal('window', { runtimeConfig: { BUD_APP_URL: 'https://runtime-bud.example/api' } })
 
     expect(getBudAppBaseUrl()).toBe('https://runtime-bud.example')
-    expect(getBudApiBaseUrl()).toBe('https://runtime-bud.example')
   })
 })

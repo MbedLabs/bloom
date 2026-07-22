@@ -3,7 +3,7 @@ Auth API endpoints: login, get current user, update profile.
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
@@ -112,7 +112,7 @@ async def login(
             detail="User account is deactivated",
         )
 
-    access_token = create_access_token(data={"sub": str(user.id)})
+    access_token = create_access_token(data={"sub": str(user.id), "type": "user"})
     await _issue_refresh_cookie(db, response, user.id)
 
     return TokenResponse(
@@ -152,7 +152,7 @@ async def refresh(
     # Rotate: burn the presented token, issue a fresh one.
     await mark_token_used(db, token_row)
     await _issue_refresh_cookie(db, response, user.id)
-    access_token = create_access_token(data={"sub": str(user.id)})
+    access_token = create_access_token(data={"sub": str(user.id), "type": "user"})
 
     return TokenResponse(
         access_token=access_token,
@@ -396,47 +396,11 @@ async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(
     return GenericMessageResponse(message="Password reset successfully")
 
 
-@router.post("/token/generate", response_model=TokenResponse)
+@router.post("/token/generate", status_code=410)
 async def generate_api_token(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(get_current_user),
 ):
-    """
-    Generate a long-lived API token for the current admin.
-    Invalidates any previous API tokens for this user.
-    """
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Only admins can generate API tokens")
-
-    import secrets
-
-    new_jti = secrets.token_hex(16)
-
-    # Generate a token with a long expiry (e.g., 1 year)
-    access_token = create_access_token(
-        data={"sub": str(current_user.id), "type": "api_token", "jti": new_jti},
-        expires_delta=timedelta(days=365),
-    )
-
-    # Invalidate previous tokens by updating JTI
-    current_user.api_token_jti = new_jti
-    await db.flush()
-
-    # Notify admin via email
-    try:
-        from app.services.mail_service import send_email
-
-        send_email(
-            to_email=current_user.email,
-            subject="New Bloom API Token Generated",
-            text_body="A new API token has been generated for your account. Any previous API tokens have been invalidated.",
-            html_body=f"<p>Hello {current_user.full_name},</p><p>A new API token has been generated for your account. Any previous API tokens have been invalidated.</p><p>If you did not perform this action, please secure your account immediately.</p>",
-        )
-
-    except Exception:
-        logger.exception("Could not send token generation notification")
-
-    return TokenResponse(
-        access_token=access_token,
-        user=UserResponse.model_validate(current_user),
+    raise HTTPException(
+        status_code=410,
+        detail="Long-lived admin API tokens were removed; create a scoped service credential.",
     )

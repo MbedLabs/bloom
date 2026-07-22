@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_project_access, require_role
+from app.core.security import require_project_access, require_role
 from app.models import Project, ProjectVariable
 from app.models.user import User, UserRole
 from app.schemas import (

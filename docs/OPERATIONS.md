@@ -111,15 +111,15 @@ tag. Never run a newer schema against an older application version.
   schedule to your tolerance and copy backups off the host.
 - **RTO** is dominated by Postgres restore time; rehearse the restore path
   against a scratch database at least once before you depend on it.
-- Keep `SECRET_KEY` (and SMTP credentials) in your secret store — a restored
-  database with a different `SECRET_KEY` invalidates all sessions, API tokens
-  and pending invite/reset links.
+- Keep `SECRET_KEY`, `SERVICE_TOKEN_PEPPER`, and SMTP credentials in your secret
+  store. A different `SECRET_KEY` invalidates sessions and pending invite/reset
+  links; a different `SERVICE_TOKEN_PEPPER` invalidates Bud result-sync credentials.
 
 ## Supply chain
 
 Every release build publishes an SPDX SBOM as a CI artifact
-(`bloom-sbom.spdx.json`) alongside the container image, and CI runs Bandit and
-pip-audit on every push.
+(`bloom-sbom.spdx.json`) alongside the container image, and CI runs Bandit,
+`pip-audit`, and blocking `npm audit` checks on every push.
 
 Backend dependencies are pinned in [`constraints.txt`](../constraints.txt)
 (generated with `pip-compile`), and both the image build and CI install with

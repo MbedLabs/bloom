@@ -14,13 +14,14 @@ Design notes:
 
 from __future__ import annotations
 
-import io
-import zipfile
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 from xml.etree import ElementTree as ET
 
 from defusedxml import ElementTree as SafeET
+
+from app.core.config import settings
+from app.core.reqif_policy import ReqIFParseError, extract_reqif_xml
 
 # Attribute long-names commonly used by tools for the requirement heading/title.
 TITLE_ATTRIBUTE_HINTS = (
@@ -82,10 +83,6 @@ _XHTML_KEEP_TAGS = {
     "code",
     "blockquote",
 }
-
-
-class ReqIFParseError(ValueError):
-    """Raised when the supplied bytes are not a readable ReqIF document."""
 
 
 @dataclass
@@ -245,18 +242,7 @@ def _plain_text(elem: ET.Element) -> str:
 
 def _extract_bytes(data: bytes) -> bytes:
     """Return raw ReqIF XML, unwrapping a ``.reqifz`` (zip) container if needed."""
-    if data[:2] == b"PK":
-        try:
-            with zipfile.ZipFile(io.BytesIO(data)) as zf:
-                names = [n for n in zf.namelist() if n.lower().endswith(".reqif")]
-                if not names:
-                    names = [n for n in zf.namelist() if n.lower().endswith(".xml")]
-                if not names:
-                    raise ReqIFParseError("Archive contains no .reqif file.")
-                return zf.read(names[0])
-        except zipfile.BadZipFile as exc:  # pragma: no cover - defensive
-            raise ReqIFParseError("Corrupt .reqifz archive.") from exc
-    return data
+    return extract_reqif_xml(data)
 
 
 def parse_reqif(data: bytes) -> ReqIFBundle:
@@ -302,7 +288,12 @@ def parse_reqif(data: bytes) -> ReqIFBundle:
     bundle = ReqIFBundle()
 
     # 4. spec objects + their attribute values
-    for so in _find_all(root, "SPEC-OBJECT"):
+    spec_objects = _find_all(root, "SPEC-OBJECT")
+    if len(spec_objects) > settings.REQIF_MAX_OBJECTS:
+        raise ReqIFParseError(
+            f"ReqIF object limit exceeded (maximum {settings.REQIF_MAX_OBJECTS})."
+        )
+    for so in spec_objects:
         ident = so.get("IDENTIFIER")
         if not ident:
             continue
@@ -328,7 +319,12 @@ def parse_reqif(data: bytes) -> ReqIFBundle:
         bundle.specifications.append(specification)
 
     # 6. spec relations (traceability links)
-    for rel in _find_all(root, "SPEC-RELATION"):
+    spec_relations = _find_all(root, "SPEC-RELATION")
+    if len(spec_relations) > settings.REQIF_MAX_RELATIONS:
+        raise ReqIFParseError(
+            f"ReqIF relation limit exceeded (maximum {settings.REQIF_MAX_RELATIONS})."
+        )
+    for rel in spec_relations:
         ident = rel.get("IDENTIFIER")
         source = _ref_text(rel, "SOURCE")
         target = _ref_text(rel, "TARGET")
@@ -388,14 +384,31 @@ def _consume_attribute_value(
             obj.attributes[key] = value
 
 
-def _build_hierarchy(hier: ET.Element) -> Optional[ReqIFHierarchyNode]:
+def _build_hierarchy(
+    hier: ET.Element,
+    *,
+    depth: int = 1,
+    ancestor_refs: frozenset[str] = frozenset(),
+) -> Optional[ReqIFHierarchyNode]:
+    if depth > settings.REQIF_MAX_HIERARCHY_DEPTH:
+        raise ReqIFParseError(
+            "ReqIF hierarchy depth limit exceeded "
+            f"(maximum {settings.REQIF_MAX_HIERARCHY_DEPTH})."
+        )
     object_ref = _ref_text(hier, "OBJECT")
+    if object_ref and object_ref in ancestor_refs:
+        raise ReqIFParseError("ReqIF hierarchy cycle detected.")
     node = ReqIFHierarchyNode(object_ref=object_ref or "")
+    next_ancestors = ancestor_refs | ({object_ref} if object_ref else set())
     children = _first_child(hier, "CHILDREN")
     if children is not None:
         for child in children:
             if _local(child.tag) == "spec-hierarchy":
-                built = _build_hierarchy(child)
+                built = _build_hierarchy(
+                    child,
+                    depth=depth + 1,
+                    ancestor_refs=frozenset(next_ancestors),
+                )
                 if built is not None:
                     node.children.append(built)
     if not node.object_ref and not node.children:

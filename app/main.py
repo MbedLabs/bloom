@@ -38,6 +38,7 @@ from app.api import (
     requirements,
     risks,
     search,
+    service_credentials,
     test_cases,
     test_concepts,
     test_suites,
@@ -62,10 +63,8 @@ from app.models import (
     DesignItem,
     Document,
     Project,
-    Requirement,
     RiskItem,
     TestCampaign,
-    TestCase,
     TestConcept,
     TestSuite,
 )
@@ -253,7 +252,6 @@ async def normalize_non_document_public_ids() -> None:
         projects = (await session.execute(select(Project).order_by(Project.id))).scalars().all()
         for project in projects:
             for model, col_name, type_code, _label in TABLE_REPAIRS:
-                id_col = getattr(model, col_name)
                 rows = (
                     (await session.execute(select(model).where(model.project_id == project.id)))
                     .scalars()
@@ -343,6 +341,11 @@ app.add_middleware(
 app.include_router(health.router, prefix="/api", tags=["Health"])
 app.include_router(metrics_router, prefix="/api", tags=["Observability"])
 app.include_router(auth_api.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(
+    service_credentials.router,
+    prefix="/api/service-credentials",
+    tags=["Service Credentials"],
+)
 app.include_router(users_api.router, prefix="/api/users", tags=["Users"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])

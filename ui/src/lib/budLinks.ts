@@ -20,10 +20,6 @@ export function getBudAppBaseUrl(): string {
   return normalizeBudAppBaseUrl(rawBudUrl())
 }
 
-export function getBudApiBaseUrl(): string {
-  return normalizeBudAppBaseUrl(rawBudUrl())
-}
-
 export function buildBudRunUrl(runId: number | string, baseUrl = getBudAppBaseUrl()): string {
   return `${normalizeBudAppBaseUrl(baseUrl)}/runs/${runId}`
 }

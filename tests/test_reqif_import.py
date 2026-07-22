@@ -211,9 +211,15 @@ from app.models.user import User, UserRole  # noqa: E402
 class _FakeUpload:
     def __init__(self, data: bytes):
         self._data = data
+        self._offset = 0
 
-    async def read(self) -> bytes:
-        return self._data
+    async def read(self, size: int = -1) -> bytes:
+        if self._offset >= len(self._data):
+            return b""
+        end = len(self._data) if size < 0 else self._offset + size
+        chunk = self._data[self._offset : end]
+        self._offset += len(chunk)
+        return chunk
 
 
 @pytest_asyncio.fixture

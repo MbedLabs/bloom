@@ -41,7 +41,7 @@ export function StatusBadge({ status }: { status: string }) {
   )
 }
 
-export function PriorityBadge({ priority }: { priority: string | null | undefined }) {
+function PriorityBadge({ priority }: { priority: string | null | undefined }) {
   if (!priority) return null
   return (
     <span className={`px-2 py-1 rounded-full text-xs font-medium ${PRIORITY_COLORS[priority] || 'bg-muted text-muted-foreground'}`}>
@@ -50,7 +50,7 @@ export function PriorityBadge({ priority }: { priority: string | null | undefine
   )
 }
 
-export function DocTypeBadge({ docType }: { docType: DocType }) {
+function DocTypeBadge({ docType }: { docType: DocType }) {
   const label = DOC_TYPE_LABELS[docType] || docType
   const color = DOC_TYPE_COLORS[docType] || 'bg-muted text-muted-foreground'
   return (

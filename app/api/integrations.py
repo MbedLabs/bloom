@@ -2,20 +2,27 @@
 
 import hashlib
 import hmac
+import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.artefact_utils import log_artefact_activity
 from app.core.database import get_db
 from app.core.security import get_current_user, require_project_access, require_role
-from app.models import Defect, DefectSyncEvent, IntegrationSetting, Project
+from app.models import (
+    Defect,
+    DefectSyncEvent,
+    IntegrationSetting,
+    Project,
+    WebhookDelivery,
+)
 from app.models.user import User, UserRole
 
 logger = logging.getLogger(__name__)
@@ -240,6 +247,81 @@ async def list_sync_events(
 # ==================== GitHub webhook ====================
 
 GITHUB_STATUS_MAP = {"open": "Open", "closed": "Closed"}
+MAX_WEBHOOK_BODY_BYTES = 1024 * 1024
+MAX_WEBHOOKS_PER_15_MINUTES = 60
+
+
+async def _read_webhook_body(request: Request) -> bytes:
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > MAX_WEBHOOK_BODY_BYTES:
+            raise HTTPException(status_code=413, detail="Webhook body exceeds the 1 MiB limit.")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def _json_payload(body: bytes) -> dict:
+    try:
+        payload = json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise HTTPException(status_code=400, detail="Invalid webhook JSON.") from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Invalid webhook JSON.")
+    return payload
+
+
+async def _reserve_webhook_delivery(
+    db: AsyncSession,
+    setting: IntegrationSetting,
+    tracker: str,
+    delivery_id: str,
+) -> bool:
+    if len(delivery_id) > 255:
+        raise HTTPException(status_code=400, detail="Invalid webhook delivery id.")
+    if db.bind is not None and db.bind.dialect.name == "postgresql":
+        lock_key = int.from_bytes(
+            hashlib.sha256(f"webhook:{setting.id}".encode()).digest()[:8],
+            "big",
+            signed=True,
+        )
+        await db.execute(select(func.pg_advisory_xact_lock(lock_key)))
+    window = datetime.utcnow() - timedelta(minutes=15)
+    count = await db.scalar(
+        select(func.count(WebhookDelivery.id)).where(
+            WebhookDelivery.integration_setting_id == setting.id,
+            WebhookDelivery.received_at >= window,
+        )
+    )
+    if (count or 0) >= MAX_WEBHOOKS_PER_15_MINUTES:
+        raise HTTPException(
+            status_code=429,
+            detail="Webhook rate limit exceeded.",
+            headers={"Retry-After": "900"},
+        )
+    existing = await db.scalar(
+        select(WebhookDelivery.id).where(
+            WebhookDelivery.tracker == tracker,
+            WebhookDelivery.delivery_id == delivery_id,
+        )
+    )
+    if existing is not None:
+        return False
+    db.add(
+        WebhookDelivery(
+            integration_setting_id=setting.id,
+            tracker=tracker,
+            delivery_id=delivery_id,
+            received_at=datetime.utcnow(),
+        )
+    )
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        return False
+    return True
 
 
 def _verify_github_signature(body: bytes, secret: str, signature: str) -> bool:
@@ -255,8 +337,8 @@ async def github_webhook(
     x_github_event: Optional[str] = Header(None),
     x_github_delivery: Optional[str] = Header(None),
 ):
-    body = await request.body()
-    payload = await request.json()
+    body = await _read_webhook_body(request)
+    payload = _json_payload(body)
 
     if x_github_event != "issues":
         return {"status": "ignored", "reason": "not an issues event"}
@@ -282,7 +364,7 @@ async def github_webhook(
     ).scalar_one_or_none()
 
     if not defect:
-        return {"status": "ignored", "reason": "no matching defect"}
+        raise HTTPException(status_code=404, detail="No matching webhook target.")
 
     # When a webhook secret is configured, a valid signature is REQUIRED —
     # a missing header must reject, otherwise omitting it bypasses auth.
@@ -294,32 +376,26 @@ async def github_webhook(
             )
         )
     ).scalar_one_or_none()
-    if setting and setting.webhook_secret:
-        if not x_hub_signature_256 or not _verify_github_signature(
-            body, setting.webhook_secret, x_hub_signature_256
-        ):
-            _log_sync_event(
-                db,
-                defect.id,
-                "inbound",
-                "github",
-                "signature_failed",
-                success=False,
-                error="Missing or invalid HMAC signature",
-            )
-            await db.flush()
-            raise HTTPException(status_code=403, detail="Invalid signature")
-
-    if x_github_delivery:
-        existing_event = (
-            await db.execute(
-                select(DefectSyncEvent).where(
-                    DefectSyncEvent.external_event_id == x_github_delivery,
-                )
-            )
-        ).scalar_one_or_none()
-        if existing_event:
-            return {"status": "duplicate", "delivery": x_github_delivery}
+    if not setting or not setting.enabled or not setting.webhook_secret:
+        raise HTTPException(status_code=403, detail="Webhook is not securely configured.")
+    if not x_hub_signature_256 or not _verify_github_signature(
+        body, setting.webhook_secret, x_hub_signature_256
+    ):
+        _log_sync_event(
+            db,
+            defect.id,
+            "inbound",
+            "github",
+            "signature_failed",
+            success=False,
+            error="Missing or invalid HMAC signature",
+        )
+        await db.flush()
+        raise HTTPException(status_code=403, detail="Invalid signature")
+    if not x_github_delivery:
+        raise HTTPException(status_code=400, detail="Missing GitHub delivery id.")
+    if not await _reserve_webhook_delivery(db, setting, "github", x_github_delivery):
+        return {"status": "duplicate", "delivery": x_github_delivery}
 
     old_state = defect.external_issue_state
     defect.external_issue_state = issue_state
@@ -364,7 +440,8 @@ async def gitlab_webhook(
     x_gitlab_event: Optional[str] = Header(None),
     x_gitlab_event_uuid: Optional[str] = Header(None),
 ):
-    payload = await request.json()
+    body = await _read_webhook_body(request)
+    payload = _json_payload(body)
 
     if x_gitlab_event != "Issue Hook":
         return {"status": "ignored", "reason": "not an Issue Hook event"}
@@ -390,7 +467,7 @@ async def gitlab_webhook(
     ).scalar_one_or_none()
 
     if not defect:
-        return {"status": "ignored", "reason": "no matching defect"}
+        raise HTTPException(status_code=404, detail="No matching webhook target.")
 
     # When a webhook secret is configured, a valid token is REQUIRED —
     # a missing header must reject, otherwise omitting it bypasses auth.
@@ -402,30 +479,24 @@ async def gitlab_webhook(
             )
         )
     ).scalar_one_or_none()
-    if setting and setting.webhook_secret:
-        if not x_gitlab_token or not _verify_gitlab_token(setting.webhook_secret, x_gitlab_token):
-            _log_sync_event(
-                db,
-                defect.id,
-                "inbound",
-                "gitlab",
-                "token_failed",
-                success=False,
-                error="Missing or invalid GitLab token",
-            )
-            await db.flush()
-            raise HTTPException(status_code=403, detail="Invalid token")
-
-    if x_gitlab_event_uuid:
-        existing_event = (
-            await db.execute(
-                select(DefectSyncEvent).where(
-                    DefectSyncEvent.external_event_id == x_gitlab_event_uuid,
-                )
-            )
-        ).scalar_one_or_none()
-        if existing_event:
-            return {"status": "duplicate", "uuid": x_gitlab_event_uuid}
+    if not setting or not setting.enabled or not setting.webhook_secret:
+        raise HTTPException(status_code=403, detail="Webhook is not securely configured.")
+    if not x_gitlab_token or not _verify_gitlab_token(setting.webhook_secret, x_gitlab_token):
+        _log_sync_event(
+            db,
+            defect.id,
+            "inbound",
+            "gitlab",
+            "token_failed",
+            success=False,
+            error="Missing or invalid GitLab token",
+        )
+        await db.flush()
+        raise HTTPException(status_code=403, detail="Invalid token")
+    if not x_gitlab_event_uuid:
+        raise HTTPException(status_code=400, detail="Missing GitLab event UUID.")
+    if not await _reserve_webhook_delivery(db, setting, "gitlab", x_gitlab_event_uuid):
+        return {"status": "duplicate", "uuid": x_gitlab_event_uuid}
 
     old_state = defect.external_issue_state
     defect.external_issue_state = issue_state

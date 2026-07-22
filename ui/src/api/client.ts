@@ -5,7 +5,7 @@ import packageJson from '../../package.json'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api'
 
-export const api = axios.create({
+const api = axios.create({
   baseURL: API_URL,
   // Send the httpOnly refresh cookie on same-origin auth calls.
   withCredentials: true,
@@ -189,9 +189,42 @@ export const authApi = {
     const response = await api.post<GenericMessageResponse>('/auth/reset-password', { token, new_password: newPassword })
     return response.data
   },
-  generateToken: async (): Promise<{ access_token: string }> => {
-    const response = await api.post<{ access_token: string }>('/auth/token/generate')
+}
+
+export interface ServiceCredential {
+  id: number
+  name: string
+  token_prefix: string
+  scope: 'test-results:write'
+  expires_at: string
+  revoked_at: string | null
+  last_used_at: string | null
+  created_at: string
+}
+
+export interface CreatedServiceCredential extends ServiceCredential {
+  token: string
+}
+
+export const serviceCredentialsApi = {
+  list: async (): Promise<ServiceCredential[]> => {
+    const response = await api.get<ServiceCredential[]>('/service-credentials')
     return response.data
+  },
+  create: async (): Promise<CreatedServiceCredential> => {
+    const response = await api.post<CreatedServiceCredential>('/service-credentials', {
+      name: 'Bud result sync',
+      scope: 'test-results:write',
+      expires_in_days: 90,
+    })
+    return response.data
+  },
+  rotate: async (id: number): Promise<CreatedServiceCredential> => {
+    const response = await api.post<CreatedServiceCredential>(`/service-credentials/${id}/rotate`)
+    return response.data
+  },
+  revoke: async (id: number): Promise<void> => {
+    await api.delete(`/service-credentials/${id}`)
   },
 }
 

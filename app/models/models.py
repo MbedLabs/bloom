@@ -2,7 +2,7 @@
 Database models for the requirements management application.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 
@@ -11,10 +11,12 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -659,6 +661,40 @@ class DefectSyncEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class WebhookDelivery(Base):
+    """Authenticated delivery ledger for replay and rolling-rate protection."""
+
+    __tablename__ = "webhook_deliveries"
+    __table_args__ = (
+        UniqueConstraint("tracker", "delivery_id", name="uq_webhook_tracker_delivery"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    integration_setting_id: Mapped[int] = mapped_column(
+        ForeignKey("integration_settings.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    tracker: Mapped[str] = mapped_column(String(20), nullable=False)
+    delivery_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    received_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class ServiceCredential(Base):
+    """Opaque, hashed, single-purpose machine credential."""
+
+    __tablename__ = "service_credentials"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    token_prefix: Mapped[str] = mapped_column(String(24), unique=True, nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    scope: Mapped[str] = mapped_column(String(64), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+
+
 class ArtefactComment(Base):
     __tablename__ = "artefact_comments"
 
@@ -697,3 +733,28 @@ class Notification(Base):
     link_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     read_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class ImportAttempt(Base):
+    """Persistent ReqIF import lease and rolling rate-limit record."""
+
+    __tablename__ = "import_attempts"
+    __table_args__ = (
+        Index(
+            "uq_import_attempts_active_project",
+            "project_id",
+            unique=True,
+            postgresql_where=text("status = 'active'"),
+            sqlite_where=text("status = 'active'"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
