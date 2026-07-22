@@ -36,7 +36,7 @@ import { docsApi, linksApi } from '../api/client'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import { fetchAllTopologyDocs } from '../lib/projectTopology'
 import { DOC_TYPE_LABELS, type DocType } from '../types/doc'
-import TopologyLinkEdge, { type TopologyLinkData } from './TopologyLinkEdge'
+import TopologyLinkEdge, { type RoleEntry, type TopologyLinkData } from './TopologyLinkEdge'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Type-level visual config
@@ -304,13 +304,6 @@ function FitViewOnLayout({ layoutToken }: { layoutToken: number }) {
 // ────────────────────────────────────────────────────────────────────────────
 // Aggregation – one edge per directional (source, target) pair
 // ────────────────────────────────────────────────────────────────────────────
-
-interface RoleEntry {
-  role: string
-  displayLabel: string
-  count: number
-  suspectCount: number
-}
 
 interface AggregatedEdge {
   id: string

@@ -23,25 +23,6 @@ export interface DocLinkOption {
   displayDirection: 'incoming' | 'outgoing'
 }
 
-export interface DocShell {
-  id: number
-  doc_id: string
-  doc_type: DocType
-  project_id: number
-  title: string
-  description: string | null
-  content_json: Record<string, unknown> | null
-  content_html: string | null
-  status: string
-  priority: string | null
-  assigned_to: number | null
-  reviewer_id: number | null
-  source_ref: string | null
-  source_project_id: number | null
-  created_at: string
-  updated_at: string
-}
-
 export interface DocConfig {
   label: string
   typeCode: string
@@ -54,7 +35,7 @@ export interface DocConfig {
   fields: DocFieldConfig[]
 }
 
-export interface DocFieldConfig {
+interface DocFieldConfig {
   key: string
   label: string
   type: 'text' | 'textarea' | 'select' | 'number' | 'user'

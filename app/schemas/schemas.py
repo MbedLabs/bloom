@@ -84,6 +84,7 @@ class ProjectResponse(BaseModel):
     updated_at: datetime
     requirement_count: int = 0
     test_case_count: int = 0
+    campaign_count: int = 0
     design_count: int = 0
     risk_count: int = 0
     change_count: int = 0

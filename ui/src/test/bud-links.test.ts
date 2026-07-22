@@ -26,4 +26,11 @@ describe('Bud link helpers', () => {
 
     expect(getBudAppBaseUrl()).toBe('https://runtime-bud.example')
   })
+
+  it('does not invent a Bud URL when Bloom is standalone', () => {
+    vi.stubGlobal('window', { runtimeConfig: {} })
+
+    expect(getBudAppBaseUrl()).toBeNull()
+    expect(buildBudRunUrl(42)).toBeNull()
+  })
 })

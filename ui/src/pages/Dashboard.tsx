@@ -15,7 +15,7 @@ import {
 import { dashboardApi, projectsApi, type Project } from '../api/client'
 import { DOC_TYPE_COLORS, DOC_TYPE_LABELS, type DocType } from '../types/doc'
 
-const CONTROLLED_DOC_TYPES: DocType[] = ['REQ', 'SPEC', 'TC', 'CPT', 'PRT', 'DES', 'RSK', 'CHG', 'RPT', 'STD']
+const CONTROLLED_DOC_TYPES: DocType[] = ['REQ', 'SPEC', 'TC', 'CPT', 'PRT', 'DES', 'RSK', 'CHG', 'RPT', 'STD', 'CMP']
 
 export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -54,7 +54,12 @@ export default function Dashboard() {
   }
 
   const portfolioProjects = projects ?? []
-  const fallbackKindCounts = buildFallbackKindCounts(portfolioProjects, s.total_requirements, s.total_test_cases)
+  const fallbackKindCounts = buildFallbackKindCounts(
+    portfolioProjects,
+    s.total_requirements,
+    s.total_test_cases,
+    s.total_campaigns,
+  )
   const kindCounts = fallbackKindCounts
   const statusDistribution = mergeDistributions(s.requirement_status_distribution, s.test_case_status_distribution)
   const totalControlledDocs = sumKindCounts(kindCounts)
@@ -461,6 +466,7 @@ function countProjectFallbackKinds(project: Project): Record<DocType, number> {
   const counts = emptyKindCounts()
   counts.REQ = coerceCount(project.requirement_count)
   counts.TC = coerceCount(project.test_case_count)
+  counts.CMP = coerceCount(project.campaign_count)
   counts.DES = coerceCount(project.design_count)
   counts.RSK = coerceCount(project.risk_count)
   counts.CHG = coerceCount(project.change_count)
@@ -468,10 +474,16 @@ function countProjectFallbackKinds(project: Project): Record<DocType, number> {
   return counts
 }
 
-function buildFallbackKindCounts(projects: Project[], requirementTotal: number, testCaseTotal: number): Record<DocType, number> {
+function buildFallbackKindCounts(
+  projects: Project[],
+  requirementTotal: number,
+  testCaseTotal: number,
+  campaignTotal: number,
+): Record<DocType, number> {
   const counts = emptyKindCounts()
   counts.REQ = coerceCount(requirementTotal)
   counts.TC = coerceCount(testCaseTotal)
+  counts.CMP = coerceCount(campaignTotal)
   projects.forEach((project) => {
     counts.DES += coerceCount(project.design_count)
     counts.RSK += coerceCount(project.risk_count)

@@ -19,6 +19,7 @@ from app.models import (
     TestCampaignItem,
     TestCase,
 )
+from app.models.project_membership import ProjectExternalDocType
 from app.models.user import User, UserRole
 
 OPEN_DEFECT_STATUSES = ("Open", "Triaged", "In Progress", "Resolved", "Verified")
@@ -52,6 +53,7 @@ async def get_dashboard_stats(
         return cached
 
     accessible_project_ids = None
+    allowed_project_ids_by_doc_type: dict[str, set[int]] = {}
     if current_user.role != UserRole.admin:
         membership_result = await db.execute(
             select(ProjectMembership.project_id).where(ProjectMembership.user_id == current_user.id)
@@ -78,14 +80,31 @@ async def get_dashboard_stats(
             }
             dashboard_stats_cache.set(cache_key, payload)
             return payload
+        if current_user.role == UserRole.external:
+            allowed_rows = await db.execute(
+                select(ProjectMembership.project_id, ProjectExternalDocType.doc_type)
+                .join(
+                    ProjectExternalDocType,
+                    ProjectExternalDocType.membership_id == ProjectMembership.id,
+                )
+                .where(ProjectMembership.user_id == current_user.id)
+            )
+            for project_id, doc_type in allowed_rows:
+                allowed_project_ids_by_doc_type.setdefault(doc_type, set()).add(project_id)
 
     def _restrict(query, model, *, project_field: str = "project_id"):
         if accessible_project_ids is None:
             return query
         return query.where(getattr(model, project_field).in_(accessible_project_ids))
 
-    def _restrict_visible(query, model, *, project_field: str = "project_id"):
+    def _restrict_visible(query, model, doc_type: str, *, project_field: str = "project_id"):
         query = _restrict(query, model, project_field=project_field)
+        if current_user.role == UserRole.external:
+            query = query.where(
+                getattr(model, project_field).in_(
+                    allowed_project_ids_by_doc_type.get(doc_type, set())
+                )
+            )
         return apply_external_visibility_filter(query, model, current_user)
 
     total_projects = await db.scalar(
@@ -99,14 +118,17 @@ async def get_dashboard_stats(
         )
     )
     total_requirements = await db.scalar(
-        _restrict_visible(select(func.count(Requirement.id)), Requirement)
+        _restrict_visible(select(func.count(Requirement.id)), Requirement, "REQ")
     )
-    total_test_cases = await db.scalar(_restrict_visible(select(func.count(TestCase.id)), TestCase))
+    total_test_cases = await db.scalar(
+        _restrict_visible(select(func.count(TestCase.id)), TestCase, "TC")
+    )
 
     req_status_result = await db.execute(
         _restrict_visible(
             select(Requirement.status, func.count(Requirement.id)).group_by(Requirement.status),
             Requirement,
+            "REQ",
         )
     )
     req_status_dist = {
@@ -115,7 +137,9 @@ async def get_dashboard_stats(
 
     tc_status_result = await db.execute(
         _restrict_visible(
-            select(TestCase.status, func.count(TestCase.id)).group_by(TestCase.status), TestCase
+            select(TestCase.status, func.count(TestCase.id)).group_by(TestCase.status),
+            TestCase,
+            "TC",
         )
     )
     tc_status_dist = {
@@ -132,11 +156,15 @@ async def get_dashboard_stats(
             ArtefactLink.role == "verifies",
         )
     )
-    covered_req_ids = _restrict_visible(covered_req_ids, TestCase).where(
+    covered_req_ids = _restrict_visible(covered_req_ids, TestCase, "TC").where(
         Requirement.project_id.in_(accessible_project_ids)
         if accessible_project_ids is not None
         else True
     )
+    if current_user.role == UserRole.external:
+        covered_req_ids = covered_req_ids.where(
+            Requirement.project_id.in_(allowed_project_ids_by_doc_type.get("REQ", set()))
+        )
     covered_req_ids = apply_external_visibility_filter(covered_req_ids, Requirement, current_user)
     covered_reqs = await db.scalar(
         select(func.count(func.distinct(covered_req_ids.subquery().c.target_id)))
@@ -151,16 +179,18 @@ async def get_dashboard_stats(
                 )
             ),
             Requirement,
+            "REQ",
         )
     )
 
     total_campaigns = await db.scalar(
-        _restrict_visible(select(func.count(TestCampaign.id)), TestCampaign)
+        _restrict_visible(select(func.count(TestCampaign.id)), TestCampaign, "CMP")
     )
     active_campaigns = await db.scalar(
         _restrict_visible(
             select(func.count(TestCampaign.id)).where(TestCampaign.status == "In Progress"),
             TestCampaign,
+            "CMP",
         )
     )
 
@@ -174,16 +204,22 @@ async def get_dashboard_stats(
         campaign_item_query = campaign_item_query.where(
             TestCampaign.project_id.in_(accessible_project_ids)
         )
+    if current_user.role == UserRole.external:
+        campaign_item_query = campaign_item_query.where(
+            TestCampaign.project_id.in_(allowed_project_ids_by_doc_type.get("CMP", set()))
+        )
     campaign_item_query = apply_external_visibility_filter(
         campaign_item_query, TestCampaign, current_user
     )
     campaign_item_result = await db.execute(campaign_item_query)
     campaign_result_dist = {row[0]: row[1] for row in campaign_item_result}
 
-    total_defects = await db.scalar(_restrict_visible(select(func.count(Defect.id)), Defect))
+    total_defects = await db.scalar(_restrict_visible(select(func.count(Defect.id)), Defect, "DEF"))
     open_defects = await db.scalar(
         _restrict_visible(
-            select(func.count(Defect.id)).where(Defect.status.in_(OPEN_DEFECT_STATUSES)), Defect
+            select(func.count(Defect.id)).where(Defect.status.in_(OPEN_DEFECT_STATUSES)),
+            Defect,
+            "DEF",
         )
     )
     defect_severity_result = await db.execute(
@@ -192,37 +228,41 @@ async def get_dashboard_stats(
             .where(Defect.status.in_(OPEN_DEFECT_STATUSES))
             .group_by(Defect.severity),
             Defect,
+            "DEF",
         )
     )
     defect_severity_dist = {row[0]: row[1] for row in defect_severity_result}
     defect_status_result = await db.execute(
         _restrict_visible(
-            select(Defect.status, func.count(Defect.id)).group_by(Defect.status), Defect
+            select(Defect.status, func.count(Defect.id)).group_by(Defect.status),
+            Defect,
+            "DEF",
         )
     )
     defect_status_dist = {row[0]: row[1] for row in defect_status_result}
 
-    project_query = (
-        select(
-            Project.id,
-            Project.name,
-            Project.prefix,
-            Project.status,
-            func.count(func.distinct(Requirement.id)).label("req_count"),
-            func.count(func.distinct(TestCase.id)).label("tc_count"),
-        )
-        .outerjoin(Requirement, Requirement.project_id == Project.id)
-        .outerjoin(TestCase, TestCase.project_id == Project.id)
-    )
+    req_count_query = select(func.count(Requirement.id)).where(Requirement.project_id == Project.id)
+    tc_count_query = select(func.count(TestCase.id)).where(TestCase.project_id == Project.id)
     if current_user.role == UserRole.external:
-        project_query = project_query.where(
-            Requirement.visibility.in_(("customer", None)) | Requirement.id.is_(None)
-        ).where(TestCase.visibility.in_(("customer", None)) | TestCase.id.is_(None))
+        req_count_query = req_count_query.where(
+            Project.id.in_(allowed_project_ids_by_doc_type.get("REQ", set())),
+            Requirement.visibility == "customer",
+        )
+        tc_count_query = tc_count_query.where(
+            Project.id.in_(allowed_project_ids_by_doc_type.get("TC", set())),
+            TestCase.visibility == "customer",
+        )
+    project_query = select(
+        Project.id,
+        Project.name,
+        Project.prefix,
+        Project.status,
+        req_count_query.scalar_subquery().label("req_count"),
+        tc_count_query.scalar_subquery().label("tc_count"),
+    )
     if accessible_project_ids is not None:
         project_query = project_query.where(Project.id.in_(accessible_project_ids))
-    project_stats_result = await db.execute(
-        project_query.group_by(Project.id).order_by(Project.created_at.desc())
-    )
+    project_stats_result = await db.execute(project_query.order_by(Project.created_at.desc()))
     project_rows = project_stats_result.all()
 
     uncovered_by_project_result = await db.execute(
@@ -231,6 +271,7 @@ async def get_dashboard_stats(
             .where(~Requirement.id.in_(covered_req_ids))
             .group_by(Requirement.project_id),
             Requirement,
+            "REQ",
         )
     )
     uncovered_by_project = {row[0]: row[1] for row in uncovered_by_project_result}
