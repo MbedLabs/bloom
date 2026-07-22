@@ -138,7 +138,7 @@ async def _count_links(
         select(
             ArtefactLink.target_id,
             func.count().label("cnt"),
-            func.sum(case((ArtefactLink.suspect == True, 1), else_=0)).label("suspect_cnt"),
+            func.sum(case((ArtefactLink.suspect.is_(True), 1), else_=0)).label("suspect_cnt"),
         )
         .where(
             ArtefactLink.project_id == project_id,
@@ -151,7 +151,7 @@ async def _count_links(
         select(
             ArtefactLink.source_id,
             func.count().label("cnt"),
-            func.sum(case((ArtefactLink.suspect == True, 1), else_=0)).label("suspect_cnt"),
+            func.sum(case((ArtefactLink.suspect.is_(True), 1), else_=0)).label("suspect_cnt"),
         )
         .where(
             ArtefactLink.project_id == project_id,

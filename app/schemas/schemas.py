@@ -24,8 +24,6 @@ class PaginatedResponse(BaseModel, Generic[T]):
     limit: int
 
 
-from app.core.id_generator import normalize_doc_id
-
 # ==================== Project Schemas ====================
 
 PROJECT_PREFIX_PATTERN = re.compile(r"^[A-Z]{3}$")
@@ -1154,7 +1152,7 @@ ImpactNode.model_rebuild()
 
 
 class AutomatedResult(BaseModel):
-    tc_id: str  # e.g., "PRJ-TC-001"
+    tc_id: str = Field(min_length=1, max_length=100)  # e.g., "PRJ-TC-001"
     status: str  # "Passed", "Failed", "Skipped"
     comment: Optional[str] = None
     executed_at: Optional[datetime] = None
@@ -1162,7 +1160,7 @@ class AutomatedResult(BaseModel):
 
 
 class SyncResultsRequest(BaseModel):
-    results: List[AutomatedResult]
+    results: List[AutomatedResult] = Field(min_length=1, max_length=1000)
 
 
 class SyncResultsResponse(BaseModel):

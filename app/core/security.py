@@ -2,7 +2,7 @@
 Security utilities: password hashing, JWT token creation/verification, auth dependencies.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import Depends, HTTPException, status
@@ -53,24 +53,19 @@ async def get_current_user(
     )
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: Optional[int] = payload.get("sub")
+        if payload.get("type") != "user":
+            raise credentials_exception
+        user_id = payload.get("sub")
         if user_id is None:
             raise credentials_exception
-    except JWTError:
+        entity_id = int(user_id)
+    except (JWTError, TypeError, ValueError):
         raise credentials_exception
 
-    result = await db.execute(select(User).where(User.id == int(user_id)))
+    result = await db.execute(select(User).where(User.id == entity_id))
     user = result.scalar_one_or_none()
     if user is None:
         raise credentials_exception
-
-    # Verify JTI if this is an API token
-    if payload.get("type") == "api_token":
-        if user.api_token_jti != payload.get("jti"):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="API token has been invalidated",
-            )
 
     if not user.is_active:
         raise HTTPException(

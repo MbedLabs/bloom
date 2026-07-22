@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     SECRET_KEY: str = Field(
         default="", validation_alias=AliasChoices("BLOOM_SECRET_KEY", "SECRET_KEY")
     )
+    SERVICE_TOKEN_PEPPER: str = Field(
+        default="",
+        validation_alias=AliasChoices("BLOOM_SERVICE_TOKEN_PEPPER", "SERVICE_TOKEN_PEPPER"),
+    )
     # Short-lived access token: kept small because a rotating refresh-token
     # cookie (below) silently renews it. A leaked access token is now valid for
     # minutes, not a week.
@@ -130,6 +134,77 @@ class Settings(BaseSettings):
     AUTO_SEED_ADMIN: bool | None = Field(
         default=None,
         validation_alias=AliasChoices("BLOOM_AUTO_SEED_ADMIN", "AUTO_SEED_ADMIN"),
+    )
+
+    # ReqIF/ReqIFZ public-beta resource policy. Request/member ceilings are
+    # intentionally bounded at 25 MiB and cannot be relaxed by deployment config.
+    REQIF_MAX_REQUEST_BYTES: int = Field(
+        default=25 * 1024 * 1024,
+        ge=1,
+        validation_alias=AliasChoices("BLOOM_REQIF_MAX_REQUEST_BYTES", "REQIF_MAX_REQUEST_BYTES"),
+    )
+    REQIF_MAX_MEMBER_BYTES: int = Field(
+        default=25 * 1024 * 1024,
+        ge=1,
+        validation_alias=AliasChoices("BLOOM_REQIF_MAX_MEMBER_BYTES", "REQIF_MAX_MEMBER_BYTES"),
+    )
+    REQIF_MAX_ARCHIVE_ENTRIES: int = Field(
+        default=100,
+        ge=1,
+        le=100,
+        validation_alias=AliasChoices(
+            "BLOOM_REQIF_MAX_ARCHIVE_ENTRIES", "REQIF_MAX_ARCHIVE_ENTRIES"
+        ),
+    )
+    REQIF_MAX_COMPRESSION_RATIO: int = Field(
+        default=20,
+        ge=1,
+        le=20,
+        validation_alias=AliasChoices(
+            "BLOOM_REQIF_MAX_COMPRESSION_RATIO", "REQIF_MAX_COMPRESSION_RATIO"
+        ),
+    )
+    REQIF_MAX_OBJECTS: int = Field(
+        default=999,
+        ge=1,
+        le=999,
+        validation_alias=AliasChoices("BLOOM_REQIF_MAX_OBJECTS", "REQIF_MAX_OBJECTS"),
+    )
+    REQIF_MAX_RELATIONS: int = Field(
+        default=10_000,
+        ge=1,
+        le=10_000,
+        validation_alias=AliasChoices("BLOOM_REQIF_MAX_RELATIONS", "REQIF_MAX_RELATIONS"),
+    )
+    REQIF_MAX_HIERARCHY_DEPTH: int = Field(
+        default=100,
+        ge=1,
+        le=100,
+        validation_alias=AliasChoices(
+            "BLOOM_REQIF_MAX_HIERARCHY_DEPTH", "REQIF_MAX_HIERARCHY_DEPTH"
+        ),
+    )
+    REQIF_PROCESSING_TIMEOUT_SECONDS: int = Field(
+        default=60,
+        ge=1,
+        le=60,
+        validation_alias=AliasChoices(
+            "BLOOM_REQIF_PROCESSING_TIMEOUT_SECONDS",
+            "REQIF_PROCESSING_TIMEOUT_SECONDS",
+        ),
+    )
+    REQIF_IMPORTS_PER_15_MINUTES: int = Field(
+        default=5,
+        ge=1,
+        validation_alias=AliasChoices(
+            "BLOOM_REQIF_IMPORTS_PER_15_MINUTES", "REQIF_IMPORTS_PER_15_MINUTES"
+        ),
+    )
+    REQIF_STREAM_CHUNK_BYTES: int = Field(
+        default=1024 * 1024,
+        ge=64 * 1024,
+        le=4 * 1024 * 1024,
+        validation_alias=AliasChoices("BLOOM_REQIF_STREAM_CHUNK_BYTES", "REQIF_STREAM_CHUNK_BYTES"),
     )
 
     ADMIN_EMAIL: str = Field(
@@ -221,6 +296,13 @@ class Settings(BaseSettings):
             self.LOG_JSON = self.BLOOM_ENV.lower() == "production"
         if self.AUTH_COOKIE_SECURE is None:
             self.AUTH_COOKIE_SECURE = self.BLOOM_ENV.lower() == "production"
+        return self
+
+    @model_validator(mode="after")
+    def validate_reqif_public_beta_ceiling(self):
+        ceiling = 25 * 1024 * 1024
+        if self.REQIF_MAX_REQUEST_BYTES > ceiling or self.REQIF_MAX_MEMBER_BYTES > ceiling:
+            raise ValueError("ReqIF request/member limits must not exceed the 25 MiB ceiling.")
         return self
 
     @model_validator(mode="after")

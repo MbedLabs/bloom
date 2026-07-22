@@ -7,8 +7,6 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from app.models.user import UserRole
-
 # ── Doc types exposed to external visibility configuration ──────────────
 # Mirrors the UI DocType union in ui/src/types/doc.ts
 EXTERNAL_DOC_TYPES = {

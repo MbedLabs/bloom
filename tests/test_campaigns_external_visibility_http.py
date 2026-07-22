@@ -9,6 +9,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
 from app.core.security import get_current_user, get_password_hash
+from app.core.service_auth import require_bud_sync_token
 from app.main import app
 from app.models import (
     CampaignSuite,
@@ -80,6 +81,11 @@ def _build_harness():
     asyncio.run(_create_schema())
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_current_user] = _override_get_current_user
+
+    async def _override_service_credential():
+        return object()
+
+    app.dependency_overrides[require_bud_sync_token] = _override_service_credential
 
     client = TestClient(app, base_url="http://test")
     return (

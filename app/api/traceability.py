@@ -4,6 +4,7 @@ Cross-requirement relationships use POST /api/links (ArtefactLink).
 """
 
 import re
+from collections import defaultdict
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -24,7 +25,7 @@ from app.core.security import (
     get_current_user,
     require_project_access,
 )
-from app.models import Requirement, TestCase, TestRunLink
+from app.models import ArtefactLink, Requirement, TestCase, TestRunLink
 from app.models.user import User
 from app.schemas import (
     CoverageGap,
@@ -42,11 +43,6 @@ router = APIRouter()
 
 def _req_id_sort_key(req_id: str) -> list:
     return [int(part) if part.isdigit() else part.casefold() for part in re.split(r"(\d+)", req_id)]
-
-
-from collections import defaultdict
-
-from app.models import ArtefactLink
 
 
 class TraceabilityContext:

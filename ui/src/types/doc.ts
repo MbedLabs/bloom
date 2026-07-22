@@ -430,23 +430,6 @@ export const DOC_LINK_ROLE_LABELS: Record<DocLinkRole, [string, string]> = {
   contains: ['contains', 'contained by'],
 }
 
-export const DOC_LINK_ROLE_COLORS: Record<DocLinkRole, string> = {
-  derives_from: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400',
-  refines: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
-  satisfies: 'bg-green-500/10 text-green-700 dark:text-green-400',
-  implements: 'bg-violet-500/10 text-violet-700 dark:text-violet-400',
-  verifies: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-  mitigates: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-  depends_on: 'bg-orange-500/10 text-orange-700 dark:text-orange-400',
-  impacts: 'bg-red-500/10 text-red-700 dark:text-red-400',
-  blocks: 'bg-rose-500/10 text-rose-700 dark:text-rose-400',
-  duplicates: 'bg-gray-500/10 text-gray-700 dark:text-gray-400',
-  references: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
-  relates_to: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
-  covers: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
-  contains: 'bg-violet-500/10 text-violet-700 dark:text-violet-400',
-}
-
 export function docUrl(prefix: string | undefined, docType: DocType, docId: string | number): string {
   const slug = DOC_TYPE_SLUGS[docType]
   return `/projects/${prefix}/docs/${slug}/${docId}`

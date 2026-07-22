@@ -1,6 +1,5 @@
 """Tests for the global search endpoint (app/api/search.py)."""
 
-import pytest
 import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine

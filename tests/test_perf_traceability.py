@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 from sqlalchemy import event
 
@@ -33,8 +35,6 @@ def _admin_headers(api_client) -> dict[str, str]:
     )
     return {"Authorization": f"Bearer {login.json()['access_token']}"}
 
-
-import uuid
 
 _LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 

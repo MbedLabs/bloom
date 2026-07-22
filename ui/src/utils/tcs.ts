@@ -20,7 +20,7 @@ function generateId(): string {
   return `row-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 }
 
-export function getDefaultTcsLabel(type: TcsRowType): string {
+function getDefaultTcsLabel(type: TcsRowType): string {
   return TCS_ROW_TYPE_OPTIONS.find((option) => option.value === type)?.label || type
 }
 

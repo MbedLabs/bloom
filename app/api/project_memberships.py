@@ -9,7 +9,7 @@ Endpoints:
     DELETE /api/projects/{project_id}/members/{id}     — remove a member
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,7 +22,6 @@ from app.schemas.memberships import (
     EXTERNAL_DOC_TYPES,
     ProjectMemberResponse,
     ProjectMembershipCreate,
-    ProjectMembershipResponse,
     ProjectMembershipUpdate,
 )
 

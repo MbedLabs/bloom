@@ -60,13 +60,6 @@ vi.mock('../hooks/useProjectByPrefix', () => ({
   }),
 }))
 
-vi.mock('../api/budClient', () => ({
-  budTestRunsApi: {
-    list: vi.fn(async () => ({ runs: [] })),
-  },
-  budResultsApi: {},
-}))
-
 vi.mock('../contexts/PageMetaContext', () => ({
   usePageMeta: () => ({
     setCrumbLabel: vi.fn(),

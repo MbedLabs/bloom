@@ -16,6 +16,7 @@ from app.core.security import (
     require_project_access,
     require_role,
 )
+from app.core.service_auth import require_bud_sync_token
 from app.models import (
     ArtefactLink,
     CampaignSuite,
@@ -63,19 +64,20 @@ def _resolved_execution_time(value: Optional[datetime]) -> datetime:
     return _normalize_datetime(resolved) or datetime.utcnow()
 
 
-def _apply_result_to_test_case(tc: TestCase, res) -> None:
+def _apply_result_to_test_case(tc: TestCase, res) -> bool:
     executed_at = _resolved_execution_time(res.executed_at)
     current = _normalize_datetime(tc.last_executed_at)
     incoming = _normalize_datetime(executed_at)
 
     if current and incoming and incoming < current:
-        return
+        return False
 
     tc.last_execution_status = res.status
     tc.last_executed_at = executed_at
     tc.last_execution_comment = res.comment
     if res.bud_run_id is not None:
         tc.last_bud_run_id = res.bud_run_id
+    return True
 
 
 def _apply_result_to_campaign_item(item: TestCampaignItem, res) -> None:
@@ -89,12 +91,12 @@ def _apply_result_to_campaign_item(item: TestCampaignItem, res) -> None:
 async def sync_results_global(
     data: SyncResultsRequest,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    _service_credential=Depends(require_bud_sync_token),
 ):
     """
-    Ingest automated test results across all campaigns.
-    Matches results to campaign items by tc_id. A tc_id can appear in
-    multiple campaigns — all matching items are updated.
+    Ingest Bud test-case execution results by Bloom tc_id. This route updates
+    TestCase execution fields and existing campaign items that reference those
+    test cases; it does not synchronize campaign entities or metadata.
     """
     tc_ids = [r.tc_id for r in data.results]
 
@@ -120,7 +122,8 @@ async def sync_results_global(
             not_found.append(res.tc_id)
             continue
 
-        _apply_result_to_test_case(tc, res)
+        if not _apply_result_to_test_case(tc, res):
+            continue
 
         matched_items = tc_id_to_items.get(res.tc_id, [])
         for item in matched_items:

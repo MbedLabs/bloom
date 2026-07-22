@@ -3,9 +3,9 @@ Project-scoped user memberships and external role doc-type visibility.
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base

@@ -136,6 +136,37 @@ def test_github_webhook_rejects_wrong_signature(env):
     assert response.status_code == 403
 
 
+def test_github_webhook_requires_delivery_id(env):
+    client, _ = env
+    body = _github_payload()
+    response = client.post(
+        "/api/integrations/github/webhook",
+        content=body,
+        headers={
+            "X-GitHub-Event": "issues",
+            "X-Hub-Signature-256": _sign(body),
+            "Content-Type": "application/json",
+        },
+    )
+    assert response.status_code == 400
+
+
+def test_github_webhook_rejects_oversized_body_before_json(env):
+    client, _ = env
+    body = b"{" + b"x" * (1024 * 1024 + 1)
+    response = client.post(
+        "/api/integrations/github/webhook",
+        content=body,
+        headers={
+            "X-GitHub-Event": "issues",
+            "X-Hub-Signature-256": _sign(body),
+            "X-GitHub-Delivery": "too-large",
+            "Content-Type": "application/json",
+        },
+    )
+    assert response.status_code == 413
+
+
 @pytest.mark.anyio
 async def test_github_webhook_accepts_valid_signature_and_syncs(env):
     client, maker = env
@@ -191,7 +222,11 @@ def test_gitlab_webhook_accepts_valid_token(env):
             "object_attributes": {"iid": 7, "state": "closed", "action": "close"},
             "project": {"path_with_namespace": "acme/widget"},
         },
-        headers={"X-Gitlab-Event": "Issue Hook", "X-Gitlab-Token": SECRET},
+        headers={
+            "X-Gitlab-Event": "Issue Hook",
+            "X-Gitlab-Token": SECRET,
+            "X-Gitlab-Event-UUID": "gitlab-delivery-1",
+        },
     )
     assert response.status_code == 200
     assert response.json()["status"] == "processed"

@@ -25,8 +25,19 @@ CONFIG_ENV_KEYS = [
     "BLOOM_FRONTEND_BASE_URL",
     "BLOOM_INVITE_TOKEN_TTL_HOURS",
     "BLOOM_PASSWORD_RESET_TOKEN_TTL_HOURS",
+    "BLOOM_REQIF_MAX_REQUEST_BYTES",
+    "BLOOM_REQIF_MAX_MEMBER_BYTES",
+    "BLOOM_REQIF_MAX_ARCHIVE_ENTRIES",
+    "BLOOM_REQIF_MAX_COMPRESSION_RATIO",
+    "BLOOM_REQIF_MAX_OBJECTS",
+    "BLOOM_REQIF_MAX_RELATIONS",
+    "BLOOM_REQIF_MAX_HIERARCHY_DEPTH",
+    "BLOOM_REQIF_PROCESSING_TIMEOUT_SECONDS",
+    "BLOOM_REQIF_IMPORTS_PER_15_MINUTES",
+    "BLOOM_REQIF_STREAM_CHUNK_BYTES",
     "BLOOM_RUN_STARTUP_DATA_REPAIR",
     "BLOOM_SECRET_KEY",
+    "BLOOM_SERVICE_TOKEN_PEPPER",
     "BLOOM_SMTP_ENABLED",
     "BLOOM_SMTP_FROM_EMAIL",
     "BLOOM_SMTP_FROM_NAME",
@@ -47,8 +58,19 @@ CONFIG_ENV_KEYS = [
     "FRONTEND_BASE_URL",
     "INVITE_TOKEN_TTL_HOURS",
     "PASSWORD_RESET_TOKEN_TTL_HOURS",
+    "REQIF_MAX_REQUEST_BYTES",
+    "REQIF_MAX_MEMBER_BYTES",
+    "REQIF_MAX_ARCHIVE_ENTRIES",
+    "REQIF_MAX_COMPRESSION_RATIO",
+    "REQIF_MAX_OBJECTS",
+    "REQIF_MAX_RELATIONS",
+    "REQIF_MAX_HIERARCHY_DEPTH",
+    "REQIF_PROCESSING_TIMEOUT_SECONDS",
+    "REQIF_IMPORTS_PER_15_MINUTES",
+    "REQIF_STREAM_CHUNK_BYTES",
     "RUN_STARTUP_DATA_REPAIR",
     "SECRET_KEY",
+    "SERVICE_TOKEN_PEPPER",
     "SMTP_ENABLED",
     "SMTP_FROM_EMAIL",
     "SMTP_FROM_NAME",
@@ -67,6 +89,35 @@ CONFIG_ENV_KEYS = [
 def clear_config_env(monkeypatch):
     for key in CONFIG_ENV_KEYS:
         monkeypatch.delenv(key, raising=False)
+
+
+def test_reqif_limits_have_public_beta_defaults(monkeypatch):
+    clear_config_env(monkeypatch)
+    monkeypatch.setenv("BLOOM_SECRET_KEY", "b" * 32)
+
+    settings = Settings(_env_file=None)
+
+    assert settings.REQIF_MAX_REQUEST_BYTES == 25 * 1024 * 1024
+    assert settings.REQIF_MAX_MEMBER_BYTES == 25 * 1024 * 1024
+    assert settings.REQIF_MAX_ARCHIVE_ENTRIES == 100
+    assert settings.REQIF_MAX_COMPRESSION_RATIO == 20
+    assert settings.REQIF_MAX_OBJECTS == 999
+    assert settings.REQIF_MAX_RELATIONS == 10_000
+    assert settings.REQIF_MAX_HIERARCHY_DEPTH == 100
+    assert settings.REQIF_PROCESSING_TIMEOUT_SECONDS == 60
+    assert settings.REQIF_IMPORTS_PER_15_MINUTES == 5
+    assert settings.REQIF_STREAM_CHUNK_BYTES == 1024 * 1024
+
+
+def test_reqif_member_limit_cannot_be_raised_above_25_mib(monkeypatch):
+    clear_config_env(monkeypatch)
+    monkeypatch.setenv("BLOOM_SECRET_KEY", "b" * 32)
+    monkeypatch.setenv("BLOOM_REQIF_MAX_MEMBER_BYTES", str(25 * 1024 * 1024 + 1))
+
+    import pytest
+
+    with pytest.raises(ValueError, match="25 MiB"):
+        Settings(_env_file=None)
 
 
 def test_settings_reads_bloom_prefixed_env(monkeypatch):

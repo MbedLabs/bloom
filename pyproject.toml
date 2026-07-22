@@ -7,7 +7,7 @@ name = "bloom-app"
 version = "1.0.0"
 description = "Backend API for Bloom Product Lifecycle Management by EmbedLabs"
 readme = "README.md"
-license = {text = "AGPL-3.0"}
+license = {text = "AGPL-3.0-only"}
 authors = [
     {name = "EmbedLabs", email = "dev@embedlabs.net"}
 ]

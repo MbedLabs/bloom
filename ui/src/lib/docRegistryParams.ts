@@ -68,10 +68,6 @@ export function syncRegistryProjectContext(projectPrefix: string | null): void {
   activeRegistryPrefix = projectPrefix
 }
 
-export function getActiveRegistryPrefix(): string | null {
-  return activeRegistryPrefix
-}
-
 export function clearRegistrySortSession(prefix: string): void {
   removeLegacyLocalStorage(prefix)
   const prefixWithColon = `${prefix}:`

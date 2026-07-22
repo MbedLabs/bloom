@@ -1,10 +1,9 @@
-import { type ReactNode, useState, useEffect, useMemo } from 'react'
+import { type ReactNode, useState, useEffect } from 'react'
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, FlaskConical, Layers3, Pencil, Plus, Trash2 } from 'lucide-react'
 
 import { campaignsApi, testCasesApi, testSuitesApi, extractApiErrorMessage } from '../api/client'
-import { budTestRunsApi, budResultsApi } from '../api/budClient'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { docUrl } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
@@ -64,20 +63,6 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
     enabled: !!projectId,
   })
   const testCases = testCasesData?.items
-
-  const { data: budRunsData } = useQuery({
-    queryKey: ['bud-test-runs'],
-    queryFn: () => budTestRunsApi.list({ limit: 100, latest_per_suite: true }),
-    staleTime: 30000,
-  })
-  const budRuns = useMemo(() => budRunsData?.runs ?? [], [budRunsData])
-
-  const [selectedBudRunId, setSelectedBudRunId] = useState<number | null>(null)
-  useEffect(() => {
-    if (budRuns.length > 0 && selectedBudRunId === null) {
-      setSelectedBudRunId(budRuns[0].id)
-    }
-  }, [budRuns, selectedBudRunId])
 
   const addItemMutation = useMutation({
     mutationFn: (testCaseId: number) => testSuitesApi.addItem(parsedSuiteId, testCaseId),
@@ -341,31 +326,6 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
         )}
       </div>
 
-      {budRuns.length > 0 && (
-        <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
-          <div className="px-6 py-4 border-b border-border flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Bud Test Runs</h3>
-            <select
-              value={selectedBudRunId ?? ''}
-              onChange={(e) => setSelectedBudRunId(Number(e.target.value))}
-              className="px-3 py-1.5 bg-background border border-input rounded-md text-sm focus:ring-2 focus:ring-ring"
-            >
-              {budRuns.map((run) => (
-                <option key={run.id} value={run.id}>
-                  {run.name} &mdash; {run.passed_tests}/{run.total_tests} passed &mdash; {run.status}
-                </option>
-              ))}
-            </select>
-          </div>
-          {selectedBudRunId && (
-            <SuiteRunResults
-              runId={selectedBudRunId}
-              suiteItemCaseIds={includedCaseIds}
-            />
-          )}
-        </div>
-      )}
-
       {suite.related_concepts && suite.related_concepts.length > 0 && (
         <div className="bg-card rounded-lg shadow-elegant p-5">
           <h3 className="text-sm font-medium text-muted-foreground mb-3">Related Concepts</h3>
@@ -442,101 +402,6 @@ function SummaryCard({ label, value }: { label: string; value: ReactNode }) {
     <div className="bg-card rounded-lg border border-border shadow-elegant p-4">
       <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="text-2xl font-bold text-foreground mt-2">{value}</div>
-    </div>
-  )
-}
-
-function SuiteRunResults({
-  runId,
-  suiteItemCaseIds,
-}: {
-  runId: number
-  suiteItemCaseIds: Set<number>
-}) {
-  const { data: results, isLoading, isError } = useQuery({
-    queryKey: ['bud-run-results', runId],
-    queryFn: () => budResultsApi.list(runId),
-    enabled: !!runId,
-  })
-
-  if (isLoading) {
-    return (
-      <div className="px-6 py-8 text-center text-sm text-muted-foreground">
-        Loading Bud run results...
-      </div>
-    )
-  }
-
-  if (isError) {
-    return (
-      <div className="px-6 py-8 text-center text-sm text-red-600">
-        Failed to load Bud run results. Is Bud backend reachable?
-      </div>
-    )
-  }
-
-  if (!results || results.length === 0) {
-    return (
-      <div className="px-6 py-8 text-center text-sm text-muted-foreground">
-        No results in this Bud run.
-      </div>
-    )
-  }
-
-  const matched = results.filter((r) => {
-    const meta = (r.test_metadata || {}) as Record<string, unknown>
-    const tcId = meta.test_case_id
-    return tcId !== undefined && suiteItemCaseIds.has(Number(tcId))
-  })
-  const unmatched = results.filter((r) => !matched.includes(r))
-
-  return (
-    <div className="divide-y divide-border">
-      {matched.length === 0 && (
-        <div className="px-6 py-6 text-center text-sm text-muted-foreground">
-          No results in this run match the test cases in this suite.
-        </div>
-      )}
-      {matched.map((r) => (
-        <div
-          key={r.id}
-          className="px-6 py-3 flex items-center justify-between gap-4 hover:bg-accent/30"
-        >
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs text-primary">{r.test_class}</span>
-            </div>
-            <div className="text-sm text-foreground truncate mt-0.5">{r.test_method}</div>
-            {r.error_message && (
-              <div className="text-xs text-red-600 dark:text-red-400 mt-1 truncate max-w-md">
-                {r.error_message}
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <span
-              className={`px-2 py-0.5 rounded text-xs font-medium ${
-                r.passed
-                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-                  : 'bg-red-500/10 text-red-700 dark:text-red-400'
-              }`}
-            >
-              {r.passed ? 'PASS' : 'FAIL'}
-            </span>
-            <span className="text-xs text-muted-foreground tabular-nums w-12 text-right">
-              {r.duration_seconds != null ? `${r.duration_seconds.toFixed(2)}s` : '-'}
-            </span>
-          </div>
-        </div>
-      ))}
-      {unmatched.length > 0 && (
-        <div className="px-6 py-3 text-center">
-          <span className="text-xs text-muted-foreground">
-            + {unmatched.length} result{unmatched.length !== 1 ? 's' : ''} from
-            other test cases not in this suite
-          </span>
-        </div>
-      )}
     </div>
   )
 }

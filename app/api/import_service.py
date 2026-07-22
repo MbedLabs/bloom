@@ -18,16 +18,16 @@ from app.core.reqif import (
     TITLE_ATTRIBUTE_HINTS,
     ReqIFObject,
     ReqIFParseError,
-    parse_reqif,
 )
+from app.core.reqif_policy import read_reqif_upload
 from app.core.security import require_project_access, require_role
 from app.models import Project, Requirement, RequirementLink, TestCase
 from app.models.user import User, UserRole
+from app.services.import_attempts import begin_import_attempt, finish_import_attempt
+from app.services.reqif_worker import ReqIFProcessingTimeout, parse_reqif_in_worker
 
 router = APIRouter()
 
-# Guard against oversized uploads (ReqIF files are XML/zip and rarely large).
-MAX_REQIF_BYTES = 25 * 1024 * 1024
 REQ_ID_SUFFIX_LIMIT = 999
 
 
@@ -299,14 +299,18 @@ async def import_reqif(
         db, current_user, target_project.id, roles={UserRole.admin.value, UserRole.maintainer.value}
     )
 
-    raw = await file.read()
-    if len(raw) > MAX_REQIF_BYTES:
-        raise HTTPException(status_code=413, detail="ReqIF file exceeds the 25 MB limit.")
-
+    attempt = await begin_import_attempt(db, user_id=current_user.id, project_id=target_project.id)
+    attempt_id = attempt.id
     try:
-        bundle = parse_reqif(raw)
+        raw = await read_reqif_upload(file)
+        bundle = await parse_reqif_in_worker(raw)
+    except ReqIFProcessingTimeout as exc:
+        await finish_import_attempt(db, attempt_id, "timeout")
+        raise HTTPException(status_code=504, detail=str(exc))
     except ReqIFParseError as exc:
-        raise HTTPException(status_code=422, detail=f"Could not parse ReqIF file: {exc}")
+        await finish_import_attempt(db, attempt_id, "failed")
+        status_code = 413 if "25 MiB" in str(exc) and "request" in str(exc) else 422
+        raise HTTPException(status_code=status_code, detail=f"Could not parse ReqIF file: {exc}")
 
     result = ReqIFImportResult(
         imported=0,
@@ -418,4 +422,5 @@ async def import_reqif(
             f"{current_user.full_name} imported requirement {requirement.req_id} from ReqIF",
         )
 
+    await finish_import_attempt(db, attempt_id, "completed")
     return result
