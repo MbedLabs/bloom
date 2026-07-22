@@ -2,18 +2,29 @@
 
 ## Unreleased
 
-### Security and reliability
+### Added
 
-- enforce authentication boundaries across API routes and signed webhook delivery replay protection
-- stream and strictly validate bounded ReqIF archives before time-limited parsing
-- replace long-lived administrator integration tokens with revocable 90-day `test-results:write` service credentials
-- run blocking Python and npm dependency vulnerability checks in CI
+- User-first deployment and operations guidance for the published Bloom by EmbedLabs container image.
+- Bounded ReqIF import processing: exactly one `.reqif` member, 25 MiB request and uncompressed-member limits, a 20:1 compression-ratio limit, and at most 100 archive entries.
+- ReqIF object, relation, and hierarchy-depth limits, plus a streamed request cap, processing timeout, per-user rate limit, and one active import per project.
 
-### Integration
+### Changed
 
-- clarify that Bud submits test-case outcomes by Bloom `tc_id` and never synchronizes campaigns
+- Bud integration now uses revocable 90-day `test-results:write` credentials instead of full administrator tokens.
+- Bud submits test-case execution outcomes by Bloom `tc_id`; it does not create or synchronize campaigns.
+
+### Fixed
+
+- Campaigns now count as controlled documents in dashboard totals and per-project document counts.
+- Authentication and project-access boundaries are consistently enforced across API routes.
+
+### Security
+
+- ReqIF archives are validated while streaming and parsed in a time-limited worker process.
+- Signed webhook deliveries have replay protection.
+- Python and npm dependency vulnerability scans block CI on actionable findings.
 
 ## 1.0.0
 
-- Combined the Bloom backend and web interface into one product repository and image.
-- Added PostgreSQL-backed deployment, migrations, health checks, and product CI.
+- Initial beta release of Bloom by EmbedLabs as a self-hosted product lifecycle management platform.
+- Published a multi-architecture container image with PostgreSQL-backed deployment, migrations, health checks, and persistent project data.

@@ -1,5 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { type DocType, DOC_TYPE_SLUGS } from '../types/doc'
+import type { TcsRow } from '../utils/tcs'
+export type { TcsRow } from '../utils/tcs'
 import { clearAuthToken, getAuthToken, setAuthToken } from '../lib/tokenStorage'
 import packageJson from '../../package.json'
 
@@ -296,6 +298,7 @@ export interface Project {
   status: string
   requirement_count: number
   test_case_count: number
+  campaign_count: number
   design_count: number
   risk_count: number
   change_count: number
@@ -321,14 +324,14 @@ export interface ProjectMember {
   updated_at: string
 }
 
-export interface RequirementSummary {
+interface RequirementSummary {
   id: number
   req_id: string
   title: string
   status: string
 }
 
-export interface TestCaseSummary {
+interface TestCaseSummary {
   id: number
   tc_id: string
   title: string
@@ -357,21 +360,21 @@ export interface TestCampaignSummary {
   last_executed_at?: string | null
 }
 
-export interface TestConceptSummary {
+interface TestConceptSummary {
   id: number
   concept_id: string
   name: string
   status: string
 }
 
-export interface RequirementVerifiedByLink {
+interface RequirementVerifiedByLink {
   id: number
   link_type: string
   created_at: string
   test_case: TestCaseSummary
 }
 
-export interface TestCaseVerifiesLink {
+interface TestCaseVerifiesLink {
   id: number
   link_type: string
   created_at: string
@@ -450,18 +453,6 @@ export interface Step {
   expected_result: string
 }
 
-export type TcsRowType = 'precondition' | 'step' | 'loop'
-
-export interface TcsRow {
-  id: string
-  row_type: TcsRowType
-  label: string
-  description: string
-  expected_result: string
-  indent_level: number
-  collapsed: boolean
-}
-
 export interface TestRunLink {
   id: number
   requirement_id: number
@@ -493,7 +484,7 @@ export interface ImpactAnalysisResponse {
   downstream: ImpactNode[]
 }
 
-export interface CoverageGap {
+interface CoverageGap {
   requirement: Requirement
   gap_type: string
   linked_test_cases: TestCase[]
@@ -509,14 +500,6 @@ export interface CoverageGapReport {
   uncovered: number
   coverage_percent: number
   gaps: CoverageGap[]
-}
-
-export interface RequirementLinkResponse {
-  id: number
-  source_id: number
-  target_id: number
-  link_type: string
-  created_at: string
 }
 
 export interface DesignItem {
@@ -653,21 +636,21 @@ export interface ArtefactActivity {
   created_at: string
 }
 
-export interface RelatedRequirementSummary {
+interface RelatedRequirementSummary {
   id: number
   req_id: string
   title: string
   status: string
 }
 
-export interface RelatedTestCaseSummary {
+interface RelatedTestCaseSummary {
   id: number
   tc_id: string
   title: string
   status: string
 }
 
-export interface RelatedDocumentSummary {
+interface RelatedDocumentSummary {
   id: number
   doc_id: string | null
   title: string
@@ -1110,7 +1093,7 @@ export interface TestCampaign {
   suites: TestSuiteSummary[]
 }
 
-export interface TestCampaignSuiteScope {
+interface TestCampaignSuiteScope {
   suite: TestSuiteSummary
   items: TestCampaignItem[]
 }

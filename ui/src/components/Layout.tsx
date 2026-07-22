@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { APP_VERSION, notificationsApi, projectsApi, searchApi } from '../api/client'
 import { docRegistryListUrl, syncRegistryProjectContext } from '../lib/docRegistryParams'
 import { searchResultUrl } from '../lib/searchLinks'
+import { getBudAppBaseUrl } from '../lib/budLinks'
 import { getBreadcrumbs } from '../lib/breadcrumbs'
 import { useAuth } from '../contexts/AuthContext'
 import { PageMetaProvider, usePageMeta } from '../contexts/PageMetaContext'
@@ -17,15 +18,7 @@ import {
 /** Must match Tailwind `w-60` / `w-14` and main `ml-*` — also positions the seam toggle. */
 const SIDEBAR_EDGE = { expanded: '15rem', collapsed: '3.5rem' } as const
 
-const getBudUrl = () => {
-  const runtimeUrl = window.runtimeConfig?.BUD_APP_URL
-  const buildTimeUrl = import.meta.env.VITE_TESTSTATION_APP_URL
-  const rawUrl = runtimeUrl || buildTimeUrl || 'http://localhost:3000'
-  // Strip trailing /api if present in the URL for navigation purposes
-  return rawUrl.replace(/\/api\/?$/, '')
-}
-
-const TESTSTATION_APP_URL = getBudUrl()
+const BUD_APP_URL = getBudAppBaseUrl()
 
 function useDarkMode() {
   const [dark, setDark] = useState(() => {
@@ -449,16 +442,18 @@ function LayoutInner() {
         {/* Bottom section */}
         <div className={`mt-auto ${sidebarCollapsed ? 'px-2' : 'px-3'} pb-4 pt-2 space-y-1`} style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
           <div className="h-px bg-white/10 mx-2 mb-2" />
-          <a
-            href={TESTSTATION_APP_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-1.5 rounded-lg text-[13px] font-medium text-violet-100/70 hover:bg-sidebar-hover hover:text-white transition-all duration-200 group`}
-            title={sidebarCollapsed ? 'Bud TMP' : undefined}
-          >
-            <ExternalLink className="h-4 w-4 shrink-0 text-violet-400/50 group-hover:text-violet-300" />
-            {!sidebarCollapsed && 'Bud TMP'}
-          </a>
+          {BUD_APP_URL && (
+            <a
+              href={BUD_APP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-1.5 rounded-lg text-[13px] font-medium text-violet-100/70 hover:bg-sidebar-hover hover:text-white transition-all duration-200 group`}
+              title={sidebarCollapsed ? 'Bud TMP' : undefined}
+            >
+              <ExternalLink className="h-4 w-4 shrink-0 text-violet-400/50 group-hover:text-violet-300" />
+              {!sidebarCollapsed && 'Bud TMP'}
+            </a>
+          )}
           <Link
             to="/settings"
             className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-1.5 rounded-lg text-[13px] font-medium text-violet-100/70 hover:bg-sidebar-hover hover:text-white transition-all duration-200 group`}

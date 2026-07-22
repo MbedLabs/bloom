@@ -7,7 +7,12 @@ from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_project_access, require_role
+from app.core.security import (
+    get_current_user,
+    get_external_doc_types,
+    require_project_access,
+    require_role,
+)
 from app.models import (
     ArtefactLink,
     Baseline,
@@ -79,58 +84,66 @@ async def _delete_project_scoped_data(db: AsyncSession, project_id: int) -> None
     await db.execute(delete(Requirement).where(Requirement.project_id == project_id))
 
 
-async def _project_counts(db: AsyncSession, project_id: int) -> dict[str, int]:
-    req_count = (
-        await db.execute(
-            select(func.count(Requirement.id)).where(Requirement.project_id == project_id)
-        )
-    ).scalar()
-    tc_count = (
-        await db.execute(select(func.count(TestCase.id)).where(TestCase.project_id == project_id))
-    ).scalar()
-    design_count = (
-        await db.execute(
-            select(func.count(DesignItem.id)).where(DesignItem.project_id == project_id)
-        )
-    ).scalar()
-    risk_count = (
-        await db.execute(select(func.count(RiskItem.id)).where(RiskItem.project_id == project_id))
-    ).scalar()
-    change_count = (
-        await db.execute(
-            select(func.count(ChangeRequest.id)).where(ChangeRequest.project_id == project_id)
-        )
-    ).scalar()
-    test_concept_count = (
-        await db.execute(
-            select(func.count(TestConcept.id)).where(TestConcept.project_id == project_id)
-        )
-    ).scalar()
-    test_suite_count = (
-        await db.execute(select(func.count(TestSuite.id)).where(TestSuite.project_id == project_id))
-    ).scalar()
-    defect_count = (
-        await db.execute(select(func.count(Defect.id)).where(Defect.project_id == project_id))
-    ).scalar()
+async def _project_counts(
+    db: AsyncSession,
+    project_id: int,
+    current_user: User,
+) -> dict[str, int]:
+    external = current_user.role == UserRole.external
+    allowed_doc_types = (
+        await get_external_doc_types(db, current_user, project_id) if external else None
+    )
 
-    covered_reqs = (
-        await db.execute(
-            select(func.count(func.distinct(ArtefactLink.target_id))).where(
-                ArtefactLink.source_type == "TC",
-                ArtefactLink.target_type == "REQ",
-                ArtefactLink.role == "verifies",
-                ArtefactLink.target_id.in_(
-                    select(Requirement.id).where(Requirement.project_id == project_id)
-                ),
-            )
+    async def count_visible(model, doc_type: str) -> int:
+        if allowed_doc_types is not None and doc_type not in allowed_doc_types:
+            return 0
+        query = select(func.count(model.id)).where(model.project_id == project_id)
+        if external:
+            query = query.where(model.visibility == "customer")
+        return (await db.scalar(query)) or 0
+
+    req_count = await count_visible(Requirement, "REQ")
+    tc_count = await count_visible(TestCase, "TC")
+    campaign_count = await count_visible(TestCampaign, "CMP")
+    design_count = await count_visible(DesignItem, "DES")
+    risk_count = await count_visible(RiskItem, "RSK")
+    change_count = await count_visible(ChangeRequest, "CHG")
+    test_concept_count = await count_visible(TestConcept, "CPT")
+    test_suite_count = await count_visible(TestSuite, "TS")
+    defect_count = await count_visible(Defect, "DEF")
+
+    covered_query = (
+        select(func.count(func.distinct(ArtefactLink.target_id)))
+        .join(Requirement, Requirement.id == ArtefactLink.target_id)
+        .join(TestCase, TestCase.id == ArtefactLink.source_id)
+        .where(
+            ArtefactLink.project_id == project_id,
+            ArtefactLink.source_type == "TC",
+            ArtefactLink.target_type == "REQ",
+            ArtefactLink.role == "verifies",
         )
-    ).scalar()
+    )
+    if external:
+        if allowed_doc_types is not None and not {"REQ", "TC"}.issubset(allowed_doc_types):
+            covered_reqs = 0
+        else:
+            covered_reqs = (
+                await db.scalar(
+                    covered_query.where(
+                        Requirement.visibility == "customer",
+                        TestCase.visibility == "customer",
+                    )
+                )
+            ) or 0
+    else:
+        covered_reqs = (await db.scalar(covered_query)) or 0
     coverage_percent = round((covered_reqs / req_count * 100) if req_count else 0, 1)
     uncovered_requirement_count = max((req_count or 0) - (covered_reqs or 0), 0)
 
     return {
         "requirement_count": req_count,
         "test_case_count": tc_count,
+        "campaign_count": campaign_count,
         "design_count": design_count,
         "risk_count": risk_count,
         "change_count": change_count,
@@ -163,7 +176,7 @@ async def list_projects(
 
     response = []
     for project in projects:
-        counts = await _project_counts(db, project.id)
+        counts = await _project_counts(db, project.id, current_user)
 
         response.append(
             ProjectResponse(
@@ -219,6 +232,7 @@ async def create_project(
         updated_at=project.updated_at,
         requirement_count=0,
         test_case_count=0,
+        campaign_count=0,
         design_count=0,
         risk_count=0,
         change_count=0,
@@ -245,7 +259,7 @@ async def get_project_by_prefix(
 
     await require_project_access(db, current_user, project.id)
 
-    counts = await _project_counts(db, project.id)
+    counts = await _project_counts(db, project.id, current_user)
 
     return ProjectResponse(
         id=project.id,
@@ -273,7 +287,7 @@ async def get_project(
         raise HTTPException(status_code=404, detail="Project not found")
     await require_project_access(db, current_user, project_id)
 
-    counts = await _project_counts(db, project.id)
+    counts = await _project_counts(db, project.id, current_user)
 
     return ProjectResponse(
         id=project.id,
@@ -292,7 +306,7 @@ async def update_project(
     project_id: int,
     data: ProjectUpdate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin)),
+    current_user: User = Depends(require_role(UserRole.admin)),
 ):
     """
     Update a project.
@@ -327,7 +341,7 @@ async def update_project(
     await db.flush()
     await db.refresh(project)
 
-    counts = await _project_counts(db, project.id)
+    counts = await _project_counts(db, project.id, current_user)
 
     return ProjectResponse(
         id=project.id,

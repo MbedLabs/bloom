@@ -103,7 +103,14 @@ async def _seed_iam_fixture_data(session_maker: async_sessionmaker[AsyncSession]
             role=UserRole.maintainer,
             is_active=True,
         )
-        session.add_all([admin, maintainer])
+        external = User(
+            email="external@example.com",
+            full_name="Read Only External",
+            hashed_password=get_password_hash("unused-external-password"),
+            role=UserRole.external,
+            is_active=True,
+        )
+        session.add_all([admin, maintainer, external])
         await session.flush()
 
         allowed = Project(name="Allowed Project", prefix="ALW", description="Visible")
@@ -111,12 +118,19 @@ async def _seed_iam_fixture_data(session_maker: async_sessionmaker[AsyncSession]
         session.add_all([allowed, blocked])
         await session.flush()
 
-        session.add(
-            ProjectMembership(
-                user_id=maintainer.id,
-                project_id=allowed.id,
-                role=UserRole.maintainer.value,
-            )
+        session.add_all(
+            [
+                ProjectMembership(
+                    user_id=maintainer.id,
+                    project_id=allowed.id,
+                    role=UserRole.maintainer.value,
+                ),
+                ProjectMembership(
+                    user_id=external.id,
+                    project_id=allowed.id,
+                    role=UserRole.external.value,
+                ),
+            ]
         )
 
         blocked_requirement = Requirement(
@@ -133,6 +147,7 @@ async def _seed_iam_fixture_data(session_maker: async_sessionmaker[AsyncSession]
         await session.commit()
         await session.refresh(admin)
         await session.refresh(maintainer)
+        await session.refresh(external)
         await session.refresh(allowed)
         await session.refresh(blocked)
         await session.refresh(blocked_requirement)
@@ -140,6 +155,7 @@ async def _seed_iam_fixture_data(session_maker: async_sessionmaker[AsyncSession]
         return {
             "admin": admin,
             "maintainer": maintainer,
+            "external": external,
             "allowed": allowed,
             "blocked": blocked,
             "blocked_requirement": blocked_requirement,
@@ -188,3 +204,15 @@ def test_unassigned_maintainer_cannot_access_other_project_data(iam_http_harness
         },
     )
     assert blocked_import.status_code == 403
+
+
+def test_external_viewer_cannot_upload_reqif(iam_http_harness: IamHttpHarness):
+    seeded = iam_http_harness.run(_seed_iam_fixture_data(iam_http_harness.session_maker))
+    iam_http_harness.act_as(seeded["external"])
+
+    response = iam_http_harness.client.post(
+        f"/api/projects/{seeded['allowed'].id}/import/reqif",
+        files={"file": ("requirements.reqif", b"<REQ-IF/>", "application/xml")},
+    )
+
+    assert response.status_code == 403

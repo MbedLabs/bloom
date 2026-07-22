@@ -15,7 +15,15 @@ from app.core.cache import dashboard_stats_cache
 from app.core.database import Base, get_db
 from app.core.security import get_current_user, get_password_hash
 from app.main import app
-from app.models import Project, ProjectMembership, Requirement, TestCase, User
+from app.models import (
+    Project,
+    ProjectExternalDocType,
+    ProjectMembership,
+    Requirement,
+    TestCampaign,
+    TestCase,
+    User,
+)
 from app.models.user import UserRole
 
 
@@ -113,7 +121,10 @@ def _build_dashboard_harness():
     return harness, engine
 
 
-async def _seed_dashboard_visibility_data(session_maker: async_sessionmaker[AsyncSession]):
+async def _seed_dashboard_visibility_data(
+    session_maker: async_sessionmaker[AsyncSession],
+    allowed_doc_types: tuple[str, ...] = ("REQ", "TC", "CMP"),
+):
     async with session_maker() as session:
         external = User(
             email="external@example.com",
@@ -129,12 +140,18 @@ async def _seed_dashboard_visibility_data(session_maker: async_sessionmaker[Asyn
         session.add(project)
         await session.flush()
 
-        session.add(
-            ProjectMembership(
-                user_id=external.id,
-                project_id=project.id,
-                role=UserRole.external.value,
-            )
+        membership = ProjectMembership(
+            user_id=external.id,
+            project_id=project.id,
+            role=UserRole.external.value,
+        )
+        session.add(membership)
+        await session.flush()
+        session.add_all(
+            [
+                ProjectExternalDocType(membership_id=membership.id, doc_type=doc_type)
+                for doc_type in allowed_doc_types
+            ]
         )
 
         session.add_all(
@@ -173,6 +190,20 @@ async def _seed_dashboard_visibility_data(session_maker: async_sessionmaker[Asyn
                     status="Draft",
                     visibility="internal",
                 ),
+                TestCampaign(
+                    project_id=project.id,
+                    campaign_id="DSV-CMP-001",
+                    name="Customer campaign",
+                    status="Planned",
+                    visibility="customer",
+                ),
+                TestCampaign(
+                    project_id=project.id,
+                    campaign_id="DSV-CMP-002",
+                    name="Internal campaign",
+                    status="Planned",
+                    visibility="internal",
+                ),
             ]
         )
         await session.commit()
@@ -193,8 +224,47 @@ def test_external_dashboard_ignores_internal_artefacts():
         body = response.json()
         assert body["total_requirements"] == 1
         assert body["total_test_cases"] == 1
+        assert body["total_campaigns"] == 1
         assert body["uncovered_requirements"] == 1
         assert body["projects"][0]["uncovered_requirement_count"] == 1
+
+        projects_response = harness.client.get("/api/projects")
+        assert projects_response.status_code == 200, projects_response.text
+        project_summary = projects_response.json()[0]
+        assert project_summary["requirement_count"] == 1
+        assert project_summary["test_case_count"] == 1
+        assert project_summary["campaign_count"] == 1
+    finally:
+        harness.client.close()
+        app.dependency_overrides.clear()
+        dashboard_stats_cache._store.clear()
+        asyncio.run(engine.dispose())
+
+
+def test_external_dashboard_honors_document_type_allowlist():
+    harness, engine = _build_dashboard_harness()
+    try:
+        seeded = harness.run(
+            _seed_dashboard_visibility_data(harness.session_maker, allowed_doc_types=("CMP",))
+        )
+        harness.act_as(seeded["external"])
+
+        response = harness.client.get("/api/dashboard/stats")
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["total_requirements"] == 0
+        assert body["total_test_cases"] == 0
+        assert body["total_campaigns"] == 1
+        assert body["uncovered_requirements"] == 0
+        assert body["projects"][0]["requirement_count"] == 0
+        assert body["projects"][0]["test_case_count"] == 0
+
+        projects_response = harness.client.get("/api/projects")
+        assert projects_response.status_code == 200, projects_response.text
+        project_summary = projects_response.json()[0]
+        assert project_summary["requirement_count"] == 0
+        assert project_summary["test_case_count"] == 0
+        assert project_summary["campaign_count"] == 1
     finally:
         harness.client.close()
         app.dependency_overrides.clear()

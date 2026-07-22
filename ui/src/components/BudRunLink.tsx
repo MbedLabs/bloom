@@ -13,9 +13,14 @@ export default function BudRunLink({ runId, className, label }: BudRunLinkProps)
     return <span className={className || 'text-muted-foreground'}>Not recorded</span>
   }
 
+  const runUrl = buildBudRunUrl(runId)
+  if (!runUrl) {
+    return <span className={className || 'text-muted-foreground'}>{label || `Bud run #${runId}`}</span>
+  }
+
   return (
     <a
-      href={buildBudRunUrl(runId)}
+      href={runUrl}
       target="_blank"
       rel="noopener noreferrer"
       className={className || 'inline-flex items-center gap-1 text-primary hover:text-primary/80'}

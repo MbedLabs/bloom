@@ -1,6 +1,8 @@
-# Bloom
+# Bloom by EmbedLabs
 
-Bloom is a self-hosted product lifecycle management application for requirements, controlled documents, verification assets, test planning, and end-to-end traceability.
+Bloom by EmbedLabs is a self-hosted product lifecycle management application for requirements, controlled documents, verification assets, test planning, and end-to-end traceability.
+
+Bloom is available under the **GNU Affero General Public License v3.0 only (AGPL-3.0-only)**. EmbedLabs also offers commercial licensing for use cases that cannot comply with the AGPL, plus paid **priority support** and **custom feature development**. Contact `dev@embedlabs.net`.
 
 ## Run the published product image
 
@@ -112,8 +114,8 @@ Put Bloom behind a TLS-terminating reverse proxy for an internet-facing deployme
 The email sender display name is fixed to `Bloom PLM by EmbedLabs` and is not configurable. Configure the SMTP sender address, server credentials, and optional reply-to address in `.env`.
 
 - `APP_BASE_URL`, `FRONTEND_BASE_URL`, and `BLOOM_APP_URL`: the externally reachable Bloom origin;
-- `BUD_APP_URL`: the externally reachable Bud origin used by Bloom's Bud navigation and cross-links;
-- `TESTSTATION_APP_URL`: retained compatibility URL for the execution application; normally the same origin as Bud.
+- `BUD_APP_URL`: optional externally reachable Bud origin; setting it enables Bloom's Bud navigation and execution cross-links;
+- `TESTSTATION_APP_URL`: optional compatibility alias for the Bud origin.
 
 SMTP is disabled in the example configuration. Before inviting users or relying on email verification and password resets, configure `SMTP_HOST`, credentials, sender/reply-to addresses, TLS mode, and then set `SMTP_ENABLED=true`. Restart Bloom after changing runtime settings.
 
@@ -136,7 +138,7 @@ These controls validate structure and resource use; they are not a malware scan.
 
 ## Connect Bloom and Bud
 
-Bloom issues the token that Bud uses to post execution results:
+Bloom and Bud are independently deployable. `bud-runner` and `budtestlibrary` communicate only with Bud and never call or require Bloom. If both applications are deployed, Bloom can issue the narrowly scoped credential that Bud uses to post test-case execution results:
 
 1. Sign in to Bloom as an administrator.
 2. Open **Settings → Bud Result-Sync Credentials**.
@@ -215,77 +217,9 @@ Compose runs Alembic migrations before the upgraded application starts. Database
 
 The full monitoring, backup/restore, upgrade, and disaster-recovery reference is in [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
-## Contribute and develop locally
+## Contributing
 
-Operator setup above uses the published package. Contributors can build and test the combined FastAPI/React source tree locally.
-
-### Install the same dependencies as CI
-
-Use Python 3.11 and Node.js 20:
-
-```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install -e ".[dev]" -c constraints.txt
-pip install black==25.1.0 isort==5.13.2 bandit==1.8.3 pip-audit
-npm --prefix ui ci
-```
-
-### Run the same checks as CI
-
-Start the CI PostgreSQL service:
-
-```bash
-docker run --rm -d --name bloom-ci-postgres \
-  -e POSTGRES_USER=test_user \
-  -e POSTGRES_PASSWORD=test_password \
-  -e POSTGRES_DB=test_bloom \
-  -p 5432:5432 \
-  postgres:16
-```
-
-Then run the backend validation, schema setup, migrations, tests, and UI checks:
-
-```bash
-black --check --diff app/ tests/
-isort --profile black --check-only --diff app/ tests/
-bandit -r app/ -ll
-pip-audit -r constraints.txt --ignore-vuln PYSEC-2026-1325
-
-export DATABASE_URL=postgresql+asyncpg://test_user:test_password@localhost:5432/test_bloom
-export SECRET_KEY=test-secret-key-for-ci-at-least-32-characters-long
-export BLOOM_DOTENV_DISABLED=1
-export BLOOM_DISABLE_RATE_LIMIT=1
-
-alembic upgrade head
-
-export ENABLE_DOCS=false
-pytest --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=55 tests/ -v
-
-npm --prefix ui run lint
-npx --prefix ui tsc --project ui/tsconfig.json --noEmit
-npm --prefix ui run test -- --coverage
-```
-
-Stop the temporary database when finished:
-
-```bash
-docker stop bloom-ci-postgres
-```
-
-Run development servers separately if you need hot reload:
-
-```bash
-uvicorn app.main:app --reload --port 8000
-npm --prefix ui run dev
-```
-
-Build the combined product image with:
-
-```bash
-docker build -t bloom:local .
-```
+Bloom users and operators should deploy the published image described above. Source development instructions belong in the [contributing guide](CONTRIBUTING.md); the authoritative automated checks are in [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml). Contributions require acceptance of the [Contributor License Agreement](CLA.md).
 
 ## Project resources
 
@@ -303,4 +237,4 @@ Report vulnerabilities according to the [security policy](SECURITY.md). Communit
 
 ## License
 
-Bloom is licensed under the [GNU Affero General Public License v3.0 only (AGPL-3.0-only)](LICENSE). Deploying a modified network service requires offering its corresponding source to users as required by the AGPL.
+Bloom by EmbedLabs is licensed under the [GNU Affero General Public License v3.0 only (AGPL-3.0-only)](LICENSE). Commercial licenses are available from EmbedLabs for use cases that cannot comply with the AGPL. Deploying a modified network service under the AGPL requires offering its corresponding source to users; contact `dev@embedlabs.net` for commercial licensing.
