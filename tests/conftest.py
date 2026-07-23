@@ -77,7 +77,14 @@ def api_client():
     if not _postgres_available_from_env():
         pytest.skip("api_client tests require reachable Postgres for app lifespan startup")
 
+    from app.core.deps import limiter
     from app.main import app
+
+    # This suite drives many real logins across a single client IP within a
+    # minute; the login rate limiter (10/min) is not what these flows test, so
+    # disable it here to avoid cross-test 429s. The DB-backed import-attempt
+    # limiter (its own 429 tests) is independent and unaffected.
+    limiter.enabled = False
 
     with TestClient(app, base_url="http://test") as client:
         yield client
