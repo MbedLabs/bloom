@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, Response
 from sqlalchemy.exc import IntegrityError
 from starlette.requests import Request
 
@@ -210,25 +210,32 @@ async def test_reset_password_updates_user_hash_and_marks_token_used(monkeypatch
         hashed_password=get_password_hash("old-password"),
         role=UserRole.maintainer,
         is_active=True,
+        session_version=1,
     )
     user_token = SimpleNamespace(user_id=user.id)
 
     get_valid = AsyncMock(return_value=user_token)
     mark_used = AsyncMock()
+    invalidate = AsyncMock()
     monkeypatch.setattr(auth_api, "get_valid_token", get_valid)
     monkeypatch.setattr(auth_api, "mark_token_used", mark_used)
+    monkeypatch.setattr(auth_api, "invalidate_all_refresh_tokens", invalidate)
 
     db = SimpleNamespace(get=AsyncMock(return_value=user), flush=AsyncMock())
 
-    response = await auth_api.reset_password(
+    result = await auth_api.reset_password(
         data=ResetPasswordRequest(token="valid-token", new_password="new-password-123"),
+        response=Response(),
         db=db,
     )
 
-    assert response.message == "Password reset successfully"
+    assert result.message == "Password reset successfully"
     assert verify_password("new-password-123", user.hashed_password)
     assert user.password_set_at is not None
+    # Reset ends every existing session: version bump + refresh-token revocation.
+    assert user.session_version == 2
     mark_used.assert_awaited_once_with(db, user_token)
+    invalidate.assert_awaited_once_with(db, user.id)
     db.flush.assert_awaited_once()
 
 
@@ -246,6 +253,7 @@ async def test_reset_password_rejects_invalid_expired_or_used_tokens(detail, mon
     with pytest.raises(HTTPException) as exc:
         await auth_api.reset_password(
             data=ResetPasswordRequest(token="bad-token", new_password="new-password-123"),
+            response=Response(),
             db=db,
         )
 
