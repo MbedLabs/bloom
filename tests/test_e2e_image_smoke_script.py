@@ -23,6 +23,10 @@ args = sys.argv[1:]
 with open(os.environ["DOCKER_ARGV_LOG"], "a", encoding="utf-8") as log:
     log.write(json.dumps(args) + "\\n")
 
+if "current" in args:
+    print("0123456789ab (head)")
+    sys.exit(0)
+
 if args and args[0] == "run" and "--name" in args:
     name = args[args.index("--name") + 1]
     if name.startswith("bloom-e2e-app-"):
