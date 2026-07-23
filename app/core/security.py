@@ -67,6 +67,12 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
 
+    # Reject tokens minted before a password/reset/email-change bumped the
+    # user's session_version. Missing "ver" (a token predating this feature)
+    # never matches, so those tokens are also retired on first use.
+    if payload.get("ver") != user.session_version:
+        raise credentials_exception
+
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="User account is deactivated"

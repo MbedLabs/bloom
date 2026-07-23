@@ -45,6 +45,7 @@ from app.services.token_service import (
     create_user_token,
     find_token,
     get_valid_token,
+    invalidate_all_refresh_tokens,
     mark_token_used,
 )
 
@@ -112,7 +113,9 @@ async def login(
             detail="User account is deactivated",
         )
 
-    access_token = create_access_token(data={"sub": str(user.id), "type": "user"})
+    access_token = create_access_token(
+        data={"sub": str(user.id), "type": "user", "ver": user.session_version}
+    )
     await _issue_refresh_cookie(db, response, user.id)
 
     return TokenResponse(
@@ -152,7 +155,9 @@ async def refresh(
     # Rotate: burn the presented token, issue a fresh one.
     await mark_token_used(db, token_row)
     await _issue_refresh_cookie(db, response, user.id)
-    access_token = create_access_token(data={"sub": str(user.id), "type": "user"})
+    access_token = create_access_token(
+        data={"sub": str(user.id), "type": "user", "ver": user.session_version}
+    )
 
     return TokenResponse(
         access_token=access_token,
@@ -204,6 +209,7 @@ async def update_me(
 @router.put("/me/password", response_model=UserResponse)
 async def change_password(
     data: PasswordChange,
+    response: Response,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -211,6 +217,12 @@ async def change_password(
         raise HTTPException(status_code=400, detail="Current password is incorrect")
     current_user.hashed_password = get_password_hash(data.new_password)
     current_user.password_set_at = datetime.utcnow()
+    # End every existing session: retire outstanding access tokens (version bump)
+    # and refresh tokens, and drop this device's refresh cookie. A fresh login is
+    # required afterward.
+    current_user.session_version += 1
+    await invalidate_all_refresh_tokens(db, current_user.id)
+    _clear_refresh_cookie(response)
     await db.flush()
     await db.refresh(current_user)
     return UserResponse.model_validate(current_user)
@@ -375,7 +387,11 @@ async def forgot_password(
 
 
 @router.post("/reset-password", response_model=GenericMessageResponse)
-async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+async def reset_password(
+    data: ResetPasswordRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
     try:
         user_token = await get_valid_token(
             db,
@@ -391,7 +407,11 @@ async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(
 
     user.hashed_password = get_password_hash(data.new_password)
     user.password_set_at = datetime.utcnow()
+    # End every existing session, exactly as on password change.
+    user.session_version += 1
     await mark_token_used(db, user_token)
+    await invalidate_all_refresh_tokens(db, user.id)
+    _clear_refresh_cookie(response)
     await db.flush()
     return GenericMessageResponse(message="Password reset successfully")
 
