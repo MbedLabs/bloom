@@ -212,13 +212,9 @@ async def test_reset_password_updates_user_hash_and_marks_token_used(monkeypatch
         is_active=True,
         session_version=1,
     )
-    user_token = SimpleNamespace(user_id=user.id)
-
-    get_valid = AsyncMock(return_value=user_token)
-    mark_used = AsyncMock()
+    claim = AsyncMock(return_value=SimpleNamespace(id=1, user_id=user.id))
     invalidate = AsyncMock()
-    monkeypatch.setattr(auth_api, "get_valid_token", get_valid)
-    monkeypatch.setattr(auth_api, "mark_token_used", mark_used)
+    monkeypatch.setattr(auth_api, "claim_token", claim)
     monkeypatch.setattr(auth_api, "invalidate_all_refresh_tokens", invalidate)
 
     db = SimpleNamespace(get=AsyncMock(return_value=user), flush=AsyncMock())
@@ -232,9 +228,10 @@ async def test_reset_password_updates_user_hash_and_marks_token_used(monkeypatch
     assert result.message == "Password reset successfully"
     assert verify_password("new-password-123", user.hashed_password)
     assert user.password_set_at is not None
-    # Reset ends every existing session: version bump + refresh-token revocation.
+    # Reset atomically consumes the token, then ends every existing session:
+    # version bump + refresh-token revocation.
     assert user.session_version == 2
-    mark_used.assert_awaited_once_with(db, user_token)
+    claim.assert_awaited_once()
     invalidate.assert_awaited_once_with(db, user.id)
     db.flush.assert_awaited_once()
 
@@ -245,8 +242,8 @@ async def test_reset_password_updates_user_hash_and_marks_token_used(monkeypatch
     ["Invalid token", "Token has expired", "Token has already been used"],
 )
 async def test_reset_password_rejects_invalid_expired_or_used_tokens(detail, monkeypatch):
-    get_valid = AsyncMock(side_effect=TokenValidationError(detail))
-    monkeypatch.setattr(auth_api, "get_valid_token", get_valid)
+    claim = AsyncMock(side_effect=TokenValidationError(detail))
+    monkeypatch.setattr(auth_api, "claim_token", claim)
 
     db = SimpleNamespace(get=AsyncMock(), flush=AsyncMock())
 
