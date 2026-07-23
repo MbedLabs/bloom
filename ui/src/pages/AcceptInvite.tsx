@@ -1,12 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useSearchParams } from 'react-router-dom'
+import { useOneTimeToken } from '../hooks/useOneTimeToken'
 import { APP_VERSION, InviteInfoResponse, authApi, extractApiErrorMessage } from '../api/client'
 import { BLOOM_LOGO_DARK, BLOOM_LOGO_LIGHT } from '../brandAssets'
 
 export default function AcceptInvite() {
-  const [searchParams] = useSearchParams()
-  const token = useMemo(() => searchParams.get('token') || '', [searchParams])
+  const token = useOneTimeToken()
 
   const [inviteInfo, setInviteInfo] = useState<InviteInfoResponse | null>(null)
   const [loadingInviteInfo, setLoadingInviteInfo] = useState(true)

@@ -28,6 +28,7 @@ from app.schemas.auth import (
     EmailChangeRequest,
     ForgotPasswordRequest,
     GenericMessageResponse,
+    InviteInfoRequest,
     InviteInfoResponse,
     LoginRequest,
     PasswordChange,
@@ -239,7 +240,7 @@ async def request_email_change(
         purpose=UserTokenPurpose.email_change,
         ttl_hours=settings.EMAIL_VERIFICATION_TOKEN_TTL_HOURS,
     )
-    confirm_link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/confirm-email-change?token={token}"
+    confirm_link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/confirm-email-change#token={token}"
     try:
         send_email_change_email(
             to_email=new_email,
@@ -330,9 +331,9 @@ async def change_password(
     return UserResponse.model_validate(current_user)
 
 
-@router.get("/invite-info", response_model=InviteInfoResponse)
-async def get_invite_info(token: str, db: AsyncSession = Depends(get_db)):
-    user_token = await find_token(db, token=token, purpose=UserTokenPurpose.invite)
+@router.post("/invite-info", response_model=InviteInfoResponse)
+async def get_invite_info(data: InviteInfoRequest, db: AsyncSession = Depends(get_db)):
+    user_token = await find_token(db, token=data.token, purpose=UserTokenPurpose.invite)
     if user_token is None:
         raise HTTPException(status_code=400, detail="Invalid token")
 
@@ -419,7 +420,7 @@ async def resend_verification(
         ttl_hours=settings.EMAIL_VERIFICATION_TOKEN_TTL_HOURS,
     )
     verification_link = (
-        f"{settings.FRONTEND_BASE_URL.rstrip('/')}/verify-email?token={verification_token}"
+        f"{settings.FRONTEND_BASE_URL.rstrip('/')}/verify-email#token={verification_token}"
     )
 
     try:
@@ -457,7 +458,7 @@ async def forgot_password(
         purpose=UserTokenPurpose.password_reset,
         ttl_hours=settings.PASSWORD_RESET_TOKEN_TTL_HOURS,
     )
-    reset_link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/reset-password?token={reset_token}"
+    reset_link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/reset-password#token={reset_token}"
 
     try:
         send_password_reset_email(

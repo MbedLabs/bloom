@@ -106,7 +106,7 @@ async def invite_user(
         ttl_hours=settings.INVITE_TOKEN_TTL_HOURS,
         created_by_user_id=admin.id,
     )
-    invite_link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/accept-invite?token={invite_token}"
+    invite_link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/accept-invite#token={invite_token}"
 
     try:
         send_invite_email(
@@ -150,7 +150,7 @@ async def resend_invite(
         ttl_hours=settings.INVITE_TOKEN_TTL_HOURS,
         created_by_user_id=admin.id,
     )
-    invite_link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/accept-invite?token={invite_token}"
+    invite_link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/accept-invite#token={invite_token}"
 
     try:
         send_invite_email(
