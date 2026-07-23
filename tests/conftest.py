@@ -50,6 +50,11 @@ else:
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characters-long")
 os.environ.setdefault("BLOOM_DISABLE_RATE_LIMIT", "1")
 
+# A valid Fernet key so integration-credential encryption works in tests.
+from cryptography.fernet import Fernet as _Fernet  # noqa: E402
+
+os.environ.setdefault("BLOOM_INTEGRATION_ENCRYPTION_KEY", _Fernet.generate_key().decode())
+
 
 def _postgres_available_from_env() -> bool:
     database_url = os.environ.get("DATABASE_URL") or os.environ.get("BLOOM_DATABASE_URL")

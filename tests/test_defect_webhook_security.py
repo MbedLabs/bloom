@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.api import integrations
 from app.core.database import Base, get_db
 from app.models import Defect, DefectSyncEvent, IntegrationSetting, Project
+from app.services.integration_secrets import encrypt_integration_secret
 
 SECRET = "hook-secret-123"
 
@@ -59,12 +60,18 @@ async def env():
         )
         setup.add(
             IntegrationSetting(
-                project_id=project.id, tracker="github", webhook_secret=SECRET, enabled=True
+                project_id=project.id,
+                tracker="github",
+                webhook_secret=encrypt_integration_secret(SECRET),
+                enabled=True,
             )
         )
         setup.add(
             IntegrationSetting(
-                project_id=project.id, tracker="gitlab", webhook_secret=SECRET, enabled=True
+                project_id=project.id,
+                tracker="gitlab",
+                webhook_secret=encrypt_integration_secret(SECRET),
+                enabled=True,
             )
         )
         await setup.commit()
