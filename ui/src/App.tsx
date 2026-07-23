@@ -13,6 +13,7 @@ import ImpactAnalysis from './pages/ImpactAnalysis'
 import TestCampaigns from './pages/TestCampaigns'
 import CampaignDetail from './pages/CampaignDetail'
 import ResetPassword from './pages/ResetPassword'
+import ConfirmEmailChange from './pages/ConfirmEmailChange'
 import SuiteDetail from './pages/SuiteDetail'
 import Reports from './pages/Reports'
 import Baselines from './pages/Baselines'
@@ -51,6 +52,7 @@ function App() {
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/confirm-email-change" element={<ConfirmEmailChange />} />
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
         <Route path="projects" element={<Projects />} />
