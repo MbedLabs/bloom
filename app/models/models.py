@@ -634,7 +634,9 @@ class IntegrationSetting(Base):
     tracker: Mapped[str] = mapped_column(String(20), nullable=False)
     base_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     token_encrypted: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    webhook_secret: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    # Text (not String(255)) because the stored value is a Fernet envelope, which
+    # can exceed 255 chars for longer secrets.
+    webhook_secret: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     enabled: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(

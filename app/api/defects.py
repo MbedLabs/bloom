@@ -27,6 +27,7 @@ from app.core.security import (
 from app.models import Defect, IntegrationSetting, Project
 from app.models.user import User, UserRole
 from app.schemas import DefectCreate, DefectResponse, DefectUpdate, PaginatedResponse
+from app.services.integration_secrets import decrypt_integration_secret
 
 logger = logging.getLogger(__name__)
 
@@ -301,7 +302,7 @@ async def refresh_external_issue(
                     "Add an integration token in project parameters or pass one explicitly."
                 ),
             )
-        token = setting.token_encrypted
+        token = decrypt_integration_secret(setting.token_encrypted)
 
     try:
         if item.external_tracker == "github":
