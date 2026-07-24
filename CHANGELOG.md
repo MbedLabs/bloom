@@ -23,6 +23,7 @@
 - ReqIF archives are validated while streaming and parsed in a time-limited worker process.
 - Signed webhook deliveries have replay protection.
 - Python and npm dependency vulnerability scans block CI on actionable findings.
+- Upgraded react-router to 7.18.1, closing moderate advisories including an open redirect via `<Link>`/`useNavigate` (GHSA-wrjc-x8rr-h8h6).
 
 ## 1.0.0
 
