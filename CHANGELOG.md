@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 1.0.0 - 2026-07-24
+
+Initial public beta release of Bloom PLM by EmbedLabs — a self-hosted product
+lifecycle management platform. Published as a multi-architecture container image
+with PostgreSQL-backed deployment, Alembic migrations, liveness/readiness health
+checks, and persistent project data.
 
 ### Added
 
@@ -20,12 +25,11 @@
 
 ### Security
 
+- External tracker credentials and webhook secrets are encrypted at rest (Fernet) and are never returned through APIs; production refuses to start without a valid encryption key.
 - ReqIF archives are validated while streaming and parsed in a time-limited worker process.
 - Signed webhook deliveries have replay protection.
+- Passwords must be at least 12 characters; changing or resetting a password signs out all existing sessions.
+- One-time links (invitation, email verification, password reset, email change) carry their token only in the URL fragment and are single-use, keeping tokens out of request targets, server logs, and the Referer header.
+- Changing an account email requires confirming the new address before it takes effect.
 - Python and npm dependency vulnerability scans block CI on actionable findings.
 - Upgraded react-router to 7.18.1, closing moderate advisories including an open redirect via `<Link>`/`useNavigate` (GHSA-wrjc-x8rr-h8h6).
-
-## 1.0.0
-
-- Initial beta release of Bloom PLM by EmbedLabs as a self-hosted product lifecycle management platform.
-- Published a multi-architecture container image with PostgreSQL-backed deployment, migrations, health checks, and persistent project data.

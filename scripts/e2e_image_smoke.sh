@@ -49,6 +49,9 @@ ENV_ARGS=(
   -e "BLOOM_ENV=production"
   -e "DATABASE_URL=${DATABASE_URL}"
   -e "SECRET_KEY=e2e-secret-key-that-is-definitely-long-enough-0123456789"
+  # Production now refuses to boot without a valid Fernet key (credentials are
+  # encrypted at rest). Throwaway key for this ephemeral container only.
+  -e "BLOOM_INTEGRATION_ENCRYPTION_KEY=i4d1_ToTN0MIR05ZRrKzNyUQo3f2UOsYT37dmkQ0oe0="
   -e "ADMIN_EMAIL=${ADMIN_EMAIL}"
   -e "ADMIN_PASSWORD=${ADMIN_PASSWORD}"
   -e "ADMIN_FULL_NAME=E2E Admin"
@@ -169,6 +172,11 @@ ready="$(curl -fsS "${BASE}/api/ready")"
 echo "    ready = ${ready}"
 printf '%s' "$ready" | grep -q '"database":"connected"' \
   || fail "/api/ready did not confirm the database"
+
+log "/api/version must report the released version (1.0.0)"
+version="$(curl -fsS "${BASE}/api/version" | json_field version)"
+echo "    /api/version = ${version}"
+[ "$version" = "1.0.0" ] || fail "/api/version reported '${version}', expected 1.0.0"
 
 log "Admin login"
 token="$(login)"
