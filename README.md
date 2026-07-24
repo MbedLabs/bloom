@@ -2,6 +2,8 @@
 
 Bloom PLM by EmbedLabs is a source-available product lifecycle management application for requirements, controlled documents, verification assets, test planning, risks, changes, defects, baselines, and end-to-end traceability.
 
+> **Release status:** 1.0.0 public beta. See the [changelog](CHANGELOG.md) for what this release includes.
+
 ## Licence status
 
 Bloom is distributed under the [EmbedLabs Source Available License 1.0](LICENSE). It is **source-available**, not Open Source under the Open Source Definition.
@@ -66,13 +68,20 @@ openssl rand -hex 32
 openssl rand -hex 24
 ```
 
+`INTEGRATION_ENCRYPTION_KEY` must be a Fernet key (not a hex string) — it encrypts external tracker credentials and webhook secrets at rest:
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
 Replace every active placeholder in `.env`. At minimum configure:
 
 - `POSTGRES_PASSWORD`
 - `SECRET_KEY`
 - `SERVICE_TOKEN_PEPPER`
+- `INTEGRATION_ENCRYPTION_KEY`
 - `ADMIN_EMAIL`
-- `ADMIN_PASSWORD`
+- `ADMIN_PASSWORD` (at least 16 characters in production)
 - `ADMIN_FULL_NAME`
 - `APP_BASE_URL`
 - `FRONTEND_BASE_URL`
@@ -80,11 +89,13 @@ Replace every active placeholder in `.env`. At minimum configure:
 
 Set `BUD_APP_URL` only when Bud navigation and result links are required.
 
+In production (`BLOOM_ENV=production`) Bloom fails closed at startup: `SECRET_KEY` must be a strong non-placeholder value of at least 32 characters, `ADMIN_PASSWORD` must be changed from the default and at least 16 characters, and `INTEGRATION_ENCRYPTION_KEY` must be a valid Fernet key so integration credentials are always encrypted at rest. The reference Compose file additionally refuses to start unless `POSTGRES_PASSWORD`, `SECRET_KEY`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` are set.
+
 Keep `RUN_STARTUP_DATA_REPAIR=false` in production. Set `AUTO_SEED_ADMIN=true` only for the one-time first-administrator bootstrap on a new empty database, then restore it to `false` immediately.
 
 ### 3. Pull, migrate, and start
 
-The reference Compose deployment waits for PostgreSQL, runs Alembic migrations, and starts Bloom:
+Pin the image by setting `BLOOM_VERSION` in `.env` (for example `BLOOM_VERSION=1.0.0`; the default is `stable`). The reference Compose deployment waits for PostgreSQL, runs Alembic migrations (`alembic upgrade head`) before the app serves traffic, and starts Bloom:
 
 ```bash
 docker compose pull
@@ -130,16 +141,38 @@ See [`docs/OPERATIONS.md`](docs/OPERATIONS.md) for backup, restore, upgrade, and
 
 ## Image tags
 
+Set `BLOOM_VERSION` in `.env` to the tag `docker compose` should pull.
+
 | Container tag | Meaning |
 |---|---|
-| `dev` | Rolling image from the `dev` branch |
-| `latest` | Rolling image from `main`; not guaranteed to be a stable release |
+| `1.0.0` | Exact production version — pin this for production |
+| `1.0` / `1` | Moving stable channels tracking the newest `1.0.x` / `1.x` |
 | `stable` | Newest stable semantic-version release |
-| `1.2.3` | Exact production version |
-| `1.2` / `1` | Moving stable channels |
-| `sha-...` | Exact source/image traceability |
+| `latest` | Rolling image from `main`; not guaranteed to be a stable release |
+| `dev` | Rolling image from the `dev` branch |
+| `sha-<commit>` | Immutable image for exact source/image traceability |
 
-Pin a full semantic version for production.
+Every moving tag (`stable`, `latest`, `1.0`, `1`, a branch name) is promoted to an image only after that exact image passes the published-image end-to-end tests, so a tag never resolves to an untested build. Pin a full semantic version (`BLOOM_VERSION=1.0.0`) for production.
+
+## Upgrading
+
+1. Read the [changelog](CHANGELOG.md) for the target release, and back up the `bloom-postgres-data` volume and your deployment secrets first (see [Persistence and backups](#persistence-and-backups)).
+2. Set the new version in `.env`, for example `BLOOM_VERSION=1.0.0`.
+3. Pull and restart. The Bloom container runs `alembic upgrade head` before it serves traffic:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+4. Confirm the running image and database:
+
+```bash
+curl -fsS http://localhost:8000/api/version
+curl -fsS http://localhost:8000/api/ready
+```
+
+To roll back, restore the pre-upgrade database backup and set `BLOOM_VERSION` to the previous release. Downgrades that require reversing a migration are not supported — restore from backup instead.
 
 ## Security and documentation
 

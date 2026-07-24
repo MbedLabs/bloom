@@ -340,3 +340,63 @@ def test_production_startup_data_repair_can_be_explicitly_enabled(monkeypatch):
     settings = Settings(_env_file=None)
 
     assert settings.RUN_STARTUP_DATA_REPAIR is True
+
+
+def test_production_requires_integration_encryption_key(monkeypatch):
+    clear_config_env(monkeypatch)
+
+    monkeypatch.delenv("BLOOM_INTEGRATION_ENCRYPTION_KEY", raising=False)
+    monkeypatch.delenv("INTEGRATION_ENCRYPTION_KEY", raising=False)
+    monkeypatch.setenv("BLOOM_ENV", "production")
+    monkeypatch.setenv("BLOOM_SECRET_KEY", "b" * 32)
+    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@embedlabs.net")
+    monkeypatch.setenv("BLOOM_ADMIN_PASSWORD", "this-is-a-long-password")
+
+    import pytest
+
+    with pytest.raises(ValueError, match="INTEGRATION_ENCRYPTION_KEY"):
+        Settings(_env_file=None)
+
+
+def test_production_rejects_invalid_integration_encryption_key(monkeypatch):
+    clear_config_env(monkeypatch)
+
+    monkeypatch.setenv("BLOOM_ENV", "production")
+    monkeypatch.setenv("BLOOM_SECRET_KEY", "b" * 32)
+    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@embedlabs.net")
+    monkeypatch.setenv("BLOOM_ADMIN_PASSWORD", "this-is-a-long-password")
+    monkeypatch.setenv("BLOOM_INTEGRATION_ENCRYPTION_KEY", "not-a-valid-fernet-key")
+
+    import pytest
+
+    with pytest.raises(ValueError, match="Fernet"):
+        Settings(_env_file=None)
+
+
+def test_production_accepts_valid_integration_encryption_key(monkeypatch):
+    from cryptography.fernet import Fernet
+
+    clear_config_env(monkeypatch)
+
+    monkeypatch.setenv("BLOOM_ENV", "production")
+    monkeypatch.setenv("BLOOM_SECRET_KEY", "b" * 32)
+    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@embedlabs.net")
+    monkeypatch.setenv("BLOOM_ADMIN_PASSWORD", "this-is-a-long-password")
+    monkeypatch.setenv("BLOOM_INTEGRATION_ENCRYPTION_KEY", Fernet.generate_key().decode())
+
+    settings = Settings(_env_file=None)
+
+    assert settings.BLOOM_ENV == "production"
+
+
+def test_development_allows_missing_integration_encryption_key(monkeypatch):
+    clear_config_env(monkeypatch)
+
+    monkeypatch.delenv("BLOOM_INTEGRATION_ENCRYPTION_KEY", raising=False)
+    monkeypatch.delenv("INTEGRATION_ENCRYPTION_KEY", raising=False)
+    monkeypatch.setenv("BLOOM_ENV", "development")
+    monkeypatch.setenv("BLOOM_SECRET_KEY", "b" * 32)
+
+    settings = Settings(_env_file=None)
+
+    assert settings.INTEGRATION_ENCRYPTION_KEY == ""
