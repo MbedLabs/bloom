@@ -1,5 +1,6 @@
 import { Routes, Route, Link } from 'react-router-dom'
 import Layout from './components/Layout'
+import PoweredByEmbedLabs from './components/PoweredByEmbedLabs'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import AcceptInvite from './pages/AcceptInvite'
@@ -46,7 +47,8 @@ function NotFound() {
 
 function App() {
   return (
-    <Routes>
+    <>
+      <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
@@ -79,7 +81,9 @@ function App() {
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<NotFound />} />
       </Route>
-    </Routes>
+      </Routes>
+      <PoweredByEmbedLabs />
+    </>
   )
 }
 

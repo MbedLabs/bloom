@@ -45,8 +45,11 @@ class User(Base):
     password_set_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     email_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     # A requested-but-unconfirmed new address. The login email only changes once
-    # the confirmation token sent to this address is claimed.
+    # an administrator approves the request and the confirmation token sent to
+    # this address is claimed.
     pending_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    email_change_status: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    email_change_requested_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     api_token_jti: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(

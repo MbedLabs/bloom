@@ -186,14 +186,6 @@ export default function AcceptInvite() {
         <div className="text-center mt-6">
           <p className="text-sm text-violet-100/70">Bloom PLM</p>
           <p className="text-xs text-violet-200/50 mt-1">v{APP_VERSION}</p>
-          <a
-            href="https://www.embedlabs.net"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-gray-300/50 mt-1 inline-block hover:text-gray-200 transition-colors"
-          >
-            by EmbedLabs
-          </a>
         </div>
       </div>
     </div>

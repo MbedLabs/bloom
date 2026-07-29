@@ -9,7 +9,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import List, Optional
 
-from cryptography.fernet import Fernet
 from pydantic import AliasChoices, EmailStr, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -56,7 +55,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("BLOOM_SERVICE_TOKEN_PEPPER", "SERVICE_TOKEN_PEPPER"),
     )
     # Fernet key encrypting external tracker credentials and webhook secrets at
-    # rest. Required in production to store or use integration credentials; the
+    # rest. Required only to store or use integration credentials; the
     # integration_secrets service fails closed (503) when it is missing/invalid.
     # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     INTEGRATION_ENCRYPTION_KEY: str = Field(
@@ -326,30 +325,6 @@ class Settings(BaseSettings):
             raise ValueError("ADMIN_PASSWORD must be changed before production startup.")
         if len(self.ADMIN_PASSWORD) < 16:
             raise ValueError("ADMIN_PASSWORD must be at least 16 characters long in production.")
-        return self
-
-    @model_validator(mode="after")
-    def require_integration_encryption_key_in_production(self):
-        # In production the app must not boot without a working encryption key.
-        # External tracker credentials and webhook secrets are encrypted at rest
-        # with this Fernet key; a missing or invalid key must fail fast at startup
-        # rather than surface only later as a 503 when integrations are used.
-        if self.BLOOM_ENV.lower() != "production":
-            return self
-        if not self.INTEGRATION_ENCRYPTION_KEY:
-            raise ValueError(
-                "BLOOM_INTEGRATION_ENCRYPTION_KEY must be set in production so external "
-                "tracker credentials and webhook secrets are encrypted at rest. Generate "
-                'one with: python -c "from cryptography.fernet import Fernet; '
-                'print(Fernet.generate_key().decode())"'
-            )
-        try:
-            Fernet(self.INTEGRATION_ENCRYPTION_KEY.encode("ascii"))
-        except (ValueError, UnicodeEncodeError) as exc:
-            raise ValueError(
-                "BLOOM_INTEGRATION_ENCRYPTION_KEY must be a valid Fernet key "
-                "(url-safe base64-encoded 32-byte key)."
-            ) from exc
         return self
 
     # C1: SECRET_KEY must be set explicitly — no insecure fallback in production

@@ -6,7 +6,7 @@ Bloom PLM by EmbedLabs is a source-available product lifecycle management applic
 
 ## Licence status
 
-Bloom is distributed under the [EmbedLabs Source Available License 1.0](LICENSE). It is **source-available**, not Open Source under the Open Source Definition.
+Bloom is distributed under the [EmbedLabs Source Available License 1.0](LICENSE).
 
 The licence permits personal, educational, evaluation, research, and internal business use, including modification for those permitted uses. A separate professional licence is required for resale, third-party hosting, managed services, commercial redistribution, white-labelling, or embedding Bloom in a third-party commercial offering.
 
@@ -59,27 +59,18 @@ cp .env.example .env
 
 ### 2. Configure secrets
 
-Generate independent values for PostgreSQL, application signing, scoped-service credentials, and the initial administrator password:
+Generate independent values for PostgreSQL, application signing, and the initial administrator password:
 
 ```bash
-openssl rand -hex 32
 openssl rand -hex 32
 openssl rand -hex 32
 openssl rand -hex 24
-```
-
-`INTEGRATION_ENCRYPTION_KEY` must be a Fernet key (not a hex string) — it encrypts external tracker credentials and webhook secrets at rest:
-
-```bash
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
 Replace every active placeholder in `.env`. At minimum configure:
 
 - `POSTGRES_PASSWORD`
 - `SECRET_KEY`
-- `SERVICE_TOKEN_PEPPER`
-- `INTEGRATION_ENCRYPTION_KEY`
 - `ADMIN_EMAIL`
 - `ADMIN_PASSWORD` (at least 16 characters in production)
 - `ADMIN_FULL_NAME`
@@ -89,7 +80,18 @@ Replace every active placeholder in `.env`. At minimum configure:
 
 Set `BUD_APP_URL` only when Bud navigation and result links are required.
 
-In production (`BLOOM_ENV=production`) Bloom fails closed at startup: `SECRET_KEY` must be a strong non-placeholder value of at least 32 characters, `ADMIN_PASSWORD` must be changed from the default and at least 16 characters, and `INTEGRATION_ENCRYPTION_KEY` must be a valid Fernet key so integration credentials are always encrypted at rest. The reference Compose file additionally refuses to start unless `POSTGRES_PASSWORD`, `SECRET_KEY`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` are set.
+In production (`BLOOM_ENV=production`) Bloom fails closed at startup when `SECRET_KEY` is missing or weak, or when `ADMIN_PASSWORD` is unchanged or shorter than 16 characters. The reference Compose file additionally refuses to start unless `POSTGRES_PASSWORD`, `SECRET_KEY`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` are set.
+
+Two independent optional features have their own secrets:
+
+- Set `SERVICE_TOKEN_PEPPER` to at least 32 random characters only when Bloom will issue or validate Bud result-sync credentials.
+- Set `INTEGRATION_ENCRYPTION_KEY` only when configuring GitHub or GitLab issue synchronization. It must be a Fernet key:
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Bloom starts and all unrelated features work without `INTEGRATION_ENCRYPTION_KEY`. Creating, updating, or using GitHub/GitLab tracker secrets fails closed with a clear `503` until a valid key is configured.
 
 Keep `RUN_STARTUP_DATA_REPAIR=false` in production. Set `AUTO_SEED_ADMIN=true` only for the one-time first-administrator bootstrap on a new empty database, then restore it to `false` immediately.
 
@@ -117,6 +119,10 @@ curl -fsS http://localhost:8000/api/ready
 
 `/api/health` is process liveness. `/api/ready` verifies PostgreSQL connectivity.
 
+## Email delivery
+
+SMTP is optional when evaluating Bloom with only the pre-seeded administrator. It is required for user invitations, password resets, and approved email changes. Configure `SMTP_ENABLED=true` together with `SMTP_HOST`, `SMTP_FROM_EMAIL`, and the authentication/TLS values required by your mail server before using those workflows.
+
 ## ReqIF imports
 
 Bloom validates bounded ReqIF imports before processing. Current protections include request-size, archive-entry, uncompressed-size, compression-ratio, object-count, relation-count, hierarchy-depth, timeout, rate, and per-project concurrency limits.
@@ -127,9 +133,10 @@ These controls validate structure and resource consumption. They are not a malwa
 
 Bloom and Bud are independently deployable. When both are used:
 
-1. Create a narrowly scoped Bud result-sync credential in Bloom.
-2. Configure the Bloom URL and credential in Bud.
-3. Set Bloom's `BUD_APP_URL` when navigation and execution links should open Bud.
+1. Set Bloom's `SERVICE_TOKEN_PEPPER` to an independent random value of at least 32 characters and restart Bloom.
+2. Sign in to Bloom as an administrator, open **Settings → Bud Result-Sync Credentials**, and create a credential. Copy the raw `blm_sync_…` value immediately; it is shown only once.
+3. In Bud, configure `BUD_INTEGRATION_ENCRYPTION_KEY`, then open **Settings → PLM Integration (Bloom)** and save Bloom's reachable base URL plus the copied credential. Saving both values enables synchronization; clearing the credential disables it.
+4. Set Bloom's `BUD_APP_URL` when navigation and execution links should open Bud. Bud's optional deployment-time `BLOOM_APP_URL` controls only its Bloom sidebar link.
 
 The integration accepts test-case execution outcomes keyed by Bloom `tc_id`. It does not make Bloom dependent on Bud and does not synchronise complete campaigns, requirements, or documents.
 
@@ -157,6 +164,7 @@ Every moving tag (`stable`, `latest`, `1.0`, `1`, a branch name) is promoted to 
 ## Upgrading
 
 1. Read the [changelog](CHANGELOG.md) for the target release, and back up the `bloom-postgres-data` volume and your deployment secrets first (see [Persistence and backups](#persistence-and-backups)).
+   When upgrading to `1.0.0`, migration `d20260722a06` clears legacy plaintext GitHub/GitLab tokens and webhook secrets and disables the affected tracker integrations. Configure `INTEGRATION_ENCRYPTION_KEY`, re-enter rotated credentials, and explicitly enable those integrations again.
 2. Set the new version in `.env`, for example `BLOOM_VERSION=1.0.0`.
 3. Pull and restart. The Bloom container runs `alembic upgrade head` before it serves traffic:
 
