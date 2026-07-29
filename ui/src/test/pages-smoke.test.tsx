@@ -24,7 +24,7 @@ vi.mock('../components/ProtectedRoute', () => ({
   default: ({ children }: { children: unknown }) => children,
 }))
 
-describe('OSS readiness smoke', () => {
+describe('source-available readiness smoke', () => {
   it('User role contract includes external (not reviewer)', () => {
     const u: User = {
       id: 1,
@@ -69,6 +69,10 @@ describe('OSS readiness smoke', () => {
     )
 
     expect(html).toContain(marker)
+    expect(html).toContain('Powered by EmbedLabs')
+    expect(html).toContain('fixed bottom-3 left-3')
+    expect(html).toContain('text-gray-500')
+    expect(html).toContain('dark:text-white')
     consoleErrorSpy.mockRestore()
     vi.unstubAllGlobals()
   })

@@ -342,7 +342,7 @@ def test_production_startup_data_repair_can_be_explicitly_enabled(monkeypatch):
     assert settings.RUN_STARTUP_DATA_REPAIR is True
 
 
-def test_production_requires_integration_encryption_key(monkeypatch):
+def test_production_allows_missing_integration_encryption_key(monkeypatch):
     clear_config_env(monkeypatch)
 
     monkeypatch.delenv("BLOOM_INTEGRATION_ENCRYPTION_KEY", raising=False)
@@ -352,13 +352,13 @@ def test_production_requires_integration_encryption_key(monkeypatch):
     monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@embedlabs.net")
     monkeypatch.setenv("BLOOM_ADMIN_PASSWORD", "this-is-a-long-password")
 
-    import pytest
+    settings = Settings(_env_file=None)
 
-    with pytest.raises(ValueError, match="INTEGRATION_ENCRYPTION_KEY"):
-        Settings(_env_file=None)
+    assert settings.BLOOM_ENV == "production"
+    assert settings.INTEGRATION_ENCRYPTION_KEY == ""
 
 
-def test_production_rejects_invalid_integration_encryption_key(monkeypatch):
+def test_production_allows_invalid_key_until_tracker_integration_is_used(monkeypatch):
     clear_config_env(monkeypatch)
 
     monkeypatch.setenv("BLOOM_ENV", "production")
@@ -367,10 +367,9 @@ def test_production_rejects_invalid_integration_encryption_key(monkeypatch):
     monkeypatch.setenv("BLOOM_ADMIN_PASSWORD", "this-is-a-long-password")
     monkeypatch.setenv("BLOOM_INTEGRATION_ENCRYPTION_KEY", "not-a-valid-fernet-key")
 
-    import pytest
+    settings = Settings(_env_file=None)
 
-    with pytest.raises(ValueError, match="Fernet"):
-        Settings(_env_file=None)
+    assert settings.INTEGRATION_ENCRYPTION_KEY == "not-a-valid-fernet-key"
 
 
 def test_production_accepts_valid_integration_encryption_key(monkeypatch):

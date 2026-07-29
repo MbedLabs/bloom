@@ -8,6 +8,7 @@ interface AuthContextType {
   isAuthenticated: boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -19,7 +20,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadUser = useCallback(async () => {
     const token = getAuthToken()
     if (!token) {
-      setIsLoading(false)
+      try {
+        const session = await authApi.refresh()
+        setAuthToken(session.access_token)
+        setUser(session.user)
+      } catch {
+        clearAuthToken()
+        setUser(null)
+      } finally {
+        setIsLoading(false)
+      }
       return
     }
     try {
@@ -60,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated: !!user,
         login,
         logout,
+        refreshUser: loadUser,
       }}
     >
       {children}
