@@ -1,65 +1,60 @@
 # Bloom PLM by EmbedLabs
 
-Bloom PLM by EmbedLabs is a source-available product lifecycle management application for requirements, controlled documents, verification assets, test planning, risks, changes, defects, baselines, and end-to-end traceability.
+Bloom PLM is a self-hosted product lifecycle management platform for requirements, controlled documents, verification, risks, changes, defects, baselines, and end-to-end traceability.
 
-> **Release status:** 1.0.0 public beta. See the [changelog](CHANGELOG.md) for what this release includes.
-
-## Licence status
-
-Bloom is distributed under the [EmbedLabs Source Available License 1.0](LICENSE).
-
-The licence permits personal, educational, evaluation, research, and internal business use, including modification for those permitted uses. A separate professional licence is required for resale, third-party hosting, managed services, commercial redistribution, white-labelling, or embedding Bloom in a third-party commercial offering.
-
-The required `Powered by EmbedLabs` attribution must remain visible as described in the licence. Product names and logos are not licensed for modified forks.
-
-The separate `bud-runner` and `budtestlibrary` Python packages remain independent AGPL-3.0-only open-source projects. Their licences do not change Bloom's application licence.
-
-For professional licensing, deployment, integration, priority support, or custom development, contact `sales@embedlabs.de`.
-
-## Container image
-
-- **Image:** `ghcr.io/mbedlabs/bloom`
-- **Package:** [Bloom on GitHub Packages](https://github.com/orgs/MbedLabs/packages/container/package/bloom)
-- **Platforms:** `linux/amd64` and `linux/arm64`
-- **Container port:** `8080`
-- **Reference host port:** `8000`
-
-The published image contains the Bloom web application and API. You do not need to build the frontend or install Python dependencies to host it.
+> **Release:** 1.0.0 public beta
 
 ## What Bloom provides
 
-- Requirements and controlled-document management
-- Test cases, suites, campaigns, and test concepts
-- Risks, changes, defects, and baselines
-- Traceability links and coverage views
-- Stable human-readable project identifiers
-- Scoped project access for maintainers and external users
-- GitHub and GitLab defect integrations
-- Optional execution-result synchronisation from Bud
-- ReqIF import and export workflows
+- Requirements and controlled documents across supported artefact types
+- Test cases, suites, campaigns, concepts, and verification planning
+- Risks, changes, defects, parameters, and baselines
+- Traceability links, relationship views, and coverage analysis
+- Stable human-readable identifiers for controlled project records
+- Administrator, maintainer, and external-user access controls
+- ReqIF import plus CSV and PDF exports
+- GitHub and GitLab defect synchronization
+- Optional test-case execution outcomes from Bud TMP
+- Readiness, health, metrics, structured logging, and backup workflows
 
-Bloom works independently. Bud integration is optional and limited to test-case execution outcomes.
+## How Bloom fits with Bud
+
+Bloom manages product definition, traceability, and verification intent. Bud manages test execution evidence. Each product runs independently.
+
+When connected, the execution path is:
+
+1. Tests use [`budtestlibrary`](https://github.com/MbedLabs/bud-test-library) for lifecycle, assertions, results, and optional Bloom test-case metadata.
+2. [`bud-runner`](https://github.com/MbedLabs/bud-runner) executes those tests and uploads results to [Bud TMP](https://github.com/MbedLabs/bud).
+3. Bud sends scoped execution outcomes to the matching Bloom test cases.
+
+Bloom does not require Bud, `bud-runner`, or `budtestlibrary` for its PLM workflows.
 
 ## Quick start
 
-### Prerequisites
+### Requirements
 
 - Docker Engine with Docker Compose v2
-- Git
+- `curl`
 - `openssl`
 - Available host port `8000`
 
-### 1. Get the deployment files
+### 1. Download the deployment files
 
 ```bash
-git clone https://github.com/MbedLabs/bloom.git
-cd bloom
-cp .env.example .env
+mkdir bloom-deployment
+cd bloom-deployment
+
+curl -fsSLo compose.yaml \
+  https://raw.githubusercontent.com/MbedLabs/bloom/main/docker-compose.yml
+curl -fsSLo .env \
+  https://raw.githubusercontent.com/MbedLabs/bloom/main/.env.example
 ```
 
-### 2. Configure secrets
+This downloads only the deployment configuration. The application itself runs from `ghcr.io/mbedlabs/bloom`.
 
-Generate independent values for PostgreSQL, application signing, and the initial administrator password:
+### 2. Configure Bloom
+
+Generate independent secrets:
 
 ```bash
 openssl rand -hex 32
@@ -67,136 +62,148 @@ openssl rand -hex 32
 openssl rand -hex 24
 ```
 
-Replace every active placeholder in `.env`. At minimum configure:
+Open `.env` and set at least:
 
 - `POSTGRES_PASSWORD`
 - `SECRET_KEY`
 - `ADMIN_EMAIL`
-- `ADMIN_PASSWORD` (at least 16 characters in production)
+- `ADMIN_PASSWORD`
 - `ADMIN_FULL_NAME`
 - `APP_BASE_URL`
 - `FRONTEND_BASE_URL`
 - `BLOOM_APP_URL`
 
-Set `BUD_APP_URL` only when Bud navigation and result links are required.
+For a new database, set `AUTO_SEED_ADMIN=true` for the first startup. In production, Bloom rejects a missing or weak signing key and requires an administrator password of at least 16 characters.
 
-In production (`BLOOM_ENV=production`) Bloom fails closed at startup when `SECRET_KEY` is missing or weak, or when `ADMIN_PASSWORD` is unchanged or shorter than 16 characters. The reference Compose file additionally refuses to start unless `POSTGRES_PASSWORD`, `SECRET_KEY`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` are set.
+Keep `RUN_STARTUP_DATA_REPAIR=false`. The container applies database migrations with Alembic before starting the application.
 
-Two independent optional features have their own secrets:
+Optional features use independent secrets:
 
-- Set `SERVICE_TOKEN_PEPPER` to at least 32 random characters only when Bloom will issue or validate Bud result-sync credentials.
-- Set `INTEGRATION_ENCRYPTION_KEY` only when configuring GitHub or GitLab issue synchronization. It must be a Fernet key:
+- Set `SERVICE_TOKEN_PEPPER` to a random value of at least 32 characters when Bloom will issue scoped service credentials for Bud.
+- Set `INTEGRATION_ENCRYPTION_KEY` to a Fernet key when GitHub or GitLab defect synchronization will store credentials:
+
+  ```bash
+  python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+  ```
+
+Bloom starts without these optional secrets. Only the corresponding integration remains unavailable.
+
+### 3. Pull and start
 
 ```bash
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+docker compose -f compose.yaml pull
+docker compose -f compose.yaml up -d
 ```
 
-Bloom starts and all unrelated features work without `INTEGRATION_ENCRYPTION_KEY`. Creating, updating, or using GitHub/GitLab tracker secrets fails closed with a clear `503` until a valid key is configured.
-
-Keep `RUN_STARTUP_DATA_REPAIR=false` in production. Set `AUTO_SEED_ADMIN=true` only for the one-time first-administrator bootstrap on a new empty database, then restore it to `false` immediately.
-
-### 3. Pull, migrate, and start
-
-Pin the image by setting `BLOOM_VERSION` in `.env` (for example `BLOOM_VERSION=1.0.0`; the default is `stable`). The reference Compose deployment waits for PostgreSQL, runs Alembic migrations (`alembic upgrade head`) before the app serves traffic, and starts Bloom:
+Follow startup and migration logs:
 
 ```bash
-docker compose pull
-docker compose up -d
+docker compose -f compose.yaml logs -f bloom
 ```
 
-Check the migration and startup logs:
+After the first administrator has been created, set `AUTO_SEED_ADMIN=false` in `.env` and apply the configuration:
 
 ```bash
-docker compose logs -f bloom
+docker compose -f compose.yaml up -d bloom
 ```
 
 ### 4. Verify
 
 ```bash
-docker compose ps
+docker compose -f compose.yaml ps
 curl -fsS http://localhost:8000/api/ready
 ```
 
-`/api/health` is process liveness. `/api/ready` verifies PostgreSQL connectivity.
+Open `http://localhost:8000`.
 
-## Email delivery
+- `/api/health` checks process liveness.
+- `/api/ready` checks application readiness and PostgreSQL connectivity.
+- `/api/version` reports the running version.
 
-SMTP is optional when evaluating Bloom with only the pre-seeded administrator. It is required for user invitations, password resets, and approved email changes. Configure `SMTP_ENABLED=true` together with `SMTP_HOST`, `SMTP_FROM_EMAIL`, and the authentication/TLS values required by your mail server before using those workflows.
+## Connect Bloom to Bud
 
-## ReqIF imports
-
-Bloom validates bounded ReqIF imports before processing. Current protections include request-size, archive-entry, uncompressed-size, compression-ratio, object-count, relation-count, hierarchy-depth, timeout, rate, and per-project concurrency limits.
-
-These controls validate structure and resource consumption. They are not a malware scan.
-
-## Connect Bloom and Bud
-
-Bloom and Bud are independently deployable. When both are used:
+To receive test-case execution outcomes:
 
 1. Set Bloom's `SERVICE_TOKEN_PEPPER` to an independent random value of at least 32 characters and restart Bloom.
-2. Sign in to Bloom as an administrator, open **Settings → Bud Result-Sync Credentials**, and create a credential. Copy the raw `blm_sync_…` value immediately; it is shown only once.
-3. In Bud, configure `BUD_INTEGRATION_ENCRYPTION_KEY`, then open **Settings → PLM Integration (Bloom)** and save Bloom's reachable base URL plus the copied credential. Saving both values enables synchronization; clearing the credential disables it.
-4. Set Bloom's `BUD_APP_URL` when navigation and execution links should open Bud. Bud's optional deployment-time `BLOOM_APP_URL` controls only its Bloom sidebar link.
+2. In Bloom Settings, open **PLM Integration Token Management** and select **Create Credential**.
+3. Copy the `blm_sync_…` credential when it is shown. Bloom displays it only once.
+4. In Bud, configure `BUD_INTEGRATION_ENCRYPTION_KEY`.
+5. Open **Settings → PLM Integration (Bloom)** in Bud and save Bloom's reachable URL and the scoped credential.
+6. Set Bloom's `BUD_APP_URL` when Bloom navigation and execution links should open Bud.
 
-The integration accepts test-case execution outcomes keyed by Bloom `tc_id`. It does not make Bloom dependent on Bud and does not synchronise complete campaigns, requirements, or documents.
+The integration accepts test-case execution outcomes identified by Bloom `tc_id`. It does not synchronize complete campaigns, requirements, documents, or unrestricted Bloom data.
 
-## Persistence and backups
+## ReqIF
 
-Bloom's durable application state is stored in PostgreSQL through the `bloom-postgres-data` volume. Back up the database and deployment secrets together, and test restoration on a separate instance.
+Bloom validates ReqIF imports before processing them. Controls cover request size, archive entries, uncompressed member size, compression ratio, object and relation counts, hierarchy depth, processing time, request rate, and per-project concurrency.
 
-See [`docs/OPERATIONS.md`](docs/OPERATIONS.md) for backup, restore, upgrade, and disaster-recovery procedures.
+These controls limit malformed or resource-intensive imports; they are not a malware scanner.
 
-## Image tags
+## Email
 
-Set `BLOOM_VERSION` in `.env` to the tag `docker compose` should pull.
+SMTP is optional for an installation that uses only the initial administrator. It is required for invitations, password resets, email verification, and approved email changes.
 
-| Container tag | Meaning |
+Set `SMTP_ENABLED=true` and configure the SMTP host, sender, authentication, and TLS values in `.env` before using those workflows.
+
+## Data and backups
+
+Bloom stores durable application data in the `bloom-postgres-data` PostgreSQL volume. Back up that volume and the deployment secrets together, and test restoration on a separate installation.
+
+Detailed backup, restore, upgrade, and recovery procedures are in [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
+
+## Images and versions
+
+- **Image:** `ghcr.io/mbedlabs/bloom`
+- **Package:** [Bloom on GitHub Packages](https://github.com/orgs/MbedLabs/packages/container/package/bloom)
+- **Platforms:** `linux/amd64`, `linux/arm64`
+- **Container port:** `8080`
+- **Default host port:** `8000`
+
+Set `BLOOM_VERSION` in `.env`:
+
+| Tag | Use |
 |---|---|
-| `1.0.0` | Exact production version — pin this for production |
-| `1.0` / `1` | Moving stable channels tracking the newest `1.0.x` / `1.x` |
-| `stable` | Newest stable semantic-version release |
-| `latest` | Rolling image from `main`; not guaranteed to be a stable release |
-| `dev` | Rolling image from the `dev` branch |
-| `sha-<commit>` | Immutable image for exact source/image traceability |
+| `1.0.0` | Immutable production release |
+| `1.0` / `1` | Moving release channels |
+| `stable` | Newest stable release |
+| `latest` | Rolling image from `main` |
+| `dev` | Rolling image from `dev` |
+| `sha-<commit>` | Exact source and image revision |
 
-Every moving tag (`stable`, `latest`, `1.0`, `1`, a branch name) is promoted to an image only after that exact image passes the published-image end-to-end tests, so a tag never resolves to an untested build. Pin a full semantic version (`BLOOM_VERSION=1.0.0`) for production.
+Pin a complete version such as `1.0.0` for production.
 
-## Upgrading
+## Upgrade
 
-1. Read the [changelog](CHANGELOG.md) for the target release, and back up the `bloom-postgres-data` volume and your deployment secrets first (see [Persistence and backups](#persistence-and-backups)).
-   When upgrading to `1.0.0`, migration `d20260722a06` clears legacy plaintext GitHub/GitLab tokens and webhook secrets and disables the affected tracker integrations. Configure `INTEGRATION_ENCRYPTION_KEY`, re-enter rotated credentials, and explicitly enable those integrations again.
-2. Set the new version in `.env`, for example `BLOOM_VERSION=1.0.0`.
-3. Pull and restart. The Bloom container runs `alembic upgrade head` before it serves traffic:
+1. Read [`CHANGELOG.md`](CHANGELOG.md).
+2. Back up `bloom-postgres-data` and `.env`.
+3. Set the target `BLOOM_VERSION`.
+4. Pull and restart:
 
-```bash
-docker compose pull
-docker compose up -d
-```
+   ```bash
+   docker compose -f compose.yaml pull
+   docker compose -f compose.yaml up -d
+   ```
 
-4. Confirm the running image and database:
+5. Verify `/api/version` and `/api/ready`.
 
-```bash
-curl -fsS http://localhost:8000/api/version
-curl -fsS http://localhost:8000/api/ready
-```
+Restore the pre-upgrade backup to roll back a release that changed the database schema. Database downgrades are not supported.
 
-To roll back, restore the pre-upgrade database backup and set `BLOOM_VERSION` to the previous release. Downgrades that require reversing a migration are not supported — restore from backup instead.
+## Documentation
 
-## Security and documentation
-
-- [Operating Bloom](docs/OPERATIONS.md)
+- [Operations](docs/OPERATIONS.md)
 - [Security policy](SECURITY.md)
 - [Changelog](CHANGELOG.md)
-- [Contributing guide](CONTRIBUTING.md)
+- [Contributing](CONTRIBUTING.md)
 - [Contributor License Agreement](CLA.md)
-- [EmbedLabs Source Available License](LICENSE)
 
 API documentation is disabled by default. Enable it only in a trusted development environment.
 
-## Contributing
+## Licensing
 
-Contributions require explicit acceptance of [`CLA.md`](CLA.md) through the pull-request declaration. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Bloom PLM is distributed under the [EmbedLabs Source Available License 1.0](LICENSE).
 
-## Professional services
+The license permits personal, educational, evaluation, research, and internal business use, including modification for those uses. A separate professional license is required for resale, third-party hosting, managed services, commercial redistribution, white-labelling, or embedding Bloom in a third-party commercial product.
 
-Professional licensing, deployment assistance, integrations, priority support, and custom engineering are available through [EmbedLabs Professional Services](https://embedlabs.de).
+The required `Powered by EmbedLabs` attribution must remain visible. Product names and logos are not licensed for modified forks.
+
+For professional licensing, deployment, integration, priority support, or custom development, contact `sales@embedlabs.de` or visit [EmbedLabs](https://www.embedlabs.net).

@@ -91,7 +91,7 @@ export default function ConfirmEmailChange() {
             rel="noopener noreferrer"
             className="text-xs text-gray-300/50 mt-1 inline-block hover:text-gray-200 transition-colors"
           >
-            by EmbedLabs
+            Powered by EmbedLabs
           </a>
         </div>
       </div>
