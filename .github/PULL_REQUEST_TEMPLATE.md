@@ -1,19 +1,20 @@
 ## Summary
 
-<!-- What changed and why -->
+Describe the change and why it is needed.
 
-## Checklist (backend)
+## Validation
 
-- [ ] No new N+1 queries (batch `IN()` or `selectinload`)
-- [ ] New FK columns have indexes / Alembic revision
-- [ ] Pytest added or updated for changed routes
-- [ ] `black --check` / `isort --check` / `pytest` pass locally
-- [ ] Auth on new endpoints (`get_current_user` / `require_role`)
+- [ ] I added or updated tests where appropriate.
+- [ ] I ran the relevant checks from `.github/workflows/ci-cd.yml`.
+- [ ] I documented user-visible or operational changes.
 
-## Verification
+## Third-party material
 
-```bash
-black --check --diff app/ tests/
-isort --profile black --check-only --diff app/ tests/
-pytest tests/ -v
-```
+- [ ] This contribution contains no third-party code or assets that I have not identified.
+- [ ] I documented every applicable third-party licence and attribution requirement.
+
+## Contributor License Agreement
+
+- [ ] **I have read and accept `CLA.md`, version 1.0, as stored in this repository at the time of this pull request. I confirm that I have the authority to submit this contribution and grant the rights described there.**
+
+Submitting this pull request does not guarantee acceptance. Contributions without the checked CLA declaration will not be merged.

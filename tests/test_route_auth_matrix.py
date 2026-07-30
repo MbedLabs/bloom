@@ -18,6 +18,7 @@ PUBLIC_ENDPOINTS = {
     "verify_email",
     "forgot_password",
     "reset_password",
+    "confirm_email_change",
 }
 
 # These endpoints authenticate with provider-specific webhook signatures rather

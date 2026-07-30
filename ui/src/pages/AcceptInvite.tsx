@@ -1,12 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useSearchParams } from 'react-router-dom'
+import { useOneTimeToken } from '../hooks/useOneTimeToken'
 import { APP_VERSION, InviteInfoResponse, authApi, extractApiErrorMessage } from '../api/client'
 import { BLOOM_LOGO_DARK, BLOOM_LOGO_LIGHT } from '../brandAssets'
 
 export default function AcceptInvite() {
-  const [searchParams] = useSearchParams()
-  const token = useMemo(() => searchParams.get('token') || '', [searchParams])
+  const token = useOneTimeToken()
 
   const [inviteInfo, setInviteInfo] = useState<InviteInfoResponse | null>(null)
   const [loadingInviteInfo, setLoadingInviteInfo] = useState(true)
@@ -58,8 +57,8 @@ export default function AcceptInvite() {
       setSubmitError('Missing invitation token')
       return
     }
-    if (password.length < 6) {
-      setSubmitError('Password must be at least 6 characters long')
+    if (password.length < 12) {
+      setSubmitError('Password must be at least 12 characters long')
       return
     }
     if (password !== confirmPassword) {
@@ -149,7 +148,7 @@ export default function AcceptInvite() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
+                minLength={12}
                 className="w-full px-3 py-2.5 bg-background border border-input rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
                 placeholder="Choose a password"
               />
@@ -162,7 +161,7 @@ export default function AcceptInvite() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                minLength={6}
+                minLength={12}
                 className="w-full px-3 py-2.5 bg-background border border-input rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
                 placeholder="Repeat your password"
               />
@@ -193,7 +192,7 @@ export default function AcceptInvite() {
             rel="noopener noreferrer"
             className="text-xs text-gray-300/50 mt-1 inline-block hover:text-gray-200 transition-colors"
           >
-            by EmbedLabs
+            Powered by EmbedLabs
           </a>
         </div>
       </div>

@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useOneTimeToken } from '../hooks/useOneTimeToken'
 import { APP_VERSION, authApi, extractApiErrorMessage } from '../api/client'
 import { BLOOM_LOGO_DARK, BLOOM_LOGO_LIGHT } from '../brandAssets'
 
 export default function VerifyEmail() {
-  const [searchParams] = useSearchParams()
-  const token = useMemo(() => searchParams.get('token') || '', [searchParams])
+  const token = useOneTimeToken()
 
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [message, setMessage] = useState('')
@@ -91,7 +91,7 @@ export default function VerifyEmail() {
             rel="noopener noreferrer"
             className="text-xs text-gray-300/50 mt-1 inline-block hover:text-gray-200 transition-colors"
           >
-            by EmbedLabs
+            Powered by EmbedLabs
           </a>
         </div>
       </div>

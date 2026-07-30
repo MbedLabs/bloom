@@ -24,6 +24,10 @@ from app.models import (
     WebhookDelivery,
 )
 from app.models.user import User, UserRole
+from app.services.integration_secrets import (
+    decrypt_integration_secret,
+    encrypt_integration_secret,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -151,8 +155,10 @@ async def create_integration_setting(
         project_id=data.project_id,
         tracker=data.tracker,
         base_url=data.base_url,
-        token_encrypted=data.token,
-        webhook_secret=data.webhook_secret,
+        token_encrypted=(encrypt_integration_secret(data.token) if data.token else None),
+        webhook_secret=(
+            encrypt_integration_secret(data.webhook_secret) if data.webhook_secret else None
+        ),
         enabled=data.enabled,
     )
     db.add(setting)
@@ -184,9 +190,12 @@ async def update_integration_setting(
     if data.base_url is not None:
         setting.base_url = data.base_url
     if data.token is not None:
-        setting.token_encrypted = data.token
+        # Rotation: a new token replaces the previously stored encrypted value.
+        setting.token_encrypted = encrypt_integration_secret(data.token) if data.token else None
     if data.webhook_secret is not None:
-        setting.webhook_secret = data.webhook_secret
+        setting.webhook_secret = (
+            encrypt_integration_secret(data.webhook_secret) if data.webhook_secret else None
+        )
     if data.enabled is not None:
         setting.enabled = data.enabled
 
@@ -379,7 +388,7 @@ async def github_webhook(
     if not setting or not setting.enabled or not setting.webhook_secret:
         raise HTTPException(status_code=403, detail="Webhook is not securely configured.")
     if not x_hub_signature_256 or not _verify_github_signature(
-        body, setting.webhook_secret, x_hub_signature_256
+        body, decrypt_integration_secret(setting.webhook_secret), x_hub_signature_256
     ):
         _log_sync_event(
             db,
@@ -481,7 +490,9 @@ async def gitlab_webhook(
     ).scalar_one_or_none()
     if not setting or not setting.enabled or not setting.webhook_secret:
         raise HTTPException(status_code=403, detail="Webhook is not securely configured.")
-    if not x_gitlab_token or not _verify_gitlab_token(setting.webhook_secret, x_gitlab_token):
+    if not x_gitlab_token or not _verify_gitlab_token(
+        decrypt_integration_secret(setting.webhook_secret), x_gitlab_token
+    ):
         _log_sync_event(
             db,
             defect.id,
@@ -602,7 +613,7 @@ async def _push_to_github(
             f"https://api.github.com/repos/{defect.external_repo_full_name}/issues/{defect.external_issue_number}",
             json=body,
             headers={
-                "Authorization": f"Bearer {setting.token_encrypted}",
+                "Authorization": f"Bearer {decrypt_integration_secret(setting.token_encrypted)}",
                 "Accept": "application/vnd.github+json",
             },
         )
@@ -633,7 +644,7 @@ async def _push_to_gitlab(
         resp = await client.put(
             f"{base_url}/api/v4/projects/{encoded}/issues/{defect.external_issue_number}",
             json=body,
-            headers={"PRIVATE-TOKEN": setting.token_encrypted or ""},
+            headers={"PRIVATE-TOKEN": decrypt_integration_secret(setting.token_encrypted)},
         )
         resp.raise_for_status()
 

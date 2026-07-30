@@ -14,6 +14,9 @@ concurrency:
 env:
   REGISTRY: ghcr.io
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     name: Validate
@@ -34,16 +37,16 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.11'
           cache: 'pip'
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
           cache: 'npm'
@@ -59,7 +62,7 @@ jobs:
         run: npm --prefix ui ci
 
       - name: Audit UI dependencies
-        run: npm --prefix ui audit --audit-level=low
+        run: npm --prefix ui run audit
 
       - name: Check backend formatting with Black
         run: black --check --diff app/ tests/
@@ -117,9 +120,10 @@ jobs:
 
     outputs:
       image: ${{ steps.sha-image.outputs.image }}
+      aliases: ${{ steps.aliases.outputs.list }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Validate release tag
         if: startsWith(github.ref, 'refs/tags/v')
@@ -140,14 +144,57 @@ jobs:
             echo "stable=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Version consistency gate
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          # The tag's MAJOR.MINOR.PATCH must match every source of truth for the
+          # version, so a release can never ship mismatched numbers.
+          base="${RELEASE_TAG#v}"; base="${base%%-*}"; base="${base%%+*}"
+          gate_fail() { echo "::error::version gate: $*"; exit 1; }
+          check() { [ "$2" = "$base" ] || gate_fail "$1 is '$2' but the tag is '$base'"; }
+          check "pyproject.toml version" \
+            "$(sed -nE 's/^version = "([^"]+)".*/\1/p' pyproject.toml | head -1)"
+          check "ui/package.json version" \
+            "$(sed -nE 's/.*"version": *"([^"]+)".*/\1/p' ui/package.json | head -1)"
+          check "app/__init__.py __version__" \
+            "$(sed -nE 's/^__version__ = "([^"]+)".*/\1/p' app/__init__.py | head -1)"
+          # BLOOM_APP_VERSION is what /api/version reports at runtime.
+          check "BLOOM_APP_VERSION (/api/version)" \
+            "$(sed -nE 's/.*BLOOM_APP_VERSION[^"]*"([^"]+)".*/\1/p' app/core/config.py | head -1)"
+          esc="${base//./\\.}"
+          grep -Eq "(^|[^0-9.])${esc}([^0-9]|\$)" CHANGELOG.md \
+            || gate_fail "CHANGELOG.md has no release entry for ${base}"
+          echo "Version consistency OK for ${base}"
+
+      - name: Verify the tagged commit is contained in main history
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          # A release tag must be cut from the reviewed release commit on main:
+          # nothing is ever built or promoted from a commit that never landed on
+          # main. The checkout is shallow, so fetch main's full history and prove
+          # the tagged commit is contained in it before anything else runs.
+          if [ -f "$(git rev-parse --git-dir)/shallow" ]; then
+            git fetch --no-tags --unshallow origin main
+          else
+            git fetch --no-tags origin main
+          fi
+          if git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD; then
+            echo "Tagged commit $GITHUB_SHA is contained in main history."
+          else
+            echo "::error::release tag ${GITHUB_REF_NAME} ($GITHUB_SHA) is not contained in main history" >&2
+            exit 1
+          fi
+
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
 
       - name: Log in to Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -155,7 +202,7 @@ jobs:
 
       - name: Extract metadata for Docker
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           images: ${{ env.REGISTRY }}/${{ github.repository }}
           flavor: |
@@ -170,12 +217,24 @@ jobs:
             type=raw,value=stable,enable=${{ steps.release.outputs.stable == 'true' }}
             type=sha,prefix=sha-
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v7
+      - name: Extract the immutable sha-only tag
+        id: metasha
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}
+          flavor: |
+            latest=false
+          tags: type=sha,prefix=sha-
+
+      - name: Build and push the immutable sha image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          # Only the immutable sha-<commit> tag is pushed here. Moving aliases
+          # (branch/latest/stable/semver) are promoted to this same manifest by
+          # the promote-image job, and only after e2e-image passes.
+          tags: ${{ steps.metasha.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -183,17 +242,38 @@ jobs:
 
       - name: Resolve pushed image reference
         id: sha-image
+        env:
+          SHA_TAGS: ${{ steps.metasha.outputs.tags }}
         run: |
-          image="$(printf '%s\n' "$DOCKER_METADATA_OUTPUT_TAGS" | grep ':sha-' | head -n 1)"
+          image="$(printf '%s\n' "$SHA_TAGS" | grep ':sha-' | head -n 1)"
           if [ -z "$image" ]; then echo "no sha- tag in metadata output" >&2; exit 1; fi
           echo "image=$image" >> "$GITHUB_OUTPUT"
           echo "Resolved sha image: $image"
 
-      - name: Verify published image startup contract
+      - name: Compute moving alias tags
+        id: aliases
+        env:
+          ALL_TAGS: ${{ steps.meta.outputs.tags }}
         run: |
-          image="$(printf '%s\n' "$DOCKER_METADATA_OUTPUT_TAGS" | grep ':sha-' | head -n 1)"
-          docker pull --platform linux/amd64 "$image"
-          docker run --rm --platform linux/amd64 --entrypoint /bin/sh "$image" -c '
+          # Every tag EXCEPT the immutable sha-<commit> one. These are the moving
+          # deploy aliases (branch / latest / stable / semver). They are NOT pushed
+          # by the build; the promote-image job attaches them to the tested manifest
+          # only after e2e-image passes, so a failing build never moves a deploy tag.
+          aliases="$(printf '%s\n' "$ALL_TAGS" | grep -v ':sha-' || true)"
+          {
+            echo "list<<ALIAS_EOF"
+            printf '%s\n' "$aliases"
+            echo "ALIAS_EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "Moving aliases to promote after e2e:"
+          printf '%s\n' "$aliases"
+
+      - name: Verify published image startup contract
+        env:
+          IMAGE: ${{ steps.sha-image.outputs.image }}
+        run: |
+          docker pull --platform linux/amd64 "$IMAGE"
+          docker run --rm --platform linux/amd64 --entrypoint /bin/sh "$IMAGE" -c '
             set -eu
             test "$(stat -c %a /usr/local/bin/start-product)" = "755"
             test "$(stat -c %a /etc/supervisord.conf)" = "644"
@@ -213,9 +293,9 @@ jobs:
           '
 
       - name: Generate SBOM (SPDX)
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
-          path: .
+          image: ${{ steps.sha-image.outputs.image }}
           format: spdx-json
           artifact-name: bloom-sbom.spdx.json
 
@@ -230,15 +310,15 @@ jobs:
       packages: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.11'
 
       - name: Log in to Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -253,3 +333,45 @@ jobs:
       # idempotent re-import proves the imported requirements persisted.
       - name: End-to-end smoke test
         run: bash scripts/e2e_image_smoke.sh "${{ needs.build-image.outputs.image }}"
+
+  promote-image:
+    if: github.event_name == 'push'
+    name: Promote moving tags
+    runs-on: [self-hosted, ovh, bloom]
+    needs: [build-image, e2e-image]
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The build published ONLY the immutable sha-<commit> manifest, and
+      # e2e-image has now proven that exact manifest boots and serves. Point every
+      # moving alias (branch / latest / stable / semver) at it via a registry-side
+      # manifest copy (no rebuild, both platforms preserved). Until this job runs,
+      # the aliases still reference the previous image that passed e2e, so a broken
+      # build can never become what `latest`/`stable`/a branch tag resolves to.
+      - name: Promote the tested image to its moving aliases
+        env:
+          SHA_IMAGE: ${{ needs.build-image.outputs.image }}
+          ALIASES: ${{ needs.build-image.outputs.aliases }}
+        run: |
+          if [ -z "${ALIASES//[[:space:]]/}" ]; then
+            echo "No moving aliases for this ref; nothing to promote."
+            exit 0
+          fi
+          printf '%s\n' "$ALIASES" | while IFS= read -r alias; do
+            [ -n "$alias" ] || continue
+            echo "Promoting $alias -> $SHA_IMAGE"
+            docker buildx imagetools create --tag "$alias" "$SHA_IMAGE"
+          done
