@@ -70,6 +70,7 @@ describe('source-available readiness smoke', () => {
 
     expect(html).toContain(marker)
     expect(html).toContain('Powered by EmbedLabs')
+    expect(html).toContain('>by EmbedLabs</a>')
     expect(html).toContain('fixed bottom-3 left-3')
     expect(html).toContain('text-gray-500')
     expect(html).toContain('dark:text-white')

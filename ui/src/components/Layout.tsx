@@ -468,9 +468,17 @@ function LayoutInner() {
             {!sidebarCollapsed && 'Settings'}
           </Link>
           {!sidebarCollapsed && (
-            <p className="pt-2 pb-1 px-3 text-center text-xs text-violet-300/30">
-              v{APP_VERSION}
-            </p>
+            <div className="pt-2 pb-1 px-3 text-center">
+              <a
+                href="https://www.embedlabs.net"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-violet-300/50 hover:text-violet-200 transition-colors"
+              >
+                by EmbedLabs
+              </a>
+              <p className="text-xs text-violet-300/30 mt-1">v{APP_VERSION}</p>
+            </div>
           )}
         </div>
       </aside>
