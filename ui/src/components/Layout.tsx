@@ -474,10 +474,6 @@ function LayoutInner() {
         </div>
       </aside>
 
-      {sidebarCollapsed && (
-        <PoweredByEmbedLabs collapsed version={APP_VERSION} />
-      )}
-
       <button
         type="button"
         onClick={() => setSidebarCollapsed((c) => !c)}
@@ -689,6 +685,11 @@ function LayoutInner() {
         <main className="p-4 bg-background flex flex-col flex-1 min-h-0 overflow-auto">
           <Outlet />
         </main>
+        {sidebarCollapsed && (
+          <footer className="flex shrink-0 justify-center bg-background px-4 pb-3 pt-2">
+            <PoweredByEmbedLabs collapsed version={APP_VERSION} />
+          </footer>
+        )}
       </div>
     </div>
   )

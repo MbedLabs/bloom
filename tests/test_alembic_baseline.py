@@ -100,3 +100,58 @@ def test_a07_disables_previously_migrated_integrations_missing_credentials():
 
     assert rows == [(1, False), (2, True)]
     assert token_target == "approved@example.com"
+
+
+def test_a08_canonicalizes_legacy_relationship_types_without_duplicates():
+    revision = _load_revision_module(
+        "d20260730a08_canonicalize_legacy_relationship_types.py",
+        "bloom_alembic_d20260730a08_canonicalize_legacy_relationship_types",
+    )
+    engine = sa.create_engine("sqlite://")
+
+    with engine.begin() as connection:
+        connection.execute(
+            sa.text(
+                "CREATE TABLE artefact_links ("
+                "id INTEGER PRIMARY KEY, "
+                "project_id INTEGER NOT NULL, "
+                "source_type VARCHAR(30) NOT NULL, "
+                "source_id INTEGER NOT NULL, "
+                "target_type VARCHAR(30) NOT NULL, "
+                "target_id INTEGER NOT NULL, "
+                "role VARCHAR(50) NOT NULL, "
+                "suspect BOOLEAN NOT NULL, "
+                "created_at DATETIME NOT NULL, "
+                "CONSTRAINT uq_artefact_link UNIQUE ("
+                "source_type, source_id, target_type, target_id, role"
+                ")"
+                ")"
+            )
+        )
+        connection.execute(
+            sa.text(
+                "INSERT INTO artefact_links "
+                "(id, project_id, source_type, source_id, target_type, target_id, "
+                "role, suspect, created_at) VALUES "
+                "(1, 1, 'TCO', 11, 'TC', 21, 'implements', FALSE, CURRENT_TIMESTAMP), "
+                "(2, 1, 'CPT', 11, 'TC', 21, 'implements', FALSE, CURRENT_TIMESTAMP), "
+                "(3, 1, 'TC', 21, 'PROT', 31, 'implements', FALSE, CURRENT_TIMESTAMP), "
+                "(4, 1, 'PROT', 31, 'TCO', 11, 'implements', FALSE, CURRENT_TIMESTAMP)"
+            )
+        )
+
+        revision.op = Operations(MigrationContext.configure(connection))
+        revision.upgrade()
+
+        rows = connection.execute(
+            sa.text(
+                "SELECT id, source_type, source_id, target_type, target_id, role "
+                "FROM artefact_links ORDER BY id"
+            )
+        ).all()
+
+    assert rows == [
+        (2, "CPT", 11, "TC", 21, "implements"),
+        (3, "TC", 21, "PRT", 31, "implements"),
+        (4, "PRT", 31, "CPT", 11, "implements"),
+    ]
