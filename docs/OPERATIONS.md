@@ -102,6 +102,11 @@ then log in and confirm projects, requirements and traceability views load.
 4. Restart the container. Confirm `/api/ready` returns `200` and check the
    version shown in the UI.
 
+When upgrading to `1.0.0`, migration `d20260722a06` clears legacy plaintext
+GitHub/GitLab tokens and webhook secrets and disables the affected tracker
+integrations. Configure `INTEGRATION_ENCRYPTION_KEY`, re-enter rotated
+credentials, and explicitly enable those integrations again.
+
 Rollback: restore the pre-upgrade database dump and start the previous image
 tag. Never run a newer schema against an older application version.
 
@@ -111,9 +116,12 @@ tag. Never run a newer schema against an older application version.
   schedule to your tolerance and copy backups off the host.
 - **RTO** is dominated by Postgres restore time; rehearse the restore path
   against a scratch database at least once before you depend on it.
-- Keep `SECRET_KEY`, `SERVICE_TOKEN_PEPPER`, and SMTP credentials in your secret
-  store. A different `SECRET_KEY` invalidates sessions and pending invite/reset
-  links; a different `SERVICE_TOKEN_PEPPER` invalidates Bud result-sync credentials.
+- Keep `SECRET_KEY`, optional `SERVICE_TOKEN_PEPPER`, optional
+  `INTEGRATION_ENCRYPTION_KEY`, and SMTP credentials in your secret store. A
+  different `SECRET_KEY` invalidates sessions and pending invite/reset links; a
+  different `SERVICE_TOKEN_PEPPER` invalidates Bud result-sync credentials; a
+  different `INTEGRATION_ENCRYPTION_KEY` makes configured GitHub/GitLab secrets
+  unreadable until they are rotated.
 
 ## Supply chain
 

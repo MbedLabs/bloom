@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 1.0.0 - 2026-07-24
+
+Initial public beta release of Bloom PLM by EmbedLabs — a self-hosted product
+lifecycle management platform. Published as a multi-architecture container image
+with PostgreSQL-backed deployment, Alembic migrations, liveness/readiness health
+checks, and persistent project data.
 
 ### Added
 
@@ -12,6 +17,7 @@
 
 - Bud integration now uses revocable 90-day `test-results:write` credentials instead of full administrator tokens.
 - Bud submits test-case execution outcomes by Bloom `tc_id`; it does not create or synchronize campaigns.
+- Email changes are administrator-controlled: users may request a change, administrators approve or reject it, and the new mailbox must confirm before the login changes. Administrators can initiate the same confirmed workflow.
 
 ### Fixed
 
@@ -20,11 +26,16 @@
 
 ### Security
 
+- External tracker credentials and webhook secrets are encrypted at rest (Fernet) and are never returned through APIs. Bloom remains fully usable without the optional key; only GitHub/GitLab tracker-secret operations fail closed.
 - ReqIF archives are validated while streaming and parsed in a time-limited worker process.
 - Signed webhook deliveries have replay protection.
+- Passwords must be at least 12 characters; changing or resetting a password signs out all existing sessions.
+- One-time links (invitation, email verification, password reset, email change) carry their token only in the URL fragment and are single-use, keeping tokens out of request targets, server logs, and the Referer header.
+- Direct email replacement through the generic administrator user-update API is no longer allowed.
 - Python and npm dependency vulnerability scans block CI on actionable findings.
+- Upgraded React Router to 7.18.2 and the lint/test toolchain to patched releases. The remaining npm advisory affects only RSC Actions, which Bloom does not use, and is narrowly documented in the audit gate.
 
-## 1.0.0
+### Upgrade notes
 
-- Initial beta release of Bloom PLM by EmbedLabs as a self-hosted product lifecycle management platform.
-- Published a multi-architecture container image with PostgreSQL-backed deployment, migrations, health checks, and persistent project data.
+- Migration `d20260722a06` clears legacy plaintext GitHub/GitLab tokens and webhook secrets and disables every affected tracker integration. Configure `INTEGRATION_ENCRYPTION_KEY`, re-enter rotated credentials, and explicitly enable each integration again.
+- SMTP remains optional for a single-administrator evaluation, but invitations, password resets, and approved email changes require it.

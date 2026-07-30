@@ -115,6 +115,18 @@ def normalize_linkable_type(value: str | None) -> str:
     return upper_value
 
 
+def get_linkable_type_storage_values(value: str | None) -> tuple[str, ...]:
+    """Return canonical and legacy DB values for a linkable document kind."""
+
+    canonical_value = normalize_linkable_type(value)
+    legacy_values = tuple(
+        legacy_value
+        for legacy_value, mapped_value in LEGACY_LINK_KIND_ALIASES.items()
+        if mapped_value == canonical_value
+    )
+    return (canonical_value, *legacy_values)
+
+
 def is_known_linkable_type(value: str | None) -> bool:
     return normalize_linkable_type(value) in LINKABLE_DOC_KINDS
 

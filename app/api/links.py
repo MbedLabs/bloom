@@ -8,6 +8,7 @@ from app.core.database import get_db
 from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS
 from app.core.link_rules import (
     get_allowed_link_roles,
+    get_linkable_type_storage_values,
     is_allowed_link_role,
     is_known_linkable_type,
     normalize_linkable_type,
@@ -50,6 +51,16 @@ ARTEFACT_MODELS = {
     "CMP": TestCampaign,
     "TS": TestSuite,
 }
+
+
+def _link_response(row: ArtefactLink) -> ArtefactLinkResponse:
+    response = ArtefactLinkResponse.model_validate(row)
+    return response.model_copy(
+        update={
+            "source_type": normalize_linkable_type(response.source_type),
+            "target_type": normalize_linkable_type(response.target_type),
+        }
+    )
 
 
 async def _artefact_exists_in_project(
@@ -145,11 +156,15 @@ async def list_links(
 
     query = select(ArtefactLink).where(ArtefactLink.project_id == project_id)
     if source_type:
-        query = query.where(ArtefactLink.source_type == normalize_linkable_type(source_type))
+        query = query.where(
+            ArtefactLink.source_type.in_(get_linkable_type_storage_values(source_type))
+        )
     if source_id is not None:
         query = query.where(ArtefactLink.source_id == source_id)
     if target_type:
-        query = query.where(ArtefactLink.target_type == normalize_linkable_type(target_type))
+        query = query.where(
+            ArtefactLink.target_type.in_(get_linkable_type_storage_values(target_type))
+        )
     if target_id is not None:
         query = query.where(ArtefactLink.target_id == target_id)
     rows = (await db.execute(query.order_by(ArtefactLink.created_at.desc()))).scalars().all()
@@ -182,7 +197,7 @@ async def list_links(
             visible_rows.append(row)
         rows = visible_rows
 
-    return [ArtefactLinkResponse.model_validate(row) for row in rows]
+    return [_link_response(row) for row in rows]
 
 
 @router.post("", response_model=ArtefactLinkResponse, status_code=201)
@@ -237,9 +252,9 @@ async def create_link(
         await db.execute(
             select(ArtefactLink).where(
                 ArtefactLink.project_id == data.project_id,
-                ArtefactLink.source_type == data.source_type,
+                ArtefactLink.source_type.in_(get_linkable_type_storage_values(data.source_type)),
                 ArtefactLink.source_id == data.source_id,
-                ArtefactLink.target_type == data.target_type,
+                ArtefactLink.target_type.in_(get_linkable_type_storage_values(data.target_type)),
                 ArtefactLink.target_id == data.target_id,
                 ArtefactLink.role == data.role,
             )
@@ -252,7 +267,7 @@ async def create_link(
     db.add(link)
     await db.flush()
     await db.refresh(link)
-    return ArtefactLinkResponse.model_validate(link)
+    return _link_response(link)
 
 
 @router.delete("/{link_id}", status_code=204)

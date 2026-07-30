@@ -2,19 +2,19 @@
 #
 # End-to-end smoke test against a *published* Bloom image.
 #
-# Proves the release-blocking path the unit suite cannot:
-#   empty database
-#     -> container boots and builds its schema
-#     -> `alembic upgrade head` applies cleanly on the real image
-#     -> admin can log in
+# Proves the release-blocking path the unit suite cannot, using a real named
+# volume and a full container teardown/recreate (not just a restart):
+#   empty named-volume PostgreSQL
+#     -> `alembic upgrade head` builds the schema on the real image (before the
+#        app boots; RUN_STARTUP_DATA_REPAIR=false, so no create_all rescue)
+#     -> `alembic current` is at head (migrations are complete on their own)
+#     -> app boots; admin can log in
 #     -> a project is created (database write)
-#     -> a >1 MB ReqIF import succeeds THROUGH nginx and imports requirements
-#        (i.e. client_max_body_size is configured; nginx's 1 MB default would 413
-#        the headline "bring your DOORS/Polarion data in" feature)
-#     -> after a container restart, re-importing the same ReqIF is idempotent
-#        (skipped, not re-created) — proving the imported data persisted
-#     -> /api/health is liveness-only (never falsely reports database "connected")
-#     -> /api/ready reports the database connected
+#     -> a >1 MB ReqIF import succeeds THROUGH nginx (client_max_body_size)
+#     -> BOTH containers are removed and recreated with the SAME named volume
+#     -> the project and imported requirements still exist, and re-importing the
+#        same ReqIF is idempotent (skipped, not duplicated)
+#     -> /api/health is liveness-only; /api/ready confirms the database
 #
 # Usage:
 #   scripts/e2e_image_smoke.sh <image-ref>
@@ -35,6 +35,7 @@ SUFFIX="$$"
 NET="bloom-e2e-net-${SUFFIX}"
 PG="bloom-e2e-pg-${SUFFIX}"
 APP="bloom-e2e-app-${SUFFIX}"
+PGVOL="bloom-e2e-pgdata-${SUFFIX}"
 
 DB_USER="e2e_user"
 DB_PASSWORD="e2e-strong-db-password-not-a-default"
@@ -48,11 +49,18 @@ ENV_ARGS=(
   -e "BLOOM_ENV=production"
   -e "DATABASE_URL=${DATABASE_URL}"
   -e "SECRET_KEY=e2e-secret-key-that-is-definitely-long-enough-0123456789"
+  # Production now refuses to boot without a valid Fernet key (credentials are
+  # encrypted at rest). Throwaway key for this ephemeral container only.
+  -e "BLOOM_INTEGRATION_ENCRYPTION_KEY=i4d1_ToTN0MIR05ZRrKzNyUQo3f2UOsYT37dmkQ0oe0="
   -e "ADMIN_EMAIL=${ADMIN_EMAIL}"
   -e "ADMIN_PASSWORD=${ADMIN_PASSWORD}"
   -e "ADMIN_FULL_NAME=E2E Admin"
   -e "AUTO_SEED_ADMIN=true"
-  -e "RUN_STARTUP_DATA_REPAIR=true"
+  # Production-path migration test: the app must NOT build or repair the schema.
+  # alembic (run explicitly below, before the app boots) is the only schema
+  # builder, so a missing/incomplete migration fails instead of being rescued by
+  # create_all().
+  -e "RUN_STARTUP_DATA_REPAIR=false"
   -e "BLOOM_DISABLE_RATE_LIMIT=1"
   -e "ENABLE_DOCS=false"
 )
@@ -64,6 +72,7 @@ cleanup() {
   local code=$?
   [ "$code" = 0 ] || { log "Dumping app logs (exit ${code})"; docker logs "$APP" 2>&1 | tail -80 || true; }
   docker rm -f "$APP" "$PG" >/dev/null 2>&1 || true
+  docker volume rm "$PGVOL" >/dev/null 2>&1 || true
   docker network rm "$NET" >/dev/null 2>&1 || true
   rm -f "${PADDED:-}" 2>/dev/null || true
 }
@@ -94,37 +103,61 @@ wait_ready() {
   fail "app never became ready ${what}"
 }
 
+start_pg() {
+  # Reuses the named PGVOL so data survives a container recreate.
+  docker run -d --name "$PG" --network "$NET" \
+    -v "${PGVOL}:/var/lib/postgresql/data" \
+    -e "POSTGRES_USER=${DB_USER}" \
+    -e "POSTGRES_PASSWORD=${DB_PASSWORD}" \
+    -e "POSTGRES_DB=${DB_NAME}" \
+    postgres:16 >/dev/null
+  for _ in $(seq 1 30); do
+    docker exec "$PG" pg_isready -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1 && break
+    sleep 2
+  done
+  docker exec "$PG" pg_isready -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1 \
+    || fail "postgres never became ready"
+}
+
+start_app() {
+  local publish="127.0.0.1::8080"
+  if [ -n "$APP_PORT" ]; then publish="127.0.0.1:${APP_PORT}:8080"; fi
+  docker run -d --name "$APP" --network "$NET" \
+    -p "$publish" \
+    --platform "$PLATFORM" \
+    "${ENV_ARGS[@]}" \
+    "$IMAGE" >/dev/null
+  refresh_base
+}
+
+import_reqif() {
+  curl -fsS -X POST "${BASE}/api/projects/${project_id}/import/reqif" \
+    -H "Authorization: Bearer ${1}" \
+    -F "file=@${PADDED};type=application/xml;filename=e2e.reqif"
+}
+
 log "Using image: ${IMAGE}"
 docker network create "$NET" >/dev/null
 
-log "Starting an empty PostgreSQL"
-docker run -d --name "$PG" --network "$NET" \
-  -e "POSTGRES_USER=${DB_USER}" \
-  -e "POSTGRES_PASSWORD=${DB_PASSWORD}" \
-  -e "POSTGRES_DB=${DB_NAME}" \
-  postgres:16 >/dev/null
-for _ in $(seq 1 30); do
-  docker exec "$PG" pg_isready -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1 && break
-  sleep 2
-done
-docker exec "$PG" pg_isready -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1 \
-  || fail "postgres never became ready"
+log "Starting an empty named-volume PostgreSQL"
+start_pg
 
-log "Booting the application container (builds schema on an empty DB)"
-PUBLISH_ADDR="127.0.0.1::8080"
-if [ -n "$APP_PORT" ]; then PUBLISH_ADDR="127.0.0.1:${APP_PORT}:8080"; fi
-docker run -d --name "$APP" --network "$NET" \
-  -p "$PUBLISH_ADDR" \
-  --platform "$PLATFORM" \
-  "${ENV_ARGS[@]}" \
-  "$IMAGE" >/dev/null
-refresh_base
-wait_ready "on first boot"
-
-log "Applying alembic upgrade head against the published image"
+log "Applying alembic upgrade head against the published image (before the app boots)"
 docker run --rm --network "$NET" --platform "$PLATFORM" \
   "${ENV_ARGS[@]}" \
   --entrypoint alembic "$IMAGE" upgrade head
+
+log "Verifying the database is at alembic head (migrations are complete on their own)"
+current="$(docker run --rm --network "$NET" --platform "$PLATFORM" \
+  "${ENV_ARGS[@]}" \
+  --entrypoint alembic "$IMAGE" current 2>&1)"
+echo "    ${current}"
+printf '%s' "$current" | grep -q '(head)' \
+  || fail "database is not at alembic head after upgrade (migration incomplete)"
+
+log "Booting the application container (schema already built by alembic; no create_all)"
+start_app
+wait_ready "on first boot"
 
 log "/api/health must be liveness-only (never claim database \"connected\")"
 health="$(curl -fsS "${BASE}/api/health")"
@@ -139,6 +172,11 @@ ready="$(curl -fsS "${BASE}/api/ready")"
 echo "    ready = ${ready}"
 printf '%s' "$ready" | grep -q '"database":"connected"' \
   || fail "/api/ready did not confirm the database"
+
+log "/api/version must report the released version (1.0.0)"
+version="$(curl -fsS "${BASE}/api/version" | json_field version)"
+echo "    /api/version = ${version}"
+[ "$version" = "1.0.0" ] || fail "/api/version reported '${version}', expected 1.0.0"
 
 log "Admin login"
 token="$(login)"
@@ -168,27 +206,33 @@ PY
 [ "$(wc -c < "$PADDED")" -gt 1048576 ] || fail "padded ReqIF is not over 1 MB"
 
 log "Importing the >1 MB ReqIF through nginx (exercises client_max_body_size)"
-import_result="$(curl -fsS -X POST "${BASE}/api/projects/${project_id}/import/reqif" \
-  -H "Authorization: Bearer ${token}" \
-  -F "file=@${PADDED};type=application/xml;filename=e2e.reqif")"
+import_result="$(import_reqif "$token")"
 echo "    import = ${import_result}"
 imported="$(printf '%s' "$import_result" | json_field imported)"
 [ "$imported" = "2" ] || fail "expected 2 imported requirements, got '${imported}'"
 
-log "Restarting the container to prove persistence"
-docker restart "$APP" >/dev/null
-refresh_base
-wait_ready "after restart"
+log "Removing BOTH containers and recreating them with the SAME named volume"
+docker rm -f "$APP" "$PG" >/dev/null
+start_pg
+# No alembic re-run: the schema and data live in the persistent PGVOL.
+start_app
+wait_ready "after container recreation"
+
+log "The project and its imported requirements must still exist"
+token="$(login)"
+[ -n "$token" ] || fail "admin login failed after recreation (database did not persist)"
+project_json="$(curl -fsS "${BASE}/api/projects/${project_id}" -H "Authorization: Bearer ${token}")"
+echo "    project = ${project_json}"
+req_count="$(printf '%s' "$project_json" | json_field requirement_count)"
+[ "$req_count" = "2" ] \
+  || fail "project/requirements did not persist across recreation (requirement_count=${req_count})"
 
 log "Re-importing the same ReqIF must be idempotent (proves the data persisted)"
-token="$(login)"
-reimport="$(curl -fsS -X POST "${BASE}/api/projects/${project_id}/import/reqif" \
-  -H "Authorization: Bearer ${token}" \
-  -F "file=@${PADDED};type=application/xml;filename=e2e.reqif")"
+reimport="$(import_reqif "$token")"
 echo "    reimport = ${reimport}"
 reimported="$(printf '%s' "$reimport" | json_field imported)"
 reskipped="$(printf '%s' "$reimport" | json_field skipped)"
 [ "$reimported" = "0" ] || fail "re-import created ${reimported} duplicates; data did not persist"
 [ "$reskipped" = "2" ] || fail "re-import skipped '${reskipped}', expected 2 persisted requirements"
 
-log "PASS: Bloom published image is end-to-end healthy"
+log "PASS: Bloom published image survives full container recreation with a named volume"

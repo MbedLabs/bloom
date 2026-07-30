@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Sun, Moon, Monitor, Info, ExternalLink, Globe, ShieldCheck, Copy, Check, Loader2, RefreshCw } from 'lucide-react'
+import { Sun, Moon, Monitor, Info, ExternalLink, Globe, ShieldCheck, Copy, Check, Loader2, RefreshCw, Mail } from 'lucide-react'
 import {
   APP_VERSION,
+  authApi,
   extractApiErrorMessage,
   serviceCredentialsApi,
   type ServiceCredential,
@@ -59,10 +60,13 @@ function useDarkMode() {
 }
 
 export default function Settings() {
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const isAdmin = user?.role === 'admin'
   
   const [dark, setDark] = useDarkMode()
+  const [newEmail, setNewEmail] = useState('')
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [emailMessage, setEmailMessage] = useState<string | null>(null)
 
   // Timezone state
   const [timezone, setTimezone] = useState(() => localStorage.getItem('bloom-timezone') || 'auto')
@@ -82,6 +86,31 @@ export default function Settings() {
     setTimezone(newTz)
     localStorage.setItem('bloom-timezone', newTz)
     window.location.reload()
+  }
+
+  const handleRequestEmailChange = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setEmailMessage(null)
+    try {
+      const response = await authApi.requestEmailChange(currentPassword, newEmail)
+      setEmailMessage(response.message)
+      setNewEmail('')
+      setCurrentPassword('')
+      await refreshUser()
+    } catch (error) {
+      setEmailMessage(extractApiErrorMessage(error, 'Failed to request email change'))
+    }
+  }
+
+  const handleCancelEmailChange = async () => {
+    setEmailMessage(null)
+    try {
+      const response = await authApi.cancelEmailChange()
+      setEmailMessage(response.message)
+      await refreshUser()
+    } catch (error) {
+      setEmailMessage(extractApiErrorMessage(error, 'Failed to cancel email change'))
+    }
   }
 
   const handleGenerateToken = async () => {
@@ -128,6 +157,92 @@ export default function Settings() {
 
   return (
     <div className="max-w-2xl space-y-6 animate-fade-in pb-20">
+      {/* Account */}
+      <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden">
+        <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-muted/30">
+          <Mail className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold text-foreground">Account</h3>
+        </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <label htmlFor="current-email" className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+              Current email
+            </label>
+            <input
+              id="current-email"
+              type="email"
+              value={user?.email ?? ''}
+              readOnly
+              className="w-full px-3 py-2 bg-muted/50 border border-input rounded-md text-sm text-foreground"
+            />
+          </div>
+
+          {user?.pending_email ? (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-4 space-y-3">
+              <div>
+                <p className="text-sm font-medium text-foreground">Requested email: {user.pending_email}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {user.email_change_status === 'requested'
+                    ? 'Waiting for an administrator to approve or reject this request.'
+                    : 'Approved. Use the confirmation link sent to the new address to finish the change.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCancelEmailChange}
+                className="text-sm font-medium text-destructive hover:underline"
+              >
+                Cancel email change
+              </button>
+            </div>
+          ) : (
+            <form className="space-y-4" onSubmit={handleRequestEmailChange}>
+              <p className="text-xs text-muted-foreground">
+                Request a new login email. An administrator must approve it before Bloom sends a confirmation link to the new address.
+              </p>
+              <div>
+                <label htmlFor="new-email" className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+                  New email
+                </label>
+                <input
+                  id="new-email"
+                  type="email"
+                  value={newEmail}
+                  onChange={(event) => setNewEmail(event.target.value)}
+                  required
+                  className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm text-foreground"
+                />
+              </div>
+              <div>
+                <label htmlFor="current-password" className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+                  Current password
+                </label>
+                <input
+                  id="current-password"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(event) => setCurrentPassword(event.target.value)}
+                  required
+                  className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm text-foreground"
+                />
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90"
+                >
+                  Request email change
+                </button>
+              </div>
+            </form>
+          )}
+
+          {emailMessage && (
+            <p className="text-sm text-muted-foreground" role="status">{emailMessage}</p>
+          )}
+        </div>
+      </div>
+
       {/* Appearance */}
       <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-muted/30">
@@ -190,7 +305,7 @@ export default function Settings() {
         <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden border-primary/20">
           <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-primary/5">
             <ShieldCheck className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">Bud Result-Sync Credentials</h3>
+            <h3 className="text-sm font-semibold text-foreground">PLM Integration Token Management</h3>
           </div>
           <div className="p-5 space-y-4">
             <div className="space-y-2">
@@ -291,15 +406,14 @@ export default function Settings() {
               <p className="text-xs text-muted-foreground">v{APP_VERSION}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>by</span>
+          <div className="flex items-center text-xs text-muted-foreground">
             <a
               href="https://www.embedlabs.net"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-primary hover:text-primary/80 transition-colors font-medium"
             >
-              EmbedLabs
+              Powered by EmbedLabs
               <ExternalLink className="h-3 w-3" />
             </a>
           </div>
@@ -318,7 +432,7 @@ export default function Settings() {
               rel="noopener noreferrer"
               className="text-primary hover:text-primary/80 transition-colors font-medium"
             >
-              AGPL-3.0 license
+              Source-available license
             </a>
           </div>
         </div>

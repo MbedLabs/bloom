@@ -8,6 +8,7 @@ import { getBudAppBaseUrl } from '../lib/budLinks'
 import { getBreadcrumbs } from '../lib/breadcrumbs'
 import { useAuth } from '../contexts/AuthContext'
 import { PageMetaProvider, usePageMeta } from '../contexts/PageMetaContext'
+import PoweredByEmbedLabs from './PoweredByEmbedLabs'
 import {
   LayoutDashboard, FolderKanban, FileText, CheckSquare,
   GitBranch, BarChart3, Sun, Moon, Bell,
@@ -271,7 +272,7 @@ function LayoutInner() {
   return (
     <div className="h-screen flex overflow-hidden">
       {/* Sidebar */}
-      <aside className={`${sidebarCollapsed ? 'w-14' : 'w-60'} sidebar-scrollbar bg-gradient-sidebar text-white flex flex-col fixed inset-y-0 left-0 z-30 overflow-y-auto transition-all duration-200`}>
+      <aside className={`${sidebarCollapsed ? 'w-14' : 'w-60'} sidebar-scrollbar bg-gradient-sidebar text-white flex flex-col fixed inset-y-0 left-0 z-30 overflow-x-hidden overflow-y-auto transition-all duration-200`}>
         {/* Logo */}
         <div className={`${sidebarCollapsed ? 'px-2 pt-4 pb-2.5' : 'px-3 pt-4 pb-2.5'}`}>
           <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-2.5'}`}>
@@ -468,12 +469,7 @@ function LayoutInner() {
             {!sidebarCollapsed && 'Settings'}
           </Link>
           {!sidebarCollapsed && (
-            <div className="pt-2 pb-1 px-3 text-center">
-              <a href="https://www.embedlabs.net" target="_blank" rel="noopener noreferrer" className="text-xs text-violet-300/50 hover:text-violet-200 transition-colors">
-                by EmbedLabs
-              </a>
-              <p className="text-xs text-violet-300/30 mt-1">v{APP_VERSION}</p>
-            </div>
+            <PoweredByEmbedLabs collapsed={false} version={APP_VERSION} />
           )}
         </div>
       </aside>
@@ -689,6 +685,11 @@ function LayoutInner() {
         <main className="p-4 bg-background flex flex-col flex-1 min-h-0 overflow-auto">
           <Outlet />
         </main>
+        {sidebarCollapsed && (
+          <footer className="flex shrink-0 justify-center bg-background px-4 pb-3 pt-2">
+            <PoweredByEmbedLabs collapsed version={APP_VERSION} />
+          </footer>
+        )}
       </div>
     </div>
   )

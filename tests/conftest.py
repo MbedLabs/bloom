@@ -50,6 +50,11 @@ else:
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characters-long")
 os.environ.setdefault("BLOOM_DISABLE_RATE_LIMIT", "1")
 
+# A valid Fernet key so integration-credential encryption works in tests.
+from cryptography.fernet import Fernet as _Fernet  # noqa: E402
+
+os.environ.setdefault("BLOOM_INTEGRATION_ENCRYPTION_KEY", _Fernet.generate_key().decode())
+
 
 def _postgres_available_from_env() -> bool:
     database_url = os.environ.get("DATABASE_URL") or os.environ.get("BLOOM_DATABASE_URL")
@@ -77,7 +82,14 @@ def api_client():
     if not _postgres_available_from_env():
         pytest.skip("api_client tests require reachable Postgres for app lifespan startup")
 
+    from app.core.deps import limiter
     from app.main import app
+
+    # This suite drives many real logins across a single client IP within a
+    # minute; the login rate limiter (10/min) is not what these flows test, so
+    # disable it here to avoid cross-test 429s. The DB-backed import-attempt
+    # limiter (its own 429 tests) is independent and unaffected.
+    limiter.enabled = False
 
     with TestClient(app, base_url="http://test") as client:
         yield client

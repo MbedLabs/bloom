@@ -54,6 +54,16 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("BLOOM_SERVICE_TOKEN_PEPPER", "SERVICE_TOKEN_PEPPER"),
     )
+    # Fernet key encrypting external tracker credentials and webhook secrets at
+    # rest. Required only to store or use integration credentials; the
+    # integration_secrets service fails closed (503) when it is missing/invalid.
+    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    INTEGRATION_ENCRYPTION_KEY: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "BLOOM_INTEGRATION_ENCRYPTION_KEY", "INTEGRATION_ENCRYPTION_KEY"
+        ),
+    )
     # Short-lived access token: kept small because a rotating refresh-token
     # cookie (below) silently renews it. A leaked access token is now valid for
     # minutes, not a week.
