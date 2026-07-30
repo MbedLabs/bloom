@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
-import { DOC_TYPE_LABELS, DOC_TYPE_COLORS, type DocType } from '../types/doc'
+import type { DocType } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -26,36 +26,10 @@ const STATUS_COLORS: Record<string, string> = {
   Verified: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
 }
 
-const PRIORITY_COLORS: Record<string, string> = {
-  Low: 'bg-gray-500/10 text-gray-700 dark:text-gray-400',
-  Medium: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
-  High: 'bg-orange-500/10 text-orange-700 dark:text-orange-400',
-  Critical: 'bg-red-500/10 text-red-700 dark:text-red-400',
-}
-
 export function StatusBadge({ status }: { status: string }) {
   return (
     <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[status] || 'bg-muted text-muted-foreground'}`}>
       {status}
-    </span>
-  )
-}
-
-function PriorityBadge({ priority }: { priority: string | null | undefined }) {
-  if (!priority) return null
-  return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${PRIORITY_COLORS[priority] || 'bg-muted text-muted-foreground'}`}>
-      {priority}
-    </span>
-  )
-}
-
-function DocTypeBadge({ docType }: { docType: DocType }) {
-  const label = DOC_TYPE_LABELS[docType] || docType
-  const color = DOC_TYPE_COLORS[docType] || 'bg-muted text-muted-foreground'
-  return (
-    <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${color}`}>
-      {label}
     </span>
   )
 }
@@ -99,8 +73,6 @@ export default function DocDetailShell({
   docType,
   docCode,
   title,
-  status,
-  priority,
   actions,
   rightRail,
   children,
@@ -128,11 +100,8 @@ export default function DocDetailShell({
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </button>
           <div>
-            <div className="flex items-center gap-3 flex-wrap mb-1">
+            <div className="mb-1">
               <span className="font-mono text-sm text-primary font-semibold">{docCode}</span>
-              <DocTypeBadge docType={docType} />
-              <StatusBadge status={status} />
-              {priority && <PriorityBadge priority={priority} />}
             </div>
             <h2 className="text-2xl font-bold text-foreground">{title}</h2>
           </div>
