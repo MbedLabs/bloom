@@ -305,7 +305,7 @@ export default function Settings() {
         <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden border-primary/20">
           <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-primary/5">
             <ShieldCheck className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">Bud Result-Sync Credentials</h3>
+            <h3 className="text-sm font-semibold text-foreground">PLM Integration Token Management</h3>
           </div>
           <div className="p-5 space-y-4">
             <div className="space-y-2">
@@ -406,15 +406,14 @@ export default function Settings() {
               <p className="text-xs text-muted-foreground">v{APP_VERSION}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>by</span>
+          <div className="flex items-center text-xs text-muted-foreground">
             <a
               href="https://www.embedlabs.net"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-primary hover:text-primary/80 transition-colors font-medium"
             >
-              EmbedLabs
+              Powered by EmbedLabs
               <ExternalLink className="h-3 w-3" />
             </a>
           </div>

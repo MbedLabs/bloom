@@ -45,12 +45,12 @@ describe('source-available readiness smoke', () => {
   })
 
   it.each([
-    ['/login', 'Welcome to Bloom'],
-    ['/accept-invite', 'Accept Invitation'],
-    ['/verify-email', 'Verify Email'],
-    ['/forgot-password', 'Forgot Password'],
-    ['/reset-password', 'Reset Password'],
-  ])('renders %s without crashing', async (path, marker) => {
+    ['/login', 'Welcome to Bloom', 'text-gray-300/60'],
+    ['/accept-invite', 'Accept Invitation', 'text-gray-300/50'],
+    ['/verify-email', 'Verify Email', 'text-gray-300/50'],
+    ['/forgot-password', 'Forgot Password', 'text-gray-300/50'],
+    ['/reset-password', 'Reset Password', 'text-gray-300/50'],
+  ])('renders %s without crashing', async (path, marker, attributionColor) => {
     vi.stubGlobal('window', { runtimeConfig: {} })
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { default: App } = await import('../App')
@@ -70,10 +70,12 @@ describe('source-available readiness smoke', () => {
 
     expect(html).toContain(marker)
     expect(html).toContain('Powered by EmbedLabs')
-    expect(html).toContain('>by EmbedLabs</a>')
-    expect(html).toContain('fixed bottom-3 left-3')
-    expect(html).toContain('text-gray-500')
-    expect(html).toContain('dark:text-white')
+    expect(html).not.toContain('>by EmbedLabs</a>')
+    expect(html).not.toContain('fixed bottom-3 left-3')
+    expect(html).toContain(attributionColor)
+    expect(html).not.toContain(
+      'text-gray-500 transition-colors hover:text-gray-700 dark:text-white',
+    )
     consoleErrorSpy.mockRestore()
     vi.unstubAllGlobals()
   })
