@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router-dom'
+import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router'
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { ArrowLeft, PanelRightOpen, PanelRightClose, Trash2 } from 'lucide-react'
 import { DocEditor } from '../components/editor'

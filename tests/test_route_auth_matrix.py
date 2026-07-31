@@ -24,7 +24,7 @@ PUBLIC_ENDPOINTS = {
 # These endpoints authenticate with provider-specific webhook signatures rather
 # than a FastAPI bearer-token dependency. Their security behavior is covered by
 # test_defect_webhook_security.py.
-SIGNED_WEBHOOK_ENDPOINTS = {"github_webhook", "gitlab_webhook"}
+SIGNED_WEBHOOK_ENDPOINTS = {"github_webhook", "gitlab_webhook", "jira_webhook"}
 
 AUTH_DEPENDENCIES = {
     "get_current_user",

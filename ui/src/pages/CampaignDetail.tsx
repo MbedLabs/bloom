@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
+import { useParams, Link, useNavigate, useLocation } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignsApi, type ArtefactLink, type TestCampaignItem, extractApiErrorMessage } from '../api/client'
 import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Pencil, Trash2, X } from 'lucide-react'

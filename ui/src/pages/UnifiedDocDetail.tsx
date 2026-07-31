@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { docsApi } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'

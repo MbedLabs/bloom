@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { requirementsApi, usersApi, projectsApi, extractApiErrorMessage } from '../api/client'
 import { ExternalLink, ChevronRight, UserCheck, UserCog, Trash2 } from 'lucide-react'

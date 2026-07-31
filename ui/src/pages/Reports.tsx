@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { dashboardApi } from '../api/client'
 import { FolderKanban, FileText, CheckCircle, FlaskConical, AlertTriangle, ArrowRight, TrendingUp, Shield } from 'lucide-react'
 
