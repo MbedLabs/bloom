@@ -92,6 +92,19 @@ jobs:
           alembic current
           alembic current | grep -q "(head)" || { echo "database is not at alembic head" >&2; exit 1; }
 
+      # A fresh install only proves the newest revision can build a schema from
+      # nothing. A deployed database instead runs that revision's downgrade/upgrade
+      # DDL against existing objects, so exercise that path too.
+      - name: Alembic downgrade and re-upgrade (deployed-database path)
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_bloom
+          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
+          BLOOM_DOTENV_DISABLED: "1"
+        run: |
+          alembic downgrade -1
+          alembic upgrade head
+          alembic current | grep -q "(head)" || { echo "database is not at alembic head" >&2; exit 1; }
+
       - name: Run backend tests
         env:
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_bloom
