@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { defectsApi, Defect, extractApiErrorMessage } from '../api/client'
 import { ArrowLeft, ArrowUpDown, ChevronDown, ChevronUp, Plus, Bug, ExternalLink, Search } from 'lucide-react'

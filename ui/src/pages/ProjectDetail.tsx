@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom'
+import { Link, useParams, useSearchParams, useNavigate } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, BookOpen, FlaskConical, GitBranch, Map, Pencil } from 'lucide-react'
 

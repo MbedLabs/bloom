@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link } from 'react-router'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { traceabilityApi, projectsApi, exportApi } from '../api/client'
 import { docUrl } from '../types/doc'

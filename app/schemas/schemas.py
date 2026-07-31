@@ -870,6 +870,11 @@ class ChangeRequestCreate(StrictModel):
     impact_assessment: Optional[str] = None
     justification: Optional[str] = None
     visibility: str = Field(default="internal", pattern=ARTEFACT_VISIBILITY_PATTERN)
+    external_tracker: Optional[str] = None
+    external_repo_full_name: Optional[str] = None
+    external_issue_number: Optional[int] = None
+    external_issue_url: Optional[str] = None
+    external_issue_state: Optional[str] = None
 
 
 class ChangeRequestUpdate(StrictModel):
@@ -881,6 +886,11 @@ class ChangeRequestUpdate(StrictModel):
     impact_assessment: Optional[str] = None
     justification: Optional[str] = None
     visibility: Optional[str] = Field(default=None, pattern=ARTEFACT_VISIBILITY_PATTERN)
+    external_tracker: Optional[str] = None
+    external_repo_full_name: Optional[str] = None
+    external_issue_number: Optional[int] = None
+    external_issue_url: Optional[str] = None
+    external_issue_state: Optional[str] = None
 
 
 class ChangeRequestResponse(BaseModel):
@@ -895,6 +905,11 @@ class ChangeRequestResponse(BaseModel):
     impact_assessment: Optional[str] = None
     justification: Optional[str] = None
     visibility: str = "internal"
+    external_tracker: Optional[str] = None
+    external_repo_full_name: Optional[str] = None
+    external_issue_number: Optional[int] = None
+    external_issue_url: Optional[str] = None
+    external_issue_state: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
