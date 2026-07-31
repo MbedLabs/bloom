@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Jira is supported alongside GitHub and GitLab, with the same security contract: a configured webhook secret makes HMAC verification mandatory, each delivery identifier is accepted only once, and credentials are encrypted at rest. Jira issues are matched by status category rather than by project-specific status names, and outbound status changes are applied as workflow transitions.
+- Change requests can now track an external issue in any supported tracker, mirroring defects, and record their sync attempts in `change_request_sync_events`.
+- `integration_settings.account_email` stores the Jira Cloud account that owns the API token.
+
+### Changed
+
+- Outbound status mapping is shared by defects and change requests, so change-request statuses (`Implemented`, `Approved`, `Under Review`, …) now open or close the linked issue correctly on GitHub and GitLab as well.
+
 ## 1.0.0 - 2026-07-24
 
 Initial public beta release of Bloom PLM by EmbedLabs — a self-hosted product

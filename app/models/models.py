@@ -503,6 +503,15 @@ class RiskItem(Base):
 
 class ChangeRequest(Base):
     __tablename__ = "change_requests"
+    __table_args__ = (
+        # Inbound webhooks resolve a change request by tracker + repo + issue number.
+        Index(
+            "ix_change_requests_external_issue",
+            "external_tracker",
+            "external_repo_full_name",
+            "external_issue_number",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
@@ -517,6 +526,14 @@ class ChangeRequest(Base):
     change_type: Mapped[str] = mapped_column(String(30), default="Enhancement")
     impact_assessment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     justification: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # External tracker linkage, mirroring Defect so a change request can be kept in
+    # step with an issue in GitHub, GitLab, or Jira.
+    external_tracker: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    external_repo_full_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    external_issue_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    external_issue_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    external_issue_state: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    external_last_event_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     source_project_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("projects.id"), nullable=True
@@ -633,6 +650,9 @@ class IntegrationSetting(Base):
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
     tracker: Mapped[str] = mapped_column(String(20), nullable=False)
     base_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    # Jira Cloud authenticates with `email:api_token` Basic auth, so the account the
+    # token belongs to is stored alongside it. Unused by GitHub and GitLab.
+    account_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     token_encrypted: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # Text (not String(255)) because the stored value is a Fernet envelope, which
     # can exceed 255 chars for longer secrets.
@@ -653,6 +673,25 @@ class DefectSyncEvent(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     defect_id: Mapped[int] = mapped_column(ForeignKey("defects.id"), nullable=False)
+    direction: Mapped[str] = mapped_column(String(10), nullable=False)
+    tracker: Mapped[str] = mapped_column(String(20), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    payload_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    success: Mapped[bool] = mapped_column(default=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    external_event_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ChangeRequestSyncEvent(Base):
+    """Append-only log of inbound/outbound sync attempts for change requests."""
+
+    __tablename__ = "change_request_sync_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    change_request_id: Mapped[int] = mapped_column(
+        ForeignKey("change_requests.id"), nullable=False, index=True
+    )
     direction: Mapped[str] = mapped_column(String(10), nullable=False)
     tracker: Mapped[str] = mapped_column(String(20), nullable=False)
     event_type: Mapped[str] = mapped_column(String(50), nullable=False)

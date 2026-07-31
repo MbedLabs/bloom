@@ -13,7 +13,7 @@ Bloom PLM is a self-hosted product lifecycle management platform for requirement
 - Stable human-readable identifiers for controlled project records
 - Administrator, maintainer, and external-user access controls
 - ReqIF import plus CSV and PDF exports
-- GitHub and GitLab defect synchronization
+- GitHub, GitLab, and Jira synchronization for defects and change requests
 - Optional test-case execution outcomes from Bud TMP
 - Readiness, health, metrics, structured logging, and backup workflows
 
@@ -80,7 +80,7 @@ Keep `RUN_STARTUP_DATA_REPAIR=false`. The container applies database migrations 
 Optional features use independent secrets:
 
 - Set `SERVICE_TOKEN_PEPPER` to a random value of at least 32 characters when Bloom will issue scoped service credentials for Bud.
-- Set `INTEGRATION_ENCRYPTION_KEY` to a Fernet key when GitHub or GitLab defect synchronization will store credentials:
+- Set `INTEGRATION_ENCRYPTION_KEY` to a Fernet key when GitHub, GitLab, or Jira synchronization will store credentials:
 
   ```bash
   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -132,6 +132,20 @@ To receive test-case execution outcomes:
 6. Set Bloom's `BUD_APP_URL` when Bloom navigation and execution links should open Bud.
 
 The integration accepts test-case execution outcomes identified by Bloom `tc_id`. It does not synchronize complete campaigns, requirements, documents, or unrestricted Bloom data.
+
+## Issue tracker synchronization
+
+Defects and change requests can each track an issue in GitHub, GitLab, or Jira. Configure one integration per project per tracker under **Settings → Integrations**; credentials and webhook secrets are encrypted at rest with `INTEGRATION_ENCRYPTION_KEY`.
+
+Inbound webhooks are rejected unless a webhook secret is configured and the delivery is authenticated, and each delivery identifier is accepted only once, so a captured request cannot be replayed.
+
+| Tracker | Webhook endpoint | Authentication | Delivery identifier |
+|---|---|---|---|
+| GitHub | `/api/integrations/github/webhook` | `X-Hub-Signature-256` HMAC | `X-GitHub-Delivery` |
+| GitLab | `/api/integrations/gitlab/webhook` | `X-Gitlab-Token` | `X-Gitlab-Event-UUID` |
+| Jira | `/api/integrations/jira/webhook` | `X-Hub-Signature` HMAC | `X-Atlassian-Webhook-Identifier` |
+
+Jira additionally needs the site base URL (for example `https://your-site.atlassian.net`) and the account e-mail owning the API token, because Jira Cloud authenticates with `email:api_token`. Jira status *names* are project-specific, so Bloom maps the issue's status **category**: `new` → Open, `indeterminate` → In Progress, `done` → Closed. Outbound status changes are applied as workflow transitions.
 
 ## ReqIF
 
