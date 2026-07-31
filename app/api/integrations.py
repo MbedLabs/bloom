@@ -1,5 +1,6 @@
 """External tracker integration endpoints: settings, webhooks, and outbound sync."""
 
+import base64
 import hashlib
 import hmac
 import json
@@ -17,6 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.security import get_current_user, require_project_access, require_role
 from app.models import (
+    ChangeRequest,
+    ChangeRequestSyncEvent,
     Defect,
     DefectSyncEvent,
     IntegrationSetting,
@@ -38,8 +41,11 @@ router = APIRouter()
 
 class IntegrationSettingCreate(BaseModel):
     project_id: int
-    tracker: str = Field(..., pattern="^(github|gitlab)$")
+    tracker: str = Field(..., pattern="^(github|gitlab|jira)$")
     base_url: Optional[str] = None
+    # Jira Cloud only: the account owning the API token (Basic auth is
+    # `email:api_token`). Ignored by GitHub and GitLab.
+    account_email: Optional[str] = None
     token: Optional[str] = None
     webhook_secret: Optional[str] = None
     enabled: bool = True
@@ -50,6 +56,7 @@ class IntegrationSettingResponse(BaseModel):
     project_id: int
     tracker: str
     base_url: Optional[str] = None
+    account_email: Optional[str] = None
     has_token: bool
     has_webhook_secret: bool
     enabled: bool
@@ -62,6 +69,7 @@ class IntegrationSettingResponse(BaseModel):
 
 class IntegrationSettingUpdate(BaseModel):
     base_url: Optional[str] = None
+    account_email: Optional[str] = None
     token: Optional[str] = None
     webhook_secret: Optional[str] = None
     enabled: Optional[bool] = None
@@ -88,6 +96,7 @@ def _setting_response(s: IntegrationSetting) -> IntegrationSettingResponse:
         project_id=s.project_id,
         tracker=s.tracker,
         base_url=s.base_url,
+        account_email=s.account_email,
         has_token=bool(s.token_encrypted),
         has_webhook_secret=bool(s.webhook_secret),
         enabled=s.enabled,
@@ -155,6 +164,7 @@ async def create_integration_setting(
         project_id=data.project_id,
         tracker=data.tracker,
         base_url=data.base_url,
+        account_email=data.account_email,
         token_encrypted=(encrypt_integration_secret(data.token) if data.token else None),
         webhook_secret=(
             encrypt_integration_secret(data.webhook_secret) if data.webhook_secret else None
@@ -189,6 +199,8 @@ async def update_integration_setting(
 
     if data.base_url is not None:
         setting.base_url = data.base_url
+    if data.account_email is not None:
+        setting.account_email = data.account_email
     if data.token is not None:
         # Rotation: a new token replaces the previously stored encrypted value.
         setting.token_encrypted = encrypt_integration_secret(data.token) if data.token else None
@@ -535,6 +547,162 @@ async def gitlab_webhook(
     return {"status": "processed", "defect_id": defect.id}
 
 
+# ==================== Jira webhook ====================
+
+# Jira status *names* are configurable per project, so the stable signal is the
+# status category key rather than the display name.
+JIRA_CATEGORY_STATUS_MAP = {
+    "new": "Open",
+    "indeterminate": "In Progress",
+    "done": "Closed",
+}
+
+JIRA_ISSUE_EVENTS = {"jira:issue_created", "jira:issue_updated"}
+
+
+def _verify_jira_signature(body: bytes, secret: str, signature: str) -> bool:
+    """Jira Cloud signs the webhook body with HMAC-SHA256 when a secret is set."""
+    expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+
+def _split_jira_key(issue_key: str) -> Optional[tuple[str, int]]:
+    """Split ``PROJ-123`` into ``("PROJ", 123)``.
+
+    Jira identifies issues by key rather than by number, so the project key is
+    stored in ``external_repo_full_name`` and the numeric part in
+    ``external_issue_number`` — the same split GitLab uses for namespace and IID.
+    This keeps Jira on the existing columns.
+    """
+    project_key, _, number = issue_key.rpartition("-")
+    if not project_key or not number.isdigit():
+        return None
+    return project_key, int(number)
+
+
+def jira_issue_key(defect_or_change) -> str:
+    """Rebuild the Jira issue key from the stored repo/number pair."""
+    return f"{defect_or_change.external_repo_full_name}-{defect_or_change.external_issue_number}"
+
+
+async def _find_jira_target(db: AsyncSession, project_key: str, issue_number: int):
+    """Resolve a Jira issue to the defect or change request tracking it."""
+    defect = (
+        await db.execute(
+            select(Defect).where(
+                Defect.external_tracker == "jira",
+                Defect.external_repo_full_name == project_key,
+                Defect.external_issue_number == issue_number,
+            )
+        )
+    ).scalar_one_or_none()
+    if defect is not None:
+        return "defect", defect
+
+    change = (
+        await db.execute(
+            select(ChangeRequest).where(
+                ChangeRequest.external_tracker == "jira",
+                ChangeRequest.external_repo_full_name == project_key,
+                ChangeRequest.external_issue_number == issue_number,
+            )
+        )
+    ).scalar_one_or_none()
+    if change is not None:
+        return "change_request", change
+
+    return None
+
+
+@router.post("/jira/webhook", status_code=200)
+async def jira_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    x_hub_signature: Optional[str] = Header(None),
+    x_atlassian_webhook_identifier: Optional[str] = Header(None),
+):
+    body = await _read_webhook_body(request)
+    payload = _json_payload(body)
+
+    if payload.get("webhookEvent", "") not in JIRA_ISSUE_EVENTS:
+        return {"status": "ignored", "reason": "not an issue event"}
+
+    issue = payload.get("issue", {}) or {}
+    fields = issue.get("fields", {}) or {}
+    status = fields.get("status", {}) or {}
+    category = (status.get("statusCategory", {}) or {}).get("key", "")
+    issue_state = status.get("name") or category
+
+    split = _split_jira_key(issue.get("key", "") or "")
+    if not split:
+        return {"status": "ignored", "reason": "missing or malformed issue key"}
+    project_key, issue_number = split
+
+    found = await _find_jira_target(db, project_key, issue_number)
+    if found is None:
+        raise HTTPException(status_code=404, detail="No matching webhook target.")
+    kind, target = found
+
+    # When a webhook secret is configured, a valid signature is REQUIRED —
+    # a missing header must reject, otherwise omitting it bypasses auth.
+    setting = (
+        await db.execute(
+            select(IntegrationSetting).where(
+                IntegrationSetting.project_id == target.project_id,
+                IntegrationSetting.tracker == "jira",
+            )
+        )
+    ).scalar_one_or_none()
+    if not setting or not setting.enabled or not setting.webhook_secret:
+        raise HTTPException(status_code=403, detail="Webhook is not securely configured.")
+    if not x_hub_signature or not _verify_jira_signature(
+        body, decrypt_integration_secret(setting.webhook_secret), x_hub_signature
+    ):
+        _log_target_sync_event(
+            db,
+            kind,
+            target.id,
+            "inbound",
+            "jira",
+            "signature_failed",
+            success=False,
+            error="Missing or invalid HMAC signature",
+        )
+        await db.flush()
+        raise HTTPException(status_code=403, detail="Invalid signature")
+    if not x_atlassian_webhook_identifier:
+        raise HTTPException(status_code=400, detail="Missing Jira webhook identifier.")
+    if not await _reserve_webhook_delivery(db, setting, "jira", x_atlassian_webhook_identifier):
+        return {"status": "duplicate", "delivery": x_atlassian_webhook_identifier}
+
+    old_state = target.external_issue_state
+    target.external_issue_state = issue_state
+    target.external_last_event_at = datetime.utcnow()
+
+    bloom_status = JIRA_CATEGORY_STATUS_MAP.get(category)
+    if bloom_status and target.status != bloom_status:
+        target.status = bloom_status
+        if kind == "defect":
+            if bloom_status == "Closed" and not target.closed_at:
+                target.closed_at = datetime.utcnow()
+            elif bloom_status != "Closed":
+                target.closed_at = None
+
+    _log_target_sync_event(
+        db,
+        kind,
+        target.id,
+        "inbound",
+        "jira",
+        payload.get("webhookEvent", "jira:issue_updated"),
+        payload_summary=f"state: {old_state} -> {issue_state}",
+        external_event_id=x_atlassian_webhook_identifier,
+    )
+
+    await db.flush()
+    return {"status": "processed", "target": kind, "id": target.id}
+
+
 # ==================== Outbound sync ====================
 
 
@@ -565,6 +733,8 @@ async def sync_defect_to_tracker(
             await _push_to_github(defect, setting, changed_fields)
         elif defect.external_tracker == "gitlab":
             await _push_to_gitlab(defect, setting, changed_fields)
+        elif defect.external_tracker == "jira":
+            await _push_to_jira(defect, setting, changed_fields)
 
         _log_sync_event(
             db,
@@ -588,8 +758,22 @@ async def sync_defect_to_tracker(
         )
 
 
-BLOOM_TO_GITHUB_STATE = {"Closed": "closed", "Rejected": "closed"}
-BLOOM_TO_GITLAB_STATE = {"Closed": "close", "Rejected": "close"}
+# Terminal statuses across both artefact types: defects use Closed/Rejected,
+# change requests add Implemented. Anything here closes the external issue.
+CLOSING_BLOOM_STATUSES = {"Closed", "Rejected", "Implemented"}
+# Statuses that mean the external issue should be (re)opened. Defect statuses
+# first, then change-request statuses.
+REOPENING_BLOOM_STATUSES = {
+    "Open",
+    "Triaged",
+    "In Progress",
+    "Resolved",
+    "Verified",
+    "Draft",
+    "Submitted",
+    "Under Review",
+    "Approved",
+}
 
 
 async def _push_to_github(
@@ -599,10 +783,9 @@ async def _push_to_github(
     if "title" in changed_fields:
         body["title"] = defect.title
     if "status" in changed_fields:
-        gh_state = BLOOM_TO_GITHUB_STATE.get(defect.status)
-        if gh_state:
-            body["state"] = gh_state
-        elif defect.status in ("Open", "Triaged", "In Progress", "Resolved", "Verified"):
+        if defect.status in CLOSING_BLOOM_STATUSES:
+            body["state"] = "closed"
+        elif defect.status in REOPENING_BLOOM_STATUSES:
             body["state"] = "open"
 
     if not body:
@@ -629,10 +812,9 @@ async def _push_to_gitlab(
     if "title" in changed_fields:
         body["title"] = defect.title
     if "status" in changed_fields:
-        gl_event = BLOOM_TO_GITLAB_STATE.get(defect.status)
-        if gl_event:
-            body["state_event"] = gl_event
-        elif defect.status in ("Open", "Triaged", "In Progress", "Resolved", "Verified"):
+        if defect.status in CLOSING_BLOOM_STATUSES:
+            body["state_event"] = "close"
+        elif defect.status in REOPENING_BLOOM_STATUSES:
             body["state_event"] = "reopen"
 
     if not body:
@@ -649,7 +831,185 @@ async def _push_to_gitlab(
         resp.raise_for_status()
 
 
+def _jira_auth_header(setting: IntegrationSetting) -> str:
+    """Jira Cloud uses Basic auth over `email:api_token`."""
+    if not setting.account_email:
+        raise ValueError("Jira integration requires the account e-mail that owns the API token.")
+    token = decrypt_integration_secret(setting.token_encrypted)
+    encoded = base64.b64encode(f"{setting.account_email}:{token}".encode()).decode("ascii")
+    return f"Basic {encoded}"
+
+
+async def _push_to_jira(target, setting: IntegrationSetting, changed_fields: dict) -> None:
+    """Push a title and/or status change to the linked Jira issue.
+
+    Jira does not accept a status as a field write: the status is reached by
+    applying a transition, and transition ids differ per workflow. So the status
+    path reads the issue's available transitions and picks the one landing in the
+    wanted status category.
+    """
+    if not setting.base_url:
+        raise ValueError("Jira integration requires the site base URL.")
+
+    issue_key = jira_issue_key(target)
+    base_url = setting.base_url.rstrip("/")
+    headers = {
+        "Authorization": _jira_auth_header(setting),
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        if "title" in changed_fields:
+            resp = await client.put(
+                f"{base_url}/rest/api/3/issue/{issue_key}",
+                json={"fields": {"summary": target.title}},
+                headers=headers,
+            )
+            resp.raise_for_status()
+
+        if "status" not in changed_fields:
+            return
+
+        if target.status in CLOSING_BLOOM_STATUSES:
+            wanted = "done"
+        elif target.status in REOPENING_BLOOM_STATUSES:
+            wanted = "new"
+        else:
+            return
+
+        resp = await client.get(
+            f"{base_url}/rest/api/3/issue/{issue_key}/transitions", headers=headers
+        )
+        resp.raise_for_status()
+        transitions = resp.json().get("transitions", []) or []
+
+        transition_id = next(
+            (
+                t.get("id")
+                for t in transitions
+                if ((t.get("to", {}) or {}).get("statusCategory", {}) or {}).get("key") == wanted
+            ),
+            None,
+        )
+        if transition_id is None:
+            raise ValueError(
+                f"No Jira transition on {issue_key} reaches the '{wanted}' status category."
+            )
+
+        resp = await client.post(
+            f"{base_url}/rest/api/3/issue/{issue_key}/transitions",
+            json={"transition": {"id": transition_id}},
+            headers=headers,
+        )
+        resp.raise_for_status()
+
+
+async def sync_change_request_to_tracker(
+    db: AsyncSession,
+    change_request: ChangeRequest,
+    changed_fields: dict,
+) -> None:
+    """Push change request updates to the linked external tracker if configured."""
+    if not change_request.external_tracker or not change_request.external_repo_full_name:
+        return
+
+    setting = (
+        await db.execute(
+            select(IntegrationSetting).where(
+                IntegrationSetting.project_id == change_request.project_id,
+                IntegrationSetting.tracker == change_request.external_tracker,
+                IntegrationSetting.enabled == True,  # noqa: E712
+            )
+        )
+    ).scalar_one_or_none()
+
+    if not setting or not setting.token_encrypted:
+        return
+
+    try:
+        if change_request.external_tracker == "github":
+            await _push_to_github(change_request, setting, changed_fields)
+        elif change_request.external_tracker == "gitlab":
+            await _push_to_gitlab(change_request, setting, changed_fields)
+        elif change_request.external_tracker == "jira":
+            await _push_to_jira(change_request, setting, changed_fields)
+
+        _log_change_request_sync_event(
+            db,
+            change_request.id,
+            "outbound",
+            change_request.external_tracker,
+            "update_pushed",
+            payload_summary=f"fields: {', '.join(changed_fields.keys())}",
+        )
+        change_request.external_last_event_at = datetime.utcnow()
+    except Exception as exc:
+        logger.warning("Outbound sync failed for change request %s: %s", change_request.id, exc)
+        _log_change_request_sync_event(
+            db,
+            change_request.id,
+            "outbound",
+            change_request.external_tracker,
+            "update_failed",
+            success=False,
+            error=str(exc),
+        )
+
+
 # ==================== Helpers ====================
+
+
+def _log_target_sync_event(
+    db: AsyncSession,
+    kind: str,
+    target_id: int,
+    direction: str,
+    tracker: str,
+    event_type: str,
+    payload_summary: Optional[str] = None,
+    success: bool = True,
+    error: Optional[str] = None,
+    external_event_id: Optional[str] = None,
+) -> None:
+    """Route a sync event to the defect or change-request log."""
+    log = _log_sync_event if kind == "defect" else _log_change_request_sync_event
+    log(
+        db,
+        target_id,
+        direction,
+        tracker,
+        event_type,
+        payload_summary=payload_summary,
+        success=success,
+        error=error,
+        external_event_id=external_event_id,
+    )
+
+
+def _log_change_request_sync_event(
+    db: AsyncSession,
+    change_request_id: int,
+    direction: str,
+    tracker: str,
+    event_type: str,
+    payload_summary: Optional[str] = None,
+    success: bool = True,
+    error: Optional[str] = None,
+    external_event_id: Optional[str] = None,
+) -> None:
+    db.add(
+        ChangeRequestSyncEvent(
+            change_request_id=change_request_id,
+            direction=direction,
+            tracker=tracker,
+            event_type=event_type,
+            payload_summary=payload_summary,
+            success=success,
+            error_message=error,
+            external_event_id=external_event_id,
+        )
+    )
 
 
 def _log_sync_event(

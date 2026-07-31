@@ -178,6 +178,15 @@ async def update_change_request(
             "updated",
             updated_summary(current_user.full_name, "change request", item.change_id, fields_set),
         )
+
+    syncable_fields = {"title", "status", "description"}
+    updates = data.model_dump(exclude_unset=True)
+    changed_sync_fields = {k: v for k, v in updates.items() if k in syncable_fields}
+    if changed_sync_fields and item.external_tracker:
+        from app.api.integrations import sync_change_request_to_tracker
+
+        await sync_change_request_to_tracker(db, item, changed_sync_fields)
+
     return _change_response(item)
 
 
