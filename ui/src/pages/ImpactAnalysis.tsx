@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { traceabilityApi, docsApi } from '../api/client'
 import { ArrowLeft, ArrowUpCircle, ArrowDownCircle, ChevronRight, ChevronDown, CheckCircle } from 'lucide-react'

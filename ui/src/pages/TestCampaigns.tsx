@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useParams, Link, useSearchParams } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignsApi, extractApiErrorMessage, testCasesApi, testSuitesApi } from '../api/client'
 import { ArrowLeft, Plus, Clock, FlaskConical, Layers3, Search, ChevronUp, ChevronDown } from 'lucide-react'

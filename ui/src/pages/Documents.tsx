@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom'
+import { Link, useParams, useSearchParams, useNavigate } from 'react-router'
 import { format } from 'date-fns'
 import {
   ArrowLeft,

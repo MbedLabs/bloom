@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowUpDown, ExternalLink, GitBranch, History, MessageSquare, Pencil, RefreshCw, Trash2 } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'

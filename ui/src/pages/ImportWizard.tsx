@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Check, ChevronRight, Download, AlertCircle, FileUp } from 'lucide-react'
 import { docsApi, projectsApi, importApi } from '../api/client'

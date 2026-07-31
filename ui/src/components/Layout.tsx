@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
+import { Outlet, Link, useLocation, useNavigate } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { APP_VERSION, notificationsApi, projectsApi, searchApi } from '../api/client'
 import { docRegistryListUrl, syncRegistryProjectContext } from '../lib/docRegistryParams'

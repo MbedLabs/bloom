@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router'
 import { ArrowLeft } from 'lucide-react'
 import type { DocType } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'

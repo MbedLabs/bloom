@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { extractApiErrorMessage, projectsApi, type Project } from '../api/client'
 import { Plus, FolderKanban, Search, FileText, CheckCircle, ArrowRight, Pencil } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
