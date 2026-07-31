@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router'
+import { useNavigate } from 'react-router'
 import { useAuth } from '../contexts/AuthContext'
 import { APP_VERSION, extractApiErrorMessage } from '../api/client'
 import { BLOOM_LOGO_DARK, BLOOM_LOGO_LIGHT } from '../brandAssets'

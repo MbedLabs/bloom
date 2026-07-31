@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import DocDetailShell from '../components/DocDetailShell'
 
-vi.mock('react-router-dom', () => ({
+vi.mock('react-router', () => ({
   useLocation: () => ({ state: null }),
   useNavigate: () => () => undefined,
 }))

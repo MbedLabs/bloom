@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router'
 import { documentsApi, projectsApi, DocumentSection, extractApiErrorMessage } from '../api/client'
 import { Trash2, ChevronRight, FileText, FileEdit } from 'lucide-react'
 import { DocEditor } from '../components/editor'
