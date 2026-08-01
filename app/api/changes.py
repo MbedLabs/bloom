@@ -97,6 +97,8 @@ async def create_change_request(
         impact_assessment=data.impact_assessment,
         justification=data.justification,
         visibility=data.visibility,
+        content_json=data.content_json,
+        content_html=data.content_html,
     )
     db.add(item)
     await db.flush()

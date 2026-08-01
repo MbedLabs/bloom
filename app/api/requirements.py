@@ -451,6 +451,8 @@ async def create_requirement(
         req_origin=data.req_origin,
         reviewer_id=data.reviewer_id,
         approver_id=data.approver_id,
+        content_json=data.content_json,
+        content_html=data.content_html,
     )
 
     db.add(requirement)
@@ -548,6 +550,10 @@ async def update_requirement(
         requirement.req_origin = data.req_origin
     if data.visibility is not None:
         requirement.visibility = data.visibility
+    if data.content_json is not None:
+        requirement.content_json = data.content_json
+    if data.content_html is not None:
+        requirement.content_html = data.content_html
     requirement.visibility = _visibility_for_requirement_origin(requirement.req_origin)
 
     if "parent_id" in fields_set:
