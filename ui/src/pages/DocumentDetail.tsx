@@ -86,7 +86,7 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
       }
     },
     onError: (err: unknown) => {
-      toast.failed('Delete failed', err)
+      toast.failed('Deleting the document', err)
       setDeleteConfirm(false)
     },
   })

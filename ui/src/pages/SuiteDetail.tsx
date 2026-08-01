@@ -71,7 +71,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
       toast.notify('Test case added', 'success')
     },
     onError: (err: unknown) => {
-      toast.failed('Add failed', err)
+      toast.failed('Adding the test case', err)
     },
   })
 
@@ -85,7 +85,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
       toast.notify('Test case removed', 'success')
     },
     onError: (err: unknown) => {
-      toast.failed('Remove failed', err)
+      toast.failed('Removing the test case', err)
     },
   })
 
@@ -107,7 +107,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
       })
     },
     onError: (err: unknown) => {
-      toast.failed('Campaign creation failed', err)
+      toast.failed('Creating the campaign', err)
     },
   })
 
@@ -127,7 +127,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
       toast.notify('Suite saved', 'success')
     },
     onError: (err: unknown) => {
-      toast.failed('Save failed', err)
+      toast.failed('Saving the suite', err)
     },
   })
 
@@ -141,7 +141,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
       }, 800)
     },
     onError: (err: unknown) => {
-      toast.failed('Delete failed', err)
+      toast.failed('Deleting the suite', err)
       setConfirmDelete(false)
     },
   })

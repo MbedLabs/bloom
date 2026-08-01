@@ -234,7 +234,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
       toast.notify(`${config.singular} saved`, 'success')
     },
     onError: (err: unknown) => {
-      toast.failed('Save failed', err)
+      toast.failed(`Saving the ${config.singular.toLowerCase()}`, err)
     },
   })
 
@@ -251,7 +251,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
       }, 800)
     },
     onError: (err: unknown) => {
-      toast.failed('Delete failed', err)
+      toast.failed(`Deleting the ${config.singular.toLowerCase()}`, err)
       setDeleteConfirm(false)
     },
   })
@@ -265,7 +265,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
       toast.notify('Comment added', 'success')
     },
     onError: (err: unknown) => {
-      toast.failed('Comment failed', err)
+      toast.failed('Adding the comment', err)
     },
   })
 
@@ -286,7 +286,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
       toast.notify(`Status changed`, 'success')
     },
     onError: (err: unknown) => {
-      toast.failed('Transition failed', err)
+      toast.failed('Changing the status', err)
     },
   })
 
