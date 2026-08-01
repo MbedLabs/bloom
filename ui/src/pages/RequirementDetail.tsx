@@ -130,7 +130,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
       }, 800)
     },
     onError: (err: unknown) => {
-      toast.failed('Delete failed', err)
+      toast.failed('Deleting the requirement', err)
       setDeleteConfirm(false)
     },
   })
@@ -149,7 +149,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
       toast.notify('Requirement marked as reviewed', 'success')
     },
     onError: (err: unknown) => {
-      toast.failed('Review failed', err)
+      toast.failed('Marking the requirement reviewed', err)
     },
   })
 
@@ -167,7 +167,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
       toast.notify('Requirement approved', 'success')
     },
     onError: (err: unknown) => {
-      toast.failed('Approval failed', err)
+      toast.failed('Approving the requirement', err)
     },
   })
 

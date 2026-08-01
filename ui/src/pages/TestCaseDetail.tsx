@@ -107,7 +107,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
       toast.notify('Test case marked as reviewed', 'success')
     },
     onError: (err: unknown) => {
-      toast.failed('Review failed', err)
+      toast.failed('Marking the test case reviewed', err)
     },
   })
 
@@ -125,7 +125,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
       toast.notify('Test case approved', 'success')
     },
     onError: (err: unknown) => {
-      toast.failed('Approval failed', err)
+      toast.failed('Approving the test case', err)
     },
   })
 
@@ -144,7 +144,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
       }, 800)
     },
     onError: (err: unknown) => {
-      toast.failed('Delete failed', err)
+      toast.failed('Deleting the test case', err)
       setDeleteConfirm(false)
     },
   })

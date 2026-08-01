@@ -69,7 +69,7 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
       toast.notify('Campaign updated', 'success')
     },
     onError: (err: unknown) => {
-      toast.failed('Save failed', err)
+      toast.failed('Saving the campaign', err)
     },
   })
 
@@ -83,7 +83,7 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
       }, 800)
     },
     onError: (err: unknown) => {
-      toast.failed('Delete failed', err)
+      toast.failed('Deleting the campaign', err)
       setConfirmDelete(false)
     },
   })

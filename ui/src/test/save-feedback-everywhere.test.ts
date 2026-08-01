@@ -84,6 +84,25 @@ describe('feedback is the shared toast', () => {
   })
 })
 
+describe('failure messages read as sentences', () => {
+  // toast.failed appends " failed" itself, so the argument names the action
+  // alone. Passing the old inline fallback verbatim produced "Save failed failed".
+  const callSites = Object.entries(sources).flatMap(([path, source]) =>
+    (source.match(/toast\.failed\(\s*[`'"][^`'"]*[`'"]/g) ?? []).map(
+      (call) => [path.split('/').pop()!, call] as const,
+    ),
+  )
+
+  it('finds the failure call sites', () => {
+    expect(callSites.length).toBeGreaterThan(20)
+  })
+
+  it.each(callSites)('%s: %s', (_file, call) => {
+    expect(call.toLowerCase()).not.toContain('failed,')
+    expect(call.toLowerCase()).not.toMatch(/fail(ed|ure)?[`'"]$/)
+  })
+})
+
 describe('the document editor', () => {
   const docCreate = sources['../pages/DocCreate.tsx']
 
