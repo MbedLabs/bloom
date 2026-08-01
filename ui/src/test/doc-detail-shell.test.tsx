@@ -1,4 +1,4 @@
-import { renderToString } from 'react-dom/server'
+import { renderPage } from './render'
 import { describe, expect, it, vi } from 'vitest'
 
 import DocDetailShell from '../components/DocDetailShell'
@@ -10,7 +10,7 @@ vi.mock('react-router', () => ({
 
 describe('DocDetailShell', () => {
   it('shows only the document code and title in the title block', () => {
-    const html = renderToString(
+    const html = renderPage(
       <DocDetailShell
         projectPrefix="PRJ"
         docType="REQ"

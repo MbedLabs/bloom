@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { ToastProvider } from '../components/Toast'
 import '@testing-library/jest-dom/vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -67,7 +68,7 @@ function renderWithQueryClient(element: React.ReactElement) {
   })
   return render(
     <QueryClientProvider client={queryClient}>
-      {element}
+      <ToastProvider>{element}</ToastProvider>
     </QueryClientProvider>,
   )
 }

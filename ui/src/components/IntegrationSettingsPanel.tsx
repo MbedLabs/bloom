@@ -4,6 +4,7 @@ import { GitBranch } from 'lucide-react'
 
 import { extractApiErrorMessage, integrationsApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from './useToast'
 
 export type TrackerChoice = 'none' | 'github' | 'gitlab'
 
@@ -20,6 +21,7 @@ const WEBHOOK_PATHS: Record<TrackerKind, string> = {
 export default function IntegrationSettingsPanel({ projectId }: { projectId: number }) {
   const { user } = useAuth()
   const queryClient = useQueryClient()
+  const toast = useToast()
   const isAdmin = user?.role === 'admin'
 
   const { data: settings, isLoading } = useQuery({
@@ -123,6 +125,7 @@ export default function IntegrationSettingsPanel({ projectId }: { projectId: num
       queryClient.invalidateQueries({ queryKey: ['integrationSettings', projectId] })
       setToken('')
       setDirty(false)
+      toast.saved('Integration')
     },
     onError: (err: unknown) => {
       if (err instanceof Error && err.message === 'cancelled') {
@@ -130,6 +133,7 @@ export default function IntegrationSettingsPanel({ projectId }: { projectId: num
         return
       }
       setError(extractApiErrorMessage(err, 'Failed to save integration'))
+      toast.failed('Saving the integration', err)
     },
   })
 

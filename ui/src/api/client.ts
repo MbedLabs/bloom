@@ -933,6 +933,8 @@ export const testCasesApi = {
     project_id: number
     title: string
     description?: string
+    content_json?: Record<string, unknown> | null
+    content_html?: string | null
     preconditions?: string
     steps?: Step[] | TcsRow[]
     status?: string
