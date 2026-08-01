@@ -26,6 +26,7 @@
 ### Added
 
 - `GET /api/projects/{project_ref}/next-doc-id/{type_code}` reports the next identifier for a document type.
+- Relationships are navigable. Clicking a relationship on a document opens the Documents registry filtered to the artefacts sharing that relationship, narrowed to that role and direction. The registry accepts `related_to`, `role`, and `direction`, and shows the active relationship as a filter chip.
 
 ### Removed
 

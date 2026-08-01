@@ -316,6 +316,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
           projectPrefix={project.prefix}
           sourceType="TC"
           sourceId={testCase.id}
+          sourceDocId={testCase.tc_id}
           derivedLinks={derivedMembershipLinks}
         />
       )}

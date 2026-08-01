@@ -240,6 +240,7 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
         projectPrefix={projectPrefix}
         sourceType={resolvedDocType}
         sourceId={docId}
+        sourceDocId={doc.doc_id ?? undefined}
       />
     </DocDetailShell>
     {toast && (
