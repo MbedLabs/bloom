@@ -1,5 +1,5 @@
+import { renderWithToasts } from './render'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { renderToString } from 'react-dom/server'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 
@@ -107,7 +107,7 @@ function renderPage(element: ReactNode) {
     },
   })
 
-  return renderToString(
+  return renderWithToasts(
     <QueryClientProvider client={queryClient}>
       {element}
     </QueryClientProvider>,

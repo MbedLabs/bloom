@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 import { extractApiErrorMessage, projectsApi, type Project } from '../api/client'
 import { Plus, FolderKanban, Search, FileText, CheckCircle, ArrowRight, Pencil } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../components/useToast'
 
 const PROJECT_PREFIX_PATTERN = /^[A-Z]{3}$/
 const PROJECT_PREFIX_ERROR = 'Use exactly three uppercase letters, e.g. PRJ.'
@@ -20,6 +21,7 @@ export default function Projects() {
   const [search, setSearch] = useState('')
   const [formError, setFormError] = useState('')
   const queryClient = useQueryClient()
+  const toast = useToast()
 
   const { data: projects, isLoading } = useQuery({
     queryKey: ['projects'],
@@ -35,9 +37,11 @@ export default function Projects() {
       setName('')
       setPrefix('')
       setDescription('')
+      toast.saved('Project')
     },
     onError: (error) => {
       setFormError(extractApiErrorMessage(error, 'Could not create project'))
+      toast.failed('Creating the project', error)
     },
   })
 

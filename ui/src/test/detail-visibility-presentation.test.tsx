@@ -1,5 +1,5 @@
+import { renderPage } from './render'
 import type { ReactNode } from 'react'
-import { renderToString } from 'react-dom/server'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 let mockParams: Record<string, string> = {}
@@ -89,7 +89,7 @@ describe('detail visibility presentation', () => {
     }
 
     const { default: DocumentDetail } = await import('../pages/DocumentDetail')
-    const html = renderToString(<DocumentDetail />)
+    const html = renderPage(<DocumentDetail />)
 
     expect(html).toContain('Flight specification')
     expectNoVisibilityPresentation(html)
@@ -125,7 +125,7 @@ describe('detail visibility presentation', () => {
     }
 
     const { default: TestCaseDetail } = await import('../pages/TestCaseDetail')
-    const html = renderToString(<TestCaseDetail />)
+    const html = renderPage(<TestCaseDetail />)
 
     expect(html).toContain('Audit test case')
     expectNoVisibilityPresentation(html)
@@ -160,7 +160,7 @@ describe('detail visibility presentation', () => {
     }
 
     const { default: ArtefactDetail } = await import('../pages/ArtefactDetail')
-    const html = renderToString(<ArtefactDetail kind="design" />)
+    const html = renderPage(<ArtefactDetail kind="design" />)
 
     expect(html).toContain('Audit design')
     expectNoVisibilityPresentation(html)

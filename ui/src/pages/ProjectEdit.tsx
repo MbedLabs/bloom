@@ -11,6 +11,7 @@ import {
   usersApi,
 } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../components/useToast'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import {
   projectDeleteConfirmationMatches,
@@ -30,6 +31,7 @@ export default function ProjectEdit() {
   const { user } = useAuth()
   const { data: project, isLoading } = useProjectByPrefix(prefix)
   const queryClient = useQueryClient()
+  const toast = useToast()
 
   const [name, setName] = useState('')
   const [projectPrefix, setProjectPrefix] = useState('')
@@ -67,12 +69,14 @@ export default function ProjectEdit() {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       queryClient.setQueryData(['project-by-prefix', updated.prefix], updated)
       queryClient.invalidateQueries({ queryKey: ['project-by-prefix', updated.prefix] })
+      toast.saved('Project')
       if (updated.prefix !== prefix) {
         navigate(`/projects/${updated.prefix}/edit`, { replace: true })
       }
     },
     onError: (error) => {
       setFormError(extractApiErrorMessage(error, 'Could not update project'))
+      toast.failed('Saving the project', error)
     },
   })
 
@@ -81,10 +85,12 @@ export default function ProjectEdit() {
     onSuccess: () => {
       setDeleteError('')
       queryClient.invalidateQueries({ queryKey: ['projects'] })
+      toast.deleted(`Project ${project?.name ?? ''}`.trim())
       navigate('/projects', { replace: true })
     },
     onError: (error) => {
       setDeleteError(extractApiErrorMessage(error, 'Could not delete project'))
+      toast.failed('Deleting the project', error)
     },
   })
 
@@ -353,6 +359,7 @@ function ProjectMembersPanel({
   users: Array<{ id: number; email: string; full_name: string; role: 'admin' | 'maintainer' | 'external' }>
 }) {
   const queryClient = useQueryClient()
+  const toast = useToast()
   const [selectedUserId, setSelectedUserId] = useState('')
   const [selectedRole, setSelectedRole] = useState<ProjectMemberRole>('external')
   const [selectedDocTypes, setSelectedDocTypes] = useState<string[]>(['REQ', 'TC', 'CPT', 'CMP'])
@@ -375,9 +382,11 @@ function ProjectMembersPanel({
       setSelectedRole('external')
       setSelectedDocTypes(['REQ', 'TC', 'CPT', 'CMP'])
       queryClient.invalidateQueries({ queryKey: ['project-members', projectId] })
+      toast.notify('Member added', 'success')
     },
     onError: (mutationError) => {
       setError(extractApiErrorMessage(mutationError, 'Could not add project member'))
+      toast.failed('Adding the member', mutationError)
     },
   })
 
@@ -397,14 +406,18 @@ function ProjectMembersPanel({
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project-members', projectId] })
+      toast.saved('Member access')
     },
+    onError: (error) => toast.failed('Saving the member access', error),
   })
 
   const removeMutation = useMutation({
     mutationFn: (membershipId: number) => projectMembersApi.remove(projectId, membershipId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project-members', projectId] })
+      toast.notify('Member removed', 'success')
     },
+    onError: (error) => toast.failed('Removing the member', error),
   })
 
   const handleCreate = (e: React.FormEvent) => {

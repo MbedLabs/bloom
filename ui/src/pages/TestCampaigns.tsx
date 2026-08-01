@@ -5,6 +5,7 @@ import { campaignsApi, extractApiErrorMessage, testCasesApi, testSuitesApi } fro
 import { ArrowLeft, Plus, Clock, FlaskConical, Layers3, Search, ChevronUp, ChevronDown } from 'lucide-react'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../components/useToast'
 import { formatDateTime } from '../test/date-utils'
 import BudRunLink from '../components/BudRunLink'
 
@@ -25,6 +26,7 @@ export default function TestCampaigns() {
   const { data: project } = useProjectByPrefix(prefix)
   const projectId = project?.id || 0
   const queryClient = useQueryClient()
+  const toast = useToast()
   const [showCreate, setShowCreate] = useState(false)
   const [showCreateSuite, setShowCreateSuite] = useState(false)
   const [form, setForm] = useState({ name: '', description: '', visibility: 'internal' })
@@ -111,9 +113,11 @@ export default function TestCampaigns() {
       setForm({ name: '', description: '', visibility: 'internal' })
       setSelectedTcIds([])
       setSelectedSuiteIds([])
+      toast.saved('Campaign')
     },
     onError: (error: unknown) => {
       setCreateError(extractApiErrorMessage(error, 'Campaign creation failed.'))
+      toast.failed('Creating the campaign', error)
     },
   })
 
@@ -126,7 +130,9 @@ export default function TestCampaigns() {
       setSuiteForm({ name: '', description: '', visibility: 'internal' })
       setSelectedTcIds([])
       setSelectedSuiteIds((prev) => [...prev, suite.id])
+      toast.saved(`Suite ${suite.name}`)
     },
+    onError: (error) => toast.failed('Creating the suite', error),
   })
 
   const toggleSuiteId = (id: number) => {

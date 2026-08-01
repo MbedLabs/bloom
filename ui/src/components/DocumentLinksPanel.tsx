@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link2, Search, X } from 'lucide-react'
+import { useToast } from './useToast'
 import {
   type ArtefactLink,
   type DocShell,
@@ -125,6 +126,7 @@ function LinkDocumentModal({
   onClose: () => void
 }) {
   const queryClient = useQueryClient()
+  const toast = useToast()
   const normalizedSourceType = normalizeDocTypeParam(sourceType)
   const [search, setSearch] = useState('')
   const eligibleTargets = useMemo(
@@ -187,8 +189,10 @@ function LinkDocumentModal({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['docLinks', projectId] })
+      toast.notify('Relationship added', 'success')
       onClose()
     },
+    onError: (error) => toast.failed('Adding the relationship', error),
   })
 
   const filteredTargets = eligibleTargets.filter((target) => {
@@ -302,6 +306,7 @@ export function DocumentLinksPanel({
 }) {
   const { user } = useAuth()
   const queryClient = useQueryClient()
+  const toast = useToast()
   const [showModal, setShowModal] = useState(false)
   const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
 
@@ -346,7 +351,9 @@ export function DocumentLinksPanel({
     mutationFn: linksApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['docLinks', projectId] })
+      toast.notify('Relationship removed', 'success')
     },
+    onError: (error) => toast.failed('Removing the relationship', error),
   })
 
   const targetLookup = useMemo(() => {

@@ -1,6 +1,6 @@
+import { renderWithToasts } from './render'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
-import { renderToString } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 let mockParams: Record<string, string> = {}
@@ -98,7 +98,7 @@ function renderPage(element: ReactNode) {
     defaultOptions: { queries: { retry: false } },
   })
 
-  return renderToString(
+  return renderWithToasts(
     <QueryClientProvider client={queryClient}>
       {element}
     </QueryClientProvider>,

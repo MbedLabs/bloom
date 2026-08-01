@@ -1,5 +1,5 @@
+import { renderPage } from './render'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { renderToString } from 'react-dom/server'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -71,7 +71,7 @@ describe('source-available readiness smoke', () => {
       },
     })
 
-    const html = renderToString(
+    const html = renderPage(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={[path]}>
           <App />

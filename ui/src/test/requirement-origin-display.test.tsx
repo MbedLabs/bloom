@@ -1,5 +1,5 @@
+import { renderPage } from './render'
 import type { ReactNode } from 'react'
-import { renderToString } from 'react-dom/server'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 const requirement = {
@@ -84,7 +84,7 @@ describe('requirement origin presentation', () => {
   it('shows origin without duplicating derived visibility', async () => {
     const { default: RequirementDetail } = await import('../pages/RequirementDetail')
 
-    const html = renderToString(<RequirementDetail resolvedId={requirement.id} />)
+    const html = renderPage(<RequirementDetail resolvedId={requirement.id} />)
 
     expect(html).toContain('Audit Stats Top-User Count Consistency')
     expect(html).toMatch(/>Origin<\/div>/)

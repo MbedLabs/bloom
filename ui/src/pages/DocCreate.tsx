@@ -21,6 +21,7 @@ import {
   normalizeDocTypeParam,
 } from '../types/doc'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../components/useToast'
 import { docRegistryBackUrl, docRegistryListLabel } from '../lib/docRegistryParams'
 import {
   dedicatedListUrl,
@@ -123,6 +124,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()
+  const toast = useToast()
   const returnTo = (location.state as { returnTo?: string } | null)?.returnTo
 
   const rawRequestedDocType = normalizeDocTypeParam(searchParams.get('type')) || 'REQ'
@@ -277,6 +279,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
         return testCasesApi.create({
           project_id: projectId,
           title,
+          content_json: contentJson,
+          content_html: contentHtml || undefined,
           description: metadata.description || undefined,
           preconditions: metadata.preconditions || undefined,
           steps: tcRows.length > 0 ? tcRows : undefined,
@@ -326,6 +330,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       if (docType === 'TC') {
         return testCasesApi.update(resolvedDocId, {
           title,
+          content_json: contentJson,
+          content_html: contentHtml || null,
           description: metadata.description || null,
           preconditions: metadata.preconditions || null,
           steps: tcRows.length > 0 ? tcRows : null,
@@ -377,11 +383,13 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       invalidateDocumentQueries(queryClient, projectId, prefix, resolvedDocId, kind, docIdStr)
       setSaveError(null)
       setSaveSuccess(true)
+      toast.saved(DOC_TYPE_LABELS[docType])
       const timer = setTimeout(() => setSaveSuccess(false), 2000)
       return () => clearTimeout(timer)
     },
     onError: (error) => {
       setSaveError(extractApiErrorMessage(error, 'Could not save document'))
+      toast.failed(`Saving the ${DOC_TYPE_LABELS[docType].toLowerCase()}`, error)
     },
   })
 
@@ -395,10 +403,12 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
     },
     onSuccess: () => {
       invalidateDocumentQueries(queryClient, projectId, prefix, resolvedDocId, kind, docIdStr)
+      toast.deleted(docIdStr ? `${DOC_TYPE_LABELS[docType]} ${docIdStr}` : DOC_TYPE_LABELS[docType])
       navigate(listBackUrl)
     },
     onError: (error) => {
       setSaveError(extractApiErrorMessage(error, 'Could not delete document'))
+      toast.failed(`Deleting the ${DOC_TYPE_LABELS[docType].toLowerCase()}`, error)
     },
   })
 
