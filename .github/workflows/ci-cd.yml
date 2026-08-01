@@ -113,7 +113,7 @@ jobs:
           BLOOM_DOTENV_DISABLED: "1"
           BLOOM_DISABLE_RATE_LIMIT: "1"
         run: |
-          pytest --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=55 tests/ -v
+          pytest --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=68 tests/ -v
 
       - name: Run UI checks
         run: |

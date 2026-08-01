@@ -16,6 +16,10 @@
 - The dependency audit no longer carries any reviewed-advisory exception; every advisory now fails the build.
 - The migration history is collapsed into a single locked baseline of explicit DDL. The base revision previously called `Base.metadata.create_all()`, which meant it always produced whatever the models currently described, so every later revision had to be written with inspect-then-add guards and the real `ALTER` path was never exercised by the fresh-install CI check. The baseline keeps the identifier of the previously deployed head, so an existing database is recognised as up to date and is not re-migrated; no stamp or manual step is required.
 
+### Changed
+
+- Coverage measurement was blind to most of the application. SQLAlchemy's async bridge runs endpoint bodies inside greenlets and the test client drives the app from a worker thread, neither of which coverage traces by default, so an endpoint could be exercised by a passing HTTP test and still be reported as entirely unhit. With `concurrency = ["thread", "greenlet"]` the real figure is 71%, not the 63% previously reported; the CI gate moves from 55% to 68%.
+
 ### Fixed
 
 - Saving a requirement, test case, design item, risk, change request, or test concept failed with `422`. Their models carry `content_json`/`content_html` and the editor sends them, but the create/update schemas forbid unknown fields and did not declare them, so the editor body could never be persisted or read back. All six now accept and return their rich content.
