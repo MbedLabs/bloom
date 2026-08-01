@@ -279,8 +279,6 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
         return testCasesApi.create({
           project_id: projectId,
           title,
-          content_json: contentJson,
-          content_html: contentHtml || undefined,
           description: metadata.description || undefined,
           preconditions: metadata.preconditions || undefined,
           steps: tcRows.length > 0 ? tcRows : undefined,
@@ -330,8 +328,6 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       if (docType === 'TC') {
         return testCasesApi.update(resolvedDocId, {
           title,
-          content_json: contentJson,
-          content_html: contentHtml || null,
           description: metadata.description || null,
           preconditions: metadata.preconditions || null,
           steps: tcRows.length > 0 ? tcRows : null,
