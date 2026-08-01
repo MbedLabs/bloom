@@ -30,13 +30,25 @@ describe.each(DETAIL_PAGES)('%s', (_name, source) => {
   })
 })
 
-describe('RequirementDetail content', () => {
-  it('renders stored rich content read-only', () => {
-    expect(requirementDetailSource).toContain('content_json')
-    expect(requirementDetailSource).toContain('DocEditor')
-    expect(requirementDetailSource).toContain('editable={false}')
+describe('detail pages render the stored body', () => {
+  it.each([
+    ['RequirementDetail', requirementDetailSource],
+    ['TestCaseDetail', testCaseDetailSource],
+  ])('%s shows rich content read-only', (_name, source) => {
+    expect(source).toContain('content_json')
+    expect(source).toContain('DocEditor')
+    expect(source).toContain('editable={false}')
   })
 
+  it.each([
+    ['RequirementDetail', requirementDetailSource],
+    ['TestCaseDetail', testCaseDetailSource],
+  ])('%s falls back to the description for pre-rich-content documents', (_name, source) => {
+    expect(source).toContain('SectionCard title="Description"')
+  })
+})
+
+describe('RequirementDetail content', () => {
   it('still shows the description when a document predates rich content', () => {
     // Legacy requirements carry only `description`; they must not render blank.
     expect(requirementDetailSource).toContain('No description provided.')
