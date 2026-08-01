@@ -117,7 +117,7 @@ export default function Baselines() {
         <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-6">
           <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden">
             <div className="px-4 py-3 border-b border-border text-sm font-medium text-foreground">Available Baselines</div>
-            <div className="divide-y divide-border max-h-[620px] overflow-y-auto">
+            <div className="divide-y divide-border max-h-[620px] overflow-y-auto themed-scrollbar">
               {baselines.map((item) => (
                 <button
                   key={item.id}

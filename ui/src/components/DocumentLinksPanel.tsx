@@ -251,7 +251,7 @@ function LinkDocumentModal({
             )}
           </select>
         </div>
-        <div className="overflow-y-auto p-3">
+        <div className="overflow-y-auto themed-scrollbar p-3">
           {availableTargetTypes.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">No valid link targets for this artefact type yet.</div>
           ) : filteredTargets.length === 0 ? (
