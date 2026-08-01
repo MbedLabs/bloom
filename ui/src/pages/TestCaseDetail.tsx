@@ -15,6 +15,7 @@ import { normalizeTcsRows } from '../utils/tcs'
 import { Pencil, UserCheck, UserCog, Trash2 } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
 import { docEditUrl } from '../types/doc'
+import { DocEditor } from '../components/editor'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocDetailShell, { MetaItem, SectionCard } from '../components/DocDetailShell'
 import { useAuth } from '../contexts/AuthContext'
@@ -298,11 +299,20 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
         </>
       }
     >
-      {testCase.description && (
+      {(testCase.content_json as Record<string, unknown> | null) ? (
+        <SectionCard title="Content">
+          <DocEditor
+            content={testCase.content_json as Record<string, unknown>}
+            editable={false}
+            minHeight="min-h-[120px]"
+            className="border-0"
+          />
+        </SectionCard>
+      ) : testCase.description ? (
         <SectionCard title="Description">
           <p className="text-foreground whitespace-pre-wrap">{testCase.description}</p>
         </SectionCard>
-      )}
+      ) : null}
 
       {tcsRows.length > 0 && (
         <TcsArteTable rows={tcsRows} onChange={() => {}} editable={false} />
