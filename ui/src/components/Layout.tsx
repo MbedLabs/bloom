@@ -538,7 +538,7 @@ function LayoutInner() {
                 {searchOpen && debouncedQuery.length >= 2 && (
                   <div
                     id="global-search-results"
-                    className="absolute left-0 right-0 top-full z-50 mt-1 max-h-96 overflow-y-auto rounded-md border border-border bg-card shadow-elegant"
+                    className="absolute left-0 right-0 top-full z-50 mt-1 max-h-96 overflow-y-auto themed-scrollbar rounded-md border border-border bg-card shadow-elegant"
                   >
                     {searchItems.length === 0 && (
                       <div className="px-3 py-2.5 text-sm text-muted-foreground">
@@ -599,7 +599,7 @@ function LayoutInner() {
                         </button>
                       )}
                     </div>
-                    <div className="max-h-96 overflow-y-auto">
+                    <div className="max-h-96 overflow-y-auto themed-scrollbar">
                       {(notifications?.items?.length ?? 0) === 0 && (
                         <div className="px-4 py-6 text-center text-sm text-muted-foreground">
                           No notifications yet
@@ -682,7 +682,7 @@ function LayoutInner() {
           </div>
         </header>
 
-        <main className="p-4 bg-background flex flex-col flex-1 min-h-0 overflow-auto">
+        <main className="p-4 bg-background flex flex-col flex-1 min-h-0 overflow-auto themed-scrollbar">
           <Outlet />
         </main>
         {sidebarCollapsed && (

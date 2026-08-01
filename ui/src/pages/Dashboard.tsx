@@ -130,7 +130,7 @@ export default function Dashboard() {
           {portfolioProjects.length === 0 ? (
             <EmptyState />
           ) : (
-            <div className="max-h-[28rem] overflow-y-auto">
+            <div className="max-h-[28rem] overflow-y-auto themed-scrollbar">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-border">
                 <thead className="sticky top-0 z-10 bg-muted/40">

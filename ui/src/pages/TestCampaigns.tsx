@@ -335,7 +335,7 @@ export default function TestCampaigns() {
               <h3 className="text-lg font-semibold">New Test Campaign</h3>
             </div>
             <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-              <div className="p-6 space-y-4 overflow-y-auto">
+              <div className="p-6 space-y-4 overflow-y-auto themed-scrollbar">
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">Name</label>
                   <input
@@ -372,7 +372,7 @@ export default function TestCampaigns() {
                   <label className="block text-sm font-medium text-foreground mb-1">
                     Campaign Suites ({selectedSuiteIds.length} selected)
                   </label>
-                  <div className="border border-input rounded-md max-h-48 overflow-y-auto">
+                  <div className="border border-input rounded-md max-h-48 overflow-y-auto themed-scrollbar">
                     {(suiteItems || []).length > 0 ? (
                       (suiteItems || []).map((suite) => (
                         <label key={suite.id} className="flex items-center px-3 py-2 hover:bg-accent/30 cursor-pointer border-b border-border last:border-b-0">
@@ -440,7 +440,7 @@ export default function TestCampaigns() {
               <h3 className="text-lg font-semibold">New Test Suite</h3>
             </div>
             <form onSubmit={handleSuiteSubmit} className="flex flex-col flex-1 overflow-hidden">
-              <div className="p-6 space-y-4 overflow-y-auto">
+              <div className="p-6 space-y-4 overflow-y-auto themed-scrollbar">
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">Name</label>
                   <input
@@ -475,7 +475,7 @@ export default function TestCampaigns() {
                   <label className="block text-sm font-medium text-foreground mb-1">
                     Select Test Cases ({selectedTcIds.length} selected)
                   </label>
-                  <div className="border border-input rounded-md max-h-48 overflow-y-auto">
+                  <div className="border border-input rounded-md max-h-48 overflow-y-auto themed-scrollbar">
                     {testCases && testCases.length > 0 ? (
                       testCases.map((tc) => (
                         <label key={tc.id} className="flex items-center px-3 py-2 hover:bg-accent/30 cursor-pointer border-b border-border last:border-b-0">

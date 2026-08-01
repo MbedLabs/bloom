@@ -347,7 +347,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
             <div className="px-6 py-4 border-b border-border">
               <h3 className="text-lg font-semibold">Add Test Case To Suite</h3>
             </div>
-            <div className="p-6 overflow-y-auto flex-1">
+            <div className="p-6 overflow-y-auto themed-scrollbar flex-1">
               {availableCases.length === 0 ? (
                 <div className="text-center text-muted-foreground py-6">No available test cases.</div>
               ) : (
