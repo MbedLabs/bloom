@@ -17,6 +17,7 @@ from app.core.document_kinds import (
     document_kind_from_slug,
     normalize_document_kind,
 )
+from app.core.id_generator import next_doc_id
 from app.core.security import (
     apply_external_visibility_filter,
     external_doc_type_allowed,
@@ -320,6 +321,50 @@ async def list_all_docs(
         return PaginatedResponse(items=results, total=total, skip=0, limit=total)
     sliced = results[skip : skip + limit]
     return PaginatedResponse(items=sliced, total=total, skip=skip, limit=limit)
+
+
+class NextDocIdResponse(BaseModel):
+    next_id: str
+
+
+# Document-backed types share one table and are distinguished by doc_type.
+_DOCUMENT_TYPE_CODES = {"SPEC", "PRT", "RPT", "STD"}
+
+
+@router.get("/projects/{project_ref}/next-doc-id/{type_code}", response_model=NextDocIdResponse)
+async def get_next_doc_id(
+    project_ref: str,
+    type_code: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Report the identifier the server would assign to the next document.
+
+    The create screen used to render a hardcoded ``-001`` preview, which claimed
+    an identifier that was usually already taken. The server allocates with
+    MAX(suffix)+1, so the preview has to come from the same place.
+
+    Deliberately not routed under ``/docs/{kind_slug}/...`` so it cannot be
+    mistaken for a document whose id happens to be "next-doc-id".
+    """
+    project = await resolve_project(db, project_ref)
+    await require_project_access(db, current_user, project.id)
+
+    code = type_code.upper()
+    if code in TYPE_MAP:
+        model, id_field, _slug = TYPE_MAP[code]
+        id_column = getattr(model, id_field)
+    elif code in _DOCUMENT_TYPE_CODES:
+        model, id_column = Document, Document.doc_id
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported document type: {type_code}")
+
+    try:
+        next_id = await next_doc_id(db, model, id_column, project.id, project.prefix, code)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return NextDocIdResponse(next_id=next_id)
 
 
 @router.get(

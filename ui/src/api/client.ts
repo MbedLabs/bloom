@@ -133,11 +133,52 @@ export interface GenericMessageResponse {
   message: string
 }
 
+/** One entry of FastAPI's 422 body: {"detail": [{loc, msg, type}, ...]}. */
+interface ApiValidationIssue {
+  loc?: unknown[]
+  msg?: string
+  type?: string
+}
+
+/** Render "body.content_json" from a FastAPI `loc`, dropping the leading scope. */
+function formatIssueLocation(loc: unknown[] | undefined): string {
+  if (!Array.isArray(loc)) return ''
+  const parts = loc
+    .filter((part) => typeof part === 'string' || typeof part === 'number')
+    .map(String)
+    .filter((part) => part !== 'body')
+  return parts.join('.')
+}
+
+function formatValidationIssues(issues: ApiValidationIssue[]): string | null {
+  const rendered = issues
+    .map((issue) => {
+      const where = formatIssueLocation(issue.loc)
+      const message = typeof issue.msg === 'string' ? issue.msg : ''
+      if (!where && !message) return ''
+      return where ? `${where}: ${message}` : message
+    })
+    .filter((text) => text.length > 0)
+
+  return rendered.length > 0 ? rendered.join('; ') : null
+}
+
 export function extractApiErrorMessage(error: unknown, fallback = 'Request failed'): string {
-  if (axios.isAxiosError<{ detail?: string }>(error)) {
+  if (axios.isAxiosError<{ detail?: unknown }>(error)) {
     const detail = error.response?.data?.detail
+
     if (typeof detail === 'string' && detail.trim().length > 0) {
       return detail
+    }
+    // FastAPI reports validation failures as a list, which previously fell
+    // through to axios's opaque "Request failed with status code 422".
+    if (Array.isArray(detail)) {
+      const formatted = formatValidationIssues(detail as ApiValidationIssue[])
+      if (formatted) return formatted
+    }
+    if (detail && typeof detail === 'object') {
+      const message = (detail as { msg?: unknown }).msg
+      if (typeof message === 'string' && message.trim().length > 0) return message
     }
   }
   if (error instanceof Error && error.message) {
@@ -787,6 +828,11 @@ export interface DocDetailFacade extends DocShell {
 }
 
 export const docsApi = {
+  /** The id the server would assign next, so the create screen stops guessing. */
+  nextDocId: async (projectRef: string, typeCode: string) => {
+    const response = await api.get<{ next_id: string }>(`/projects/${projectRef}/next-doc-id/${typeCode}`)
+    return response.data.next_id
+  },
   list: async (projectRef: string, params?: { type?: string[]; status?: string; q?: string; includeLinkCounts?: boolean; skip?: number; limit?: number }) => {
     const query = new URLSearchParams()
     if (params?.type) params.type.forEach(t => query.append('type', t))

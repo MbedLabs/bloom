@@ -98,6 +98,8 @@ async def create_risk_item(
         risk_category=data.risk_category,
         visibility=data.visibility,
         linked_requirement_id=None,
+        content_json=data.content_json,
+        content_html=data.content_html,
     )
     db.add(item)
     await db.flush()

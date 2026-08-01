@@ -111,6 +111,8 @@ async def create_test_concept(
         visibility=data.visibility,
         linked_requirement_ids=None,
         coverage=data.coverage,
+        content_json=data.content_json,
+        content_html=data.content_html,
     )
     db.add(item)
     await db.flush()
