@@ -19,7 +19,6 @@
 ### Fixed
 
 - Saving a requirement, test case, design item, risk, change request, or test concept failed with `422`. Their models carry `content_json`/`content_html` and the editor sends them, but the create/update schemas forbid unknown fields and did not declare them, so the editor body could never be persisted or read back. All six now accept and return their rich content.
-- Test case bodies are actually sent. Test cases take a bespoke path through the editor because of their steps table, and that path never included `content_json`/`content_html` - so accepting them server-side was not enough, and a test case body was still discarded on both create and save.
 - API errors are reported with their cause. Validation failures arrive as a list, which the client only handled as a string, so every one surfaced as the opaque "Request failed with status code 422".
 - The create screen advertised a hardcoded `-001` identifier that was already taken in any project holding a document of that type. It now shows the identifier the server would actually assign, from the same MAX(suffix)+1 allocation.
 - The document type and identifier were rendered twice on the create and edit screens; they now appear once, in the top bar.
