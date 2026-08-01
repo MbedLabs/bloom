@@ -4,7 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { requirementsApi, usersApi, projectsApi, extractApiErrorMessage } from '../api/client'
 import { ExternalLink, ChevronRight, UserCheck, UserCog, Trash2 } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
-import { docUrl } from '../types/doc'
+import { docEditUrl, docUrl } from '../types/doc'
+import { DocEditor } from '../components/editor'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import DocDetailShell, { StatusBadge, MetaItem, SectionCard } from '../components/DocDetailShell'
@@ -112,58 +113,10 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
     return () => clearTimeout(timer)
   }, [toast])
 
-  const [isEditing, setIsEditing] = useState(false)
-  const [editForm, setEditForm] = useState({
-    title: '',
-    description: '',
-    status: '',
-    visibility: 'internal',
-    priority: '',
-    req_type: '',
-    req_origin: '',
-    reviewer_id: '',
-    approver_id: '',
-  })
-
   const { data: users } = useQuery({
     queryKey: ['users'],
     queryFn: usersApi.list,
     enabled: user?.role === 'admin' || user?.role === 'maintainer',
-  })
-
-  useEffect(() => {
-    if (requirement && isEditing) {
-      setEditForm({
-        title: requirement.title,
-        description: requirement.description || '',
-        status: requirement.status,
-        visibility: requirement.visibility,
-        priority: requirement.priority,
-        req_type: requirement.req_type,
-        req_origin: requirement.req_origin,
-        reviewer_id: requirement.reviewer_id ? String(requirement.reviewer_id) : '',
-        approver_id: requirement.approver_id ? String(requirement.approver_id) : '',
-      })
-    }
-  }, [requirement, isEditing])
-
-  const updateMutation = useMutation({
-    mutationFn: (data: Parameters<typeof requirementsApi.update>[1]) => requirementsApi.update(reqId, data),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(['requirement', reqId], (old: unknown) => {
-        if (old && typeof old === 'object') {
-          return { ...(old as object), ...(updated as object) }
-        }
-        return updated
-      })
-      queryClient.invalidateQueries({ queryKey: ['requirement', reqId] })
-      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'requirement', reqId] })
-      setIsEditing(false)
-      setToast({ message: 'Requirement saved', variant: 'success' })
-    },
-    onError: (err: unknown) => {
-      setToast({ message: extractApiErrorMessage(err) || 'Save failed', variant: 'error' })
-    },
   })
 
   const [deleteConfirm, setDeleteConfirm] = useState(false)
@@ -222,21 +175,6 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
     },
   })
 
-  const handleEditSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    updateMutation.mutate({
-      title: editForm.title,
-      description: editForm.description || null,
-      status: editForm.status,
-      visibility: editForm.req_origin === 'Customer' ? 'customer' : 'internal',
-      priority: editForm.priority,
-      req_type: editForm.req_type,
-      req_origin: editForm.req_origin,
-      reviewer_id: editForm.reviewer_id ? Number(editForm.reviewer_id) : null,
-      approver_id: editForm.approver_id ? Number(editForm.approver_id) : null,
-    })
-  }
-
   if (isLoading) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
   }
@@ -266,7 +204,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
       actions={canEditDocs ? (
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setIsEditing(true)}
+            onClick={() => navigate(docEditUrl(projectPrefix, 'REQ', requirement.req_id))}
             className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
           >
             Edit
@@ -369,132 +307,15 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
         </div>
       )}
 
-      {isEditing ? (
-        <div className="bg-card rounded-lg shadow-elegant p-6">
-          <form onSubmit={handleEditSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Title</label>
-              <input
-                type="text"
-                required
-                value={editForm.title}
-                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Description</label>
-              <textarea
-                value={editForm.description}
-                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
-                rows={4}
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Status</label>
-                <select
-                  value={editForm.status}
-                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
-                >
-                  <option>Draft</option>
-                  <option>Review</option>
-                  <option>Approved</option>
-                  <option>Implemented</option>
-                  <option>Verified</option>
-                  <option>Rejected</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Priority</label>
-                <select
-                  value={editForm.priority}
-                  onChange={(e) => setEditForm({ ...editForm, priority: e.target.value })}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
-                >
-                  <option>Low</option>
-                  <option>Medium</option>
-                  <option>High</option>
-                  <option>Critical</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Type</label>
-                <select
-                  value={editForm.req_type}
-                  onChange={(e) => setEditForm({ ...editForm, req_type: e.target.value })}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
-                >
-                  <option>Functional</option>
-                  <option>Non-Functional</option>
-                  <option>Performance</option>
-                  <option>Security</option>
-                  <option>Usability</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Origin</label>
-                <select
-                  value={editForm.req_origin}
-                  onChange={(e) => setEditForm({ ...editForm, req_origin: e.target.value })}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
-                >
-                  <option>Internal</option>
-                  <option>Customer</option>
-                  <option>Compliance</option>
-                  <option>Regulatory</option>
-                  <option>Legal</option>
-                  <option>Business</option>
-                  <option>Technical</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Reviewer</label>
-                <select
-                  value={editForm.reviewer_id}
-                  onChange={(e) => setEditForm({ ...editForm, reviewer_id: e.target.value })}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
-                >
-                  <option value="">Unassigned</option>
-                  {(users || []).map((u) => (
-                    <option key={u.id} value={u.id}>{u.full_name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Approver</label>
-                <select
-                  value={editForm.approver_id}
-                  onChange={(e) => setEditForm({ ...editForm, approver_id: e.target.value })}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
-                >
-                  <option value="">Unassigned</option>
-                  {(users || []).map((u) => (
-                    <option key={u.id} value={u.id}>{u.full_name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setIsEditing(false)}
-                className="px-4 py-2 border border-input rounded-md text-foreground hover:bg-accent/50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={updateMutation.isPending}
-                className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50"
-              >
-                {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
-              </button>
-            </div>
-          </form>
-        </div>
+      {(requirement.content_json as Record<string, unknown> | null) ? (
+        <SectionCard title="Content">
+          <DocEditor
+            content={requirement.content_json as Record<string, unknown>}
+            editable={false}
+            minHeight="min-h-[120px]"
+            className="border-0"
+          />
+        </SectionCard>
       ) : (
         <SectionCard title="Description">
           <p className="text-foreground whitespace-pre-wrap">
