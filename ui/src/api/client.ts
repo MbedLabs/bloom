@@ -833,11 +833,15 @@ export const docsApi = {
     const response = await api.get<{ next_id: string }>(`/projects/${projectRef}/next-doc-id/${typeCode}`)
     return response.data.next_id
   },
-  list: async (projectRef: string, params?: { type?: string[]; status?: string; q?: string; includeLinkCounts?: boolean; skip?: number; limit?: number }) => {
+  list: async (projectRef: string, params?: { type?: string[]; status?: string; q?: string; includeLinkCounts?: boolean; skip?: number; limit?: number; relatedTo?: string; role?: string; direction?: 'incoming' | 'outgoing' }) => {
     const query = new URLSearchParams()
     if (params?.type) params.type.forEach(t => query.append('type', t))
     if (params?.status) query.set('status', params.status)
     if (params?.q) query.set('q', params.q)
+    // Relationship filter: only documents linked to `relatedTo`.
+    if (params?.relatedTo) query.set('related_to', params.relatedTo)
+    if (params?.role) query.set('role', params.role)
+    if (params?.direction) query.set('direction', params.direction)
     if (params?.includeLinkCounts !== undefined) query.set('include_link_counts', String(params.includeLinkCounts))
     if (params?.skip !== undefined) query.set('skip', String(params.skip))
     if (params?.limit !== undefined) query.set('limit', String(params.limit))

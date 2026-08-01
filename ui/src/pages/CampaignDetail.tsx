@@ -373,6 +373,7 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
         projectPrefix={prefix || ''}
         sourceType="CMP"
         sourceId={campaign.id}
+        sourceDocId={campaign.campaign_id}
         derivedLinks={scopeLinks}
       />
 

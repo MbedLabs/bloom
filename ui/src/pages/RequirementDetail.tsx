@@ -580,6 +580,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
         projectPrefix={projectPrefix}
         sourceType="REQ"
         sourceId={reqId}
+        sourceDocId={requirement.req_id}
         derivedLinks={derivedMembershipLinks}
       />
     </DocDetailShell>

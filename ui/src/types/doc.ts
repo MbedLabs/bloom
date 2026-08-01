@@ -421,6 +421,22 @@ export function docEditUrl(prefix: string | undefined, docType: DocType, docId: 
   return `/projects/${prefix}/docs/${slug}/${docId}/edit`
 }
 
+/**
+ * Documents registry filtered to the artefacts sharing a relationship with
+ * `anchorDocId`. Clicking a relationship should show that relationship in the
+ * registry rather than silently jumping to the other document.
+ */
+export function relatedDocsUrl(
+  prefix: string | undefined,
+  anchorDocId: string,
+  options?: { role?: string; direction?: 'incoming' | 'outgoing' },
+): string {
+  const params = new URLSearchParams({ related_to: anchorDocId })
+  if (options?.role) params.set('role', options.role)
+  if (options?.direction) params.set('direction', options.direction)
+  return `/projects/${prefix}/docs?${params.toString()}`
+}
+
 export function docCreateUrl(prefix: string | undefined, docType: DocType): string {
   const slug = DOC_TYPE_SLUGS[docType]
   return `/projects/${prefix}/docs/new?type=${slug}`
