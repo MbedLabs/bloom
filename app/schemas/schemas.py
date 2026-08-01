@@ -428,7 +428,6 @@ class CoverageGap(BaseModel):
     gap_type: str
     linked_test_cases: List[TestCaseResponse]
     all_test_cases_draft: bool
-    missing_link_types: List[str]
 
 
 class CoverageGapReport(BaseModel):
