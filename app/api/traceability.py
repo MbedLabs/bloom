@@ -37,6 +37,7 @@ from app.schemas import (
     TestRunLinkResponse,
     TraceabilityItem,
 )
+from app.services.coverage import PARTIAL, UNCOVERED, coverage_percent, coverage_status
 
 router = APIRouter()
 
@@ -180,12 +181,7 @@ async def _get_linked_test_runs(req_id: int, db: AsyncSession):
 
 
 def _compute_coverage(linked_test_cases: list) -> str:
-    tc_count = len(linked_test_cases)
-    if tc_count == 0:
-        return "Uncovered"
-    if all(tc.status == "Draft" for tc in linked_test_cases):
-        return "Partial"
-    return "Covered"
+    return coverage_status(tc.status for tc in linked_test_cases)
 
 
 @router.get("", response_model=list[TraceabilityItem])
@@ -214,7 +210,7 @@ async def get_traceability_matrix(
     for req in requirements:
         linked_tcs = ctx.linked_tcs_by_req.get(req.id, [])
         linked_trs = ctx.linked_trs_by_req.get(req.id, [])
-        coverage_status = _compute_coverage(linked_tcs)
+        status = _compute_coverage(linked_tcs)
         req_resp = _build_req_response_sync(req, ctx)
 
         items.append(
@@ -222,7 +218,7 @@ async def get_traceability_matrix(
                 requirement=req_resp,
                 linked_test_cases=linked_tcs,
                 linked_test_runs=linked_trs,
-                coverage_status=coverage_status,
+                coverage_status=status,
             )
         )
 
@@ -421,21 +417,15 @@ async def get_coverage_gaps(
     uncovered = 0
     for req in requirements:
         linked_tcs = ctx.linked_tcs_by_req.get(req.id, [])
+        status = _compute_coverage(linked_tcs)
+        all_draft = status == PARTIAL
 
-        tc_count = len(linked_tcs)
-        all_draft = tc_count > 0 and all(tc.status == "Draft" for tc in linked_tcs)
-
-        missing: list[str] = []
-
-        if tc_count == 0:
+        if status == UNCOVERED:
             gap_type = "no_test_cases"
             uncovered += 1
-        elif all_draft:
+        elif status == PARTIAL:
             gap_type = "all_draft"
             partial += 1
-        elif missing:
-            gap_type = "missing_link_types"
-            covered += 1
         else:
             gap_type = "none"
             covered += 1
@@ -448,12 +438,11 @@ async def get_coverage_gaps(
                     gap_type=gap_type,
                     linked_test_cases=linked_tcs,
                     all_test_cases_draft=all_draft,
-                    missing_link_types=missing,
                 )
             )
 
     total = len(requirements)
-    coverage_pct = round((covered / total * 100) if total > 0 else 0, 1)
+    coverage_pct = coverage_percent(covered, total)
 
     return CoverageGapReport(
         project_id=project_id,
