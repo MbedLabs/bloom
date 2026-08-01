@@ -8,7 +8,6 @@ import { createDefaultTcRows, normalizeTcsRows, type TcsRow } from '../utils/tcs
 import {
   docsApi, projectsApi, requirementsApi, testCasesApi, designsApi,
   risksApi, changesApi, testConceptsApi, documentsApi, usersApi, projectVariablesApi,
-  defectsApi,
   extractApiErrorMessage,
   type ArtefactVisibility,
 } from '../api/client'
@@ -18,11 +17,16 @@ import {
   DOC_TYPE_LABELS,
   DOC_TYPE_COLORS,
   DOC_TYPE_SLUGS,
+  docUrl,
   normalizeDocTypeParam,
 } from '../types/doc'
 import { useAuth } from '../contexts/AuthContext'
 import { docRegistryBackUrl, docRegistryListLabel } from '../lib/docRegistryParams'
-import { isServerAssignedDocIdOnCreate } from './docCreateIdPolicy'
+import {
+  dedicatedListUrl,
+  isServerAssignedDocIdOnCreate,
+  usesDocumentEditor,
+} from './docCreateIdPolicy'
 
 function artefactActivityTypeForDocType(docType: DocType): string | null {
   if (docType === 'REQ') return 'requirement'
@@ -194,22 +198,34 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const apiForType = useCallback((type: DocType) => {
     const map: Record<string, unknown> = {
       REQ: requirementsApi, TC: testCasesApi, DES: designsApi,
-      RSK: risksApi, CHG: changesApi, CPT: testConceptsApi, DEF: defectsApi,
+      RSK: risksApi, CHG: changesApi, CPT: testConceptsApi,
       SPEC: documentsApi, PRT: documentsApi, RPT: documentsApi, STD: documentsApi,
     }
     return map[type]
   }, [])
 
+  // Types with a dedicated page never open the generic document editor - not on
+  // create and not on edit either. `docs/defects/PRJ-DEF-001/edit` used to render
+  // the rich-text editor, which has no severity, resolution summary or tracker
+  // link, so a defect could not be edited there without losing them.
   useEffect(() => {
-      if (editMode || !prefix) return
-    if (docType === 'CMP') {
-      navigate(`/projects/${prefix}/campaigns`, { replace: true })
+    if (!prefix || usesDocumentEditor(docType)) return
+    if (editMode) {
+      navigate(
+        docIdStr
+          ? docUrl(prefix, docType, docIdStr)
+          : docRegistryBackUrl(prefix, docType, null),
+        { replace: true },
+      )
       return
     }
-    if (docType === 'TS') {
-      navigate(docRegistryBackUrl(prefix, 'TS', null), { replace: true })
-      return
-    }
+    navigate(dedicatedListUrl(prefix, docType) ?? docRegistryBackUrl(prefix, docType, null), {
+      replace: true,
+    })
+  }, [docIdStr, docType, editMode, navigate, prefix])
+
+  useEffect(() => {
+    if (editMode || !prefix || !usesDocumentEditor(docType)) return
     if (!isServerAssignedDocIdOnCreate(docType)) {
       navigate(docRegistryBackUrl(prefix, docType, returnTo ?? null), { replace: true })
     }
@@ -275,16 +291,6 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           ...sharedDocumentCreatePayload(docType, title, contentJson, contentHtml, metadata, config.statusOptions),
         })
       }
-      if (docType === 'DEF') {
-        return defectsApi.create({
-          project_id: projectId,
-          title,
-          description: metadata.description || undefined,
-          visibility: metadata.visibility === 'customer' ? 'customer' : 'internal',
-          severity: metadata.severity || undefined,
-          priority: metadata.priority || undefined,
-        })
-      }
       const payload: Record<string, unknown> = {
         project_id: projectId,
         [config.titleField]: title,
@@ -303,7 +309,6 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       const docIdFieldMap: Record<string, string> = {
         REQ: 'req_id', TC: 'tc_id', DES: 'design_id',
         RSK: 'risk_id', CHG: 'change_id', CPT: 'concept_id',
-        DEF: 'defect_id',
         SPEC: 'doc_id', PRT: 'doc_id', RPT: 'doc_id', STD: 'doc_id',
       }
       const newDocId = record[docIdFieldMap[docType]] || record.id
@@ -595,7 +600,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
 
         {/* Metadata sidebar */}
         {sidebarOpen && (
-          <div className="w-72 border-l border-border bg-card/50 overflow-y-auto shrink-0">
+          <div className="w-72 border-l border-border bg-card/50 overflow-y-auto themed-scrollbar shrink-0">
             <div className="p-4 space-y-4">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Properties</h3>
 
