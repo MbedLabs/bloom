@@ -582,6 +582,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
               projectPrefix={projectPrefix}
               sourceType={SOURCE_TYPE_CODES[kind]}
               sourceId={recordId}
+              sourceDocId={code}
             />
           </div>
         )

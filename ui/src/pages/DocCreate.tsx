@@ -159,7 +159,15 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       ? 'Back'
       : `Back to ${docRegistryListLabel(docType)}`
   const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
-  const expectedDocIdExample = project ? `${project.prefix}-${config.typeCode}-001` : `PRJ-${config.typeCode}-001`
+  // The server allocates ids with MAX(suffix)+1, so ask it rather than assuming
+  // -001, which was almost always already taken.
+  const { data: nextDocId } = useQuery({
+    queryKey: ['next-doc-id', prefix, config.typeCode],
+    queryFn: () => docsApi.nextDocId(prefix!, config.typeCode),
+    enabled: !editMode && !!prefix,
+    staleTime: 0,
+  })
+  const expectedDocIdExample = nextDocId ?? (project ? `${project.prefix}-${config.typeCode}-…` : '')
   const serverAssignedId = !editMode && isServerAssignedDocIdOnCreate(docType)
   const docIdIsValid = editMode || serverAssignedId
 
@@ -471,11 +479,10 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${DOC_TYPE_COLORS[docType]}`}>
             {DOC_TYPE_LABELS[docType]}
           </span>
-          {project && !editMode && (
-            <span className="text-xs font-mono text-muted-foreground">
-              {expectedDocIdExample}
-            </span>
-          )}
+          {/* The only place the document id is rendered. */}
+          <span className="text-xs font-mono text-muted-foreground">
+            {editMode ? editDocFacade?.doc_id || docIdStr : expectedDocIdExample}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -532,24 +539,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
         <div className="flex-1 flex flex-col min-w-0">
           {/* Document header inside frame */}
           <div className={`${docType === 'TC' ? 'max-w-none' : 'max-w-4xl mx-auto'} w-full px-8 pt-8 pb-0`}>
-            {/* Document header metadata bar */}
+            {/* Status only: the type and document id are already shown in the top bar. */}
             <div className="flex items-center gap-2 mb-4 flex-wrap">
-              <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider ${DOC_TYPE_COLORS[docType]}`}>
-                {DOC_TYPE_LABELS[docType]}
-              </span>
-              {project && (
-                <>
-                  {editMode ? (
-                    <span className="text-xs font-mono text-muted-foreground">
-                      {editDocFacade?.doc_id || docIdStr}
-                    </span>
-                  ) : (
-                    <span className="text-xs font-mono text-muted-foreground">
-                      {expectedDocIdExample}
-                    </span>
-                  )}
-                </>
-              )}
               <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground">
                 {metadata.status || config.statusOptions[0]}
               </span>

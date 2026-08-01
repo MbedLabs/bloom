@@ -280,6 +280,9 @@ export default function Documents() {
   const search = searchParams.get('q') || ''
   const priorityFilter = searchParams.get('priority') || ''
   const reviewerFilter = searchParams.get('reviewer') || ''
+  const relatedTo = searchParams.get('related_to') || ''
+  const relatedRole = searchParams.get('role') || ''
+  const relatedDirection = searchParams.get('direction') || ''
   const linkParam = searchParams.get('links')
   const linkFilter: LinkFilter = isLinkFilter(linkParam) ? linkParam : ''
   const createdFrom = searchParams.get('created_from') || ''
@@ -292,10 +295,13 @@ export default function Documents() {
   const showExecColumn = typeFilters.length === 0 || typeFilters.includes('TC')
 
   const { data: docsData, isLoading } = useQuery({
-    queryKey: ['all-docs', prefix, typeFilters],
+    queryKey: ['all-docs', prefix, typeFilters, relatedTo, relatedRole, relatedDirection],
     queryFn: () => docsApi.list(prefix!, {
       type: typeFilters.length > 0 ? typeFilters : undefined,
       includeLinkCounts: true,
+      relatedTo: relatedTo || undefined,
+      role: relatedRole || undefined,
+      direction: (relatedDirection as 'incoming' | 'outgoing') || undefined,
     }),
     enabled: !!prefix,
   })
@@ -534,6 +540,7 @@ export default function Documents() {
 
   const sortLabel = SORT_OPTIONS.find((option) => option.field === sortField)?.label || 'Updated'
   const hasActiveFilters = Boolean(
+    relatedTo ||
     statusFilters.length ||
     search ||
     priorityFilter ||
@@ -597,6 +604,11 @@ export default function Documents() {
                 ? 'unassigned'
                 : userMap.get(Number(reviewerFilter)) || reviewerFilter
           }`}
+        />
+      )}
+      {relatedTo && (
+        <FilterChip
+          label={`Related to ${relatedTo}${relatedRole ? ` (${relatedRole})` : ''}${relatedDirection ? `, ${relatedDirection}` : ''}`}
         />
       )}
       {linkFilter && <FilterChip label={`Links: ${LINK_FILTER_OPTIONS.find((option) => option.code === linkFilter)?.label}`} />}
