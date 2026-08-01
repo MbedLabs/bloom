@@ -16,6 +16,7 @@ import {
   getDocLinkOptions,
   getDocLinkRoleLabel,
   normalizeDocTypeParam,
+  relatedDocsUrl,
   type DocType,
 } from '../types/doc'
 import { SectionCard } from './DocDetailShell'
@@ -54,12 +55,14 @@ function DocumentLinkRow({
   link,
   target,
   projectPrefix,
+  sourceDocId,
   direction,
   onDelete,
 }: {
   link: ArtefactLink
   target: LinkTarget | undefined
   projectPrefix: string
+  sourceDocId?: string
   direction: 'incoming' | 'outgoing'
   onDelete?: () => void
 }) {
@@ -77,9 +80,19 @@ function DocumentLinkRow({
       >
         {target?.doc_id || otherId}
       </Link>
-      <span className="shrink-0 text-[10px] text-muted-foreground/70 select-none" title={roleLabel}>
-        {roleLabel}
-      </span>
+      {sourceDocId ? (
+        <Link
+          to={relatedDocsUrl(projectPrefix, sourceDocId, { role: link.role, direction })}
+          className="shrink-0 text-[10px] text-muted-foreground/70 hover:text-foreground hover:underline"
+          title={`Show every ${roleLabel} relationship of ${sourceDocId} in Documents`}
+        >
+          {roleLabel}
+        </Link>
+      ) : (
+        <span className="shrink-0 text-[10px] text-muted-foreground/70 select-none" title={roleLabel}>
+          {roleLabel}
+        </span>
+      )}
       {link.suspect && (
         <span className="shrink-0 rounded-full bg-amber-500/10 px-1 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
           !
@@ -276,12 +289,15 @@ export function DocumentLinksPanel({
   projectPrefix,
   sourceType,
   sourceId,
+  sourceDocId,
   derivedLinks,
 }: {
   projectId: number
   projectPrefix: string
   sourceType: string
   sourceId: number
+  /** Human-readable id of the document this panel belongs to (e.g. FLT-REQ-001). */
+  sourceDocId?: string
   derivedLinks?: ArtefactLink[]
 }) {
   const { user } = useAuth()
@@ -400,6 +416,7 @@ export function DocumentLinksPanel({
                 link={link}
                 target={targetLookup.get(docKey(targetType, targetId))}
                 projectPrefix={projectPrefix}
+                sourceDocId={sourceDocId}
                 direction={direction}
                 onDelete={canEditDocs && !isDerived ? () => deleteMutation.mutate(link.id) : undefined}
               />

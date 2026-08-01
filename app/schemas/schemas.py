@@ -222,6 +222,8 @@ class RequirementCreate(StrictModel):
     req_origin: str = "Internal"
     reviewer_id: Optional[int] = None
     approver_id: Optional[int] = None
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
 
 
 class RequirementUpdate(StrictModel):
@@ -241,6 +243,8 @@ class RequirementUpdate(StrictModel):
     reviewed_at: Optional[datetime] = None
     approved_at: Optional[datetime] = None
     parent_id: Optional[int] = None
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
 
 
 class RequirementResponse(BaseModel):
@@ -272,6 +276,8 @@ class RequirementResponse(BaseModel):
     linked_test_runs: List["TestRunLinkResponse"] = []
     suite_backlinks: List[TestSuiteSummary] = []
     campaign_backlinks: List[TestCampaignSummary] = []
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
 
     @field_serializer("created_at", "updated_at", "reviewed_at", "approved_at")
     def serialize_dt(self, dt: Optional[datetime], _info):
@@ -296,6 +302,8 @@ class TestCaseCreate(StrictModel):
     visibility: str = Field(default="internal", pattern=ARTEFACT_VISIBILITY_PATTERN)
     reviewer_id: Optional[int] = None
     approver_id: Optional[int] = None
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
 
 
 class TestCaseUpdate(StrictModel):
@@ -313,6 +321,8 @@ class TestCaseUpdate(StrictModel):
     approved_by_id: Optional[int] = None
     reviewed_at: Optional[datetime] = None
     approved_at: Optional[datetime] = None
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
 
 
 class TestCaseResponse(BaseModel):
@@ -344,6 +354,8 @@ class TestCaseResponse(BaseModel):
     verifies: List[TestCaseVerifiesLinkResponse] = []
     suite_memberships: List[TestSuiteSummary] = []
     campaign_memberships: List[TestCampaignSummary] = []
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
 
     @field_serializer(
         "created_at",
@@ -776,6 +788,8 @@ class DesignItemCreate(StrictModel):
     priority: str = "Medium"
     design_type: str = "Architecture"
     visibility: str = Field(default="internal", pattern=ARTEFACT_VISIBILITY_PATTERN)
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
 
 
 class DesignItemUpdate(StrictModel):
@@ -785,6 +799,8 @@ class DesignItemUpdate(StrictModel):
     priority: Optional[str] = None
     design_type: Optional[str] = None
     visibility: Optional[str] = Field(default=None, pattern=ARTEFACT_VISIBILITY_PATTERN)
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
 
 
 class DesignItemResponse(BaseModel):
@@ -799,6 +815,8 @@ class DesignItemResponse(BaseModel):
     visibility: str = "internal"
     created_at: datetime
     updated_at: datetime
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
 
     @field_serializer("created_at", "updated_at")
     def serialize_dt(self, dt: datetime, _info):
@@ -821,6 +839,8 @@ class RiskItemCreate(StrictModel):
     mitigation: Optional[str] = None
     risk_category: str = "Technical"
     visibility: str = Field(default="internal", pattern=ARTEFACT_VISIBILITY_PATTERN)
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
 
 
 class RiskItemUpdate(StrictModel):
@@ -832,6 +852,8 @@ class RiskItemUpdate(StrictModel):
     mitigation: Optional[str] = None
     risk_category: Optional[str] = None
     visibility: Optional[str] = Field(default=None, pattern=ARTEFACT_VISIBILITY_PATTERN)
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
 
 
 class RiskItemResponse(BaseModel):
@@ -848,6 +870,8 @@ class RiskItemResponse(BaseModel):
     visibility: str = "internal"
     created_at: datetime
     updated_at: datetime
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
 
     @field_serializer("created_at", "updated_at")
     def serialize_dt(self, dt: datetime, _info):
@@ -875,6 +899,8 @@ class ChangeRequestCreate(StrictModel):
     external_issue_number: Optional[int] = None
     external_issue_url: Optional[str] = None
     external_issue_state: Optional[str] = None
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
 
 
 class ChangeRequestUpdate(StrictModel):
@@ -891,6 +917,8 @@ class ChangeRequestUpdate(StrictModel):
     external_issue_number: Optional[int] = None
     external_issue_url: Optional[str] = None
     external_issue_state: Optional[str] = None
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
 
 
 class ChangeRequestResponse(BaseModel):
@@ -912,6 +940,8 @@ class ChangeRequestResponse(BaseModel):
     external_issue_state: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
 
     @field_serializer("created_at", "updated_at")
     def serialize_dt(self, dt: datetime, _info):
@@ -1050,6 +1080,8 @@ class TestConceptCreate(StrictModel):
     status: str = "Draft"
     coverage: float = 0
     visibility: str = Field(default="internal", pattern=ARTEFACT_VISIBILITY_PATTERN)
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
 
 
 class TestConceptUpdate(StrictModel):
@@ -1058,6 +1090,8 @@ class TestConceptUpdate(StrictModel):
     status: Optional[str] = None
     coverage: Optional[float] = None
     visibility: Optional[str] = Field(default=None, pattern=ARTEFACT_VISIBILITY_PATTERN)
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
 
 
 class TestConceptResponse(BaseModel):
@@ -1072,6 +1106,8 @@ class TestConceptResponse(BaseModel):
     coverage: float
     created_at: datetime
     updated_at: datetime
+    content_json: Optional[Dict[str, Any]] = None
+    content_html: Optional[str] = None
 
     @field_serializer("created_at", "updated_at")
     def serialize_dt(self, dt: datetime, _info):

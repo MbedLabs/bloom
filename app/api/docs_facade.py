@@ -17,6 +17,7 @@ from app.core.document_kinds import (
     document_kind_from_slug,
     normalize_document_kind,
 )
+from app.core.id_generator import next_doc_id
 from app.core.security import (
     apply_external_visibility_filter,
     external_doc_type_allowed,
@@ -174,12 +175,76 @@ async def _count_links(
     return result
 
 
+async def _resolve_doc_by_public_id(
+    db: AsyncSession, project_id: int, public_id: str
+) -> tuple[str, int] | None:
+    """Resolve a human-readable id such as ``FLT-REQ-001`` to (type_code, row id)."""
+    for type_code, (model, id_col_name, _slug) in TYPE_MAP.items():
+        row_id = (
+            await db.execute(
+                select(model.id).where(
+                    model.project_id == project_id,
+                    getattr(model, id_col_name) == public_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if row_id is not None:
+            return type_code, row_id
+    return None
+
+
+async def _related_doc_keys(
+    db: AsyncSession,
+    project_id: int,
+    anchor: tuple[str, int],
+    role: Optional[str],
+    direction: Optional[str],
+) -> set[tuple[str, int]]:
+    """Every (type_code, row id) sharing a relationship with the anchor document."""
+    anchor_type, anchor_id = anchor
+    related: set[tuple[str, int]] = set()
+
+    if direction in (None, "", "outgoing"):
+        query = select(ArtefactLink.target_type, ArtefactLink.target_id).where(
+            ArtefactLink.project_id == project_id,
+            ArtefactLink.source_type == anchor_type,
+            ArtefactLink.source_id == anchor_id,
+        )
+        if role:
+            query = query.where(ArtefactLink.role == role)
+        related.update((t, i) for t, i in (await db.execute(query)).all())
+
+    if direction in (None, "", "incoming"):
+        query = select(ArtefactLink.source_type, ArtefactLink.source_id).where(
+            ArtefactLink.project_id == project_id,
+            ArtefactLink.target_type == anchor_type,
+            ArtefactLink.target_id == anchor_id,
+        )
+        if role:
+            query = query.where(ArtefactLink.role == role)
+        related.update((t, i) for t, i in (await db.execute(query)).all())
+
+    return related
+
+
 @router.get("/projects/{project_ref}/docs", response_model=PaginatedResponse[DocShellResponse])
 async def list_all_docs(
     project_ref: str,
     type: Optional[List[str]] = Query(None),
     status: Optional[str] = None,
     q: Optional[str] = None,
+    related_to: Optional[str] = Query(
+        None,
+        description="Only documents sharing a relationship with this document id (e.g. FLT-REQ-001).",
+    ),
+    role: Optional[str] = Query(
+        None, description="Restrict `related_to` to a single relationship role."
+    ),
+    direction: Optional[str] = Query(
+        None,
+        pattern="^(incoming|outgoing)$",
+        description="Restrict `related_to` to one direction of the relationship.",
+    ),
     include_link_counts: bool = Query(True),
     skip: int = Query(0, ge=0),
     limit: int | None = Query(None, ge=1, le=500),
@@ -194,16 +259,32 @@ async def list_all_docs(
 
     type_filter = [t.upper() for t in type] if type else None
 
+    related_keys: set[tuple[str, int]] | None = None
+    if related_to:
+        anchor = await _resolve_doc_by_public_id(db, project.id, related_to.strip().upper())
+        if anchor is None:
+            raise HTTPException(status_code=404, detail=f"Document {related_to} not found")
+        related_keys = await _related_doc_keys(db, project.id, anchor, role, direction)
+        if not related_keys:
+            return PaginatedResponse(items=[], total=0, skip=skip, limit=limit or 0)
+
     for type_code, (model, id_col_name, _table) in TYPE_MAP.items():
         if type_filter and type_code not in type_filter:
             continue
         if not external_doc_type_allowed(current_user, allowed_doc_types, type_code):
             continue
 
+        if related_keys is not None:
+            allowed_ids = [rid for tcode, rid in related_keys if tcode == type_code]
+            if not allowed_ids:
+                continue
+
         id_col = getattr(model, id_col_name)
         title_col = model.title if hasattr(model, "title") else model.name
 
         query = select(model).where(model.project_id == project.id)
+        if related_keys is not None:
+            query = query.where(model.id.in_(allowed_ids))
         query = apply_external_visibility_filter(query, model, current_user)
 
         if status:
@@ -320,6 +401,50 @@ async def list_all_docs(
         return PaginatedResponse(items=results, total=total, skip=0, limit=total)
     sliced = results[skip : skip + limit]
     return PaginatedResponse(items=sliced, total=total, skip=skip, limit=limit)
+
+
+class NextDocIdResponse(BaseModel):
+    next_id: str
+
+
+# Document-backed types share one table and are distinguished by doc_type.
+_DOCUMENT_TYPE_CODES = {"SPEC", "PRT", "RPT", "STD"}
+
+
+@router.get("/projects/{project_ref}/next-doc-id/{type_code}", response_model=NextDocIdResponse)
+async def get_next_doc_id(
+    project_ref: str,
+    type_code: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Report the identifier the server would assign to the next document.
+
+    The create screen used to render a hardcoded ``-001`` preview, which claimed
+    an identifier that was usually already taken. The server allocates with
+    MAX(suffix)+1, so the preview has to come from the same place.
+
+    Deliberately not routed under ``/docs/{kind_slug}/...`` so it cannot be
+    mistaken for a document whose id happens to be "next-doc-id".
+    """
+    project = await resolve_project(db, project_ref)
+    await require_project_access(db, current_user, project.id)
+
+    code = type_code.upper()
+    if code in TYPE_MAP:
+        model, id_field, _slug = TYPE_MAP[code]
+        id_column = getattr(model, id_field)
+    elif code in _DOCUMENT_TYPE_CODES:
+        model, id_column = Document, Document.doc_id
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported document type: {type_code}")
+
+    try:
+        next_id = await next_doc_id(db, model, id_column, project.id, project.prefix, code)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return NextDocIdResponse(next_id=next_id)
 
 
 @router.get(

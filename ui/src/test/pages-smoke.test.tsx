@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderToString } from 'react-dom/server'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { User } from '../api/client'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
@@ -25,6 +25,18 @@ vi.mock('../components/ProtectedRoute', () => ({
 }))
 
 describe('source-available readiness smoke', () => {
+  // These tests run in the node environment, so `window` only exists because it
+  // is stubbed here. Without cleanup the stub leaked into later cases and raced
+  // the cached App import, which made the suite fail intermittently.
+  beforeEach(() => {
+    vi.stubGlobal('window', { runtimeConfig: {} })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.resetModules()
+  })
+
   it('User role contract includes external (not reviewer)', () => {
     const u: User = {
       id: 1,
@@ -51,7 +63,6 @@ describe('source-available readiness smoke', () => {
     ['/forgot-password', 'Forgot Password', 'text-gray-300/50'],
     ['/reset-password', 'Reset Password', 'text-gray-300/50'],
   ])('renders %s without crashing', async (path, marker, attributionColor) => {
-    vi.stubGlobal('window', { runtimeConfig: {} })
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { default: App } = await import('../App')
     const queryClient = new QueryClient({
@@ -77,6 +88,5 @@ describe('source-available readiness smoke', () => {
       'text-gray-500 transition-colors hover:text-gray-700 dark:text-white',
     )
     consoleErrorSpy.mockRestore()
-    vi.unstubAllGlobals()
   })
 })

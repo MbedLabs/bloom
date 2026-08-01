@@ -292,6 +292,8 @@ async def create_test_case(
         visibility=data.visibility,
         reviewer_id=data.reviewer_id,
         approver_id=data.approver_id,
+        content_json=data.content_json,
+        content_html=data.content_html,
     )
 
     db.add(test_case)
@@ -372,6 +374,10 @@ async def update_test_case(
         test_case.status = data.status
     if data.visibility is not None:
         test_case.visibility = data.visibility
+    if data.content_json is not None:
+        test_case.content_json = data.content_json
+    if data.content_html is not None:
+        test_case.content_html = data.content_html
 
     if "reviewer_id" in fields_set:
         if data.reviewer_id is None:

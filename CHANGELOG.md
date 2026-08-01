@@ -16,6 +16,20 @@
 - The dependency audit no longer carries any reviewed-advisory exception; every advisory now fails the build.
 - The migration history is collapsed into a single locked baseline of explicit DDL. The base revision previously called `Base.metadata.create_all()`, which meant it always produced whatever the models currently described, so every later revision had to be written with inspect-then-add guards and the real `ALTER` path was never exercised by the fresh-install CI check. The baseline keeps the identifier of the previously deployed head, so an existing database is recognised as up to date and is not re-migrated; no stamp or manual step is required.
 
+### Fixed
+
+- Saving a requirement, test case, design item, risk, change request, or test concept failed with `422`. Their models carry `content_json`/`content_html` and the editor sends them, but the create/update schemas forbid unknown fields and did not declare them, so the editor body could never be persisted or read back. All six now accept and return their rich content.
+- API errors are reported with their cause. Validation failures arrive as a list, which the client only handled as a string, so every one surfaced as the opaque "Request failed with status code 422".
+- The create screen advertised a hardcoded `-001` identifier that was already taken in any project holding a document of that type. It now shows the identifier the server would actually assign, from the same MAX(suffix)+1 allocation.
+- The document type and identifier were rendered twice on the create and edit screens; they now appear once, in the top bar.
+- Test case bodies are displayed on the detail page, falling back to the plain description for test cases created before rich content existed.
+- Editing a requirement opens the full document editor. It used to render a small inline form with a handful of fields instead, so a requirement could never be edited as a document; the other detail pages already opened the editor. Requirement bodies are also now displayed, falling back to the plain description for requirements created before rich content existed.
+
+### Added
+
+- `GET /api/projects/{project_ref}/next-doc-id/{type_code}` reports the next identifier for a document type.
+- Relationships are navigable. Clicking a relationship on a document opens the Documents registry filtered to the artefacts sharing that relationship, narrowed to that role and direction. The registry accepts `related_to`, `role`, and `direction`, and shows the active relationship as a filter chip.
+
 ### Removed
 
 - The stale duplicate CI workflow and pull request template under `ui/.github/`, neither of which GitHub ever read.
