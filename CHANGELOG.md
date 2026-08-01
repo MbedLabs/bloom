@@ -22,6 +22,7 @@
 - API errors are reported with their cause. Validation failures arrive as a list, which the client only handled as a string, so every one surfaced as the opaque "Request failed with status code 422".
 - The create screen advertised a hardcoded `-001` identifier that was already taken in any project holding a document of that type. It now shows the identifier the server would actually assign, from the same MAX(suffix)+1 allocation.
 - The document type and identifier were rendered twice on the create and edit screens; they now appear once, in the top bar.
+- Editing a requirement opens the full document editor. It used to render a small inline form with a handful of fields instead, so a requirement could never be edited as a document; the other detail pages already opened the editor. Requirement bodies are also now displayed, falling back to the plain description for requirements created before rich content existed.
 
 ### Added
 
