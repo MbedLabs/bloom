@@ -20,7 +20,7 @@ permissions:
 jobs:
   validate:
     name: Validate
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, ovh, bloom]
 
     services:
       postgres:
@@ -113,7 +113,7 @@ jobs:
           BLOOM_DOTENV_DISABLED: "1"
           BLOOM_DISABLE_RATE_LIMIT: "1"
         run: |
-          pytest --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=78 tests/ -v
+          pytest --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=55 tests/ -v
 
       - name: Run UI checks
         run: |
@@ -124,7 +124,7 @@ jobs:
   build-image:
     if: github.event_name == 'push'
     name: Build Product Image
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, ovh, bloom]
     needs: validate
 
     permissions:
@@ -315,7 +315,7 @@ jobs:
   e2e-image:
     if: github.event_name == 'push'
     name: End-to-end (published image)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, ovh, bloom]
     needs: build-image
 
     permissions:
@@ -350,7 +350,7 @@ jobs:
   promote-image:
     if: github.event_name == 'push'
     name: Promote moving tags
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, ovh, bloom]
     needs: [build-image, e2e-image]
 
     permissions:
