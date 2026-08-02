@@ -9,6 +9,7 @@ import { DocEditor } from '../components/editor'
 import DocDetailShell, { MetaItem, SectionCard, StatusBadge } from '../components/DocDetailShell'
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../components/useToast'
 
 import {
   artefactsApi,
@@ -152,19 +153,14 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
   const recordId = resolvedId || Number(itemId)
   const config = configs[kind]
   const queryClient = useQueryClient()
+  const toast = useToast()
   const navigate = useNavigate()
 
   const [activeTab, setActiveTab] = useState<DetailTab>('overview')
   const [isEditing, setIsEditing] = useState(false)
   const [commentBody, setCommentBody] = useState('')
   const [form, setForm] = useState<Record<string, string>>({})
-  const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' | 'info' } | null>(null)
 
-  useEffect(() => {
-    if (!toast) return
-    const timer = setTimeout(() => setToast(null), 4000)
-    return () => clearTimeout(timer)
-  }, [toast])
 
   const { data: artefact, isLoading } = useQuery<ArtefactRecord>({
     queryKey: [config.queryKey, recordId],
@@ -235,10 +231,10 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
       queryClient.invalidateQueries({ queryKey: ['project', updated.project_id] })
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', kind, recordId] })
       setIsEditing(false)
-      setToast({ message: `${config.singular} saved`, variant: 'success' })
+      toast.notify(`${config.singular} saved`, 'success')
     },
     onError: (err: unknown) => {
-      setToast({ message: extractApiErrorMessage(err) || 'Save failed', variant: 'error' })
+      toast.failed(`Saving the ${config.singular.toLowerCase()}`, err)
     },
   })
 
@@ -249,13 +245,13 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
       if (!artefact) return
       queryClient.invalidateQueries({ queryKey: [config.listKey, artefact.project_id] })
       queryClient.invalidateQueries({ queryKey: ['project', artefact.project_id] })
-      setToast({ message: `${config.singular} deleted`, variant: 'success' })
+      toast.notify(`${config.singular} deleted`, 'success')
       setTimeout(() => {
         navigate(docRegistryListUrl(projectPrefix, config.docType))
       }, 800)
     },
     onError: (err: unknown) => {
-      setToast({ message: extractApiErrorMessage(err) || 'Delete failed', variant: 'error' })
+      toast.failed(`Deleting the ${config.singular.toLowerCase()}`, err)
       setDeleteConfirm(false)
     },
   })
@@ -266,10 +262,10 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
       queryClient.invalidateQueries({ queryKey: ['artefactComments', kind, recordId] })
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', kind, recordId] })
       setCommentBody('')
-      setToast({ message: 'Comment added', variant: 'success' })
+      toast.notify('Comment added', 'success')
     },
     onError: (err: unknown) => {
-      setToast({ message: extractApiErrorMessage(err) || 'Comment failed', variant: 'error' })
+      toast.failed('Adding the comment', err)
     },
   })
 
@@ -287,10 +283,10 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
       if (artefact) {
         queryClient.invalidateQueries({ queryKey: [config.listKey, artefact.project_id] })
       }
-      setToast({ message: `Status changed`, variant: 'success' })
+      toast.notify(`Status changed`, 'success')
     },
     onError: (err: unknown) => {
-      setToast({ message: extractApiErrorMessage(err) || 'Transition failed', variant: 'error' })
+      toast.failed('Changing the status', err)
     },
   })
 
@@ -306,6 +302,11 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
       queryClient.invalidateQueries({ queryKey: [config.queryKey, recordId] })
       queryClient.invalidateQueries({ queryKey: ['syncEvents', recordId] })
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', kind, recordId] })
+      const state = (updated as unknown as Defect).external_issue_state
+      toast.notify(state ? `External issue is ${state}` : 'External issue refreshed', 'success')
+    },
+    onError: (err: unknown) => {
+      toast.failed('Refreshing the external issue', err)
     },
   })
 
@@ -711,20 +712,6 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
         </SectionCard>
       )}
     </DocDetailShell>
-      {toast && (
-        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-md shadow-lg text-sm border"
-          style={{
-            background: toast.variant === 'success' ? 'var(--color-emerald-50, #ecfdf5)' : toast.variant === 'error' ? 'var(--color-red-50, #fef2f2)' : 'var(--color-blue-50, #eff6ff)',
-            borderColor: toast.variant === 'success' ? 'var(--color-emerald-200, #a7f3d0)' : toast.variant === 'error' ? 'var(--color-red-200, #fecaca)' : 'var(--color-blue-200, #bfdbfe)',
-          }}
-        >
-          <div className={`w-2 h-2 rounded-full ${toast.variant === 'success' ? 'bg-emerald-500' : toast.variant === 'error' ? 'bg-red-500' : 'bg-blue-500'}`} />
-          <span className={toast.variant === 'success' ? 'text-emerald-800' : toast.variant === 'error' ? 'text-red-800' : 'text-blue-800'}>
-            {toast.message}
-          </span>
-          <button onClick={() => setToast(null)} className="ml-3 text-xs underline opacity-60 hover:opacity-100">Dismiss</button>
-        </div>
-      )}
     </>
   )
 }

@@ -4,6 +4,14 @@
 
 @layer base {
   :root {
+    /*
+     * Tells the browser which palette to paint its own UI with - scrollbars
+     * above all, but also form controls and the overscroll gutter. Without it
+     * every scrollbar stayed light in dark mode, because the theme lives in a
+     * `.dark` class the browser knows nothing about.
+     */
+    color-scheme: light;
+
     /* Bloom brand: viola + gray */
     --background: 0 0% 100%;
     --foreground: 270 15% 12%;
@@ -38,6 +46,8 @@
   }
 
   .dark {
+    color-scheme: dark;
+
     --background: 270 20% 6%;
     --foreground: 270 10% 96%;
     --card: 270 20% 8%;
@@ -108,6 +118,41 @@
 
   .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--sidebar-border) / 0.85);
+  }
+
+  /*
+   * Content scrollbars. `color-scheme` already keeps the browser default on the
+   * right side of the theme; this draws the thinner, quieter bar the app uses,
+   * from the same tokens, so it tracks light and dark automatically.
+   */
+  .themed-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent;
+  }
+
+  .themed-scrollbar::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .themed-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .themed-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.35);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 5px;
+  }
+
+  .themed-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.55);
+    background-clip: padding-box;
+  }
+
+  .themed-scrollbar::-webkit-scrollbar-corner {
+    background: transparent;
   }
 
   .glass {

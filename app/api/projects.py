@@ -40,6 +40,8 @@ from app.models import (
 from app.models.project_membership import ProjectMembership
 from app.models.user import User, UserRole
 from app.schemas import ProjectCreate, ProjectResponse, ProjectUpdate
+from app.services.coverage import coverage_percent as coverage_percent_of
+from app.services.coverage import covered_requirement_ids
 
 router = APIRouter()
 
@@ -112,32 +114,22 @@ async def _project_counts(
     test_suite_count = await count_visible(TestSuite, "TS")
     defect_count = await count_visible(Defect, "DEF")
 
-    covered_query = (
-        select(func.count(func.distinct(ArtefactLink.target_id)))
-        .join(Requirement, Requirement.id == ArtefactLink.target_id)
-        .join(TestCase, TestCase.id == ArtefactLink.source_id)
-        .where(
-            ArtefactLink.project_id == project_id,
-            ArtefactLink.source_type == "TC",
-            ArtefactLink.target_type == "REQ",
-            ArtefactLink.role == "verifies",
-        )
-    )
+    covered_query = covered_requirement_ids().where(ArtefactLink.project_id == project_id)
     if external:
         if allowed_doc_types is not None and not {"REQ", "TC"}.issubset(allowed_doc_types):
-            covered_reqs = 0
+            covered_query = None
         else:
-            covered_reqs = (
-                await db.scalar(
-                    covered_query.where(
-                        Requirement.visibility == "customer",
-                        TestCase.visibility == "customer",
-                    )
-                )
-            ) or 0
+            covered_query = covered_query.where(
+                Requirement.visibility == "customer",
+                TestCase.visibility == "customer",
+            )
+    if covered_query is None:
+        covered_reqs = 0
     else:
-        covered_reqs = (await db.scalar(covered_query)) or 0
-    coverage_percent = round((covered_reqs / req_count * 100) if req_count else 0, 1)
+        covered_reqs = (
+            await db.scalar(select(func.count()).select_from(covered_query.distinct().subquery()))
+        ) or 0
+    coverage_percent = coverage_percent_of(covered_reqs, req_count or 0)
     uncovered_requirement_count = max((req_count or 0) - (covered_reqs or 0), 0)
 
     return {

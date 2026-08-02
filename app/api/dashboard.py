@@ -21,6 +21,8 @@ from app.models import (
 )
 from app.models.project_membership import ProjectExternalDocType
 from app.models.user import User, UserRole
+from app.services.coverage import coverage_percent as coverage_percent_of
+from app.services.coverage import covered_requirement_ids
 
 OPEN_DEFECT_STATUSES = ("Open", "Triaged", "In Progress", "Resolved", "Verified")
 
@@ -146,16 +148,7 @@ async def get_dashboard_stats(
         row[0]: row[1] for row in tc_status_result if row[0] in VALID_DOCUMENT_STATUSES
     }
 
-    covered_req_ids = (
-        select(ArtefactLink.target_id)
-        .join(TestCase, TestCase.id == ArtefactLink.source_id)
-        .join(Requirement, Requirement.id == ArtefactLink.target_id)
-        .where(
-            ArtefactLink.source_type == "TC",
-            ArtefactLink.target_type == "REQ",
-            ArtefactLink.role == "verifies",
-        )
-    )
+    covered_req_ids = covered_requirement_ids()
     covered_req_ids = _restrict_visible(covered_req_ids, TestCase, "TC").where(
         Requirement.project_id.in_(accessible_project_ids)
         if accessible_project_ids is not None
@@ -169,7 +162,7 @@ async def get_dashboard_stats(
     covered_reqs = await db.scalar(
         select(func.count(func.distinct(covered_req_ids.subquery().c.target_id)))
     )
-    coverage_pct = round((covered_reqs / total_requirements * 100) if total_requirements else 0, 1)
+    coverage_pct = coverage_percent_of(covered_reqs or 0, total_requirements or 0)
 
     uncovered_reqs = await db.scalar(
         _restrict_visible(

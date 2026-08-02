@@ -28,6 +28,7 @@ import {
   type RegistrySortDir,
 } from '../lib/docRegistryParams'
 import { docCreateUrl, docUrl, normalizeDocTypeParam, DOC_TYPE_LABELS, type DocType } from '../types/doc'
+import { dedicatedListUrl } from './docCreateIdPolicy'
 import { formatDateTime } from '../test/date-utils'
 import { useAuth } from '../contexts/AuthContext'
 import BudRunLink from '../components/BudRunLink'
@@ -658,7 +659,7 @@ export default function Documents() {
             </Link>
             {soleDocType ? (
               <Link
-                to={docCreateUrl(prefix!, soleDocType)}
+                to={dedicatedListUrl(prefix!, soleDocType) ?? docCreateUrl(prefix!, soleDocType)}
                 state={createReturnState}
                 className={`${docCreateLinkClass} bg-primary text-primary-foreground hover:bg-primary/90`}
               >

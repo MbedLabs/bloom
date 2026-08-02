@@ -1,13 +1,16 @@
 import type { Editor } from '@tiptap/react'
 import { List, ListTree } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
-interface HeadingItem {
-  id: string
-  level: number
-  text: string
-  pos: number
-}
+import {
+  activeHeadingAt,
+  extractHeadings,
+  headingElement,
+  sameHeadings,
+  scrollParentOf,
+  slugify,
+  type HeadingItem,
+} from './outlineNavigation'
 
 interface OutlineSidebarProps {
   editor: Editor | null
@@ -15,38 +18,18 @@ interface OutlineSidebarProps {
   onToggle: () => void
 }
 
-function extractHeadings(editor: Editor | null): HeadingItem[] {
-  if (!editor) return []
-  const headings: HeadingItem[] = []
-  editor.state.doc.descendants((node, pos) => {
-    if (node.type.name.startsWith('heading')) {
-      const text = node.textContent || 'Untitled'
-      headings.push({
-        id: `heading-${pos}`,
-        level: parseInt(node.attrs.level, 10),
-        text,
-        pos,
-      })
-    }
-  })
-  return headings
-}
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .trim()
-}
-
 export default function OutlineSidebar({ editor, open, onToggle }: OutlineSidebarProps) {
   const [headings, setHeadings] = useState<HeadingItem[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
 
+  const navRef = useRef<HTMLElement | null>(null)
+
   const updateHeadings = useCallback(() => {
-    setHeadings(extractHeadings(editor))
+    const next = extractHeadings(editor)
+    // Every transaction fires this, including plain cursor moves. Replacing the
+    // array each time re-rendered the outline - and re-subscribed the listeners
+    // below - on every keystroke, which is what made it stutter.
+    setHeadings((current) => (sameHeadings(current, next) ? current : next))
   }, [editor])
 
   useEffect(() => {
@@ -79,15 +62,46 @@ export default function OutlineSidebar({ editor, open, onToggle }: OutlineSideba
     }
   }, [editor, headings])
 
+  // Reading is scrolling, not typing. Without this the highlight only moved
+  // when the cursor did, so scrolling through a document left the outline
+  // pointing at wherever the caret happened to be.
+  useEffect(() => {
+    if (!editor || !open || headings.length === 0) return
+    const container = scrollParentOf(editor.view.dom)
+    const target: HTMLElement | Window = container ?? window
+
+    let queued = false
+    const onScroll = () => {
+      if (queued) return
+      queued = true
+      requestAnimationFrame(() => {
+        queued = false
+        const viewportTop = container ? container.getBoundingClientRect().top : 0
+        setActiveId(activeHeadingAt(editor, headings, viewportTop))
+      })
+    }
+
+    onScroll()
+    target.addEventListener('scroll', onScroll, { passive: true })
+    return () => target.removeEventListener('scroll', onScroll)
+  }, [editor, headings, open])
+
+  // Keep the highlighted entry visible in a long outline.
+  useEffect(() => {
+    if (!activeId) return
+    navRef.current
+      ?.querySelector(`[data-outline-id="${CSS.escape(activeId)}"]`)
+      ?.scrollIntoView({ block: 'nearest' })
+  }, [activeId])
+
   const scrollToHeading = useCallback(
     (heading: HeadingItem) => {
-      if (!editor) return
-      const dom = editor.view.domAtPos(heading.pos)
-      const el = dom.node instanceof HTMLElement ? dom.node : dom.node.parentElement
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        editor.commands.setTextSelection(heading.pos)
-      }
+      const el = headingElement(editor, heading.pos)
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      // +1 puts the cursor inside the heading; `heading.pos` is the position
+      // before it, which belongs to the node above.
+      editor?.commands.setTextSelection(heading.pos + 1)
     },
     [editor],
   )
@@ -105,7 +119,7 @@ export default function OutlineSidebar({ editor, open, onToggle }: OutlineSideba
   }
 
   return (
-    <div className="w-56 border-r border-border bg-card/30 overflow-y-auto shrink-0 animate-slide-in-left">
+    <div className="w-56 border-r border-border bg-card/30 overflow-y-auto themed-scrollbar shrink-0 animate-slide-in-left">
       <div className="flex items-center justify-between px-3 py-2 border-b border-border">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
           <List className="h-3 w-3" />
@@ -121,7 +135,7 @@ export default function OutlineSidebar({ editor, open, onToggle }: OutlineSideba
           </svg>
         </button>
       </div>
-      <nav className="py-2">
+      <nav ref={navRef} className="py-2">
         {headings.length === 0 ? (
           <p className="px-3 py-4 text-xs text-muted-foreground/60 italic">
             Add headings to see the outline
@@ -134,6 +148,7 @@ export default function OutlineSidebar({ editor, open, onToggle }: OutlineSideba
               <button
                 key={h.id}
                 onClick={() => scrollToHeading(h)}
+                data-outline-id={h.id}
                 data-outline-slug={slugify(h.text)}
                 className={`w-full text-left px-3 py-1.5 text-xs transition-colors truncate block ${
                   isActive

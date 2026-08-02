@@ -563,7 +563,6 @@ interface CoverageGap {
   gap_type: string
   linked_test_cases: TestCase[]
   all_test_cases_draft: boolean
-  missing_link_types: string[]
 }
 
 export interface CoverageGapReport {

@@ -216,15 +216,6 @@ export default function TraceabilityMatrix() {
                     </div>
                     <div className="flex items-center space-x-3">
                       <GapTypeBadge gapType={gap.gap_type} />
-                      {gap.missing_link_types.length > 0 && (
-                        <div className="flex items-center space-x-1">
-                          {gap.missing_link_types.map((lt) => (
-                            <span key={lt} className="px-1.5 py-0.5 bg-red-500/10 text-red-700 dark:text-red-400 rounded text-xs">
-                              missing: {lt}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                       <ImpactLink prefix={prefix!} reqId={gap.requirement.req_id} />
                     </div>
                   </div>
@@ -519,7 +510,6 @@ function GapTypeBadge({ gapType }: { gapType: string }) {
   const config: Record<string, { colors: string; label: string }> = {
     no_test_cases: { colors: 'bg-red-500/10 text-red-700 dark:text-red-400', label: 'No Test Cases' },
     all_draft: { colors: 'bg-amber-500/10 text-amber-700 dark:text-amber-400', label: 'All Draft' },
-    missing_link_types: { colors: 'bg-orange-500/10 text-orange-700 dark:text-orange-400', label: 'Missing Links' },
   }
   const cfg = config[gapType] || { colors: 'bg-gray-500/10 text-gray-700', label: gapType }
   return (

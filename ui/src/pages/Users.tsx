@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { extractApiErrorMessage, InviteUserResponse, User, usersApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../components/useToast'
 import { UserPlus, Edit2, Trash2, X, Shield, Wrench, Eye, Copy, Check, Mail } from 'lucide-react'
 
 const ROLE_CONFIG = {
@@ -13,6 +14,7 @@ const ROLE_CONFIG = {
 export default function UsersPage() {
   const { user: currentUser } = useAuth()
   const queryClient = useQueryClient()
+  const toast = useToast()
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [emailChangeUser, setEmailChangeUser] = useState<User | null>(null)
   const [editingUser, setEditingUser] = useState<number | null>(null)
@@ -29,7 +31,9 @@ export default function UsersPage() {
     mutationFn: usersApi.invite,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
+      toast.notify('Invitation sent', 'success')
     },
+    onError: (error) => toast.failed('Sending the invitation', error),
   })
 
   const updateMutation = useMutation({
@@ -39,7 +43,9 @@ export default function UsersPage() {
       void _updated
       queryClient.invalidateQueries({ queryKey: ['users'] })
       setEditingUser(null)
+      toast.saved('User')
     },
+    onError: (error) => toast.failed('Saving the user', error),
   })
 
   const deleteMutation = useMutation({
@@ -48,9 +54,13 @@ export default function UsersPage() {
       setDeleteError(null)
       setPendingDeleteUserId(id)
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      toast.deleted('User')
+    },
     onError: (error: unknown) => {
       setDeleteError(extractApiErrorMessage(error, 'Failed to delete user'))
+      toast.failed('Deleting the user', error)
     },
     onSettled: () => {
       setPendingDeleteUserId(null)
