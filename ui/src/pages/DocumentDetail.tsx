@@ -1,7 +1,7 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, Link, useNavigate } from 'react-router'
-import { documentsApi, projectsApi, DocumentSection, extractApiErrorMessage } from '../api/client'
+import { documentsApi, projectsApi, DocumentSection } from '../api/client'
 import { Trash2, ChevronRight, FileText, FileEdit } from 'lucide-react'
 import { DocEditor } from '../components/editor'
 import DocDetailShell, { MetaItem, SectionCard } from '../components/DocDetailShell'
@@ -10,6 +10,7 @@ import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import { docEditUrl, kindSlugToType } from '../types/doc'
 import { formatDateTime } from '../test/date-utils'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../components/useToast'
 
 function flattenSections(sections: DocumentSection[]): DocumentSection[] {
   const result: DocumentSection[] = []
@@ -46,14 +47,9 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
   const docId = resolvedId || Number(docIdParam)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const toast = useToast()
 
-  const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' | 'info' } | null>(null)
 
-  useEffect(() => {
-    if (!toast) return
-    const timer = setTimeout(() => setToast(null), 4000)
-    return () => clearTimeout(timer)
-  }, [toast])
 
   const resolvedDocType = kindSlugToType(kind || '')
   const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
@@ -77,7 +73,7 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
     mutationFn: () => documentsApi.delete(docId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'document', docId] })
-      setToast({ message: 'Document deleted', variant: 'success' })
+      toast.notify('Document deleted', 'success')
       if (projectPrefix) {
         queryClient.invalidateQueries({ queryKey: ['documents', doc?.project_id] })
         setTimeout(() => {
@@ -90,7 +86,7 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
       }
     },
     onError: (err: unknown) => {
-      setToast({ message: extractApiErrorMessage(err) || 'Delete failed', variant: 'error' })
+      toast.failed('Deleting the document', err)
       setDeleteConfirm(false)
     },
   })
@@ -243,20 +239,6 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
         sourceDocId={doc.doc_id ?? undefined}
       />
     </DocDetailShell>
-    {toast && (
-      <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-md shadow-lg text-sm border"
-        style={{
-          background: toast.variant === 'success' ? 'var(--color-emerald-50, #ecfdf5)' : toast.variant === 'error' ? 'var(--color-red-50, #fef2f2)' : 'var(--color-blue-50, #eff6ff)',
-          borderColor: toast.variant === 'success' ? 'var(--color-emerald-200, #a7f3d0)' : toast.variant === 'error' ? 'var(--color-red-200, #fecaca)' : 'var(--color-blue-200, #bfdbfe)',
-        }}
-      >
-        <div className={`w-2 h-2 rounded-full ${toast.variant === 'success' ? 'bg-emerald-500' : toast.variant === 'error' ? 'bg-red-500' : 'bg-blue-500'}`} />
-        <span className={toast.variant === 'success' ? 'text-emerald-800' : toast.variant === 'error' ? 'text-red-800' : 'text-blue-800'}>
-          {toast.message}
-        </span>
-        <button onClick={() => setToast(null)} className="ml-3 text-xs underline opacity-60 hover:opacity-100">Dismiss</button>
-      </div>
-    )}
     </>
   )
 }

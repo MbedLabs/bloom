@@ -296,7 +296,7 @@ export default function ImportWizard() {
                 >
                   {selectedIds.length === sourceDocs.length ? 'Deselect all' : 'Select all'}
                 </button>
-                <div className="max-h-96 overflow-y-auto space-y-1">
+                <div className="max-h-96 overflow-y-auto themed-scrollbar space-y-1">
                   {sourceDocs.map((doc) => {
                     const isSelected = selectedIds.includes(doc.id)
                     return (

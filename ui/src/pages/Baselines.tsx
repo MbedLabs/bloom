@@ -5,6 +5,7 @@ import { Layers, Plus, GitCompareArrows } from 'lucide-react'
 
 import { baselinesApi, projectsApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../components/useToast'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { formatDateTime } from '../test/date-utils'
 
@@ -13,6 +14,7 @@ export default function Baselines() {
   const { prefix } = useParams<{ prefix?: string }>()
   const { data: project } = useProjectByPrefix(prefix)
   const queryClient = useQueryClient()
+  const toast = useToast()
   const [showCreate, setShowCreate] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [form, setForm] = useState({ project_id: '', name: '', description: '', baseline_type: 'Milestone' })
@@ -35,8 +37,9 @@ export default function Baselines() {
 
   const createMutation = useMutation({
     mutationFn: baselinesApi.create,
-    onSuccess: () => {
+    onSuccess: (baseline) => {
       queryClient.invalidateQueries({ queryKey: ['baselines'] })
+      toast.saved(`Baseline ${baseline.name}`)
       setShowCreate(false)
       setForm({
         project_id: scopedProjectId ? String(scopedProjectId) : '',
@@ -45,6 +48,7 @@ export default function Baselines() {
         baseline_type: 'Milestone',
       })
     },
+    onError: (error) => toast.failed('Creating the baseline', error),
   })
 
   const selectedBaseline = useMemo(
@@ -117,7 +121,7 @@ export default function Baselines() {
         <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-6">
           <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden">
             <div className="px-4 py-3 border-b border-border text-sm font-medium text-foreground">Available Baselines</div>
-            <div className="divide-y divide-border max-h-[620px] overflow-y-auto">
+            <div className="divide-y divide-border max-h-[620px] overflow-y-auto themed-scrollbar">
               {baselines.map((item) => (
                 <button
                   key={item.id}

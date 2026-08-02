@@ -5,6 +5,7 @@ import { defectsApi, Defect, extractApiErrorMessage } from '../api/client'
 import { ArrowLeft, ArrowUpDown, ChevronDown, ChevronUp, Plus, Bug, ExternalLink, Search } from 'lucide-react'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../components/useToast'
 import { formatDateTime } from '../test/date-utils'
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -37,6 +38,7 @@ export default function Defects() {
   const projectId = project?.id || 0
   const { user } = useAuth()
   const queryClient = useQueryClient()
+  const toast = useToast()
   const navigate = useNavigate()
 
   const [showCreate, setShowCreate] = useState(false)
@@ -115,8 +117,9 @@ export default function Defects() {
   const createMutation = useMutation({
     mutationFn: defectsApi.create,
     onMutate: () => setCreateError(''),
-    onSuccess: () => {
+    onSuccess: (defect) => {
       queryClient.invalidateQueries({ queryKey: ['defects', projectId] })
+      toast.saved(`Defect ${defect.defect_id}`)
       setShowCreate(false)
       setForm({
         title: '',
@@ -129,7 +132,10 @@ export default function Defects() {
         external_issue_url: '',
       })
     },
-    onError: (err) => setCreateError(extractApiErrorMessage(err)),
+    onError: (err) => {
+      setCreateError(extractApiErrorMessage(err))
+      toast.failed('Creating the defect', err)
+    },
   })
 
   const canEdit = user?.role === 'admin' || user?.role === 'maintainer'

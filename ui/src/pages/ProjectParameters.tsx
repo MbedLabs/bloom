@@ -6,6 +6,7 @@ import { ArrowLeft, Edit2, Plus, SlidersHorizontal, Trash2, X } from 'lucide-rea
 import { projectVariablesApi, ProjectVariable } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../components/useToast'
 
 export default function ProjectParameters() {
   const { user } = useAuth()
@@ -14,6 +15,7 @@ export default function ProjectParameters() {
   const { data: project, isLoading: projectLoading } = useProjectByPrefix(prefix)
   const projectId = project?.id || 0
   const queryClient = useQueryClient()
+  const toast = useToast()
 
   const [showCreate, setShowCreate] = useState(false)
   const [createForm, setCreateForm] = useState({ kind: 'variable' as ProjectVariable['kind'], key: '', value: '', description: '' })
@@ -32,7 +34,9 @@ export default function ProjectParameters() {
       queryClient.invalidateQueries({ queryKey: ['projectVariables', projectId] })
       setShowCreate(false)
       setCreateForm({ kind: 'variable', key: '', value: '', description: '' })
+      toast.saved('Parameter')
     },
+    onError: (error) => toast.failed('Creating the parameter', error),
   })
 
   useEffect(() => {
@@ -51,7 +55,9 @@ export default function ProjectParameters() {
     mutationFn: projectVariablesApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projectVariables', projectId] })
+      toast.deleted('Parameter')
     },
+    onError: (error) => toast.failed('Deleting the parameter', error),
   })
 
   const updateMutation = useMutation({
@@ -61,7 +67,9 @@ export default function ProjectParameters() {
       void _updated
       queryClient.invalidateQueries({ queryKey: ['projectVariables', projectId] })
       setEditingId(null)
+      toast.saved('Parameter')
     },
+    onError: (error) => toast.failed('Saving the parameter', error),
   })
 
   const onCreate = (e: React.FormEvent) => {

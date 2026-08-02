@@ -1,5 +1,5 @@
+import { renderPage } from './render'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { renderToString } from 'react-dom/server'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
 
@@ -54,7 +54,7 @@ describe('Dashboard document totals', () => {
     queryClient.setQueryData(['dashboard-stats'], stats)
     queryClient.setQueryData(['projects'], [project])
 
-    const html = renderToString(
+    const html = renderPage(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
           <Dashboard />

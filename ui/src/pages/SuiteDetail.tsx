@@ -3,13 +3,14 @@ import { Link, useParams, useNavigate, useLocation } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, FlaskConical, Layers3, Pencil, Plus, Trash2 } from 'lucide-react'
 
-import { campaignsApi, testCasesApi, testSuitesApi, extractApiErrorMessage } from '../api/client'
+import { campaignsApi, testCasesApi, testSuitesApi } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { docUrl } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import { usePageMeta } from '../contexts/PageMetaContext'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../components/useToast'
 import { formatDateTime } from '../test/date-utils'
 import BudRunLink from '../components/BudRunLink'
 
@@ -23,6 +24,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
   const projectId = project?.id || 0
   const parsedSuiteId = resolvedId || Number(suiteId)
   const queryClient = useQueryClient()
+  const toast = useToast()
   const navigate = useNavigate()
   const location = useLocation()
   const backUrl = (location.state as { returnTo?: string } | null)?.returnTo
@@ -38,13 +40,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
   })
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' | 'info' } | null>(null)
 
-  useEffect(() => {
-    if (!toast) return
-    const timer = setTimeout(() => setToast(null), 4000)
-    return () => clearTimeout(timer)
-  }, [toast])
 
   const { data: suite, isLoading } = useQuery({
     queryKey: ['testSuite', parsedSuiteId],
@@ -72,10 +68,10 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
       queryClient.invalidateQueries({ queryKey: ['testCases', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       setShowAddCase(false)
-      setToast({ message: 'Test case added', variant: 'success' })
+      toast.notify('Test case added', 'success')
     },
     onError: (err: unknown) => {
-      setToast({ message: extractApiErrorMessage(err) || 'Add failed', variant: 'error' })
+      toast.failed('Adding the test case', err)
     },
   })
 
@@ -86,10 +82,10 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
       queryClient.invalidateQueries({ queryKey: ['testSuites', projectId] })
       queryClient.invalidateQueries({ queryKey: ['testCases', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
-      setToast({ message: 'Test case removed', variant: 'success' })
+      toast.notify('Test case removed', 'success')
     },
     onError: (err: unknown) => {
-      setToast({ message: extractApiErrorMessage(err) || 'Remove failed', variant: 'error' })
+      toast.failed('Removing the test case', err)
     },
   })
 
@@ -105,13 +101,13 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
     onSuccess: (campaign) => {
       queryClient.invalidateQueries({ queryKey: ['campaigns', projectId] })
       queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
-      setToast({ message: 'Campaign scope created', variant: 'success' })
+      toast.notify('Campaign scope created', 'success')
       navigate(`/projects/${prefix}/campaigns/${campaign.id}`, {
         state: { returnTo: `/projects/${prefix}/suites/${suiteId}` },
       })
     },
     onError: (err: unknown) => {
-      setToast({ message: extractApiErrorMessage(err) || 'Campaign creation failed', variant: 'error' })
+      toast.failed('Creating the campaign', err)
     },
   })
 
@@ -128,10 +124,10 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
       queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
       queryClient.invalidateQueries({ queryKey: ['testSuites', projectId] })
       setEditing(false)
-      setToast({ message: 'Suite saved', variant: 'success' })
+      toast.notify('Suite saved', 'success')
     },
     onError: (err: unknown) => {
-      setToast({ message: extractApiErrorMessage(err) || 'Save failed', variant: 'error' })
+      toast.failed('Saving the suite', err)
     },
   })
 
@@ -139,13 +135,13 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
     mutationFn: () => testSuitesApi.delete(parsedSuiteId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['testSuites', projectId] })
-      setToast({ message: 'Suite deleted', variant: 'success' })
+      toast.notify('Suite deleted', 'success')
       setTimeout(() => {
         navigate(backUrl)
       }, 800)
     },
     onError: (err: unknown) => {
-      setToast({ message: extractApiErrorMessage(err) || 'Delete failed', variant: 'error' })
+      toast.failed('Deleting the suite', err)
       setConfirmDelete(false)
     },
   })
@@ -347,7 +343,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
             <div className="px-6 py-4 border-b border-border">
               <h3 className="text-lg font-semibold">Add Test Case To Suite</h3>
             </div>
-            <div className="p-6 overflow-y-auto flex-1">
+            <div className="p-6 overflow-y-auto themed-scrollbar flex-1">
               {availableCases.length === 0 ? (
                 <div className="text-center text-muted-foreground py-6">No available test cases.</div>
               ) : (
@@ -379,20 +375,6 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
         <DocumentActivityPanel artefactType="test-suite" artefactId={parsedSuiteId} />
       </div>
     </div>
-    {toast && (
-      <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-md shadow-lg text-sm border"
-        style={{
-          background: toast.variant === 'success' ? 'var(--color-emerald-50, #ecfdf5)' : toast.variant === 'error' ? 'var(--color-red-50, #fef2f2)' : 'var(--color-blue-50, #eff6ff)',
-          borderColor: toast.variant === 'success' ? 'var(--color-emerald-200, #a7f3d0)' : toast.variant === 'error' ? 'var(--color-red-200, #fecaca)' : 'var(--color-blue-200, #bfdbfe)',
-        }}
-      >
-        <div className={`w-2 h-2 rounded-full ${toast.variant === 'success' ? 'bg-emerald-500' : toast.variant === 'error' ? 'bg-red-500' : 'bg-blue-500'}`} />
-        <span className={toast.variant === 'success' ? 'text-emerald-800' : toast.variant === 'error' ? 'text-red-800' : 'text-blue-800'}>
-          {toast.message}
-        </span>
-        <button onClick={() => setToast(null)} className="ml-3 text-xs underline opacity-60 hover:opacity-100">Dismiss</button>
-      </div>
-    )}
     </>
   )
 }
