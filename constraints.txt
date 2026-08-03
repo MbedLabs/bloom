@@ -53,7 +53,7 @@ fonttools==4.63.0
     # via fpdf2
 fpdf2==2.8.7
     # via bloom-app (pyproject.toml)
-greenlet==3.5.3
+greenlet==3.5.4
     # via
     #   bloom-app (pyproject.toml)
     #   sqlalchemy
@@ -145,7 +145,7 @@ uvloop==0.22.1
     # via uvicorn
 watchfiles==1.2.0
     # via uvicorn
-websockets==16.1
+websockets==16.1.1
     # via uvicorn
 wrapt==2.2.2
     # via deprecated
