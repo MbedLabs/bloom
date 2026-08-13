@@ -1,0 +1,13 @@
+__pycache__
+*.pyc
+.git
+.gitignore
+*.md
+!README.md
+.env
+.env.*
+.venv
+.pytest_cache
+coverage.xml
+ui/node_modules
+ui/dist
