@@ -1,0 +1,46 @@
+services:
+  bloom:
+    image: ghcr.io/mbedlabs/bloom:${BLOOM_VERSION:-stable}
+    restart: unless-stopped
+    env_file:
+      - ${BLOOM_ENV_FILE:-.env}
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-bloom}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env before starting Bloom}@postgres:5432/${POSTGRES_DB:-bloom}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env before starting Bloom}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Set ADMIN_EMAIL in .env before starting Bloom}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env before starting Bloom}
+      BLOOM_ATTACHMENT_DIR: /app/attachments
+    command: ["/bin/sh", "-c", "alembic upgrade head && exec /usr/local/bin/start-product"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8080"
+    healthcheck:
+      # Readiness: passes only once the app can reach PostgreSQL (SELECT 1).
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    volumes:
+      - bloom-attachments:/app/attachments
+
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bloom}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env before starting Bloom}
+      POSTGRES_DB: ${POSTGRES_DB:-bloom}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - bloom-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  bloom-postgres-data:
+  bloom-attachments:
