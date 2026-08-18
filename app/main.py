@@ -1,0 +1,417 @@
+"""
+FastAPI application for EmbedLabs Bloom - Product Lifecycle Management.
+
+Main entry point for the backend API.
+"""
+
+import asyncio
+import contextlib
+import logging
+import re
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from sqlalchemy import or_, select, text
+
+from app.api import artefacts, attachments
+from app.api import auth as auth_api
+from app.api import (
+    baselines,
+    campaigns,
+    changes,
+    dashboard,
+    defects,
+    designs,
+    docs_facade,
+    documents,
+    export,
+    health,
+    import_service,
+    integrations,
+    links,
+    notifications,
+    project_memberships,
+    project_variables,
+    projects,
+    requirements,
+    risks,
+    search,
+    service_credentials,
+    test_cases,
+    test_concepts,
+    test_suites,
+    traceability,
+)
+from app.api import users as users_api
+from app.core.config import settings
+from app.core.database import async_session_maker, create_tables, engine
+from app.core.deps import limiter
+from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS, normalize_document_kind
+from app.core.id_generator import compute_next_id, next_doc_id
+from app.core.observability import (
+    RequestObservabilityMiddleware,
+    metrics_router,
+    setup_logging,
+)
+from app.core.security import get_password_hash
+from app.models import (
+    ArtefactLink,
+    ChangeRequest,
+    Defect,
+    DesignItem,
+    Document,
+    Project,
+    RiskItem,
+    TestCampaign,
+    TestConcept,
+    TestSuite,
+)
+from app.models.user import User, UserRole
+from app.services.attachment_cleanup import reconcile_attachments
+
+# Structured logging: JSON lines in production, text in dev (see LOG_LEVEL/LOG_JSON)
+setup_logging(level=settings.LOG_LEVEL, json_logs=bool(settings.LOG_JSON))
+logger = logging.getLogger(__name__)
+
+
+async def seed_admin_user():
+    async with async_session_maker() as session:
+        result = await session.execute(select(User).where(User.email == settings.ADMIN_EMAIL))
+        admin = result.scalar_one_or_none()
+        if admin is None:
+            admin = User(
+                email=settings.ADMIN_EMAIL,
+                full_name=settings.ADMIN_FULL_NAME,
+                hashed_password=get_password_hash(settings.ADMIN_PASSWORD),
+                role=UserRole.admin,
+                is_active=True,
+            )
+            session.add(admin)
+        else:
+            admin.role = UserRole.admin
+            admin.is_active = True
+
+        await session.commit()
+
+
+async def migrate_user_columns() -> None:
+    """Ensure newer user columns exist on legacy databases."""
+    if engine.dialect.name != "postgresql":
+        return
+
+    async with engine.begin() as conn:
+        await conn.execute(
+            text("ALTER TABLE users ADD COLUMN IF NOT EXISTS api_token_jti VARCHAR(255) NULL")
+        )
+
+
+async def normalize_document_kinds_and_ids() -> None:
+    """Normalize legacy shared-document types and ids to canonical kind codes."""
+    async with async_session_maker() as session:
+        projects = (await session.execute(select(Project).order_by(Project.id))).scalars().all()
+        id_pattern = re.compile(r"^(?P<prefix>[A-Z0-9]+)-(?P<kind>[A-Z]+)-(?P<num>\d+)$")
+
+        for project in projects:
+            documents = (
+                (
+                    await session.execute(
+                        select(Document)
+                        .where(Document.project_id == project.id)
+                        .order_by(Document.created_at.asc(), Document.id.asc())
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            used_ids_by_kind: dict[str, set[str]] = {
+                kind: set() for kind in CANONICAL_DOCUMENT_KINDS
+            }
+            for document in documents:
+                normalized_kind = normalize_document_kind(document.doc_type)
+                if normalized_kind not in CANONICAL_DOCUMENT_KINDS:
+                    normalized_kind = "SPEC"
+
+                current_id = document.doc_id or ""
+                if current_id.startswith(f"{project.prefix}-{normalized_kind}-"):
+                    used_ids_by_kind[normalized_kind].add(current_id)
+
+            for document in documents:
+                normalized_kind = normalize_document_kind(document.doc_type)
+                if normalized_kind not in CANONICAL_DOCUMENT_KINDS:
+                    normalized_kind = "SPEC"
+                document.doc_type = normalized_kind
+
+                current_id = document.doc_id or ""
+                desired_prefix = f"{project.prefix}-{normalized_kind}-"
+                if current_id.startswith(desired_prefix):
+                    continue
+
+                replacement_id = None
+                match = id_pattern.match(current_id)
+                if match and match.group("prefix") == project.prefix:
+                    candidate = f"{desired_prefix}{match.group('num')}"
+                    if candidate not in used_ids_by_kind[normalized_kind]:
+                        replacement_id = candidate
+
+                if replacement_id is None:
+                    existing_ids = sorted(used_ids_by_kind[normalized_kind])
+                    replacement_id = compute_next_id(existing_ids, project.prefix, normalized_kind)
+
+                document.doc_id = replacement_id
+                used_ids_by_kind[normalized_kind].add(replacement_id)
+
+            documents_by_id = {document.id: document for document in documents}
+            links = (
+                (
+                    await session.execute(
+                        select(ArtefactLink)
+                        .where(ArtefactLink.project_id == project.id)
+                        .order_by(ArtefactLink.id.asc())
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            seen_link_keys: set[tuple[str, int, str, int, str]] = set()
+
+            for link in links:
+                if (
+                    link.source_id in documents_by_id
+                    and normalize_document_kind(link.source_type) in CANONICAL_DOCUMENT_KINDS
+                ):
+                    link.source_type = documents_by_id[link.source_id].doc_type
+                if (
+                    link.target_id in documents_by_id
+                    and normalize_document_kind(link.target_type) in CANONICAL_DOCUMENT_KINDS
+                ):
+                    link.target_type = documents_by_id[link.target_id].doc_type
+
+                link_key = (
+                    link.source_type,
+                    link.source_id,
+                    link.target_type,
+                    link.target_id,
+                    link.role,
+                )
+                if link_key in seen_link_keys:
+                    await session.delete(link)
+                else:
+                    seen_link_keys.add(link_key)
+
+        await session.commit()
+
+
+async def backfill_campaign_public_ids() -> None:
+    """Assign PRJ-CMP-NNN to campaigns missing campaign_id (legacy rows)."""
+    async with async_session_maker() as session:
+        projects = (await session.execute(select(Project).order_by(Project.id))).scalars().all()
+        for project in projects:
+            campaigns = (
+                (
+                    await session.execute(
+                        select(TestCampaign)
+                        .where(
+                            TestCampaign.project_id == project.id,
+                            or_(
+                                TestCampaign.campaign_id.is_(None),
+                                TestCampaign.campaign_id == "",
+                            ),
+                        )
+                        .order_by(TestCampaign.id.asc())
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for campaign in campaigns:
+                campaign.campaign_id = await next_doc_id(
+                    session,
+                    TestCampaign,
+                    TestCampaign.campaign_id,
+                    project.id,
+                    project.prefix,
+                    "CMP",
+                )
+        await session.commit()
+
+
+async def normalize_non_document_public_ids() -> None:
+    """Repair malformed IDs (wrong type code, non-numeric suffix) across all artefact tables."""
+    TABLE_REPAIRS: list[tuple[type, str, str, str]] = [
+        (ChangeRequest, "change_id", "CHG", "change request"),
+        (Defect, "defect_id", "DEF", "defect"),
+        (DesignItem, "design_id", "DES", "design item"),
+        (RiskItem, "risk_id", "RSK", "risk item"),
+        (TestCampaign, "campaign_id", "CMP", "campaign"),
+        (TestConcept, "concept_id", "CPT", "test concept"),
+        (TestSuite, "suite_id", "TS", "test suite"),
+    ]
+
+    async with async_session_maker() as session:
+        projects = (await session.execute(select(Project).order_by(Project.id))).scalars().all()
+        for project in projects:
+            for model, col_name, type_code, _label in TABLE_REPAIRS:
+                rows = (
+                    (await session.execute(select(model).where(model.project_id == project.id)))
+                    .scalars()
+                    .all()
+                )
+
+                correct_prefix = f"{project.prefix}-{type_code}-"
+                existing_ids: list[str] = [correct_prefix]
+                # First pass: collect correct IDs
+                for row in rows:
+                    current = str(getattr(row, col_name) or "")
+                    if (
+                        current.startswith(correct_prefix)
+                        and current[len(correct_prefix) :].isdigit()
+                    ):
+                        existing_ids.append(current)
+
+                # Second pass: repair malformed IDs
+                for row in rows:
+                    current = str(getattr(row, col_name) or "")
+                    if (
+                        current.startswith(correct_prefix)
+                        and current[len(correct_prefix) :].isdigit()
+                    ):
+                        continue
+
+                    # Try to extract numeric suffix from PRJ-OLDCODE-NNN
+                    match = re.match(r"^[A-Z0-9]+-[A-Z]+-(\d+)$", current)
+                    new_id = None
+                    if match:
+                        candidate = f"{correct_prefix}{int(match.group(1)):03d}"
+                        if candidate not in existing_ids:
+                            new_id = candidate
+
+                    if new_id is None:
+                        new_id = compute_next_id(existing_ids, project.prefix, type_code)
+
+                    setattr(row, col_name, new_id)
+                    existing_ids.append(new_id)
+                    logging.getLogger(__name__).info(
+                        "repair %s id: %s -> %s", _label, current, new_id
+                    )
+
+        await session.commit()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan handler."""
+    if settings.RUN_STARTUP_DATA_REPAIR:
+        await create_tables()
+        await migrate_user_columns()
+        await normalize_document_kinds_and_ids()
+        await backfill_campaign_public_ids()
+        await normalize_non_document_public_ids()
+    if settings.AUTO_SEED_ADMIN:
+        await seed_admin_user()
+
+    async def cleanup_loop() -> None:
+        while True:
+            try:
+                async with async_session_maker() as session:
+                    report = await reconcile_attachments(session)
+                    if report.leader_acquired:
+                        logger.info(
+                            "Attachment cleanup: orphan=%s missing=%s",
+                            report.orphan_files,
+                            report.missing_files,
+                        )
+            except Exception:
+                logger.exception("Attachment cleanup pass failed")
+            await asyncio.sleep(24 * 60 * 60)
+
+    cleanup_task = asyncio.create_task(cleanup_loop())
+    try:
+        yield
+    finally:
+        cleanup_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await cleanup_task
+
+
+app = FastAPI(
+    title=settings.BLOOM_APP_NAME,
+    description="Backend API for EmbedLabs Bloom - Product Lifecycle Management",
+    version=settings.BLOOM_APP_VERSION,
+    docs_url="/api/docs" if settings.ENABLE_DOCS else None,
+    redoc_url="/api/redoc" if settings.ENABLE_DOCS else None,
+    openapi_url="/api/openapi.json" if settings.ENABLE_DOCS else None,
+    lifespan=lifespan,
+)
+
+# H2: Attach rate-limiter state and error handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Outermost middleware: request-id propagation, access logs, Prometheus metrics
+app.add_middleware(RequestObservabilityMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
+)
+
+app.include_router(health.router, prefix="/api", tags=["Health"])
+app.include_router(metrics_router, prefix="/api", tags=["Observability"])
+app.include_router(auth_api.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(
+    service_credentials.router,
+    prefix="/api/service-credentials",
+    tags=["Service Credentials"],
+)
+app.include_router(users_api.router, prefix="/api/users", tags=["Users"])
+app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
+app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
+app.include_router(
+    project_memberships.router,
+    prefix="/api/projects",
+    tags=["Project Members"],
+)
+app.include_router(
+    project_variables.router,
+    prefix="/api/project-variables",
+    tags=["Project Variables"],
+)
+app.include_router(requirements.router, prefix="/api/requirements", tags=["Requirements"])
+app.include_router(test_cases.router, prefix="/api/test-cases", tags=["Test Cases"])
+app.include_router(traceability.router, prefix="/api/traceability", tags=["Traceability"])
+app.include_router(documents.router, prefix="/api", tags=["Documents"])
+app.include_router(attachments.router, prefix="/api", tags=["Attachments"])
+app.include_router(test_suites.router, prefix="/api/test-suites", tags=["Test Suites"])
+app.include_router(campaigns.router, prefix="/api/campaigns", tags=["Campaigns"])
+app.include_router(designs.router, prefix="/api/designs", tags=["Designs"])
+app.include_router(risks.router, prefix="/api/risks", tags=["Risks"])
+app.include_router(changes.router, prefix="/api/changes", tags=["Changes"])
+app.include_router(defects.router, prefix="/api/defects", tags=["Defects"])
+app.include_router(integrations.router, prefix="/api/integrations", tags=["Integrations"])
+app.include_router(baselines.router, prefix="/api/baselines", tags=["Baselines"])
+app.include_router(test_concepts.router, prefix="/api/test-concepts", tags=["Test Concepts"])
+app.include_router(artefacts.router, prefix="/api/artefacts", tags=["Artefacts"])
+app.include_router(links.router, prefix="/api/links", tags=["Links"])
+app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
+app.include_router(import_service.router, prefix="/api", tags=["Import"])
+app.include_router(export.router, prefix="/api", tags=["Export"])
+app.include_router(search.router, prefix="/api/search", tags=["Search"])
+app.include_router(docs_facade.router, prefix="/api", tags=["Docs Facade"])
+
+
+@app.get("/")
+async def root():
+    """Root endpoint."""
+    return {
+        "message": settings.BLOOM_APP_NAME,
+        "version": settings.BLOOM_APP_VERSION,
+    }
