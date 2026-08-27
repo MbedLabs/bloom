@@ -17,6 +17,8 @@ import {
   type TcsRow,
   type TcsRowType,
 } from '../utils/tcs'
+import MentionTextarea from './editor/MentionTextarea'
+import type { MentionSuggestion } from './editor/MentionList'
 
 const ROW_TYPE_STYLES: Record<TcsRowType, { marker: string; chip: string; row: string; label: string }> = {
   precondition: {
@@ -68,11 +70,26 @@ interface TcsArteTableProps {
   rows: TcsRow[]
   onChange: (rows: TcsRow[]) => void
   editable?: boolean
+  mentionItems?: MentionSuggestion[]
+  userMentionItems?: MentionSuggestion[]
 }
 
-export function TcsArteTable({ rows, onChange, editable = false }: TcsArteTableProps) {
+export function TcsArteTable({
+  rows,
+  onChange,
+  editable = false,
+  mentionItems = [],
+  userMentionItems = [],
+}: TcsArteTableProps) {
   if (editable) {
-    return <TcsArteTableEditor rows={rows} onChange={onChange} />
+    return (
+      <TcsArteTableEditor
+        rows={rows}
+        onChange={onChange}
+        mentionItems={mentionItems}
+        userMentionItems={userMentionItems}
+      />
+    )
   }
   return <TcsArteTableView rows={rows} />
 }
@@ -132,7 +149,17 @@ function TcsViewRow({ row, hasChildren }: { row: TcsRow; hasChildren: boolean })
   )
 }
 
-function TcsArteTableEditor({ rows, onChange }: { rows: TcsRow[]; onChange: (rows: TcsRow[]) => void }) {
+function TcsArteTableEditor({
+  rows,
+  onChange,
+  mentionItems,
+  userMentionItems,
+}: {
+  rows: TcsRow[]
+  onChange: (rows: TcsRow[]) => void
+  mentionItems: MentionSuggestion[]
+  userMentionItems: MentionSuggestion[]
+}) {
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [actionMenu, setActionMenu] = useState<{ index: number; top: number; left: number } | null>(null)
@@ -214,6 +241,8 @@ function TcsArteTableEditor({ rows, onChange }: { rows: TcsRow[]; onChange: (row
                 key={row.id}
                 row={row}
                 hasChildren={hasChildRows(rows, index)}
+                mentionItems={mentionItems}
+                userMentionItems={userMentionItems}
                 isDragTarget={dragOverIndex === index}
                 menuOpen={actionMenu?.index === index}
                 menuPosition={actionMenu?.index === index ? { top: actionMenu.top, left: actionMenu.left } : null}
@@ -304,6 +333,8 @@ function TcsAddRow({
 function TcsEditorRow({
   row,
   hasChildren,
+  mentionItems,
+  userMentionItems,
   isDragTarget,
   menuOpen,
   menuPosition,
@@ -321,6 +352,8 @@ function TcsEditorRow({
 }: {
   row: TcsRow
   hasChildren: boolean
+  mentionItems: MentionSuggestion[]
+  userMentionItems: MentionSuggestion[]
   isDragTarget: boolean
   menuOpen: boolean
   menuPosition: { top: number; left: number } | null
@@ -385,18 +418,22 @@ function TcsEditorRow({
       </div>
 
       <div className="border-r border-border/70 p-2">
-        <textarea
+        <MentionTextarea
           value={row.description}
-          onChange={(event) => onUpdate({ description: event.target.value })}
+          onChange={(description) => onUpdate({ description })}
+          mentionItems={mentionItems}
+          userMentionItems={userMentionItems}
           className="min-h-[4rem] w-full resize-y border-0 bg-transparent px-2 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:bg-background focus:ring-1 focus:ring-ring"
           placeholder={row.row_type === 'loop' ? 'Loop condition or group intent' : 'Action / description'}
         />
       </div>
 
       <div className="border-r border-border/70 p-2">
-        <textarea
+        <MentionTextarea
           value={row.expected_result}
-          onChange={(event) => onUpdate({ expected_result: event.target.value })}
+          onChange={(expected_result) => onUpdate({ expected_result })}
+          mentionItems={mentionItems}
+          userMentionItems={userMentionItems}
           className="min-h-[4rem] w-full resize-y border-0 bg-transparent px-2 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:bg-background focus:ring-1 focus:ring-ring"
           placeholder="Expected result"
         />

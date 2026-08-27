@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router'
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { ArrowLeft, PanelRightOpen, PanelRightClose, Trash2 } from 'lucide-react'
@@ -196,6 +196,22 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
     queryFn: () => projectVariablesApi.list(projectId),
     enabled: canEditDocs && !!projectId,
   })
+
+  // `{{` inserts a project parameter *or* a project variable - both kinds live
+  // on the Parameters & Variables screen and both are addressed the same way in
+  // a document. `@` is for people, and only people.
+  //
+  // Both lists go to the TCS table as well as to the editor: a test step that
+  // references a parameter has to name it the same way a requirement does, and
+  // a test case is the surface where a parameter is most often pinned down.
+  const parameterMentionItems = useMemo(
+    () => (projectVariables ?? []).map((variable) => ({ id: variable.id, label: variable.key })),
+    [projectVariables],
+  )
+  const userMentionItems = useMemo(
+    () => (users ?? []).map((u) => ({ id: u.id, label: u.full_name })),
+    [users],
+  )
 
   const apiForType = useCallback((type: DocType) => {
     const map: Record<string, unknown> = {
@@ -582,7 +598,13 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           <div className="flex-1">
             <div className={`${docType === 'TC' ? 'max-w-none' : 'max-w-4xl mx-auto'} w-full px-4 py-4`}>
               {docType === 'TC' ? (
-                <TcsArteTable rows={tcRows} onChange={setTcRows} editable />
+                <TcsArteTable
+                  rows={tcRows}
+                  onChange={setTcRows}
+                  editable
+                  mentionItems={parameterMentionItems}
+                  userMentionItems={userMentionItems}
+                />
               ) : (
                 <DocEditor
                   content={contentJson}
@@ -594,15 +616,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                   onHeadingNumberedChange={setHeadingNumbered}
                   showOutline={outlineOpen}
                   onOutlineToggle={setOutlineOpen}
-                  // `{{` inserts a project parameter *or* a project variable -
-                  // both kinds live on the Parameters & Variables screen and
-                  // both are addressed the same way in a document. `@` is for
-                  // people, and only people.
-                  mentionItems={(projectVariables ?? []).map((variable) => ({
-                    id: variable.id,
-                    label: variable.key,
-                  }))}
-                  userMentionItems={(users ?? []).map((u) => ({ id: u.id, label: u.full_name }))}
+                  mentionItems={parameterMentionItems}
+                  userMentionItems={userMentionItems}
                 />
               )}
             </div>
