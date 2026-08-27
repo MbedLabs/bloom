@@ -185,10 +185,13 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
     }
   }, [navigate, listBackUrl])
 
+  // The project's people, not the admin-only user directory: a maintainer has
+  // to be able to tag the colleagues on their own project, and `@` reads a 403
+  // as an empty list rather than as an error, so the gate was invisible.
   const { data: users } = useQuery({
-    queryKey: ['users'],
-    queryFn: usersApi.list,
-    enabled: canEditDocs,
+    queryKey: ['mentionableUsers', projectId],
+    queryFn: () => usersApi.listMentionable(projectId),
+    enabled: canEditDocs && !!projectId,
   })
 
   const { data: projectVariables } = useQuery({

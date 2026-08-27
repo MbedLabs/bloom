@@ -76,6 +76,23 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 
+class MentionableUserResponse(BaseModel):
+    """A person who can be addressed with `@` inside one project.
+
+    Deliberately not UserResponse: being allowed to mention a colleague is not
+    the same permission as reading the user directory, and everything
+    UserResponse carries past a name - the address, the role, the invite and
+    email-change state - is directory data. A name and an id are all the editor
+    needs to write `@Name`.
+    """
+
+    id: int
+    full_name: str
+
+    class Config:
+        from_attributes = True
+
+
 class PasswordChange(BaseModel):
     current_password: str
     new_password: PasswordStr

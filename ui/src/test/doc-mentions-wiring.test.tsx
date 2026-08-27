@@ -81,7 +81,8 @@ beforeEach(() => {
   resetApiMocks(client as unknown as Record<string, unknown>, vi)
   lastEditorProps = {}
   vi.mocked(client.projectVariablesApi.list).mockResolvedValue([parameter, variable] as never)
-  vi.mocked(client.usersApi.list).mockResolvedValue([user, person] as never)
+  // `@` reads the project's people, not the admin-only directory.
+  vi.mocked(client.usersApi.listMentionable).mockResolvedValue([user, person] as never)
 })
 
 afterEach(cleanup)

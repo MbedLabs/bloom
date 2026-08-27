@@ -7,20 +7,28 @@ import string
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import get_password_hash, require_role
+from app.core.security import (
+    get_current_user,
+    get_password_hash,
+    require_project_access,
+    require_role,
+)
+from app.models import Project
 from app.models.models import Requirement, TestCase
+from app.models.project_membership import ProjectMembership
 from app.models.user import User, UserRole
 from app.models.user_token import UserToken, UserTokenPurpose
 from app.schemas.auth import (
     AdminEmailChangeRequest,
     InviteCreateRequest,
     InviteResponse,
+    MentionableUserResponse,
     UserCreate,
     UserResponse,
     UserUpdate,
@@ -97,6 +105,43 @@ async def list_users(
 ):
     result = await db.execute(select(User).order_by(User.created_at.desc()))
     return [UserResponse.model_validate(u) for u in result.scalars().all()]
+
+
+# Declared before GET /{user_id}, or "mentionable" is parsed as a user id.
+@router.get("/mentionable", response_model=list[MentionableUserResponse])
+async def list_mentionable_users(
+    project_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Who may be addressed with `@` in one project.
+
+    Mentioning a colleague is a collaboration act, not an administrative one:
+    the people working a project have to be able to tag each other. Gating the
+    editor's list on the admin-only user directory meant `@` silently offered
+    nothing to every maintainer, because a 403 here reads as an empty list.
+
+    So the gate is project access rather than global role, and the list is the
+    project's own members plus the admins, who reach every project anyway.
+    Inactive accounts are left out - there is no point addressing someone who
+    cannot answer.
+    """
+    project = (
+        await db.execute(select(Project).where(Project.id == project_id))
+    ).scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    await require_project_access(db, current_user, project_id)
+
+    member_ids = select(ProjectMembership.user_id).where(ProjectMembership.project_id == project_id)
+    result = await db.execute(
+        select(User)
+        .where(User.is_active.is_(True))
+        .where(or_(User.id.in_(member_ids), User.role == UserRole.admin))
+        .order_by(User.full_name.asc())
+    )
+    return [MentionableUserResponse.model_validate(u) for u in result.scalars().all()]
 
 
 @router.post("", response_model=UserResponse, status_code=201)

@@ -292,9 +292,22 @@ export const serviceCredentialsApi = {
   },
 }
 
+export interface MentionableUser {
+  id: number
+  full_name: string
+}
+
 export const usersApi = {
   list: async (): Promise<User[]> => {
     const response = await api.get<User[]>('/users')
+    return response.data
+  },
+  // `/users` is the admin-only directory. Anyone working a project may address
+  // the people on it, so the mention and reviewer lists come from here instead.
+  listMentionable: async (projectId: number): Promise<MentionableUser[]> => {
+    const response = await api.get<MentionableUser[]>('/users/mentionable', {
+      params: { project_id: projectId },
+    })
     return response.data
   },
   get: async (id: number): Promise<User> => {
