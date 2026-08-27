@@ -69,11 +69,28 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
     enabled: !!testCase?.project_id,
   })
 
-  const { data: users } = useQuery({
+  // Reviewer and approver are shown by name, so this page has to turn ids into
+  // names. `/users` is the admin-only directory, which left a maintainer
+  // reading "User #7" where a name belongs.
+  const { data: projectPeople } = useQuery({
+    queryKey: ['mentionableUsers', testCase?.project_id],
+    queryFn: () => usersApi.listMentionable(testCase!.project_id),
+    enabled: !!testCase?.project_id,
+  })
+
+  // Admins keep reading the directory too: reviewed_by and approved_by are
+  // historical, and whoever signed off may since have left the project or been
+  // deactivated, so they are no longer in the project's own list.
+  const { data: directory } = useQuery({
     queryKey: ['users'],
     queryFn: usersApi.list,
-    enabled: user?.role === 'admin' || user?.role === 'maintainer',
+    enabled: user?.role === 'admin',
   })
+
+  const users = useMemo<Array<{ id: number; full_name: string }>>(
+    () => [...(projectPeople ?? []), ...(directory ?? [])],
+    [projectPeople, directory],
+  )
 
   const derivedMembershipLinks = useMemo(() => {
     if (!testCase) return []
