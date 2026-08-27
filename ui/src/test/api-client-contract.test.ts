@@ -92,6 +92,7 @@ const CALLS: Array<[string, unknown[], string, string]> = [
   ['serviceCredentialsApi.revoke', [7], 'delete', '/service-credentials/7'],
 
   ['usersApi.list', [], 'get', '/users'],
+  ['usersApi.listMentionable', [5], 'get', '/users/mentionable'],
   ['usersApi.get', [3], 'get', '/users/3'],
   [
     'usersApi.create',

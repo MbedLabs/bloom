@@ -521,6 +521,7 @@ export const RESPONSES: Record<string, unknown> = {
   'attachmentsApi.remove': undefined,
 
   'usersApi.list': [user],
+  'usersApi.listMentionable': [user],
   'usersApi.get': user,
   'usersApi.create': user,
   'usersApi.invite': { message: 'Invitation sent', user, invite_link: null },
