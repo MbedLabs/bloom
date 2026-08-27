@@ -37,9 +37,12 @@ vi.mock('@tanstack/react-query', async () => {
   return {
     ...actual,
     useQuery: ({ queryKey }: { queryKey: unknown[] }) => ({
+      // The catch-all hands back the requirement, so every people-shaped query
+      // has to be named here or the page is given an object where it expects a
+      // list.
       data: queryKey[0] === 'project'
         ? { id: 7, name: 'Flight', prefix: 'FLT' }
-        : queryKey[0] === 'users'
+        : queryKey[0] === 'users' || queryKey[0] === 'mentionableUsers'
           ? []
           : requirement,
       isLoading: false,
