@@ -530,6 +530,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
                 <DocEditor
                   content={artefactRecord.content_json as Record<string, unknown>}
                   editable={false}
+                  parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined}
                   minHeight="min-h-[120px]"
                   className="border-0"
                 />

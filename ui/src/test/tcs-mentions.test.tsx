@@ -195,3 +195,42 @@ describe('keyboard handling in the step table', () => {
     expect(document.querySelector('.mention-suggestion-popover')).toBeNull()
   })
 })
+
+describe('reading a parameter back out of a step', () => {
+  const STEP = {
+    ...createDefaultTcsRow('step'),
+    description: 'ramp to {{BOOT_BUDGET_MS}} then hold',
+    expected_result: 'within {{BOOT_BUDGET_MS}}',
+  }
+
+  it('links each reference to the screen that owns the value', () => {
+    render(<TcsArteTable rows={[STEP]} onChange={() => {}} parameterHref="/projects/FLT/parameters" />)
+
+    // A step is plain text, so a reference is only characters - "{{BOOT_BUDGET_MS}}"
+    // says nothing about what the budget is unless you can go and look.
+    const links = Array.from(document.querySelectorAll('a')) as HTMLAnchorElement[]
+    expect(links.map((a) => a.textContent)).toEqual(['{{BOOT_BUDGET_MS}}', '{{BOOT_BUDGET_MS}}'])
+    expect(links[0].getAttribute('href')).toBe('/projects/FLT/parameters')
+  })
+
+  it('keeps the surrounding words intact', () => {
+    const { container } = render(
+      <TcsArteTable rows={[STEP]} onChange={() => {}} parameterHref="/projects/FLT/parameters" />,
+    )
+
+    expect(container.textContent).toContain('ramp to {{BOOT_BUDGET_MS}} then hold')
+  })
+
+  it('leaves the text alone when there is nowhere to send the reader', () => {
+    render(<TcsArteTable rows={[STEP]} onChange={() => {}} />)
+
+    expect(document.querySelector('a')).toBeNull()
+  })
+
+  it('does not invent links for ordinary braces', () => {
+    const plain = { ...createDefaultTcsRow('step'), description: 'set {x} to 3', expected_result: 'ok' }
+    render(<TcsArteTable rows={[plain]} onChange={() => {}} parameterHref="/projects/FLT/parameters" />)
+
+    expect(document.querySelector('a')).toBeNull()
+  })
+})

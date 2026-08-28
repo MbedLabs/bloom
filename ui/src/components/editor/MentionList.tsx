@@ -3,6 +3,13 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
 export interface MentionSuggestion {
   id: number
   label: string
+  /**
+   * Shown beside the label while choosing. A parameter is addressed by its key,
+   * but the key alone does not say what you are about to pin, so the current
+   * value rides along here. It is never written into the document - the point
+   * of a parameter is that its value lives in one place.
+   */
+  hint?: string
 }
 
 export interface MentionListRef {
@@ -60,6 +67,9 @@ const MentionList = forwardRef<MentionListRef, MentionListProps>(({ items, comma
           }`}
         >
           <span className="font-medium">{triggerPrefix}{item.label}{triggerSuffix}</span>
+          {item.hint ? (
+            <span className="ml-2 text-xs text-muted-foreground">{item.hint}</span>
+          ) : null}
         </button>
       ))}
     </div>
