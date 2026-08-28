@@ -86,6 +86,26 @@ function sharedDocumentUpdatePayload(
   }
 }
 
+/**
+ * The singular query keys the detail pages read one record under.
+ *
+ * TestCaseDetail uses 'testCase', RequirementDetail 'requirement', and
+ * ArtefactDetail one of the artefact kinds; DocumentDetail uses 'document'.
+ * A save has to clear whichever of these holds the record just edited, and the
+ * id is the same numeric one for all of them, so clearing all of them is both
+ * correct and cheap - a key nothing is subscribed to is a no-op.
+ */
+const DETAIL_QUERY_KEYS = [
+  'document',
+  'testCase',
+  'requirement',
+  'design',
+  'risk',
+  'change',
+  'testConcept',
+  'defect',
+] as const
+
 function invalidateDocumentQueries(
   queryClient: QueryClient,
   projectId: number,
@@ -106,7 +126,14 @@ function invalidateDocumentQueries(
   queryClient.invalidateQueries({ queryKey: ['project-by-prefix', prefix] })
   queryClient.invalidateQueries({ queryKey: ['project-docs-shell', prefix] })
   if (resolvedDocId) {
-    queryClient.invalidateQueries({ queryKey: ['document', resolvedDocId] })
+    // The lists above are keyed by project; a detail page reads its own record
+    // under a singular key keyed by the record id. Only 'document' was listed
+    // here, so saving a requirement, a test case or any artefact sent you back
+    // to a page still reading its cached copy - the edit showed up only after a
+    // manual reload. These are the keys those pages actually query.
+    for (const key of DETAIL_QUERY_KEYS) {
+      queryClient.invalidateQueries({ queryKey: [key, resolvedDocId] })
+    }
   }
   if (prefix && kind && docIdStr) {
     queryClient.invalidateQueries({ queryKey: ['doc-facade', prefix, kind, docIdStr] })
@@ -207,8 +234,14 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   // Both lists go to the TCS table as well as to the editor: a test step that
   // references a parameter has to name it the same way a requirement does, and
   // a test case is the surface where a parameter is most often pinned down.
+  // The value rides along as a hint so the picker says what you are pinning -
+  // a key on its own does not. Only the key is ever written to the document.
   const parameterMentionItems = useMemo(
-    () => (projectVariables ?? []).map((variable) => ({ id: variable.id, label: variable.key })),
+    () => (projectVariables ?? []).map((variable) => ({
+      id: variable.id,
+      label: variable.key,
+      hint: variable.value,
+    })),
     [projectVariables],
   )
   const userMentionItems = useMemo(
@@ -607,6 +640,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                   editable
                   mentionItems={parameterMentionItems}
                   userMentionItems={userMentionItems}
+                  parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined}
                 />
               ) : (
                 <DocEditor

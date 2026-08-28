@@ -72,6 +72,8 @@ interface TcsArteTableProps {
   editable?: boolean
   mentionItems?: MentionSuggestion[]
   userMentionItems?: MentionSuggestion[]
+  /** Where a `{{parameter}}` in a step should take the reader. */
+  parameterHref?: string
 }
 
 export function TcsArteTable({
@@ -80,6 +82,7 @@ export function TcsArteTable({
   editable = false,
   mentionItems = [],
   userMentionItems = [],
+  parameterHref,
 }: TcsArteTableProps) {
   if (editable) {
     return (
@@ -91,10 +94,31 @@ export function TcsArteTable({
       />
     )
   }
-  return <TcsArteTableView rows={rows} />
+  return <TcsArteTableView rows={rows} parameterHref={parameterHref} />
 }
 
-function TcsArteTableView({ rows }: { rows: TcsRow[] }) {
+/**
+ * Split a step's text so its `{{parameter}}` references come out as links.
+ *
+ * A step stores plain text, so a reference here is only a run of characters -
+ * there is no node to hang a link on the way the rich editor has. Reading a
+ * step, "{{BOOT_BUDGET_MS}}" says nothing about what the budget actually is,
+ * so each reference becomes a link to the screen that owns the value.
+ */
+function withParameterLinks(text: string, href?: string): ReactNode {
+  if (!href || !text.includes('{{')) return text
+  return text.split(/(\{\{[^{}\n]+\}\})/g).map((part, index) => (
+    /^\{\{[^{}\n]+\}\}$/.test(part)
+      ? (
+        <a key={index} href={href} className="mention" title="Open Parameters & Variables">
+          {part}
+        </a>
+      )
+      : part
+  ))
+}
+
+function TcsArteTableView({ rows, parameterHref }: { rows: TcsRow[]; parameterHref?: string }) {
   if (!rows || rows.length === 0) return null
   const visibleRows = getVisibleRows(rows)
 
@@ -109,7 +133,7 @@ function TcsArteTableView({ rows }: { rows: TcsRow[] }) {
           </div>
           <div className="divide-y divide-border">
             {visibleRows.map(({ row }) => (
-              <TcsViewRow key={row.id} row={row} hasChildren={hasChildRows(rows, rows.findIndex((candidate) => candidate.id === row.id))} />
+              <TcsViewRow key={row.id} row={row} parameterHref={parameterHref} hasChildren={hasChildRows(rows, rows.findIndex((candidate) => candidate.id === row.id))} />
             ))}
           </div>
         </div>
@@ -118,7 +142,7 @@ function TcsArteTableView({ rows }: { rows: TcsRow[] }) {
   )
 }
 
-function TcsViewRow({ row, hasChildren }: { row: TcsRow; hasChildren: boolean }) {
+function TcsViewRow({ row, hasChildren, parameterHref }: { row: TcsRow; hasChildren: boolean; parameterHref?: string }) {
   const styles = ROW_TYPE_STYLES[row.row_type]
   const isLoop = row.row_type === 'loop'
 
@@ -140,10 +164,14 @@ function TcsViewRow({ row, hasChildren }: { row: TcsRow; hasChildren: boolean })
         </div>
       </div>
       <div className={`border-r border-border/70 px-4 py-3 text-sm ${isLoop ? 'font-medium text-foreground' : 'text-foreground'} whitespace-pre-wrap`}>
-        {row.description || <span className="text-muted-foreground">-</span>}
+        {row.description
+          ? withParameterLinks(row.description, parameterHref)
+          : <span className="text-muted-foreground">-</span>}
       </div>
       <div className="px-4 py-3 text-sm text-foreground whitespace-pre-wrap">
-        {row.expected_result || <span className="text-muted-foreground">-</span>}
+        {row.expected_result
+          ? withParameterLinks(row.expected_result, parameterHref)
+          : <span className="text-muted-foreground">-</span>}
       </div>
     </div>
   )

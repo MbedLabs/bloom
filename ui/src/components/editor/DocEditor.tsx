@@ -42,6 +42,13 @@ interface DocEditorProps {
   onOutlineToggle?: (open: boolean) => void
   mentionItems?: MentionSuggestion[]
   userMentionItems?: MentionSuggestion[]
+  /**
+   * Where a `{{parameter}}` should take the reader - the project's Parameters &
+   * Variables screen. Given this, the chip renders as a real link so a reader
+   * can go and see what the key currently stands for. Omitted, it stays a plain
+   * chip, which is what an editor with no project context wants.
+   */
+  parameterHref?: string
 }
 
 export default function DocEditor({
@@ -57,9 +64,18 @@ export default function DocEditor({
   onOutlineToggle,
   mentionItems = [],
   userMentionItems = [],
+  parameterHref,
 }: DocEditorProps) {
   const mentionItemsRef = useRef(mentionItems)
   const userMentionItemsRef = useRef(userMentionItems)
+  // Read through a ref for the same reason the lists are: the extensions are
+  // built once, so reading the prop directly would freeze whatever it was on
+  // the render that created the editor.
+  const parameterHrefRef = useRef(parameterHref)
+
+  useEffect(() => {
+    parameterHrefRef.current = parameterHref
+  }, [parameterHref])
 
   useEffect(() => {
     mentionItemsRef.current = mentionItems
@@ -194,11 +210,31 @@ export default function DocEditor({
         renderText: ({ node }) => node.attrs.mentionSuggestionChar === '@'
           ? `@${String(node.attrs.label ?? node.attrs.id)}`
           : `{{${String(node.attrs.label ?? node.attrs.id)}}}`,
-        renderHTML: ({ node }) => [
-          'span',
-          { 'data-type': 'mention', class: node.attrs.mentionSuggestionChar === '@' ? 'mention-user text-blue-500 font-medium' : 'mention' },
-          node.attrs.mentionSuggestionChar === '@' ? `@${String(node.attrs.label ?? node.attrs.id)}` : `{{${String(node.attrs.label ?? node.attrs.id)}}}`
-        ],
+        renderHTML: ({ node }) => {
+          const label = String(node.attrs.label ?? node.attrs.id)
+          if (node.attrs.mentionSuggestionChar === '@') {
+            return [
+              'span',
+              { 'data-type': 'mention', class: 'mention-user text-blue-500 font-medium' },
+              `@${label}`,
+            ]
+          }
+          // A parameter is written as a key, so on its own it does not say what
+          // it stands for. Linking the chip to the screen that owns the value
+          // is how a reader finds out, and it stays correct when the value
+          // changes because nothing about the value is stored here.
+          //
+          // An anchor is safe inside the editable surface: contenteditable
+          // swallows the click and just places the caret, so this only
+          // navigates where the document is being read.
+          const href = parameterHrefRef.current
+          const attrs: Record<string, string> = { 'data-type': 'mention', class: 'mention' }
+          if (href) {
+            attrs.href = href
+            attrs.title = 'Open Parameters & Variables'
+          }
+          return [href ? 'a' : 'span', attrs, `{{${label}}}`]
+        },
         suggestions: [
           {
             char: PARAMETER_MENTION_TRIGGER,

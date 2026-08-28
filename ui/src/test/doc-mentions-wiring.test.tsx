@@ -33,7 +33,7 @@ vi.mock('../contexts/AuthContext', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => children,
 }))
 
-type Suggestion = { id: number; label: string }
+type Suggestion = { id: number; label: string; hint?: string }
 type EditorProps = { mentionItems?: Suggestion[]; userMentionItems?: Suggestion[] }
 
 /** The props the page last handed the editor. */
@@ -126,11 +126,22 @@ describe('what each mention trigger offers', () => {
 
     // The label is what ends up between the braces, so it has to be the name
     // the parameter is looked up by.
-    expect(lastEditorProps.mentionItems).toContainEqual({
-      id: parameter.id,
-      label: parameter.key,
-    })
+    expect(lastEditorProps.mentionItems).toContainEqual(
+      expect.objectContaining({ id: parameter.id, label: parameter.key }),
+    )
     expect(labels(lastEditorProps.mentionItems)).not.toContain(parameter.value)
+  })
+
+  it('offers the value as a hint, so the picker says what is being pinned', async () => {
+    renderCreate()
+    await screen.findByTestId('doc-editor')
+    await waitFor(() => expect(lastEditorProps.mentionItems?.length).toBe(2))
+
+    // The value travels beside the key for the picker to show. It has to stay
+    // out of the label, or it would be what gets written into the document.
+    const offered = lastEditorProps.mentionItems?.find((item) => item.id === parameter.id)
+    expect(offered?.hint).toBe(parameter.value)
+    expect(offered?.label).toBe(parameter.key)
   })
 
   it('offers nothing rather than breaking when the project has no parameters', async () => {

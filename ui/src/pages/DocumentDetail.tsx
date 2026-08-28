@@ -184,6 +184,7 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
             <DocEditor
               content={doc.content_json as Record<string, unknown>}
               editable={false}
+              parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined}
               minHeight="min-h-[40vh]"
             />
           </div>

@@ -316,6 +316,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
           <DocEditor
             content={testCase.content_json as Record<string, unknown>}
             editable={false}
+            parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined}
             minHeight="min-h-[120px]"
             className="border-0"
           />
@@ -327,7 +328,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
       ) : null}
 
       {tcsRows.length > 0 && (
-        <TcsArteTable rows={tcsRows} onChange={() => {}} editable={false} />
+        <TcsArteTable rows={tcsRows} onChange={() => {}} editable={false} parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} />
       )}
 
       <DocumentActivityPanel artefactType="test-case" artefactId={tcId} />
