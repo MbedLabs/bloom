@@ -41,6 +41,7 @@ from app.api import (
     risks,
     search,
     service_credentials,
+    setup,
     test_cases,
     test_concepts,
     test_suites,
@@ -373,6 +374,7 @@ app.include_router(
     tags=["Service Credentials"],
 )
 app.include_router(users_api.router, prefix="/api/users", tags=["Users"])
+app.include_router(setup.router, prefix="/api", tags=["Setup"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
 app.include_router(

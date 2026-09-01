@@ -86,6 +86,9 @@ const CALLS: Array<[string, unknown[], string, string]> = [
   ['authApi.forgotPassword', ['u@example.com'], 'post', '/auth/forgot-password'],
   ['authApi.resetPassword', ['tok', 'pw'], 'post', '/auth/reset-password'],
 
+  ['setupApi.getStatus', [], 'get', '/setup/status'],
+  ['setupApi.createFirstAdmin', ['u@example.com', 'pw', 'Owner'], 'post', '/setup'],
+
   ['serviceCredentialsApi.list', [], 'get', '/service-credentials'],
   ['serviceCredentialsApi.create', [], 'post', '/service-credentials'],
   ['serviceCredentialsApi.rotate', [7], 'post', '/service-credentials/7/rotate'],

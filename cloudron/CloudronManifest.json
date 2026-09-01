@@ -1,0 +1,36 @@
+{
+  "manifestVersion": 2,
+  "id": "net.embedlabs.bloom",
+  "title": "Bloom",
+  "tagline": "Requirements and traceability for embedded teams",
+  "version": "1.0.0",
+  "upstreamVersion": "1.0.0",
+  "icon": "file://logo.png",
+  "httpPort": 8080,
+  "healthCheckPath": "/api/ready",
+  "memoryLimit": 1073741824,
+  "addons": {
+    "postgresql": {},
+    "localstorage": {},
+    "sendmail": {
+      "optional": true
+    }
+  },
+  "description": "file://DESCRIPTION.md",
+  "changelog": "file://CHANGELOG",
+  "postInstallMessage": "file://POSTINSTALL.md",
+  "website": "https://embedlabs.net",
+  "documentationUrl": "https://github.com/MbedLabs/bloom#readme",
+  "forumUrl": "https://github.com/MbedLabs/bloom/discussions",
+  "packageUrl": "https://github.com/MbedLabs/bloom",
+  "packagerName": "EmbedLabs",
+  "packagerUrl": "https://embedlabs.net",
+  "tags": [
+    "requirements",
+    "traceability",
+    "embedded",
+    "engineering",
+    "project"
+  ],
+  "minBoxVersion": "9.1.0"
+}
