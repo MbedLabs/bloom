@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { useNavigate } from 'react-router'
 import { useAuth } from '../contexts/AuthContext'
-import { APP_VERSION, extractApiErrorMessage } from '../api/client'
+import { APP_VERSION, extractApiErrorMessage, setupApi } from '../api/client'
 import { BLOOM_LOGO_DARK, BLOOM_LOGO_LIGHT } from '../brandAssets'
 
 export default function Login() {
@@ -12,6 +12,23 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
+
+  // An instance with no accounts cannot be signed in to; send the first
+  // visitor to create the administrator instead of showing them a form that
+  // can only fail. Failures are ignored: a backend that cannot answer should
+  // still render the login form.
+  useEffect(() => {
+    let cancelled = false
+    setupApi
+      .getStatus()
+      .then((status) => {
+        if (!cancelled && status.setup_required) navigate('/setup', { replace: true })
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

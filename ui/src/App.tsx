@@ -14,6 +14,7 @@ import TestCampaigns from './pages/TestCampaigns'
 import CampaignDetail from './pages/CampaignDetail'
 import ResetPassword from './pages/ResetPassword'
 import ConfirmEmailChange from './pages/ConfirmEmailChange'
+import Setup from './pages/Setup'
 import SuiteDetail from './pages/SuiteDetail'
 import Reports from './pages/Reports'
 import Baselines from './pages/Baselines'
@@ -47,6 +48,7 @@ function NotFound() {
 function App() {
   return (
     <Routes>
+      <Route path="/setup" element={<Setup />} />
       <Route path="/login" element={<Login />} />
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="/verify-email" element={<VerifyEmail />} />

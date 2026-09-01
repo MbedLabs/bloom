@@ -10,7 +10,7 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:?Set ADMIN_EMAIL in .env before starting Bloom}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env before starting Bloom}
       BLOOM_ATTACHMENT_DIR: /app/attachments
-    command: ["/bin/sh", "-c", "alembic upgrade head && exec /usr/local/bin/start-product"]
+    command: ["/bin/sh", "-c", "gosu appuser alembic upgrade head && exec /usr/local/bin/start-product"]
     depends_on:
       postgres:
         condition: service_healthy

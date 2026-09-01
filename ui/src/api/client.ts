@@ -1780,3 +1780,28 @@ export const artefactsApi = {
     return response.data
   },
 }
+
+export interface SetupStatusResponse {
+  setup_required: boolean
+}
+
+export const setupApi = {
+  // Unauthenticated on purpose: this is what a brand new instance answers
+  // before any account exists. It stops reporting true the moment one does.
+  getStatus: async (): Promise<SetupStatusResponse> => {
+    const response = await api.get<SetupStatusResponse>('/setup/status')
+    return response.data
+  },
+  createFirstAdmin: async (
+    email: string,
+    password: string,
+    fullName: string
+  ): Promise<{ message: string }> => {
+    const response = await api.post<{ message: string }>('/setup', {
+      email,
+      password,
+      full_name: fullName,
+    })
+    return response.data
+  },
+}
