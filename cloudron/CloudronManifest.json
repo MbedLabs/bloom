@@ -1,8 +1,8 @@
 {
   "manifestVersion": 2,
   "id": "net.embedlabs.bloom",
-  "title": "Bloom",
-  "tagline": "Requirements and traceability for embedded teams",
+  "title": "Bloom PLM by EmbedLabs",
+  "tagline": "Requirements, controlled documents and traceability",
   "version": "1.0.0",
   "upstreamVersion": "1.0.0",
   "icon": "file://logo.png",
@@ -26,10 +26,11 @@
   "packagerName": "EmbedLabs",
   "packagerUrl": "https://embedlabs.net",
   "tags": [
+    "plm",
     "requirements",
+    "documents",
+    "verification",
     "traceability",
-    "embedded",
-    "engineering",
     "project"
   ],
   "minBoxVersion": "9.1.0"
