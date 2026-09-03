@@ -65,7 +65,7 @@ export default function Setup() {
 
   if (setupRequired === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-auth">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1a1028] via-[#3b1d6e] to-[#6b7280]">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           <p className="text-sm text-muted-foreground">Loading...</p>
@@ -79,7 +79,7 @@ export default function Setup() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-auth p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1a1028] via-[#3b1d6e] to-[#6b7280] p-4">
       <div className="w-full max-w-md bg-card rounded-2xl shadow-2xl p-8 border border-border">
         <div className="flex flex-col items-center mb-6">
           <img
@@ -159,7 +159,7 @@ export default function Setup() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-2.5 px-4 bg-gradient-button text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-2.5 px-4 bg-gradient-to-r from-primary to-[#6b7280] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? 'Creating administrator...' : 'Create Administrator'}
           </button>
