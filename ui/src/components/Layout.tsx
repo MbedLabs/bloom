@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { Suspense } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { APP_VERSION, notificationsApi, projectsApi, searchApi } from '../api/client'
@@ -683,7 +684,15 @@ function LayoutInner() {
         </header>
 
         <main className="p-4 bg-background flex flex-col flex-1 min-h-0 overflow-auto themed-scrollbar">
-          <Outlet />
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center h-64">
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            }
+          >
+            <Outlet />
+          </Suspense>
         </main>
         {sidebarCollapsed && (
           <footer className="flex shrink-0 justify-center bg-background px-4 pb-3 pt-2">
