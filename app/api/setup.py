@@ -17,12 +17,14 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import limiter
 from app.core.security import get_password_hash
 from app.models.user import User, UserRole
 from app.schemas.auth import GenericMessageResponse
 from app.schemas.setup import CreateFirstAdminRequest, SetupStatusResponse
+from app.services.mail_service import MailConfigurationError, send_admin_welcome_email
 
 logger = logging.getLogger(__name__)
 
@@ -86,4 +88,17 @@ async def create_first_admin(
     await db.commit()
 
     logger.info("First administrator created via setup flow: %s", data.email)
+
+    # Best effort, never fatal. Setup must complete on a deployment with no SMTP
+    # at all — the docker-compose default, and any Cloudron install with the
+    # optional mail addon disabled.
+    try:
+        send_admin_welcome_email(
+            to_email=admin.email,
+            full_name=admin.full_name,
+            login_link=f"{settings.FRONTEND_BASE_URL.rstrip('/')}/login",
+        )
+    except MailConfigurationError as exc:
+        logger.warning("Administrator created but the confirmation email failed: %s", exc)
+
     return GenericMessageResponse(message="Administrator account created. You can now sign in.")
