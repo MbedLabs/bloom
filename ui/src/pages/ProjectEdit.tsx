@@ -476,7 +476,7 @@ function ProjectMembersPanel({
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               title="Project role"
             >
-              <option value="external">External</option>
+              <option value="external">Reviewer</option>
               <option value="maintainer">Maintainer</option>
             </select>
           </div>
@@ -484,7 +484,7 @@ function ProjectMembersPanel({
 
         {selectedRole === 'external' && (
           <DocTypePicker
-            label="External document visibility"
+            label="Reviewer document visibility"
             selected={selectedDocTypes}
             onToggle={(docType, checked) => {
               setSelectedDocTypes((current) =>
@@ -573,14 +573,14 @@ function ProjectMemberRow({
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             title={`Project role for ${member.full_name}`}
           >
-            <option value="external">External</option>
+            <option value="external">Reviewer</option>
             <option value="maintainer">Maintainer</option>
           </select>
         </div>
 
         {role === 'external' ? (
           <DocTypePicker
-            label="External document visibility"
+            label="Reviewer document visibility"
             selected={docTypes}
             onToggle={(docType, checked) => {
               setDocTypes((current) =>
