@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react'
+import { lazy } from 'react'
 import { Routes, Route, Link } from 'react-router'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -42,14 +42,6 @@ const UnifiedDocDetail = lazy(() => import('./pages/UnifiedDocDetail'))
 const Users = lazy(() => import('./pages/Users'))
 /* v8 ignore stop */
 
-function RouteFallback() {
-  return (
-    <div className="flex items-center justify-center h-64">
-      <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
-}
-
 function NotFound() {
   return (
     <div className="flex flex-col items-center justify-center h-64 animate-fade-in">
@@ -67,7 +59,6 @@ function NotFound() {
 
 function App() {
   return (
-    <Suspense fallback={<RouteFallback />}>
     <Routes>
       <Route path="/setup" element={<Setup />} />
       <Route path="/login" element={<Login />} />
@@ -103,7 +94,6 @@ function App() {
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
-    </Suspense>
   )
 }
 
