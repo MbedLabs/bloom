@@ -52,7 +52,7 @@ from app.core.config import settings
 from app.core.database import async_session_maker, create_tables, engine
 from app.core.deps import limiter
 from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS, normalize_document_kind
-from app.core.id_generator import compute_next_id, next_doc_id
+from app.core.id_generator import compute_next_id, id_width, next_doc_id
 from app.core.observability import (
     RequestObservabilityMiddleware,
     metrics_router,
@@ -287,7 +287,10 @@ async def normalize_non_document_public_ids() -> None:
                     match = re.match(r"^[A-Z0-9]+-[A-Z]+-(\d+)$", current)
                     new_id = None
                     if match:
-                        candidate = f"{correct_prefix}{int(match.group(1)):03d}"
+                        # Width comes from the number, so a repair pass cannot
+                        # squash a four-digit id back to three.
+                        suffix = int(match.group(1))
+                        candidate = f"{correct_prefix}{suffix:0{id_width(suffix)}d}"
                         if candidate not in existing_ids:
                             new_id = candidate
 
