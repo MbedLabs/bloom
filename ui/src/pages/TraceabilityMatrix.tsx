@@ -13,6 +13,8 @@ const TRACEABILITY_SORT_OPTIONS = [
   { value: 'coverage', label: 'Coverage' },
 ] as const
 
+const PAGE_SIZE = 50
+
 export default function TraceabilityMatrix() {
   const { prefix } = useParams<{ prefix: string }>()
   const [coverageFilter, setCoverageFilter] = useState('')
@@ -51,12 +53,22 @@ export default function TraceabilityMatrix() {
     setCoverageDefaultApplied(true)
   }, [projId, coverageReport, coverageDefaultApplied])
 
+  const [page, setPage] = useState(0)
+
+  // A filter or sort change reorders the whole set, so page 3 of the old result
+  // is meaningless against the new one.
+  useEffect(() => {
+    setPage(0)
+  }, [coverageFilter, priorityFilter, sortBy, projId])
+
   const { data: matrix, isLoading, error } = useQuery({
-    queryKey: ['traceability', projId, coverageFilter, priorityFilter, sortBy],
+    queryKey: ['traceability', projId, coverageFilter, priorityFilter, sortBy, page],
     queryFn: () => traceabilityApi.getMatrix(projId, {
       coverage_filter: coverageFilter || undefined,
       priority_filter: priorityFilter || undefined,
       sort_by: sortBy,
+      skip: page * PAGE_SIZE,
+      limit: PAGE_SIZE,
     }),
     enabled: !!projId && coverageDefaultApplied,
     placeholderData: keepPreviousData,
@@ -100,7 +112,9 @@ export default function TraceabilityMatrix() {
     )
   }
 
-  const rows = matrix ?? []
+  const rows = matrix?.items ?? []
+  const matrixTotal = matrix?.total ?? 0
+  const pageCount = Math.max(1, Math.ceil(matrixTotal / PAGE_SIZE))
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -421,6 +435,36 @@ export default function TraceabilityMatrix() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {matrixTotal > PAGE_SIZE && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-border">
+            <span className="text-sm text-muted-foreground">
+              {page * PAGE_SIZE + 1}&ndash;{Math.min((page + 1) * PAGE_SIZE, matrixTotal)} of{' '}
+              {matrixTotal}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="px-3 py-1.5 text-sm rounded-md border border-input disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted transition-colors"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-muted-foreground">
+                Page {page + 1} of {pageCount}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+                disabled={page >= pageCount - 1}
+                className="px-3 py-1.5 text-sm rounded-md border border-input disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted transition-colors"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </section>

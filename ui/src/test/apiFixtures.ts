@@ -576,7 +576,9 @@ export const RESPONSES: Record<string, unknown> = {
   'testCasesApi.setApproved': testCase,
   'testCasesApi.delete': undefined,
 
-  'traceabilityApi.getMatrix': [traceabilityItem],
+  // Paginated like the other list endpoints: the matrix lists every
+  // requirement in a project, which runs to thousands.
+  'traceabilityApi.getMatrix': { items: [traceabilityItem], total: 1, skip: 0, limit: 50 },
   'traceabilityApi.getImpactAnalysis': impactAnalysis,
   'traceabilityApi.getCoverageGaps': coverageGaps,
 

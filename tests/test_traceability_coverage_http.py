@@ -89,7 +89,9 @@ def test_coverage_gap_report_counts_requirements_by_verification_state(api_clien
 
     matrix = api_client.get(f"/api/traceability?project_id={project_id}", headers=headers)
     assert matrix.status_code == 200
-    statuses = {item["requirement"]["title"]: item["coverage_status"] for item in matrix.json()}
+    statuses = {
+        item["requirement"]["title"]: item["coverage_status"] for item in matrix.json()["items"]
+    }
     assert statuses[f"Uncovered {suffix}"] == "Uncovered"
     assert statuses[f"Partial {suffix}"] == "Partial"
     assert statuses[f"Covered {suffix}"] == "Covered"
@@ -99,14 +101,16 @@ def test_coverage_gap_report_counts_requirements_by_verification_state(api_clien
         headers=headers,
     )
     assert filtered.status_code == 200
-    assert len(filtered.json()) == 1
+    # Filtering happens in the query now, so total reflects the filter too.
+    assert filtered.json()["total"] == 1
+    assert len(filtered.json()["items"]) == 1
 
     sorted_by_coverage = api_client.get(
         f"/api/traceability?project_id={project_id}&sort_by=coverage",
         headers=headers,
     )
     assert sorted_by_coverage.status_code == 200
-    assert [item["coverage_status"] for item in sorted_by_coverage.json()] == [
+    assert [item["coverage_status"] for item in sorted_by_coverage.json()["items"]] == [
         "Uncovered",
         "Partial",
         "Covered",
