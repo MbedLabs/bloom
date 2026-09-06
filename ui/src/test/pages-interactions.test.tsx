@@ -898,9 +898,10 @@ describe('project settings', () => {
   it('offers document visibility only for an external member', async () => {
     renderProjectEdit()
     await screen.findByText(/Ext Ernal/)
-    const pickers = () => screen.queryAllByText(/external document visibility/i).length
-    // The existing member is external, so one picker is always on screen; the
-    // add form contributes a second while its role is external.
+    // The role value is still 'external'; the label reads Reviewer.
+    const pickers = () => screen.queryAllByText(/reviewer document visibility/i).length
+    // The existing member holds that role, so one picker is always on screen;
+    // the add form contributes a second while its own role matches.
     expect(pickers()).toBe(2)
 
     fireEvent.change(screen.getByTitle('Project role'), { target: { value: 'maintainer' } })
