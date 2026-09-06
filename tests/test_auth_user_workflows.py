@@ -59,35 +59,45 @@ async def test_delete_user_cleans_known_user_references_before_delete():
         is_active=True,
     )
     db = SimpleNamespace(
-        execute=AsyncMock(
-            side_effect=[
-                _ScalarResult(target_user),
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-            ]
-        ),
+        execute=AsyncMock(side_effect=[_ScalarResult(target_user)] + [None] * 40),
         delete=AsyncMock(),
+        flush=AsyncMock(),
     )
 
     await users_api.delete_user(user_id=target_user.id, admin=admin, db=db)
 
-    assert db.execute.await_count == 12
     stmt_texts = [str(call.args[0]) for call in db.execute.await_args_list]
-    assert any("DELETE FROM user_tokens" in stmt for stmt in stmt_texts)
-    assert any("UPDATE user_tokens" in stmt for stmt in stmt_texts)
-    assert any("UPDATE users" in stmt for stmt in stmt_texts)
-    assert any("UPDATE requirements" in stmt for stmt in stmt_texts)
-    assert any("UPDATE test_cases" in stmt for stmt in stmt_texts)
+
+    # Every table referencing users.id has to be dealt with before the row goes,
+    # or the delete fails at commit time - after the endpoint answered 204.
+    for expected in (
+        "user_tokens",
+        "users",
+        "requirements",
+        "test_cases",
+        "project_external_doc_types",
+        "project_memberships",
+        "notifications",
+        "import_attempts",
+        "service_credentials",
+        "defects",
+        "document_attachments",
+    ):
+        assert any(expected in stmt for stmt in stmt_texts), f"{expected} was never touched"
+
+    # The external allowlist hangs off the membership, so it has to go first.
+    doc_types_at = next(i for i, t in enumerate(stmt_texts) if "project_external_doc_types" in t)
+    memberships_at = next(
+        i
+        for i, t in enumerate(stmt_texts)
+        if "project_memberships" in t and "project_external_doc_types" not in t
+    )
+    assert doc_types_at < memberships_at
+
     db.delete.assert_awaited_once_with(target_user)
+    # Flushed inside the handler so an unhandled reference surfaces as a 409,
+    # not during get_db's commit long after the 204 was sent.
+    db.flush.assert_awaited_once()
 
 
 @pytest.mark.asyncio
