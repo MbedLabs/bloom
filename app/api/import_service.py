@@ -152,15 +152,31 @@ async def _import_requirements(
 ):
     next_num = await _get_next_req_num(db, target_project.id, target_project.prefix)
 
-    for src_id in doc_ids:
-        src = (
-            await db.execute(
-                select(Requirement).where(
-                    Requirement.id == src_id,
-                    Requirement.project_id == source_project.id,
+    # Load the whole selection up front: an import of several hundred rows was
+    # otherwise a statement per row. Ids missing from the map are reported
+    # individually below, in request order, exactly as before.
+    sources_by_id = (
+        {
+            row.id: row
+            for row in (
+                (
+                    await db.execute(
+                        select(Requirement).where(
+                            Requirement.id.in_(doc_ids),
+                            Requirement.project_id == source_project.id,
+                        )
+                    )
                 )
+                .scalars()
+                .all()
             )
-        ).scalar_one_or_none()
+        }
+        if doc_ids
+        else {}
+    )
+
+    for src_id in doc_ids:
+        src = sources_by_id.get(src_id)
         if not src:
             result.errors.append(f"Requirement {src_id} not found in source project")
             result.skipped += 1
@@ -198,14 +214,31 @@ async def _import_test_cases(
 ):
     next_num = await _get_next_tc_num(db, target_project.id, target_project.prefix)
 
-    for src_id in doc_ids:
-        src = (
-            await db.execute(
-                select(TestCase).where(
-                    TestCase.id == src_id, TestCase.project_id == source_project.id
+    # Load the whole selection up front: an import of several hundred rows was
+    # otherwise a statement per row. Ids missing from the map are reported
+    # individually below, in request order, exactly as before.
+    sources_by_id = (
+        {
+            row.id: row
+            for row in (
+                (
+                    await db.execute(
+                        select(TestCase).where(
+                            TestCase.id.in_(doc_ids),
+                            TestCase.project_id == source_project.id,
+                        )
+                    )
                 )
+                .scalars()
+                .all()
             )
-        ).scalar_one_or_none()
+        }
+        if doc_ids
+        else {}
+    )
+
+    for src_id in doc_ids:
+        src = sources_by_id.get(src_id)
         if not src:
             result.errors.append(f"TestCase {src_id} not found in source project")
             result.skipped += 1
