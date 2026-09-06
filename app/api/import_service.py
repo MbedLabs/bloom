@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import log_artefact_activity
 from app.core.database import get_db
+from app.core.id_generator import format_doc_id
 from app.core.reqif import (
     FOREIGN_ID_HINTS,
     TEXT_ATTRIBUTE_HINTS,
@@ -27,8 +28,6 @@ from app.services.import_attempts import begin_import_attempt, finish_import_att
 from app.services.reqif_worker import ReqIFProcessingTimeout, parse_reqif_in_worker
 
 router = APIRouter()
-
-REQ_ID_SUFFIX_LIMIT = 999
 
 
 class ImportRequest(BaseModel):
@@ -182,7 +181,7 @@ async def _import_requirements(
             result.skipped += 1
             continue
 
-        new_req_id = f"{target_project.prefix}-REQ-{next_num:03d}"
+        new_req_id = format_doc_id(target_project.prefix, "REQ", next_num)
         imported = Requirement(
             project_id=target_project.id,
             req_id=new_req_id,
@@ -244,7 +243,7 @@ async def _import_test_cases(
             result.skipped += 1
             continue
 
-        new_tc_id = f"{target_project.prefix}-TC-{next_num:03d}"
+        new_tc_id = format_doc_id(target_project.prefix, "TC", next_num)
         imported = TestCase(
             project_id=target_project.id,
             tc_id=new_tc_id,
@@ -380,15 +379,8 @@ async def import_reqif(
             result.skipped += 1
             continue
 
-        if next_num > REQ_ID_SUFFIX_LIMIT:
-            result.errors.append(
-                f"Requirement ID sequence exhausted for {prefix}-REQ (max {REQ_ID_SUFFIX_LIMIT}); "
-                f"{len(bundle.objects) - result.imported - result.skipped} object(s) not imported."
-            )
-            break
-
         parent_id = ref_to_req_id.get(parent_ref[:100]) if parent_ref else None
-        new_req_id = f"{prefix}-REQ-{next_num:03d}"
+        new_req_id = format_doc_id(prefix, "REQ", next_num)
         priority = (obj.attributes.get("priority") or "Medium").strip()[:20] or "Medium"
 
         requirement = Requirement(

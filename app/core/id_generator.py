@@ -5,7 +5,7 @@ Handles gaps from deletions correctly.
 
 import re
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 ALLOWED_TYPE_CODES = frozenset(
@@ -28,8 +28,12 @@ ALLOWED_TYPE_CODES = frozenset(
 )
 
 PROJECT_PREFIX_PATTERN = re.compile(r"^[A-Z]{3}$")
-DOC_ID_PATTERN = re.compile(r"^([A-Z]{3})-([A-Z]+)-([0-9]{3})$")
-ID_SUFFIX_LIMIT = 999
+# Three digits is the floor, not the ceiling: a project that passes 999 keeps
+# counting and every id in that project and type widens to match, so
+# FLT-REQ-001 becomes FLT-REQ-0001 the moment FLT-REQ-1000 is needed. Equal
+# width is what keeps the ids sorting correctly as plain strings.
+DOC_ID_PATTERN = re.compile(r"^([A-Z]{3})-([A-Z]+)-([0-9]{3,})$")
+ID_MIN_WIDTH = 3
 
 
 def _validate_naming_parts(prefix: str, type_code: str) -> None:
@@ -65,6 +69,35 @@ def normalize_doc_id(
     return normalized
 
 
+def id_width(number: int) -> int:
+    """Digits an id suffix needs: never fewer than three, more once required."""
+    return max(ID_MIN_WIDTH, len(str(number)))
+
+
+def format_doc_id(prefix: str, type_code: str, number: int, width: int | None = None) -> str:
+    """Render one id, padded to ``width`` or to the width ``number`` requires."""
+    return f"{prefix}-{type_code}-{number:0{width or id_width(number)}d}"
+
+
+def widened_ids(existing_ids: list[str], prefix: str, type_code: str, width: int) -> dict[str, str]:
+    """Map old id to new for every id narrower than ``width``.
+
+    Returned rather than applied so the caller owns the write, and so the rule
+    can be tested without a database. Ids already at the width, and anything
+    that does not parse, are left out.
+    """
+    search_prefix = f"{prefix}-{type_code}-"
+    renames: dict[str, str] = {}
+    for item_id in existing_ids:
+        if not item_id.startswith(search_prefix):
+            continue
+        suffix = item_id[len(search_prefix) :]
+        if not suffix.isdigit() or len(suffix) >= width:
+            continue
+        renames[item_id] = format_doc_id(prefix, type_code, int(suffix), width)
+    return renames
+
+
 def compute_next_id(existing_ids: list[str], prefix: str, type_code: str) -> str:
     """
     Pure function: given a list of existing ID strings, compute the next one.
@@ -91,10 +124,7 @@ def compute_next_id(existing_ids: list[str], prefix: str, type_code: str) -> str
             continue
 
     next_num = max_num + 1
-    if next_num > ID_SUFFIX_LIMIT:
-        raise ValueError(f"ID sequence exhausted for {prefix}-{type_code}; maximum is 999")
-
-    return f"{search_prefix}{next_num:03d}"
+    return format_doc_id(prefix, type_code, next_num)
 
 
 async def next_doc_id(
@@ -132,4 +162,22 @@ async def next_doc_id(
         .all()
     )
 
-    return compute_next_id(rows, prefix, type_code)
+    next_id = compute_next_id(rows, prefix, type_code)
+    width = len(next_id.rsplit("-", 1)[1])
+
+    # Crossing a power of ten widens every id in this project and type, so
+    # FLT-REQ-001 becomes FLT-REQ-0001 alongside the new FLT-REQ-1000. Without
+    # it the two widths coexist and the ids stop sorting as strings.
+    #
+    # One statement per id, but this runs once in the life of a project and type
+    # - only on the single creation that crosses the boundary - and the ids are
+    # rewritten in place, so a rename never collides with a row it has not
+    # reached yet.
+    for old_id, new_id in widened_ids(rows, prefix, type_code, width).items():
+        await db.execute(
+            update(model)
+            .where(model.project_id == project_id, id_column == old_id)
+            .values({id_column.key: new_id})
+        )
+
+    return next_id
