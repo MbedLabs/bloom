@@ -5,6 +5,11 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
 import { UserPlus, Edit2, Trash2, X, Shield, Wrench, Eye, Copy, Check, Mail } from 'lucide-react'
 
+// The third role is stored as `external` and shown as Reviewer. That is
+// deliberate, not drift: a reviewer is often internal, but the capability is the
+// same either way - project-scoped and read-only - so one role covers both an
+// outside auditor and an internal reviewer, and the backend keeps the name it
+// already had. Change labels here; never the stored value.
 const ROLE_CONFIG = {
   admin: { label: 'Admin', color: 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400', icon: Shield },
   maintainer: { label: 'Maintainer', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400', icon: Wrench },
