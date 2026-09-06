@@ -189,12 +189,24 @@ async def create_campaign(
     if not resolved_suite_ids and data.suite_id is not None:
         resolved_suite_ids = [data.suite_id]
 
-    # Validate all suites exist and belong to the project
+    # Validate all suites exist and belong to the project. Fetched in one
+    # statement and then checked in request order, so the first offending id is
+    # still the one reported.
+    suites_by_id = (
+        {
+            suite.id: suite
+            for suite in (
+                (await db.execute(select(TestSuite).where(TestSuite.id.in_(resolved_suite_ids))))
+                .scalars()
+                .all()
+            )
+        }
+        if resolved_suite_ids
+        else {}
+    )
     validated_suites: list[TestSuite] = []
     for sid in resolved_suite_ids:
-        suite = (
-            await db.execute(select(TestSuite).where(TestSuite.id == sid))
-        ).scalar_one_or_none()
+        suite = suites_by_id.get(sid)
         if not suite or suite.project_id != data.project_id:
             raise HTTPException(404, f"Suite {sid} not found")
         validated_suites.append(suite)
@@ -230,19 +242,19 @@ async def create_campaign(
 
     # Collect test case IDs from all suites (union, dedup)
     selected_test_case_ids: set[int] = set(data.test_case_ids)
-    for suite in validated_suites:
-        suite_items = (
+    if validated_suites:
+        suite_item_rows = (
             (
                 await db.execute(
-                    select(TestSuiteItem)
-                    .where(TestSuiteItem.suite_id == suite.id)
-                    .order_by(TestSuiteItem.order, TestSuiteItem.created_at)
+                    select(TestSuiteItem.test_case_id).where(
+                        TestSuiteItem.suite_id.in_([s.id for s in validated_suites])
+                    )
                 )
             )
             .scalars()
             .all()
         )
-        selected_test_case_ids.update(item.test_case_id for item in suite_items)
+        selected_test_case_ids.update(suite_item_rows)
 
     if selected_test_case_ids:
         tc_rows = (
@@ -320,10 +332,24 @@ async def update_campaign(
     if resolved_suite_ids is None and data.suite_id is not None:
         resolved_suite_ids = [data.suite_id]
     if resolved_suite_ids is not None:
+        existing_suites = (
+            {
+                suite.id: suite
+                for suite in (
+                    (
+                        await db.execute(
+                            select(TestSuite).where(TestSuite.id.in_(resolved_suite_ids))
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+            }
+            if resolved_suite_ids
+            else {}
+        )
         for sid in resolved_suite_ids:
-            suite = (
-                await db.execute(select(TestSuite).where(TestSuite.id == sid))
-            ).scalar_one_or_none()
+            suite = existing_suites.get(sid)
             if not suite or suite.project_id != campaign.project_id:
                 raise HTTPException(404, f"Suite {sid} not found")
         # Delete existing CampaignSuite rows
