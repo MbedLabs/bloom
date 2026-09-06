@@ -5,7 +5,12 @@ Tests the pure compute_next_id function directly -- no DB mocking needed.
 
 import pytest
 
-from app.core.id_generator import DOC_ID_PATTERN, compute_next_id, widened_ids, normalize_doc_id
+from app.core.id_generator import (
+    DOC_ID_PATTERN,
+    compute_next_id,
+    normalize_doc_id,
+    widened_ids,
+)
 
 
 def test_first_id_when_none_exist():
