@@ -147,6 +147,92 @@ async def _project_counts(
     }
 
 
+# (model, doc type, response key) for every artefact counted on a project card.
+_COUNTED_ARTEFACTS = (
+    (Requirement, "REQ", "requirement_count"),
+    (TestCase, "TC", "test_case_count"),
+    (TestCampaign, "CMP", "campaign_count"),
+    (DesignItem, "DES", "design_count"),
+    (RiskItem, "RSK", "risk_count"),
+    (ChangeRequest, "CHG", "change_count"),
+    (TestConcept, "CPT", "test_concept_count"),
+    (TestSuite, "TS", "test_suite_count"),
+    (Defect, "DEF", "defect_count"),
+)
+
+
+async def _project_counts_bulk(
+    db: AsyncSession,
+    project_ids: list[int],
+    current_user: User,
+) -> dict[int, dict[str, int]]:
+    """Counts for many projects in a fixed number of queries.
+
+    ``_project_counts`` issues ten queries for a single project, which the list
+    endpoint used to repeat per row: a ten-project dashboard cost 101 sequential
+    round trips. Each artefact type is now counted once across every project
+    with a GROUP BY, so the cost no longer scales with the number of projects.
+
+    External members keep a per-project lookup of their allowed document types,
+    because that allowlist is stored per membership. That is one query per
+    project rather than eleven, and their project list is membership-scoped and
+    therefore short.
+    """
+    if not project_ids:
+        return {}
+
+    external = current_user.role == UserRole.external
+    allowed_by_project: dict[int, set[str] | None] = {}
+    if external:
+        for pid in project_ids:
+            allowed_by_project[pid] = await get_external_doc_types(db, current_user, pid)
+
+    counts: dict[int, dict[str, int]] = {
+        pid: {key: 0 for _, _, key in _COUNTED_ARTEFACTS} for pid in project_ids
+    }
+
+    for model, doc_type, key in _COUNTED_ARTEFACTS:
+        query = (
+            select(model.project_id, func.count(model.id))
+            .where(model.project_id.in_(project_ids))
+            .group_by(model.project_id)
+        )
+        if external:
+            query = query.where(model.visibility == "customer")
+        for pid, total in (await db.execute(query)).all():
+            # Mask types this external member may not see, matching the
+            # single-project helper, which returns 0 rather than omitting them.
+            allowed = allowed_by_project.get(pid)
+            if allowed is not None and doc_type not in allowed:
+                continue
+            counts[pid][key] = total or 0
+
+    covered_query = covered_requirement_ids().where(ArtefactLink.project_id.in_(project_ids))
+    if external:
+        covered_query = covered_query.where(
+            Requirement.visibility == "customer",
+            TestCase.visibility == "customer",
+        )
+    # Distinct over (project, requirement) so a requirement verified by several
+    # test cases still counts once, which is what the per-project version does.
+    covered_sub = covered_query.add_columns(ArtefactLink.project_id).distinct().subquery()
+    covered_rows = await db.execute(
+        select(covered_sub.c.project_id, func.count()).group_by(covered_sub.c.project_id)
+    )
+    covered_by_project = {pid: total or 0 for pid, total in covered_rows.all()}
+
+    for pid in project_ids:
+        allowed = allowed_by_project.get(pid)
+        covered = covered_by_project.get(pid, 0)
+        if allowed is not None and not {"REQ", "TC"}.issubset(allowed):
+            covered = 0
+        req_total = counts[pid]["requirement_count"]
+        counts[pid]["coverage_percent"] = coverage_percent_of(covered, req_total)
+        counts[pid]["uncovered_requirement_count"] = max(req_total - covered, 0)
+
+    return counts
+
+
 @router.get("", response_model=list[ProjectResponse])
 async def list_projects(
     db: AsyncSession = Depends(get_db),
@@ -166,9 +252,11 @@ async def list_projects(
     result = await db.execute(query)
     projects = result.scalars().all()
 
+    counts_by_project = await _project_counts_bulk(db, [p.id for p in projects], current_user)
+
     response = []
     for project in projects:
-        counts = await _project_counts(db, project.id, current_user)
+        counts = counts_by_project[project.id]
 
         response.append(
             ProjectResponse(
