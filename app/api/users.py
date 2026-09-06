@@ -20,8 +20,16 @@ from app.core.security import (
     require_role,
 )
 from app.models import Project
-from app.models.models import Requirement, TestCase
-from app.models.project_membership import ProjectMembership
+from app.models.models import (
+    Defect,
+    DocumentAttachment,
+    ImportAttempt,
+    Notification,
+    Requirement,
+    ServiceCredential,
+    TestCase,
+)
+from app.models.project_membership import ProjectExternalDocType, ProjectMembership
 from app.models.user import User, UserRole
 from app.models.user_token import UserToken, UserTokenPurpose
 from app.schemas.auth import (
@@ -445,7 +453,50 @@ async def delete_user(
             .values(approved_by_id=None, approved_at=None)
         )
 
+        # Rows that cannot exist without their user. The external doc-type
+        # allowlist hangs off the membership rather than the user, so it has to
+        # go first or removing the membership violates its foreign key.
+        await db.execute(
+            delete(ProjectExternalDocType).where(
+                ProjectExternalDocType.membership_id.in_(
+                    select(ProjectMembership.id).where(ProjectMembership.user_id == user_id)
+                )
+            )
+        )
+        await db.execute(delete(ProjectMembership).where(ProjectMembership.user_id == user_id))
+        await db.execute(delete(Notification).where(Notification.user_id == user_id))
+        await db.execute(delete(ImportAttempt).where(ImportAttempt.user_id == user_id))
+
+        # A service credential outlives whoever minted it: deleting one because
+        # its creator left would silently break a working integration, so it is
+        # reassigned to the administrator performing the deletion instead.
+        await db.execute(
+            update(ServiceCredential)
+            .where(ServiceCredential.created_by_user_id == user_id)
+            .values(created_by_user_id=admin.id)
+        )
+
+        await db.execute(update(Defect).where(Defect.owner_id == user_id).values(owner_id=None))
+        await db.execute(
+            update(Defect).where(Defect.reporter_id == user_id).values(reporter_id=None)
+        )
+        await db.execute(
+            update(Defect).where(Defect.reviewer_id == user_id).values(reviewer_id=None)
+        )
+        await db.execute(
+            update(DocumentAttachment)
+            .where(DocumentAttachment.uploaded_by_id == user_id)
+            .values(uploaded_by_id=None)
+        )
+
         await db.delete(user)
+
+        # Force the statement out now. get_db commits after this handler has
+        # already returned, so without this an unhandled foreign key raises
+        # during teardown: the except below never runs, the transaction rolls
+        # back, and the caller has been given a 204 for a deletion that did not
+        # happen. Any future reference to users.id fails loudly here instead.
+        await db.flush()
     except IntegrityError as exc:
         raise HTTPException(
             status_code=409,
