@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { traceabilityApi, projectsApi, exportApi } from '../api/client'
 import { docUrl } from '../types/doc'
-import { ArrowLeft, CheckCircle, AlertCircle, XCircle, ExternalLink, Shield, Filter, GitBranch, AlertTriangle, X, Download } from 'lucide-react'
+import { ArrowLeft, CheckCircle, AlertCircle, XCircle, Shield, Filter, GitBranch, AlertTriangle, X, Download } from 'lucide-react'
 
 const COVERAGE_OPTIONS = ['Covered', 'Partial', 'Uncovered'] as const
 const PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Critical']
@@ -386,8 +386,6 @@ export default function TraceabilityMatrix() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Priority</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Coverage</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Test Cases</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Test Runs</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Impact</th>
                 </tr>
               </thead>
@@ -415,48 +413,6 @@ export default function TraceabilityMatrix() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <CoverageBadge status={item.coverage_status} />
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      {item.linked_test_cases.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {item.linked_test_cases.map((tc) => (
-                            <Link
-                              key={tc.id}
-                              to={docUrl(prefix!, 'TC', tc.tc_id)}
-                              className="inline-flex items-center px-2 py-0.5 bg-primary/10 text-primary rounded text-xs font-mono hover:bg-primary/20"
-                            >
-                              {tc.tc_id}
-                            </Link>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">&mdash;</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      {item.linked_test_runs.length > 0 ? (
-                        <div className="space-y-1">
-                          {item.linked_test_runs.map((tr) => (
-                            <div key={tr.id} className="flex items-center">
-                              {tr.teststation_url ? (
-                                <a
-                                  href={tr.teststation_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-primary hover:text-primary/80 inline-flex items-center"
-                                >
-                                  <ExternalLink className="h-3 w-3 mr-1" />
-                                  {tr.test_run_name || `#${tr.test_run_id}`}
-                                </a>
-                              ) : (
-                                <span className="text-muted-foreground">{tr.test_run_name || `#${tr.test_run_id}`}</span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">&mdash;</span>
-                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <ImpactLink prefix={prefix!} reqId={item.requirement.req_id} />
