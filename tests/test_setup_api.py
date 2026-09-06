@@ -107,3 +107,33 @@ def test_rejects_a_password_below_the_shared_policy(fresh_client):
     response = fresh_client.post("/api/setup", json=_payload(password="short"))
 
     assert response.status_code == 422
+
+
+def test_setup_succeeds_when_mail_is_unavailable(fresh_client, monkeypatch):
+    """No SMTP is a supported deployment, not a failure.
+
+    docker-compose defaults to SMTP_ENABLED=false and the Cloudron mail addon is
+    optional; if a mail failure aborted setup, those installs could never create
+    an administrator at all.
+    """
+    from app.services.mail_service import MailConfigurationError
+
+    def _boom(**kwargs):
+        raise MailConfigurationError("SMTP is disabled")
+
+    monkeypatch.setattr("app.api.setup.send_admin_welcome_email", _boom)
+
+    response = fresh_client.post("/api/setup", json=_payload())
+
+    assert response.status_code == 201
+    assert fresh_client.get("/api/setup/status").json() == {"setup_required": False}
+
+
+def test_setup_emails_the_new_administrator(fresh_client, monkeypatch):
+    sent = {}
+    monkeypatch.setattr("app.api.setup.send_admin_welcome_email", lambda **kw: sent.update(kw))
+
+    fresh_client.post("/api/setup", json=_payload())
+
+    assert sent["to_email"] == "owner@example.com"
+    assert sent["login_link"].endswith("/login")
