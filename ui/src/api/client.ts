@@ -1036,13 +1036,26 @@ export const testCasesApi = {
 }
 
 export const traceabilityApi = {
-  getMatrix: async (projectId: number, params?: { coverage_filter?: string; priority_filter?: string; sort_by?: string }) => {
+  getMatrix: async (
+    projectId: number,
+    params?: {
+      coverage_filter?: string
+      priority_filter?: string
+      sort_by?: string
+      skip?: number
+      limit?: number
+    }
+  ) => {
     const query = new URLSearchParams()
     query.set('project_id', String(projectId))
     if (params?.coverage_filter) query.set('coverage_filter', params.coverage_filter)
     if (params?.priority_filter) query.set('priority_filter', params.priority_filter)
     if (params?.sort_by) query.set('sort_by', params.sort_by)
-    const response = await api.get<TraceabilityItem[]>(`/traceability?${query.toString()}`)
+    if (params?.skip !== undefined) query.set('skip', String(params.skip))
+    if (params?.limit !== undefined) query.set('limit', String(params.limit))
+    const response = await api.get<PaginatedResponse<TraceabilityItem>>(
+      `/traceability?${query.toString()}`
+    )
     return response.data
   },
 

@@ -8,7 +8,7 @@ from collections import defaultdict
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.link_read_utils import (
@@ -37,7 +37,18 @@ from app.schemas import (
     TestRunLinkResponse,
     TraceabilityItem,
 )
-from app.services.coverage import PARTIAL, UNCOVERED, coverage_percent, coverage_status
+from app.schemas.schemas import PaginatedResponse
+from app.services.coverage import (
+    COVERED,
+    DRAFT_STATUS,
+    PARTIAL,
+    UNCOVERED,
+    VERIFY_LINK_ROLE,
+    VERIFY_SOURCE_TYPE,
+    VERIFY_TARGET_TYPE,
+    coverage_percent,
+    coverage_status,
+)
 
 router = APIRouter()
 
@@ -184,24 +195,95 @@ def _compute_coverage(linked_test_cases: list) -> str:
     return coverage_status(tc.status for tc in linked_test_cases)
 
 
-@router.get("", response_model=list[TraceabilityItem])
+@router.get("", response_model=PaginatedResponse[TraceabilityItem])
 async def get_traceability_matrix(
     project_id: int = Query(..., description="Project ID"),
     coverage_filter: Optional[str] = Query(None, description="Filter: Covered, Partial, Uncovered"),
     priority_filter: Optional[str] = Query(None, description="Filter by priority"),
     sort_by: Optional[str] = Query("req_id", description="Sort: req_id, priority, coverage"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """The matrix lists every requirement in the project, which runs to thousands.
+
+    Coverage used to be computed in Python after loading all of them, and the
+    coverage filter and sort ran over that list. Paging on top of that would have
+    returned the wrong rows, so coverage is derived in the query instead and the
+    filter, the sort and the page all agree.
+    """
     await require_project_access(db, current_user, project_id)
-    result = await db.execute(
+
+    # Verifying links per requirement: how many test cases point at it, and how
+    # many of those are past Draft. That pair is what coverage_status decides on.
+    link_counts = (
         apply_external_visibility_filter(
-            select(Requirement).where(Requirement.project_id == project_id),
-            Requirement,
+            select(
+                ArtefactLink.target_id.label("requirement_id"),
+                func.count().label("linked"),
+                func.count(case((TestCase.status != DRAFT_STATUS, 1))).label("verifying"),
+            )
+            .join(TestCase, TestCase.id == ArtefactLink.source_id)
+            .where(
+                ArtefactLink.project_id == project_id,
+                ArtefactLink.source_type == VERIFY_SOURCE_TYPE,
+                ArtefactLink.target_type == VERIFY_TARGET_TYPE,
+                ArtefactLink.role == VERIFY_LINK_ROLE,
+            ),
+            TestCase,
             current_user,
         )
+        .group_by(ArtefactLink.target_id)
+        .subquery()
     )
-    requirements = result.scalars().all()
+
+    coverage_expr = case(
+        (func.coalesce(link_counts.c.verifying, 0) > 0, COVERED),
+        (func.coalesce(link_counts.c.linked, 0) > 0, PARTIAL),
+        else_=UNCOVERED,
+    )
+
+    scoped = apply_external_visibility_filter(
+        select(Requirement)
+        .outerjoin(link_counts, link_counts.c.requirement_id == Requirement.id)
+        .where(Requirement.project_id == project_id),
+        Requirement,
+        current_user,
+    )
+    if coverage_filter:
+        scoped = scoped.where(coverage_expr == coverage_filter)
+    if priority_filter:
+        scoped = scoped.where(Requirement.priority == priority_filter)
+
+    total = (
+        await db.scalar(select(func.count()).select_from(scoped.order_by(None).subquery()))
+    ) or 0
+
+    if sort_by == "priority":
+        order = (
+            case(
+                (Requirement.priority == "Critical", 0),
+                (Requirement.priority == "High", 1),
+                (Requirement.priority == "Medium", 2),
+                (Requirement.priority == "Low", 3),
+                else_=99,
+            ),
+            Requirement.req_id,
+        )
+    elif sort_by == "coverage":
+        order = (
+            case((coverage_expr == UNCOVERED, 0), (coverage_expr == PARTIAL, 1), else_=2),
+            Requirement.req_id,
+        )
+    else:
+        # Ids inside one project and type share a suffix width, so ordering them
+        # as plain strings matches the natural order the Python key produced.
+        order = (Requirement.req_id,)
+
+    requirements = (
+        (await db.execute(scoped.order_by(*order).offset(skip).limit(limit))).scalars().all()
+    )
 
     req_ids = [req.id for req in requirements]
     ctx = await _build_traceability_context(project_id, req_ids, db, current_user)
@@ -222,32 +304,8 @@ async def get_traceability_matrix(
             )
         )
 
-    if coverage_filter:
-        items = [i for i in items if i.coverage_status == coverage_filter]
-    if priority_filter:
-        items = [i for i in items if i.requirement.priority == priority_filter]
-
-    priority_order = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3}
-    coverage_order = {"Uncovered": 0, "Partial": 1, "Covered": 2}
-
-    if sort_by == "priority":
-        items.sort(
-            key=lambda i: (
-                priority_order.get(i.requirement.priority, 99),
-                _req_id_sort_key(i.requirement.req_id),
-            )
-        )
-    elif sort_by == "coverage":
-        items.sort(
-            key=lambda i: (
-                coverage_order.get(i.coverage_status, 99),
-                _req_id_sort_key(i.requirement.req_id),
-            )
-        )
-    else:
-        items.sort(key=lambda i: _req_id_sort_key(i.requirement.req_id))
-
-    return items
+    # Already filtered, sorted and paged by the query above.
+    return PaginatedResponse[TraceabilityItem](items=items, total=total, skip=skip, limit=limit)
 
 
 @router.get("/impact/{requirement_id}", response_model=ImpactAnalysisResponse)

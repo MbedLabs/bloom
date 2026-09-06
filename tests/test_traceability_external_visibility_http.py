@@ -193,7 +193,7 @@ def test_external_traceability_hides_internal_artefacts():
             params={"project_id": seeded["project"].id},
         )
         assert response.status_code == 200, response.text
-        items = response.json()
+        items = response.json()["items"]
         assert len(items) == 1
         assert items[0]["requirement"]["req_id"] == seeded["customer_requirement"].req_id
         assert [tc["tc_id"] for tc in items[0]["linked_test_cases"]] == ["TRV-TC-001"]
