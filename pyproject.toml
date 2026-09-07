@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bloom-app"
-version = "1.0.0"
+version = "1.0.1"
 description = "Backend API for Bloom Product Lifecycle Management by EmbedLabs"
 readme = "README.md"
 license = {text = "LicenseRef-EmbedLabs-Source-Available-1.0"}
