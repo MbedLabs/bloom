@@ -87,10 +87,9 @@ def api_client():
     from app.core.deps import limiter
     from app.main import app
 
-    # This suite drives many real logins across a single client IP within a
-    # minute; the login rate limiter (10/min) is not what these flows test, so
-    # disable it here to avoid cross-test 429s. The DB-backed import-attempt
-    # limiter (its own 429 tests) is independent and unaffected.
+    # This suite drives many real logins across a single client IP within a minute; the
+    # login rate limiter (10/min) is not what these flows test, so disable it here to
+    # avoid cross-test 429s.
     limiter.enabled = False
 
     with TestClient(app, base_url="http://test") as client:
@@ -134,13 +133,7 @@ def make_email():
 
 
 def create_project(client, headers: dict, stem: str = "Project", **overrides) -> dict:
-    """Create a project, retrying past a taken prefix.
-
-    Prefixes are exactly three uppercase letters - 17,576 of them - so a random
-    one is not unique, merely unlikely to clash. On a database that accumulates
-    projects across runs that is a real collision, not a theoretical one, so
-    retry rather than hope.
-    """
+    """Create a project, retrying past a taken prefix."""
     last = None
     for _ in range(12):
         body = {"name": unique_name(stem), "prefix": unique_prefix()}

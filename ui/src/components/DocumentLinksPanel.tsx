@@ -398,9 +398,7 @@ export function DocumentLinksPanel({
     return items
   }, [outgoingLinks, incomingLinks, filteredDerivedLinks])
 
-  // Exactly the documents the chips point at. This used to be answered by
-  // downloading the project's entire registry and looking each one up, which on
-  // a real project is a thousand documents fetched to print a dozen titles.
+  // Exactly the documents the chips point at.
   const chipKeys = useMemo(() => {
     const keys = new Set<string>()
     allLinks.forEach(({ link, direction }) => {

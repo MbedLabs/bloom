@@ -168,9 +168,7 @@ describe('keyboard handling in the step table', () => {
     expect(screen.getByTestId('description').textContent).toBe('ramp to {{')
   })
 
-  // The cell has to stay a textarea. Swallowing Enter whenever a trigger was
-  // open would mean a stray `@` behind the caret silently costs the user their
-  // newline, which is worse than offering no completion at all.
+  // The cell has to stay a textarea.
   it('leaves Enter to the textarea when the list has nothing to offer', () => {
     render(<Harness />)
     const cell = actionCell()

@@ -397,9 +397,7 @@ async def build_related_response(
             .all()
         )
 
-    # Fetch every parent document at once. The visibility filter still decides
-    # which ones come back, so a document the caller may not see is absent from
-    # the map and its sections are skipped exactly as before.
+    # Fetch every parent document at once.
     documents_by_id: dict[int, dict[str, Any]] = {}
     section_document_ids = {section.document_id for section in sections}
     if section_document_ids:

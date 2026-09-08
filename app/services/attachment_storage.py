@@ -1,9 +1,4 @@
-"""Storing files against a document.
-
-Bytes go to disk under a generated name; the name a person typed is only ever
-data. Sizes are enforced while streaming rather than from a declared length, so
-a lying Content-Length cannot fill the volume.
-"""
+"""Storing files against a document."""
 
 from __future__ import annotations
 

@@ -11,12 +11,7 @@ from app.core.database import Base
 from app.core.id_generator import next_doc_id
 from app.models.models import Project, Requirement
 
-"""Widening is applied to the rows, not just computed.
-
-compute_next_id decides the new width; next_doc_id is what has to rewrite the
-ids already stored, and getting that wrong leaves a project with two widths and
-ids that no longer sort.
-"""
+"""Widening is applied to the rows, not just computed."""
 
 
 @pytest_asyncio.fixture

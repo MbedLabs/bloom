@@ -166,18 +166,7 @@ async def _project_counts_bulk(
     project_ids: list[int],
     current_user: User,
 ) -> dict[int, dict[str, int]]:
-    """Counts for many projects in a fixed number of queries.
-
-    ``_project_counts`` issues ten queries for a single project, which the list
-    endpoint used to repeat per row: a ten-project dashboard cost 101 sequential
-    round trips. Each artefact type is now counted once across every project
-    with a GROUP BY, so the cost no longer scales with the number of projects.
-
-    External members keep a per-project lookup of their allowed document types,
-    because that allowlist is stored per membership. That is one query per
-    project rather than eleven, and their project list is membership-scoped and
-    therefore short.
-    """
+    """Counts for many projects in a fixed number of queries."""
     if not project_ids:
         return {}
 

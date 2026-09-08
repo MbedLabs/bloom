@@ -109,9 +109,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
 
 
 
-  // Reviewer and approver are shown by name, so this page has to turn ids into
-  // names. `/users` is the admin-only directory, which left a maintainer
-  // reading "User #7" where a name belongs.
+  // Reviewer and approver are shown by name, so this page has to turn ids into names.
   const { data: projectPeople } = useQuery({
     queryKey: ['mentionableUsers', requirement?.project_id],
     queryFn: () => usersApi.listMentionable(requirement!.project_id),

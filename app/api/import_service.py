@@ -151,9 +151,8 @@ async def _import_requirements(
 ):
     next_num = await _get_next_req_num(db, target_project.id, target_project.prefix)
 
-    # Load the whole selection up front: an import of several hundred rows was
-    # otherwise a statement per row. Ids missing from the map are reported
-    # individually below, in request order, exactly as before.
+    # Load the whole selection up front: an import of several hundred rows was otherwise
+    # a statement per row.
     sources_by_id = (
         {
             row.id: row
@@ -213,9 +212,8 @@ async def _import_test_cases(
 ):
     next_num = await _get_next_tc_num(db, target_project.id, target_project.prefix)
 
-    # Load the whole selection up front: an import of several hundred rows was
-    # otherwise a statement per row. Ids missing from the map are reported
-    # individually below, in request order, exactly as before.
+    # Load the whole selection up front: an import of several hundred rows was otherwise
+    # a statement per row.
     sources_by_id = (
         {
             row.id: row
@@ -314,13 +312,7 @@ async def import_reqif(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    """Import a ReqIF (``.reqif`` / ``.reqifz``) export as project requirements.
-
-    Spec objects become requirements (hierarchy preserved via ``parent_id``),
-    spec relations become requirement links, and re-importing the same file is
-    idempotent — objects already imported (matched on ``source_ref``) are reused
-    rather than duplicated so hierarchy and links still resolve.
-    """
+    """Import a ReqIF (``.reqif`` / ``.reqifz``) export as project requirements."""
     target_project = (
         await db.execute(select(Project).where(Project.id == project_id))
     ).scalar_one_or_none()

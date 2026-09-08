@@ -22,10 +22,7 @@ async def notify(
     link_path: Optional[str] = None,
     actor: Optional[User] = None,
 ) -> Optional[Notification]:
-    """Create one notification. Self-notifications (actor == recipient) are skipped.
-
-    Never raises: notification failures must not break the write they decorate.
-    """
+    """Create one notification. Self-notifications (actor == recipient) are skipped."""
     if actor is not None and actor.id == user_id:
         return None
     try:

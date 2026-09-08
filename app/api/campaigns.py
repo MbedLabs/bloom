@@ -189,9 +189,7 @@ async def create_campaign(
     if not resolved_suite_ids and data.suite_id is not None:
         resolved_suite_ids = [data.suite_id]
 
-    # Validate all suites exist and belong to the project. Fetched in one
-    # statement and then checked in request order, so the first offending id is
-    # still the one reported.
+    # Validate all suites exist and belong to the project.
     suites_by_id = (
         {
             suite.id: suite

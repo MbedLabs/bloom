@@ -79,21 +79,13 @@ def test_different_project_prefix():
 
 
 def test_sequence_continues_past_999():
-    """Three digits is the floor, not the ceiling.
-
-    Creation used to raise here, so a project could hold at most 999 of any one
-    artefact and the thousandth attempt failed outright.
-    """
+    """Three digits is the floor, not the ceiling."""
     assert compute_next_id(["PRJ-REQ-999"], "PRJ", "REQ") == "PRJ-REQ-1000"
     assert compute_next_id(["PRJ-REQ-9999"], "PRJ", "REQ") == "PRJ-REQ-10000"
 
 
 def test_existing_ids_widen_when_the_boundary_is_crossed():
-    """Passing 999 renumbers the narrower ids so one width is in use.
-
-    Mixed widths would break plain string ordering: PRJ-REQ-1000 sorts before
-    PRJ-REQ-002.
-    """
+    """Passing 999 renumbers the narrower ids so one width is in use."""
     existing = ["PRJ-REQ-001", "PRJ-REQ-099", "PRJ-REQ-999", "PRJ-REQ-1000"]
 
     renames = widened_ids(existing, "PRJ", "REQ", 4)

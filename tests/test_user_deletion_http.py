@@ -6,14 +6,7 @@ from fastapi.testclient import TestClient
 
 from tests.conftest import create_project, unique_email, unique_suffix
 
-"""Deleting a user must actually delete the user.
-
-The endpoint returns 204 as soon as its handler finishes, but the session is
-committed afterwards by the get_db dependency. Any foreign key the handler did
-not clear therefore raises at commit time, outside the handler's own try block:
-the 409 it defines never fires, the transaction rolls back, and the caller has
-already been told the deletion succeeded.
-"""
+"""Deleting a user must actually delete the user."""
 
 
 def _admin_headers(api_client: TestClient) -> dict[str, str]:

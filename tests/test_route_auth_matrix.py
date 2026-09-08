@@ -20,16 +20,14 @@ PUBLIC_ENDPOINTS = {
     "reset_password",
     "confirm_email_change",
     # First-run setup. Unauthenticated by necessity — there is no account to
-    # authenticate as yet — and safe because both endpoints refuse to act once
-    # any user exists. See app/api/setup.py and tests/test_setup_api.py, which
-    # asserts the window closes.
+    # authenticate as yet — and safe because both endpoints refuse to act once any user
+    # exists.
     "setup_status",
     "create_first_admin",
 }
 
-# These endpoints authenticate with provider-specific webhook signatures rather
-# than a FastAPI bearer-token dependency. Their security behavior is covered by
-# test_defect_webhook_security.py.
+# These endpoints authenticate with provider-specific webhook signatures rather than a
+# FastAPI bearer-token dependency.
 SIGNED_WEBHOOK_ENDPOINTS = {"github_webhook", "gitlab_webhook", "jira_webhook"}
 
 AUTH_DEPENDENCIES = {

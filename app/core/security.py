@@ -67,9 +67,8 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
 
-    # Reject tokens minted before a password/reset/email-change bumped the
-    # user's session_version. Missing "ver" (a token predating this feature)
-    # never matches, so those tokens are also retired on first use.
+    # Reject tokens minted before a password/reset/email-change bumped the user's
+    # session_version.
     if payload.get("ver") != user.session_version:
         raise credentials_exception
 
@@ -107,13 +106,7 @@ async def _get_project_membership(
 async def get_external_doc_types(
     db: AsyncSession, current_user: User, project_id: int
 ) -> Optional[set[str]]:
-    """Return allowed document types for an external member.
-
-    Admins and maintainers return ``None`` to mean unrestricted document types
-    after project membership access is validated. External users return the
-    explicit allowlist stored for their project membership. Missing membership
-    is rejected deny-by-default.
-    """
+    """Return allowed document types for an external member."""
     if current_user.role == UserRole.admin:
         return None
 
@@ -207,10 +200,7 @@ async def require_project_access(
 
 
 class _ProjectRoleChecker:
-    """Callable dependency that checks project-scoped roles.
-
-    Admin always passes (global).
-    Maintainer and external must have a project_memberships row for the project."""
+    """Callable dependency that checks project-scoped roles."""
 
     def __init__(self, *roles: str) -> None:
         self._roles = set(roles)  # 'admin','maintainer','external'
@@ -241,13 +231,6 @@ def require_project_role(*roles: str):
     """FastAPI dependency: user has the given role AND a project_membership row.
 
     Args:
-        roles: 'admin', 'maintainer', 'external'
-
-    Usage:
-        @router.post("/{project_id}/items")
-        async def create_item(
-            project_id: int,
-            current_user: User = Depends(require_project_role("admin", "maintainer")),
-        ): ...
+    roles: 'admin', 'maintainer', 'external'
     """
     return _ProjectRoleChecker(*roles)

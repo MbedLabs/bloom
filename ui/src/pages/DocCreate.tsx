@@ -126,11 +126,8 @@ function invalidateDocumentQueries(
   queryClient.invalidateQueries({ queryKey: ['project-by-prefix', prefix] })
   queryClient.invalidateQueries({ queryKey: ['project-docs-shell', prefix] })
   if (resolvedDocId) {
-    // The lists above are keyed by project; a detail page reads its own record
-    // under a singular key keyed by the record id. Only 'document' was listed
-    // here, so saving a requirement, a test case or any artefact sent you back
-    // to a page still reading its cached copy - the edit showed up only after a
-    // manual reload. These are the keys those pages actually query.
+    // The lists above are keyed by project; a detail page reads its own record under a
+    // singular key keyed by the record id.
     for (const key of DETAIL_QUERY_KEYS) {
       queryClient.invalidateQueries({ queryKey: [key, resolvedDocId] })
     }
@@ -227,15 +224,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
     enabled: canEditDocs && !!projectId,
   })
 
-  // `{{` inserts a project parameter *or* a project variable - both kinds live
-  // on the Parameters & Variables screen and both are addressed the same way in
-  // a document. `@` is for people, and only people.
-  //
-  // Both lists go to the TCS table as well as to the editor: a test step that
-  // references a parameter has to name it the same way a requirement does, and
-  // a test case is the surface where a parameter is most often pinned down.
-  // The value rides along as a hint so the picker says what you are pinning -
-  // a key on its own does not. Only the key is ever written to the document.
+  // `{{` inserts a project parameter *or* a project variable - both kinds live on the
+  // Parameters & Variables screen and both are addressed the same way in a document.
   const parameterMentionItems = useMemo(
     () => (projectVariables ?? []).map((variable) => ({
       id: variable.id,
@@ -258,10 +248,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
     return map[type]
   }, [])
 
-  // Types with a dedicated page never open the generic document editor - not on
-  // create and not on edit either. `docs/defects/PRJ-DEF-001/edit` used to render
-  // the rich-text editor, which has no severity, resolution summary or tracker
-  // link, so a defect could not be edited there without losing them.
+  // Types with a dedicated page never open the generic document editor - not on create
+  // and not on edit either.
   useEffect(() => {
     if (!prefix || usesDocumentEditor(docType)) return
     if (editMode) {

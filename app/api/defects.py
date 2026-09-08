@@ -262,12 +262,7 @@ async def refresh_external_issue(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    """Fetch current state from GitHub/GitLab and update cached fields.
-
-    If a token is not supplied in the request body, fall back to the project's
-    `IntegrationSetting` for the relevant tracker so admins do not have to
-    paste a token every refresh.
-    """
+    """Fetch current state from GitHub/GitLab and update cached fields."""
     item = (await db.execute(select(Defect).where(Defect.id == defect_pk))).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Defect not found")

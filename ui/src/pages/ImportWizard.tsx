@@ -48,9 +48,7 @@ export default function ImportWizard() {
   const [docSearch, setDocSearch] = useState('')
   const debouncedDocSearch = useDebounced(docSearch, 250)
 
-  // One page of the source project, searched by the server. This used to ask
-  // for every document of the type and scroll them all, which on a project of
-  // any size is a thousand rows rendered so that a handful can be ticked.
+  // One page of the source project, searched by the server.
   const { data: sourceDocsData, isLoading: sourceDocsLoading } = useQuery({
     queryKey: ['import-docs', sourceProject?.prefix, docType, debouncedDocSearch],
     queryFn: () => docsApi.list(sourceProject!.prefix, {

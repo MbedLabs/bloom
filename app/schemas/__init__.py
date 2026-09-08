@@ -7,7 +7,7 @@ from app.schemas.memberships import (
     ProjectMembershipUpdate,
 )
 from app.schemas.schemas import (
-    ALMIntegrationSettings,
+    PLMIntegrationSettings,
     ArtefactActivityResponse,
     ArtefactCommentCreate,
     ArtefactCommentResponse,
@@ -184,7 +184,7 @@ __all__ = [
     "SyncResultsRequest",
     "SyncResultsResponse",
     "AutomatedResult",
-    "ALMIntegrationSettings",
+    "PLMIntegrationSettings",
 ]
 
 from app.schemas.schemas import (  # noqa: E402

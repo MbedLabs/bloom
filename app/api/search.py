@@ -87,12 +87,7 @@ async def run_global_search(
     project_id: Optional[int] = None,
     limit: int = 25,
 ) -> SearchResponse:
-    """Search artefacts by human ID and title across accessible projects.
-
-    Results are ranked (exact ID, ID prefix, title prefix, substrings) and
-    capped per type before the global limit. External users only see artefact
-    types allowed by their membership and customer-visible artefacts.
-    """
+    """Search artefacts by human ID and title across accessible projects."""
     projects = await _accessible_projects(db, current_user)
     if project_id is not None:
         projects = {pid: p for pid, p in projects.items() if pid == project_id}
