@@ -6,9 +6,10 @@ import logging
 import re
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import or_, select, text
@@ -52,6 +53,7 @@ from app.core.id_generator import compute_next_id, id_width, next_doc_id
 from app.core.observability import (
     RequestObservabilityMiddleware,
     metrics_router,
+    request_id_var,
     setup_logging,
 )
 from app.core.security import get_password_hash
@@ -350,7 +352,26 @@ app = FastAPI(
 
 # H2: Attach rate-limiter state and error handler
 app.state.limiter = limiter
+
+
+async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    request_id = request_id_var.get()
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": (
+                "Something went wrong on the server. "
+                f"Quote reference {request_id} when reporting this."
+            ),
+            "request_id": request_id,
+        },
+        headers={"x-request-id": request_id},
+    )
+
+
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(Exception, _unhandled_exception_handler)
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
