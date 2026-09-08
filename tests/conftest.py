@@ -41,15 +41,12 @@ def _load_workspace_dotenv_into_environ() -> None:
             os.environ[key] = val
 
 
-# Tests do not inherit the operator's .env. It holds real SMTP, database and
-# admin credentials, and any suite that forgets to mock a mail path would send
-# with them. Opt in deliberately with BLOOM_TESTS_USE_DOTENV=1.
 if os.environ.get("BLOOM_TESTS_USE_DOTENV") == "1":
     _load_workspace_dotenv_into_environ()
     if "SECRET_KEY" not in os.environ and os.environ.get("BLOOM_SECRET_KEY"):
         os.environ["SECRET_KEY"] = os.environ["BLOOM_SECRET_KEY"]
 else:
-    # Shell env alone applies; strip the bloom-prefixed DB so DATABASE_URL wins.
+    # CI / explicit pytest: shell env wins; strip bloom-prefixed DB so ``DATABASE_URL`` alone applies.
     os.environ.pop("BLOOM_DATABASE_URL", None)
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characters-long")

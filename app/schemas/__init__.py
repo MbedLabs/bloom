@@ -7,7 +7,6 @@ from app.schemas.memberships import (
     ProjectMembershipUpdate,
 )
 from app.schemas.schemas import (
-    PLMIntegrationSettings,
     ArtefactActivityResponse,
     ArtefactCommentCreate,
     ArtefactCommentResponse,
@@ -42,6 +41,7 @@ from app.schemas.schemas import (
     ImpactAnalysisResponse,
     ImpactNode,
     PaginatedResponse,
+    PLMIntegrationSettings,
     ProjectCreate,
     ProjectResponse,
     ProjectUpdate,
