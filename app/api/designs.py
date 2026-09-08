@@ -26,6 +26,7 @@ from app.schemas import (
     DesignItemUpdate,
     PaginatedResponse,
 )
+from app.services.tag_links import sync_tag_links
 
 router = APIRouter()
 
@@ -102,6 +103,13 @@ async def create_design_item(
     db.add(item)
     await db.flush()
     await db.refresh(item)
+    await sync_tag_links(
+        db,
+        project_id=item.project_id,
+        source_type="DES",
+        source_id=item.id,
+        content_json=item.content_json,
+    )
     await log_artefact_activity(
         db,
         "design",
@@ -156,6 +164,14 @@ async def update_design_item(
 
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(item, field, value)
+    if item.content_json is not None and "content_json" in fields_set:
+        await sync_tag_links(
+            db,
+            project_id=item.project_id,
+            source_type="DES",
+            source_id=item.id,
+            content_json=item.content_json,
+        )
 
     await db.flush()
     await db.refresh(item)

@@ -26,6 +26,7 @@ from app.schemas import (
     ChangeRequestUpdate,
     PaginatedResponse,
 )
+from app.services.tag_links import sync_tag_links
 
 router = APIRouter()
 
@@ -103,6 +104,13 @@ async def create_change_request(
     db.add(item)
     await db.flush()
     await db.refresh(item)
+    await sync_tag_links(
+        db,
+        project_id=item.project_id,
+        source_type="CHG",
+        source_id=item.id,
+        content_json=item.content_json,
+    )
     await log_artefact_activity(
         db,
         "change",
@@ -159,6 +167,14 @@ async def update_change_request(
 
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(item, field, value)
+    if item.content_json is not None and "content_json" in fields_set:
+        await sync_tag_links(
+            db,
+            project_id=item.project_id,
+            source_type="CHG",
+            source_id=item.id,
+            content_json=item.content_json,
+        )
 
     await db.flush()
     await db.refresh(item)

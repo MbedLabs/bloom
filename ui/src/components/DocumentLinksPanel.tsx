@@ -16,7 +16,9 @@ import {
   DOC_LINK_ROLE_LABELS,
   getDocLinkOptions,
   getDocLinkRoleLabel,
+  DOC_TAG_ROLE,
   isDocLinkRoleAllowed,
+  isDocTagTargetAllowed,
   normalizeDocTypeParam,
   relatedDocsUrl,
   type DocType,
@@ -381,10 +383,11 @@ export function DocumentLinksPanel({
     const involvesThisArtefact = (link: ArtefactLink): boolean =>
       (link.source_type === sourceType && link.source_id === sourceId) ||
       (link.target_type === sourceType && link.target_id === sourceId)
+    const isPermittedByRules = (link: ArtefactLink): boolean =>
+      isDocLinkRoleAllowed(link.source_type, link.target_type, link.role) ||
+      (link.role === DOC_TAG_ROLE && isDocTagTargetAllowed(link.source_type, link.target_type))
     const isShowable = (link: ArtefactLink): boolean =>
-      link.role in DOC_LINK_ROLE_LABELS &&
-      involvesThisArtefact(link) &&
-      isDocLinkRoleAllowed(link.source_type, link.target_type, link.role)
+      link.role in DOC_LINK_ROLE_LABELS && involvesThisArtefact(link) && isPermittedByRules(link)
     const directionFor = (link: ArtefactLink): 'outgoing' | 'incoming' =>
       link.source_type === sourceType && link.source_id === sourceId ? 'outgoing' : 'incoming'
     const directionalKey = (link: ArtefactLink): string => {

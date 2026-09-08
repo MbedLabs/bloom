@@ -5,7 +5,9 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characte
 from app.core.link_rules import (
     get_allowed_link_roles,
     is_allowed_link_role,
+    is_allowed_tag_pair,
     is_known_linkable_type,
+    is_tag_host_type,
     normalize_linkable_type,
 )
 
@@ -42,3 +44,35 @@ def test_link_rule_helpers_recognize_supported_types_and_roles():
     assert is_allowed_link_role("CPT", "TC", "implements") is True
     assert is_allowed_link_role("TS", "TC", "contains") is True
     assert is_allowed_link_role("CMP", "REQ", "verifies") is False
+
+
+def test_only_prose_bodies_host_tags():
+    for kind in ("REQ", "DES", "RSK", "CHG", "CPT", "SPEC", "PRT", "RPT", "STD"):
+        assert is_tag_host_type(kind) is True, kind
+    for kind in ("TC", "TS", "CMP", "DEF", "other"):
+        assert is_tag_host_type(kind) is False, kind
+
+
+def test_tags_reach_pairs_the_link_matrix_has_no_row_for():
+    assert is_allowed_link_role("SPEC", "REQ", "references") is False
+    assert is_allowed_tag_pair("SPEC", "REQ") is True
+
+    assert is_allowed_link_role("REQ", "REQ", "references") is False
+    assert is_allowed_tag_pair("REQ", "REQ") is True
+
+    assert is_allowed_link_role("REQ", "DES", "references") is False
+    assert is_allowed_tag_pair("REQ", "DES") is True
+
+
+def test_containers_are_taggable_but_never_tag():
+    assert is_allowed_tag_pair("REQ", "CMP") is True
+    assert is_allowed_tag_pair("REQ", "TS") is True
+    assert is_allowed_tag_pair("REQ", "TC") is True
+    assert is_allowed_tag_pair("CMP", "REQ") is False
+    assert is_allowed_tag_pair("TS", "REQ") is False
+    assert is_allowed_tag_pair("TC", "REQ") is False
+
+
+def test_unknown_kinds_are_not_taggable():
+    assert is_allowed_tag_pair("REQ", "other") is False
+    assert is_allowed_tag_pair("other", "REQ") is False

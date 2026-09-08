@@ -57,6 +57,7 @@ from app.schemas import (
     TestSuiteSummary,
 )
 from app.services.notification_service import notify_assignment
+from app.services.tag_links import sync_tag_links
 
 router = APIRouter()
 
@@ -458,6 +459,13 @@ async def create_requirement(
     db.add(requirement)
     await db.flush()
     await db.refresh(requirement)
+    await sync_tag_links(
+        db,
+        project_id=requirement.project_id,
+        source_type="REQ",
+        source_id=requirement.id,
+        content_json=requirement.content_json,
+    )
     await log_artefact_activity(
         db,
         "requirement",
@@ -552,6 +560,13 @@ async def update_requirement(
         requirement.visibility = data.visibility
     if data.content_json is not None:
         requirement.content_json = data.content_json
+        await sync_tag_links(
+            db,
+            project_id=requirement.project_id,
+            source_type="REQ",
+            source_id=requirement.id,
+            content_json=data.content_json,
+        )
     if data.content_html is not None:
         requirement.content_html = data.content_html
     requirement.visibility = _visibility_for_requirement_origin(requirement.req_origin)

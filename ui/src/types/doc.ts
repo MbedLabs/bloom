@@ -526,3 +526,17 @@ export function isDocLinkRoleAllowed(sourceType: string, targetType: string, rol
     role as DocLinkRole,
   )
 }
+
+export const DOC_TAG_ROLE: DocLinkRole = 'references'
+
+export const DOC_TAG_HOST_TYPES = new Set<DocType>([
+  'REQ', 'DES', 'RSK', 'CHG', 'CPT', 'SPEC', 'PRT', 'RPT', 'STD',
+])
+
+export function isDocTagHostType(sourceType: string): boolean {
+  return DOC_TAG_HOST_TYPES.has(sourceType as DocType)
+}
+
+export function isDocTagTargetAllowed(sourceType: string, targetType: string): boolean {
+  return isDocTagHostType(sourceType) && DOC_TYPE_CODES.includes(targetType as DocType)
+}
