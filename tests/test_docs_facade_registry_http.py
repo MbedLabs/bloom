@@ -433,6 +433,53 @@ class TestTheTypeSummary:
             assert entry["count"] == expected_counts[entry["doc_type"]]
             assert entry["suspect_links"] == expected_suspect[entry["doc_type"]]
 
+    def test_reports_membership_as_edges(self, api_client, auth_headers):
+        from tests.conftest import create_project, unique_suffix
+
+        suffix = unique_suffix()
+        project_id = create_project(api_client, auth_headers, f"Membership {suffix}")["id"]
+        prefix = api_client.get(f"/api/projects/{project_id}", headers=auth_headers).json()[
+            "prefix"
+        ]
+
+        case_ids = []
+        for n in range(2):
+            created = api_client.post(
+                "/api/test-cases",
+                headers=auth_headers,
+                json={"project_id": project_id, "title": f"TC {n} {suffix}"},
+            )
+            assert created.status_code in (200, 201), created.text
+            case_ids.append(created.json()["id"])
+
+        suite = api_client.post(
+            "/api/test-suites",
+            headers=auth_headers,
+            json={"project_id": project_id, "name": f"S {suffix}", "test_case_ids": case_ids},
+        )
+        assert suite.status_code in (200, 201), suite.text
+
+        campaign = api_client.post(
+            "/api/campaigns",
+            headers=auth_headers,
+            json={
+                "project_id": project_id,
+                "name": f"C {suffix}",
+                "suite_ids": [suite.json()["id"]],
+            },
+        )
+        assert campaign.status_code in (200, 201), campaign.text
+
+        body = api_client.get(
+            f"/api/projects/{prefix}/doc-type-summary", headers=auth_headers
+        ).json()
+        edges = {(e["source_type"], e["target_type"]): e for e in body["membership_edges"]}
+
+        assert edges[("TS", "TC")]["count"] == 2
+        assert edges[("TS", "TC")]["role"] == "contains"
+        assert edges[("CMP", "TS")]["count"] == 1
+        assert edges[("CMP", "TS")]["role"] == "relates_to"
+
     def test_is_scoped_to_the_project(self, api_client, auth_headers, registry):
         other = create_project(api_client, auth_headers, "Registry Other")
         response = api_client.get(
@@ -440,7 +487,7 @@ class TestTheTypeSummary:
         )
 
         assert response.status_code == 200
-        assert response.json() == {"types": [], "total": 0}
+        assert response.json() == {"types": [], "total": 0, "membership_edges": []}
 
     def test_requires_authentication(self, api_client, registry):
         response = api_client.get(f"/api/projects/{registry['prefix']}/doc-type-summary")

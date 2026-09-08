@@ -42,6 +42,7 @@ from app.core.security import (
 from app.models import (
     ArtefactLink,
     ArtefactVisibility,
+    CampaignSuite,
     ChangeRequest,
     Defect,
     DesignItem,
@@ -50,9 +51,11 @@ from app.models import (
     Requirement,
     RiskItem,
     TestCampaign,
+    TestCampaignItem,
     TestCase,
     TestConcept,
     TestSuite,
+    TestSuiteItem,
     UserRole,
 )
 from app.models.user import User
@@ -708,9 +711,17 @@ class DocTypeCount(BaseModel):
     suspect_links: int
 
 
+class MembershipEdge(BaseModel):
+    source_type: str
+    target_type: str
+    role: str
+    count: int
+
+
 class DocTypeSummaryResponse(BaseModel):
     types: List[DocTypeCount]
     total: int
+    membership_edges: List[MembershipEdge] = []
 
 
 @router.get(
@@ -728,7 +739,7 @@ async def get_doc_type_summary(
 
     registry = await _registry_union(db, project, current_user, type_filter=None, related_keys=None)
     if registry is None:
-        return DocTypeSummaryResponse(types=[], total=0)
+        return DocTypeSummaryResponse(types=[], total=0, membership_edges=[])
 
     incoming, outgoing = _link_count_subqueries(project.id)
     suspect_links = func.coalesce(incoming.c.suspect_count, 0) + func.coalesce(
@@ -766,7 +777,43 @@ async def get_doc_type_summary(
         )
         for row in rows
     ]
-    return DocTypeSummaryResponse(types=types, total=sum(t.count for t in types))
+    return DocTypeSummaryResponse(
+        types=types,
+        total=sum(t.count for t in types),
+        membership_edges=await _membership_edges(db, project.id),
+    )
+
+
+async def _membership_edges(db: AsyncSession, project_id: int) -> List[MembershipEdge]:
+    suites_in_campaigns = (
+        select(func.count())
+        .select_from(CampaignSuite)
+        .join(TestCampaign, TestCampaign.id == CampaignSuite.campaign_id)
+        .where(TestCampaign.project_id == project_id)
+    )
+    cases_in_suites = (
+        select(func.count())
+        .select_from(TestSuiteItem)
+        .join(TestSuite, TestSuite.id == TestSuiteItem.suite_id)
+        .where(TestSuite.project_id == project_id)
+    )
+    cases_in_campaigns = (
+        select(func.count())
+        .select_from(TestCampaignItem)
+        .join(TestCampaign, TestCampaign.id == TestCampaignItem.campaign_id)
+        .where(TestCampaign.project_id == project_id)
+    )
+
+    counted = [
+        ("CMP", "TS", "relates_to", await db.scalar(suites_in_campaigns)),
+        ("TS", "TC", "contains", await db.scalar(cases_in_suites)),
+        ("CMP", "TC", "contains", await db.scalar(cases_in_campaigns)),
+    ]
+    return [
+        MembershipEdge(source_type=source, target_type=target, role=role, count=count)
+        for source, target, role, count in counted
+        if count
+    ]
 
 
 class NextDocIdResponse(BaseModel):

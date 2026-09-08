@@ -864,9 +864,17 @@ export interface DocListParams {
   keys?: string[]
 }
 
+export interface MembershipEdge {
+  source_type: string
+  target_type: string
+  role: string
+  count: number
+}
+
 export interface DocTypeSummary {
   types: { doc_type: string; count: number; suspect_links: number }[]
   total: number
+  membership_edges?: MembershipEdge[]
 }
 
 export const docsApi = {
