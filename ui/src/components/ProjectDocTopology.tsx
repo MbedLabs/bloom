@@ -458,8 +458,42 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
 
   const aggEdges = useMemo<AggregatedEdge[]>(() => {
     if (!links) return []
-    return aggregateEdges(links, new Set(presentTypes))
-  }, [links, presentTypes])
+    const present = new Set(presentTypes)
+    const fromLinks = aggregateEdges(links, present)
+    const byId = new Map(fromLinks.map((e) => [e.id, e]))
+
+    for (const edge of summary?.membership_edges ?? []) {
+      const source = edge.source_type as DocType
+      const target = edge.target_type as DocType
+      if (!present.has(source) || !present.has(target)) continue
+      const id = `${source}->${target}`
+      const entry: RoleEntry = {
+        role: edge.role,
+        displayLabel: roleDisplayLabel(edge.role),
+        count: edge.count,
+        suspectCount: 0,
+      }
+      const existing = byId.get(id)
+      if (existing) {
+        if (existing.roles.some((r) => r.role === edge.role)) continue
+        existing.roles.push(entry)
+        existing.totalCount += edge.count
+        continue
+      }
+      const added: AggregatedEdge = {
+        id,
+        source,
+        target,
+        roles: [entry],
+        totalCount: edge.count,
+        totalSuspect: 0,
+        isSyntheticInverse: false,
+      }
+      byId.set(id, added)
+      fromLinks.push(added)
+    }
+    return fromLinks
+  }, [links, presentTypes, summary])
 
   const aggEdgeMap = useMemo(() => {
     const m = new Map<string, AggregatedEdge>()
