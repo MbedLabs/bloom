@@ -27,9 +27,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["uploaded_by_id"], ["users.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        "ix_document_attachments_document_id", "document_attachments", ["document_id"]
-    )
+    op.create_index("ix_document_attachments_document_id", "document_attachments", ["document_id"])
     op.create_index("ix_document_attachments_source_ref", "document_attachments", ["source_ref"])
     op.create_index("ix_document_attachments_created_at", "document_attachments", ["created_at"])
 
