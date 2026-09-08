@@ -175,6 +175,47 @@ describe('the links of a document', () => {
     expect(await screen.findByText('No links yet.')).toBeTruthy()
   })
 
+  function manyLinks(count: number, role = 'verifies') {
+    return Array.from({ length: count }, (_, i) => ({
+      ...link,
+      suspect: false,
+      id: 500 + i,
+      source_type: 'TC',
+      source_id: 21,
+      target_type: 'REQ',
+      target_id: 900 + i,
+      role,
+    }))
+  }
+
+  it('lists the rows while the document stays under twenty links', async () => {
+    vi.mocked(client.linksApi.list).mockResolvedValue(manyLinks(19))
+    linksPanel()
+    await waitFor(() => expect(screen.queryByText('No links yet.')).toBeNull())
+
+    expect(screen.queryByText('19')).toBeNull()
+  })
+
+  it('collapses to a count per relationship at twenty', async () => {
+    vi.mocked(client.linksApi.list).mockResolvedValue(manyLinks(20))
+    linksPanel()
+
+    expect(await screen.findByText('20')).toBeTruthy()
+    expect(screen.getByText('verifies')).toBeTruthy()
+  })
+
+  it('counts the whole document, not each relationship', async () => {
+    vi.mocked(client.linksApi.list).mockResolvedValue([
+      ...manyLinks(11, 'verifies'),
+      ...manyLinks(9, 'references').map((l, i) => ({ ...l, id: 700 + i, target_type: 'STD' })),
+    ])
+    linksPanel()
+
+    // Neither group reaches twenty on its own; the document does.
+    expect(await screen.findByText('11')).toBeTruthy()
+    expect(screen.getByText('9')).toBeTruthy()
+  })
+
   it('hides a link this document is not an endpoint of', async () => {
     vi.mocked(client.linksApi.list).mockResolvedValue([])
     renderPanel(
