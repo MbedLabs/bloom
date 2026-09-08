@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Added
+
+- **Artefacts are taggable inline.** A specification lists its requirements in prose, and a reader had no way to reach them other than copying the identifier and searching. Typing `#` in a document body now searches the project's artefacts and inserts a reference that links to the one chosen. Unlike `{{` for parameters and `@` for people, which filter a list handed to the editor as a prop, this one queries the server: a project holds thousands of artefacts, not dozens. Nothing is sent until two characters are typed, results are capped at twenty, and the tag stores the artefact type and its numeric id rather than the display string, so the link survives an identifier widening.
+
+  A tag is written to `artefact_links` with role `references`, which means points at, asserts nothing - so it appears in backlinks, in the topology and in the registry with no new store, and coverage and traceability never see it, since both filter on the exact triple `(TC, REQ, verifies)`. Tags follow their own rule rather than `LINK_RULE_ROWS`: the matrix has no `SPEC -> REQ` row at all, and no `references` role on `REQ -> REQ` or `REQ -> DES`, so constraining the picker by it would have refused the three cases the feature exists for. The matrix stays the sole authority over links, which do assert something and are made deliberately from the links panel.
+
+  Requirements, designs, risks, change requests, test concepts and the four document kinds host tags. Test cases, suites and campaigns are taggable but host none: a container lists its members, so there is no prose to tag in.
+
+- **Campaign and suite membership is drawn in the topology.** The graph built every edge from `artefact_links` alone, but membership lives in `campaign_suites`, `test_suite_items` and `test_campaign_items`, which write no link row - so a campaign rendered as an unconnected node however many suites and test cases it held. `doc-type-summary` now returns membership as type-level edges with counts and the topology merges them with the link-derived ones, following the same roles the rule table gives: `relates_to` for a campaign to its suites, `contains` for a suite or campaign to its test cases. Membership itself stays out of `artefact_links`, so traceability and coverage are unchanged.
+
+### Changed
+
+- **A document's links collapse to counts past twenty.** A well-linked artefact rendered one row per relationship, which is a wall to read, and the number of each kind had to be counted by eye. At twenty the panel shows a count per role and direction instead, and pressing one opens the Documents registry filtered to that relationship, which is already paginated; under twenty it lists rows as before. Twenty counts the document, not each relationship, so eleven `verifies` and nine `references` collapse together. The count is taken after the visibility filter, so a reviewer is never told how many links they cannot open.
+
+### Fixed
+
+- **A campaign claimed relationships it was not part of.** The campaign page fed the links panel from `GET /campaigns/{id}/scope-links`, which returns the links owned by the campaign's *test cases*. The campaign is neither end of those, so the panel invented an orientation for them and each `TC -> REQ verifies` row rendered against the campaign as "verified by TC-xxx" - a traceability claim nobody made. The panel now shows only relationships the open artefact is actually one end of, and drops any row the rule table does not permit for its own pair, so a bad row already in the database stops being displayed as fact.
+
+- **An unhandled error now carries a reference that can be quoted.** A 500 returned Starlette's default response with no detail for the client to extract, so every one of them surfaced as axios's "Request failed with status code 500". The request identifier was already minted per request, stamped on every log line and returned as `x-request-id`, but nothing put it in front of the user, so a report could not be traced to the log line explaining it. The handler now returns that identifier in the body and the message, and the client falls back to the response header when a body carries nothing usable. The exception itself is logged and never returned.
+
+- **Tests no longer inherit the operator's `.env`.** The test configuration loaded the workspace `.env` file, so a developer's real credentials - the production SMTP account among them - were live during a test run, and the suite sent genuine mail. Inheritance is now opt-in behind `BLOOM_TESTS_USE_DOTENV`, off by default, and the test database URL is always overridden.
+
 ## 1.0.1 - 2026-09-07
 
 ### Added
