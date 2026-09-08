@@ -324,6 +324,8 @@ function LinkDocumentModal({
   )
 }
 
+const LINK_COLLAPSE_THRESHOLD = 20
+
 export function DocumentLinksPanel({
   projectId,
   projectPrefix,
@@ -431,6 +433,21 @@ export function DocumentLinksPanel({
     placeholderData: (previous) => previous,
   })
 
+  const collapsedGroups = useMemo(() => {
+    if (allLinks.length < LINK_COLLAPSE_THRESHOLD) return []
+    const groups = new Map<string, { role: string; direction: 'outgoing' | 'incoming'; count: number }>()
+    for (const { link, direction } of allLinks) {
+      const key = `${link.role}:${direction}`
+      const existing = groups.get(key)
+      if (existing) {
+        existing.count += 1
+        continue
+      }
+      groups.set(key, { role: link.role, direction, count: 1 })
+    }
+    return Array.from(groups.values()).sort((a, b) => b.count - a.count)
+  }, [allLinks])
+
   const targetLookup = useMemo(() => {
     const map = new Map<string, LinkTarget>()
     ;(labelData?.items ?? []).forEach((doc) => {
@@ -456,6 +473,37 @@ export function DocumentLinksPanel({
       <p className="text-xs text-muted-foreground mb-3">Typed links to requirements, specifications, designs, risks, defects, campaigns, test suites, and other controlled documents.</p>
       {allLinks.length === 0 ? (
         <p className="text-muted-foreground">No links yet.</p>
+      ) : collapsedGroups.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {collapsedGroups.map((group) => {
+            const label = getDocLinkRoleLabel(group.role, group.direction)
+            const chip = (
+              <>
+                <span className="text-foreground">{label}</span>
+                <span className="font-medium text-muted-foreground">{group.count}</span>
+              </>
+            )
+            const chipClass =
+              'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border bg-muted/40 text-xs'
+            return sourceDocId ? (
+              <Link
+                key={`${group.role}:${group.direction}`}
+                to={relatedDocsUrl(projectPrefix, sourceDocId, {
+                  role: group.role,
+                  direction: group.direction,
+                })}
+                title={`Show every ${label} relationship of ${sourceDocId} in Documents`}
+                className={`${chipClass} hover:bg-muted transition-colors`}
+              >
+                {chip}
+              </Link>
+            ) : (
+              <span key={`${group.role}:${group.direction}`} className={chipClass}>
+                {chip}
+              </span>
+            )
+          })}
+        </div>
       ) : (
         <div className="flex flex-wrap gap-1.5 -mx-6 -mb-6 px-6 pb-6">
           {allLinks.map(({ link, direction, isDerived }) => {
