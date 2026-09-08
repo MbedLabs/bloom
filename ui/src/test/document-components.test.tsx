@@ -211,7 +211,6 @@ describe('the links of a document', () => {
     ])
     linksPanel()
 
-    // Neither group reaches twenty on its own; the document does.
     expect(await screen.findByText('11')).toBeTruthy()
     expect(screen.getByText('9')).toBeTruthy()
   })
