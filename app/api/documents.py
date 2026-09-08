@@ -34,6 +34,7 @@ from app.schemas import (
     PaginatedResponse,
     SectionReorder,
 )
+from app.services.tag_links import sync_tag_links
 
 router = APIRouter()
 
@@ -147,6 +148,13 @@ async def create_document(
     db.add(document)
     await db.flush()
     await db.refresh(document)
+    await sync_tag_links(
+        db,
+        project_id=document.project_id,
+        source_type=normalize_document_kind(document.doc_type),
+        source_id=document.id,
+        content_json=document.content_json,
+    )
     await log_artefact_activity(
         db,
         "document",
@@ -287,6 +295,13 @@ async def update_document(
         document.description = data.description
     if data.content_json is not None:
         document.content_json = data.content_json
+        await sync_tag_links(
+            db,
+            project_id=document.project_id,
+            source_type=normalize_document_kind(document.doc_type),
+            source_id=document.id,
+            content_json=data.content_json,
+        )
     if data.content_html is not None:
         document.content_html = data.content_html
 

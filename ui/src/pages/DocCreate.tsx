@@ -19,7 +19,8 @@ import {
   DOC_TYPE_COLORS,
   DOC_TYPE_SLUGS,
   docUrl,
-  isDocLinkRoleAllowed,
+  isDocTagHostType,
+  isDocTagTargetAllowed,
   normalizeDocTypeParam,
 } from '../types/doc'
 import { useAuth } from '../contexts/AuthContext'
@@ -30,10 +31,6 @@ import {
   isServerAssignedDocIdOnCreate,
   usesDocumentEditor,
 } from './docCreateIdPolicy'
-
-const TAG_HOST_TYPES = new Set<DocType>([
-  'REQ', 'SPEC', 'DES', 'CPT', 'RSK', 'CHG', 'DEF', 'PRT', 'RPT', 'STD',
-])
 
 function artefactActivityTypeForDocType(docType: DocType): string | null {
   if (docType === 'REQ') return 'requirement'
@@ -246,11 +243,11 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   )
 
   const artefactSearch = useMemo(() => {
-    if (!projectId || !TAG_HOST_TYPES.has(docType)) return undefined
+    if (!projectId || !isDocTagHostType(docType)) return undefined
     return async (query: string) => {
       const response = await searchApi.global(query, { projectId, limit: 20 })
       return response.items
-        .filter((item) => isDocLinkRoleAllowed(docType, item.type, 'references'))
+        .filter((item) => isDocTagTargetAllowed(docType, item.type))
         .map((item) => ({
           id: item.id,
           label: item.doc_id ?? `${item.type} ${item.id}`,
