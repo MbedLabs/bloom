@@ -3,6 +3,7 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
 export interface MentionSuggestion {
   id: number
   label: string
+  docType?: string
   /**
    * Shown beside the label while choosing. A parameter is addressed by its key,
    * but the key alone does not say what you are about to pin, so the current

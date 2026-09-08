@@ -10,6 +10,7 @@ import {
   risksApi, changesApi, testConceptsApi, documentsApi, usersApi, projectVariablesApi,
   extractApiErrorMessage,
   type ArtefactVisibility,
+  searchApi,
 } from '../api/client'
 import type { DocType } from '../types/doc'
 import {
@@ -18,6 +19,7 @@ import {
   DOC_TYPE_COLORS,
   DOC_TYPE_SLUGS,
   docUrl,
+  isDocLinkRoleAllowed,
   normalizeDocTypeParam,
 } from '../types/doc'
 import { useAuth } from '../contexts/AuthContext'
@@ -28,6 +30,10 @@ import {
   isServerAssignedDocIdOnCreate,
   usesDocumentEditor,
 } from './docCreateIdPolicy'
+
+const TAG_HOST_TYPES = new Set<DocType>([
+  'REQ', 'SPEC', 'DES', 'CPT', 'RSK', 'CHG', 'DEF', 'PRT', 'RPT', 'STD',
+])
 
 function artefactActivityTypeForDocType(docType: DocType): string | null {
   if (docType === 'REQ') return 'requirement'
@@ -237,6 +243,26 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const userMentionItems = useMemo(
     () => (users ?? []).map((u) => ({ id: u.id, label: u.full_name })),
     [users],
+  )
+
+  const artefactSearch = useMemo(() => {
+    if (!projectId || !TAG_HOST_TYPES.has(docType)) return undefined
+    return async (query: string) => {
+      const response = await searchApi.global(query, { projectId, limit: 20 })
+      return response.items
+        .filter((item) => isDocLinkRoleAllowed(docType, item.type, 'references'))
+        .map((item) => ({
+          id: item.id,
+          label: item.doc_id ?? `${item.type} ${item.id}`,
+          hint: item.title,
+          docType: item.type,
+        }))
+    }
+  }, [projectId, docType])
+
+  const artefactHref = useCallback(
+    (type: string, id: number) => docUrl(prefix, type as DocType, id),
+    [prefix],
   )
 
   const apiForType = useCallback((type: DocType) => {
@@ -643,6 +669,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                   onOutlineToggle={setOutlineOpen}
                   mentionItems={parameterMentionItems}
                   userMentionItems={userMentionItems}
+                  artefactSearch={artefactSearch}
+                  artefactHref={artefactHref}
                 />
               )}
             </div>
