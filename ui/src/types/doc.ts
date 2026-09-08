@@ -518,3 +518,11 @@ export function getDocLinkOptions(sourceType: DocType, targetType: DocType): Doc
 export function getAllowedDocLinkRoles(sourceType: DocType, targetType: DocType): DocLinkRole[] {
   return Array.from(new Set(getDocLinkOptions(sourceType, targetType).map((option) => option.role)))
 }
+
+export function isDocLinkRoleAllowed(sourceType: string, targetType: string, role: string): boolean {
+  if (!DOC_TYPE_CODES.includes(sourceType as DocType)) return false
+  if (!DOC_TYPE_CODES.includes(targetType as DocType)) return false
+  return getCanonicalDocLinkRoles(sourceType as DocType, targetType as DocType).includes(
+    role as DocLinkRole,
+  )
+}

@@ -189,7 +189,6 @@ const CALLS: Array<[string, unknown[], string, string]> = [
   ['campaignsApi.addItem', [41, 12], 'post', '/campaigns/41/items?test_case_id=12'],
   ['campaignsApi.updateItem', [41, 51, { comment: 'c' }], 'patch', '/campaigns/41/items/51'],
   ['campaignsApi.removeItem', [41, 51], 'delete', '/campaigns/41/items/51'],
-  ['campaignsApi.scopeLinks', [41], 'get', '/campaigns/41/scope-links'],
   ['campaignsApi.listConfigurations', [5], 'get', '/campaigns/configurations?project_id=5'],
   [
     'campaignsApi.createConfiguration',

@@ -175,6 +175,63 @@ describe('the links of a document', () => {
     expect(await screen.findByText('No links yet.')).toBeTruthy()
   })
 
+  it('hides a link this document is not an endpoint of', async () => {
+    vi.mocked(client.linksApi.list).mockResolvedValue([])
+    renderPanel(
+      <DocumentLinksPanel
+        projectId={1}
+        projectPrefix="VCU"
+        sourceType="CMP"
+        sourceId={5}
+        sourceDocId="VCU-CMP-001"
+        derivedLinks={[{ ...link, suspect: false }]}
+      />,
+    )
+    expect(await screen.findByText('No links yet.')).toBeTruthy()
+    expect(screen.queryByText(/verified by/i)).toBeNull()
+  })
+
+  it('hides a link whose type pairing the rule table forbids', async () => {
+    vi.mocked(client.linksApi.list).mockResolvedValue([])
+    renderPanel(
+      <DocumentLinksPanel
+        projectId={1}
+        projectPrefix="VCU"
+        sourceType="TC"
+        sourceId={21}
+        sourceDocId="VCU-TC-001"
+        derivedLinks={[{ ...link, suspect: false, target_type: 'CMP', target_id: 5, role: 'verifies' }]}
+      />,
+    )
+    expect(await screen.findByText('No links yet.')).toBeTruthy()
+  })
+
+  it('shows a membership link the document is the target of', async () => {
+    vi.mocked(client.linksApi.list).mockResolvedValue([])
+    renderPanel(
+      <DocumentLinksPanel
+        projectId={1}
+        projectPrefix="VCU"
+        sourceType="TC"
+        sourceId={21}
+        sourceDocId="VCU-TC-001"
+        derivedLinks={[
+          {
+            ...link,
+            suspect: false,
+            id: -10001,
+            source_type: 'TS',
+            source_id: 3,
+            target_type: 'TC',
+            target_id: 21,
+            role: 'contains',
+          },
+        ]}
+      />,
+    )
+    await waitFor(() => expect(screen.queryByText('No links yet.')).toBeNull())
+  })
+
   it('scopes the lookup to the project the document belongs to', async () => {
     linksPanel()
     await screen.findByText('Linked Documents')
