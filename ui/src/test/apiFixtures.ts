@@ -605,7 +605,6 @@ export const RESPONSES: Record<string, unknown> = {
   'campaignsApi.addItem': { id: 1, campaign_id: 31, test_case_id: 21, status: 'Not Run', comment: null },
   'campaignsApi.updateItem': { id: 1, campaign_id: 31, test_case_id: 21, status: 'Not Run', comment: null },
   'campaignsApi.removeItem': undefined,
-  'campaignsApi.scopeLinks': [link],
   'campaignsApi.listConfigurations': [],
   'campaignsApi.createConfiguration': { id: 1, project_id: 1, name: 'Default', description: null, environment: null, parameters: {} },
 

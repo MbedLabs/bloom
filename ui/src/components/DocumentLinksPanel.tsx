@@ -16,6 +16,7 @@ import {
   DOC_LINK_ROLE_LABELS,
   getDocLinkOptions,
   getDocLinkRoleLabel,
+  isDocLinkRoleAllowed,
   normalizeDocTypeParam,
   relatedDocsUrl,
   type DocType,
@@ -375,7 +376,15 @@ export function DocumentLinksPanel({
   const allLinks = useMemo(() => {
     const seen = new Set<string>()
     const items: { link: ArtefactLink; direction: 'outgoing' | 'incoming'; isDerived: boolean }[] = []
-    const isValidRole = (role: string): boolean => role in DOC_LINK_ROLE_LABELS
+    const involvesThisArtefact = (link: ArtefactLink): boolean =>
+      (link.source_type === sourceType && link.source_id === sourceId) ||
+      (link.target_type === sourceType && link.target_id === sourceId)
+    const isShowable = (link: ArtefactLink): boolean =>
+      link.role in DOC_LINK_ROLE_LABELS &&
+      involvesThisArtefact(link) &&
+      isDocLinkRoleAllowed(link.source_type, link.target_type, link.role)
+    const directionFor = (link: ArtefactLink): 'outgoing' | 'incoming' =>
+      link.source_type === sourceType && link.source_id === sourceId ? 'outgoing' : 'incoming'
     const directionalKey = (link: ArtefactLink): string => {
       const [t1, i1, t2, i2] =
         link.source_type < link.target_type ||
@@ -385,7 +394,7 @@ export function DocumentLinksPanel({
       return `${t1}:${i1}:${t2}:${i2}:${link.role}`
     }
     const addIfUnique = (item: typeof items[0]) => {
-      if (!isValidRole(item.link.role)) return
+      if (!isShowable(item.link)) return
       const key = directionalKey(item.link)
       if (!seen.has(key)) {
         seen.add(key)
@@ -394,7 +403,9 @@ export function DocumentLinksPanel({
     }
     ;(outgoingLinks || []).forEach((link) => addIfUnique({ link, direction: 'outgoing', isDerived: false }))
     ;(incomingLinks || []).forEach((link) => addIfUnique({ link, direction: 'incoming', isDerived: false }))
-    ;filteredDerivedLinks.forEach((link) => addIfUnique({ link, direction: 'incoming', isDerived: true }))
+    ;filteredDerivedLinks.forEach((link) =>
+      addIfUnique({ link, direction: directionFor(link), isDerived: true }),
+    )
     return items
   }, [outgoingLinks, incomingLinks, filteredDerivedLinks])
 
