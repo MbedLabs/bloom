@@ -134,6 +134,34 @@ describe('the # trigger', () => {
     expect(popover()?.textContent ?? '').not.toContain('FLT-REQ-0042')
   })
 
+  it('stores the type and id the server parses a tag from', async () => {
+    const search = vi.fn().mockResolvedValue(artefacts)
+    const onChange = vi.fn()
+    const { container } = renderEditor({ artefactSearch: search, onChange })
+    const surface = await editorSurface(container)
+
+    await type(surface, '#brake')
+    await waitFor(() => expect(popover()).toBeTruthy())
+    fireEvent.click(popover()?.querySelector('button') as HTMLElement)
+
+    await waitFor(() => {
+      const calls = onChange.mock.calls
+      const json = calls[calls.length - 1]?.[0] as Record<string, unknown>
+      const found: Record<string, unknown>[] = []
+      const walk = (node: unknown): void => {
+        if (Array.isArray(node)) return node.forEach(walk)
+        if (!node || typeof node !== 'object') return
+        const record = node as Record<string, unknown>
+        if (record.type === 'mention') found.push(record.attrs as Record<string, unknown>)
+        Object.values(record).forEach(walk)
+      }
+      walk(json)
+      expect(found).toHaveLength(1)
+      expect(found[0].id).toBe('REQ:42')
+      expect(found[0].mentionSuggestionChar).toBe('#')
+    })
+  })
+
   it('inserts a reference that links to the artefact', async () => {
     const search = vi.fn().mockResolvedValue(artefacts)
     const { container } = renderEditor({
