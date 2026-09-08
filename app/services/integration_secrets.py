@@ -1,12 +1,4 @@
-"""Authenticated encryption for external tracker credentials and webhook secrets.
-
-GitHub/GitLab access tokens and webhook secrets are encrypted with Fernet
-(AES-128-CBC + HMAC) before they are stored, in a versioned envelope
-``fernet:v1:<ciphertext>``. They are decrypted only immediately before an
-outbound tracker request or webhook-signature verification, and never returned
-in API responses, exceptions, or logs. Every path fails closed when the key is
-missing, malformed, or a stored value cannot be decrypted.
-"""
+"""Authenticated encryption for external tracker credentials and webhook secrets."""
 
 from __future__ import annotations
 

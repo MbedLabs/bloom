@@ -44,11 +44,7 @@ SEARCH_TARGETS: tuple[SearchTarget, ...] = (
 
 
 def rank_match(query_lower: str, doc_id: Optional[str], title: Optional[str]) -> int:
-    """Rank a candidate row for ordering: lower is better.
-
-    0 exact human-id match, 1 id prefix, 2 title prefix,
-    3 id substring, 4 title substring, 5 anything else.
-    """
+    """Rank a candidate row for ordering: lower is better."""
     did = (doc_id or "").lower()
     ttl = (title or "").lower()
     if did == query_lower:

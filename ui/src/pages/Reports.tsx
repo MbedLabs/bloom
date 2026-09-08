@@ -163,9 +163,8 @@ export default function Reports() {
               </thead>
               <tbody className="divide-y divide-border">
                 {s.projects.map((p) => {
-                  // Coverage = requirements with >=1 verifying test case / total requirements
-                  // (NOT test-case count / requirement count). covered = total - uncovered,
-                  // both computed server-side and consistent with Overall Coverage above.
+                  // Coverage = requirements with >=1 verifying test case / total
+                  // requirements (NOT test-case count / requirement count).
                   const coveredReqs = Math.max(0, p.requirement_count - p.uncovered_requirement_count)
                   const cov = p.requirement_count > 0 ? Math.round((coveredReqs / p.requirement_count) * 100) : 0
                   const health = getHealth(p, cov)

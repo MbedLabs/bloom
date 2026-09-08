@@ -1,9 +1,4 @@
-"""Coverage means the same thing wherever it is reported.
-
-Total coverage is the share of requirements with at least one verifying test
-case. Draft-only links remain visible as Partial coverage, but Partial is a
-quality breakdown inside Total coverage rather than a deduction from it.
-"""
+"""Coverage means the same thing wherever it is reported."""
 
 import os
 

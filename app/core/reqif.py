@@ -1,16 +1,4 @@
-"""
-ReqIF import parser.
-
-Parses OMG ReqIF (Requirements Interchange Format) 1.x exports into a normalized,
-tool-agnostic structure that the import API maps onto Bloom requirements.
-
-Design notes:
-- Uses ``defusedxml`` + ``zipfile`` for safe XML parsing and archive extraction.
-- Matching is *namespace-agnostic*: elements are compared by their local name so
-  that files from DOORS, Polarion, Jama and PTC (which use slightly different
-  namespace URIs and prefixes) all parse the same way.
-- The parser is pure and side-effect free; persistence lives in the API layer.
-"""
+"""ReqIF import parser."""
 
 from __future__ import annotations
 
@@ -145,12 +133,8 @@ class ReqIFBundle:
     relations: List[ReqIFRelation] = field(default_factory=list)
 
     def ordered_object_refs(self) -> List[tuple]:
-        """
-        Flatten every specification hierarchy into ``(object_ref, parent_ref)``
+        """Flatten every specification hierarchy into ``(object_ref, parent_ref)``
         pairs in document order, parents always before their children.
-
-        Objects that are not referenced by any specification hierarchy are
-        appended afterwards (parent ``None``) so nothing is silently dropped.
         """
         ordered: List[tuple] = []
         seen: set = set()
@@ -200,12 +184,7 @@ def _first_child(elem: ET.Element, local_name: str) -> Optional[ET.Element]:
 
 
 def _xhtml_to_html(elem: ET.Element) -> str:
-    """Render an XHTML THE-VALUE subtree to a compact HTML string.
-
-    Keeps a safe subset of structural tags (stripping namespaces and attributes)
-    so the requirement body survives round-tripping without importing markup we
-    do not control.
-    """
+    """Render an XHTML THE-VALUE subtree to a compact HTML string."""
     parts: List[str] = []
 
     def render(node: ET.Element) -> None:

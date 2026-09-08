@@ -103,9 +103,8 @@ describe('loading', () => {
     renderTopology()
     await settled()
 
-    // One node per type is all this graph ever draws, so downloading the
-    // project to count it was a page load spent on two numbers. At a thousand
-    // documents it was three round trips, each re-reading every type table.
+    // One node per type is all this graph ever draws, so downloading the project to
+    // count it was a page load spent on two numbers.
     expect(docsApi.typeSummary).toHaveBeenCalledWith('VCU')
     expect(docsApi.list).not.toHaveBeenCalled()
     expect(await screen.findByText('2')).toBeTruthy()

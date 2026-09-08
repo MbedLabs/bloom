@@ -26,9 +26,7 @@ export default function OutlineSidebar({ editor, open, onToggle }: OutlineSideba
 
   const updateHeadings = useCallback(() => {
     const next = extractHeadings(editor)
-    // Every transaction fires this, including plain cursor moves. Replacing the
-    // array each time re-rendered the outline - and re-subscribed the listeners
-    // below - on every keystroke, which is what made it stutter.
+    // Every transaction fires this, including plain cursor moves.
     setHeadings((current) => (sameHeadings(current, next) ? current : next))
   }, [editor])
 
@@ -62,9 +60,7 @@ export default function OutlineSidebar({ editor, open, onToggle }: OutlineSideba
     }
   }, [editor, headings])
 
-  // Reading is scrolling, not typing. Without this the highlight only moved
-  // when the cursor did, so scrolling through a document left the outline
-  // pointing at wherever the caret happened to be.
+  // Reading is scrolling, not typing.
   useEffect(() => {
     if (!editor || !open || headings.length === 0) return
     const container = scrollParentOf(editor.view.dom)

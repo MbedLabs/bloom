@@ -218,9 +218,8 @@ describe('the links of a document', () => {
 
     await waitFor(() => expect(client.docsApi.list).toHaveBeenCalled())
     const calls = vi.mocked(client.docsApi.list).mock.calls
-    // The fixture links VCU-TC-001 to requirement 11; that is the one label
-    // this panel needs, and the only document it may ask for. Reading the
-    // whole registry to find one title is what this replaced.
+    // The fixture links VCU-TC-001 to requirement 11; that is the one label this panel
+    // needs, and the only document it may ask for.
     for (const [, params] of calls as [string, { keys?: string[]; type?: string[] }][]) {
       expect(params?.keys ?? params?.type).toBeTruthy()
     }

@@ -206,13 +206,7 @@ async def get_traceability_matrix(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """The matrix lists every requirement in the project, which runs to thousands.
-
-    Coverage used to be computed in Python after loading all of them, and the
-    coverage filter and sort ran over that list. Paging on top of that would have
-    returned the wrong rows, so coverage is derived in the query instead and the
-    filter, the sort and the page all agree.
-    """
+    """The matrix lists every requirement in the project, which runs to thousands."""
     await require_project_access(db, current_user, project_id)
 
     # Verifying links per requirement: how many test cases point at it, and how

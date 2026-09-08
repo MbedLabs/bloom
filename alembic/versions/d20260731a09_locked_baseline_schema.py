@@ -1,32 +1,4 @@
-"""locked baseline schema
-
-Revision ID: d20260731a09
-Revises:
-Create Date: 2026-07-31
-
-Single locked baseline for the Bloom schema.
-
-This replaces the previous chain, whose base revision built the schema by calling
-``Base.metadata.create_all()``. Because that base always produced whatever the
-models currently described, every later revision found its columns already
-present on a fresh install and had to be written defensively with
-inspect-then-add guards - and the real ALTER path was therefore never exercised
-by the fresh-install CI check.
-
-The revision identifier is deliberately kept as the previous head
-(``d20260731a09``) so that databases already migrated to that head report the
-same identifier, are seen as up to date, and are left untouched. No stamp or
-manual step is required for an existing deployment.
-
-The retired chain also carried data-only revisions (membership backfill,
-relationship-type canonicalisation, credential encryption). Those are safe to
-drop: on an empty database they match no rows, and every deployed database has
-already applied them.
-
-From here migrations are ordinary explicit DDL: a new revision alters this
-baseline, so the empty-database CI check exercises the same statements a
-deployed database will run.
-"""
+"""locked baseline schema"""
 
 from typing import Sequence, Union
 
@@ -41,9 +13,8 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-# Indexes that are not expressed on the SQLAlchemy models and were previously
-# added by dedicated revisions. They must stay part of the baseline, otherwise a
-# fresh install would silently lose them.
+# Indexes that are not expressed on the SQLAlchemy models and were previously added by
+# dedicated revisions.
 _PERFORMANCE_INDEXES = (
     ("ix_test_cases_tc_id", "test_cases", ["tc_id"]),
     ("ix_test_campaign_items_campaign_id", "test_campaign_items", ["campaign_id"]),

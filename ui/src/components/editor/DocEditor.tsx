@@ -194,11 +194,9 @@ export default function DocEditor({
   }, [])
 
   const editor = useEditor({
-    // The toolbar reads its whole state off the editor at render time - which
-    // mark is active, whether undo is available - and TipTap 3 stopped
-    // re-rendering on transactions by default. Without this the toolbar is
-    // frozen at whatever it showed when the editor mounted: Undo never leaves
-    // its disabled state and no formatting button ever lights up.
+    // The toolbar reads its whole state off the editor at render time - which mark is
+    // active, whether undo is available - and TipTap 3 stopped re-rendering on
+    // transactions by default.
     shouldRerenderOnTransaction: true,
     extensions: [
       StarterKit.configure({
@@ -219,14 +217,8 @@ export default function DocEditor({
               `@${label}`,
             ]
           }
-          // A parameter is written as a key, so on its own it does not say what
-          // it stands for. Linking the chip to the screen that owns the value
-          // is how a reader finds out, and it stays correct when the value
-          // changes because nothing about the value is stored here.
-          //
-          // An anchor is safe inside the editable surface: contenteditable
-          // swallows the click and just places the caret, so this only
-          // navigates where the document is being read.
+          // A parameter is written as a key, so on its own it does not say what it
+          // stands for.
           const href = parameterHrefRef.current
           const attrs: Record<string, string> = { 'data-type': 'mention', class: 'mention' }
           if (href) {

@@ -38,9 +38,7 @@ const EMPTY_RECT = {
 } as DOMRect
 
 beforeEach(() => {
-  // The outline builds a selector with CSS.escape, which jsdom does not
-  // provide. Every browser does, so this is a gap in the test environment
-  // rather than in the app.
+  // The outline builds a selector with CSS.escape, which jsdom does not provide.
   if (typeof globalThis.CSS?.escape !== 'function') {
     globalThis.CSS = { ...(globalThis.CSS ?? {}), escape: (value: string) => value } as never
   }

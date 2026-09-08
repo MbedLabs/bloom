@@ -1,9 +1,4 @@
-"""
-Schemas for the first-run setup flow.
-
-Only meaningful on a Bloom instance that has never had a user: the endpoints
-behind these schemas refuse to do anything once an account exists.
-"""
+"""Schemas for the first-run setup flow."""
 
 from typing import Annotated
 

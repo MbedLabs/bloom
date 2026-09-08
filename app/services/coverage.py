@@ -1,10 +1,4 @@
-"""Requirement test coverage - one definition, used everywhere.
-
-Total Coverage is the share of requirements with at least one verifying test
-case. A requirement linked only to Draft test cases is still part of Total
-Coverage, but is classified as Partial so test maturity remains visible as a
-separate quality measure.
-"""
+"""Requirement test coverage - one definition, used everywhere."""
 
 from typing import Iterable, Optional
 
@@ -39,12 +33,7 @@ def coverage_status(test_case_statuses: Iterable[Optional[str]]) -> str:
 
 
 def covered_requirement_ids() -> Select:
-    """Select requirement ids with at least one verifying test case.
-
-    ``Requirement`` and ``TestCase`` are both joined so callers can add their
-    own project scoping and external-visibility filters to either side. Draft
-    status affects the Covered/Partial breakdown, not Total Coverage.
-    """
+    """Select requirement ids with at least one verifying test case."""
     return (
         select(ArtefactLink.target_id)
         .join(TestCase, TestCase.id == ArtefactLink.source_id)

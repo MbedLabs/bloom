@@ -40,11 +40,7 @@ class ProjectMembershipBase(BaseModel):
 
 
 class ProjectMembershipCreate(ProjectMembershipBase):
-    """Paylod for adding a user to a project.
-
-    For external role, doc_types can optionally be provided.
-    If omitted and role='external', the default set is applied.
-    """
+    """Paylod for adding a user to a project."""
 
     doc_types: Optional[List[str]] = Field(
         default=None,
@@ -53,10 +49,7 @@ class ProjectMembershipCreate(ProjectMembershipBase):
 
 
 class ProjectMembershipUpdate(BaseModel):
-    """Payload for updating a project membership.
-
-    Only the role and/or doc_types can be changed.
-    user_id and project_id are immutable (delete and re-create if needed)."""
+    """Payload for updating a project membership."""
 
     role: Optional[str] = Field(default=None, pattern="^(maintainer|external)$")
     doc_types: Optional[List[str]] = Field(

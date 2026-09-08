@@ -12,11 +12,7 @@ from app.core.database import Base
 
 
 class ProjectMembership(Base):
-    """Which projects a user belongs to and at what role.
-
-    Admins have no rows here — their global admin role suffices.
-    Maintainers must have a row per project they maintain.
-    External users must have a row per project they can access."""
+    """Which projects a user belongs to and at what role."""
 
     __tablename__ = "project_memberships"
     __table_args__ = (
@@ -38,10 +34,7 @@ class ProjectMembership(Base):
 
 
 class ProjectExternalDocType(Base):
-    """Doc types visible to an external user within a project.
-
-    Only populated for memberships with role='external'.
-    If empty, external user sees nothing (deny-by-default)."""
+    """Doc types visible to an external user within a project."""
 
     __tablename__ = "project_external_doc_types"
     __table_args__ = (

@@ -1,8 +1,4 @@
-"""
-FastAPI application for EmbedLabs Bloom - Product Lifecycle Management.
-
-Main entry point for the backend API.
-"""
+"""FastAPI application for EmbedLabs Bloom - Product Lifecycle Management."""
 
 import asyncio
 import contextlib

@@ -211,13 +211,7 @@ MAX_DOC_KEYS = 500
 
 
 def _parse_doc_keys(keys: list[str]) -> set[tuple[str, int]]:
-    """Parse ``TYPE:row_id`` pairs into the key set the union already filters on.
-
-    A caller that holds links holds (type, row id) pairs, not public ids - that
-    is what a link stores. Letting it ask for exactly those documents is what
-    keeps a panel showing a dozen chips from reading the whole project to find
-    a dozen titles.
-    """
+    """Parse ``TYPE:row_id`` pairs into the key set the union already filters on."""
     parsed: set[tuple[str, int]] = set()
     for key in keys:
         type_code, _, raw_id = key.partition(":")
@@ -284,9 +278,7 @@ async def _related_doc_keys(
 # got before, so the topology's paged fetch is unaffected.
 # ---------------------------------------------------------------------------
 
-# The labels the registry shows for each type. They live here as well as in the
-# UI because free-text search matches what the reader can see: someone typing
-# "Requirement" means the REQ rows, and the server is now the one searching.
+# The labels the registry shows for each type.
 _TYPE_LABELS = {
     "REQ": "Requirement",
     "TC": "Test Case",
@@ -322,14 +314,7 @@ _LINK_FILTERS = frozenset({"linked", "unlinked", "incoming", "outgoing", "suspec
 
 
 def _optional_column(model, name: str, type_):
-    """The model's column, or a typed NULL for the arms that do not have one.
-
-    Every arm of a UNION has to present the same columns in the same order, so a
-    model without `req_origin` contributes a NULL of the right type rather than
-    being left out. Only the NULL is given a type: SQLite's DATETIME has NUMERIC
-    affinity, so casting a real timestamp column to it yields the year as an
-    integer and the row comes back unreadable.
-    """
+    """The model's column, or a typed NULL for the arms that do not have one."""
     column = getattr(model, name, None)
     return cast(null(), type_) if column is None else column
 
@@ -373,12 +358,7 @@ def _shell_arm(model, type_code: str, id_col_name: str):
 
 
 def _link_count_subqueries(project_id: int):
-    """Per-document incoming and outgoing link tallies, as two grouped subqueries.
-
-    Joined onto the union rather than fetched per type, so the counts cost two
-    grouped scans of `artefact_links` no matter how many types are in play, and
-    stay filterable and sortable in SQL.
-    """
+    """Per-document incoming and outgoing link tallies, as two grouped subqueries."""
     suspect_sum = func.coalesce(
         func.sum(case((ArtefactLink.suspect.is_(True), 1), else_=0)), 0
     ).label("suspect_count")
@@ -416,11 +396,7 @@ async def _registry_union(
     type_filter: Optional[list[str]],
     related_keys: Optional[set[tuple[str, int]]],
 ):
-    """The set of documents this user may see in this project, as one union.
-
-    Returns None when no type survives the filters, which is not the same as
-    an empty result set: there is nothing to select from at all.
-    """
+    """The set of documents this user may see in this project, as one union."""
     allowed_doc_types = await get_external_doc_types(db, current_user, project.id)
     arms = []
 
@@ -643,11 +619,8 @@ async def list_all_docs(
 
     if q and q.strip():
         needle = f"%{q.strip()}%"
-        # The reader searches what the table shows them, so this covers the
-        # human label of the kind and the reviewer's name as well as the stored
-        # fields. Dates match on their ISO form - a timestamp cast to text
-        # starts `YYYY-MM-DD` on Postgres and on the SQLite the tests run on,
-        # so "2026-03" narrows to a month without a dialect-specific format.
+        # The reader searches what the table shows them, so this covers the human label
+        # of the kind and the reviewer's name as well as the stored fields.
         type_label = case(
             *[(registry.c.doc_type == code, label) for code, label in _TYPE_LABELS.items()],
             else_=registry.c.doc_type,
@@ -749,15 +722,7 @@ async def get_doc_type_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """How many documents of each type this user can see, and how many suspect links.
-
-    The topology draws one node per *type*, not per document, and the project
-    screen wants a single count - both used to download every document in the
-    project to work that out. This is the same numbers as one grouped query.
-
-    Deliberately not routed under `/docs/...` so it cannot be mistaken for a
-    document whose id happens to be "doc-type-summary".
-    """
+    """How many documents of each type this user can see, and how many suspect links."""
     project = await resolve_project(db, project_ref)
     await require_project_access(db, current_user, project.id)
 
@@ -819,15 +784,7 @@ async def get_next_doc_id(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Report the identifier the server would assign to the next document.
-
-    The create screen used to render a hardcoded ``-001`` preview, which claimed
-    an identifier that was usually already taken. The server allocates with
-    MAX(suffix)+1, so the preview has to come from the same place.
-
-    Deliberately not routed under ``/docs/{kind_slug}/...`` so it cannot be
-    mistaken for a document whose id happens to be "next-doc-id".
-    """
+    """Report the identifier the server would assign to the next document."""
     project = await resolve_project(db, project_ref)
     await require_project_access(db, current_user, project.id)
 

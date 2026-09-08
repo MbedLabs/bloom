@@ -426,11 +426,8 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null)
   const [layoutToken, setLayoutToken] = useState(0)
 
-  // This graph has one node per doc *type*, never one per document, so all it
-  // has ever needed is a count and a suspect tally per type. It used to get
-  // them by downloading every document in the project - three round trips at a
-  // thousand documents, each one re-reading every type table - and folding them
-  // down in the browser. The server does the fold now, in one grouped query.
+  // This graph has one node per doc *type*, never one per document, so all it has ever
+  // needed is a count and a suspect tally per type.
   const { data: summary, isLoading: docsLoading } = useQuery({
     queryKey: ['project-doc-type-summary', prefix],
     queryFn: () => docsApi.typeSummary(prefix),

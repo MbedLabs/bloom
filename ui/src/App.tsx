@@ -11,11 +11,9 @@ import VerifyEmail from './pages/VerifyEmail'
 import AcceptInvite from './pages/AcceptInvite'
 import ErrorBoundary from './components/ErrorBoundary'
 
-// Route-level splitting. Everything below sits behind authentication and a
-// deliberate navigation; the document screens drag in TipTap and ProseMirror,
-// 19 packages that were previously downloaded and parsed on every visit,
-// including the login screen. The auth screens above stay eager: they are the
-// first paint, and are usually opened straight from an email link.
+// Route-level splitting. Everything below sits behind authentication and a deliberate
+// navigation; the document screens drag in TipTap and ProseMirror, 19 packages that
+// were previously downloaded and parsed on every visit, including the login screen.
 /* v8 ignore start -- these thunks hold no logic, and React only invokes
    them when a lazy route actually renders, which renderToString never does.
    Their one real failure mode is a path that does not resolve, which

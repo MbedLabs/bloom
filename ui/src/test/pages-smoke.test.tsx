@@ -25,9 +25,8 @@ vi.mock('../components/ProtectedRoute', () => ({
 }))
 
 describe('source-available readiness smoke', () => {
-  // These tests run in the node environment, so `window` only exists because it
-  // is stubbed here. Without cleanup the stub leaked into later cases and raced
-  // the cached App import, which made the suite fail intermittently.
+  // These tests run in the node environment, so `window` only exists because it is
+  // stubbed here.
   beforeEach(() => {
     vi.stubGlobal('window', { runtimeConfig: {} })
   })

@@ -567,13 +567,7 @@ def _verify_jira_signature(body: bytes, secret: str, signature: str) -> bool:
 
 
 def _split_jira_key(issue_key: str) -> Optional[tuple[str, int]]:
-    """Split ``PROJ-123`` into ``("PROJ", 123)``.
-
-    Jira identifies issues by key rather than by number, so the project key is
-    stored in ``external_repo_full_name`` and the numeric part in
-    ``external_issue_number`` — the same split GitLab uses for namespace and IID.
-    This keeps Jira on the existing columns.
-    """
+    """Split ``PROJ-123`` into ``("PROJ", 123)``."""
     project_key, _, number = issue_key.rpartition("-")
     if not project_key or not number.isdigit():
         return None
@@ -841,13 +835,7 @@ def _jira_auth_header(setting: IntegrationSetting) -> str:
 
 
 async def _push_to_jira(target, setting: IntegrationSetting, changed_fields: dict) -> None:
-    """Push a title and/or status change to the linked Jira issue.
-
-    Jira does not accept a status as a field write: the status is reached by
-    applying a transition, and transition ids differ per workflow. So the status
-    path reads the issue's available transitions and picks the one landing in the
-    wanted status category.
-    """
+    """Push a title and/or status change to the linked Jira issue."""
     if not setting.base_url:
         raise ValueError("Jira integration requires the site base URL.")
 

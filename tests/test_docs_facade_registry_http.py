@@ -1,14 +1,4 @@
-"""The registry endpoint's filtering, sorting and paging, in SQL.
-
-The screen used to fetch a project's documents whole and narrow them in the
-browser. It now sends every filter, the sort and the page to the server, so the
-questions that used to be answered in JavaScript are answered here - and these
-drive the real route against real Postgres so the answers come from the query
-plan and not from a fixture.
-
-The browser-side counterpart (ui/src/test/registry-filtering.test.tsx) checks
-only that the screen *asks* correctly. This checks the answering.
-"""
+"""The registry endpoint's filtering, sorting and paging, in SQL."""
 
 from __future__ import annotations
 
@@ -53,11 +43,7 @@ def reviewer(api_client: TestClient, auth_headers):
 
 @pytest.fixture
 def registry(api_client: TestClient, auth_headers, reviewer):
-    """A project whose documents disagree on every axis the registry filters by.
-
-    Four artefacts across two types, chosen so that a filter matching everything
-    and a filter matching nothing are told apart by which identifiers come back.
-    """
+    """A project whose documents disagree on every axis the registry filters by."""
     project = create_project(api_client, auth_headers, "Registry")
     pid = project["id"]
 
@@ -363,10 +349,8 @@ class TestOrdering:
         assert sorted(found[:2]) == sorted([registry["bravo"], registry["charlie"]])
 
     def test_sorts_by_a_column_only_one_type_has(self, api_client, auth_headers, registry):
-        # req_origin exists on requirements alone; the test cases contribute a
-        # typed NULL, which has to sort as the empty string rather than fail or
-        # scatter. Ascending: the two NULLs, then Customer, then the Internal
-        # a requirement defaults to.
+        # req_origin exists on requirements alone; the test cases contribute a typed
+        # NULL, which has to sort as the empty string rather than fail or scatter.
         response = fetch(api_client, auth_headers, registry["prefix"], sort="req_origin", dir="asc")
         assert response.status_code == 200
         found = ids(response)
@@ -464,12 +448,7 @@ class TestTheTypeSummary:
 
 
 class TestAskingForNamedDocuments:
-    """`keys=TYPE:row_id` - the shape a caller holding links can actually ask in.
-
-    A links panel knows the (type, row id) pairs its chips point at, because
-    that is what a link stores. It used to read the whole project to turn a
-    dozen of those into a dozen titles.
-    """
+    """`keys=TYPE:row_id` - the shape a caller holding links can actually ask in."""
 
     def keys_for(self, api_client, headers, prefix, *doc_ids) -> list[str]:
         items = fetch(api_client, headers, prefix).json()["items"]
@@ -490,11 +469,7 @@ class TestAskingForNamedDocuments:
         assert body["total"] == 2
 
     def test_reaches_across_types(self, api_client, auth_headers, registry):
-        """One request has to answer for every type at once, or it is useless.
-
-        A panel's chips are mixed - a requirement next to a test case - and it
-        cannot afford one request per type.
-        """
+        """One request has to answer for every type at once, or it is useless."""
         prefix = registry["prefix"]
         keys = self.keys_for(api_client, auth_headers, prefix, registry["bravo"], registry["delta"])
 
@@ -521,11 +496,7 @@ class TestAskingForNamedDocuments:
         assert body["total"] == 0
 
     def test_names_a_document_backed_kind(self, api_client, auth_headers, registry):
-        """SPEC/PRT/RPT/STD live in a shared table and are not in TYPE_MAP.
-
-        They are ordinary link targets, so a key naming one has to work rather
-        than be rejected as an unknown type.
-        """
+        """SPEC/PRT/RPT/STD live in a shared table and are not in TYPE_MAP."""
         prefix = registry["prefix"]
         created = api_client.post(
             f"/api/projects/{registry['project']['id']}/documents",

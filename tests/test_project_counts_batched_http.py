@@ -97,12 +97,7 @@ def test_counts_are_isolated_between_projects(api_client: TestClient):
 
 
 def test_listing_projects_does_not_issue_a_query_per_project(api_client: TestClient):
-    """The cost of the list must not scale with the number of projects.
-
-    Each project card carries eleven counts. Computing them per row meant a
-    ten-project dashboard executed 101 sequential statements; this asserts the
-    shape of that cost rather than a wall-clock time, so it holds on any machine.
-    """
+    """The cost of the list must not scale with the number of projects."""
     from sqlalchemy import event
 
     from app.core.database import engine
@@ -131,9 +126,7 @@ def test_listing_projects_does_not_issue_a_query_per_project(api_client: TestCli
         create_project(api_client, headers, f"Scale {n} {suffix}")
     grown = count_list_queries()
 
-    # Four more projects previously meant roughly forty more statements. A small
-    # constant increase is tolerated so the assertion does not depend on how many
-    # projects other tests happen to have left behind.
+    # Four more projects previously meant roughly forty more statements.
     assert grown - baseline <= 2, (
         f"listing grew by {grown - baseline} queries for 4 more projects "
         f"({baseline} -> {grown}); the per-project N+1 has returned"

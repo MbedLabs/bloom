@@ -1,9 +1,4 @@
-"""files held against a document
-
-Revision ID: d20260810c11
-Revises: d20260805b10
-Create Date: 2026-08-10
-"""
+"""files held against a document"""
 
 import sqlalchemy as sa
 from alembic import op

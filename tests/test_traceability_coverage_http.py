@@ -81,9 +81,7 @@ def test_coverage_gap_report_counts_requirements_by_verification_state(api_clien
     assert body["uncovered"] == 1
     assert body["partial"] == 1
     assert body["covered"] == 1
-    # Total coverage counts requirements with any verifying test case. The
-    # draft-only requirement remains Partial, but it is not deducted from
-    # coverage.
+    # Total coverage counts requirements with any verifying test case.
     assert body["coverage_percent"] == 66.7
     assert len(body["gaps"]) == 2
 

@@ -1271,7 +1271,7 @@ class SyncResultsResponse(BaseModel):
     not_found: List[str]
 
 
-class ALMIntegrationSettings(BaseModel):
+class PLMIntegrationSettings(BaseModel):
     """Schema for PLM integration settings (Bloom)."""
 
     bloom_url: str

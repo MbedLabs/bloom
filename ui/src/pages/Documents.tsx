@@ -304,10 +304,7 @@ export default function Documents() {
   // filter stays shareable; the server only hears about it once typing pauses.
   const debouncedSearch = useDebounced(search, 250)
 
-  // Every filter, the sort and the page are the server's job now. The registry
-  // used to fetch the whole project - all 10 filters, 9 sort fields and the
-  // paging ran in the browser over every document it owned - which meant a
-  // thousand-document project paid for a thousand documents to show thirty.
+  // Every filter, the sort and the page are the server's job now.
   const { data: docsData, isLoading } = useQuery({
     queryKey: [
       'all-docs', prefix, typeFilters, statusFilters, debouncedSearch, priorityFilter,

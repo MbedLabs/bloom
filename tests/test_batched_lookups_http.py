@@ -6,12 +6,7 @@ from fastapi.testclient import TestClient
 
 from tests.conftest import create_project, unique_suffix
 
-"""Behaviour preserved when per-row lookups were replaced by batched ones.
-
-Each of these paths used to issue one statement per requested id. Batching them
-changes how the rows arrive but must not change which ids are accepted, which
-are rejected, or what the caller is told — and none of that was covered before.
-"""
+"""Behaviour preserved when per-row lookups were replaced by batched ones."""
 
 
 def _admin_headers(api_client: TestClient) -> dict[str, str]:

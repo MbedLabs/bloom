@@ -1,16 +1,4 @@
-"""
-First-run setup flow.
-
-The endpoints are unauthenticated, so the tests that matter are the ones
-proving the window closes: once any user exists, the instance must refuse to
-create another administrator and must stop advertising that setup is needed.
-
-Unlike the rest of the HTTP suite this builds its own throwaway SQLite engine
-rather than using ``api_client``. The shared session-scoped client runs against
-a real Postgres that already holds users, and the state under test here is an
-instance that has none — which cannot be reached without destroying that
-database.
-"""
+"""First-run setup flow."""
 
 from typing import AsyncGenerator
 
@@ -55,12 +43,7 @@ async def session_maker(empty_engine):
 
 @pytest.fixture
 def fresh_client(session_maker):
-    """A client whose instance has never had a user.
-
-    The app object is not started through its lifespan here, so nothing seeds an
-    administrator: this is the empty-table state a packaged first boot begins
-    from.
-    """
+    """A client whose instance has never had a user."""
 
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         async with session_maker() as session:
@@ -110,12 +93,7 @@ def test_rejects_a_password_below_the_shared_policy(fresh_client):
 
 
 def test_setup_succeeds_when_mail_is_unavailable(fresh_client, monkeypatch):
-    """No SMTP is a supported deployment, not a failure.
-
-    docker-compose defaults to SMTP_ENABLED=false and the Cloudron mail addon is
-    optional; if a mail failure aborted setup, those installs could never create
-    an administrator at all.
-    """
+    """No SMTP is a supported deployment, not a failure."""
     from app.services.mail_service import MailConfigurationError
 
     def _boom(**kwargs):

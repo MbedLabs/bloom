@@ -807,12 +807,7 @@ class ImportAttempt(Base):
 
 
 class DocumentAttachment(Base):
-    """A file held against a document.
-
-    Bloom is where the evidence lives: Bud expires its artifacts on a retention
-    timer, so a report only linked there stops being readable long before the
-    project it belongs to is closed.
-    """
+    """A file held against a document."""
 
     __tablename__ = "document_attachments"
 
