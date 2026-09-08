@@ -97,6 +97,66 @@ afterEach(() => {
   })
 })
 
+describe('the # trigger', () => {
+  const artefacts = [
+    { id: 42, label: 'FLT-REQ-0042', hint: 'Brake pressure', docType: 'REQ' },
+    { id: 43, label: 'FLT-DES-0007', hint: 'Hydraulic loop', docType: 'DES' },
+  ]
+
+  it('searches on the query rather than filtering a fixed list', async () => {
+    const search = vi.fn().mockResolvedValue(artefacts)
+    const { container } = renderEditor({ artefactSearch: search })
+    const surface = await editorSurface(container)
+
+    await type(surface, '#brake')
+
+    await waitFor(() => expect(search).toHaveBeenCalledWith('brake'))
+    await waitFor(() => expect(popover()).toBeTruthy())
+    expect(popover()?.textContent).toContain('FLT-REQ-0042')
+  })
+
+  it('stays quiet until the query is worth a request', async () => {
+    const search = vi.fn().mockResolvedValue(artefacts)
+    const { container } = renderEditor({ artefactSearch: search })
+    const surface = await editorSurface(container)
+
+    await type(surface, '#b')
+
+    expect(search).not.toHaveBeenCalled()
+  })
+
+  it('offers nothing when the host cannot tag', async () => {
+    const { container } = renderEditor({})
+    const surface = await editorSurface(container)
+
+    await type(surface, '#brake')
+
+    expect(popover()?.textContent ?? '').not.toContain('FLT-REQ-0042')
+  })
+
+  it('inserts a reference that links to the artefact', async () => {
+    const search = vi.fn().mockResolvedValue(artefacts)
+    const { container } = renderEditor({
+      artefactSearch: search,
+      artefactHref: (type: string, id: number) => `/projects/FLT/${type}/${id}`,
+    })
+    const surface = await editorSurface(container)
+
+    await type(surface, '#brake')
+    await waitFor(() => expect(popover()).toBeTruthy())
+
+    const option = popover()?.querySelector('button') as HTMLElement
+    fireEvent.click(option)
+
+    await waitFor(() => {
+      const anchor = surface.querySelector('a.mention-artefact') as HTMLAnchorElement
+      expect(anchor).toBeTruthy()
+      expect(anchor.getAttribute('href')).toBe('/projects/FLT/REQ/42')
+      expect(anchor.textContent).toBe('FLT-REQ-0042')
+    })
+  })
+})
+
 describe('the {{ trigger', () => {
   it('opens on {{ and offers the project’s parameters', async () => {
     const { container } = renderEditor()
