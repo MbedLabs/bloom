@@ -172,12 +172,7 @@ async def export_traceability(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    """Export the requirement <-> verifying-test-case matrix as CSV.
-
-    Long format: one row per (requirement, verifying test case) pair; uncovered
-    requirements appear once with empty test-case columns so coverage gaps are
-    visible in the same file.
-    """
+    """Export the requirement <-> verifying-test-case matrix as CSV."""
     project = await _load_project(db, project_id, current_user)
     requirements = await _load_requirements(db, project_id)
 

@@ -1,10 +1,4 @@
-"""Documents can be filtered to the artefacts sharing a relationship with one document.
-
-Clicking a relationship used to be a dead end: the role label was inert, and the
-id beside it jumped straight to the other document, so there was no way to see a
-relationship in the registry. The registry only had blunt link filters
-(linked/unlinked/incoming/outgoing), never "related to *this* document".
-"""
+"""Documents can be filtered to the artefacts sharing a relationship with one document."""
 
 import pytest
 import pytest_asyncio

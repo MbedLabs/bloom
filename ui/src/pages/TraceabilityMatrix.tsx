@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { traceabilityApi, projectsApi, exportApi } from '../api/client'
 import { docUrl } from '../types/doc'
-import { ArrowLeft, CheckCircle, AlertCircle, XCircle, ExternalLink, Shield, Filter, GitBranch, AlertTriangle, X, Download } from 'lucide-react'
+import { ArrowLeft, CheckCircle, AlertCircle, XCircle, Shield, Filter, GitBranch, AlertTriangle, X, Download } from 'lucide-react'
 
 const COVERAGE_OPTIONS = ['Covered', 'Partial', 'Uncovered'] as const
 const PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Critical']
@@ -12,6 +12,8 @@ const TRACEABILITY_SORT_OPTIONS = [
   { value: 'priority', label: 'Priority' },
   { value: 'coverage', label: 'Coverage' },
 ] as const
+
+const PAGE_SIZE = 50
 
 export default function TraceabilityMatrix() {
   const { prefix } = useParams<{ prefix: string }>()
@@ -51,12 +53,22 @@ export default function TraceabilityMatrix() {
     setCoverageDefaultApplied(true)
   }, [projId, coverageReport, coverageDefaultApplied])
 
+  const [page, setPage] = useState(0)
+
+  // A filter or sort change reorders the whole set, so page 3 of the old result
+  // is meaningless against the new one.
+  useEffect(() => {
+    setPage(0)
+  }, [coverageFilter, priorityFilter, sortBy, projId])
+
   const { data: matrix, isLoading, error } = useQuery({
-    queryKey: ['traceability', projId, coverageFilter, priorityFilter, sortBy],
+    queryKey: ['traceability', projId, coverageFilter, priorityFilter, sortBy, page],
     queryFn: () => traceabilityApi.getMatrix(projId, {
       coverage_filter: coverageFilter || undefined,
       priority_filter: priorityFilter || undefined,
       sort_by: sortBy,
+      skip: page * PAGE_SIZE,
+      limit: PAGE_SIZE,
     }),
     enabled: !!projId && coverageDefaultApplied,
     placeholderData: keepPreviousData,
@@ -100,7 +112,9 @@ export default function TraceabilityMatrix() {
     )
   }
 
-  const rows = matrix ?? []
+  const rows = matrix?.items ?? []
+  const matrixTotal = matrix?.total ?? 0
+  const pageCount = Math.max(1, Math.ceil(matrixTotal / PAGE_SIZE))
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -386,8 +400,6 @@ export default function TraceabilityMatrix() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Priority</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Coverage</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Test Cases</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Test Runs</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Impact</th>
                 </tr>
               </thead>
@@ -416,48 +428,6 @@ export default function TraceabilityMatrix() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <CoverageBadge status={item.coverage_status} />
                     </td>
-                    <td className="px-6 py-4 text-sm">
-                      {item.linked_test_cases.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {item.linked_test_cases.map((tc) => (
-                            <Link
-                              key={tc.id}
-                              to={docUrl(prefix!, 'TC', tc.tc_id)}
-                              className="inline-flex items-center px-2 py-0.5 bg-primary/10 text-primary rounded text-xs font-mono hover:bg-primary/20"
-                            >
-                              {tc.tc_id}
-                            </Link>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">&mdash;</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      {item.linked_test_runs.length > 0 ? (
-                        <div className="space-y-1">
-                          {item.linked_test_runs.map((tr) => (
-                            <div key={tr.id} className="flex items-center">
-                              {tr.teststation_url ? (
-                                <a
-                                  href={tr.teststation_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-primary hover:text-primary/80 inline-flex items-center"
-                                >
-                                  <ExternalLink className="h-3 w-3 mr-1" />
-                                  {tr.test_run_name || `#${tr.test_run_id}`}
-                                </a>
-                              ) : (
-                                <span className="text-muted-foreground">{tr.test_run_name || `#${tr.test_run_id}`}</span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">&mdash;</span>
-                      )}
-                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <ImpactLink prefix={prefix!} reqId={item.requirement.req_id} />
                     </td>
@@ -465,6 +435,36 @@ export default function TraceabilityMatrix() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {matrixTotal > PAGE_SIZE && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-border">
+            <span className="text-sm text-muted-foreground">
+              {page * PAGE_SIZE + 1}&ndash;{Math.min((page + 1) * PAGE_SIZE, matrixTotal)} of{' '}
+              {matrixTotal}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="px-3 py-1.5 text-sm rounded-md border border-input disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted transition-colors"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-muted-foreground">
+                Page {page + 1} of {pageCount}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+                disabled={page >= pageCount - 1}
+                className="px-3 py-1.5 text-sm rounded-md border border-input disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted transition-colors"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </section>

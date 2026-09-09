@@ -5,6 +5,9 @@ from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS, normalize_document
 LINKABLE_ARTEFACT_KINDS = ("REQ", "TC", "DES", "RSK", "CHG", "CPT", "DEF", "CMP", "TS")
 LINKABLE_DOC_KINDS = LINKABLE_ARTEFACT_KINDS + tuple(CANONICAL_DOCUMENT_KINDS)
 
+TAG_ROLE = "references"
+TAG_HOST_KINDS = ("REQ", "DES", "RSK", "CHG", "CPT") + tuple(CANONICAL_DOCUMENT_KINDS)
+
 LEGACY_LINK_KIND_ALIASES = {
     "TCO": "CPT",
     "PROT": "PRT",
@@ -150,3 +153,21 @@ def get_allowed_link_roles(source_type: str, target_type: str) -> tuple[str, ...
 
 def is_allowed_link_role(source_type: str, target_type: str, role: str) -> bool:
     return role in get_allowed_link_roles(source_type, target_type)
+
+
+def is_tag_host_type(source_type: str | None) -> bool:
+    """Whether a body of this kind may carry tags."""
+
+    return normalize_linkable_type(source_type) in TAG_HOST_KINDS
+
+
+def is_allowed_tag_pair(source_type: str | None, target_type: str | None) -> bool:
+    """Whether a body of one kind may tag an artefact of another.
+
+    Tags carry ``TAG_ROLE`` and are not governed by ``LINK_RULE_ROWS``: any
+    known kind may be tagged from any body that hosts tags.
+    """
+
+    return (
+        is_tag_host_type(source_type) and normalize_linkable_type(target_type) in LINKABLE_DOC_KINDS
+    )

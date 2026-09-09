@@ -5,7 +5,12 @@ Tests the pure compute_next_id function directly -- no DB mocking needed.
 
 import pytest
 
-from app.core.id_generator import compute_next_id, normalize_doc_id
+from app.core.id_generator import (
+    DOC_ID_PATTERN,
+    compute_next_id,
+    normalize_doc_id,
+    widened_ids,
+)
 
 
 def test_first_id_when_none_exist():
@@ -73,10 +78,38 @@ def test_different_project_prefix():
     assert result == "VCU-TC-013"
 
 
-def test_sequence_stops_at_999():
-    """The PRJ-TYP-XXX convention only permits three numeric suffix digits."""
-    with pytest.raises(ValueError, match="maximum is 999"):
-        compute_next_id(["PRJ-REQ-999"], "PRJ", "REQ")
+def test_sequence_continues_past_999():
+    """Three digits is the floor, not the ceiling."""
+    assert compute_next_id(["PRJ-REQ-999"], "PRJ", "REQ") == "PRJ-REQ-1000"
+    assert compute_next_id(["PRJ-REQ-9999"], "PRJ", "REQ") == "PRJ-REQ-10000"
+
+
+def test_existing_ids_widen_when_the_boundary_is_crossed():
+    """Passing 999 renumbers the narrower ids so one width is in use."""
+    existing = ["PRJ-REQ-001", "PRJ-REQ-099", "PRJ-REQ-999", "PRJ-REQ-1000"]
+
+    renames = widened_ids(existing, "PRJ", "REQ", 4)
+
+    assert renames == {
+        "PRJ-REQ-001": "PRJ-REQ-0001",
+        "PRJ-REQ-099": "PRJ-REQ-0099",
+        "PRJ-REQ-999": "PRJ-REQ-0999",
+    }
+    # Already at the target width, so untouched.
+    assert "PRJ-REQ-1000" not in renames
+
+
+def test_widening_leaves_other_projects_and_types_alone():
+    existing = ["PRJ-REQ-001", "PRJ-TC-001", "OTH-REQ-001"]
+
+    assert widened_ids(existing, "PRJ", "REQ", 4) == {"PRJ-REQ-001": "PRJ-REQ-0001"}
+
+
+def test_four_digit_ids_are_accepted_by_the_id_pattern():
+    """The pattern required exactly three digits, so a widened id would have
+    been rejected as malformed by the very code that generated it."""
+    assert DOC_ID_PATTERN.fullmatch("PRJ-REQ-0001") is not None
+    assert DOC_ID_PATTERN.fullmatch("PRJ-REQ-001") is not None
 
 
 def test_import_scenario_bulk_ids():
@@ -107,6 +140,9 @@ def test_zero_padded_consistency():
     result2 = compute_next_id(["PRJ-REQ-098"], "PRJ", "REQ")
     assert result2 == "PRJ-REQ-099"
     assert len(result2.split("-")[-1]) == 3
+
+    # Beyond three digits the width follows the number.
+    assert compute_next_id(["PRJ-REQ-1000"], "PRJ", "REQ") == "PRJ-REQ-1001"
 
 
 def test_rejects_project_prefix_that_is_not_three_letters():

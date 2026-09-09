@@ -1,9 +1,4 @@
-"""rate and concurrency controls for interactive attachment uploads
-
-Revision ID: d20260812d12
-Revises: d20260810c11
-Create Date: 2026-08-12
-"""
+"""rate and concurrency controls for interactive attachment uploads"""
 
 import sqlalchemy as sa
 

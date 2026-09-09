@@ -1,19 +1,4 @@
-"""The migration chain must stay a single explicit-DDL baseline.
-
-The schema used to be built by a base revision that called
-``Base.metadata.create_all()``. That made the baseline mirror whatever the models
-currently described, so every later revision found its columns already present on
-a fresh install and had to be written with inspect-then-add guards - and the real
-ALTER path was therefore never exercised by the empty-database CI check.
-
-The retired chain also carried data-only revisions (membership backfill,
-relationship-type canonicalisation, disabling integrations left without
-credentials). Those were one-time fixes: they match no rows on an empty database
-and every deployed database has already applied them, so the tests that covered
-them retired with the revisions themselves.
-
-These tests pin the replacement contract.
-"""
+"""The migration chain must stay a single explicit-DDL baseline."""
 
 import ast
 from pathlib import Path
@@ -37,13 +22,7 @@ def _revision_files() -> list[Path]:
 
 
 def test_the_baseline_is_still_the_only_root():
-    """Revisions may follow the baseline; none may sit beside it.
-
-    The rule this file exists to pin is that the schema is not rebuilt from the
-    models - not that the schema can never change again. What must stay true is
-    that every revision descends from the baseline, so a fresh database and a
-    deployed one walk the same path and the ALTER steps are really exercised.
-    """
+    """Revisions may follow the baseline; none may sit beside it."""
     roots = [
         path.name
         for path in _revision_files()
@@ -81,11 +60,7 @@ def test_baseline_is_the_root_and_keeps_the_deployed_head_id():
 
 
 def _create_all_calls() -> list[str]:
-    """Names of any create_all calls in the baseline.
-
-    Checked through the AST rather than by text search, because the module
-    docstring mentions create_all while explaining why it is gone.
-    """
+    """Names of any create_all calls in the baseline."""
     found: list[str] = []
     for node in ast.walk(ast.parse(_baseline_source())):
         if not isinstance(node, ast.Call):

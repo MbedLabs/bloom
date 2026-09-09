@@ -133,8 +133,6 @@ export default function MentionTextarea({
         return
       }
       // Only hand navigation keys to the list when it has something to select.
-      // Swallowing Enter on an empty list would stop the textarea from ever
-      // taking a newline while a stray `@` sits behind the caret.
       if (items.length > 0 && ['ArrowUp', 'ArrowDown', 'Enter'].includes(event.key)) {
         if (listRef.current?.onKeyDown({ event: event.nativeEvent })) {
           event.preventDefault()

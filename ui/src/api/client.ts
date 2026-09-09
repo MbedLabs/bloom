@@ -181,6 +181,12 @@ export function extractApiErrorMessage(error: unknown, fallback = 'Request faile
       if (typeof message === 'string' && message.trim().length > 0) return message
     }
   }
+  if (axios.isAxiosError(error)) {
+    const reference = error.response?.headers?.['x-request-id']
+    if (typeof reference === 'string' && reference.trim() && reference !== '-') {
+      return `${fallback}. Quote reference ${reference} when reporting this.`
+    }
+  }
   if (error instanceof Error && error.message) {
     return error.message
   }
@@ -864,9 +870,17 @@ export interface DocListParams {
   keys?: string[]
 }
 
+export interface MembershipEdge {
+  source_type: string
+  target_type: string
+  role: string
+  count: number
+}
+
 export interface DocTypeSummary {
   types: { doc_type: string; count: number; suspect_links: number }[]
   total: number
+  membership_edges?: MembershipEdge[]
 }
 
 export const docsApi = {
@@ -1036,13 +1050,26 @@ export const testCasesApi = {
 }
 
 export const traceabilityApi = {
-  getMatrix: async (projectId: number, params?: { coverage_filter?: string; priority_filter?: string; sort_by?: string }) => {
+  getMatrix: async (
+    projectId: number,
+    params?: {
+      coverage_filter?: string
+      priority_filter?: string
+      sort_by?: string
+      skip?: number
+      limit?: number
+    }
+  ) => {
     const query = new URLSearchParams()
     query.set('project_id', String(projectId))
     if (params?.coverage_filter) query.set('coverage_filter', params.coverage_filter)
     if (params?.priority_filter) query.set('priority_filter', params.priority_filter)
     if (params?.sort_by) query.set('sort_by', params.sort_by)
-    const response = await api.get<TraceabilityItem[]>(`/traceability?${query.toString()}`)
+    if (params?.skip !== undefined) query.set('skip', String(params.skip))
+    if (params?.limit !== undefined) query.set('limit', String(params.limit))
+    const response = await api.get<PaginatedResponse<TraceabilityItem>>(
+      `/traceability?${query.toString()}`
+    )
     return response.data
   },
 
@@ -1306,11 +1333,6 @@ export const campaignsApi = {
 
   removeItem: async (campaignId: number, itemId: number) => {
     await api.delete(`/campaigns/${campaignId}/items/${itemId}`)
-  },
-
-  scopeLinks: async (campaignId: number) => {
-    const response = await api.get<ArtefactLink[]>(`/campaigns/${campaignId}/scope-links`)
-    return response.data
   },
 
   listConfigurations: async (projectId: number) => {
@@ -1777,6 +1799,31 @@ export const artefactsApi = {
   },
   transition: async (artefactType: string, artefactId: number, status: string) => {
     const response = await api.post<{ status: string; allowed_transitions: string[] }>(`/artefacts/${artefactType}/${artefactId}/transition`, { status })
+    return response.data
+  },
+}
+
+export interface SetupStatusResponse {
+  setup_required: boolean
+}
+
+export const setupApi = {
+  // Unauthenticated on purpose: this is what a brand new instance answers
+  // before any account exists. It stops reporting true the moment one does.
+  getStatus: async (): Promise<SetupStatusResponse> => {
+    const response = await api.get<SetupStatusResponse>('/setup/status')
+    return response.data
+  },
+  createFirstAdmin: async (
+    email: string,
+    password: string,
+    fullName: string
+  ): Promise<{ message: string }> => {
+    const response = await api.post<{ message: string }>('/setup', {
+      email,
+      password,
+      full_name: fullName,
+    })
     return response.data
   },
 }

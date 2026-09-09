@@ -20,8 +20,16 @@ from app.core.security import (
     require_role,
 )
 from app.models import Project
-from app.models.models import Requirement, TestCase
-from app.models.project_membership import ProjectMembership
+from app.models.models import (
+    Defect,
+    DocumentAttachment,
+    ImportAttempt,
+    Notification,
+    Requirement,
+    ServiceCredential,
+    TestCase,
+)
+from app.models.project_membership import ProjectExternalDocType, ProjectMembership
 from app.models.user import User, UserRole
 from app.models.user_token import UserToken, UserTokenPurpose
 from app.schemas.auth import (
@@ -114,18 +122,7 @@ async def list_mentionable_users(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Who may be addressed with `@` in one project.
-
-    Mentioning a colleague is a collaboration act, not an administrative one:
-    the people working a project have to be able to tag each other. Gating the
-    editor's list on the admin-only user directory meant `@` silently offered
-    nothing to every maintainer, because a 403 here reads as an empty list.
-
-    So the gate is project access rather than global role, and the list is the
-    project's own members plus the admins, who reach every project anyway.
-    Inactive accounts are left out - there is no point addressing someone who
-    cannot answer.
-    """
+    """Who may be addressed with `@` in one project."""
     project = (
         await db.execute(select(Project).where(Project.id == project_id))
     ).scalar_one_or_none()
@@ -445,7 +442,44 @@ async def delete_user(
             .values(approved_by_id=None, approved_at=None)
         )
 
+        # Rows that cannot exist without their user.
+        await db.execute(
+            delete(ProjectExternalDocType).where(
+                ProjectExternalDocType.membership_id.in_(
+                    select(ProjectMembership.id).where(ProjectMembership.user_id == user_id)
+                )
+            )
+        )
+        await db.execute(delete(ProjectMembership).where(ProjectMembership.user_id == user_id))
+        await db.execute(delete(Notification).where(Notification.user_id == user_id))
+        await db.execute(delete(ImportAttempt).where(ImportAttempt.user_id == user_id))
+
+        # A service credential outlives whoever minted it: deleting one because
+        # its creator left would silently break a working integration, so it is
+        # reassigned to the administrator performing the deletion instead.
+        await db.execute(
+            update(ServiceCredential)
+            .where(ServiceCredential.created_by_user_id == user_id)
+            .values(created_by_user_id=admin.id)
+        )
+
+        await db.execute(update(Defect).where(Defect.owner_id == user_id).values(owner_id=None))
+        await db.execute(
+            update(Defect).where(Defect.reporter_id == user_id).values(reporter_id=None)
+        )
+        await db.execute(
+            update(Defect).where(Defect.reviewer_id == user_id).values(reviewer_id=None)
+        )
+        await db.execute(
+            update(DocumentAttachment)
+            .where(DocumentAttachment.uploaded_by_id == user_id)
+            .values(uploaded_by_id=None)
+        )
+
         await db.delete(user)
+
+        # Force the statement out now.
+        await db.flush()
     except IntegrityError as exc:
         raise HTTPException(
             status_code=409,

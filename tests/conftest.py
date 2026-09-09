@@ -41,13 +41,13 @@ def _load_workspace_dotenv_into_environ() -> None:
             os.environ[key] = val
 
 
-if os.environ.get("BLOOM_DOTENV_DISABLED") == "1":
-    # CI / explicit pytest: shell env wins; strip bloom-prefixed DB so ``DATABASE_URL`` alone applies.
-    os.environ.pop("BLOOM_DATABASE_URL", None)
-else:
+if os.environ.get("BLOOM_TESTS_USE_DOTENV") == "1":
     _load_workspace_dotenv_into_environ()
     if "SECRET_KEY" not in os.environ and os.environ.get("BLOOM_SECRET_KEY"):
         os.environ["SECRET_KEY"] = os.environ["BLOOM_SECRET_KEY"]
+else:
+    # CI / explicit pytest: shell env wins; strip bloom-prefixed DB so ``DATABASE_URL`` alone applies.
+    os.environ.pop("BLOOM_DATABASE_URL", None)
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characters-long")
 os.environ.setdefault("BLOOM_DISABLE_RATE_LIMIT", "1")
@@ -87,10 +87,9 @@ def api_client():
     from app.core.deps import limiter
     from app.main import app
 
-    # This suite drives many real logins across a single client IP within a
-    # minute; the login rate limiter (10/min) is not what these flows test, so
-    # disable it here to avoid cross-test 429s. The DB-backed import-attempt
-    # limiter (its own 429 tests) is independent and unaffected.
+    # This suite drives many real logins across a single client IP within a minute; the
+    # login rate limiter (10/min) is not what these flows test, so disable it here to
+    # avoid cross-test 429s.
     limiter.enabled = False
 
     with TestClient(app, base_url="http://test") as client:
@@ -134,13 +133,7 @@ def make_email():
 
 
 def create_project(client, headers: dict, stem: str = "Project", **overrides) -> dict:
-    """Create a project, retrying past a taken prefix.
-
-    Prefixes are exactly three uppercase letters - 17,576 of them - so a random
-    one is not unique, merely unlikely to clash. On a database that accumulates
-    projects across runs that is a real collision, not a theoretical one, so
-    retry rather than hope.
-    """
+    """Create a project, retrying past a taken prefix."""
     last = None
     for _ in range(12):
         body = {"name": unique_name(stem), "prefix": unique_prefix()}

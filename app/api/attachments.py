@@ -1,10 +1,4 @@
-"""Files held against a document.
-
-Access follows the document: whoever may read it may read what is attached to
-it, and only a maintainer may add or remove. Downloads are always served as an
-attachment, never inline, so a stored SVG or HTML cannot execute in the
-browsing user's session.
-"""
+"""Files held against a document."""
 
 from __future__ import annotations
 
@@ -207,13 +201,7 @@ async def publish_test_report(
     db: AsyncSession = Depends(get_db),
     _service_credential=Depends(require_bud_sync_token),
 ):
-    """Receive a Bud run's report as a Report (RPT) document.
-
-    Publishing is a decision made in Bud, not a consequence of running tests:
-    a suite that runs nightly would otherwise mint a Report a night. Re-sending
-    the same run updates the document it already made rather than adding
-    another, so a retry is safe and a re-publish is a correction.
-    """
+    """Receive a Bud run's report as a Report (RPT) document."""
     project = await resolve_project(db, data.project_prefix)
     source_ref = f"bud-run:{data.bud_run_id}"
 

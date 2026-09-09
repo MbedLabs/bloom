@@ -1,9 +1,4 @@
-"""Coverage means the same thing wherever it is reported.
-
-Total coverage is the share of requirements with at least one verifying test
-case. Draft-only links remain visible as Partial coverage, but Partial is a
-quality breakdown inside Total coverage rather than a deduction from it.
-"""
+"""Coverage means the same thing wherever it is reported."""
 
 import os
 
@@ -140,7 +135,7 @@ def test_all_coverage_percentages_include_partial_requirements(
 
     matrix = api_client.get(
         f"/api/traceability?project_id={project_id}", headers=auth_headers
-    ).json()
+    ).json()["items"]
     statuses = {item["requirement"]["req_id"]: item["coverage_status"] for item in matrix}
     assert statuses[covered_req["req_id"]] == COVERED
     assert statuses[draft_only_req["req_id"]] == PARTIAL

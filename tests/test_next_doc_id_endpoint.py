@@ -1,10 +1,4 @@
-"""The create screen's id preview must come from the server, not a guess.
-
-DocCreate used to render a hardcoded ``PRJ-TYP-001``, so it advertised an
-identifier that was already taken as soon as a project held one document of that
-type. The server allocates with MAX(suffix)+1; this endpoint exposes the same
-computation so the preview matches what will actually be assigned.
-"""
+"""The create screen's id preview must come from the server, not a guess."""
 
 import pytest
 

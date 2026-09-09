@@ -1,10 +1,4 @@
-"""CRUD across the controlled artefacts: defects, changes, risks, baselines.
-
-Each type has its own router with the same shape - list, create, read, patch,
-delete - and the same guards around project access, terminal statuses and
-external tracker references. These drive the real routes so those guards are
-exercised rather than assumed.
-"""
+"""CRUD across the controlled artefacts: defects, changes, risks, baselines."""
 
 from __future__ import annotations
 

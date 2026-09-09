@@ -34,6 +34,7 @@ from app.schemas import (
     PaginatedResponse,
     SectionReorder,
 )
+from app.services.tag_links import sync_tag_links
 
 router = APIRouter()
 
@@ -57,12 +58,24 @@ async def list_documents(
     result = await db.execute(query)
     documents = result.scalars().all()
 
+    # Section counts for the whole page in one statement; this used to be a
+    # count query per document returned.
+    section_counts: dict[int, int] = {}
+    if documents:
+        section_counts = {
+            document_id: total
+            for document_id, total in (
+                await db.execute(
+                    select(DocumentSection.document_id, func.count(DocumentSection.id))
+                    .where(DocumentSection.document_id.in_([d.id for d in documents]))
+                    .group_by(DocumentSection.document_id)
+                )
+            ).all()
+        }
+
     response = []
     for doc in documents:
-        section_count_result = await db.execute(
-            select(func.count(DocumentSection.id)).where(DocumentSection.document_id == doc.id)
-        )
-        section_count = section_count_result.scalar()
+        section_count = section_counts.get(doc.id, 0)
 
         response.append(
             DocumentResponse(
@@ -135,6 +148,13 @@ async def create_document(
     db.add(document)
     await db.flush()
     await db.refresh(document)
+    await sync_tag_links(
+        db,
+        project_id=document.project_id,
+        source_type=normalize_document_kind(document.doc_type),
+        source_id=document.id,
+        content_json=document.content_json,
+    )
     await log_artefact_activity(
         db,
         "document",
@@ -275,6 +295,13 @@ async def update_document(
         document.description = data.description
     if data.content_json is not None:
         document.content_json = data.content_json
+        await sync_tag_links(
+            db,
+            project_id=document.project_id,
+            source_type=normalize_document_kind(document.doc_type),
+            source_id=document.id,
+            content_json=data.content_json,
+        )
     if data.content_html is not None:
         document.content_html = data.content_html
 
@@ -522,14 +549,30 @@ async def reorder_sections(
         roles={UserRole.admin.value, UserRole.maintainer.value},
     )
 
-    for item in data.section_orders:
-        section_result = await db.execute(
-            select(DocumentSection).where(
-                DocumentSection.id == item["id"],
-                DocumentSection.document_id == document_id,
+    # Load every section being reordered at once. Scoping by document_id is kept
+    # so ids belonging to another document are ignored exactly as before.
+    requested_ids = [item["id"] for item in data.section_orders]
+    sections_by_id = (
+        {
+            section.id: section
+            for section in (
+                (
+                    await db.execute(
+                        select(DocumentSection).where(
+                            DocumentSection.id.in_(requested_ids),
+                            DocumentSection.document_id == document_id,
+                        )
+                    )
+                )
+                .scalars()
+                .all()
             )
-        )
-        section = section_result.scalar_one_or_none()
+        }
+        if requested_ids
+        else {}
+    )
+    for item in data.section_orders:
+        section = sections_by_id.get(item["id"])
         if section:
             section.order = item["order"]
 

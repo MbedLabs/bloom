@@ -42,6 +42,7 @@ from app.core.security import (
 from app.models import (
     ArtefactLink,
     ArtefactVisibility,
+    CampaignSuite,
     ChangeRequest,
     Defect,
     DesignItem,
@@ -50,9 +51,11 @@ from app.models import (
     Requirement,
     RiskItem,
     TestCampaign,
+    TestCampaignItem,
     TestCase,
     TestConcept,
     TestSuite,
+    TestSuiteItem,
     UserRole,
 )
 from app.models.user import User
@@ -211,13 +214,7 @@ MAX_DOC_KEYS = 500
 
 
 def _parse_doc_keys(keys: list[str]) -> set[tuple[str, int]]:
-    """Parse ``TYPE:row_id`` pairs into the key set the union already filters on.
-
-    A caller that holds links holds (type, row id) pairs, not public ids - that
-    is what a link stores. Letting it ask for exactly those documents is what
-    keeps a panel showing a dozen chips from reading the whole project to find
-    a dozen titles.
-    """
+    """Parse ``TYPE:row_id`` pairs into the key set the union already filters on."""
     parsed: set[tuple[str, int]] = set()
     for key in keys:
         type_code, _, raw_id = key.partition(":")
@@ -284,9 +281,7 @@ async def _related_doc_keys(
 # got before, so the topology's paged fetch is unaffected.
 # ---------------------------------------------------------------------------
 
-# The labels the registry shows for each type. They live here as well as in the
-# UI because free-text search matches what the reader can see: someone typing
-# "Requirement" means the REQ rows, and the server is now the one searching.
+# The labels the registry shows for each type.
 _TYPE_LABELS = {
     "REQ": "Requirement",
     "TC": "Test Case",
@@ -322,14 +317,7 @@ _LINK_FILTERS = frozenset({"linked", "unlinked", "incoming", "outgoing", "suspec
 
 
 def _optional_column(model, name: str, type_):
-    """The model's column, or a typed NULL for the arms that do not have one.
-
-    Every arm of a UNION has to present the same columns in the same order, so a
-    model without `req_origin` contributes a NULL of the right type rather than
-    being left out. Only the NULL is given a type: SQLite's DATETIME has NUMERIC
-    affinity, so casting a real timestamp column to it yields the year as an
-    integer and the row comes back unreadable.
-    """
+    """The model's column, or a typed NULL for the arms that do not have one."""
     column = getattr(model, name, None)
     return cast(null(), type_) if column is None else column
 
@@ -373,12 +361,7 @@ def _shell_arm(model, type_code: str, id_col_name: str):
 
 
 def _link_count_subqueries(project_id: int):
-    """Per-document incoming and outgoing link tallies, as two grouped subqueries.
-
-    Joined onto the union rather than fetched per type, so the counts cost two
-    grouped scans of `artefact_links` no matter how many types are in play, and
-    stay filterable and sortable in SQL.
-    """
+    """Per-document incoming and outgoing link tallies, as two grouped subqueries."""
     suspect_sum = func.coalesce(
         func.sum(case((ArtefactLink.suspect.is_(True), 1), else_=0)), 0
     ).label("suspect_count")
@@ -416,11 +399,7 @@ async def _registry_union(
     type_filter: Optional[list[str]],
     related_keys: Optional[set[tuple[str, int]]],
 ):
-    """The set of documents this user may see in this project, as one union.
-
-    Returns None when no type survives the filters, which is not the same as
-    an empty result set: there is nothing to select from at all.
-    """
+    """The set of documents this user may see in this project, as one union."""
     allowed_doc_types = await get_external_doc_types(db, current_user, project.id)
     arms = []
 
@@ -643,11 +622,8 @@ async def list_all_docs(
 
     if q and q.strip():
         needle = f"%{q.strip()}%"
-        # The reader searches what the table shows them, so this covers the
-        # human label of the kind and the reviewer's name as well as the stored
-        # fields. Dates match on their ISO form - a timestamp cast to text
-        # starts `YYYY-MM-DD` on Postgres and on the SQLite the tests run on,
-        # so "2026-03" narrows to a month without a dialect-specific format.
+        # The reader searches what the table shows them, so this covers the human label
+        # of the kind and the reviewer's name as well as the stored fields.
         type_label = case(
             *[(registry.c.doc_type == code, label) for code, label in _TYPE_LABELS.items()],
             else_=registry.c.doc_type,
@@ -735,9 +711,17 @@ class DocTypeCount(BaseModel):
     suspect_links: int
 
 
+class MembershipEdge(BaseModel):
+    source_type: str
+    target_type: str
+    role: str
+    count: int
+
+
 class DocTypeSummaryResponse(BaseModel):
     types: List[DocTypeCount]
     total: int
+    membership_edges: List[MembershipEdge] = []
 
 
 @router.get(
@@ -749,21 +733,13 @@ async def get_doc_type_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """How many documents of each type this user can see, and how many suspect links.
-
-    The topology draws one node per *type*, not per document, and the project
-    screen wants a single count - both used to download every document in the
-    project to work that out. This is the same numbers as one grouped query.
-
-    Deliberately not routed under `/docs/...` so it cannot be mistaken for a
-    document whose id happens to be "doc-type-summary".
-    """
+    """How many documents of each type this user can see, and how many suspect links."""
     project = await resolve_project(db, project_ref)
     await require_project_access(db, current_user, project.id)
 
     registry = await _registry_union(db, project, current_user, type_filter=None, related_keys=None)
     if registry is None:
-        return DocTypeSummaryResponse(types=[], total=0)
+        return DocTypeSummaryResponse(types=[], total=0, membership_edges=[])
 
     incoming, outgoing = _link_count_subqueries(project.id)
     suspect_links = func.coalesce(incoming.c.suspect_count, 0) + func.coalesce(
@@ -801,7 +777,43 @@ async def get_doc_type_summary(
         )
         for row in rows
     ]
-    return DocTypeSummaryResponse(types=types, total=sum(t.count for t in types))
+    return DocTypeSummaryResponse(
+        types=types,
+        total=sum(t.count for t in types),
+        membership_edges=await _membership_edges(db, project.id),
+    )
+
+
+async def _membership_edges(db: AsyncSession, project_id: int) -> List[MembershipEdge]:
+    suites_in_campaigns = (
+        select(func.count())
+        .select_from(CampaignSuite)
+        .join(TestCampaign, TestCampaign.id == CampaignSuite.campaign_id)
+        .where(TestCampaign.project_id == project_id)
+    )
+    cases_in_suites = (
+        select(func.count())
+        .select_from(TestSuiteItem)
+        .join(TestSuite, TestSuite.id == TestSuiteItem.suite_id)
+        .where(TestSuite.project_id == project_id)
+    )
+    cases_in_campaigns = (
+        select(func.count())
+        .select_from(TestCampaignItem)
+        .join(TestCampaign, TestCampaign.id == TestCampaignItem.campaign_id)
+        .where(TestCampaign.project_id == project_id)
+    )
+
+    counted = [
+        ("CMP", "TS", "relates_to", await db.scalar(suites_in_campaigns)),
+        ("TS", "TC", "contains", await db.scalar(cases_in_suites)),
+        ("CMP", "TC", "contains", await db.scalar(cases_in_campaigns)),
+    ]
+    return [
+        MembershipEdge(source_type=source, target_type=target, role=role, count=count)
+        for source, target, role, count in counted
+        if count
+    ]
 
 
 class NextDocIdResponse(BaseModel):
@@ -819,15 +831,7 @@ async def get_next_doc_id(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Report the identifier the server would assign to the next document.
-
-    The create screen used to render a hardcoded ``-001`` preview, which claimed
-    an identifier that was usually already taken. The server allocates with
-    MAX(suffix)+1, so the preview has to come from the same place.
-
-    Deliberately not routed under ``/docs/{kind_slug}/...`` so it cannot be
-    mistaken for a document whose id happens to be "next-doc-id".
-    """
+    """Report the identifier the server would assign to the next document."""
     project = await resolve_project(db, project_ref)
     await require_project_access(db, current_user, project.id)
 

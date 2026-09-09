@@ -426,11 +426,8 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null)
   const [layoutToken, setLayoutToken] = useState(0)
 
-  // This graph has one node per doc *type*, never one per document, so all it
-  // has ever needed is a count and a suspect tally per type. It used to get
-  // them by downloading every document in the project - three round trips at a
-  // thousand documents, each one re-reading every type table - and folding them
-  // down in the browser. The server does the fold now, in one grouped query.
+  // This graph has one node per doc *type*, never one per document, so all it has ever
+  // needed is a count and a suspect tally per type.
   const { data: summary, isLoading: docsLoading } = useQuery({
     queryKey: ['project-doc-type-summary', prefix],
     queryFn: () => docsApi.typeSummary(prefix),
@@ -461,8 +458,42 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
 
   const aggEdges = useMemo<AggregatedEdge[]>(() => {
     if (!links) return []
-    return aggregateEdges(links, new Set(presentTypes))
-  }, [links, presentTypes])
+    const present = new Set(presentTypes)
+    const fromLinks = aggregateEdges(links, present)
+    const byId = new Map(fromLinks.map((e) => [e.id, e]))
+
+    for (const edge of summary?.membership_edges ?? []) {
+      const source = edge.source_type as DocType
+      const target = edge.target_type as DocType
+      if (!present.has(source) || !present.has(target)) continue
+      const id = `${source}->${target}`
+      const entry: RoleEntry = {
+        role: edge.role,
+        displayLabel: roleDisplayLabel(edge.role),
+        count: edge.count,
+        suspectCount: 0,
+      }
+      const existing = byId.get(id)
+      if (existing) {
+        if (existing.roles.some((r) => r.role === edge.role)) continue
+        existing.roles.push(entry)
+        existing.totalCount += edge.count
+        continue
+      }
+      const added: AggregatedEdge = {
+        id,
+        source,
+        target,
+        roles: [entry],
+        totalCount: edge.count,
+        totalSuspect: 0,
+        isSyntheticInverse: false,
+      }
+      byId.set(id, added)
+      fromLinks.push(added)
+    }
+    return fromLinks
+  }, [links, presentTypes, summary])
 
   const aggEdgeMap = useMemo(() => {
     const m = new Map<string, AggregatedEdge>()

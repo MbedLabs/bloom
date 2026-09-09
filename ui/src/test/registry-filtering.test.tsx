@@ -263,9 +263,8 @@ beforeEach(() => {
   vi.mocked(client.docsApi.list).mockImplementation(fakeRegistry(ALL) as never)
   vi.mocked(client.usersApi.list).mockResolvedValue([user, reviewer] as never)
   window.localStorage.clear()
-  // The registry remembers a sort per project for the length of the session,
-  // in a module-level map that outlives a render. Without this the sort one
-  // case chooses is still in force in the next one.
+  // The registry remembers a sort per project for the length of the session, in a
+  // module-level map that outlives a render.
   clearRegistrySortSession('VCU')
 })
 

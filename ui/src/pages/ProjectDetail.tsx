@@ -60,10 +60,7 @@ export default function ProjectDetail() {
 
   const projectId = project?.id || 0
 
-  // One number, so ask for one number. This used to download every document in
-  // the project - link counts and all - and then count the SPECs in the
-  // browser, on a screen that renders the topology right below it and made it
-  // do the same download again.
+  // One number, so ask for one number.
   const { data: summary } = useQuery({
     queryKey: ['project-doc-type-summary', prefix],
     queryFn: () => docsApi.typeSummary(prefix!),

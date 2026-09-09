@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate, useLocation } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { campaignsApi, type ArtefactLink, type TestCampaignItem } from '../api/client'
+import { campaignsApi, type TestCampaignItem } from '../api/client'
 import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Pencil, Trash2, X } from 'lucide-react'
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
@@ -45,12 +45,6 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
   const { data: campaign, isLoading } = useQuery({
     queryKey: ['campaign', campId],
     queryFn: () => campaignsApi.get(campId),
-    enabled: !!campId,
-  })
-
-  const { data: scopeLinks } = useQuery<ArtefactLink[]>({
-    queryKey: ['campaign-scope-links', campId],
-    queryFn: () => campaignsApi.scopeLinks(campId),
     enabled: !!campId,
   })
 
@@ -370,7 +364,6 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
         sourceType="CMP"
         sourceId={campaign.id}
         sourceDocId={campaign.campaign_id}
-        derivedLinks={scopeLinks}
       />
 
       {/* Activity */}

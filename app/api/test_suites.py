@@ -279,12 +279,24 @@ async def create_suite(
     await db.flush()
     await db.refresh(suite)
 
-    for index, test_case_id in enumerate(data.test_case_ids):
-        tc = (
-            await db.execute(select(TestCase).where(TestCase.id == test_case_id))
-        ).scalar_one_or_none()
-        if tc and tc.project_id == data.project_id:
-            db.add(TestSuiteItem(suite_id=suite.id, test_case_id=test_case_id, order=index))
+    # One statement for the whole selection. Ids that do not exist, or belong to
+    # another project, are still skipped silently rather than rejected.
+    if data.test_case_ids:
+        valid_test_case_ids = set(
+            (
+                await db.execute(
+                    select(TestCase.id).where(
+                        TestCase.id.in_(data.test_case_ids),
+                        TestCase.project_id == data.project_id,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for index, test_case_id in enumerate(data.test_case_ids):
+            if test_case_id in valid_test_case_ids:
+                db.add(TestSuiteItem(suite_id=suite.id, test_case_id=test_case_id, order=index))
 
     await db.flush()
     return await _build_suite_detail(suite, db, current_user)

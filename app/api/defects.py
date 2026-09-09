@@ -262,12 +262,7 @@ async def refresh_external_issue(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    """Fetch current state from GitHub/GitLab and update cached fields.
-
-    If a token is not supplied in the request body, fall back to the project's
-    `IntegrationSetting` for the relevant tracker so admins do not have to
-    paste a token every refresh.
-    """
+    """Fetch current state from GitHub/GitLab and update cached fields."""
     item = (await db.execute(select(Defect).where(Defect.id == defect_pk))).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Defect not found")
@@ -321,6 +316,21 @@ async def refresh_external_issue(
         raise HTTPException(
             status_code=502,
             detail=f"Tracker API returned {exc.response.status_code}",
+        ) from exc
+    except httpx.TimeoutException as exc:
+        raise HTTPException(
+            status_code=504,
+            detail=f"{item.external_tracker} did not answer in time.",
+        ) from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not reach {item.external_tracker}.",
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"{item.external_tracker} answered with something that was not an issue.",
         ) from exc
 
     item.external_issue_state = result["state"]

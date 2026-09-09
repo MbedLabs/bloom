@@ -68,9 +68,7 @@ function popover(): HTMLElement | null {
 }
 
 beforeEach(() => {
-  // The outline builds a selector with CSS.escape, which jsdom does not
-  // provide. Every browser does, so this is a gap in the test environment
-  // rather than in the app.
+  // The outline builds a selector with CSS.escape, which jsdom does not provide.
   if (typeof globalThis.CSS?.escape !== 'function') {
     globalThis.CSS = { ...(globalThis.CSS ?? {}), escape: (value: string) => value } as never
   }
@@ -96,6 +94,94 @@ afterEach(() => {
   // The popover lives outside the React tree, so cleanup does not remove it.
   document.querySelectorAll('.mention-suggestion-popover').forEach((node) => {
     node.parentElement?.remove()
+  })
+})
+
+describe('the # trigger', () => {
+  const artefacts = [
+    { id: 42, label: 'FLT-REQ-0042', hint: 'Brake pressure', docType: 'REQ' },
+    { id: 43, label: 'FLT-DES-0007', hint: 'Hydraulic loop', docType: 'DES' },
+  ]
+
+  it('searches on the query rather than filtering a fixed list', async () => {
+    const search = vi.fn().mockResolvedValue(artefacts)
+    const { container } = renderEditor({ artefactSearch: search })
+    const surface = await editorSurface(container)
+
+    await type(surface, '#brake')
+
+    await waitFor(() => expect(search).toHaveBeenCalledWith('brake'))
+    await waitFor(() => expect(popover()).toBeTruthy())
+    expect(popover()?.textContent).toContain('FLT-REQ-0042')
+  })
+
+  it('stays quiet until the query is worth a request', async () => {
+    const search = vi.fn().mockResolvedValue(artefacts)
+    const { container } = renderEditor({ artefactSearch: search })
+    const surface = await editorSurface(container)
+
+    await type(surface, '#b')
+
+    expect(search).not.toHaveBeenCalled()
+  })
+
+  it('offers nothing when the host cannot tag', async () => {
+    const { container } = renderEditor({})
+    const surface = await editorSurface(container)
+
+    await type(surface, '#brake')
+
+    expect(popover()?.textContent ?? '').not.toContain('FLT-REQ-0042')
+  })
+
+  it('stores the type and id the server parses a tag from', async () => {
+    const search = vi.fn().mockResolvedValue(artefacts)
+    const onChange = vi.fn()
+    const { container } = renderEditor({ artefactSearch: search, onChange })
+    const surface = await editorSurface(container)
+
+    await type(surface, '#brake')
+    await waitFor(() => expect(popover()).toBeTruthy())
+    fireEvent.click(popover()?.querySelector('button') as HTMLElement)
+
+    await waitFor(() => {
+      const calls = onChange.mock.calls
+      const json = calls[calls.length - 1]?.[0] as Record<string, unknown>
+      const found: Record<string, unknown>[] = []
+      const walk = (node: unknown): void => {
+        if (Array.isArray(node)) return node.forEach(walk)
+        if (!node || typeof node !== 'object') return
+        const record = node as Record<string, unknown>
+        if (record.type === 'mention') found.push(record.attrs as Record<string, unknown>)
+        Object.values(record).forEach(walk)
+      }
+      walk(json)
+      expect(found).toHaveLength(1)
+      expect(found[0].id).toBe('REQ:42')
+      expect(found[0].mentionSuggestionChar).toBe('#')
+    })
+  })
+
+  it('inserts a reference that links to the artefact', async () => {
+    const search = vi.fn().mockResolvedValue(artefacts)
+    const { container } = renderEditor({
+      artefactSearch: search,
+      artefactHref: (type: string, id: number) => `/projects/FLT/${type}/${id}`,
+    })
+    const surface = await editorSurface(container)
+
+    await type(surface, '#brake')
+    await waitFor(() => expect(popover()).toBeTruthy())
+
+    const option = popover()?.querySelector('button') as HTMLElement
+    fireEvent.click(option)
+
+    await waitFor(() => {
+      const anchor = surface.querySelector('a.mention-artefact') as HTMLAnchorElement
+      expect(anchor).toBeTruthy()
+      expect(anchor.getAttribute('href')).toBe('/projects/FLT/REQ/42')
+      expect(anchor.textContent).toBe('FLT-REQ-0042')
+    })
   })
 })
 

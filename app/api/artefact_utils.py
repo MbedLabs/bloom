@@ -397,23 +397,29 @@ async def build_related_response(
             .all()
         )
 
+    # Fetch every parent document at once.
     documents_by_id: dict[int, dict[str, Any]] = {}
-    for section in sections:
-        if section.document_id not in documents_by_id:
-            document = (
+    section_document_ids = {section.document_id for section in sections}
+    if section_document_ids:
+        visible_documents = (
+            (
                 await db.execute(
                     apply_external_visibility_filter(
-                        select(Document).where(Document.id == section.document_id),
+                        select(Document).where(Document.id.in_(section_document_ids)),
                         Document,
                         current_user,
                     )
                 )
-            ).scalar_one_or_none()
-            if document:
-                documents_by_id[section.document_id] = {
-                    "document": document,
-                    "matched_sections": [],
-                }
+            )
+            .scalars()
+            .all()
+        )
+        documents_by_id = {
+            document.id: {"document": document, "matched_sections": []}
+            for document in visible_documents
+        }
+
+    for section in sections:
         if section.document_id in documents_by_id:
             documents_by_id[section.document_id]["matched_sections"].append(section.title)
 
