@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.link_read_utils import get_verified_requirement_links_for_test_case
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
 from app.core.security import (
@@ -33,6 +34,7 @@ from app.models.user import User, UserRole
 from app.schemas import (
     PaginatedResponse,
     RequirementSummary,
+    SyncedCampaignRef,
     SyncResultsRequest,
     SyncResultsResponse,
     TestCampaignCreate,
@@ -48,6 +50,13 @@ from app.schemas import (
 )
 
 router = APIRouter()
+
+
+def campaign_frontend_url(project_prefix: str, campaign_id: int) -> str | None:
+    """Bloom's own address for a campaign, or None when it does not know it."""
+
+    base = (settings.FRONTEND_BASE_URL or "").rstrip("/")
+    return f"{base}/projects/{project_prefix}/campaigns/{campaign_id}" if base else None
 
 
 def _normalize_datetime(value: Optional[datetime]) -> Optional[datetime]:
@@ -103,17 +112,30 @@ async def sync_results_global(
     tc_id_to_case = {tc.tc_id: tc for tc in test_cases_result.scalars().all()}
 
     items_result = await db.execute(
-        select(TestCampaignItem, TestCase)
+        select(TestCampaignItem, TestCase, TestCampaign, Project.prefix)
         .join(TestCase, TestCampaignItem.test_case_id == TestCase.id)
+        .join(TestCampaign, TestCampaignItem.campaign_id == TestCampaign.id)
+        .join(Project, TestCampaign.project_id == Project.id)
         .where(TestCase.tc_id.in_(tc_ids))
     )
 
     tc_id_to_items: dict[str, list] = {}
-    for item, tc in items_result.all():
+    campaign_refs: dict[int, SyncedCampaignRef] = {}
+    for item, tc, campaign, project_prefix in items_result.all():
         tc_id_to_items.setdefault(tc.tc_id, []).append(item)
+        campaign_refs.setdefault(
+            campaign.id,
+            SyncedCampaignRef(
+                id=campaign.id,
+                campaign_id=campaign.campaign_id,
+                name=campaign.name,
+                url=campaign_frontend_url(project_prefix, campaign.id),
+            ),
+        )
 
     updated_count = 0
     not_found = []
+    reached_campaign_ids: set[int] = set()
 
     for res in data.results:
         tc = tc_id_to_case.get(res.tc_id)
@@ -127,12 +149,21 @@ async def sync_results_global(
         matched_items = tc_id_to_items.get(res.tc_id, [])
         for item in matched_items:
             _apply_result_to_campaign_item(item, res)
+            reached_campaign_ids.add(item.campaign_id)
 
         updated_count += 1
 
     await db.commit()
 
-    return SyncResultsResponse(updated=updated_count, not_found=not_found)
+    return SyncResultsResponse(
+        updated=updated_count,
+        not_found=not_found,
+        campaigns=[
+            campaign_refs[campaign_id]
+            for campaign_id in sorted(reached_campaign_ids)
+            if campaign_id in campaign_refs
+        ],
+    )
 
 
 @router.get("", response_model=PaginatedResponse[TestCampaignResponse])
