@@ -412,7 +412,7 @@ export function DocumentLinksPanel({
       addIfUnique({ link, direction: directionFor(link), isDerived: true }),
     )
     return items
-  }, [outgoingLinks, incomingLinks, filteredDerivedLinks])
+  }, [outgoingLinks, incomingLinks, filteredDerivedLinks, sourceType, sourceId])
 
   // Exactly the documents the chips point at.
   const chipKeys = useMemo(() => {
