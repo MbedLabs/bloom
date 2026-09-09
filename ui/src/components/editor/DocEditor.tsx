@@ -45,12 +45,7 @@ interface DocEditorProps {
   userMentionItems?: MentionSuggestion[]
   artefactSearch?: (query: string) => Promise<MentionSuggestion[]>
   artefactHref?: (docType: string, id: number) => string
-  /**
-   * Where a `{{parameter}}` should take the reader - the project's Parameters &
-   * Variables screen. Given this, the chip renders as a real link so a reader
-   * can go and see what the key currently stands for. Omitted, it stays a plain
-   * chip, which is what an editor with no project context wants.
-   */
+  /** Where a `{{parameter}}` links to. Omitted, the chip is not a link. */
   parameterHref?: string
 }
 
