@@ -1,33 +1,44 @@
+import { lazy } from 'react'
 import { Routes, Route, Link } from 'react-router'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
-import AcceptInvite from './pages/AcceptInvite'
-import Dashboard from './pages/Dashboard'
-import ForgotPassword from './pages/ForgotPassword'
-import Projects from './pages/Projects'
-import ProjectDetail from './pages/ProjectDetail'
-import ProjectEdit from './pages/ProjectEdit'
-import TraceabilityMatrix from './pages/TraceabilityMatrix'
-import ImpactAnalysis from './pages/ImpactAnalysis'
-import TestCampaigns from './pages/TestCampaigns'
-import CampaignDetail from './pages/CampaignDetail'
-import ResetPassword from './pages/ResetPassword'
+import Setup from './pages/Setup'
 import ConfirmEmailChange from './pages/ConfirmEmailChange'
-import SuiteDetail from './pages/SuiteDetail'
-import Reports from './pages/Reports'
-import Baselines from './pages/Baselines'
-import Users from './pages/Users'
-import Documents from './pages/Documents'
-import Settings from './pages/Settings'
-import ProjectParameters from './pages/ProjectParameters'
-import DocCreate from './pages/DocCreate'
-import ImportWizard from './pages/ImportWizard'
-import UnifiedDocDetail from './pages/UnifiedDocDetail'
-import Defects from './pages/Defects'
-import ArtefactDetail from './pages/ArtefactDetail'
+import ResetPassword from './pages/ResetPassword'
+import ForgotPassword from './pages/ForgotPassword'
 import VerifyEmail from './pages/VerifyEmail'
+import AcceptInvite from './pages/AcceptInvite'
 import ErrorBoundary from './components/ErrorBoundary'
+
+// Route-level splitting. Everything below sits behind authentication and a deliberate
+// navigation; the document screens drag in TipTap and ProseMirror, 19 packages that
+// were previously downloaded and parsed on every visit, including the login screen.
+/* v8 ignore start -- these thunks hold no logic, and React only invokes
+   them when a lazy route actually renders, which renderToString never does.
+   Their one real failure mode is a path that does not resolve, which
+   src/test/lazy-routes-resolve.test.ts checks for every entry below. */
+const ArtefactDetail = lazy(() => import('./pages/ArtefactDetail'))
+const Baselines = lazy(() => import('./pages/Baselines'))
+const CampaignDetail = lazy(() => import('./pages/CampaignDetail'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Defects = lazy(() => import('./pages/Defects'))
+const DocCreate = lazy(() => import('./pages/DocCreate'))
+const Documents = lazy(() => import('./pages/Documents'))
+const ImpactAnalysis = lazy(() => import('./pages/ImpactAnalysis'))
+const ImportWizard = lazy(() => import('./pages/ImportWizard'))
+const ProjectDetail = lazy(() => import('./pages/ProjectDetail'))
+const ProjectEdit = lazy(() => import('./pages/ProjectEdit'))
+const ProjectParameters = lazy(() => import('./pages/ProjectParameters'))
+const Projects = lazy(() => import('./pages/Projects'))
+const Reports = lazy(() => import('./pages/Reports'))
+const Settings = lazy(() => import('./pages/Settings'))
+const SuiteDetail = lazy(() => import('./pages/SuiteDetail'))
+const TestCampaigns = lazy(() => import('./pages/TestCampaigns'))
+const TraceabilityMatrix = lazy(() => import('./pages/TraceabilityMatrix'))
+const UnifiedDocDetail = lazy(() => import('./pages/UnifiedDocDetail'))
+const Users = lazy(() => import('./pages/Users'))
+/* v8 ignore stop */
 
 function NotFound() {
   return (
@@ -47,6 +58,7 @@ function NotFound() {
 function App() {
   return (
     <Routes>
+      <Route path="/setup" element={<Setup />} />
       <Route path="/login" element={<Login />} />
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="/verify-email" element={<VerifyEmail />} />

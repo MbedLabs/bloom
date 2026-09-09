@@ -1,14 +1,4 @@
-"""
-HTTP-level pytest coverage using FastAPI ``TestClient`` (lifespan runs: DB tables, migrations, admin seed).
-
-**Local:** omit ``BLOOM_DOTENV_DISABLED``; ``tests/conftest.py`` loads monorepo ``../.env`` so ``BLOOM_DATABASE_URL``
-/ ``BLOOM_SECRET_KEY`` apply (unless already set in the shell).
-
-**CI:** pass ``DATABASE_URL``, ``SECRET_KEY``, and ``BLOOM_DOTENV_DISABLED=1`` so the job Postgres wins
-(see ``Settings.settings_customise_sources``).
-
-Requires a reachable Postgres matching the effective ``DATABASE_URL``.
-"""
+"""HTTP-level pytest coverage using FastAPI ``TestClient`` (lifespan runs: DB tables, migrations, admin seed)."""
 
 import os
 

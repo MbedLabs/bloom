@@ -1,8 +1,4 @@
-"""
-Application configuration.
-
-Loads settings from environment variables with sensible defaults.
-"""
+"""Application configuration."""
 
 import os
 from functools import lru_cache
@@ -54,19 +50,15 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("BLOOM_SERVICE_TOKEN_PEPPER", "SERVICE_TOKEN_PEPPER"),
     )
-    # Fernet key encrypting external tracker credentials and webhook secrets at
-    # rest. Required only to store or use integration credentials; the
-    # integration_secrets service fails closed (503) when it is missing/invalid.
-    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # Fernet key encrypting external tracker credentials and webhook secrets at rest.
     INTEGRATION_ENCRYPTION_KEY: str = Field(
         default="",
         validation_alias=AliasChoices(
             "BLOOM_INTEGRATION_ENCRYPTION_KEY", "INTEGRATION_ENCRYPTION_KEY"
         ),
     )
-    # Short-lived access token: kept small because a rotating refresh-token
-    # cookie (below) silently renews it. A leaked access token is now valid for
-    # minutes, not a week.
+    # Short-lived access token: kept small because a rotating refresh-token cookie
+    # (below) silently renews it.
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
         default=30,
         validation_alias=AliasChoices(
@@ -89,7 +81,7 @@ class Settings(BaseSettings):
     )
 
     BLOOM_APP_NAME: str = "EmbedLabs Bloom"
-    BLOOM_APP_VERSION: str = "1.0.0"
+    BLOOM_APP_VERSION: str = "1.1.0"
 
     APP_BASE_URL: str = Field(
         default="http://localhost:8000",

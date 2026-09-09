@@ -1,8 +1,4 @@
-"""
-Shared FastAPI dependencies.
-
-H2: Rate limiting via slowapi.
-"""
+"""Shared FastAPI dependencies."""
 
 import os
 

@@ -1,15 +1,4 @@
-"""Who `@` may reach, and what it discloses about them.
-
-Mentioning a colleague is a collaboration act, not an administrative one. The
-editor's `@` list used to come from the admin-only user directory, so every
-maintainer got a 403 - which the editor reads as an empty list, not as an
-error, so the trigger simply went quiet. These pin the rule that replaced it:
-the people on the project, plus the admins who reach every project anyway.
-
-They also pin what is *not* disclosed. Being allowed to address someone is not
-being allowed to read their address, so the payload carries a name and an id
-and nothing else.
-"""
+"""Who `@` may reach, and what it discloses about them."""
 
 import asyncio
 from dataclasses import dataclass

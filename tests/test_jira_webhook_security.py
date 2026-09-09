@@ -1,10 +1,4 @@
-"""Jira webhook: signature enforcement, replay protection, and status mapping.
-
-Jira is held to the same contract as the GitHub and GitLab webhooks — a
-configured secret makes signature verification mandatory, and a delivery
-identifier is consumed once — and it additionally targets change requests, not
-only defects.
-"""
+"""Jira webhook: signature enforcement, replay protection, and status mapping."""
 
 import hashlib
 import hmac
@@ -246,12 +240,7 @@ def test_malformed_issue_key_is_ignored(env):
 
 @pytest.mark.asyncio
 async def test_rejected_delivery_records_no_successful_event(env):
-    """A spoofed delivery must leave no successful sync event on either log.
-
-    The rejection rolls the request transaction back, so the attempted
-    ``signature_failed`` row goes with it; what matters is that nothing is
-    recorded as having succeeded.
-    """
+    """A spoofed delivery must leave no successful sync event on either log."""
     client, maker = env
     _post(client, _payload("PROJ-42"), signature="sha256=bad")
     _post(client, _payload("PROJ-99"), signature="sha256=bad", delivery="d-cr")

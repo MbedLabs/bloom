@@ -31,10 +31,7 @@ class User(Base):
         SaEnum(UserRole), default=UserRole.external, nullable=False
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    # Bumped on password change/reset and confirmed email change. Every access
-    # token carries the value it was minted with; a mismatch means the token
-    # predates a credential change and is rejected, so those events log the user
-    # out everywhere.
+    # Bumped on password change/reset and confirmed email change.
     session_version: Mapped[int] = mapped_column(
         Integer, nullable=False, default=1, server_default="1"
     )
@@ -44,10 +41,9 @@ class User(Base):
     invite_accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     password_set_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     email_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    # A requested-but-unconfirmed new address. An administrator self-change
-    # requires authorization from the current mailbox and verification from the
-    # new mailbox; other roles require administrator approval and new-mailbox
-    # verification. The login changes only after the final token is claimed.
+    # A requested-but-unconfirmed new address. An administrator self-change requires
+    # authorization from the current mailbox and verification from the new mailbox;
+    # other roles require administrator approval and new-mailbox verification.
     pending_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     email_change_status: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     email_change_requested_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

@@ -8,7 +8,7 @@ import { UserPlus, Edit2, Trash2, X, Shield, Wrench, Eye, Copy, Check, Mail } fr
 const ROLE_CONFIG = {
   admin: { label: 'Admin', color: 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400', icon: Shield },
   maintainer: { label: 'Maintainer', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400', icon: Wrench },
-  external: { label: 'External', color: 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400', icon: Eye },
+  external: { label: 'Reviewer', color: 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400', icon: Eye },
 }
 
 export default function UsersPage() {
@@ -188,7 +188,7 @@ export default function UsersPage() {
                         autoFocus
                       >
                         <option value="maintainer">Maintainer</option>
-                        <option value="external">External</option>
+                        <option value="external">Reviewer</option>
                       </select>
                     ) : (
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold ${roleConf?.color || ''}`}>
@@ -462,7 +462,7 @@ function InviteUserModal({ onClose, onSubmit, isLoading, error }: {
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Role</label>
             <select value={role} onChange={(e) => setRole(e.target.value)} title="Role" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground">
-              <option value="external">External</option>
+              <option value="external">Reviewer</option>
               <option value="maintainer">Maintainer</option>
               <option value="admin">Admin</option>
             </select>

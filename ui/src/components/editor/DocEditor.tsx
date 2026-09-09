@@ -1,6 +1,7 @@
 import './editor-styles.css'
 import { useRef, useCallback, useEffect } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
+import type { SuggestionProps } from '@tiptap/suggestion'
 import { BubbleMenu } from '@tiptap/react/menus'
 import { ReactRenderer } from '@tiptap/react'
 import Mention from '@tiptap/extension-mention'
@@ -42,12 +43,9 @@ interface DocEditorProps {
   onOutlineToggle?: (open: boolean) => void
   mentionItems?: MentionSuggestion[]
   userMentionItems?: MentionSuggestion[]
-  /**
-   * Where a `{{parameter}}` should take the reader - the project's Parameters &
-   * Variables screen. Given this, the chip renders as a real link so a reader
-   * can go and see what the key currently stands for. Omitted, it stays a plain
-   * chip, which is what an editor with no project context wants.
-   */
+  artefactSearch?: (query: string) => Promise<MentionSuggestion[]>
+  artefactHref?: (docType: string, id: number) => string
+  /** Where a `{{parameter}}` links to. Omitted, the chip is not a link. */
   parameterHref?: string
 }
 
@@ -64,6 +62,8 @@ export default function DocEditor({
   onOutlineToggle,
   mentionItems = [],
   userMentionItems = [],
+  artefactSearch,
+  artefactHref,
   parameterHref,
 }: DocEditorProps) {
   const mentionItemsRef = useRef(mentionItems)
@@ -72,10 +72,20 @@ export default function DocEditor({
   // built once, so reading the prop directly would freeze whatever it was on
   // the render that created the editor.
   const parameterHrefRef = useRef(parameterHref)
+  const artefactSearchRef = useRef(artefactSearch)
+  const artefactHrefRef = useRef(artefactHref)
 
   useEffect(() => {
     parameterHrefRef.current = parameterHref
   }, [parameterHref])
+
+  useEffect(() => {
+    artefactSearchRef.current = artefactSearch
+  }, [artefactSearch])
+
+  useEffect(() => {
+    artefactHrefRef.current = artefactHref
+  }, [artefactHref])
 
   useEffect(() => {
     mentionItemsRef.current = mentionItems
@@ -105,7 +115,7 @@ export default function DocEditor({
     }
 
     return {
-      onStart: (props: { editor: typeof editor; items: MentionSuggestion[]; command: (item: MentionSuggestion) => void; clientRect?: (() => DOMRect | null) | null }) => {
+      onStart: (props: SuggestionProps) => {
         component = new ReactRenderer(MentionList, {
           editor: props.editor,
           props: {
@@ -125,7 +135,7 @@ export default function DocEditor({
         document.body.appendChild(popup)
         position(props.clientRect)
       },
-      onUpdate: (props: { items: MentionSuggestion[]; command: (item: MentionSuggestion) => void; clientRect?: (() => DOMRect | null) | null }) => {
+      onUpdate: (props: SuggestionProps) => {
         component?.updateProps({
           items: props.items,
           command: props.command,
@@ -139,7 +149,7 @@ export default function DocEditor({
     }
   }, [])
 
-  const renderUserMentionList = useCallback(() => {
+  const makeMentionRenderer = useCallback((triggerPrefix: string) => () => {
     let component: ReactRenderer<MentionListRef> | null = null
     let popup: HTMLDivElement | null = null
 
@@ -159,13 +169,13 @@ export default function DocEditor({
     }
 
     return {
-      onStart: (props: { editor: typeof editor; items: MentionSuggestion[]; command: (item: MentionSuggestion) => void; clientRect?: (() => DOMRect | null) | null }) => {
+      onStart: (props: SuggestionProps) => {
         component = new ReactRenderer(MentionList, {
           editor: props.editor,
           props: {
             items: props.items,
             command: props.command,
-            triggerPrefix: '@',
+            triggerPrefix,
             triggerSuffix: '',
           },
           as: 'div',
@@ -179,11 +189,11 @@ export default function DocEditor({
         document.body.appendChild(popup)
         position(props.clientRect)
       },
-      onUpdate: (props: { items: MentionSuggestion[]; command: (item: MentionSuggestion) => void; clientRect?: (() => DOMRect | null) | null }) => {
+      onUpdate: (props: SuggestionProps) => {
         component?.updateProps({
           items: props.items,
           command: props.command,
-          triggerPrefix: '@',
+          triggerPrefix,
           triggerSuffix: '',
         })
         position(props.clientRect)
@@ -194,11 +204,9 @@ export default function DocEditor({
   }, [])
 
   const editor = useEditor({
-    // The toolbar reads its whole state off the editor at render time - which
-    // mark is active, whether undo is available - and TipTap 3 stopped
-    // re-rendering on transactions by default. Without this the toolbar is
-    // frozen at whatever it showed when the editor mounted: Undo never leaves
-    // its disabled state and no formatting button ever lights up.
+    // The toolbar reads its whole state off the editor at render time - which mark is
+    // active, whether undo is available - and TipTap 3 stopped re-rendering on
+    // transactions by default.
     shouldRerenderOnTransaction: true,
     extensions: [
       StarterKit.configure({
@@ -207,11 +215,28 @@ export default function DocEditor({
       }),
       Mention.configure({
         HTMLAttributes: { class: 'mention' },
-        renderText: ({ node }) => node.attrs.mentionSuggestionChar === '@'
-          ? `@${String(node.attrs.label ?? node.attrs.id)}`
-          : `{{${String(node.attrs.label ?? node.attrs.id)}}}`,
+        renderText: ({ node }) => {
+          const label = String(node.attrs.label ?? node.attrs.id)
+          if (node.attrs.mentionSuggestionChar === '@') return `@${label}`
+          if (node.attrs.mentionSuggestionChar === '#') return label
+          return `{{${label}}}`
+        },
         renderHTML: ({ node }) => {
           const label = String(node.attrs.label ?? node.attrs.id)
+          if (node.attrs.mentionSuggestionChar === '#') {
+            const [docType, rawId] = String(node.attrs.id).split(':')
+            const build = artefactHrefRef.current
+            const target = build && docType && rawId ? build(docType, Number(rawId)) : undefined
+            const attrs: Record<string, string> = {
+              'data-type': 'mention',
+              class: 'mention-artefact text-primary font-medium',
+            }
+            if (target) {
+              attrs.href = target
+              attrs.title = label
+            }
+            return [target ? 'a' : 'span', attrs, label]
+          }
           if (node.attrs.mentionSuggestionChar === '@') {
             return [
               'span',
@@ -219,14 +244,8 @@ export default function DocEditor({
               `@${label}`,
             ]
           }
-          // A parameter is written as a key, so on its own it does not say what
-          // it stands for. Linking the chip to the screen that owns the value
-          // is how a reader finds out, and it stays correct when the value
-          // changes because nothing about the value is stored here.
-          //
-          // An anchor is safe inside the editable surface: contenteditable
-          // swallows the click and just places the caret, so this only
-          // navigates where the document is being read.
+          // A parameter is written as a key, so on its own it does not say what it
+          // stands for.
           const href = parameterHrefRef.current
           const attrs: Record<string, string> = { 'data-type': 'mention', class: 'mention' }
           if (href) {
@@ -257,6 +276,32 @@ export default function DocEditor({
             render: renderParameterMentionList,
           },
           {
+            char: '#',
+            allowedPrefixes: null,
+            items: async ({ query }) => {
+              const search = artefactSearchRef.current
+              if (!search) return []
+              const trimmed = query.trim()
+              if (trimmed.length < 2) return []
+              try {
+                return await search(trimmed)
+              } catch {
+                return []
+              }
+            },
+            command: ({ editor: mentionEditor, range, props }) => {
+              mentionEditor.chain().focus().insertContentAt(range, {
+                type: 'mention',
+                attrs: {
+                  id: `${(props as unknown as MentionSuggestion).docType ?? ''}:${props.id}`,
+                  label: props.label,
+                  mentionSuggestionChar: '#',
+                },
+              }).run()
+            },
+            render: makeMentionRenderer('#'),
+          },
+          {
             char: '@',
             allowedPrefixes: null,
             items: ({ query }) => userMentionItemsRef.current.filter((item) => {
@@ -274,7 +319,7 @@ export default function DocEditor({
                 },
               }).run()
             },
-            render: renderUserMentionList,
+            render: makeMentionRenderer('@'),
           },
         ],
       }),

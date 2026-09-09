@@ -16,6 +16,9 @@ import {
   DOC_LINK_ROLE_LABELS,
   getDocLinkOptions,
   getDocLinkRoleLabel,
+  DOC_TAG_ROLE,
+  isDocLinkRoleAllowed,
+  isDocTagTargetAllowed,
   normalizeDocTypeParam,
   relatedDocsUrl,
   type DocType,
@@ -323,6 +326,8 @@ function LinkDocumentModal({
   )
 }
 
+const LINK_COLLAPSE_THRESHOLD = 20
+
 export function DocumentLinksPanel({
   projectId,
   projectPrefix,
@@ -375,7 +380,16 @@ export function DocumentLinksPanel({
   const allLinks = useMemo(() => {
     const seen = new Set<string>()
     const items: { link: ArtefactLink; direction: 'outgoing' | 'incoming'; isDerived: boolean }[] = []
-    const isValidRole = (role: string): boolean => role in DOC_LINK_ROLE_LABELS
+    const involvesThisArtefact = (link: ArtefactLink): boolean =>
+      (link.source_type === sourceType && link.source_id === sourceId) ||
+      (link.target_type === sourceType && link.target_id === sourceId)
+    const isPermittedByRules = (link: ArtefactLink): boolean =>
+      isDocLinkRoleAllowed(link.source_type, link.target_type, link.role) ||
+      (link.role === DOC_TAG_ROLE && isDocTagTargetAllowed(link.source_type, link.target_type))
+    const isShowable = (link: ArtefactLink): boolean =>
+      link.role in DOC_LINK_ROLE_LABELS && involvesThisArtefact(link) && isPermittedByRules(link)
+    const directionFor = (link: ArtefactLink): 'outgoing' | 'incoming' =>
+      link.source_type === sourceType && link.source_id === sourceId ? 'outgoing' : 'incoming'
     const directionalKey = (link: ArtefactLink): string => {
       const [t1, i1, t2, i2] =
         link.source_type < link.target_type ||
@@ -385,7 +399,7 @@ export function DocumentLinksPanel({
       return `${t1}:${i1}:${t2}:${i2}:${link.role}`
     }
     const addIfUnique = (item: typeof items[0]) => {
-      if (!isValidRole(item.link.role)) return
+      if (!isShowable(item.link)) return
       const key = directionalKey(item.link)
       if (!seen.has(key)) {
         seen.add(key)
@@ -394,13 +408,12 @@ export function DocumentLinksPanel({
     }
     ;(outgoingLinks || []).forEach((link) => addIfUnique({ link, direction: 'outgoing', isDerived: false }))
     ;(incomingLinks || []).forEach((link) => addIfUnique({ link, direction: 'incoming', isDerived: false }))
-    ;filteredDerivedLinks.forEach((link) => addIfUnique({ link, direction: 'incoming', isDerived: true }))
+    ;filteredDerivedLinks.forEach((link) =>
+      addIfUnique({ link, direction: directionFor(link), isDerived: true }),
+    )
     return items
-  }, [outgoingLinks, incomingLinks, filteredDerivedLinks])
+  }, [outgoingLinks, incomingLinks, filteredDerivedLinks, sourceType, sourceId])
 
-  // Exactly the documents the chips point at. This used to be answered by
-  // downloading the project's entire registry and looking each one up, which on
-  // a real project is a thousand documents fetched to print a dozen titles.
   const chipKeys = useMemo(() => {
     const keys = new Set<string>()
     allLinks.forEach(({ link, direction }) => {
@@ -421,6 +434,21 @@ export function DocumentLinksPanel({
     enabled: !!projectPrefix && chipKeys.length > 0,
     placeholderData: (previous) => previous,
   })
+
+  const collapsedGroups = useMemo(() => {
+    if (allLinks.length < LINK_COLLAPSE_THRESHOLD) return []
+    const groups = new Map<string, { role: string; direction: 'outgoing' | 'incoming'; count: number }>()
+    for (const { link, direction } of allLinks) {
+      const key = `${link.role}:${direction}`
+      const existing = groups.get(key)
+      if (existing) {
+        existing.count += 1
+        continue
+      }
+      groups.set(key, { role: link.role, direction, count: 1 })
+    }
+    return Array.from(groups.values()).sort((a, b) => b.count - a.count)
+  }, [allLinks])
 
   const targetLookup = useMemo(() => {
     const map = new Map<string, LinkTarget>()
@@ -447,6 +475,37 @@ export function DocumentLinksPanel({
       <p className="text-xs text-muted-foreground mb-3">Typed links to requirements, specifications, designs, risks, defects, campaigns, test suites, and other controlled documents.</p>
       {allLinks.length === 0 ? (
         <p className="text-muted-foreground">No links yet.</p>
+      ) : collapsedGroups.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {collapsedGroups.map((group) => {
+            const label = getDocLinkRoleLabel(group.role, group.direction)
+            const chip = (
+              <>
+                <span className="text-foreground">{label}</span>
+                <span className="font-medium text-muted-foreground">{group.count}</span>
+              </>
+            )
+            const chipClass =
+              'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border bg-muted/40 text-xs'
+            return sourceDocId ? (
+              <Link
+                key={`${group.role}:${group.direction}`}
+                to={relatedDocsUrl(projectPrefix, sourceDocId, {
+                  role: group.role,
+                  direction: group.direction,
+                })}
+                title={`Show every ${label} relationship of ${sourceDocId} in Documents`}
+                className={`${chipClass} hover:bg-muted transition-colors`}
+              >
+                {chip}
+              </Link>
+            ) : (
+              <span key={`${group.role}:${group.direction}`} className={chipClass}>
+                {chip}
+              </span>
+            )
+          })}
+        </div>
       ) : (
         <div className="flex flex-wrap gap-1.5 -mx-6 -mb-6 px-6 pb-6">
           {allLinks.map(({ link, direction, isDerived }) => {

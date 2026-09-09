@@ -4,10 +4,11 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.link_read_utils import get_verified_requirement_links_for_test_case
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
 from app.core.security import (
@@ -31,9 +32,9 @@ from app.models import (
 )
 from app.models.user import User, UserRole
 from app.schemas import (
-    ArtefactLinkResponse,
     PaginatedResponse,
     RequirementSummary,
+    SyncedCampaignRef,
     SyncResultsRequest,
     SyncResultsResponse,
     TestCampaignCreate,
@@ -49,6 +50,13 @@ from app.schemas import (
 )
 
 router = APIRouter()
+
+
+def campaign_frontend_url(project_prefix: str, campaign_id: int) -> str | None:
+    """Bloom's own address for a campaign, or None when it does not know it."""
+
+    base = (settings.FRONTEND_BASE_URL or "").rstrip("/")
+    return f"{base}/projects/{project_prefix}/campaigns/{campaign_id}" if base else None
 
 
 def _normalize_datetime(value: Optional[datetime]) -> Optional[datetime]:
@@ -104,17 +112,30 @@ async def sync_results_global(
     tc_id_to_case = {tc.tc_id: tc for tc in test_cases_result.scalars().all()}
 
     items_result = await db.execute(
-        select(TestCampaignItem, TestCase)
+        select(TestCampaignItem, TestCase, TestCampaign, Project.prefix)
         .join(TestCase, TestCampaignItem.test_case_id == TestCase.id)
+        .join(TestCampaign, TestCampaignItem.campaign_id == TestCampaign.id)
+        .join(Project, TestCampaign.project_id == Project.id)
         .where(TestCase.tc_id.in_(tc_ids))
     )
 
     tc_id_to_items: dict[str, list] = {}
-    for item, tc in items_result.all():
+    campaign_refs: dict[int, SyncedCampaignRef] = {}
+    for item, tc, campaign, project_prefix in items_result.all():
         tc_id_to_items.setdefault(tc.tc_id, []).append(item)
+        campaign_refs.setdefault(
+            campaign.id,
+            SyncedCampaignRef(
+                id=campaign.id,
+                campaign_id=campaign.campaign_id,
+                name=campaign.name,
+                url=campaign_frontend_url(project_prefix, campaign.id),
+            ),
+        )
 
     updated_count = 0
     not_found = []
+    reached_campaign_ids: set[int] = set()
 
     for res in data.results:
         tc = tc_id_to_case.get(res.tc_id)
@@ -128,12 +149,21 @@ async def sync_results_global(
         matched_items = tc_id_to_items.get(res.tc_id, [])
         for item in matched_items:
             _apply_result_to_campaign_item(item, res)
+            reached_campaign_ids.add(item.campaign_id)
 
         updated_count += 1
 
     await db.commit()
 
-    return SyncResultsResponse(updated=updated_count, not_found=not_found)
+    return SyncResultsResponse(
+        updated=updated_count,
+        not_found=not_found,
+        campaigns=[
+            campaign_refs[campaign_id]
+            for campaign_id in sorted(reached_campaign_ids)
+            if campaign_id in campaign_refs
+        ],
+    )
 
 
 @router.get("", response_model=PaginatedResponse[TestCampaignResponse])
@@ -189,12 +219,22 @@ async def create_campaign(
     if not resolved_suite_ids and data.suite_id is not None:
         resolved_suite_ids = [data.suite_id]
 
-    # Validate all suites exist and belong to the project
+    # Validate all suites exist and belong to the project.
+    suites_by_id = (
+        {
+            suite.id: suite
+            for suite in (
+                (await db.execute(select(TestSuite).where(TestSuite.id.in_(resolved_suite_ids))))
+                .scalars()
+                .all()
+            )
+        }
+        if resolved_suite_ids
+        else {}
+    )
     validated_suites: list[TestSuite] = []
     for sid in resolved_suite_ids:
-        suite = (
-            await db.execute(select(TestSuite).where(TestSuite.id == sid))
-        ).scalar_one_or_none()
+        suite = suites_by_id.get(sid)
         if not suite or suite.project_id != data.project_id:
             raise HTTPException(404, f"Suite {sid} not found")
         validated_suites.append(suite)
@@ -230,19 +270,19 @@ async def create_campaign(
 
     # Collect test case IDs from all suites (union, dedup)
     selected_test_case_ids: set[int] = set(data.test_case_ids)
-    for suite in validated_suites:
-        suite_items = (
+    if validated_suites:
+        suite_item_rows = (
             (
                 await db.execute(
-                    select(TestSuiteItem)
-                    .where(TestSuiteItem.suite_id == suite.id)
-                    .order_by(TestSuiteItem.order, TestSuiteItem.created_at)
+                    select(TestSuiteItem.test_case_id).where(
+                        TestSuiteItem.suite_id.in_([s.id for s in validated_suites])
+                    )
                 )
             )
             .scalars()
             .all()
         )
-        selected_test_case_ids.update(item.test_case_id for item in suite_items)
+        selected_test_case_ids.update(suite_item_rows)
 
     if selected_test_case_ids:
         tc_rows = (
@@ -320,10 +360,24 @@ async def update_campaign(
     if resolved_suite_ids is None and data.suite_id is not None:
         resolved_suite_ids = [data.suite_id]
     if resolved_suite_ids is not None:
+        existing_suites = (
+            {
+                suite.id: suite
+                for suite in (
+                    (
+                        await db.execute(
+                            select(TestSuite).where(TestSuite.id.in_(resolved_suite_ids))
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+            }
+            if resolved_suite_ids
+            else {}
+        )
         for sid in resolved_suite_ids:
-            suite = (
-                await db.execute(select(TestSuite).where(TestSuite.id == sid))
-            ).scalar_one_or_none()
+            suite = existing_suites.get(sid)
             if not suite or suite.project_id != campaign.project_id:
                 raise HTTPException(404, f"Suite {sid} not found")
         # Delete existing CampaignSuite rows
@@ -372,52 +426,6 @@ async def delete_campaign(
         roles={UserRole.admin.value, UserRole.maintainer.value},
     )
     await db.delete(campaign)
-
-
-@router.get("/{campaign_id}/scope-links", response_model=list[ArtefactLinkResponse])
-async def get_campaign_scope_links(
-    campaign_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Return all ArtefactLinks involving test cases that belong to this campaign."""
-    result = await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
-    campaign = result.scalar_one_or_none()
-    if not campaign:
-        raise HTTPException(404, "Campaign not found")
-    await require_project_access(db, current_user, campaign.project_id)
-
-    tc_ids = (
-        (
-            await db.execute(
-                select(TestCampaignItem.test_case_id).where(
-                    TestCampaignItem.campaign_id == campaign_id
-                )
-            )
-        )
-        .scalars()
-        .all()
-    )
-    if not tc_ids:
-        return []
-
-    rows = (
-        (
-            await db.execute(
-                select(ArtefactLink)
-                .where(
-                    or_(
-                        and_(ArtefactLink.source_type == "TC", ArtefactLink.source_id.in_(tc_ids)),
-                        and_(ArtefactLink.target_type == "TC", ArtefactLink.target_id.in_(tc_ids)),
-                    )
-                )
-                .order_by(ArtefactLink.created_at.desc())
-            )
-        )
-        .scalars()
-        .all()
-    )
-    return [ArtefactLinkResponse.model_validate(row) for row in rows]
 
 
 @router.post("/{campaign_id}/items", response_model=TestCampaignItemResponse, status_code=201)

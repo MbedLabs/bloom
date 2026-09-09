@@ -518,3 +518,25 @@ export function getDocLinkOptions(sourceType: DocType, targetType: DocType): Doc
 export function getAllowedDocLinkRoles(sourceType: DocType, targetType: DocType): DocLinkRole[] {
   return Array.from(new Set(getDocLinkOptions(sourceType, targetType).map((option) => option.role)))
 }
+
+export function isDocLinkRoleAllowed(sourceType: string, targetType: string, role: string): boolean {
+  if (!DOC_TYPE_CODES.includes(sourceType as DocType)) return false
+  if (!DOC_TYPE_CODES.includes(targetType as DocType)) return false
+  return getCanonicalDocLinkRoles(sourceType as DocType, targetType as DocType).includes(
+    role as DocLinkRole,
+  )
+}
+
+export const DOC_TAG_ROLE: DocLinkRole = 'references'
+
+export const DOC_TAG_HOST_TYPES = new Set<DocType>([
+  'REQ', 'DES', 'RSK', 'CHG', 'CPT', 'SPEC', 'PRT', 'RPT', 'STD',
+])
+
+export function isDocTagHostType(sourceType: string): boolean {
+  return DOC_TAG_HOST_TYPES.has(sourceType as DocType)
+}
+
+export function isDocTagTargetAllowed(sourceType: string, targetType: string): boolean {
+  return isDocTagHostType(sourceType) && DOC_TYPE_CODES.includes(targetType as DocType)
+}

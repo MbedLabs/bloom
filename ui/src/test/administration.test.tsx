@@ -163,7 +163,8 @@ describe('the user table', () => {
 
     expect(within(rowFor(admin.full_name)).getByText('Admin')).toBeTruthy()
     expect(within(rowFor(maintainer.full_name)).getByText('Maintainer')).toBeTruthy()
-    expect(within(rowFor(external.full_name)).getByText('External')).toBeTruthy()
+    // The stored value stays 'external'; the label shown to users is Reviewer.
+    expect(within(rowFor(external.full_name)).getByText('Reviewer')).toBeTruthy()
   })
 
   it('distinguishes an email change waiting on an admin from one waiting on a mailbox', async () => {

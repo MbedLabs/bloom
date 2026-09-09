@@ -2,7 +2,7 @@
 
 Bloom PLM is a self-hosted product lifecycle management platform for requirements, controlled documents, verification, risks, changes, defects, baselines, and end-to-end traceability.
 
-> **Release:** 1.0.0 public beta
+> **Release:** 1.1.0 public beta
 
 ## What Bloom provides
 
@@ -10,6 +10,7 @@ Bloom PLM is a self-hosted product lifecycle management platform for requirement
 - Test cases, suites, campaigns, concepts, and verification planning
 - Risks, changes, defects, parameters, and baselines
 - Traceability links, relationship views, and coverage analysis
+- Inline `#` tags that turn a mention in a document body into a link a reader can follow
 - Stable human-readable identifiers for controlled project records
 - Administrator, maintainer, and external-user access controls
 - ReqIF import plus CSV and PDF exports
@@ -26,8 +27,9 @@ When connected, the execution path is:
 1. Tests use [`budtestlibrary`](https://github.com/MbedLabs/bud-test-library) for lifecycle, assertions, results, and optional Bloom test-case metadata.
 2. [`bud-runner`](https://github.com/MbedLabs/bud-runner) executes those tests and uploads results to [Bud TMP](https://github.com/MbedLabs/bud).
 3. Bud sends scoped execution outcomes to the matching Bloom test cases.
+4. Bloom answers with the campaigns those outcomes reached, so a run in Bud links back to the campaign it came from.
 
-Bloom does not require Bud, `bud-runner`, or `budtestlibrary` for its PLM workflows.
+Bloom does not require Bud, `bud-runner`, or `budtestlibrary` for its PLM workflows, and Bud does not require Bloom. The link in either direction appears when a pairing exists and is simply absent otherwise.
 
 ## Quick start
 
@@ -195,14 +197,14 @@ Set `BLOOM_VERSION` in `.env`:
 
 | Tag | Use |
 |---|---|
-| `1.0.0` | Immutable production release |
+| `1.1.0` | Immutable production release |
 | `1.0` / `1` | Moving release channels |
 | `stable` | Newest stable release |
 | `latest` | Rolling image from `main` |
 | `dev` | Rolling image from `dev` |
 | `sha-<commit>` | Exact source and image revision |
 
-Pin a complete version such as `1.0.0` for production.
+Pin a complete version such as `1.1.0` for production.
 
 ## Upgrade
 

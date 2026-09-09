@@ -1,10 +1,4 @@
-"""Regression tests: defect webhook signature enforcement (auth-bypass fix).
-
-Previously both webhook handlers only verified the signature/token when the
-header was present — so an attacker could spoof defect state changes simply by
-omitting the header. With a webhook secret configured, verification is now
-mandatory.
-"""
+"""Regression tests: defect webhook signature enforcement (auth-bypass fix)."""
 
 import hashlib
 import hmac

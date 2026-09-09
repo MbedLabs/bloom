@@ -175,6 +175,103 @@ describe('the links of a document', () => {
     expect(await screen.findByText('No links yet.')).toBeTruthy()
   })
 
+  function manyLinks(count: number, role = 'verifies') {
+    return Array.from({ length: count }, (_, i) => ({
+      ...link,
+      suspect: false,
+      id: 500 + i,
+      source_type: 'TC',
+      source_id: 21,
+      target_type: 'REQ',
+      target_id: 900 + i,
+      role,
+    }))
+  }
+
+  it('lists the rows while the document stays under twenty links', async () => {
+    vi.mocked(client.linksApi.list).mockResolvedValue(manyLinks(19))
+    linksPanel()
+    await waitFor(() => expect(screen.queryByText('No links yet.')).toBeNull())
+
+    expect(screen.queryByText('19')).toBeNull()
+  })
+
+  it('collapses to a count per relationship at twenty', async () => {
+    vi.mocked(client.linksApi.list).mockResolvedValue(manyLinks(20))
+    linksPanel()
+
+    expect(await screen.findByText('20')).toBeTruthy()
+    expect(screen.getByText('verifies')).toBeTruthy()
+  })
+
+  it('counts the whole document, not each relationship', async () => {
+    vi.mocked(client.linksApi.list).mockResolvedValue([
+      ...manyLinks(11, 'verifies'),
+      ...manyLinks(9, 'references').map((l, i) => ({ ...l, id: 700 + i, target_type: 'STD' })),
+    ])
+    linksPanel()
+
+    expect(await screen.findByText('11')).toBeTruthy()
+    expect(screen.getByText('9')).toBeTruthy()
+  })
+
+  it('hides a link this document is not an endpoint of', async () => {
+    vi.mocked(client.linksApi.list).mockResolvedValue([])
+    renderPanel(
+      <DocumentLinksPanel
+        projectId={1}
+        projectPrefix="VCU"
+        sourceType="CMP"
+        sourceId={5}
+        sourceDocId="VCU-CMP-001"
+        derivedLinks={[{ ...link, suspect: false }]}
+      />,
+    )
+    expect(await screen.findByText('No links yet.')).toBeTruthy()
+    expect(screen.queryByText(/verified by/i)).toBeNull()
+  })
+
+  it('hides a link whose type pairing the rule table forbids', async () => {
+    vi.mocked(client.linksApi.list).mockResolvedValue([])
+    renderPanel(
+      <DocumentLinksPanel
+        projectId={1}
+        projectPrefix="VCU"
+        sourceType="TC"
+        sourceId={21}
+        sourceDocId="VCU-TC-001"
+        derivedLinks={[{ ...link, suspect: false, target_type: 'CMP', target_id: 5, role: 'verifies' }]}
+      />,
+    )
+    expect(await screen.findByText('No links yet.')).toBeTruthy()
+  })
+
+  it('shows a membership link the document is the target of', async () => {
+    vi.mocked(client.linksApi.list).mockResolvedValue([])
+    renderPanel(
+      <DocumentLinksPanel
+        projectId={1}
+        projectPrefix="VCU"
+        sourceType="TC"
+        sourceId={21}
+        sourceDocId="VCU-TC-001"
+        derivedLinks={[
+          {
+            ...link,
+            suspect: false,
+            id: -10001,
+            source_type: 'TS',
+            source_id: 3,
+            target_type: 'TC',
+            target_id: 21,
+            role: 'contains',
+          },
+        ]}
+      />,
+    )
+    await waitFor(() => expect(screen.queryByText('No links yet.')).toBeNull())
+  })
+
   it('scopes the lookup to the project the document belongs to', async () => {
     linksPanel()
     await screen.findByText('Linked Documents')
@@ -218,9 +315,8 @@ describe('the links of a document', () => {
 
     await waitFor(() => expect(client.docsApi.list).toHaveBeenCalled())
     const calls = vi.mocked(client.docsApi.list).mock.calls
-    // The fixture links VCU-TC-001 to requirement 11; that is the one label
-    // this panel needs, and the only document it may ask for. Reading the
-    // whole registry to find one title is what this replaced.
+    // The fixture links VCU-TC-001 to requirement 11; that is the one label this panel
+    // needs, and the only document it may ask for.
     for (const [, params] of calls as [string, { keys?: string[]; type?: string[] }][]) {
       expect(params?.keys ?? params?.type).toBeTruthy()
     }

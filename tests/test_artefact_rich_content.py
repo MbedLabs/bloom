@@ -1,10 +1,4 @@
-"""Every artefact the editor can open must accept and return its rich content.
-
-The models carry ``content_json``/``content_html`` and the document editor sends
-them, but the Create/Update schemas are ``StrictModel`` (``extra="forbid"``). For
-every type except Document those fields were missing from the schema, so each
-save was rejected with a 422 and the editor could never persist a body.
-"""
+"""Every artefact the editor can open must accept and return its rich content."""
 
 import pytest
 

@@ -7,7 +7,6 @@ from app.schemas.memberships import (
     ProjectMembershipUpdate,
 )
 from app.schemas.schemas import (
-    ALMIntegrationSettings,
     ArtefactActivityResponse,
     ArtefactCommentCreate,
     ArtefactCommentResponse,
@@ -42,6 +41,7 @@ from app.schemas.schemas import (
     ImpactAnalysisResponse,
     ImpactNode,
     PaginatedResponse,
+    PLMIntegrationSettings,
     ProjectCreate,
     ProjectResponse,
     ProjectUpdate,
@@ -62,6 +62,7 @@ from app.schemas.schemas import (
     RiskItemResponse,
     RiskItemUpdate,
     SectionReorder,
+    SyncedCampaignRef,
     SyncResultsRequest,
     SyncResultsResponse,
     TestCampaignCreate,
@@ -182,9 +183,10 @@ __all__ = [
     "ArtefactLinkCreate",
     "ArtefactLinkResponse",
     "SyncResultsRequest",
+    "SyncedCampaignRef",
     "SyncResultsResponse",
     "AutomatedResult",
-    "ALMIntegrationSettings",
+    "PLMIntegrationSettings",
 ]
 
 from app.schemas.schemas import (  # noqa: E402

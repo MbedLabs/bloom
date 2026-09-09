@@ -1,13 +1,4 @@
-"""
-Project membership management (admin only).
-
-Endpoints:
-    GET    /api/projects/{project_id}/members          — list all members
-    POST   /api/projects/{project_id}/members          — add a member
-    GET    /api/projects/{project_id}/members/{id}     — get one membership
-    PATCH  /api/projects/{project_id}/members/{id}     — update role / doc_types
-    DELETE /api/projects/{project_id}/members/{id}     — remove a member
-"""
+"""Project membership management (admin only)."""
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, select

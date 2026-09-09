@@ -26,8 +26,15 @@ vi.mock('../api/client', async (importOriginal) => {
 const ProjectDocTopology = (await import('../components/ProjectDocTopology')).default
 
 /** The per-type tally the graph is drawn from. */
-function summary(types: { doc_type: string; count: number; suspect_links: number }[]) {
-  return { types, total: types.reduce((sum, entry) => sum + entry.count, 0) }
+function summary(
+  types: { doc_type: string; count: number; suspect_links: number }[],
+  membershipEdges: { source_type: string; target_type: string; role: string; count: number }[] = [],
+) {
+  return {
+    types,
+    total: types.reduce((sum, entry) => sum + entry.count, 0),
+    membership_edges: membershipEdges,
+  }
 }
 
 function renderTopology() {
@@ -103,9 +110,8 @@ describe('loading', () => {
     renderTopology()
     await settled()
 
-    // One node per type is all this graph ever draws, so downloading the
-    // project to count it was a page load spent on two numbers. At a thousand
-    // documents it was three round trips, each re-reading every type table.
+    // One node per type is all this graph ever draws, so downloading the project to
+    // count it was a page load spent on two numbers.
     expect(docsApi.typeSummary).toHaveBeenCalledWith('VCU')
     expect(docsApi.list).not.toHaveBeenCalled()
     expect(await screen.findByText('2')).toBeTruthy()
@@ -170,8 +176,42 @@ describe('the roll-up', () => {
     ).toBeTruthy()
   })
 
+  it('draws the campaign, suite and test case chain that links never carry', async () => {
+    docsApi.typeSummary.mockResolvedValue(
+      summary(
+        [
+          { doc_type: 'CMP', count: 1, suspect_links: 0 },
+          { doc_type: 'TS', count: 12, suspect_links: 0 },
+          { doc_type: 'TC', count: 285, suspect_links: 0 },
+        ],
+        [
+          { source_type: 'CMP', target_type: 'TS', role: 'relates_to', count: 12 },
+          { source_type: 'TS', target_type: 'TC', role: 'contains', count: 285 },
+        ],
+      ),
+    )
+    linksApi.list.mockResolvedValue([])
+    renderTopology()
+    await settled()
+
+    expect(screen.queryByText(/link documents to see them here/i)).toBeNull()
+  })
+
+  it('leaves out a membership edge whose type has no documents', async () => {
+    docsApi.typeSummary.mockResolvedValue(
+      summary(
+        [{ doc_type: 'TC', count: 3, suspect_links: 0 }],
+        [{ source_type: 'CMP', target_type: 'TS', role: 'relates_to', count: 4 }],
+      ),
+    )
+    linksApi.list.mockResolvedValue([])
+    renderTopology()
+    await settled()
+
+    expect(await screen.findByText(/link documents to see them here/i)).toBeTruthy()
+  })
+
   it('ignores links whose endpoints are not on the graph', async () => {
-    // A link to a type no document of which exists cannot be drawn.
     linksApi.list.mockResolvedValue([
       link,
       { ...link, id: 999, source_type: 'RSK', target_type: 'CHG' },

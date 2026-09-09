@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import log_artefact_activity
 from app.core.database import get_db
+from app.core.id_generator import format_doc_id
 from app.core.reqif import (
     FOREIGN_ID_HINTS,
     TEXT_ATTRIBUTE_HINTS,
@@ -27,8 +28,6 @@ from app.services.import_attempts import begin_import_attempt, finish_import_att
 from app.services.reqif_worker import ReqIFProcessingTimeout, parse_reqif_in_worker
 
 router = APIRouter()
-
-REQ_ID_SUFFIX_LIMIT = 999
 
 
 class ImportRequest(BaseModel):
@@ -152,21 +151,36 @@ async def _import_requirements(
 ):
     next_num = await _get_next_req_num(db, target_project.id, target_project.prefix)
 
-    for src_id in doc_ids:
-        src = (
-            await db.execute(
-                select(Requirement).where(
-                    Requirement.id == src_id,
-                    Requirement.project_id == source_project.id,
+    # Load the whole selection up front: an import of several hundred rows was otherwise
+    # a statement per row.
+    sources_by_id = (
+        {
+            row.id: row
+            for row in (
+                (
+                    await db.execute(
+                        select(Requirement).where(
+                            Requirement.id.in_(doc_ids),
+                            Requirement.project_id == source_project.id,
+                        )
+                    )
                 )
+                .scalars()
+                .all()
             )
-        ).scalar_one_or_none()
+        }
+        if doc_ids
+        else {}
+    )
+
+    for src_id in doc_ids:
+        src = sources_by_id.get(src_id)
         if not src:
             result.errors.append(f"Requirement {src_id} not found in source project")
             result.skipped += 1
             continue
 
-        new_req_id = f"{target_project.prefix}-REQ-{next_num:03d}"
+        new_req_id = format_doc_id(target_project.prefix, "REQ", next_num)
         imported = Requirement(
             project_id=target_project.id,
             req_id=new_req_id,
@@ -198,20 +212,36 @@ async def _import_test_cases(
 ):
     next_num = await _get_next_tc_num(db, target_project.id, target_project.prefix)
 
-    for src_id in doc_ids:
-        src = (
-            await db.execute(
-                select(TestCase).where(
-                    TestCase.id == src_id, TestCase.project_id == source_project.id
+    # Load the whole selection up front: an import of several hundred rows was otherwise
+    # a statement per row.
+    sources_by_id = (
+        {
+            row.id: row
+            for row in (
+                (
+                    await db.execute(
+                        select(TestCase).where(
+                            TestCase.id.in_(doc_ids),
+                            TestCase.project_id == source_project.id,
+                        )
+                    )
                 )
+                .scalars()
+                .all()
             )
-        ).scalar_one_or_none()
+        }
+        if doc_ids
+        else {}
+    )
+
+    for src_id in doc_ids:
+        src = sources_by_id.get(src_id)
         if not src:
             result.errors.append(f"TestCase {src_id} not found in source project")
             result.skipped += 1
             continue
 
-        new_tc_id = f"{target_project.prefix}-TC-{next_num:03d}"
+        new_tc_id = format_doc_id(target_project.prefix, "TC", next_num)
         imported = TestCase(
             project_id=target_project.id,
             tc_id=new_tc_id,
@@ -282,13 +312,7 @@ async def import_reqif(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
-    """Import a ReqIF (``.reqif`` / ``.reqifz``) export as project requirements.
-
-    Spec objects become requirements (hierarchy preserved via ``parent_id``),
-    spec relations become requirement links, and re-importing the same file is
-    idempotent — objects already imported (matched on ``source_ref``) are reused
-    rather than duplicated so hierarchy and links still resolve.
-    """
+    """Import a ReqIF (``.reqif`` / ``.reqifz``) export as project requirements."""
     target_project = (
         await db.execute(select(Project).where(Project.id == project_id))
     ).scalar_one_or_none()
@@ -347,15 +371,8 @@ async def import_reqif(
             result.skipped += 1
             continue
 
-        if next_num > REQ_ID_SUFFIX_LIMIT:
-            result.errors.append(
-                f"Requirement ID sequence exhausted for {prefix}-REQ (max {REQ_ID_SUFFIX_LIMIT}); "
-                f"{len(bundle.objects) - result.imported - result.skipped} object(s) not imported."
-            )
-            break
-
         parent_id = ref_to_req_id.get(parent_ref[:100]) if parent_ref else None
-        new_req_id = f"{prefix}-REQ-{next_num:03d}"
+        new_req_id = format_doc_id(prefix, "REQ", next_num)
         priority = (obj.attributes.get("priority") or "Medium").strip()[:20] or "Medium"
 
         requirement = Requirement(

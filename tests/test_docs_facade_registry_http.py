@@ -1,14 +1,4 @@
-"""The registry endpoint's filtering, sorting and paging, in SQL.
-
-The screen used to fetch a project's documents whole and narrow them in the
-browser. It now sends every filter, the sort and the page to the server, so the
-questions that used to be answered in JavaScript are answered here - and these
-drive the real route against real Postgres so the answers come from the query
-plan and not from a fixture.
-
-The browser-side counterpart (ui/src/test/registry-filtering.test.tsx) checks
-only that the screen *asks* correctly. This checks the answering.
-"""
+"""The registry endpoint's filtering, sorting and paging, in SQL."""
 
 from __future__ import annotations
 
@@ -53,11 +43,7 @@ def reviewer(api_client: TestClient, auth_headers):
 
 @pytest.fixture
 def registry(api_client: TestClient, auth_headers, reviewer):
-    """A project whose documents disagree on every axis the registry filters by.
-
-    Four artefacts across two types, chosen so that a filter matching everything
-    and a filter matching nothing are told apart by which identifiers come back.
-    """
+    """A project whose documents disagree on every axis the registry filters by."""
     project = create_project(api_client, auth_headers, "Registry")
     pid = project["id"]
 
@@ -363,10 +349,8 @@ class TestOrdering:
         assert sorted(found[:2]) == sorted([registry["bravo"], registry["charlie"]])
 
     def test_sorts_by_a_column_only_one_type_has(self, api_client, auth_headers, registry):
-        # req_origin exists on requirements alone; the test cases contribute a
-        # typed NULL, which has to sort as the empty string rather than fail or
-        # scatter. Ascending: the two NULLs, then Customer, then the Internal
-        # a requirement defaults to.
+        # req_origin exists on requirements alone; the test cases contribute a typed
+        # NULL, which has to sort as the empty string rather than fail or scatter.
         response = fetch(api_client, auth_headers, registry["prefix"], sort="req_origin", dir="asc")
         assert response.status_code == 200
         found = ids(response)
@@ -449,6 +433,53 @@ class TestTheTypeSummary:
             assert entry["count"] == expected_counts[entry["doc_type"]]
             assert entry["suspect_links"] == expected_suspect[entry["doc_type"]]
 
+    def test_reports_membership_as_edges(self, api_client, auth_headers):
+        from tests.conftest import create_project, unique_suffix
+
+        suffix = unique_suffix()
+        project_id = create_project(api_client, auth_headers, f"Membership {suffix}")["id"]
+        prefix = api_client.get(f"/api/projects/{project_id}", headers=auth_headers).json()[
+            "prefix"
+        ]
+
+        case_ids = []
+        for n in range(2):
+            created = api_client.post(
+                "/api/test-cases",
+                headers=auth_headers,
+                json={"project_id": project_id, "title": f"TC {n} {suffix}"},
+            )
+            assert created.status_code in (200, 201), created.text
+            case_ids.append(created.json()["id"])
+
+        suite = api_client.post(
+            "/api/test-suites",
+            headers=auth_headers,
+            json={"project_id": project_id, "name": f"S {suffix}", "test_case_ids": case_ids},
+        )
+        assert suite.status_code in (200, 201), suite.text
+
+        campaign = api_client.post(
+            "/api/campaigns",
+            headers=auth_headers,
+            json={
+                "project_id": project_id,
+                "name": f"C {suffix}",
+                "suite_ids": [suite.json()["id"]],
+            },
+        )
+        assert campaign.status_code in (200, 201), campaign.text
+
+        body = api_client.get(
+            f"/api/projects/{prefix}/doc-type-summary", headers=auth_headers
+        ).json()
+        edges = {(e["source_type"], e["target_type"]): e for e in body["membership_edges"]}
+
+        assert edges[("TS", "TC")]["count"] == 2
+        assert edges[("TS", "TC")]["role"] == "contains"
+        assert edges[("CMP", "TS")]["count"] == 1
+        assert edges[("CMP", "TS")]["role"] == "relates_to"
+
     def test_is_scoped_to_the_project(self, api_client, auth_headers, registry):
         other = create_project(api_client, auth_headers, "Registry Other")
         response = api_client.get(
@@ -456,7 +487,7 @@ class TestTheTypeSummary:
         )
 
         assert response.status_code == 200
-        assert response.json() == {"types": [], "total": 0}
+        assert response.json() == {"types": [], "total": 0, "membership_edges": []}
 
     def test_requires_authentication(self, api_client, registry):
         response = api_client.get(f"/api/projects/{registry['prefix']}/doc-type-summary")
@@ -464,12 +495,7 @@ class TestTheTypeSummary:
 
 
 class TestAskingForNamedDocuments:
-    """`keys=TYPE:row_id` - the shape a caller holding links can actually ask in.
-
-    A links panel knows the (type, row id) pairs its chips point at, because
-    that is what a link stores. It used to read the whole project to turn a
-    dozen of those into a dozen titles.
-    """
+    """`keys=TYPE:row_id` - the shape a caller holding links can actually ask in."""
 
     def keys_for(self, api_client, headers, prefix, *doc_ids) -> list[str]:
         items = fetch(api_client, headers, prefix).json()["items"]
@@ -490,11 +516,7 @@ class TestAskingForNamedDocuments:
         assert body["total"] == 2
 
     def test_reaches_across_types(self, api_client, auth_headers, registry):
-        """One request has to answer for every type at once, or it is useless.
-
-        A panel's chips are mixed - a requirement next to a test case - and it
-        cannot afford one request per type.
-        """
+        """One request has to answer for every type at once, or it is useless."""
         prefix = registry["prefix"]
         keys = self.keys_for(api_client, auth_headers, prefix, registry["bravo"], registry["delta"])
 
@@ -521,11 +543,7 @@ class TestAskingForNamedDocuments:
         assert body["total"] == 0
 
     def test_names_a_document_backed_kind(self, api_client, auth_headers, registry):
-        """SPEC/PRT/RPT/STD live in a shared table and are not in TYPE_MAP.
-
-        They are ordinary link targets, so a key naming one has to work rather
-        than be rejected as an unknown type.
-        """
+        """SPEC/PRT/RPT/STD live in a shared table and are not in TYPE_MAP."""
         prefix = registry["prefix"]
         created = api_client.post(
             f"/api/projects/{registry['project']['id']}/documents",

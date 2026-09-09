@@ -202,8 +202,7 @@ async def update_me(
     if data.full_name is not None:
         current_user.full_name = data.full_name
     # Email changes are not applied here: they require the current password and a
-    # confirmation of the new address via POST /me/email. Any email in this
-    # payload is ignored so an unconfirmed address can never become the login.
+    # confirmation of the new address via POST /me/email.
 
     await db.flush()
     await db.refresh(current_user)
@@ -216,13 +215,7 @@ async def request_email_change(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Request a verified email change.
-
-    The current password is required for every request. Administrators must then
-    authorize their own change from the current mailbox before Bloom sends a
-    second verification link to the new mailbox. Other roles wait for
-    administrator approval before new-mailbox confirmation is sent.
-    """
+    """Request a verified email change."""
     current_user = await db.get(
         User,
         current_user.id,
@@ -312,13 +305,7 @@ async def confirm_email_change(
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):
-    """Advance or complete a verified email change.
-
-    For an administrator's self-service request, the token sent to the current
-    mailbox authorizes the change and triggers a second token to the new mailbox.
-    That second token (or a token from the normal admin-approval flow) switches
-    the login and ends every existing session.
-    """
+    """Advance or complete a verified email change."""
     try:
         candidate = await get_valid_token(
             db,
@@ -418,9 +405,8 @@ async def change_password(
         raise HTTPException(status_code=400, detail="Current password is incorrect")
     current_user.hashed_password = get_password_hash(data.new_password)
     current_user.password_set_at = datetime.utcnow()
-    # End every existing session: retire outstanding access tokens (version bump)
-    # and refresh tokens, and drop this device's refresh cookie. A fresh login is
-    # required afterward.
+    # End every existing session: retire outstanding access tokens (version bump) and
+    # refresh tokens, and drop this device's refresh cookie.
     current_user.session_version += 1
     await invalidate_all_refresh_tokens(db, current_user.id)
     _clear_refresh_cookie(response)
@@ -466,9 +452,8 @@ async def accept_invite(data: AcceptInviteRequest, db: AsyncSession = Depends(ge
     now = datetime.utcnow()
     user.invite_accepted_at = now
     user.password_set_at = now
-    # Accepting an invitation proves control of the invited address, so treat it
-    # as verification. No separate verification email is sent (which also means
-    # this flow no longer depends on SMTP being configured).
+    # Accepting an invitation proves control of the invited address, so treat it as
+    # verification.
     user.email_verified_at = now
 
     await db.flush()
