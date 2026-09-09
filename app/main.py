@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import or_, select, text
+from sqlalchemy.exc import IntegrityError
 
 from app.api import artefacts, attachments
 from app.api import auth as auth_api
@@ -354,6 +355,53 @@ app = FastAPI(
 app.state.limiter = limiter
 
 
+INTEGRITY_ANSWERS: dict[str, tuple[int, str]] = {
+    "23505": (409, "That already exists."),
+    "23P01": (409, "That already exists."),
+    "23503": (409, "Something this refers to is missing or still in use."),
+    "23502": (422, "A required value was missing."),
+    "23514": (422, "A value was outside what this field accepts."),
+}
+
+
+def _sqlstate(exc: Exception) -> str:
+    cause = getattr(exc, "orig", None)
+    for candidate in (cause, getattr(cause, "__cause__", None)):
+        for attribute in ("sqlstate", "pgcode"):
+            code = getattr(candidate, attribute, None)
+            if code:
+                return str(code)
+    return ""
+
+
+async def _integrity_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Answer a constraint violation with the status it deserves.
+
+    Endpoints check for a conflict before writing, so this catches the race
+    between that check and the write. The constraint text is logged, never
+    returned: it names columns and indexes.
+    """
+
+    request_id = request_id_var.get()
+    status_code, detail = INTEGRITY_ANSWERS.get(
+        _sqlstate(exc), (409, "That conflicts with something already stored.")
+    )
+    logger.warning(
+        "Integrity error on %s %s: %s",
+        request.method,
+        request.url.path,
+        getattr(exc, "orig", None) or exc,
+    )
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "detail": f"{detail} Quote reference {request_id} when reporting this.",
+            "request_id": request_id,
+        },
+        headers={"x-request-id": request_id},
+    )
+
+
 async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     request_id = request_id_var.get()
     logger.exception("Unhandled error on %s %s", request.method, request.url.path)
@@ -371,6 +419,7 @@ async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSON
 
 
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(IntegrityError, _integrity_error_handler)
 app.add_exception_handler(Exception, _unhandled_exception_handler)
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)

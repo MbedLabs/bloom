@@ -317,6 +317,21 @@ async def refresh_external_issue(
             status_code=502,
             detail=f"Tracker API returned {exc.response.status_code}",
         ) from exc
+    except httpx.TimeoutException as exc:
+        raise HTTPException(
+            status_code=504,
+            detail=f"{item.external_tracker} did not answer in time.",
+        ) from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not reach {item.external_tracker}.",
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"{item.external_tracker} answered with something that was not an issue.",
+        ) from exc
 
     item.external_issue_state = result["state"]
     item.external_last_event_at = datetime.utcnow()
