@@ -1266,9 +1266,19 @@ class SyncResultsRequest(BaseModel):
     results: List[AutomatedResult] = Field(min_length=1, max_length=1000)
 
 
+class SyncedCampaignRef(BaseModel):
+    """A campaign whose items the synced results reached."""
+
+    id: int
+    campaign_id: str
+    name: str
+    url: Optional[str] = None
+
+
 class SyncResultsResponse(BaseModel):
     updated: int
     not_found: List[str]
+    campaigns: List[SyncedCampaignRef] = Field(default_factory=list)
 
 
 class PLMIntegrationSettings(BaseModel):
