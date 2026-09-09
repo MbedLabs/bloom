@@ -414,7 +414,6 @@ export function DocumentLinksPanel({
     return items
   }, [outgoingLinks, incomingLinks, filteredDerivedLinks, sourceType, sourceId])
 
-  // Exactly the documents the chips point at.
   const chipKeys = useMemo(() => {
     const keys = new Set<string>()
     allLinks.forEach(({ link, direction }) => {

@@ -212,7 +212,6 @@ describe('the roll-up', () => {
   })
 
   it('ignores links whose endpoints are not on the graph', async () => {
-    // A link to a type no document of which exists cannot be drawn.
     linksApi.list.mockResolvedValue([
       link,
       { ...link, id: 999, source_type: 'RSK', target_type: 'CHG' },
