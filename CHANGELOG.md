@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 - 2026-09-09
 
 ### Added
 
@@ -21,6 +21,10 @@
 ### Fixed
 
 - **A lost write race is a conflict, not a crash.** Every create endpoint checks for a conflict before it writes - a project prefix already taken, a document identifier already issued - but two requests arriving together both pass that check and the second one violates the constraint. That reached the user as a bare 500. A constraint violation is now answered from its SQLSTATE: a duplicate or a broken reference is a 409, a missing or out-of-range value a 422, each carrying the request identifier. The constraint text is logged and never returned, because it names columns and indexes.
+
+- **A links panel could show another artefact's relationships.** The panel computed its rows without depending on which artefact it was rendering, so a panel reused across two documents kept the first one's list until something else forced a recompute.
+
+- The test runner is pinned past GHSA-82fw-gwwq-j7x9, a path-traversal advisory affecting vitest below 4.1.11. A development dependency only, but the dependency audit refuses any advisory it has not reviewed.
 
 - **An unreachable issue tracker says so.** Refreshing a defect's external state caught the case where GitHub or GitLab *answered* with an error, and nothing else - so a connection failure, a DNS failure or a timeout became a 500 with no body. Being unable to reach the tracker is now a 502, a timeout a 504, and an answer that is not an issue a 502. The message names the tracker and nothing about the exception.
 

@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     )
 
     BLOOM_APP_NAME: str = "EmbedLabs Bloom"
-    BLOOM_APP_VERSION: str = "1.0.1"
+    BLOOM_APP_VERSION: str = "1.1.0"
 
     APP_BASE_URL: str = Field(
         default="http://localhost:8000",
