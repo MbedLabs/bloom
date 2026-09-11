@@ -34,7 +34,6 @@
   ],
   "minBoxVersion": "9.1.0",
   "iconUrl": "https://embedlabs.net/img/bloom-mark.png",
-  "packageUrl": "https://github.com/MbedLabs/bloom/tree/main/cloudron",
   "mediaLinks": [
     "https://embedlabs.net/app-bloom-dashboard-light.png"
   ]
