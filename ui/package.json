@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.20",
-    "@tanstack/react-query": "^5.101.2",
+    "@tanstack/react-query": "^5.102.8",
     "@tiptap/core": "^3.30.6",
     "@tiptap/extension-code-block-lowlight": "^3.30.6",
     "@tiptap/extension-highlight": "^3.30.6",
@@ -38,15 +38,15 @@
     "@tiptap/react": "^3.30.6",
     "@tiptap/starter-kit": "^3.30.6",
     "@types/dagre": "^0.7.54",
-    "@xyflow/react": "^12.11.2",
-    "axios": "^1.18.1",
+    "@xyflow/react": "^12.11.6",
+    "axios": "^1.20.0",
     "dagre": "^0.8.5",
     "date-fns": "^3.0.0",
     "lowlight": "^3.3.0",
     "lucide-react": "^1.28.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-router": "^8.3.0"
+    "react-router": "^8.3.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
