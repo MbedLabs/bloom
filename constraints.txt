@@ -49,7 +49,7 @@ email-validator==2.3.0
     # via pydantic
 fastapi==0.141.1
     # via bloom-app (pyproject.toml)
-fonttools==4.63.0
+fonttools==4.64.0
     # via fpdf2
 fpdf2==2.8.8
     # via bloom-app (pyproject.toml)
