@@ -1275,10 +1275,22 @@ class SyncedCampaignRef(BaseModel):
     url: Optional[str] = None
 
 
+class SyncedSuiteRef(BaseModel):
+    """A test suite that holds synced test cases, with how many of them it holds and its total size."""
+
+    id: int
+    suite_id: str
+    name: str
+    url: Optional[str] = None
+    matched: int
+    size: int
+
+
 class SyncResultsResponse(BaseModel):
     updated: int
     not_found: List[str]
     campaigns: List[SyncedCampaignRef] = Field(default_factory=list)
+    suites: List[SyncedSuiteRef] = Field(default_factory=list)
 
 
 class PLMIntegrationSettings(BaseModel):
