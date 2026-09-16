@@ -35,6 +35,7 @@ from app.schemas import (
     PaginatedResponse,
     RequirementSummary,
     SyncedCampaignRef,
+    SyncedSuiteRef,
     SyncResultsRequest,
     SyncResultsResponse,
     TestCampaignCreate,
@@ -57,6 +58,13 @@ def campaign_frontend_url(project_prefix: str, campaign_id: int) -> str | None:
 
     base = (settings.FRONTEND_BASE_URL or "").rstrip("/")
     return f"{base}/projects/{project_prefix}/campaigns/{campaign_id}" if base else None
+
+
+def suite_frontend_url(project_prefix: str, suite_id: int) -> str | None:
+    """Bloom's own address for a test suite, or None when it does not know it."""
+
+    base = (settings.FRONTEND_BASE_URL or "").rstrip("/")
+    return f"{base}/projects/{project_prefix}/suites/{suite_id}" if base else None
 
 
 def _normalize_datetime(value: Optional[datetime]) -> Optional[datetime]:
@@ -136,6 +144,7 @@ async def sync_results_global(
     updated_count = 0
     not_found = []
     reached_campaign_ids: set[int] = set()
+    applied_tc_ids: set[str] = set()
 
     for res in data.results:
         tc = tc_id_to_case.get(res.tc_id)
@@ -151,6 +160,7 @@ async def sync_results_global(
             _apply_result_to_campaign_item(item, res)
             reached_campaign_ids.add(item.campaign_id)
 
+        applied_tc_ids.add(res.tc_id)
         updated_count += 1
 
     await db.commit()
@@ -163,7 +173,43 @@ async def sync_results_global(
             for campaign_id in sorted(reached_campaign_ids)
             if campaign_id in campaign_refs
         ],
+        suites=await _suites_holding(db, applied_tc_ids),
     )
+
+
+async def _suites_holding(db: AsyncSession, tc_ids: set[str]) -> list[SyncedSuiteRef]:
+    """List every suite that contains one of the test cases, with the count it contains and its total size."""
+    if not tc_ids:
+        return []
+    matched_rows = await db.execute(
+        select(TestSuite, Project.prefix, func.count(TestSuiteItem.id))
+        .join(TestSuiteItem, TestSuiteItem.suite_id == TestSuite.id)
+        .join(TestCase, TestSuiteItem.test_case_id == TestCase.id)
+        .join(Project, TestSuite.project_id == Project.id)
+        .where(TestCase.tc_id.in_(tc_ids))
+        .group_by(TestSuite.id, Project.prefix)
+        .order_by(TestSuite.id)
+    )
+    matched = matched_rows.all()
+    if not matched:
+        return []
+    size_rows = await db.execute(
+        select(TestSuiteItem.suite_id, func.count(TestSuiteItem.id))
+        .where(TestSuiteItem.suite_id.in_([suite.id for suite, _, _ in matched]))
+        .group_by(TestSuiteItem.suite_id)
+    )
+    sizes = dict(size_rows.all())
+    return [
+        SyncedSuiteRef(
+            id=suite.id,
+            suite_id=suite.suite_id,
+            name=suite.name,
+            url=suite_frontend_url(project_prefix, suite.id),
+            matched=count,
+            size=sizes.get(suite.id, count),
+        )
+        for suite, project_prefix, count in matched
+    ]
 
 
 @router.get("", response_model=PaginatedResponse[TestCampaignResponse])

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from app.schemas import ProjectCreate
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "e2e_image_smoke.sh"
 
 

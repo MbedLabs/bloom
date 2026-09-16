@@ -115,14 +115,9 @@ jobs:
           BLOOM_DOTENV_DISABLED: "1"
           BLOOM_DISABLE_RATE_LIMIT: "1"
         run: |
-          pytest --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=78 tests/ -v
+          pytest --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=78 tests/api tests/logic tests/sec -v
 
-      # The suite must survive being run twice against the same database. CI
-      # alone would never catch a test that hardcodes a unique value - it gets a
-      # new service container every time - but a developer running it locally
-      # hits "Email already registered" on the second run and has to drop the
-      # database to work. This step is the only thing that keeps that honest.
-      - name: Run backend tests again on the same database (re-runnable)
+      - name: Postgres tests
         env:
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_bloom
           SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
@@ -131,7 +126,18 @@ jobs:
           BLOOM_DOTENV_DISABLED: "1"
           BLOOM_DISABLE_RATE_LIMIT: "1"
         run: |
-          pytest tests/ -q
+          pytest tests/pg -v
+
+      - name: Postgres tests again on the same database
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_bloom
+          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
+          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
+          ENABLE_DOCS: "false"
+          BLOOM_DOTENV_DISABLED: "1"
+          BLOOM_DISABLE_RATE_LIMIT: "1"
+        run: |
+          pytest tests/pg -q
 
       - name: Run UI checks
         run: |
@@ -200,8 +206,8 @@ jobs:
           check "Cloudron package version" "$(python -c 'import json; print(json.load(open("cloudron/CloudronManifest.json"))["version"])')"
           check "Cloudron upstream version" "$(python -c 'import json; print(json.load(open("cloudron/CloudronManifest.json"))["upstreamVersion"])')"
           esc="${base//./\\.}"
-          grep -Eq "(^|[^0-9.])${esc}([^0-9]|\$)" CHANGELOG.md \
-            || gate_fail "CHANGELOG.md has no release entry for ${base}"
+          grep -Eq "(^|[^0-9.])${esc}([^0-9]|\$)" docs/CHANGELOG.md \
+            || gate_fail "docs/CHANGELOG.md has no release entry for ${base}"
           echo "Version consistency OK for ${base}"
 
       - name: Verify the tagged commit is contained in main history
