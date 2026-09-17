@@ -45,7 +45,7 @@ interface DocEditorProps {
   mentionItems?: MentionSuggestion[]
   userMentionItems?: MentionSuggestion[]
   artefactSearch?: (query: string) => Promise<MentionSuggestion[]>
-  artefactHref?: (docType: string, id: number) => string
+  artefactHref?: (docType: string, id: number, label: string) => string
   /** Where a `{{parameter}}` links to. Omitted, the chip is not a link. */
   parameterHref?: string
 }
@@ -227,7 +227,7 @@ export default function DocEditor({
           if (node.attrs.mentionSuggestionChar === '#') {
             const [docType, rawId] = String(node.attrs.id).split(':')
             const build = artefactHrefRef.current
-            const target = build && docType && rawId ? build(docType, Number(rawId)) : undefined
+            const target = build && docType && rawId ? build(docType, Number(rawId), label) : undefined
             const attrs: Record<string, string> = {
               'data-type': 'mention',
               class: 'mention-artefact text-primary font-medium',

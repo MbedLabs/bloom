@@ -531,7 +531,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
                   content={artefactRecord.content_json as Record<string, unknown>}
                   editable={false}
                   parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined}
-            artefactHref={(type, id) => docUrl(prefix, type as DocType, id)}
+            artefactHref={(type, _id, label) => docUrl(prefix, type as DocType, label)}
                   minHeight="min-h-[120px]"
                   className="border-0"
                 />
