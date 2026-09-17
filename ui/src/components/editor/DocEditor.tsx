@@ -1,3 +1,4 @@
+import { parameterKeyHref } from '../../utils/parameters'
 import './editor-styles.css'
 import { useRef, useCallback, useEffect } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
@@ -244,13 +245,11 @@ export default function DocEditor({
               `@${label}`,
             ]
           }
-          // A parameter is written as a key, so on its own it does not say what it
-          // stands for.
           const href = parameterHrefRef.current
           const attrs: Record<string, string> = { 'data-type': 'mention', class: 'mention' }
           if (href) {
-            attrs.href = href
-            attrs.title = 'Open Parameters & Variables'
+            attrs.href = parameterKeyHref(href, label)
+            attrs.title = `Open parameter ${label}`
           }
           return [href ? 'a' : 'span', attrs, `{{${label}}}`]
         },

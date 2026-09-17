@@ -13,7 +13,7 @@ import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import { normalizeTcsRows } from '../utils/tcs'
 import { Pencil, UserCheck, UserCog, Trash2 } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
-import { docEditUrl } from '../types/doc'
+import { docEditUrl, docUrl, type DocType } from '../types/doc'
 import { DocEditor } from '../components/editor'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocDetailShell, { MetaItem, SectionCard } from '../components/DocDetailShell'
@@ -315,6 +315,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
             content={testCase.content_json as Record<string, unknown>}
             editable={false}
             parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined}
+            artefactHref={(type, id) => docUrl(prefix, type as DocType, id)}
             minHeight="min-h-[120px]"
             className="border-0"
           />

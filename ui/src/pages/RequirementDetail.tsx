@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { requirementsApi, usersApi, projectsApi } from '../api/client'
 import { ExternalLink, ChevronRight, UserCheck, UserCog, Trash2 } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
-import { docEditUrl, docUrl } from '../types/doc'
+import { docEditUrl, docUrl, type DocType } from '../types/doc'
 import { DocEditor } from '../components/editor'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
@@ -324,6 +324,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
             content={requirement.content_json as Record<string, unknown>}
             editable={false}
             parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined}
+            artefactHref={(type, id) => docUrl(prefix, type as DocType, id)}
             minHeight="min-h-[120px]"
             className="border-0"
           />

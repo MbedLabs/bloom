@@ -49,6 +49,7 @@ vi.mock('react-router', async () => {
     useParams: () => mockParams,
     useNavigate: () => vi.fn(),
     useLocation: () => ({ state: mockLocationState }),
+    useSearchParams: () => [new URLSearchParams(), vi.fn()],
     Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
   }
 })

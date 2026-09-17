@@ -8,7 +8,7 @@ import DocDetailShell, { MetaItem, SectionCard } from '../components/DocDetailSh
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import DocumentAttachmentsPanel from '../components/DocumentAttachmentsPanel'
-import { docEditUrl, kindSlugToType } from '../types/doc'
+import { docEditUrl, docUrl, kindSlugToType, type DocType } from '../types/doc'
 import { formatDateTime } from '../test/date-utils'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
@@ -185,6 +185,7 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
               content={doc.content_json as Record<string, unknown>}
               editable={false}
               parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined}
+            artefactHref={(type, id) => docUrl(prefix, type as DocType, id)}
               minHeight="min-h-[40vh]"
             />
           </div>

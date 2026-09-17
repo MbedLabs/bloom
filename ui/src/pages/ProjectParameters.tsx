@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useParams, useSearchParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Edit2, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react'
 
@@ -10,6 +10,8 @@ import { useToast } from '../components/useToast'
 
 export default function ProjectParameters() {
   const { user } = useAuth()
+  const [searchParams] = useSearchParams()
+  const focusedKey = searchParams.get('key')
   const { prefix } = useParams<{ prefix: string }>()
   const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
   const { data: project, isLoading: projectLoading } = useProjectByPrefix(prefix)
@@ -38,6 +40,12 @@ export default function ProjectParameters() {
     },
     onError: (error) => toast.failed('Creating the parameter', error),
   })
+
+  useEffect(() => {
+    if (!focusedKey) return
+    const row = document.getElementById(`parameter-${focusedKey}`)
+    if (row) row.scrollIntoView({ block: 'center' })
+  }, [focusedKey])
 
   useEffect(() => {
     if (!editingId || !variables) return
@@ -310,7 +318,7 @@ export default function ProjectParameters() {
                       </Td>
                     </tr>
                   ) : (
-                    <tr key={item.id} className="hover:bg-accent/50">
+                    <tr key={item.id} id={`parameter-${item.key}`} className={item.key === focusedKey ? 'bg-primary/10 ring-1 ring-primary/40' : 'hover:bg-accent/50'}>
                       <Td><span className="font-mono text-sm text-foreground">{item.kind}</span></Td>
                       <Td><span className="font-mono text-sm text-foreground">{item.key}</span></Td>
                       <Td><span className="font-mono text-xs text-muted-foreground">{item.value}</span></Td>

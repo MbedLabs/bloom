@@ -1,3 +1,4 @@
+import { parameterKeyHref } from '../utils/parameters'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import {
@@ -110,7 +111,7 @@ function withParameterLinks(text: string, href?: string): ReactNode {
   return text.split(/(\{\{[^{}\n]+\}\})/g).map((part, index) => (
     /^\{\{[^{}\n]+\}\}$/.test(part)
       ? (
-        <a key={index} href={href} className="mention" title="Open Parameters & Variables">
+        <a key={index} href={parameterKeyHref(href, part.slice(2, -2))} className="mention" title={`Open parameter ${part.slice(2, -2)}`}>
           {part}
         </a>
       )
