@@ -264,6 +264,8 @@ async def _build_requirement_response(
     return RequirementResponse(
         id=req.id,
         project_id=req.project_id,
+        content_json=req.content_json,
+        content_html=req.content_html,
         parent_id=req.parent_id,
         req_id=req.req_id,
         title=req.title,
@@ -297,6 +299,8 @@ def _build_requirement_list_response(
     return RequirementResponse(
         id=req.id,
         project_id=req.project_id,
+        content_json=req.content_json,
+        content_html=req.content_html,
         parent_id=req.parent_id,
         req_id=req.req_id,
         title=req.title,

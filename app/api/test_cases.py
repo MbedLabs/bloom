@@ -140,6 +140,8 @@ async def _build_test_case_response(
     return TestCaseResponse(
         id=tc.id,
         project_id=tc.project_id,
+        content_json=tc.content_json,
+        content_html=tc.content_html,
         tc_id=tc.tc_id,
         title=tc.title,
         description=tc.description,
@@ -171,6 +173,8 @@ def _build_test_case_list_response(tc: TestCase, requirement_count: int = 0) -> 
     return TestCaseResponse(
         id=tc.id,
         project_id=tc.project_id,
+        content_json=tc.content_json,
+        content_html=tc.content_html,
         tc_id=tc.tc_id,
         title=tc.title,
         description=tc.description,

@@ -57,3 +57,33 @@ def test_requirements_crud_roundtrip(api_client: TestClient):
 
     deleted = api_client.delete(f"/api/requirements/{body['id']}", headers=headers)
     assert deleted.status_code in (200, 204)
+
+
+BODY = {"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "boots in "}, {"type": "mention", "attrs": {"id": "1", "label": "BOOT_BUDGET_MS", "mentionSuggestionChar": "{{"}}]}]}
+
+
+def test_requirement_body_is_returned(api_client: TestClient):
+    """The editor body a requirement was created with comes back on create, list, detail and update."""
+    headers = _auth_headers(api_client)
+    pid = create_project(api_client, headers, "Req Body Project", description="test")["id"]
+    created = api_client.post("/api/requirements", json={"project_id": pid, "title": "Boots in budget", "content_json": BODY, "content_html": "<p>boots in {{BOOT_BUDGET_MS}}</p>"}, headers=headers)
+    assert created.status_code == 201
+    assert created.json()["content_json"] == BODY
+    assert created.json()["content_html"] == "<p>boots in {{BOOT_BUDGET_MS}}</p>"
+    rid = created.json()["id"]
+    assert api_client.get("/api/requirements", params={"project_id": pid}, headers=headers).json()["items"][0]["content_json"] == BODY
+    assert api_client.get(f"/api/requirements/{rid}", headers=headers).json()["content_json"] == BODY
+    updated = api_client.patch(f"/api/requirements/{rid}", json={"title": "Boots"}, headers=headers)
+    assert updated.json()["content_json"] == BODY
+
+
+def test_test_case_body_is_returned(api_client: TestClient):
+    """The editor body a test case was created with comes back on create, list and detail."""
+    headers = _auth_headers(api_client)
+    pid = create_project(api_client, headers, "TC Body Project", description="test")["id"]
+    created = api_client.post("/api/test-cases", json={"project_id": pid, "title": "Boot time", "content_json": BODY, "content_html": "<p>boots in {{BOOT_BUDGET_MS}}</p>"}, headers=headers)
+    assert created.status_code == 201
+    assert created.json()["content_json"] == BODY
+    tid = created.json()["id"]
+    assert api_client.get("/api/test-cases", params={"project_id": pid}, headers=headers).json()["items"][0]["content_json"] == BODY
+    assert api_client.get(f"/api/test-cases/{tid}", headers=headers).json()["content_html"] == "<p>boots in {{BOOT_BUDGET_MS}}</p>"
