@@ -90,13 +90,20 @@ async def env():
     await engine.dispose()
 
 
-def _payload(issue_key: str, category: str = "done", status_name: str = "Done") -> bytes:
+def _payload(
+    issue_key: str,
+    category: str = "done",
+    status_name: str = "Done",
+    summary: str = "Imported issue",
+    event: str = "jira:issue_updated",
+) -> bytes:
     return json.dumps(
         {
-            "webhookEvent": "jira:issue_updated",
+            "webhookEvent": event,
             "issue": {
                 "key": issue_key,
                 "fields": {
+                    "summary": summary,
                     "status": {"name": status_name, "statusCategory": {"key": category}},
                 },
             },
@@ -270,3 +277,68 @@ async def test_sync_events_route_to_the_matching_log(env):
 
     assert [e.event_type for e in defect_events] == ["probe_defect"]
     assert [e.event_type for e in change_events] == ["probe_change"]
+
+
+async def _map_project_for_creation(maker, *, create: bool) -> None:
+    async with maker() as session:
+        setting = (
+            await session.execute(
+                select(IntegrationSetting).where(IntegrationSetting.tracker == "jira")
+            )
+        ).scalar_one()
+        setting.jira_project_key = "PROJ"
+        setting.create_defects_on_inbound = create
+        await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_inbound_creates_a_defect_when_the_project_is_mapped(env):
+    """An inbound Jira issue with no matching defect creates one for the mapped project."""
+    client, maker = env
+    await _map_project_for_creation(maker, create=True)
+
+    body = _payload("PROJ-500", category="new", status_name="To Do", summary="Sensor fails")
+    response = _post(client, body, signature=_sign(body), delivery="create-1")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "created"
+    assert response.json()["target"] == "defect"
+    async with maker() as session:
+        defect = (
+            await session.execute(
+                select(Defect).where(
+                    Defect.external_tracker == "jira",
+                    Defect.external_repo_full_name == "PROJ",
+                    Defect.external_issue_number == 500,
+                )
+            )
+        ).scalar_one()
+        assert defect.title == "Sensor fails"
+        assert defect.status == "Open"
+
+
+@pytest.mark.asyncio
+async def test_inbound_creation_is_idempotent_on_replay(env):
+    """A replayed create delivery does not make a second defect."""
+    client, maker = env
+    await _map_project_for_creation(maker, create=True)
+    body = _payload("PROJ-501")
+    assert _post(client, body, signature=_sign(body), delivery="dup").status_code == 200
+    replay = _post(client, body, signature=_sign(body), delivery="dup")
+    assert replay.json()["status"] == "duplicate"
+    async with maker() as session:
+        rows = (
+            (await session.execute(select(Defect).where(Defect.external_issue_number == 501)))
+            .scalars()
+            .all()
+        )
+        assert len(rows) == 1
+
+
+@pytest.mark.asyncio
+async def test_inbound_does_not_create_when_disabled(env):
+    """With creation disabled, an unmatched issue is rejected even if the project maps."""
+    client, maker = env
+    await _map_project_for_creation(maker, create=False)
+    body = _payload("PROJ-502")
+    assert _post(client, body, signature=_sign(body), delivery="off-1").status_code == 404

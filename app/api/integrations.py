@@ -16,6 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_project_access, require_role
 from app.models import (
     ChangeRequest,
@@ -48,6 +49,8 @@ class IntegrationSettingCreate(BaseModel):
     account_email: Optional[str] = None
     token: Optional[str] = None
     webhook_secret: Optional[str] = None
+    jira_project_key: Optional[str] = None
+    create_defects_on_inbound: bool = True
     enabled: bool = True
 
 
@@ -59,6 +62,8 @@ class IntegrationSettingResponse(BaseModel):
     account_email: Optional[str] = None
     has_token: bool
     has_webhook_secret: bool
+    jira_project_key: Optional[str] = None
+    create_defects_on_inbound: bool = True
     enabled: bool
     created_at: datetime
     updated_at: datetime
@@ -72,6 +77,8 @@ class IntegrationSettingUpdate(BaseModel):
     account_email: Optional[str] = None
     token: Optional[str] = None
     webhook_secret: Optional[str] = None
+    jira_project_key: Optional[str] = None
+    create_defects_on_inbound: Optional[bool] = None
     enabled: Optional[bool] = None
 
 
@@ -99,6 +106,8 @@ def _setting_response(s: IntegrationSetting) -> IntegrationSettingResponse:
         account_email=s.account_email,
         has_token=bool(s.token_encrypted),
         has_webhook_secret=bool(s.webhook_secret),
+        jira_project_key=s.jira_project_key,
+        create_defects_on_inbound=s.create_defects_on_inbound,
         enabled=s.enabled,
         created_at=s.created_at,
         updated_at=s.updated_at,
@@ -169,6 +178,8 @@ async def create_integration_setting(
         webhook_secret=(
             encrypt_integration_secret(data.webhook_secret) if data.webhook_secret else None
         ),
+        jira_project_key=data.jira_project_key,
+        create_defects_on_inbound=data.create_defects_on_inbound,
         enabled=data.enabled,
     )
     db.add(setting)
@@ -208,6 +219,10 @@ async def update_integration_setting(
         setting.webhook_secret = (
             encrypt_integration_secret(data.webhook_secret) if data.webhook_secret else None
         )
+    if data.jira_project_key is not None:
+        setting.jira_project_key = data.jira_project_key
+    if data.create_defects_on_inbound is not None:
+        setting.create_defects_on_inbound = data.create_defects_on_inbound
     if data.enabled is not None:
         setting.enabled = data.enabled
 
@@ -608,6 +623,74 @@ async def _find_jira_target(db: AsyncSession, project_key: str, issue_number: in
     return None
 
 
+async def _create_defect_from_jira_issue(
+    db: AsyncSession,
+    *,
+    project_key: str,
+    issue_number: int,
+    fields: dict,
+    issue_state: str,
+    category: str,
+    body: bytes,
+    signature: Optional[str],
+    delivery: Optional[str],
+) -> dict:
+    """Create a Bloom defect from an inbound Jira issue when its project is mapped.
+
+    Falls back to the historical 404 when no enabled jira integration claims the
+    project key or creation is disabled, so unmapped issues stay rejected.
+    """
+    setting = (
+        await db.execute(
+            select(IntegrationSetting).where(
+                IntegrationSetting.tracker == "jira",
+                IntegrationSetting.jira_project_key == project_key,
+                IntegrationSetting.enabled.is_(True),
+            )
+        )
+    ).scalar_one_or_none()
+    if setting is None or not setting.webhook_secret or not setting.create_defects_on_inbound:
+        raise HTTPException(status_code=404, detail="No matching webhook target.")
+    if not signature or not _verify_jira_signature(
+        body, decrypt_integration_secret(setting.webhook_secret), signature
+    ):
+        raise HTTPException(status_code=403, detail="Invalid signature")
+    if not delivery:
+        raise HTTPException(status_code=400, detail="Missing Jira webhook identifier.")
+    if not await _reserve_webhook_delivery(db, setting, "jira", delivery):
+        return {"status": "duplicate", "delivery": delivery}
+
+    project = (
+        await db.execute(select(Project).where(Project.id == setting.project_id))
+    ).scalar_one()
+    defect_id = await next_doc_id(db, Defect, Defect.defect_id, project.id, project.prefix, "DEF")
+    defect = Defect(
+        project_id=project.id,
+        defect_id=defect_id,
+        title=(fields.get("summary") or f"{project_key}-{issue_number}")[:500],
+        status=JIRA_CATEGORY_STATUS_MAP.get(category, "Open"),
+        external_tracker="jira",
+        external_repo_full_name=project_key,
+        external_issue_number=issue_number,
+        external_issue_state=issue_state,
+        external_last_event_at=datetime.utcnow(),
+    )
+    db.add(defect)
+    await db.flush()
+    _log_target_sync_event(
+        db,
+        "defect",
+        defect.id,
+        "inbound",
+        "jira",
+        "created",
+        payload_summary=f"created from {project_key}-{issue_number}",
+        external_event_id=delivery,
+    )
+    await db.flush()
+    return {"status": "created", "target": "defect", "id": defect.id}
+
+
 @router.post("/jira/webhook", status_code=200)
 async def jira_webhook(
     request: Request,
@@ -634,7 +717,17 @@ async def jira_webhook(
 
     found = await _find_jira_target(db, project_key, issue_number)
     if found is None:
-        raise HTTPException(status_code=404, detail="No matching webhook target.")
+        return await _create_defect_from_jira_issue(
+            db,
+            project_key=project_key,
+            issue_number=issue_number,
+            fields=fields,
+            issue_state=issue_state,
+            category=category,
+            body=body,
+            signature=x_hub_signature,
+            delivery=x_atlassian_webhook_identifier,
+        )
     kind, target = found
 
     # When a webhook secret is configured, a valid signature is REQUIRED —

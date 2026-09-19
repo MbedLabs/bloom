@@ -649,6 +649,7 @@ class IntegrationSetting(Base):
     __tablename__ = "integration_settings"
     __table_args__ = (
         UniqueConstraint("project_id", "tracker", name="uq_integration_project_tracker"),
+        UniqueConstraint("tracker", "jira_project_key", name="uq_integration_jira_project_key"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -662,6 +663,12 @@ class IntegrationSetting(Base):
     # Text (not String(255)) because the stored value is a Fernet envelope, which
     # can exceed 255 chars for longer secrets.
     webhook_secret: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Jira Cloud only: the Jira project key (e.g. "PROJ") this integration owns, so an
+    # inbound webhook for PROJ-123 resolves to this Bloom project. Unique across jira
+    # integrations. Unused by GitHub and GitLab.
+    jira_project_key: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    # Jira only: when true, an inbound issue with no matching defect creates one.
+    create_defects_on_inbound: Mapped[bool] = mapped_column(default=True)
     enabled: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
