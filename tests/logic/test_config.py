@@ -274,7 +274,7 @@ def test_production_rejects_default_admin_password(monkeypatch):
 
     monkeypatch.setenv("BLOOM_ENV", "production")
     monkeypatch.setenv("BLOOM_SECRET_KEY", "b" * 32)
-    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@embedlabs.net")
+    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@example.com")
     monkeypatch.setenv("BLOOM_ADMIN_PASSWORD", "changeme123")
 
     import pytest
@@ -288,7 +288,7 @@ def test_production_rejects_short_admin_password(monkeypatch):
 
     monkeypatch.setenv("BLOOM_ENV", "production")
     monkeypatch.setenv("BLOOM_SECRET_KEY", "b" * 32)
-    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@embedlabs.net")
+    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@example.com")
     monkeypatch.setenv("BLOOM_ADMIN_PASSWORD", "short-password")
 
     import pytest
@@ -338,7 +338,7 @@ def test_production_auto_seed_admin_defaults_off(monkeypatch):
 
     monkeypatch.setenv("BLOOM_ENV", "production")
     monkeypatch.setenv("BLOOM_SECRET_KEY", "b" * 32)
-    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@embedlabs.net")
+    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@example.com")
     monkeypatch.setenv("BLOOM_ADMIN_PASSWORD", "this-is-a-long-password")
 
     settings = Settings(_env_file=None)
@@ -351,7 +351,7 @@ def test_production_startup_data_repair_defaults_off(monkeypatch):
 
     monkeypatch.setenv("BLOOM_ENV", "production")
     monkeypatch.setenv("BLOOM_SECRET_KEY", "b" * 32)
-    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@embedlabs.net")
+    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@example.com")
     monkeypatch.setenv("BLOOM_ADMIN_PASSWORD", "this-is-a-long-password")
 
     settings = Settings(_env_file=None)
@@ -364,7 +364,7 @@ def test_production_auto_seed_admin_can_be_explicitly_enabled(monkeypatch):
 
     monkeypatch.setenv("BLOOM_ENV", "production")
     monkeypatch.setenv("BLOOM_SECRET_KEY", "b" * 32)
-    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@embedlabs.net")
+    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@example.com")
     monkeypatch.setenv("BLOOM_ADMIN_PASSWORD", "this-is-a-long-password")
     monkeypatch.setenv("BLOOM_AUTO_SEED_ADMIN", "true")
 
@@ -378,7 +378,7 @@ def test_production_startup_data_repair_can_be_explicitly_enabled(monkeypatch):
 
     monkeypatch.setenv("BLOOM_ENV", "production")
     monkeypatch.setenv("BLOOM_SECRET_KEY", "b" * 32)
-    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@embedlabs.net")
+    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@example.com")
     monkeypatch.setenv("BLOOM_ADMIN_PASSWORD", "this-is-a-long-password")
     monkeypatch.setenv("BLOOM_RUN_STARTUP_DATA_REPAIR", "true")
 
@@ -394,7 +394,7 @@ def test_production_allows_missing_integration_encryption_key(monkeypatch):
     monkeypatch.delenv("INTEGRATION_ENCRYPTION_KEY", raising=False)
     monkeypatch.setenv("BLOOM_ENV", "production")
     monkeypatch.setenv("BLOOM_SECRET_KEY", "b" * 32)
-    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@embedlabs.net")
+    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@example.com")
     monkeypatch.setenv("BLOOM_ADMIN_PASSWORD", "this-is-a-long-password")
 
     settings = Settings(_env_file=None)
@@ -408,7 +408,7 @@ def test_production_allows_invalid_key_until_tracker_integration_is_used(monkeyp
 
     monkeypatch.setenv("BLOOM_ENV", "production")
     monkeypatch.setenv("BLOOM_SECRET_KEY", "b" * 32)
-    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@embedlabs.net")
+    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@example.com")
     monkeypatch.setenv("BLOOM_ADMIN_PASSWORD", "this-is-a-long-password")
     monkeypatch.setenv("BLOOM_INTEGRATION_ENCRYPTION_KEY", "not-a-valid-fernet-key")
 
@@ -424,7 +424,7 @@ def test_production_accepts_valid_integration_encryption_key(monkeypatch):
 
     monkeypatch.setenv("BLOOM_ENV", "production")
     monkeypatch.setenv("BLOOM_SECRET_KEY", "b" * 32)
-    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@embedlabs.net")
+    monkeypatch.setenv("BLOOM_ADMIN_EMAIL", "ops@example.com")
     monkeypatch.setenv("BLOOM_ADMIN_PASSWORD", "this-is-a-long-password")
     monkeypatch.setenv("BLOOM_INTEGRATION_ENCRYPTION_KEY", Fernet.generate_key().decode())
 
