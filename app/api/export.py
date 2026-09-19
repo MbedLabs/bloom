@@ -3,6 +3,7 @@
 import csv
 import io
 from datetime import datetime, timezone
+from xml.etree import ElementTree as ET
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
@@ -223,3 +224,148 @@ async def export_traceability(
         "tc_last_execution",
     ]
     return _csv_response(rows, header, f"{project.prefix}-traceability.csv")
+
+
+async def _load_test_cases(db: AsyncSession, project_id: int) -> list[TestCase]:
+    """Load a project's test cases ordered by their human id."""
+    return (
+        (
+            await db.execute(
+                select(TestCase).where(TestCase.project_id == project_id).order_by(TestCase.tc_id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+
+def _steps_to_text(steps) -> str:
+    """Flatten a test case's steps JSON into readable plain text."""
+    if not steps:
+        return ""
+    if isinstance(steps, dict):
+        inner = steps.get("steps")
+        if isinstance(inner, list):
+            return _steps_to_text(inner)
+        return "\n".join(f"{key}: {value}" for key, value in steps.items())
+    if isinstance(steps, list):
+        lines = []
+        for index, step in enumerate(steps, start=1):
+            if isinstance(step, dict):
+                action = step.get("action") or step.get("step") or ""
+                expected = step.get("expected") or step.get("expected_result") or ""
+                line = f"{index}. {action}".rstrip()
+                if expected:
+                    line = f"{line} => {expected}"
+                lines.append(line)
+            else:
+                lines.append(f"{index}. {step}")
+        return "\n".join(lines)
+    return str(steps)
+
+
+def _test_cases_markdown(project: Project, test_cases: list[TestCase]) -> str:
+    """Render the test cases as a Markdown document."""
+    generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    parts = [
+        f"# {project.name} - Test Cases",
+        "",
+        f"Project {project.prefix} - generated {generated} - {len(test_cases)} test case(s)",
+        "",
+    ]
+    for tc in test_cases:
+        parts.append(f"## {tc.tc_id}  {tc.title}")
+        parts.append("")
+        parts.append(f"- **Status:** {tc.status}")
+        parts.append(f"- **Visibility:** {tc.visibility}")
+        if tc.last_execution_status:
+            parts.append(f"- **Last execution:** {tc.last_execution_status}")
+        parts.append("")
+        if tc.preconditions:
+            parts.extend(["**Preconditions**", "", tc.preconditions, ""])
+        steps = _steps_to_text(tc.steps)
+        if steps:
+            parts.extend(["**Steps**", "", steps, ""])
+        if tc.description:
+            parts.extend([tc.description, ""])
+    return "\n".join(parts).rstrip() + "\n"
+
+
+def _test_cases_xml(project: Project, test_cases: list[TestCase]) -> bytes:
+    """Render the test cases as an XML document."""
+    root = ET.Element(
+        "test-cases",
+        {
+            "project": project.prefix,
+            "name": project.name,
+            "generated": datetime.now(timezone.utc).isoformat(),
+            "count": str(len(test_cases)),
+        },
+    )
+    for tc in test_cases:
+        node = ET.SubElement(root, "test-case", {"id": tc.tc_id})
+        ET.SubElement(node, "title").text = tc.title or ""
+        ET.SubElement(node, "status").text = tc.status or ""
+        ET.SubElement(node, "visibility").text = tc.visibility or ""
+        ET.SubElement(node, "preconditions").text = tc.preconditions or ""
+        ET.SubElement(node, "steps").text = _steps_to_text(tc.steps)
+        ET.SubElement(node, "description").text = tc.description or ""
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+
+@router.get("/projects/{project_id}/export/test-cases")
+async def export_test_cases(
+    project_id: int,
+    format: str = Query(default="csv", pattern="^(csv|md|xml)$"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+):
+    """Export the project's test cases as CSV, Markdown or XML."""
+    project = await _load_project(db, project_id, current_user)
+    test_cases = await _load_test_cases(db, project_id)
+
+    if format == "md":
+        return Response(
+            content=_test_cases_markdown(project, test_cases),
+            media_type="text/markdown; charset=utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="{project.prefix}-test-cases.md"'
+            },
+        )
+    if format == "xml":
+        return Response(
+            content=_test_cases_xml(project, test_cases),
+            media_type="application/xml; charset=utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="{project.prefix}-test-cases.xml"'
+            },
+        )
+
+    rows = [
+        [
+            tc.tc_id,
+            tc.title,
+            tc.status,
+            tc.visibility,
+            tc.preconditions or "",
+            _steps_to_text(tc.steps),
+            tc.description or "",
+            tc.last_execution_status or "",
+            tc.created_at.isoformat() if tc.created_at else "",
+            tc.updated_at.isoformat() if tc.updated_at else "",
+        ]
+        for tc in test_cases
+    ]
+    header = [
+        "tc_id",
+        "title",
+        "status",
+        "visibility",
+        "preconditions",
+        "steps",
+        "description",
+        "last_execution",
+        "created_at",
+        "updated_at",
+    ]
+    return _csv_response(rows, header, f"{project.prefix}-test-cases.csv")
