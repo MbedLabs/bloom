@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.artefact_utils import log_artefact_activity
 from app.core.database import get_db
 from app.core.id_generator import format_doc_id
+from app.core.md_import import parameter_name_collisions, parse_markdown_document
 from app.core.reqif import (
     FOREIGN_ID_HINTS,
     TEXT_ATTRIBUTE_HINTS,
@@ -25,7 +26,7 @@ from app.core.reqif import (
 )
 from app.core.reqif_policy import read_reqif_upload
 from app.core.security import require_project_access, require_role
-from app.models import Project, Requirement, RequirementLink, TestCase
+from app.models import Project, ProjectVariable, Requirement, RequirementLink, TestCase
 from app.models.user import User, UserRole
 from app.services.import_attempts import begin_import_attempt, finish_import_attempt
 from app.services.reqif_worker import ReqIFProcessingTimeout, parse_reqif_in_worker
@@ -614,4 +615,105 @@ async def import_test_cases_file(
     await finish_import_attempt(db, attempt_id, "completed")
     return TestCaseImportResult(
         created=created, updated=updated, skipped=skipped, new_ids=new_ids, errors=errors
+    )
+
+
+class ClassifiedSection(BaseModel):
+    type_code: Optional[str]
+    title: str
+
+
+class MarkdownImportResult(BaseModel):
+    doc_type: Optional[str]
+    parameters_created: int
+    parameter_collisions: List[str]
+    sections: List[ClassifiedSection]
+
+
+@router.post(
+    "/projects/{project_id}/import/markdown",
+    response_model=MarkdownImportResult,
+    status_code=201,
+)
+async def import_markdown(
+    project_id: int,
+    default_type: Optional[str] = Query(None),
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+):
+    """Import a Markdown document: create its parameters and classify its sections.
+
+    A parameter whose key already exists is a collision - it is reported for the
+    uploader to act on and is never overwritten. Section persistence follows in a
+    later change; for now their classification is returned.
+    """
+    target_project = (
+        await db.execute(select(Project).where(Project.id == project_id))
+    ).scalar_one_or_none()
+    if not target_project:
+        raise HTTPException(status_code=404, detail="Target project not found")
+    await require_project_access(
+        db,
+        current_user,
+        target_project.id,
+        roles={UserRole.admin.value, UserRole.maintainer.value},
+    )
+
+    attempt = await begin_import_attempt(db, user_id=current_user.id, project_id=target_project.id)
+    attempt_id = attempt.id
+    raw = await file.read()
+    if len(raw) > 5_000_000:
+        await finish_import_attempt(db, attempt_id, "failed")
+        raise HTTPException(status_code=413, detail="Import file too large")
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        await finish_import_attempt(db, attempt_id, "failed")
+        raise HTTPException(status_code=400, detail="File is not valid UTF-8 text")
+
+    parsed = parse_markdown_document(text, default_type=default_type)
+
+    existing_keys = (
+        (
+            await db.execute(
+                select(ProjectVariable.key).where(
+                    ProjectVariable.project_id == target_project.id,
+                    ProjectVariable.kind == "variable",
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    collisions = parameter_name_collisions(parsed.parameters, existing_keys)
+    blocked = {name.strip().lower() for name in collisions}
+
+    created = 0
+    done: set = set()
+    for parameter in parsed.parameters:
+        key_norm = parameter.name.strip().lower()
+        if not key_norm or key_norm in blocked or key_norm in done:
+            continue
+        db.add(
+            ProjectVariable(
+                project_id=target_project.id,
+                kind="variable",
+                key=parameter.name.strip(),
+                value=parameter.value,
+            )
+        )
+        done.add(key_norm)
+        created += 1
+
+    await db.flush()
+    await finish_import_attempt(db, attempt_id, "completed")
+    return MarkdownImportResult(
+        doc_type=parsed.doc_type,
+        parameters_created=created,
+        parameter_collisions=collisions,
+        sections=[
+            ClassifiedSection(type_code=section.type_code, title=section.title)
+            for section in parsed.sections
+        ],
     )
