@@ -9,7 +9,7 @@ from starlette.datastructures import UploadFile
 
 from app.api.import_service import import_markdown
 from app.core.database import Base
-from app.models import Project, ProjectVariable
+from app.models import DesignItem, Project, ProjectVariable, Requirement
 from app.models.user import User, UserRole
 
 
@@ -82,6 +82,16 @@ async def test_collision_requires_action_and_never_overwrites(session):
     sections = {s.title: s.type_code for s in result.sections}
     assert sections["Fast boot"] == "REQ"
     assert sections["Boot design"] == "DES"
+    # the tagged sections became artefacts; the Parameters section did not
+    assert result.artefacts_created == 2
+    req = (
+        await session.execute(select(Requirement).where(Requirement.title == "Fast boot"))
+    ).scalar_one()
+    assert req.req_id.startswith("ALP-REQ-")
+    des = (
+        await session.execute(select(DesignItem).where(DesignItem.title == "Boot design"))
+    ).scalar_one()
+    assert des.design_id.startswith("ALP-DES-")
 
 
 async def test_no_collision_creates_all(session):

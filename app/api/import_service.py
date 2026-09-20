@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import log_artefact_activity
 from app.core.database import get_db
-from app.core.id_generator import format_doc_id
+from app.core.id_generator import format_doc_id, next_doc_id
 from app.core.md_import import parameter_name_collisions, parse_markdown_document
 from app.core.reqif import (
     FOREIGN_ID_HINTS,
@@ -26,7 +26,19 @@ from app.core.reqif import (
 )
 from app.core.reqif_policy import read_reqif_upload
 from app.core.security import require_project_access, require_role
-from app.models import Project, ProjectVariable, Requirement, RequirementLink, TestCase
+from app.models import (
+    ChangeRequest,
+    Defect,
+    DesignItem,
+    Document,
+    Project,
+    ProjectVariable,
+    Requirement,
+    RequirementLink,
+    RiskItem,
+    TestCase,
+    TestConcept,
+)
 from app.models.user import User, UserRole
 from app.services.import_attempts import begin_import_attempt, finish_import_attempt
 from app.services.reqif_worker import ReqIFProcessingTimeout, parse_reqif_in_worker
@@ -618,6 +630,32 @@ async def import_test_cases_file(
     )
 
 
+# type code -> (model, id attribute, id type code, title attribute, extra kwargs)
+ARTEFACT_FACTORY = {
+    "REQ": (Requirement, "req_id", "REQ", "title", {}),
+    "DES": (DesignItem, "design_id", "DES", "title", {}),
+    "RSK": (RiskItem, "risk_id", "RSK", "title", {}),
+    "CPT": (TestConcept, "concept_id", "CPT", "name", {}),
+    "TC": (TestCase, "tc_id", "TC", "title", {}),
+    "DEF": (Defect, "defect_id", "DEF", "title", {}),
+    "CHG": (ChangeRequest, "change_id", "CHG", "title", {}),
+    "SPEC": (Document, "doc_id", "SPEC", "title", {"doc_type": "SPEC"}),
+    "STD": (Document, "doc_id", "STD", "title", {"doc_type": "STD"}),
+}
+
+ARTEFACT_TYPE_FOR_CODE = {
+    "REQ": "requirement",
+    "DES": "design",
+    "RSK": "risk",
+    "CPT": "test-concept",
+    "TC": "test-case",
+    "DEF": "defect",
+    "CHG": "change",
+    "SPEC": "document",
+    "STD": "document",
+}
+
+
 class ClassifiedSection(BaseModel):
     type_code: Optional[str]
     title: str
@@ -627,6 +665,8 @@ class MarkdownImportResult(BaseModel):
     doc_type: Optional[str]
     parameters_created: int
     parameter_collisions: List[str]
+    artefacts_created: int
+    artefacts_skipped: int
     sections: List[ClassifiedSection]
 
 
@@ -707,11 +747,64 @@ async def import_markdown(
         created += 1
 
     await db.flush()
+
+    artefacts_created = 0
+    artefacts_skipped = 0
+    for section in parsed.sections:
+        title = section.title.strip()
+        if not title or title.lower() == "parameters":
+            continue
+        factory = ARTEFACT_FACTORY.get(section.type_code or "")
+        if factory is None:
+            artefacts_skipped += 1
+            continue
+        model, id_attr, id_type_code, title_attr, extra = factory
+        source_marker = f"md:{section.type_code}:{title}"[:100]
+        if hasattr(model, "source_ref"):
+            duplicate = (
+                await db.execute(
+                    select(model.id).where(
+                        model.project_id == target_project.id,
+                        model.source_ref == source_marker,
+                    )
+                )
+            ).scalar_one_or_none()
+            if duplicate is not None:
+                artefacts_skipped += 1
+                continue
+        new_id = await next_doc_id(
+            db,
+            model,
+            getattr(model, id_attr),
+            target_project.id,
+            target_project.prefix,
+            id_type_code,
+        )
+        kwargs = {"project_id": target_project.id, id_attr: new_id, title_attr: title, **extra}
+        instance = model(**kwargs)
+        if section.body and hasattr(instance, "description"):
+            instance.description = section.body
+        if hasattr(instance, "source_ref"):
+            instance.source_ref = source_marker
+        db.add(instance)
+        await db.flush()
+        await log_artefact_activity(
+            db,
+            ARTEFACT_TYPE_FOR_CODE[section.type_code],
+            instance.id,
+            "created",
+            f"{current_user.full_name} imported {new_id} from Markdown",
+        )
+        artefacts_created += 1
+
+    await db.flush()
     await finish_import_attempt(db, attempt_id, "completed")
     return MarkdownImportResult(
         doc_type=parsed.doc_type,
         parameters_created=created,
         parameter_collisions=collisions,
+        artefacts_created=artefacts_created,
+        artefacts_skipped=artefacts_skipped,
         sections=[
             ClassifiedSection(type_code=section.type_code, title=section.title)
             for section in parsed.sections
