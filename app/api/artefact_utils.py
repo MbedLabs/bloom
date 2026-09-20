@@ -92,14 +92,21 @@ WORKFLOW_TRANSITIONS = {
 async def get_artefact_or_404(
     db: AsyncSession,
     artefact_type: str,
-    artefact_id: int,
+    artefact_id: int | str,
     current_user: User | None = None,
 ):
     model = ARTEFACT_MODELS.get(artefact_type)
     if not model:
         raise HTTPException(status_code=404, detail="Unsupported artefact type")
 
-    query = select(model).where(model.id == artefact_id)
+    id_text = str(artefact_id)
+    public_attr = ARTEFACT_PUBLIC_ID_ATTRS.get(artefact_type)
+    if id_text.isdigit():
+        query = select(model).where(model.id == int(id_text))
+    elif public_attr and hasattr(model, public_attr):
+        query = select(model).where(getattr(model, public_attr) == id_text)
+    else:
+        raise HTTPException(status_code=404, detail="Artefact not found")
     if current_user is not None and hasattr(model, "visibility"):
         query = apply_external_visibility_filter(query, model, current_user)
 
@@ -336,9 +343,10 @@ async def _get_related_requirement_ids_from_links(
 
 
 async def build_related_response(
-    db: AsyncSession, artefact_type: str, artefact_id: int, current_user: User
+    db: AsyncSession, artefact_type: str, artefact_id: int | str, current_user: User
 ) -> ArtefactRelatedResponse:
     artefact = await get_artefact_or_404(db, artefact_type, artefact_id, current_user)
+    artefact_id = artefact.id
     project = (
         await db.execute(select(Project).where(Project.id == artefact.project_id))
     ).scalar_one()
