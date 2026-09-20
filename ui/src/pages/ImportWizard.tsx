@@ -418,6 +418,7 @@ export default function ImportWizard() {
             <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-4 space-y-2">
               <div className="text-emerald-700 dark:text-emerald-400 font-medium">
                 {mdResult.parameters_created} parameter{mdResult.parameters_created !== 1 ? 's' : ''} imported
+                &middot; {mdResult.artefacts_created} artefact{mdResult.artefacts_created !== 1 ? 's' : ''} created
                 &middot; {mdResult.sections.length} section{mdResult.sections.length !== 1 ? 's' : ''} classified
               </div>
             </div>

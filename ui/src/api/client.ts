@@ -1646,6 +1646,8 @@ export interface MarkdownImportResult {
   doc_type: string | null
   parameters_created: number
   parameter_collisions: string[]
+  artefacts_created: number
+  artefacts_skipped: number
   sections: { type_code: string | null; title: string }[]
 }
 

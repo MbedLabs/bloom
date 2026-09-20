@@ -683,6 +683,8 @@ export const RESPONSES: Record<string, unknown> = {
     doc_type: 'REQ',
     parameters_created: 1,
     parameter_collisions: [],
+    artefacts_created: 2,
+    artefacts_skipped: 0,
     sections: [],
   },
 
