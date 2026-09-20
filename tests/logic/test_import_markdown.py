@@ -9,7 +9,7 @@ from starlette.datastructures import UploadFile
 
 from app.api.import_service import import_markdown
 from app.core.database import Base
-from app.models import DesignItem, Project, ProjectVariable, Requirement
+from app.models import DesignItem, Notification, Project, ProjectVariable, Requirement
 from app.models.user import User, UserRole
 
 
@@ -92,6 +92,11 @@ async def test_collision_requires_action_and_never_overwrites(session):
         await session.execute(select(DesignItem).where(DesignItem.title == "Boot design"))
     ).scalar_one()
     assert des.design_id.startswith("ALP-DES-")
+    # each unlinked artefact prompts the uploader to link it, with the review wording
+    assert result.notifications_created == 2
+    notes = (await session.execute(select(Notification))).scalars().all()
+    assert len(notes) == 2
+    assert any("Check the necessity" in (n.body or "") for n in notes)
 
 
 async def test_no_collision_creates_all(session):

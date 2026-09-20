@@ -41,6 +41,7 @@ from app.models import (
 )
 from app.models.user import User, UserRole
 from app.services.import_attempts import begin_import_attempt, finish_import_attempt
+from app.services.notification_service import notify
 from app.services.reqif_worker import ReqIFProcessingTimeout, parse_reqif_in_worker
 
 router = APIRouter()
@@ -643,6 +644,21 @@ ARTEFACT_FACTORY = {
     "STD": (Document, "doc_id", "STD", "title", {"doc_type": "STD"}),
 }
 
+ARTEFACT_SLUG_FOR_CODE = {
+    "REQ": "requirements",
+    "DES": "designs",
+    "RSK": "risks",
+    "CPT": "test-concepts",
+    "TC": "test-cases",
+    "DEF": "defects",
+    "CHG": "changes",
+    "SPEC": "documents",
+    "STD": "documents",
+}
+
+# Types for which the uploader is prompted to check link necessity.
+LINK_REVIEW_CODES = {"REQ", "DES", "CPT", "SPEC", "STD"}
+
 ARTEFACT_TYPE_FOR_CODE = {
     "REQ": "requirement",
     "DES": "design",
@@ -667,6 +683,7 @@ class MarkdownImportResult(BaseModel):
     parameter_collisions: List[str]
     artefacts_created: int
     artefacts_skipped: int
+    notifications_created: int
     sections: List[ClassifiedSection]
 
 
@@ -750,6 +767,7 @@ async def import_markdown(
 
     artefacts_created = 0
     artefacts_skipped = 0
+    notifications_created = 0
     for section in parsed.sections:
         title = section.title.strip()
         if not title or title.lower() == "parameters":
@@ -796,6 +814,25 @@ async def import_markdown(
             f"{current_user.full_name} imported {new_id} from Markdown",
         )
         artefacts_created += 1
+        slug = ARTEFACT_SLUG_FOR_CODE.get(section.type_code, "docs")
+        needs_review = section.type_code in LINK_REVIEW_CODES
+        await notify(
+            db,
+            user_id=current_user.id,
+            event_type="import_unlinked",
+            title=f"Link {new_id}",
+            project_id=target_project.id,
+            body=(
+                f"{new_id} was imported from Markdown and has no links yet. "
+                + (
+                    "Check the necessity of relevant links in the text and the relationship tree."
+                    if needs_review
+                    else "Add any relevant links."
+                )
+            ),
+            link_path=f"/projects/{target_project.prefix}/docs/{slug}/{new_id}",
+        )
+        notifications_created += 1
 
     await db.flush()
     await finish_import_attempt(db, attempt_id, "completed")
@@ -805,6 +842,7 @@ async def import_markdown(
         parameter_collisions=collisions,
         artefacts_created=artefacts_created,
         artefacts_skipped=artefacts_skipped,
+        notifications_created=notifications_created,
         sections=[
             ClassifiedSection(type_code=section.type_code, title=section.title)
             for section in parsed.sections

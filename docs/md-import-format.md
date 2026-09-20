@@ -51,3 +51,24 @@ When an imported document classifies as a specification, test concept, design or
 requirement, the uploader is prompted to check the necessity of the relevant
 links, both in the text and in the relationship tree. A document that ends up
 unlinked always prompts the user to link it, via a notification.
+
+## Per-template acceptance
+
+Each artefact template accepts the same document shape; the type token or default
+decides which template a section is filed under.
+
+| Type token | Template | Notes |
+|---|---|---|
+| `req` / `requirement` | Requirement | title + body |
+| `spec` / `std` | Document (SPEC/STD) | title + body; filed in the document registry |
+| `des` / `design` | Design | title + body |
+| `rsk` / `risk` | Risk | title + body |
+| `cpt` / `concept` / `test-concept` | Test Concept | title becomes the concept name |
+| `tc` / `test-case` | Test Case | title + body |
+| `chg` / `change` | Change Request | title + body |
+| `def` / `defect` | Defect | title + body |
+
+On import every created artefact starts **unlinked** and raises a notification asking
+you to add relevant links. For **requirement, design, test-concept and
+spec/standard** documents the notification specifically asks you to check the
+necessity of links in the text and in the relationship tree.
