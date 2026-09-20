@@ -18,7 +18,7 @@ from app.api.link_read_utils import (
 )
 from app.core.database import get_db
 from app.core.security import require_project_access, require_role
-from app.models import ArtefactLink, Project, Requirement, TestCase
+from app.models import ArtefactLink, Project, ReportBranding, Requirement, TestCase
 from app.models.user import User, UserRole
 
 router = APIRouter()
@@ -69,10 +69,23 @@ def _pdf_safe(text: str) -> str:
     return (text or "").encode("latin-1", "replace").decode("latin-1")
 
 
-def _requirements_pdf(project: Project, requirements: list[Requirement]) -> bytes:
+async def _load_report_logo(db: AsyncSession):
+    row = (await db.execute(select(ReportBranding).limit(1))).scalar_one_or_none()
+    return row.logo if row and row.logo else None
+
+
+def _requirements_pdf(
+    project: Project, requirements: list[Requirement], logo: bytes | None = None
+) -> bytes:
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=18)
     pdf.add_page()
+
+    if logo:
+        try:
+            pdf.image(io.BytesIO(logo), x=170, y=8, h=16)
+        except Exception:  # noqa: BLE001 - a bad logo must never break the report
+            pass
 
     pdf.set_font("Helvetica", "B", 20)
     pdf.multi_cell(
@@ -125,7 +138,7 @@ async def export_requirements(
     requirements = await _load_requirements(db, project_id)
 
     if format == "pdf":
-        content = _requirements_pdf(project, requirements)
+        content = _requirements_pdf(project, requirements, await _load_report_logo(db))
         return Response(
             content=content,
             media_type="application/pdf",

@@ -13,6 +13,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -860,3 +861,17 @@ class AttachmentUploadAttempt(Base):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class ReportBranding(Base):
+    """Instance-wide report branding: an admin-uploaded company logo for PDF reports."""
+
+    __tablename__ = "report_branding"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    logo: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    logo_content_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    logo_filename: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
