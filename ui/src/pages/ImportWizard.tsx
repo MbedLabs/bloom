@@ -5,10 +5,10 @@ import { ArrowLeft, Check, ChevronRight, Download, AlertCircle, FileUp } from 'l
 import { docsApi, projectsApi, importApi } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { useDebounced } from '../hooks/useDebounced'
-import type { ImportResult, ReqIFImportResult } from '../api/client'
+import type { ImportResult, ReqIFImportResult, TestCaseImportResult } from '../api/client'
 
 type WizardStep = 1 | 2 | 3 | 4 | 5
-type ImportMode = 'project' | 'reqif'
+type ImportMode = 'project' | 'reqif' | 'file'
 
 /** How many source documents the picker shows at once. */
 const IMPORT_PAGE = 100
@@ -30,6 +30,10 @@ export default function ImportWizard() {
   const [reqifFile, setReqifFile] = useState<File | null>(null)
   const [reqifResult, setReqifResult] = useState<ReqIFImportResult | null>(null)
   const [reqifError, setReqifError] = useState<string | null>(null)
+  const [fileUpload, setFileUpload] = useState<File | null>(null)
+  const [fileFormat, setFileFormat] = useState<'csv' | 'xml'>('csv')
+  const [fileResult, setFileResult] = useState<TestCaseImportResult | null>(null)
+  const [fileError, setFileError] = useState<string | null>(null)
 
   const { data: projects } = useQuery({
     queryKey: ['projects'],
@@ -98,6 +102,22 @@ export default function ImportWizard() {
     },
   })
 
+  const fileMutation = useMutation({
+    mutationFn: (args: { file: File; format: 'csv' | 'xml' }) =>
+      importApi.importTestCases(projectId, args.file, args.format),
+    onSuccess: (data) => {
+      setFileResult(data)
+      setFileError(null)
+      queryClient.invalidateQueries({ queryKey: ['testCases', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['all-docs', prefix] })
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+    },
+    onError: (error: { response?: { data?: { detail?: string } } }) => {
+      setFileResult(null)
+      setFileError(error.response?.data?.detail || 'Import failed. Check the file and try again.')
+    },
+  })
+
   const toggleId = (id: number) => {
     setSelectedIds((prev) => prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id])
   }
@@ -123,6 +143,7 @@ export default function ImportWizard() {
         {([
           { key: 'project', label: 'From another project' },
           { key: 'reqif', label: 'From ReqIF file' },
+          { key: 'file', label: 'From CSV/XML file' },
         ] as const).map((m) => (
           <button
             key={m.key}
@@ -232,6 +253,97 @@ export default function ImportWizard() {
               className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90"
             >
               View imported requirements
+            </button>
+          </div>
+        )}
+      </div>
+      )}
+
+      {mode === 'file' && (
+      <div className="bg-card rounded-lg border border-border shadow-elegant p-6 space-y-4">
+        <h3 className="text-lg font-semibold text-foreground">Import test cases from a file</h3>
+        <p className="text-sm text-muted-foreground">
+          Upload a <span className="font-mono">.csv</span> or <span className="font-mono">.xml</span> file in
+          Bloom&apos;s export format. A row whose ID already exists updates that test case; new rows are created.
+        </p>
+
+        <div className="flex gap-2">
+          {(['csv', 'xml'] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFileFormat(f)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                fileFormat === f ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {f.toUpperCase()}
+            </button>
+          ))}
+        </div>
+
+        <label className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border p-8 cursor-pointer hover:border-primary/40 hover:bg-accent/30 transition-colors">
+          <FileUp className="h-6 w-6 text-muted-foreground" />
+          <span className="text-sm text-foreground font-medium">
+            {fileUpload ? fileUpload.name : `Choose a ${fileFormat.toUpperCase()} file`}
+          </span>
+          <span className="text-xs text-muted-foreground">.csv or .xml, up to 5 MB</span>
+          <input
+            type="file"
+            accept=".csv,.xml,text/csv,application/xml"
+            className="hidden"
+            onChange={(e) => {
+              setFileUpload(e.target.files?.[0] ?? null)
+              setFileResult(null)
+              setFileError(null)
+            }}
+          />
+        </label>
+
+        <div className="flex justify-end">
+          <button
+            onClick={() => fileUpload && fileMutation.mutate({ file: fileUpload, format: fileFormat })}
+            disabled={!fileUpload || fileMutation.isPending}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50 inline-flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            {fileMutation.isPending ? 'Importing...' : `Import ${fileFormat.toUpperCase()}`}
+          </button>
+        </div>
+
+        {fileError && (
+          <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-4 flex items-center gap-2 text-sm text-red-700 dark:text-red-400">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {fileError}
+          </div>
+        )}
+
+        {fileResult && (
+          <div className="space-y-3">
+            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-4 space-y-2">
+              <div className="text-emerald-700 dark:text-emerald-400 font-medium">
+                {fileResult.created} created &middot; {fileResult.updated} updated
+                {fileResult.skipped > 0 && ` · ${fileResult.skipped} skipped`}
+              </div>
+              {fileResult.new_ids.length > 0 && (
+                <div className="text-sm text-muted-foreground">New IDs: {fileResult.new_ids.join(', ')}</div>
+              )}
+            </div>
+            {fileResult.errors.length > 0 && (
+              <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-4 space-y-1">
+                <div className="flex items-center gap-2 text-red-700 dark:text-red-400 font-medium">
+                  <AlertCircle className="h-4 w-4" />
+                  Warnings
+                </div>
+                {fileResult.errors.map((err, i) => (
+                  <div key={i} className="text-sm text-red-600 dark:text-red-400">{err}</div>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={() => navigate(`/projects/${prefix}/docs`)}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90"
+            >
+              View test cases
             </button>
           </div>
         )}

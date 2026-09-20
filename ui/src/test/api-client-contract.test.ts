@@ -269,6 +269,12 @@ const CALLS: Array<[string, unknown[], string, string]> = [
     'post',
     '/projects/5/import/reqif',
   ],
+  [
+    'importApi.importTestCases',
+    [5, new File(['tc_id,title\n,New'], 'tcs.csv'), 'csv'],
+    'post',
+    '/projects/5/import/test-cases?format=csv',
+  ],
 
   ['exportApi.download', [5, 'requirements'], 'get', '/projects/5/export/requirements'],
 

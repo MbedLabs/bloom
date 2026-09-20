@@ -1634,6 +1634,14 @@ export interface ReqIFImportResult {
   errors: string[]
 }
 
+export interface TestCaseImportResult {
+  created: number
+  updated: number
+  skipped: number
+  new_ids: string[]
+  errors: string[]
+}
+
 export const importApi = {
   import: async (projectId: number, data: ImportRequest): Promise<ImportResult> => {
     const response = await api.post<ImportResult>(`/projects/${projectId}/import`, data)
@@ -1646,6 +1654,20 @@ export const importApi = {
       `/projects/${projectId}/import/reqif`,
       form,
       { headers: { 'Content-Type': 'multipart/form-data' } }
+    )
+    return response.data
+  },
+  importTestCases: async (
+    projectId: number,
+    file: File,
+    format: 'csv' | 'xml',
+  ): Promise<TestCaseImportResult> => {
+    const form = new FormData()
+    form.append('file', file)
+    const response = await api.post<TestCaseImportResult>(
+      `/projects/${projectId}/import/test-cases?format=${format}`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
     )
     return response.data
   },

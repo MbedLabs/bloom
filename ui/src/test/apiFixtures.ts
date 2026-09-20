@@ -672,6 +672,13 @@ export const RESPONSES: Record<string, unknown> = {
     new_ids: ['VCU-REQ-004'],
     errors: [],
   },
+  'importApi.importTestCases': {
+    created: 1,
+    updated: 0,
+    skipped: 0,
+    new_ids: ['VCU-TC-004'],
+    errors: [],
+  },
 
   'exportApi.download': undefined,
 
