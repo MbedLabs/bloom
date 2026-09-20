@@ -1697,6 +1697,22 @@ export const importApi = {
   },
 }
 
+export const brandingApi = {
+  setLogo: async (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    const response = await api.put<{ content_type: string; size: number }>(
+      '/branding/logo',
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    return response.data
+  },
+  deleteLogo: async () => {
+    await api.delete('/branding/logo')
+  },
+}
+
 export interface SearchResultItem {
   type: string
   id: number

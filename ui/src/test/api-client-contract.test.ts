@@ -281,6 +281,8 @@ const CALLS: Array<[string, unknown[], string, string]> = [
     'post',
     '/projects/5/import/markdown',
   ],
+  ['brandingApi.setLogo', [new File(['x'], 'logo.png')], 'put', '/branding/logo'],
+  ['brandingApi.deleteLogo', [], 'delete', '/branding/logo'],
 
   ['exportApi.download', [5, 'requirements'], 'get', '/projects/5/export/requirements'],
 

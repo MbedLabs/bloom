@@ -4,6 +4,7 @@ import {
   APP_VERSION,
   authApi,
   extractApiErrorMessage,
+  brandingApi,
   serviceCredentialsApi,
   type ServiceCredential,
 } from '../api/client'
@@ -62,6 +63,40 @@ function useDarkMode() {
 export default function Settings() {
   const { user, refreshUser } = useAuth()
   const isAdmin = user?.role === 'admin'
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [logoVersion, setLogoVersion] = useState(0)
+  const [logoBusy, setLogoBusy] = useState(false)
+  const [logoMessage, setLogoMessage] = useState('')
+
+  const handleUploadLogo = async () => {
+    if (!logoFile) return
+    setLogoBusy(true)
+    setLogoMessage('')
+    try {
+      await brandingApi.setLogo(logoFile)
+      setLogoFile(null)
+      setLogoVersion((v) => v + 1)
+      setLogoMessage('Logo updated.')
+    } catch (err) {
+      setLogoMessage(extractApiErrorMessage(err, 'Could not upload the logo.'))
+    } finally {
+      setLogoBusy(false)
+    }
+  }
+
+  const handleRemoveLogo = async () => {
+    setLogoBusy(true)
+    setLogoMessage('')
+    try {
+      await brandingApi.deleteLogo()
+      setLogoVersion((v) => v + 1)
+      setLogoMessage('Logo removed.')
+    } catch (err) {
+      setLogoMessage(extractApiErrorMessage(err, 'Could not remove the logo.'))
+    } finally {
+      setLogoBusy(false)
+    }
+  }
   
   const [dark, setDark] = useDarkMode()
   const [newEmail, setNewEmail] = useState('')
@@ -389,6 +424,56 @@ export default function Settings() {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {isAdmin && (
+        <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden border-primary/20">
+          <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-primary/5">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold text-foreground">Report branding</h3>
+          </div>
+          <div className="p-5 space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Upload your company logo (PNG, JPEG, GIF or WebP, up to 2 MB). It appears on generated
+              PDF reports alongside the EmbedLabs branding.
+            </p>
+            <img
+              key={logoVersion}
+              src={`/api/branding/logo?v=${logoVersion}`}
+              alt="Company logo"
+              className="h-12 w-auto rounded border border-border bg-muted/30 p-1"
+              onError={(e) => {
+                ;(e.currentTarget as HTMLImageElement).style.display = 'none'
+              }}
+            />
+            <div className="flex items-center gap-3 flex-wrap">
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
+                className="text-sm"
+              />
+              <button
+                onClick={handleUploadLogo}
+                disabled={!logoFile || logoBusy}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+              >
+                {logoBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Upload logo
+              </button>
+              <button
+                onClick={handleRemoveLogo}
+                disabled={logoBusy}
+                className="text-xs font-medium text-destructive hover:underline disabled:opacity-50"
+              >
+                Remove
+              </button>
+            </div>
+            {logoMessage && (
+              <p className="text-sm text-muted-foreground" role="status">{logoMessage}</p>
             )}
           </div>
         </div>
