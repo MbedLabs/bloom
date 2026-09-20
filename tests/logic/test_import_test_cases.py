@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from starlette.datastructures import UploadFile
 
-from app.api.test_cases import import_test_cases
+from app.api.import_service import import_test_cases_file
 from app.core.database import Base
 from app.models import Project, TestCase
 from app.models.user import User, UserRole
@@ -56,11 +56,11 @@ async def test_csv_import_updates_existing_and_creates_new(session):
         "ALP-TC-001,Updated login,Approved,internal,User exists,1. Open => Form,Round-trip\n"
         ",Brand new case,Draft,internal,,1. Do X => Y,New one\n"
     ).encode()
-    result = await import_test_cases(
+    result = await import_test_cases_file(
         project_id=1, format="csv", file=_upload(content), db=session, current_user=admin
     )
-    assert result["updated"] == 1
-    assert result["created"] == 1
+    assert result.updated == 1
+    assert result.created == 1
     tc = (
         await session.execute(select(TestCase).where(TestCase.tc_id == "ALP-TC-001"))
     ).scalar_one()
@@ -76,10 +76,10 @@ async def test_xml_import_creates(session):
         b'<test-case id="X"><title>From XML</title><status>Draft</status>'
         b"<steps>1. Click => Opens</steps></test-case></test-cases>"
     )
-    result = await import_test_cases(
+    result = await import_test_cases_file(
         project_id=1, format="xml", file=_upload(xml), db=session, current_user=admin
     )
-    assert result["created"] == 1
+    assert result.created == 1
     tc = (await session.execute(select(TestCase).where(TestCase.title == "From XML"))).scalar_one()
     assert tc.steps == [{"action": "Click", "expected": "Opens"}]
     assert tc.tc_id.startswith("ALP-TC-")
@@ -88,9 +88,9 @@ async def test_xml_import_creates(session):
 async def test_missing_title_is_skipped(session):
     admin = await _admin(session)
     content = b"tc_id,title,steps\n,,1. x\n"
-    result = await import_test_cases(
+    result = await import_test_cases_file(
         project_id=1, format="csv", file=_upload(content), db=session, current_user=admin
     )
-    assert result["skipped"] == 1
-    assert result["created"] == 0
-    assert result["errors"] == ["row 1: missing title"]
+    assert result.skipped == 1
+    assert result.created == 0
+    assert result.errors == ["row 1: missing title"]
