@@ -275,6 +275,12 @@ const CALLS: Array<[string, unknown[], string, string]> = [
     'post',
     '/projects/5/import/test-cases?format=csv',
   ],
+  [
+    'importApi.importMarkdown',
+    [5, new File(['# Doc'], 'doc.md')],
+    'post',
+    '/projects/5/import/markdown',
+  ],
 
   ['exportApi.download', [5, 'requirements'], 'get', '/projects/5/export/requirements'],
 

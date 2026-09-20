@@ -5,10 +5,10 @@ import { ArrowLeft, Check, ChevronRight, Download, AlertCircle, FileUp } from 'l
 import { docsApi, projectsApi, importApi } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { useDebounced } from '../hooks/useDebounced'
-import type { ImportResult, ReqIFImportResult, TestCaseImportResult } from '../api/client'
+import type { ImportResult, ReqIFImportResult, TestCaseImportResult, MarkdownImportResult } from '../api/client'
 
 type WizardStep = 1 | 2 | 3 | 4 | 5
-type ImportMode = 'project' | 'reqif' | 'file'
+type ImportMode = 'project' | 'reqif' | 'file' | 'md'
 
 /** How many source documents the picker shows at once. */
 const IMPORT_PAGE = 100
@@ -34,6 +34,9 @@ export default function ImportWizard() {
   const [fileFormat, setFileFormat] = useState<'csv' | 'xml'>('csv')
   const [fileResult, setFileResult] = useState<TestCaseImportResult | null>(null)
   const [fileError, setFileError] = useState<string | null>(null)
+  const [mdFile, setMdFile] = useState<File | null>(null)
+  const [mdResult, setMdResult] = useState<MarkdownImportResult | null>(null)
+  const [mdError, setMdError] = useState<string | null>(null)
 
   const { data: projects } = useQuery({
     queryKey: ['projects'],
@@ -118,6 +121,20 @@ export default function ImportWizard() {
     },
   })
 
+  const mdMutation = useMutation({
+    mutationFn: (file: File) => importApi.importMarkdown(projectId, file),
+    onSuccess: (data) => {
+      setMdResult(data)
+      setMdError(null)
+      queryClient.invalidateQueries({ queryKey: ['project-variables', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+    },
+    onError: (error: { response?: { data?: { detail?: string } } }) => {
+      setMdResult(null)
+      setMdError(error.response?.data?.detail || 'Import failed. Check the file and try again.')
+    },
+  })
+
   const toggleId = (id: number) => {
     setSelectedIds((prev) => prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id])
   }
@@ -144,6 +161,7 @@ export default function ImportWizard() {
           { key: 'project', label: 'From another project' },
           { key: 'reqif', label: 'From ReqIF file' },
           { key: 'file', label: 'From CSV/XML file' },
+          { key: 'md', label: 'From Markdown file' },
         ] as const).map((m) => (
           <button
             key={m.key}
@@ -345,6 +363,75 @@ export default function ImportWizard() {
             >
               View test cases
             </button>
+          </div>
+        )}
+      </div>
+      )}
+
+      {mode === 'md' && (
+      <div className="bg-card rounded-lg border border-border shadow-elegant p-6 space-y-4">
+        <h3 className="text-lg font-semibold text-foreground">Import from Markdown</h3>
+        <p className="text-sm text-muted-foreground">
+          Upload a <span className="font-mono">.md</span> file. Its parameters become project
+          variables and its sections are classified by type. A parameter whose name already exists
+          is flagged for you to act on and is never overwritten.
+        </p>
+
+        <label className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border p-8 cursor-pointer hover:border-primary/40 hover:bg-accent/30 transition-colors">
+          <FileUp className="h-6 w-6 text-muted-foreground" />
+          <span className="text-sm text-foreground font-medium">
+            {mdFile ? mdFile.name : 'Choose a Markdown file'}
+          </span>
+          <span className="text-xs text-muted-foreground">.md, up to 5 MB</span>
+          <input
+            type="file"
+            accept=".md,.markdown,text/markdown"
+            className="hidden"
+            onChange={(e) => {
+              setMdFile(e.target.files?.[0] ?? null)
+              setMdResult(null)
+              setMdError(null)
+            }}
+          />
+        </label>
+
+        <div className="flex justify-end">
+          <button
+            onClick={() => mdFile && mdMutation.mutate(mdFile)}
+            disabled={!mdFile || mdMutation.isPending}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50 inline-flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            {mdMutation.isPending ? 'Importing...' : 'Import Markdown'}
+          </button>
+        </div>
+
+        {mdError && (
+          <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-4 flex items-center gap-2 text-sm text-red-700 dark:text-red-400">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {mdError}
+          </div>
+        )}
+
+        {mdResult && (
+          <div className="space-y-3">
+            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-4 space-y-2">
+              <div className="text-emerald-700 dark:text-emerald-400 font-medium">
+                {mdResult.parameters_created} parameter{mdResult.parameters_created !== 1 ? 's' : ''} imported
+                &middot; {mdResult.sections.length} section{mdResult.sections.length !== 1 ? 's' : ''} classified
+              </div>
+            </div>
+            {mdResult.parameter_collisions.length > 0 && (
+              <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-4 space-y-1">
+                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-medium">
+                  <AlertCircle className="h-4 w-4" />
+                  Action required &mdash; already exists, not overwritten
+                </div>
+                <div className="text-sm text-amber-700 dark:text-amber-400">
+                  {mdResult.parameter_collisions.join(', ')}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

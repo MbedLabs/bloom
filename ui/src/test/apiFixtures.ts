@@ -679,6 +679,12 @@ export const RESPONSES: Record<string, unknown> = {
     new_ids: ['VCU-TC-004'],
     errors: [],
   },
+  'importApi.importMarkdown': {
+    doc_type: 'REQ',
+    parameters_created: 1,
+    parameter_collisions: [],
+    sections: [],
+  },
 
   'exportApi.download': undefined,
 

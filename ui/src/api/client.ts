@@ -1642,6 +1642,13 @@ export interface TestCaseImportResult {
   errors: string[]
 }
 
+export interface MarkdownImportResult {
+  doc_type: string | null
+  parameters_created: number
+  parameter_collisions: string[]
+  sections: { type_code: string | null; title: string }[]
+}
+
 export const importApi = {
   import: async (projectId: number, data: ImportRequest): Promise<ImportResult> => {
     const response = await api.post<ImportResult>(`/projects/${projectId}/import`, data)
@@ -1666,6 +1673,21 @@ export const importApi = {
     form.append('file', file)
     const response = await api.post<TestCaseImportResult>(
       `/projects/${projectId}/import/test-cases?format=${format}`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    return response.data
+  },
+  importMarkdown: async (
+    projectId: number,
+    file: File,
+    defaultType?: string,
+  ): Promise<MarkdownImportResult> => {
+    const form = new FormData()
+    form.append('file', file)
+    const qs = defaultType ? `?default_type=${defaultType}` : ''
+    const response = await api.post<MarkdownImportResult>(
+      `/projects/${projectId}/import/markdown${qs}`,
       form,
       { headers: { 'Content-Type': 'multipart/form-data' } },
     )
