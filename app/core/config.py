@@ -87,6 +87,9 @@ class Settings(BaseSettings):
         default="http://localhost:8000",
         validation_alias=AliasChoices("BLOOM_APP_BASE_URL", "APP_BASE_URL"),
     )
+    # Legacy name for APP_BASE_URL. Kept for backward compatibility and left out
+    # of .env.example and the docs on purpose. No code reads it directly;
+    # APP_BASE_URL falls back to it when only this variable is set.
     FRONTEND_BASE_URL: str = Field(
         default="http://localhost:8000",
         validation_alias=AliasChoices("BLOOM_FRONTEND_BASE_URL", "FRONTEND_BASE_URL"),
@@ -337,6 +340,21 @@ class Settings(BaseSettings):
         if os.environ.get("BLOOM_DOTENV_DISABLED") == "1":
             return init_settings, env_settings, file_secret_settings
         return init_settings, env_settings, dotenv_settings, file_secret_settings
+
+    @model_validator(mode="after")
+    def prefer_app_base_url_over_legacy_frontend_url(self):
+        # APP_BASE_URL is the public URL Bloom uses in the links it emails
+        # (invites, email verification, password resets) and in report and campaign links.
+        # FRONTEND_BASE_URL is the former name of this setting and is kept
+        # only for backward compatibility: an install that sets
+        # FRONTEND_BASE_URL but not APP_BASE_URL keeps working. When both
+        # are set, APP_BASE_URL wins.
+        if (
+            "APP_BASE_URL" not in self.model_fields_set
+            and "FRONTEND_BASE_URL" in self.model_fields_set
+        ):
+            self.APP_BASE_URL = self.FRONTEND_BASE_URL
+        return self
 
     @model_validator(mode="after")
     def populate_database_url(self):

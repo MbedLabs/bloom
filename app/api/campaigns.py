@@ -56,14 +56,14 @@ router = APIRouter()
 def campaign_frontend_url(project_prefix: str, campaign_id: int) -> str | None:
     """Bloom's own address for a campaign, or None when it does not know it."""
 
-    base = (settings.FRONTEND_BASE_URL or "").rstrip("/")
+    base = (settings.APP_BASE_URL or "").rstrip("/")
     return f"{base}/projects/{project_prefix}/campaigns/{campaign_id}" if base else None
 
 
 def suite_frontend_url(project_prefix: str, suite_id: int) -> str | None:
     """Bloom's own address for a test suite, or None when it does not know it."""
 
-    base = (settings.FRONTEND_BASE_URL or "").rstrip("/")
+    base = (settings.APP_BASE_URL or "").rstrip("/")
     return f"{base}/projects/{project_prefix}/suites/{suite_id}" if base else None
 
 

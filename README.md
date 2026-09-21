@@ -72,7 +72,6 @@ Open `.env` and set at least:
 - `ADMIN_PASSWORD`
 - `ADMIN_FULL_NAME`
 - `APP_BASE_URL`
-- `FRONTEND_BASE_URL`
 - `BLOOM_APP_URL`
 
 For a new database, set `AUTO_SEED_ADMIN=true` for the first startup. In production, Bloom rejects a missing or weak signing key and requires an administrator password of at least 16 characters.
