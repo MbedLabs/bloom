@@ -1,6 +1,6 @@
 # Bloom PLM by EmbedLabs
 
-Bloom PLM is a self-hosted product lifecycle management platform for requirements, controlled documents, verification, risks, changes, defects, baselines, and end-to-end traceability.
+Bloom PLM is a product lifecycle management platform for requirements, controlled documents, verification, risks, changes, defects, baselines, and end-to-end traceability.
 
 > **Release:** 1.1.0 public beta
 
@@ -10,10 +10,12 @@ Bloom PLM is a self-hosted product lifecycle management platform for requirement
 - Test cases, suites, campaigns, concepts, and verification planning
 - Risks, changes, defects, parameters, and baselines
 - Traceability links, relationship views, and coverage analysis
+- Notifications, and project-wide search across artefacts
 - Inline `#` tags that turn a mention in a document body into a link a reader can follow
 - Stable human-readable identifiers for controlled project records
 - Administrator, maintainer, and external-user access controls
-- ReqIF import plus CSV and PDF exports
+- ReqIF and Markdown document import; test cases import from CSV and XML and export as CSV, XML, and Markdown
+- PDF and CSV exports, with an optional administrator company logo on PDF reports
 - GitHub, GitLab, and Jira synchronization for defects and change requests
 - Optional test-case execution outcomes from Bud TMP
 - Readiness, health, metrics, structured logging, and backup workflows
