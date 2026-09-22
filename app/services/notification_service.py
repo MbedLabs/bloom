@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Notification
 from app.models.user import User
+from app.services import webhook_emitter
 
 logger = logging.getLogger(__name__)
 
@@ -36,10 +37,21 @@ async def notify(
         )
         db.add(notification)
         await db.flush()
-        return notification
     except Exception:  # pragma: no cover - defensive
         logger.exception("Failed to create notification for user %s", user_id)
         return None
+
+    # Mirror the event to the outbound webhook (a no-op unless one is configured).
+    # emit swallows its own errors, so a webhook failure never affects the caller.
+    await webhook_emitter.emit(
+        event_type,
+        project_id=project_id,
+        title=title,
+        body=body,
+        link_path=link_path,
+        recipient_user_id=user_id,
+    )
+    return notification
 
 
 async def notify_assignment(
