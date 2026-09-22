@@ -1,4 +1,4 @@
-"""Report branding: admin company logo storage, retrieval, and PDF rendering."""
+"""Company logo: admin customer-logo storage, retrieval, and PDF rendering."""
 
 import base64
 import io
@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from starlette.datastructures import Headers, UploadFile
 
-from app.api.branding import delete_report_logo, get_report_logo, set_report_logo
+from app.api.company_logo import delete_company_logo, get_company_logo, set_company_logo
 from app.api.export import _load_report_logo, _requirements_pdf
 from app.core.database import Base
 from app.models import Project, Requirement
@@ -61,18 +61,18 @@ def _upload(data: bytes, content_type: str) -> UploadFile:
 
 async def test_set_get_delete_logo_roundtrip(session):
     admin = await _admin(session)
-    out = await set_report_logo(file=_upload(PNG, "image/png"), db=session, current_user=admin)
+    out = await set_company_logo(file=_upload(PNG, "image/png"), db=session, current_user=admin)
     assert out["content_type"] == "image/png"
     assert out["size"] == len(PNG)
 
-    resp = await get_report_logo(db=session, current_user=admin)
+    resp = await get_company_logo(db=session, current_user=admin)
     assert resp.body == PNG
     assert resp.media_type == "image/png"
     assert await _load_report_logo(session) == PNG
 
-    await delete_report_logo(db=session, current_user=admin)
+    await delete_company_logo(db=session, current_user=admin)
     with pytest.raises(HTTPException) as exc:
-        await get_report_logo(db=session, current_user=admin)
+        await get_company_logo(db=session, current_user=admin)
     assert exc.value.status_code == 404
     assert await _load_report_logo(session) is None
 
@@ -80,7 +80,7 @@ async def test_set_get_delete_logo_roundtrip(session):
 async def test_non_image_rejected(session):
     admin = await _admin(session)
     with pytest.raises(HTTPException) as exc:
-        await set_report_logo(file=_upload(b"nope", "text/plain"), db=session, current_user=admin)
+        await set_company_logo(file=_upload(b"nope", "text/plain"), db=session, current_user=admin)
     assert exc.value.status_code == 415
 
 

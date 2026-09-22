@@ -1,3 +1,10 @@
+[1.2.0]
+* Admin company logo on PDF reports, alongside the EmbedLabs branding.
+* Import Markdown documents (classified into artefacts) and test cases from CSV and XML.
+* Export test cases as Markdown, CSV and XML.
+* Address artefacts and backlinks by public id.
+* Create a Bloom defect from an inbound Jira issue.
+
 [1.1.0]
 * Inline artefact references and campaign/suite topology membership.
 * Results sync reports the campaigns it updated.

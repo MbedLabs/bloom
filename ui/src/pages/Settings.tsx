@@ -4,7 +4,7 @@ import {
   APP_VERSION,
   authApi,
   extractApiErrorMessage,
-  brandingApi,
+  companyLogoApi,
   serviceCredentialsApi,
   type ServiceCredential,
 } from '../api/client'
@@ -64,19 +64,45 @@ export default function Settings() {
   const { user, refreshUser } = useAuth()
   const isAdmin = user?.role === 'admin'
   const [logoFile, setLogoFile] = useState<File | null>(null)
-  const [logoVersion, setLogoVersion] = useState(0)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [logoBusy, setLogoBusy] = useState(false)
   const [logoMessage, setLogoMessage] = useState('')
+
+  // Load the stored logo through the authenticated client and hand the preview
+  // a blob URL - a bare <img src="/api/..."> can't send the bearer token, so it
+  // would 401 and the admin would never see what they uploaded.
+  const refreshLogoPreview = async () => {
+    try {
+      const blob = await companyLogoApi.fetchLogo()
+      setLogoUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev)
+        return blob ? URL.createObjectURL(blob) : null
+      })
+    } catch {
+      // Upload/remove report their own status; leave the preview untouched.
+    }
+  }
+
+  useEffect(() => {
+    if (!isAdmin) return
+    void refreshLogoPreview()
+    return () => {
+      setLogoUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev)
+        return null
+      })
+    }
+  }, [isAdmin])
 
   const handleUploadLogo = async () => {
     if (!logoFile) return
     setLogoBusy(true)
     setLogoMessage('')
     try {
-      await brandingApi.setLogo(logoFile)
+      await companyLogoApi.setLogo(logoFile)
       setLogoFile(null)
-      setLogoVersion((v) => v + 1)
       setLogoMessage('Logo updated.')
+      await refreshLogoPreview()
     } catch (err) {
       setLogoMessage(extractApiErrorMessage(err, 'Could not upload the logo.'))
     } finally {
@@ -88,9 +114,9 @@ export default function Settings() {
     setLogoBusy(true)
     setLogoMessage('')
     try {
-      await brandingApi.deleteLogo()
-      setLogoVersion((v) => v + 1)
+      await companyLogoApi.deleteLogo()
       setLogoMessage('Logo removed.')
+      await refreshLogoPreview()
     } catch (err) {
       setLogoMessage(extractApiErrorMessage(err, 'Could not remove the logo.'))
     } finally {
@@ -433,22 +459,23 @@ export default function Settings() {
         <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden border-primary/20">
           <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-primary/5">
             <ShieldCheck className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">Report branding</h3>
+            <h3 className="text-sm font-semibold text-foreground">Company logo</h3>
           </div>
           <div className="p-5 space-y-4">
             <p className="text-xs text-muted-foreground">
-              Upload your company logo (PNG, JPEG, GIF or WebP, up to 2 MB). It appears on generated
-              PDF reports alongside the EmbedLabs branding.
+              Upload your company logo (PNG, JPEG, GIF or WebP, up to 2 MB). It appears top-left on
+              generated PDF reports, alongside the EmbedLabs tamper-evidence footer, which always
+              stays.
             </p>
-            <img
-              key={logoVersion}
-              src={`/api/branding/logo?v=${logoVersion}`}
-              alt="Company logo"
-              className="h-12 w-auto rounded border border-border bg-muted/30 p-1"
-              onError={(e) => {
-                ;(e.currentTarget as HTMLImageElement).style.display = 'none'
-              }}
-            />
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt="Company logo"
+                className="h-16 w-auto max-w-[220px] object-contain rounded border border-border bg-muted/30 p-2"
+              />
+            ) : (
+              <p className="text-xs italic text-muted-foreground">No company logo set yet.</p>
+            )}
             <div className="flex items-center gap-3 flex-wrap">
               <input
                 type="file"

@@ -19,9 +19,9 @@ from app.api import artefacts, attachments
 from app.api import auth as auth_api
 from app.api import (
     baselines,
-    branding,
     campaigns,
     changes,
+    company_logo,
     dashboard,
     defects,
     designs,
@@ -474,7 +474,7 @@ app.include_router(links.router, prefix="/api/links", tags=["Links"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
 app.include_router(import_service.router, prefix="/api", tags=["Import"])
 app.include_router(export.router, prefix="/api", tags=["Export"])
-app.include_router(branding.router, prefix="/api/branding", tags=["Branding"])
+app.include_router(company_logo.router, prefix="/api/company-logo", tags=["Company logo"])
 app.include_router(search.router, prefix="/api/search", tags=["Search"])
 app.include_router(docs_facade.router, prefix="/api", tags=["Docs Facade"])
 

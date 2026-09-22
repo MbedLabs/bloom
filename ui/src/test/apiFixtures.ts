@@ -687,8 +687,9 @@ export const RESPONSES: Record<string, unknown> = {
     artefacts_skipped: 0,
     sections: [],
   },
-  'brandingApi.setLogo': { content_type: 'image/png', size: 4 },
-  'brandingApi.deleteLogo': undefined,
+  'companyLogoApi.setLogo': { content_type: 'image/png', size: 4 },
+  'companyLogoApi.fetchLogo': undefined,
+  'companyLogoApi.deleteLogo': undefined,
 
   'exportApi.download': undefined,
 

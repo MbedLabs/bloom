@@ -3,11 +3,13 @@
 import csv
 import io
 from datetime import datetime, timezone
+from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from fpdf import FPDF
+from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,12 +20,84 @@ from app.api.link_read_utils import (
 )
 from app.core.database import get_db
 from app.core.security import require_project_access, require_role
-from app.models import ArtefactLink, Project, ReportBranding, Requirement, TestCase
+from app.models import ArtefactLink, CompanyLogo, Project, Requirement, TestCase
 from app.models.user import User, UserRole
 
 router = APIRouter()
 
 CSV_MEDIA_TYPE = "text/csv; charset=utf-8"
+
+# Report letterhead assets. The Bloom mark and the EmbedLabs footer are shipped
+# with the app; the customer's own logo is uploaded and passed in at render time.
+ASSETS = Path(__file__).resolve().parent.parent / "assets"
+BLOOM_LOGO = ASSETS / "bloom-logo.png"
+EMBEDLABS_LOGO = ASSETS / "embedlabs-logo.png"
+EMBEDLABS_URL = "https://www.embedlabs.net"
+
+
+def _fit(iw: int, ih: int, max_w: float, max_h: float) -> tuple[float, float]:
+    """Scale (iw, ih) to fit inside the box, keeping aspect ratio (never cropped)."""
+    if iw <= 0 or ih <= 0:
+        return max_w, max_h
+    scale = min(max_w / iw, max_h / ih)
+    return iw * scale, ih * scale
+
+
+class _BrandedPDF(FPDF):
+    """A4 report letterhead: the customer's company logo top-left, the Bloom
+    application mark top-right, and the EmbedLabs tamper-evidence footer -
+    "Powered by EmbedLabs", linked - on every page. The EmbedLabs branding is
+    deployment-agnostic and always present; the company logo is optional."""
+
+    def __init__(self, *args, company_logo: bytes | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._company_logo = company_logo
+
+    def header(self) -> None:
+        top = 9
+        # Customer company logo, top-left, fit inside a fixed box so a wide or
+        # tall logo can never be cropped or pushed off the page edge.
+        if self._company_logo:
+            try:
+                with Image.open(io.BytesIO(self._company_logo)) as im:
+                    w, h = _fit(im.width, im.height, 55, 15)
+                self.image(io.BytesIO(self._company_logo), x=self.l_margin, y=top, w=w, h=h)
+            except Exception:  # noqa: BLE001 - a bad logo must never break the report
+                pass
+        # Bloom application mark, top-right.
+        if BLOOM_LOGO.exists():
+            try:
+                with Image.open(BLOOM_LOGO) as im:
+                    w, h = _fit(im.width, im.height, 42, 12)
+                self.image(str(BLOOM_LOGO), x=self.w - self.r_margin - w, y=top, w=w, h=h)
+            except Exception:  # noqa: BLE001
+                pass
+
+    def footer(self) -> None:
+        self.set_y(-14)
+        self.set_draw_color(0xC7, 0xCD, 0xD6)
+        self.set_line_width(0.2)
+        self.line(self.l_margin, self.get_y(), self.w - self.r_margin, self.get_y())
+        self.ln(1.5)
+        y = self.get_y()
+        x = self.l_margin
+        if EMBEDLABS_LOGO.exists():
+            try:
+                with Image.open(EMBEDLABS_LOGO) as im:
+                    w, h = _fit(im.width, im.height, 30, 4.5)
+                self.image(str(EMBEDLABS_LOGO), x=x, y=y + (5 - h) / 2, w=w, h=h)
+                x += w + 2
+            except Exception:  # noqa: BLE001
+                pass
+        self.set_xy(x, y)
+        self.set_font("Helvetica", "", 8)
+        self.set_text_color(0x25, 0x63, 0xEB)
+        label = "Powered by EmbedLabs"
+        self.cell(self.get_string_width(label) + 1, 5, label, link=EMBEDLABS_URL)
+        # Page number, bottom-right, on the same baseline.
+        self.set_text_color(0x64, 0x74, 0x8B)
+        self.set_xy(self.l_margin, y)
+        self.cell(0, 5, f"Page {self.page_no()}", align="R")
 
 
 async def _load_project(db: AsyncSession, project_id: int, current_user: User) -> Project:
@@ -70,22 +144,17 @@ def _pdf_safe(text: str) -> str:
 
 
 async def _load_report_logo(db: AsyncSession):
-    row = (await db.execute(select(ReportBranding).limit(1))).scalar_one_or_none()
+    row = (await db.execute(select(CompanyLogo).limit(1))).scalar_one_or_none()
     return row.logo if row and row.logo else None
 
 
 def _requirements_pdf(
     project: Project, requirements: list[Requirement], logo: bytes | None = None
 ) -> bytes:
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=18)
+    pdf = _BrandedPDF(company_logo=logo)
+    pdf.set_top_margin(28)
+    pdf.set_auto_page_break(auto=True, margin=20)
     pdf.add_page()
-
-    if logo:
-        try:
-            pdf.image(io.BytesIO(logo), x=170, y=8, h=16)
-        except Exception:  # noqa: BLE001 - a bad logo must never break the report
-            pass
 
     pdf.set_font("Helvetica", "B", 20)
     pdf.multi_cell(

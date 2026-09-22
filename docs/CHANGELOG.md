@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.0 - unreleased
+
+### Added
+
+- Admin company logo on PDF reports: an administrator uploads a company logo in Settings; it renders on the report letterhead (top-left) alongside the EmbedLabs tamper-evidence footer, which is always present. The Settings preview loads through the authenticated client so the admin sees exactly what was stored.
+- Markdown document import: classifies a Markdown document into artefacts (by heading tag, front matter, or an at-import marker); a parameters section declares `parameter:`/`value:` pairs and a name collision requires an action rather than overwriting; classified sections are persisted as artefacts; an unlinked imported artefact raises a notification to link it; documented per template. A Markdown mode is added to the Import Wizard.
+- Test-case import from CSV and XML, round-tripping with the export, on the `POST /projects/{id}/import` convention; a CSV/XML mode in the Import Wizard.
+- Export test cases as Markdown, CSV and XML.
+- Address artefacts and their backlinks by public id, not only the database id (additive; database ids continue to resolve).
+- Create a Bloom defect from an inbound Jira issue for a mapped project.
+- Open a mentioned artefact, and the exact parameter, from a document body; mention links resolve by public id.
+
+### Fixed
+
+- Requirements and test cases return their editor body.
+
 ## 1.1.0 - 2026-09-16
 
 ### Added
@@ -60,7 +76,7 @@
 
 ## 1.0.0 - 2026-07-24
 
-Initial public beta release of Bloom PLM by EmbedLabs — a self-hosted product
+Initial public beta release of Bloom PLM by EmbedLabs, a product
 lifecycle management platform. Published as a multi-architecture container image
 with PostgreSQL-backed deployment, Alembic migrations, liveness/readiness health
 checks, and persistent project data.
