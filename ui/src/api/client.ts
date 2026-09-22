@@ -349,6 +349,88 @@ export const usersApi = {
   },
 }
 
+// ─── Groups & policies (admin) ────────────────────────────────────────────
+export type BaseRole = 'admin' | 'maintainer' | 'external'
+
+export interface Policy {
+  id: number
+  name: string
+  description: string
+  base_role: BaseRole
+  permissions: Record<string, string[]>
+  doc_tag_scope: string[] | null
+  is_default: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface PolicyInput {
+  name?: string
+  description?: string
+  base_role?: BaseRole
+  permissions?: Record<string, string[]>
+  doc_tag_scope?: string[] | null
+}
+
+export interface GroupMember {
+  user_id: number
+  email: string
+  full_name: string
+}
+
+export interface GroupGrant {
+  id: number
+  // null is an all-projects grant.
+  project_id: number | null
+}
+
+export interface Group {
+  id: number
+  name: string
+  description: string
+  policy_id: number | null
+  created_at: string
+  updated_at: string
+  members: GroupMember[]
+  grants: GroupGrant[]
+}
+
+export interface GroupInput {
+  name?: string
+  description?: string
+  policy_id?: number | null
+}
+
+export const policiesApi = {
+  list: async () => (await api.get<Policy[]>('/policies')).data,
+  create: async (data: PolicyInput) => (await api.post<Policy>('/policies', data)).data,
+  update: async (id: number, data: PolicyInput) =>
+    (await api.patch<Policy>(`/policies/${id}`, data)).data,
+  delete: async (id: number) => {
+    await api.delete(`/policies/${id}`)
+  },
+}
+
+export const groupsApi = {
+  list: async () => (await api.get<Group[]>('/groups')).data,
+  create: async (data: GroupInput) => (await api.post<Group>('/groups', data)).data,
+  update: async (id: number, data: GroupInput) =>
+    (await api.patch<Group>(`/groups/${id}`, data)).data,
+  delete: async (id: number) => {
+    await api.delete(`/groups/${id}`)
+  },
+  addMember: async (id: number, userId: number) =>
+    (await api.post<Group>(`/groups/${id}/members`, { user_id: userId })).data,
+  removeMember: async (id: number, userId: number) => {
+    await api.delete(`/groups/${id}/members/${userId}`)
+  },
+  addGrant: async (id: number, projectId: number | null) =>
+    (await api.post<Group>(`/groups/${id}/grants`, { project_id: projectId })).data,
+  removeGrant: async (id: number, grantId: number) => {
+    await api.delete(`/groups/${id}/grants/${grantId}`)
+  },
+}
+
 export interface DashboardStats {
   total_projects: number
   active_projects: number

@@ -299,6 +299,20 @@ const CALLS: Array<[string, unknown[], string, string]> = [
   ['artefactsApi.listActivity', ['requirement', 11], 'get', '/artefacts/requirement/11/activity'],
   ['artefactsApi.getRelated', ['requirement', 11], 'get', '/artefacts/requirement/11/related'],
   ['artefactsApi.transition', ['requirement', 11, 'Approved'], 'post', '/artefacts/requirement/11/transition'],
+
+  ['policiesApi.list', [], 'get', '/policies'],
+  ['policiesApi.create', [{ name: 'P', base_role: 'external' }], 'post', '/policies'],
+  ['policiesApi.update', [2, { description: 'x' }], 'patch', '/policies/2'],
+  ['policiesApi.delete', [2], 'delete', '/policies/2'],
+
+  ['groupsApi.list', [], 'get', '/groups'],
+  ['groupsApi.create', [{ name: 'G' }], 'post', '/groups'],
+  ['groupsApi.update', [10, { name: 'G2' }], 'patch', '/groups/10'],
+  ['groupsApi.delete', [10], 'delete', '/groups/10'],
+  ['groupsApi.addMember', [10, 5], 'post', '/groups/10/members'],
+  ['groupsApi.removeMember', [10, 5], 'delete', '/groups/10/members/5'],
+  ['groupsApi.addGrant', [10, 7], 'post', '/groups/10/grants'],
+  ['groupsApi.removeGrant', [10, 3], 'delete', '/groups/10/grants/3'],
 ]
 
 type ApiGroup = Record<string, (...args: unknown[]) => Promise<unknown>>
