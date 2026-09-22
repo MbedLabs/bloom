@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.core.database import Base
 from app.core.policy_seed import DEFAULT_POLICIES, seed_default_policies
 from app.core.security import (
+    get_external_doc_types,
     require_project_access,
     resolve_project_role,
     user_can_access_project,
@@ -51,8 +52,15 @@ async def _project(db):
     return p
 
 
-async def _grant_group(db, user, base_role, *, project=None, all_projects=False):
-    pol = Policy(name=f"pol{next(_seq)}", base_role=base_role, permissions={})
+async def _grant_group(
+    db, user, base_role, *, project=None, all_projects=False, doc_tag_scope=None
+):
+    pol = Policy(
+        name=f"pol{next(_seq)}",
+        base_role=base_role,
+        permissions={},
+        doc_tag_scope=doc_tag_scope,
+    )
     db.add(pol)
     await db.flush()
     g = Group(name=f"grp{next(_seq)}", policy_id=pol.id)
@@ -141,3 +149,57 @@ async def test_seed_default_policies_idempotent(session):
     assert "Administrator" in names
     assert "Customer/Stakeholder" in names
     assert await seed_default_policies(session) == 0
+
+
+@pytest.mark.asyncio
+async def test_group_external_doc_scope_enforced(session):
+    user = await _user(session, UserRole.external)
+    proj = await _project(session)
+    await _grant_group(session, user, "external", project=proj, doc_tag_scope=["REQ", "TC"])
+    # No direct membership, so the group policy's doc_tag_scope is the allowlist.
+    assert await get_external_doc_types(session, user, proj.id) == {"REQ", "TC"}
+
+
+@pytest.mark.asyncio
+async def test_group_external_doc_scope_none_means_all(session):
+    user = await _user(session, UserRole.external)
+    proj = await _project(session)
+    await _grant_group(session, user, "external", project=proj, doc_tag_scope=None)
+    # A NULL scope grants every type.
+    assert await get_external_doc_types(session, user, proj.id) is None
+
+
+@pytest.mark.asyncio
+async def test_group_external_doc_scope_unions_across_groups(session):
+    user = await _user(session, UserRole.external)
+    proj = await _project(session)
+    await _grant_group(session, user, "external", project=proj, doc_tag_scope=["REQ"])
+    await _grant_group(session, user, "external", project=proj, doc_tag_scope=["DEF"])
+    assert await get_external_doc_types(session, user, proj.id) == {"REQ", "DEF"}
+
+
+@pytest.mark.asyncio
+async def test_group_maintainer_sees_every_doc_type(session):
+    user = await _user(session, UserRole.maintainer)
+    proj = await _project(session)
+    await _grant_group(session, user, "maintainer", project=proj, doc_tag_scope=["REQ"])
+    # A maintainer is never scoped by the external doc-type allowlist.
+    assert await get_external_doc_types(session, user, proj.id) is None
+
+
+@pytest.mark.asyncio
+async def test_no_group_external_still_forbidden(session):
+    user = await _user(session, UserRole.external)
+    proj = await _project(session)
+    with pytest.raises(HTTPException):
+        await get_external_doc_types(session, user, proj.id)
+
+
+@pytest.mark.asyncio
+async def test_default_customer_policy_scopes_doc_types(session):
+    await seed_default_policies(session)
+    customer = (
+        await session.execute(select(Policy).where(Policy.name == "Customer/Stakeholder"))
+    ).scalar_one()
+    assert customer.base_role == "external"
+    assert set(customer.doc_tag_scope) == {"REQ", "TC", "CPT", "CMP"}

@@ -47,17 +47,16 @@ def _create_user(api_client, headers, role="external") -> dict:
     return body
 
 
-def _create_policy(api_client, headers, base_role="external") -> dict:
-    created = api_client.post(
-        "/api/policies",
-        headers=headers,
-        json={
-            "name": unique_name("Policy"),
-            "description": "Test policy",
-            "base_role": base_role,
-            "permissions": {"requirement": ["view", "comment"]},
-        },
-    )
+def _create_policy(api_client, headers, base_role="external", doc_tag_scope=None) -> dict:
+    body = {
+        "name": unique_name("Policy"),
+        "description": "Test policy",
+        "base_role": base_role,
+        "permissions": {"requirement": ["view", "comment"]},
+    }
+    if doc_tag_scope is not None:
+        body["doc_tag_scope"] = doc_tag_scope
+    created = api_client.post("/api/policies", headers=headers, json=body)
     assert created.status_code == 201, created.text
     return created.json()
 
@@ -202,6 +201,45 @@ def test_group_grant_confers_project_access(api_client: TestClient):
     assert (
         api_client.get(f"/api/projects/{granted_project}", headers=user_headers).status_code == 403
     )
+
+
+def test_group_grant_admits_external_user_scoped_by_policy(api_client: TestClient):
+    # The doc_tag_scope path: an external-instance user with only group access no
+    # longer 403s on the external document-visibility lookup; the group policy's
+    # doc_tag_scope is their document-type allowlist.
+    headers = _admin_headers(api_client)
+    user = _create_user(api_client, headers, role="external")
+    user_headers = _headers_for(api_client, user["email"])
+    project_id = create_project(api_client, headers, "ExtGrant")["id"]
+
+    assert api_client.get(f"/api/projects/{project_id}", headers=user_headers).status_code == 403
+
+    policy = _create_policy(api_client, headers, base_role="external", doc_tag_scope=["REQ", "TC"])
+    group = _create_group(api_client, headers, policy_id=policy["id"])
+    api_client.post(
+        f"/api/groups/{group['id']}/grants", headers=headers, json={"project_id": project_id}
+    )
+    api_client.post(
+        f"/api/groups/{group['id']}/members", headers=headers, json={"user_id": user["id"]}
+    )
+
+    assert api_client.get(f"/api/projects/{project_id}", headers=user_headers).status_code == 200
+
+
+def test_policy_rejects_unknown_doc_types(api_client: TestClient):
+    headers = _admin_headers(api_client)
+    bad = api_client.post(
+        "/api/policies",
+        headers=headers,
+        json={
+            "name": unique_name("BadPolicy"),
+            "base_role": "external",
+            "permissions": {},
+            "doc_tag_scope": ["REQ", "NOPE"],
+        },
+    )
+    assert bad.status_code == 400, bad.text
+    assert "NOPE" in bad.text
 
 
 def test_default_policies_are_protected(api_client: TestClient):

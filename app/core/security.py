@@ -113,10 +113,18 @@ async def get_external_doc_types(
 
     membership = await _get_project_membership(db, current_user.id, project_id)
     if membership is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User is not assigned to this project.",
-        )
+        # No direct membership: a group grant may still admit the user. External
+        # members are then scoped by the group policy's document-type allowlist
+        # (doc_tag_scope) instead of a per-membership ProjectExternalDocType set.
+        group_role = await _group_project_role(db, current_user.id, project_id)
+        if group_role is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User is not assigned to this project.",
+            )
+        if current_user.role != UserRole.external:
+            return None
+        return await _group_doc_type_scope(db, current_user.id, project_id)
 
     if current_user.role != UserRole.external:
         return None
@@ -183,6 +191,33 @@ async def _group_project_role(db: AsyncSession, user_id: int, project_id: int) -
     if not roles:
         return None
     return max(roles, key=lambda r: _ROLE_STRENGTH.get(r, 0))
+
+
+async def _group_doc_type_scope(
+    db: AsyncSession, user_id: int, project_id: int
+) -> Optional[set[str]]:
+    """Allowed external document types from the user's groups granted this project.
+
+    Unions the doc_tag_scope of every applicable group policy. A policy whose scope
+    is NULL grants every type, so the union collapses to None (no restriction).
+    """
+    result = await db.execute(
+        select(Policy.doc_tag_scope)
+        .select_from(GroupMembership)
+        .join(Group, Group.id == GroupMembership.group_id)
+        .join(GroupProjectGrant, GroupProjectGrant.group_id == Group.id)
+        .join(Policy, Policy.id == Group.policy_id)
+        .where(
+            GroupMembership.user_id == user_id,
+            (GroupProjectGrant.project_id == project_id) | (GroupProjectGrant.project_id.is_(None)),
+        )
+    )
+    allowed: set[str] = set()
+    for scope in result.scalars().all():
+        if scope is None:
+            return None
+        allowed.update(scope)
+    return allowed
 
 
 async def resolve_project_role(

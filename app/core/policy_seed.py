@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.groups import Policy
+from app.schemas.memberships import DEFAULT_EXTERNAL_DOC_TYPES
 
 _ARTEFACTS = [
     "requirement",
@@ -134,9 +135,11 @@ DEFAULT_POLICIES = [
     {
         "name": "Customer/Stakeholder",
         "base_role": "external",
-        "description": "Views and comments on customer-visible artefacts within the allowed document tags.",
+        "description": "Views and comments on customer-visible artefacts of the allowed document types.",
         "permissions": _all("view", "comment"),
-        "doc_tag_scope": ["customer"],
+        # doc_tag_scope is the external document-type allowlist (the same codes a
+        # direct external membership uses); None would mean every type.
+        "doc_tag_scope": sorted(DEFAULT_EXTERNAL_DOC_TYPES),
     },
     {
         "name": "Viewer",

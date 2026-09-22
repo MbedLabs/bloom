@@ -15,6 +15,7 @@ from app.core.security import require_role
 from app.models.groups import Group, Policy
 from app.models.user import User, UserRole
 from app.schemas.groups import PolicyCreate, PolicyResponse, PolicyUpdate
+from app.schemas.memberships import EXTERNAL_DOC_TYPES
 
 router = APIRouter()
 
@@ -26,6 +27,19 @@ async def _get_policy_or_404(db: AsyncSession, policy_id: int) -> Policy:
     if policy is None:
         raise HTTPException(status_code=404, detail="Policy not found")
     return policy
+
+
+def _validate_doc_tag_scope(doc_tag_scope) -> None:
+    """doc_tag_scope is the external document-type allowlist, so its entries must be
+    known document-type codes."""
+    if doc_tag_scope is None:
+        return
+    invalid = set(doc_tag_scope) - EXTERNAL_DOC_TYPES
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown document types {sorted(invalid)}. Allowed: {sorted(EXTERNAL_DOC_TYPES)}",
+        )
 
 
 @router.get("", response_model=list[PolicyResponse])
@@ -46,6 +60,7 @@ async def create_policy(
     existing = await db.execute(select(Policy).where(Policy.name == data.name))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="A policy with this name already exists")
+    _validate_doc_tag_scope(data.doc_tag_scope)
     policy = Policy(
         name=data.name,
         description=data.description,
@@ -82,6 +97,7 @@ async def update_policy(
     if data.permissions is not None:
         policy.permissions = data.permissions
     if "doc_tag_scope" in data.model_fields_set:
+        _validate_doc_tag_scope(data.doc_tag_scope)
         policy.doc_tag_scope = data.doc_tag_scope
     if data.base_role is not None and data.base_role != policy.base_role:
         if policy.is_default:
