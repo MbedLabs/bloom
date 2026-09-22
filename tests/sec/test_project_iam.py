@@ -10,7 +10,13 @@ from app.models.user import UserRole
 
 def _db_with_membership(membership):
     db = AsyncMock()
-    result = SimpleNamespace(scalar_one_or_none=lambda: membership)
+    # Every execute returns this result: scalar_one_or_none answers the direct
+    # ProjectMembership lookup; scalars answers the additive group-role query with
+    # no groups, so these tests exercise the direct-membership path unchanged.
+    result = SimpleNamespace(
+        scalar_one_or_none=lambda: membership,
+        scalars=lambda: SimpleNamespace(all=lambda: []),
+    )
     db.execute.return_value = result
     return db
 

@@ -1,5 +1,6 @@
 """Models package initialization."""
 
+from app.models.groups import Group, GroupMembership, GroupProjectGrant, Policy
 from app.models.models import (
     ArtefactActivity,
     ArtefactComment,
@@ -79,6 +80,10 @@ __all__ = [
     "ArtefactLink",
     "ProjectMembership",
     "ProjectExternalDocType",
+    "Group",
+    "GroupMembership",
+    "GroupProjectGrant",
+    "Policy",
     "WebhookDelivery",
     "ServiceCredential",
 ]

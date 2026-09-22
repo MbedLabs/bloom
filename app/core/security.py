@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.models import ArtefactVisibility, Project
+from app.models.groups import Group, GroupMembership, GroupProjectGrant, Policy
 from app.models.project_membership import ProjectExternalDocType, ProjectMembership
 from app.models.user import User, UserRole
 
@@ -159,17 +160,65 @@ def apply_external_visibility_filter(query, model, current_user: User):
     return query
 
 
+_ROLE_STRENGTH = {"external": 1, "maintainer": 2, "admin": 3}
+
+
+async def _group_project_role(db: AsyncSession, user_id: int, project_id: int) -> Optional[str]:
+    """Strongest policy base_role from the user's groups granted this project.
+
+    A grant with a NULL project is an all-projects grant that covers every project.
+    """
+    result = await db.execute(
+        select(Policy.base_role)
+        .select_from(GroupMembership)
+        .join(Group, Group.id == GroupMembership.group_id)
+        .join(GroupProjectGrant, GroupProjectGrant.group_id == Group.id)
+        .join(Policy, Policy.id == Group.policy_id)
+        .where(
+            GroupMembership.user_id == user_id,
+            (GroupProjectGrant.project_id == project_id) | (GroupProjectGrant.project_id.is_(None)),
+        )
+    )
+    roles = [r for r in result.scalars().all() if r]
+    if not roles:
+        return None
+    return max(roles, key=lambda r: _ROLE_STRENGTH.get(r, 0))
+
+
+async def resolve_project_role(
+    db: AsyncSession, current_user: User, project_id: int
+) -> Optional[str]:
+    """The user's effective role on a project: the strongest of the global admin
+    baseline, the direct ProjectMembership.role, and any group grant. Returns None
+    when the user has no access. Additive: a user in no group resolves exactly to
+    their direct membership role, so existing access never changes.
+    """
+    if current_user.role == UserRole.admin:
+        return "admin"
+    candidates: list[str] = []
+    membership = await _get_project_membership(db, current_user.id, project_id)
+    if membership is not None:
+        candidates.append(membership.role)
+    group_role = await _group_project_role(db, current_user.id, project_id)
+    if group_role is not None:
+        candidates.append(group_role)
+    if not candidates:
+        return None
+    return max(candidates, key=lambda r: _ROLE_STRENGTH.get(r, 0))
+
+
 async def user_can_access_project(
     db: AsyncSession, current_user: User, project_id: int, *, roles: Optional[set[str]] = None
 ) -> bool:
     if current_user.role == UserRole.admin:
         return True
     membership = await _get_project_membership(db, current_user.id, project_id)
-    if membership is None:
-        return False
-    if roles is None:
+    if membership is not None and (
+        roles is None or (membership.role in roles and current_user.role.value in roles)
+    ):
         return True
-    return membership.role in roles and current_user.role.value in roles
+    group_role = await _group_project_role(db, current_user.id, project_id)
+    return group_role is not None and (roles is None or group_role in roles)
 
 
 async def require_project_access(
@@ -186,17 +235,22 @@ async def require_project_access(
         return None
 
     membership = await _get_project_membership(db, current_user.id, project_id)
+    if membership is not None and (
+        roles is None or (membership.role in roles and current_user.role.value in roles)
+    ):
+        return membership
+    group_role = await _group_project_role(db, current_user.id, project_id)
+    if group_role is not None and (roles is None or group_role in roles):
+        return None
     if membership is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User is not assigned to this project.",
         )
-    if roles is not None and (membership.role not in roles or current_user.role.value not in roles):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"User is not assigned to this project with one of: {sorted(roles)}.",
-        )
-    return membership
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=f"User is not assigned to this project with one of: {sorted(roles)}.",
+    )
 
 
 class _ProjectRoleChecker:
