@@ -28,11 +28,13 @@ from app.api import (
     docs_facade,
     documents,
     export,
+    groups,
     health,
     import_service,
     integrations,
     links,
     notifications,
+    policies,
     project_memberships,
     project_variables,
     projects,
@@ -442,6 +444,8 @@ app.include_router(
     tags=["Service Credentials"],
 )
 app.include_router(users_api.router, prefix="/api/users", tags=["Users"])
+app.include_router(groups.router, prefix="/api/groups", tags=["Groups"])
+app.include_router(policies.router, prefix="/api/policies", tags=["Policies"])
 app.include_router(setup.router, prefix="/api", tags=["Setup"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
