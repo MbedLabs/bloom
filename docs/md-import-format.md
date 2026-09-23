@@ -55,6 +55,25 @@ Each parameter has a **name** and a **value**. On import the backend checks each
 name: if a parameter with that name already exists, it alerts and requires an
 action. It is never silently overwritten.
 
+## Test cases
+
+In a `[TC]` section, each `- Pre-Condition:`, `- Step:` or `- Loop:` line becomes a
+row of the test case's steps table. Text after `=>` is the row's expected result.
+Indent a row by two spaces to nest it under the loop above it. Every other line of
+the section is the test case description. Keep each step to one action with one
+expected result.
+
+```markdown
+## [TC] Boot within budget
+Measures the cold boot time of the device under test.
+
+- Pre-Condition: device under test powered off through the relay
+- Loop: repeat {{parameter: BOOT_CYCLES, value: 3}} times
+  - Step: switch the relay on => relay reports closed
+  - Step: read the serial port until the boot banner => boot banner received
+  - Step: measure the time from relay on to boot banner => within {{parameter: BOOT_BUDGET_MS, value: 500}} ms +- {{parameter: BOOT_TOLERANCE_MS, value: 50}} ms
+```
+
 ## Links
 
 When an imported document classifies as a specification, test concept, design or
@@ -74,7 +93,7 @@ decides which template a section is filed under.
 | `des` / `design` | Design | title + body |
 | `rsk` / `risk` | Risk | title + body |
 | `cpt` / `concept` / `test-concept` | Test Concept | title becomes the concept name |
-| `tc` / `test-case` | Test Case | title + body |
+| `tc` / `test-case` | Test Case | title, description and steps rows (see Test cases) |
 | `chg` / `change` | Change Request | title + body |
 | `def` / `defect` | Defect | title + body |
 

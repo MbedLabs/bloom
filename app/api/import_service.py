@@ -802,6 +802,8 @@ async def import_markdown(
         instance = model(**kwargs)
         if section.body and hasattr(instance, "description"):
             instance.description = section.body
+        if section.steps and hasattr(instance, "steps"):
+            instance.steps = section.steps
         if hasattr(instance, "source_ref"):
             instance.source_ref = source_marker
         db.add(instance)

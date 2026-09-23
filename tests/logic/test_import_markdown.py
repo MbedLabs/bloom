@@ -10,6 +10,7 @@ from starlette.datastructures import UploadFile
 from app.api.import_service import import_markdown
 from app.core.database import Base
 from app.models import DesignItem, Notification, Project, ProjectVariable, Requirement
+from app.models import TestCase as TestCaseModel
 from app.models.user import User, UserRole
 
 
@@ -103,3 +104,26 @@ async def test_no_collision_creates_all(session):
     )
     assert result.parameters_created == 2
     assert result.parameter_collisions == []
+
+
+async def test_test_case_imports_with_step_rows(session):
+    admin = await _admin(session)
+    md = (
+        b"## [TC] Relay boot\n"
+        b"Checks the relay-driven boot.\n"
+        b"- Pre-Condition: relay open\n"
+        b"- Step: close the relay => boot banner within {{parameter: RELAY_MS, value: 200}} ms\n"
+    )
+    result = await import_markdown(
+        project_id=1, default_type=None, file=_upload(md), db=session, current_user=admin
+    )
+    assert result.artefacts_created == 1
+    tc = (
+        await session.execute(select(TestCaseModel).where(TestCaseModel.title == "Relay boot"))
+    ).scalar_one()
+    assert tc.tc_id.startswith("ALP-TC-")
+    assert tc.description == "Checks the relay-driven boot."
+    assert [(r["row_type"], r["description"], r["expected_result"]) for r in tc.steps] == [
+        ("precondition", "relay open", ""),
+        ("step", "close the relay", "boot banner within {{RELAY_MS}} ms"),
+    ]

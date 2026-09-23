@@ -60,3 +60,47 @@ def test_parameter_collisions_require_action():
     params = [Parameter("BOOT_MS", "500"), Parameter("NEW_ONE", "1")]
     collisions = parameter_name_collisions(params, existing_names=["boot_ms", "other"])
     assert collisions == ["BOOT_MS"]
+
+
+def test_test_case_rows_follow_the_step_contract():
+    text = (
+        "## [TC] Boot within budget\n"
+        "Measures the cold boot time of the device under test.\n"
+        "- Pre-Condition: device under test powered off through the relay\n"
+        "- Loop: repeat {{parameter: BOOT_CYCLES, value: 3}} times\n"
+        "  - Step: switch the relay on => relay reports closed\n"
+        "  - Step: measure the time from relay on to boot banner => within "
+        "{{parameter: BOOT_BUDGET_MS, value: 500}} ms +- "
+        "{{parameter: BOOT_TOLERANCE_MS, value: 50}} ms\n"
+    )
+    doc = parse_markdown_document(text)
+    tc = doc.sections[0]
+    assert tc.type_code == "TC"
+    assert tc.body == "Measures the cold boot time of the device under test."
+    assert [
+        (r["row_type"], r["label"], r["indent_level"], r["description"], r["expected_result"])
+        for r in tc.steps
+    ] == [
+        ("precondition", "Pre-Condition", 0, "device under test powered off through the relay", ""),
+        ("loop", "Loop", 0, "repeat {{BOOT_CYCLES}} times", ""),
+        ("step", "Step", 1, "switch the relay on", "relay reports closed"),
+        (
+            "step",
+            "Step",
+            1,
+            "measure the time from relay on to boot banner",
+            "within {{BOOT_BUDGET_MS}} ms +- {{BOOT_TOLERANCE_MS}} ms",
+        ),
+    ]
+    assert all(r["collapsed"] is False and r["id"] for r in tc.steps)
+    assert [p.name for p in doc.parameters] == [
+        "BOOT_CYCLES",
+        "BOOT_BUDGET_MS",
+        "BOOT_TOLERANCE_MS",
+    ]
+
+
+def test_step_lines_outside_a_test_case_stay_text():
+    doc = parse_markdown_document("## [REQ] Boot\n- Step: not a test case row\n")
+    assert doc.sections[0].steps == []
+    assert doc.sections[0].body == "- Step: not a test case row"
