@@ -4,9 +4,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { defectsApi, Defect, extractApiErrorMessage } from '../api/client'
 import { ArrowLeft, ArrowUpDown, ChevronDown, ChevronUp, Plus, Bug, ExternalLink, Search } from 'lucide-react'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
-import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
 import { formatDateTime } from '../test/date-utils'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
 
 const SEVERITY_COLORS: Record<string, string> = {
   Critical: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
@@ -36,7 +36,6 @@ export default function Defects() {
   const { prefix } = useParams<{ prefix: string }>()
   const { data: project } = useProjectByPrefix(prefix)
   const projectId = project?.id || 0
-  const { user } = useAuth()
   const queryClient = useQueryClient()
   const toast = useToast()
   const navigate = useNavigate()
@@ -138,7 +137,8 @@ export default function Defects() {
     },
   })
 
-  const canEdit = user?.role === 'admin' || user?.role === 'maintainer'
+  const { can } = useProjectPermissions(prefix, project?.id)
+  const canEdit = can('create', 'defect')
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault()

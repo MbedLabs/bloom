@@ -22,10 +22,9 @@ from app.core.security import (
     apply_external_visibility_filter,
     get_current_user,
     require_project_access,
-    require_role,
 )
 from app.models import Defect, IntegrationSetting, Project
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas import DefectCreate, DefectResponse, DefectUpdate, PaginatedResponse
 from app.services.integration_secrets import decrypt_integration_secret
 
@@ -73,7 +72,7 @@ async def list_defects(
 async def create_defect(
     data: DefectCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     project = (
         await db.execute(select(Project).where(Project.id == data.project_id))
@@ -85,7 +84,7 @@ async def create_defect(
         db,
         current_user,
         data.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("create", "defect"),
     )
 
     defect_id = await next_doc_id(db, Defect, Defect.defect_id, project.id, project.prefix, "DEF")
@@ -157,7 +156,7 @@ async def update_defect(
     defect_pk: int,
     data: DefectUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     item = (await db.execute(select(Defect).where(Defect.id == defect_pk))).scalar_one_or_none()
     if not item:
@@ -167,7 +166,7 @@ async def update_defect(
         db,
         current_user,
         item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "defect"),
     )
 
     fields_set = data.model_fields_set
@@ -227,7 +226,7 @@ async def update_defect(
 async def delete_defect(
     defect_pk: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     item = (await db.execute(select(Defect).where(Defect.id == defect_pk))).scalar_one_or_none()
     if not item:
@@ -236,7 +235,7 @@ async def delete_defect(
         db,
         current_user,
         item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("delete", "defect"),
     )
     await log_artefact_activity(
         db,
@@ -260,7 +259,7 @@ async def refresh_external_issue(
     defect_pk: int,
     payload: RefreshTokenPayload | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     """Fetch current state from GitHub/GitLab and update cached fields."""
     item = (await db.execute(select(Defect).where(Defect.id == defect_pk))).scalar_one_or_none()
@@ -270,7 +269,7 @@ async def refresh_external_issue(
         db,
         current_user,
         item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "defect"),
     )
     if (
         not item.external_tracker

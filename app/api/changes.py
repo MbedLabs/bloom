@@ -16,10 +16,9 @@ from app.core.security import (
     apply_external_visibility_filter,
     get_current_user,
     require_project_access,
-    require_role,
 )
 from app.models import ChangeRequest, Project
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas import (
     ChangeRequestCreate,
     ChangeRequestResponse,
@@ -59,7 +58,7 @@ async def list_change_requests(
 async def create_change_request(
     data: ChangeRequestCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     project = (
         await db.execute(select(Project).where(Project.id == data.project_id))
@@ -71,7 +70,7 @@ async def create_change_request(
         db,
         current_user,
         data.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("create", "change_request"),
     )
 
     change_id = await next_doc_id(
@@ -147,7 +146,7 @@ async def update_change_request(
     change_id: int,
     data: ChangeRequestUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     item = (
         await db.execute(select(ChangeRequest).where(ChangeRequest.id == change_id))
@@ -159,7 +158,7 @@ async def update_change_request(
         db,
         current_user,
         item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "change_request"),
     )
 
     fields_set = data.model_fields_set
@@ -212,7 +211,7 @@ async def update_change_request(
 async def delete_change_request(
     change_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     item = (
         await db.execute(select(ChangeRequest).where(ChangeRequest.id == change_id))
@@ -223,7 +222,7 @@ async def delete_change_request(
         db,
         current_user,
         item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("delete", "change_request"),
     )
     await log_artefact_activity(
         db,

@@ -120,6 +120,7 @@ const CALLS: Array<[string, unknown[], string, string]> = [
   ['projectsApi.delete', [5], 'delete', '/projects/5'],
 
   ['projectMembersApi.list', [5], 'get', '/projects/5/members'],
+  ['projectMembersApi.permissions', [5], 'get', '/projects/5/permissions'],
   [
     'projectMembersApi.create',
     [5, { user_id: 3, role: 'maintainer' }],

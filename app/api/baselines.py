@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_project_access, require_role
+from app.core.security import get_current_user, require_project_access
 from app.models import (
     Baseline,
     ChangeRequest,
@@ -102,7 +102,7 @@ async def list_baselines(
 async def create_baseline(
     data: BaselineCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     project = (
         await db.execute(select(Project).where(Project.id == data.project_id))
@@ -114,7 +114,7 @@ async def create_baseline(
         db,
         current_user,
         data.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("create", "baseline"),
     )
 
     baseline_id = await next_doc_id(
@@ -154,7 +154,7 @@ async def update_baseline(
     baseline_id: int,
     data: BaselineUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     item = (
         await db.execute(select(Baseline).where(Baseline.id == baseline_id))
@@ -166,7 +166,7 @@ async def update_baseline(
         db,
         current_user,
         item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "baseline"),
     )
 
     for field, value in data.model_dump(exclude_unset=True).items():
@@ -181,7 +181,7 @@ async def update_baseline(
 async def delete_baseline(
     baseline_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     item = (
         await db.execute(select(Baseline).where(Baseline.id == baseline_id))
@@ -192,6 +192,6 @@ async def delete_baseline(
         db,
         current_user,
         item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("delete", "baseline"),
     )
     await db.delete(item)

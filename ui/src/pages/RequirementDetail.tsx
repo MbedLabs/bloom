@@ -16,6 +16,7 @@ import {
   membershipLinksForCampaigns,
   membershipLinksForSuites,
 } from '../lib/membershipLinks'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
 
 function TypeBadge({ reqType }: { reqType: string }) {
   return (
@@ -64,6 +65,7 @@ function resolveUserName(users: Array<{ id: number; full_name: string }> | undef
 export default function RequirementDetail({ resolvedId }: { resolvedId?: number } = {}) {
   const { user } = useAuth()
   const { prefix, itemId } = useParams<{ prefix: string; itemId: string }>()
+  const { can } = useProjectPermissions(prefix)
   const reqId = resolvedId || parseInt(itemId || '0')
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -201,7 +203,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
     )
   }
 
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const canEditDocs = can('edit', 'requirement')
 
   return (
     <>

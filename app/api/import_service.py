@@ -28,7 +28,7 @@ from app.core.reqif import (
     ReqIFParseError,
 )
 from app.core.reqif_policy import read_reqif_upload
-from app.core.security import require_project_access, require_role
+from app.core.security import get_current_user, require_project_access
 from app.core.tc_steps import text_to_rows
 from app.core.testrail import (
     TestRailCase,
@@ -54,7 +54,7 @@ from app.models import (
     TestSuite,
     TestSuiteItem,
 )
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.services.import_attempts import begin_import_attempt, finish_import_attempt
 from app.services.notification_service import notify
 from app.services.reqif_worker import (
@@ -95,12 +95,17 @@ def _extract_numeric_suffix(item_id: str, prefix_len: int) -> int:
         return 0
 
 
+def _copied_resource(doc_type: str) -> str:
+    """The permission resource of the documents a project-to-project copy moves."""
+    return "requirement" if doc_type == "REQ" else "test_case"
+
+
 @router.post("/projects/{project_id}/import", response_model=ImportResult, status_code=201)
 async def import_docs(
     project_id: int,
     data: ImportRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     target_project = (
         await db.execute(select(Project).where(Project.id == project_id))
@@ -118,13 +123,13 @@ async def import_docs(
         raise HTTPException(status_code=400, detail="Cannot import from the same project")
 
     await require_project_access(
-        db, current_user, target_project.id, roles={UserRole.admin.value, UserRole.maintainer.value}
+        db, current_user, target_project.id, permission=("import", _copied_resource(data.doc_type))
     )
     await require_project_access(
         db,
         current_user,
         source_project.id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("export", _copied_resource(data.doc_type)),
     )
 
     result = ImportResult(imported=0, skipped=0, new_ids=[], errors=[])
@@ -354,7 +359,7 @@ async def import_reqif(
     project_id: int,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     """Import a ReqIF (``.reqif`` / ``.reqifz``) export as project requirements."""
     target_project = (
@@ -364,7 +369,7 @@ async def import_reqif(
         raise HTTPException(status_code=404, detail="Target project not found")
 
     await require_project_access(
-        db, current_user, target_project.id, roles={UserRole.admin.value, UserRole.maintainer.value}
+        db, current_user, target_project.id, permission=("import", "requirement")
     )
 
     attempt = await begin_import_attempt(db, user_id=current_user.id, project_id=target_project.id)
@@ -522,7 +527,7 @@ async def import_test_cases_file(
     format: str = Query("csv", pattern="^(csv|xml)$"),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     """Import test cases from a CSV or XML file in Bloom's export format (round-trip).
 
@@ -538,7 +543,7 @@ async def import_test_cases_file(
         db,
         current_user,
         target_project.id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("import", "test_case"),
     )
 
     attempt = await begin_import_attempt(db, user_id=current_user.id, project_id=target_project.id)
@@ -695,7 +700,7 @@ async def import_markdown(
     default_type: Optional[str] = Query(None),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     """Import a Markdown document: create its parameters and classify its sections.
 
@@ -712,7 +717,7 @@ async def import_markdown(
         db,
         current_user,
         target_project.id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("import", "document"),
     )
 
     attempt = await begin_import_attempt(db, user_id=current_user.id, project_id=target_project.id)
@@ -887,15 +892,13 @@ def _testrail_body(case: TestRailCase, unmatched: list) -> str:
 
 
 async def _testrail_project(db: AsyncSession, project_id: int, current_user: User) -> Project:
-    """The target project, after the maintainer access check."""
+    """The target project, after the test-case import permission check."""
     project = (
         await db.execute(select(Project).where(Project.id == project_id))
     ).scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Target project not found")
-    await require_project_access(
-        db, current_user, project.id, roles={UserRole.admin.value, UserRole.maintainer.value}
-    )
+    await require_project_access(db, current_user, project.id, permission=("import", "test_case"))
     return project
 
 
@@ -904,7 +907,7 @@ async def testrail_csv_columns(
     project_id: int,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     """The columns of a TestRail CSV export and the fields Bloom recognised in them."""
     await _testrail_project(db, project_id, current_user)
@@ -929,7 +932,7 @@ async def import_testrail(
     file: UploadFile = File(...),
     mapping: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     """Import a TestRail XML or CSV export as test cases, suites and requirement links.
 

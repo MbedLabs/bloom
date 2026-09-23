@@ -10,8 +10,8 @@ import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import DocumentAttachmentsPanel from '../components/DocumentAttachmentsPanel'
 import { docEditUrl, docUrl, kindSlugToType, type DocType } from '../types/doc'
 import { formatDateTime } from '../test/date-utils'
-import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
 
 function flattenSections(sections: DocumentSection[]): DocumentSection[] {
   const result: DocumentSection[] = []
@@ -43,7 +43,6 @@ function TocItem({ section, depth }: { section: DocumentSection; depth: number }
 }
 
 export default function DocumentDetail({ resolvedId }: { resolvedId?: number } = {}) {
-  const { user } = useAuth()
   const { prefix, docId: docIdParam, kind } = useParams<{ prefix: string; docId: string; kind: string }>()
   const docId = resolvedId || Number(docIdParam)
   const navigate = useNavigate()
@@ -53,7 +52,8 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
 
 
   const resolvedDocType = kindSlugToType(kind || '')
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const { can } = useProjectPermissions(prefix)
+  const canEditDocs = can('edit', 'document')
 
   const { data: doc, isLoading } = useQuery({
     queryKey: ['document', docId],

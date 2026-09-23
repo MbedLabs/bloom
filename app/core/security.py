@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.permissions import Permissions, has_permission, merge, role_baseline
 from app.models import ArtefactVisibility, Project
 from app.models.groups import Group, GroupMembership, GroupProjectGrant, Policy
 from app.models.project_membership import ProjectExternalDocType, ProjectMembership
@@ -210,6 +211,34 @@ async def _group_doc_type_scope(
     return allowed
 
 
+async def _effective_permissions(
+    db: AsyncSession,
+    current_user: User,
+    project_id: int,
+    membership: Optional[ProjectMembership],
+) -> Permissions:
+    permissions = role_baseline(current_user.role.value, membership.role if membership else None)
+    for policy in await _group_policy_values(db, current_user.id, project_id, Policy):
+        seen: set[int] = set()
+        current: Optional[Policy] = policy
+        while current is not None and current.id not in seen:
+            seen.add(current.id)
+            merge(permissions, current.permissions)
+            current = await db.get(Policy, current.parent_id) if current.parent_id else None
+    return permissions
+
+
+async def effective_permissions(
+    db: AsyncSession, current_user: User, project_id: int
+) -> Permissions:
+    """The user's permissions on a project: the role baseline plus every policy of the
+    user's groups granted the project, each with the policies it inherits from."""
+    if current_user.role == UserRole.admin:
+        return role_baseline(current_user.role.value, None)
+    membership = await _get_project_membership(db, current_user.id, project_id)
+    return await _effective_permissions(db, current_user, project_id, membership)
+
+
 async def user_can_access_project(
     db: AsyncSession, current_user: User, project_id: int, *, roles: Optional[set[str]] = None
 ) -> bool:
@@ -230,7 +259,13 @@ async def require_project_access(
     project_id: int,
     *,
     roles: Optional[set[str]] = None,
+    permission: Optional[tuple[str, str]] = None,
 ) -> ProjectMembership | None:
+    """Admit the user to the project or raise 403.
+
+    With ``permission=(action, resource)`` the check is the effective permission set
+    (role baseline plus group policies); with ``roles`` it is the role gate.
+    """
     if current_user.role == UserRole.admin:
         project = await db.get(Project, project_id)
         if project is None:
@@ -238,6 +273,20 @@ async def require_project_access(
         return None
 
     membership = await _get_project_membership(db, current_user.id, project_id)
+    if permission is not None:
+        permissions = await _effective_permissions(db, current_user, project_id, membership)
+        action, resource = permission
+        if has_permission(permissions, action, resource):
+            return membership
+        if not permissions:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User is not assigned to this project.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Missing permission: {action} on {resource}.",
+        )
     if membership is not None and (
         roles is None or (membership.role in roles and current_user.role.value in roles)
     ):
@@ -256,38 +305,18 @@ async def require_project_access(
     )
 
 
-class _ProjectRoleChecker:
-    """Callable dependency that checks project-scoped roles."""
+def require_permission(action: str, resource: str):
+    """FastAPI dependency for a route with a ``project_id`` path parameter: the user's
+    effective permissions on that project allow the action on the resource."""
 
-    def __init__(self, *roles: str) -> None:
-        self._roles = set(roles)  # 'admin','maintainer','external'
-
-    async def __call__(
-        self,
+    async def permission_checker(
         project_id: int,
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ) -> User:
         if current_user.role == UserRole.admin:
             return current_user
-        if current_user.role.value not in self._roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Role '{current_user.role.value}' not authorized for this project.",
-            )
-        membership = await _get_project_membership(db, current_user.id, project_id)
-        if membership is None or membership.role != current_user.role.value:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"User is not assigned to this project with role '{current_user.role.value}'.",
-            )
+        await require_project_access(db, current_user, project_id, permission=(action, resource))
         return current_user
 
-
-def require_project_role(*roles: str):
-    """FastAPI dependency: user has the given role AND a project_membership row.
-
-    Args:
-    roles: 'admin', 'maintainer', 'external'
-    """
-    return _ProjectRoleChecker(*roles)
+    return permission_checker

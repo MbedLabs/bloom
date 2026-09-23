@@ -869,7 +869,14 @@ export const projectsApi = {
   },
 }
 
+/** Effective permissions on a project: resource (or `*`) to actions (or `*`). */
+export type ProjectPermissions = Record<string, string[]>
+
 export const projectMembersApi = {
+  permissions: async (projectId: number): Promise<ProjectPermissions> => {
+    const response = await api.get<ProjectPermissions>(`/projects/${projectId}/permissions`)
+    return response.data
+  },
   list: async (projectId: number): Promise<ProjectMember[]> => {
     const response = await api.get<ProjectMember[]>(`/projects/${projectId}/members`)
     return response.data

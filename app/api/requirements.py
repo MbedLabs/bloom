@@ -28,7 +28,6 @@ from app.core.security import (
     apply_external_visibility_filter,
     get_current_user,
     require_project_access,
-    require_role,
 )
 from app.models import (
     ArtefactLink,
@@ -43,7 +42,6 @@ from app.models import (
 )
 from app.models.user import User
 from app.models.user import User as UserModel
-from app.models.user import UserRole
 from app.schemas import (
     PaginatedResponse,
     RequirementCreate,
@@ -386,7 +384,7 @@ async def list_requirements(
 async def create_requirement(
     data: RequirementCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Create a new requirement; server assigns req_id.
@@ -401,7 +399,7 @@ async def create_requirement(
         db,
         current_user,
         data.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("create", "requirement"),
     )
 
     if data.parent_id is not None:
@@ -527,7 +525,7 @@ async def update_requirement(
     requirement_id: int,
     data: RequirementUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Update a requirement.
@@ -542,7 +540,7 @@ async def update_requirement(
         db,
         current_user,
         requirement.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "requirement"),
     )
 
     fields_set = data.model_fields_set
@@ -690,7 +688,7 @@ async def update_requirement(
 async def delete_requirement(
     requirement_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Delete a requirement.
@@ -705,7 +703,7 @@ async def delete_requirement(
         db,
         current_user,
         requirement.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("delete", "requirement"),
     )
 
     await log_artefact_activity(
@@ -727,7 +725,7 @@ async def link_test_run(
     requirement_id: int,
     data: TestRunLinkCreate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    _current_user: User = Depends(get_current_user),
 ):
     """
     Link an externally hosted Bud test run to a requirement.
@@ -741,7 +739,7 @@ async def link_test_run(
         db,
         _current_user,
         requirement.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "requirement"),
     )
 
     link = TestRunLink(

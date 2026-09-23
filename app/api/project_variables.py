@@ -5,9 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import require_project_access, require_role
+from app.core.security import get_current_user, require_project_access
 from app.models import Project, ProjectVariable
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas import (
     ProjectVariableCreate,
     ProjectVariableResponse,
@@ -21,7 +21,7 @@ router = APIRouter()
 async def list_project_variables(
     project_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     project = (
         await db.execute(select(Project).where(Project.id == project_id))
@@ -33,7 +33,7 @@ async def list_project_variables(
         db,
         current_user,
         project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("view", "parameter"),
     )
 
     result = await db.execute(
@@ -48,7 +48,7 @@ async def list_project_variables(
 async def create_project_variable(
     data: ProjectVariableCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     project = (
         await db.execute(select(Project).where(Project.id == data.project_id))
@@ -60,7 +60,7 @@ async def create_project_variable(
         db,
         current_user,
         data.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("create", "parameter"),
     )
 
     existing = (
@@ -93,7 +93,7 @@ async def update_project_variable(
     item_id: int,
     data: ProjectVariableUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     item = (
         await db.execute(select(ProjectVariable).where(ProjectVariable.id == item_id))
@@ -105,7 +105,7 @@ async def update_project_variable(
         db,
         current_user,
         item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "parameter"),
     )
 
     updated_kind = data.kind if data.kind is not None else item.kind
@@ -143,7 +143,7 @@ async def update_project_variable(
 async def delete_project_variable(
     item_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     item = (
         await db.execute(select(ProjectVariable).where(ProjectVariable.id == item_id))
@@ -154,6 +154,6 @@ async def delete_project_variable(
         db,
         current_user,
         item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("delete", "parameter"),
     )
     await db.delete(item)

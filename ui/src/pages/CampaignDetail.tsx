@@ -6,18 +6,18 @@ import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Pencil, Trash2, X }
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import { usePageMeta } from '../contexts/PageMetaContext'
-import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
 import { docUrl } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import { formatDateTime } from '../test/date-utils'
 import { buildBudRunUrl } from '../lib/budLinks'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
 
 const CAMPAIGN_STATUSES = ['Planned', 'Scope', 'In Progress', 'Completed', 'Aborted']
 
 export default function CampaignDetail({ resolvedId }: { resolvedId?: number } = {}) {
-  const { user } = useAuth()
   const { prefix, campaignId } = useParams<{ prefix: string; campaignId: string }>()
+  const { can } = useProjectPermissions(prefix)
   const campId = resolvedId || parseInt(campaignId || '0')
   const navigate = useNavigate()
   const location = useLocation()
@@ -140,7 +140,7 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
     )
   }
 
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const canEditDocs = can('edit', 'campaign')
   const suiteScopes = campaign.suite_scopes ?? []
   const adHocItems = campaign.ad_hoc_items ?? []
   const campaignBudRunUrl = campaign.bud_run_url || (campaign.bud_run_id ? buildBudRunUrl(campaign.bud_run_id) : null)

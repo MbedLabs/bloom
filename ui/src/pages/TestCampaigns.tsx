@@ -4,10 +4,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignsApi, extractApiErrorMessage, testCasesApi, testSuitesApi } from '../api/client'
 import { ArrowLeft, Plus, Clock, FlaskConical, Layers3, Search, ChevronUp, ChevronDown } from 'lucide-react'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
-import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
 import { formatDateTime } from '../test/date-utils'
 import BudRunLink from '../components/BudRunLink'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
 
 type CampaignSortField = 'name' | 'status' | 'updated_at'
 type SortDir = 'asc' | 'desc'
@@ -19,9 +19,9 @@ const SORT_OPTIONS: { field: CampaignSortField; label: string }[] = [
 ]
 
 export default function TestCampaigns() {
-  const { user } = useAuth()
   const { prefix } = useParams<{ prefix: string }>()
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const { can } = useProjectPermissions(prefix)
+  const canEditDocs = can('create', 'campaign')
   const [searchParams, setSearchParams] = useSearchParams()
   const { data: project } = useProjectByPrefix(prefix)
   const projectId = project?.id || 0
@@ -439,7 +439,7 @@ export default function TestCampaigns() {
         </div>
       )}
 
-      {canEditDocs && showCreateSuite && (
+      {can('create', 'suite') && showCreateSuite && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-card rounded-lg shadow-elegant max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
             <div className="px-6 py-4 border-b border-border">

@@ -16,6 +16,7 @@ import {
   ExternalLink, ChevronDown, ChevronLeft, ChevronRight, Search,
   BookOpen, Bug, Layers, FlaskConical, LogOut, Users, PenTool, AlertTriangle, GitPullRequest, Settings, SlidersHorizontal, ShieldCheck,
 } from 'lucide-react'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
 
 /** Must match Tailwind `w-60` / `w-14` and main `ml-*` — also positions the seam toggle. */
 const SIDEBAR_EDGE = { expanded: '15rem', collapsed: '3.5rem' } as const
@@ -259,7 +260,11 @@ function LayoutInner() {
     : user?.role === 'maintainer'
     ? 'bg-blue-500/10 text-violet-400'
     : 'bg-green-500/10 text-green-400'
-  const canEditProjectParameters = user?.role === 'admin' || user?.role === 'maintainer'
+  const currentProjectId = projects?.find(
+    (p) => p.prefix === currentProjectSlug || String(p.id) === currentProjectSlug,
+  )?.id
+  const { can } = useProjectPermissions(undefined, currentProjectId)
+  const canEditProjectParameters = can('edit', 'parameter')
 
   const handleLogout = () => {
     logout()

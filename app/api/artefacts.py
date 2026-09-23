@@ -14,9 +14,10 @@ from app.api.artefact_utils import (
     log_workflow_status_transition,
 )
 from app.core.database import get_db
-from app.core.security import get_current_user, require_project_access, require_role
+from app.core.permissions import TRANSITION_RESOURCES, transition_action
+from app.core.security import get_current_user, require_project_access
 from app.models import ArtefactActivity, ArtefactComment
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas import (
     ArtefactActivityResponse,
     ArtefactCommentCreate,
@@ -164,7 +165,7 @@ async def transition_status(
     artefact_id: str,
     data: ArtefactTransitionRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     artefact = await get_artefact_or_404(db, artefact_type, artefact_id, current_user)
     artefact_id = artefact.id
@@ -172,7 +173,10 @@ async def transition_status(
         db,
         current_user,
         artefact.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=(
+            transition_action(artefact.status, data.status),
+            TRANSITION_RESOURCES.get(artefact_type, artefact_type),
+        ),
     )
     allowed = get_allowed_transitions(artefact_type, artefact.status)
     if data.status not in allowed:

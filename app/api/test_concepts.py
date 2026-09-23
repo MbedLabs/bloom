@@ -17,10 +17,9 @@ from app.core.security import (
     apply_external_visibility_filter,
     get_current_user,
     require_project_access,
-    require_role,
 )
 from app.models import Project, TestConcept
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas import (
     PaginatedResponse,
     TestConceptCreate,
@@ -75,7 +74,7 @@ async def list_test_concepts(
 async def create_test_concept(
     data: TestConceptCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     project = (
         await db.execute(select(Project).where(Project.id == data.project_id))
@@ -87,7 +86,7 @@ async def create_test_concept(
         db,
         current_user,
         data.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("create", "test_concept"),
     )
 
     concept_id = await next_doc_id(
@@ -161,7 +160,7 @@ async def update_test_concept(
     concept_id: int,
     data: TestConceptUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     item = (
         await db.execute(select(TestConcept).where(TestConcept.id == concept_id))
@@ -173,7 +172,7 @@ async def update_test_concept(
         db,
         current_user,
         item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "test_concept"),
     )
 
     fields_set = data.model_fields_set
@@ -217,7 +216,7 @@ async def update_test_concept(
 async def delete_test_concept(
     concept_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     item = (
         await db.execute(select(TestConcept).where(TestConcept.id == concept_id))
@@ -228,7 +227,7 @@ async def delete_test_concept(
         db,
         current_user,
         item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("delete", "test_concept"),
     )
     await log_artefact_activity(
         db,

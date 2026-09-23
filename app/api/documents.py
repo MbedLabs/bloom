@@ -19,10 +19,9 @@ from app.core.security import (
     apply_external_visibility_filter,
     get_current_user,
     require_project_access,
-    require_role,
 )
 from app.models import Document, DocumentSection
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas import (
     DocumentCreate,
     DocumentDetailResponse,
@@ -103,7 +102,7 @@ async def create_document(
     project_id: int,
     data: DocumentCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     from app.models import Project
 
@@ -117,7 +116,7 @@ async def create_document(
         db,
         current_user,
         project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("create", "document"),
     )
 
     if data.project_id != project_id:
@@ -263,7 +262,7 @@ async def update_document(
     document_id: int,
     data: DocumentUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(Document).where(Document.id == document_id))
     document = result.scalar_one_or_none()
@@ -275,7 +274,7 @@ async def update_document(
         db,
         current_user,
         document.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "document"),
     )
 
     fields_set = data.model_fields_set
@@ -353,7 +352,7 @@ async def update_document(
 async def delete_document(
     document_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(Document).where(Document.id == document_id))
     document = result.scalar_one_or_none()
@@ -365,7 +364,7 @@ async def delete_document(
         db,
         current_user,
         document.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("delete", "document"),
     )
 
     await log_artefact_activity(
@@ -387,7 +386,7 @@ async def create_section(
     document_id: int,
     data: DocumentSectionCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(Document).where(Document.id == document_id))
     document = result.scalar_one_or_none()
@@ -399,7 +398,7 @@ async def create_section(
         db,
         current_user,
         document.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "document"),
     )
 
     section = DocumentSection(
@@ -434,7 +433,7 @@ async def update_section(
     section_id: int,
     data: DocumentSectionUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(DocumentSection).where(DocumentSection.id == section_id))
     section = result.scalar_one_or_none()
@@ -451,7 +450,7 @@ async def update_section(
         db,
         current_user,
         document.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "document"),
     )
 
     if data.title is not None:
@@ -506,7 +505,7 @@ async def update_section(
 async def delete_section(
     section_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(DocumentSection).where(DocumentSection.id == section_id))
     section = result.scalar_one_or_none()
@@ -523,7 +522,7 @@ async def delete_section(
         db,
         current_user,
         document.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "document"),
     )
 
     await db.delete(section)
@@ -534,7 +533,7 @@ async def reorder_sections(
     document_id: int,
     data: SectionReorder,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(Document).where(Document.id == document_id))
     document = result.scalar_one_or_none()
@@ -546,7 +545,7 @@ async def reorder_sections(
         db,
         current_user,
         document.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "document"),
     )
 
     # Load every section being reordered at once. Scoping by document_id is kept

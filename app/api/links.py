@@ -18,7 +18,6 @@ from app.core.security import (
     get_current_user,
     get_external_doc_types,
     require_project_access,
-    require_role,
 )
 from app.models import (
     ArtefactLink,
@@ -204,7 +203,7 @@ async def list_links(
 async def create_link(
     data: ArtefactLinkCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     data.source_type = normalize_linkable_type(data.source_type)
     data.target_type = normalize_linkable_type(data.target_type)
@@ -218,7 +217,7 @@ async def create_link(
         db,
         current_user,
         data.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("create", "link"),
     )
     if not is_known_linkable_type(data.source_type) or not is_known_linkable_type(data.target_type):
         raise HTTPException(status_code=422, detail="Unsupported relationship document kind")
@@ -274,7 +273,7 @@ async def create_link(
 async def delete_link(
     link_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     link = (
         await db.execute(select(ArtefactLink).where(ArtefactLink.id == link_id))
@@ -285,6 +284,6 @@ async def delete_link(
         db,
         current_user,
         link.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("delete", "link"),
     )
     await db.delete(link)

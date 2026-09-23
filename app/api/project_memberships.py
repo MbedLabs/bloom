@@ -5,7 +5,12 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import require_project_role
+from app.core.permissions import as_lists
+from app.core.security import (
+    effective_permissions,
+    get_current_user,
+    require_permission,
+)
 from app.models.project_membership import ProjectExternalDocType, ProjectMembership
 from app.models.user import User, UserRole
 from app.schemas.memberships import (
@@ -49,7 +54,7 @@ async def _build_member_response(
 @router.get("/{project_id}/members", response_model=list[ProjectMemberResponse])
 async def list_project_members(
     project_id: int,
-    _admin: User = Depends(require_project_role("admin")),
+    _allowed: User = Depends(require_permission("view", "member")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -63,7 +68,7 @@ async def list_project_members(
 async def add_project_member(
     project_id: int,
     data: ProjectMembershipCreate,
-    _admin: User = Depends(require_project_role("admin")),
+    _allowed: User = Depends(require_permission("manage", "member")),
     db: AsyncSession = Depends(get_db),
 ):
     user_row = await db.execute(select(User).where(User.id == data.user_id))
@@ -116,7 +121,7 @@ async def add_project_member(
 async def get_project_member(
     project_id: int,
     membership_id: int,
-    _admin: User = Depends(require_project_role("admin")),
+    _allowed: User = Depends(require_permission("view", "member")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -136,7 +141,7 @@ async def update_project_member(
     project_id: int,
     membership_id: int,
     data: ProjectMembershipUpdate,
-    _admin: User = Depends(require_project_role("admin")),
+    _allowed: User = Depends(require_permission("manage", "member")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -179,7 +184,7 @@ async def update_project_member(
 async def remove_project_member(
     project_id: int,
     membership_id: int,
-    _admin: User = Depends(require_project_role("admin")),
+    _allowed: User = Depends(require_permission("manage", "member")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -192,3 +197,16 @@ async def remove_project_member(
     if membership is None:
         raise HTTPException(status_code=404, detail="Membership not found")
     await db.delete(membership)
+
+
+@router.get("/{project_id}/permissions", response_model=dict[str, list[str]])
+async def get_my_project_permissions(
+    project_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """The current user's effective permissions on the project, as {resource: [action]}.
+
+    ``*`` stands for every resource or every action. An empty object means no access.
+    """
+    return as_lists(await effective_permissions(db, current_user, project_id))

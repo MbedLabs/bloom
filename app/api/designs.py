@@ -16,10 +16,9 @@ from app.core.security import (
     apply_external_visibility_filter,
     get_current_user,
     require_project_access,
-    require_role,
 )
 from app.models import DesignItem, Project
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas import (
     DesignItemCreate,
     DesignItemResponse,
@@ -59,7 +58,7 @@ async def list_design_items(
 async def create_design_item(
     data: DesignItemCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     project = (
         await db.execute(select(Project).where(Project.id == data.project_id))
@@ -71,7 +70,7 @@ async def create_design_item(
         db,
         current_user,
         data.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("create", "design"),
     )
 
     design_id = await next_doc_id(
@@ -144,7 +143,7 @@ async def update_design_item(
     design_id: int,
     data: DesignItemUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     item = (
         await db.execute(select(DesignItem).where(DesignItem.id == design_id))
@@ -156,7 +155,7 @@ async def update_design_item(
         db,
         current_user,
         item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "design"),
     )
 
     fields_set = data.model_fields_set
@@ -200,7 +199,7 @@ async def update_design_item(
 async def delete_design_item(
     design_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     item = (
         await db.execute(select(DesignItem).where(DesignItem.id == design_id))
@@ -211,7 +210,7 @@ async def delete_design_item(
         db,
         current_user,
         item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("delete", "design"),
     )
     await log_artefact_activity(
         db,

@@ -11,7 +11,6 @@ from app.core.security import (
     apply_external_visibility_filter,
     get_current_user,
     require_project_access,
-    require_role,
 )
 from app.models import (
     ArtefactLink,
@@ -24,7 +23,7 @@ from app.models import (
     TestSuite,
     TestSuiteItem,
 )
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas import (
     PaginatedResponse,
     RequirementSummary,
@@ -249,7 +248,7 @@ async def list_suites(
 async def create_suite(
     data: TestSuiteCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     project = (
         await db.execute(select(Project).where(Project.id == data.project_id))
@@ -261,7 +260,7 @@ async def create_suite(
         db,
         current_user,
         data.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("create", "suite"),
     )
 
     suite_id = await next_doc_id(
@@ -328,7 +327,7 @@ async def update_suite(
     suite_id: int,
     data: TestSuiteUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     suite = (
         await db.execute(select(TestSuite).where(TestSuite.id == suite_id))
@@ -340,7 +339,7 @@ async def update_suite(
         db,
         current_user,
         suite.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "suite"),
     )
 
     for field, value in data.model_dump(exclude_unset=True).items():
@@ -355,7 +354,7 @@ async def update_suite(
 async def delete_suite(
     suite_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     suite = (
         await db.execute(select(TestSuite).where(TestSuite.id == suite_id))
@@ -366,7 +365,7 @@ async def delete_suite(
         db,
         current_user,
         suite.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("delete", "suite"),
     )
     await db.delete(suite)
 
@@ -376,7 +375,7 @@ async def add_suite_item(
     suite_id: int,
     test_case_id: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     suite = (
         await db.execute(select(TestSuite).where(TestSuite.id == suite_id))
@@ -387,7 +386,7 @@ async def add_suite_item(
         db,
         current_user,
         suite.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("plan", "suite"),
     )
     tc = (
         await db.execute(select(TestCase).where(TestCase.id == test_case_id))
@@ -429,7 +428,7 @@ async def remove_suite_item(
     suite_id: int,
     item_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     suite = (
         await db.execute(select(TestSuite).where(TestSuite.id == suite_id))
@@ -440,7 +439,7 @@ async def remove_suite_item(
         db,
         current_user,
         suite.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("plan", "suite"),
     )
     item = (
         await db.execute(

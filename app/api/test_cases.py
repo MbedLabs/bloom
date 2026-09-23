@@ -26,7 +26,6 @@ from app.core.security import (
     apply_external_visibility_filter,
     get_current_user,
     require_project_access,
-    require_role,
 )
 from app.models import (
     ArtefactLink,
@@ -40,7 +39,6 @@ from app.models import (
 )
 from app.models.user import User
 from app.models.user import User as UserModel
-from app.models.user import UserRole
 from app.schemas import (
     PaginatedResponse,
     RequirementSummary,
@@ -256,7 +254,7 @@ async def list_test_cases(
 async def create_test_case(
     data: TestCaseCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Create a new test case; server assigns tc_id.
@@ -271,7 +269,7 @@ async def create_test_case(
         db,
         current_user,
         data.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("create", "test_case"),
     )
 
     tc_id = await next_doc_id(db, TestCase, TestCase.tc_id, data.project_id, project.prefix, "TC")
@@ -345,7 +343,7 @@ async def update_test_case(
     test_case_id: int,
     data: TestCaseUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Update a test case.
@@ -360,7 +358,7 @@ async def update_test_case(
         db,
         current_user,
         test_case.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "test_case"),
     )
 
     fields_set = data.model_fields_set
@@ -456,7 +454,7 @@ async def update_test_case(
 async def delete_test_case(
     test_case_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Delete a test case.
@@ -471,7 +469,7 @@ async def delete_test_case(
         db,
         current_user,
         test_case.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("delete", "test_case"),
     )
 
     await log_artefact_activity(

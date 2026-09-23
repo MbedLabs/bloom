@@ -5,15 +5,15 @@ import { ArrowLeft, Edit2, Plus, SlidersHorizontal, Trash2, X } from 'lucide-rea
 
 import { projectVariablesApi, ProjectVariable } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
-import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
 
 export default function ProjectParameters() {
-  const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const focusedKey = searchParams.get('key')
   const { prefix } = useParams<{ prefix: string }>()
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const { can } = useProjectPermissions(prefix)
+  const canEditDocs = can('edit', 'parameter')
   const { data: project, isLoading: projectLoading } = useProjectByPrefix(prefix)
   const projectId = project?.id || 0
   const queryClient = useQueryClient()

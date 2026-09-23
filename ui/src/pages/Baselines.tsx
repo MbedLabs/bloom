@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { formatDateTime } from '../test/date-utils'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
 
 export default function Baselines() {
   const { user } = useAuth()
@@ -19,7 +20,8 @@ export default function Baselines() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [form, setForm] = useState({ project_id: '', name: '', description: '', baseline_type: 'Milestone' })
   const isAdmin = user?.role === 'admin'
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const { can } = useProjectPermissions(prefix, project?.id)
+  const canEditDocs = can('create', 'baseline')
   const scopedProjectId = project?.id ?? null
   const canListBaselines = isAdmin || scopedProjectId !== null
 

@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.permissions import invalid_entries
 from app.core.security import require_role
 from app.models.groups import Group, Policy
 from app.models.user import User, UserRole
@@ -42,6 +43,13 @@ def _validate_doc_tag_scope(doc_tag_scope) -> None:
         )
 
 
+def _validate_permissions(permissions: dict) -> None:
+    """A policy matrix may only name the resources and actions require_permission checks."""
+    problems = invalid_entries(permissions)
+    if problems:
+        raise HTTPException(status_code=400, detail="Invalid permissions: " + "; ".join(problems))
+
+
 @router.get("", response_model=list[PolicyResponse])
 async def list_policies(
     _admin: User = Depends(require_admin),
@@ -61,6 +69,7 @@ async def create_policy(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="A policy with this name already exists")
     _validate_doc_tag_scope(data.doc_tag_scope)
+    _validate_permissions(data.permissions)
     policy = Policy(
         name=data.name,
         description=data.description,
@@ -95,6 +104,7 @@ async def update_policy(
     if data.description is not None:
         policy.description = data.description
     if data.permissions is not None:
+        _validate_permissions(data.permissions)
         policy.permissions = data.permissions
     if "doc_tag_scope" in data.model_fields_set:
         _validate_doc_tag_scope(data.doc_tag_scope)

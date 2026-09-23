@@ -2,9 +2,10 @@ import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Download, Paperclip, Trash2, Upload } from 'lucide-react'
 import { attachmentsApi, extractApiErrorMessage, type DocumentAttachment } from '../api/client'
-import { useAuth } from '../contexts/AuthContext'
 import { SectionCard } from './DocDetailShell'
 import { useToast } from './useToast'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import { useParams } from 'react-router'
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -13,12 +14,13 @@ function formatBytes(bytes: number): string {
 }
 
 export default function DocumentAttachmentsPanel({ documentId }: { documentId: number }) {
-  const { user } = useAuth()
   const queryClient = useQueryClient()
   const toast = useToast()
   const fileInput = useRef<HTMLInputElement>(null)
   const [busyId, setBusyId] = useState<number | null>(null)
-  const canEdit = user?.role === 'admin' || user?.role === 'maintainer'
+  const { prefix } = useParams<{ prefix: string }>()
+  const { can } = useProjectPermissions(prefix)
+  const canEdit = can('edit', 'document')
 
   const { data: attachments, isLoading } = useQuery({
     queryKey: ['attachments', documentId],

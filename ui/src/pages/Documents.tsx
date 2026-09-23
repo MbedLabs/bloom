@@ -33,6 +33,7 @@ import { formatDateTime } from '../test/date-utils'
 import { useAuth } from '../contexts/AuthContext'
 import { useDebounced } from '../hooks/useDebounced'
 import BudRunLink from '../components/BudRunLink'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
 
 const TYPE_BADGES: Record<DocType, { label: string; color: string }> = {
   REQ: { label: 'Requirement', color: 'bg-amber-500/10 text-amber-700 dark:text-amber-400' },
@@ -236,7 +237,9 @@ function ExecutionBadge({ status }: { status: string | null }) {
 export default function Documents() {
   const { user } = useAuth()
   const { prefix } = useParams<{ prefix: string }>()
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const canListUsers = user?.role === 'admin' || user?.role === 'maintainer'
+  const { canAny } = useProjectPermissions(prefix)
+  const canEditDocs = canAny('create')
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -349,7 +352,7 @@ export default function Documents() {
   const { data: users } = useQuery({
     queryKey: ['users'],
     queryFn: usersApi.list,
-    enabled: canEditDocs,
+    enabled: canListUsers,
   })
 
   const userMap = useMemo(() => {

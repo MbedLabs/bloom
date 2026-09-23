@@ -9,17 +9,17 @@ import { docUrl } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import { usePageMeta } from '../contexts/PageMetaContext'
-import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
 import { formatDateTime } from '../test/date-utils'
 import BudRunLink from '../components/BudRunLink'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
 
 const SUITE_STATUSES = ['Draft', 'Active', 'Archived']
 
 export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}) {
-  const { user } = useAuth()
   const { prefix, suiteId } = useParams<{ prefix: string; suiteId: string }>()
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const { can } = useProjectPermissions(prefix)
+  const canEditDocs = can('edit', 'suite')
   const { data: project } = useProjectByPrefix(prefix)
   const projectId = project?.id || 0
   const parsedSuiteId = resolvedId || Number(suiteId)

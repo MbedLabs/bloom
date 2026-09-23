@@ -24,6 +24,7 @@ import {
   membershipLinksForCampaigns,
   membershipLinksForSuites,
 } from '../lib/membershipLinks'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
 
 function normalizeSteps(steps: unknown): TcsRow[] {
   return normalizeTcsRows(steps) as TcsRow[]
@@ -50,6 +51,7 @@ function ExecutionBadge({ status }: { status: string }) {
 export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } = {}) {
   const { user } = useAuth()
   const { prefix, itemId } = useParams<{ prefix: string; itemId: string }>()
+  const { can } = useProjectPermissions(prefix)
   const tcId = resolvedId || parseInt(itemId || '0')
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -182,7 +184,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
   const projectPrefix = project?.prefix || ''
   const tcsRows = normalizeSteps(testCase.steps)
   const editUrl = docEditUrl(projectPrefix, 'TC', testCase.tc_id)
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const canEditDocs = can('edit', 'test_case')
 
   return (
     <>

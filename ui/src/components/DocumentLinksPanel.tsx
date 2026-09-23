@@ -24,8 +24,8 @@ import {
   type DocType,
 } from '../types/doc'
 import { SectionCard } from './DocDetailShell'
-import { useAuth } from '../contexts/AuthContext'
 import { useDebounced } from '../hooks/useDebounced'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
 
 export interface LinkTarget {
   id: number
@@ -344,11 +344,11 @@ export function DocumentLinksPanel({
   sourceDocId?: string
   derivedLinks?: ArtefactLink[]
 }) {
-  const { user } = useAuth()
   const queryClient = useQueryClient()
   const toast = useToast()
   const [showModal, setShowModal] = useState(false)
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const { can } = useProjectPermissions(undefined, projectId)
+  const canEditDocs = can('create', 'link')
 
   const { data: outgoingLinks } = useQuery({
     queryKey: ['docLinks', projectId, sourceType, sourceId, 'outgoing'],
@@ -519,7 +519,7 @@ export function DocumentLinksPanel({
                 projectPrefix={projectPrefix}
                 sourceDocId={sourceDocId}
                 direction={direction}
-                onDelete={canEditDocs && !isDerived ? () => deleteMutation.mutate(link.id) : undefined}
+                onDelete={can('delete', 'link') && !isDerived ? () => deleteMutation.mutate(link.id) : undefined}
               />
             )
           })}

@@ -16,10 +16,9 @@ from app.core.security import (
     apply_external_visibility_filter,
     get_current_user,
     require_project_access,
-    require_role,
 )
 from app.models import Project, RiskItem
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas import (
     PaginatedResponse,
     RiskItemCreate,
@@ -59,7 +58,7 @@ async def list_risk_items(
 async def create_risk_item(
     data: RiskItemCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     project = (
         await db.execute(select(Project).where(Project.id == data.project_id))
@@ -71,7 +70,7 @@ async def create_risk_item(
         db,
         current_user,
         data.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("create", "risk"),
     )
 
     risk_id = await next_doc_id(
@@ -146,7 +145,7 @@ async def update_risk_item(
     risk_id: int,
     data: RiskItemUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     item = (await db.execute(select(RiskItem).where(RiskItem.id == risk_id))).scalar_one_or_none()
     if not item:
@@ -156,7 +155,7 @@ async def update_risk_item(
         db,
         current_user,
         item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "risk"),
     )
 
     fields_set = data.model_fields_set
@@ -200,7 +199,7 @@ async def update_risk_item(
 async def delete_risk_item(
     risk_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     item = (await db.execute(select(RiskItem).where(RiskItem.id == risk_id))).scalar_one_or_none()
     if not item:
@@ -209,7 +208,7 @@ async def delete_risk_item(
         db,
         current_user,
         item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("delete", "risk"),
     )
     await log_artefact_activity(
         db,

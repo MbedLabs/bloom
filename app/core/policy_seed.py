@@ -2,26 +2,16 @@
 
 Each default Policy carries is_default=True: an instance base_role plus an
 (action x resource) matrix. The base_role drives project access through group
-grants (see require_project_access); the matrix is stored but not yet enforced.
+grants (see require_project_access); require_permission enforces the matrix.
 Defaults are protected: undeletable and their base_role is fixed.
 """
 
+from app.core.permissions import RESOURCES
 from app.schemas.memberships import DEFAULT_EXTERNAL_DOC_TYPES
 
-_ARTEFACTS = [
-    "requirement",
-    "design",
-    "test_concept",
-    "test_case",
-    "risk",
-    "change_request",
-    "defect",
-    "document",
-    "suite",
-    "campaign",
-    "run",
-    "baseline",
-]
+_ARTEFACTS = list(RESOURCES)
+_AUTHOR = ["view", "comment", "create", "edit", "delete"]
+_LINKS = {"link": _AUTHOR}
 
 
 def _all(*actions: str) -> dict:
@@ -49,10 +39,12 @@ DEFAULT_POLICIES = [
         "permissions": _merge(
             _all("view", "comment"),
             {
-                "requirement": ["view", "comment", "create", "edit", "approve"],
-                "document": ["view", "comment", "create", "edit", "approve"],
-                "change_request": ["view", "comment", "create", "edit", "approve"],
-                "risk": ["view", "comment", "create", "edit"],
+                "requirement": _AUTHOR + ["approve", "import", "export"],
+                "document": _AUTHOR + ["approve", "import"],
+                "change_request": _AUTHOR + ["approve"],
+                "risk": _AUTHOR,
+                "parameter": _AUTHOR,
+                **_LINKS,
             },
         ),
         "doc_tag_scope": None,
@@ -64,13 +56,15 @@ DEFAULT_POLICIES = [
         "permissions": _merge(
             _all("view", "comment"),
             {
-                "change_request": ["view", "comment", "create", "edit", "review", "approve"],
-                "risk": ["view", "comment", "create", "edit", "review"],
-                "campaign": ["view", "comment", "plan"],
+                "change_request": _AUTHOR + ["review", "approve"],
+                "risk": _AUTHOR + ["review"],
+                "campaign": _AUTHOR + ["plan"],
                 "suite": ["view", "comment", "plan"],
-                "baseline": ["view", "comment", "create", "approve"],
-                "requirement": ["view", "comment", "review"],
+                "baseline": _AUTHOR + ["approve"],
+                "requirement": ["view", "comment", "review", "export"],
+                "test_case": ["view", "comment", "export"],
                 "member": ["view", "manage"],
+                **_LINKS,
             },
         ),
         "doc_tag_scope": None,
@@ -82,9 +76,11 @@ DEFAULT_POLICIES = [
         "permissions": _merge(
             _all("view", "comment"),
             {
-                "requirement": ["view", "comment", "create", "edit"],
-                "document": ["view", "comment", "create", "edit"],
-                "risk": ["view", "comment", "create", "edit"],
+                "requirement": _AUTHOR + ["import", "export"],
+                "document": _AUTHOR + ["import"],
+                "risk": _AUTHOR,
+                "parameter": _AUTHOR,
+                **_LINKS,
             },
         ),
         "doc_tag_scope": None,
@@ -96,8 +92,9 @@ DEFAULT_POLICIES = [
         "permissions": _merge(
             _all("view", "comment"),
             {
-                "design": ["view", "comment", "create", "edit"],
-                "defect": ["view", "comment", "create", "edit"],
+                "design": _AUTHOR,
+                "defect": _AUTHOR,
+                **_LINKS,
             },
         ),
         "doc_tag_scope": None,
@@ -109,12 +106,14 @@ DEFAULT_POLICIES = [
         "permissions": _merge(
             _all("view", "comment"),
             {
-                "test_concept": ["view", "comment", "create", "edit"],
-                "test_case": ["view", "comment", "create", "edit"],
-                "suite": ["view", "comment", "create", "edit", "plan"],
-                "campaign": ["view", "comment", "create", "edit", "plan"],
+                "test_concept": _AUTHOR,
+                "test_case": _AUTHOR + ["import", "export"],
+                "suite": _AUTHOR + ["plan"],
+                "campaign": _AUTHOR + ["plan"],
                 "run": ["view", "comment", "execute"],
                 "defect": ["view", "comment", "create"],
+                "parameter": _AUTHOR,
+                **_LINKS,
             },
         ),
         "doc_tag_scope": None,
@@ -130,7 +129,7 @@ DEFAULT_POLICIES = [
         "name": "Customer/Stakeholder",
         "base_role": "external",
         "description": "Views and comments on customer-visible artefacts of the allowed document types.",
-        "permissions": _all("view", "comment"),
+        "permissions": {r: ["view", "comment"] for r in _ARTEFACTS if r != "parameter"},
         "doc_tag_scope": sorted(DEFAULT_EXTERNAL_DOC_TYPES),
     },
     {

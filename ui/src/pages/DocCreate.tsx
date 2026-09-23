@@ -23,7 +23,6 @@ import {
   isDocTagTargetAllowed,
   normalizeDocTypeParam,
 } from '../types/doc'
-import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
 import { docRegistryBackUrl, docRegistryListLabel } from '../lib/docRegistryParams'
 import {
@@ -31,6 +30,7 @@ import {
   isServerAssignedDocIdOnCreate,
   usesDocumentEditor,
 } from './docCreateIdPolicy'
+import { DOC_TYPE_RESOURCES, useProjectPermissions } from '../hooks/useProjectPermissions'
 
 function artefactActivityTypeForDocType(docType: DocType): string | null {
   if (docType === 'REQ') return 'requirement'
@@ -145,7 +145,6 @@ interface DocCreateProps {
 }
 
 export default function DocCreate({ editMode = false }: DocCreateProps) {
-  const { user } = useAuth()
   const { prefix, kind, docId: docIdStr } = useParams<{ prefix: string; kind?: string; docId: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -191,7 +190,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
     typeof returnTo === 'string' && returnTo.trim() !== ''
       ? 'Back'
       : `Back to ${docRegistryListLabel(docType)}`
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const { can } = useProjectPermissions(prefix, projectId)
+  const canEditDocs = can(editMode ? 'edit' : 'create', DOC_TYPE_RESOURCES[docType])
   // The server allocates ids with MAX(suffix)+1, so ask it rather than assuming
   // -001, which was almost always already taken.
   const { data: nextDocId } = useQuery({
@@ -224,7 +224,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const { data: projectVariables } = useQuery({
     queryKey: ['projectVariables', projectId],
     queryFn: () => projectVariablesApi.list(projectId),
-    enabled: canEditDocs && !!projectId,
+    enabled: can('view', 'parameter') && !!projectId,
   })
 
   // `{{` inserts a project parameter *or* a project variable - both kinds live on the

@@ -15,7 +15,6 @@ from app.core.security import (
     apply_external_visibility_filter,
     get_current_user,
     require_project_access,
-    require_role,
 )
 from app.core.service_auth import require_bud_sync_token
 from app.models import (
@@ -30,7 +29,7 @@ from app.models import (
     TestSuite,
     TestSuiteItem,
 )
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas import (
     PaginatedResponse,
     RequirementSummary,
@@ -247,7 +246,7 @@ async def list_campaigns(
 async def create_campaign(
     data: TestCampaignCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     proj_row = await db.execute(select(Project).where(Project.id == data.project_id))
     project = proj_row.scalar_one_or_none()
@@ -257,7 +256,7 @@ async def create_campaign(
         db,
         current_user,
         data.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("create", "campaign"),
     )
 
     # Resolve suite_ids: prefer new field, fall back to legacy suite_id
@@ -382,7 +381,7 @@ async def update_campaign(
     campaign_id: int,
     data: TestCampaignUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
     campaign = result.scalar_one_or_none()
@@ -392,7 +391,7 @@ async def update_campaign(
         db,
         current_user,
         campaign.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "campaign"),
     )
 
     if data.name is not None:
@@ -459,7 +458,7 @@ async def update_campaign(
 async def delete_campaign(
     campaign_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
     campaign = result.scalar_one_or_none()
@@ -469,7 +468,7 @@ async def delete_campaign(
         db,
         current_user,
         campaign.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("delete", "campaign"),
     )
     await db.delete(campaign)
 
@@ -479,7 +478,7 @@ async def add_campaign_item(
     campaign_id: int,
     test_case_id: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
     campaign = result.scalar_one_or_none()
@@ -489,7 +488,7 @@ async def add_campaign_item(
         db,
         current_user,
         campaign.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("plan", "campaign"),
     )
 
     tc_result = await db.execute(select(TestCase).where(TestCase.id == test_case_id))
@@ -524,7 +523,7 @@ async def remove_campaign_item(
     campaign_id: int,
     item_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     campaign = (
         await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
@@ -535,7 +534,7 @@ async def remove_campaign_item(
         db,
         current_user,
         campaign.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("plan", "campaign"),
     )
     result = await db.execute(
         select(TestCampaignItem).where(
@@ -555,7 +554,7 @@ async def update_campaign_item(
     item_id: int,
     data: TestCampaignItemUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     campaign = (
         await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
@@ -566,7 +565,7 @@ async def update_campaign_item(
         db,
         current_user,
         campaign.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("plan", "campaign"),
     )
     item = (
         await db.execute(

@@ -19,9 +19,9 @@ from app.api.link_read_utils import (
     VERIFY_TARGET_TYPE,
 )
 from app.core.database import get_db
-from app.core.security import require_project_access, require_role
+from app.core.security import get_current_user, require_project_access
 from app.models import ArtefactLink, CompanyLogo, Project, Requirement, TestCase
-from app.models.user import User, UserRole
+from app.models.user import User
 
 router = APIRouter()
 
@@ -101,15 +101,15 @@ class _BrandedPDF(FPDF):
         self.cell(0, 5, f"Page {self.page_no()}", align="R")
 
 
-async def _load_project(db: AsyncSession, project_id: int, current_user: User) -> Project:
+async def _load_project(
+    db: AsyncSession, project_id: int, current_user: User, resource: str
+) -> Project:
     project = (
         await db.execute(select(Project).where(Project.id == project_id))
     ).scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    await require_project_access(
-        db, current_user, project_id, roles={UserRole.admin.value, UserRole.maintainer.value}
-    )
+    await require_project_access(db, current_user, project_id, permission=("export", resource))
     return project
 
 
@@ -201,10 +201,10 @@ async def export_requirements(
     project_id: int,
     format: str = Query(default="csv", pattern="^(csv|pdf)$"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     """Export the project's requirements as CSV or a PDF specification."""
-    project = await _load_project(db, project_id, current_user)
+    project = await _load_project(db, project_id, current_user, "requirement")
     requirements = await _load_requirements(db, project_id)
 
     if format == "pdf":
@@ -254,10 +254,10 @@ async def export_requirements(
 async def export_traceability(
     project_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     """Export the requirement <-> verifying-test-case matrix as CSV."""
-    project = await _load_project(db, project_id, current_user)
+    project = await _load_project(db, project_id, current_user, "requirement")
     requirements = await _load_requirements(db, project_id)
 
     link_rows = (
@@ -372,10 +372,10 @@ async def export_test_cases(
     project_id: int,
     format: str = Query(default="csv", pattern="^(csv|md|xml)$"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     """Export the project's test cases as CSV, Markdown or XML."""
-    project = await _load_project(db, project_id, current_user)
+    project = await _load_project(db, project_id, current_user, "test_case")
     test_cases = await _load_test_cases(db, project_id)
 
     if format == "md":

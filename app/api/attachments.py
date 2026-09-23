@@ -16,10 +16,10 @@ from app.api.docs_facade import resolve_project
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_project_access, require_role
+from app.core.security import get_current_user, require_project_access
 from app.core.service_auth import require_bud_sync_token
 from app.models import Document, DocumentAttachment
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas import (
     DocumentAttachmentResponse,
     TestReportFile,
@@ -55,7 +55,7 @@ async def _writable_document(db: AsyncSession, document_id: int, user: User) -> 
         db,
         user,
         document.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "document"),
     )
     return document
 
@@ -87,7 +87,7 @@ async def upload_attachment(
     document_id: int,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     """Attach a file to a document."""
     document = await _writable_document(db, document_id, current_user)
@@ -165,7 +165,7 @@ async def download_attachment(
 async def delete_attachment(
     attachment_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    current_user: User = Depends(get_current_user),
 ):
     """Remove an attachment and the file behind it."""
     attachment = (
@@ -181,7 +181,7 @@ async def delete_attachment(
         db,
         current_user,
         attachment.document.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "document"),
     )
 
     storage_path = attachment.storage_path

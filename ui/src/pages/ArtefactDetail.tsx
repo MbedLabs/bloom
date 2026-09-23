@@ -8,7 +8,6 @@ import { docRegistryListUrl } from '../lib/docRegistryParams'
 import { DocEditor } from '../components/editor'
 import DocDetailShell, { MetaItem, SectionCard, StatusBadge } from '../components/DocDetailShell'
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
-import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
 
 import {
@@ -28,8 +27,16 @@ import {
   testConceptsApi,
   projectsApi,
 } from '../api/client'
+import { useProjectPermissions, type PermissionResource } from '../hooks/useProjectPermissions'
 
 type ArtefactKind = 'design' | 'risk' | 'change' | 'test-concept' | 'defect'
+const KIND_RESOURCES: Record<ArtefactKind, PermissionResource> = {
+  design: 'design',
+  risk: 'risk',
+  change: 'change_request',
+  'test-concept': 'test_concept',
+  defect: 'defect',
+}
 type ArtefactRecord = DesignItem | RiskItem | ChangeRequest | TestConcept | Defect
 type DetailTab = 'overview' | 'comments' | 'activity' | 'related' | 'sync'
 
@@ -148,7 +155,6 @@ const workflowTransitions: Record<ArtefactKind, Record<string, string[]>> = {
 }
 
 export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKind; resolvedId?: number }) {
-  const { user } = useAuth()
   const { itemId, prefix } = useParams<{ prefix: string; itemId: string }>()
   const recordId = resolvedId || Number(itemId)
   const config = configs[kind]
@@ -169,6 +175,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
   })
 
   const projectId = artefact ? (artefact as unknown as Record<string, unknown>).project_id as number : undefined
+  const { can } = useProjectPermissions(prefix, projectId)
   const { data: projectData } = useQuery({
     queryKey: ['project', projectId],
     queryFn: () => projectsApi.get(projectId!),
@@ -339,7 +346,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
   const title = String(artefactRecord[config.titleField] ?? config.singular)
   const description = String(artefactRecord[config.descriptionField] ?? '')
   const editUrl = docEditUrl(projectPrefix, config.docType, code)
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const canEditDocs = can('edit', KIND_RESOURCES[kind])
 
   return (
     <>
