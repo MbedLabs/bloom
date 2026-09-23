@@ -1731,6 +1731,36 @@ export interface MarkdownImportResult {
   sections: { type_code: string | null; title: string }[]
 }
 
+export type TestRailField =
+  | 'id'
+  | 'title'
+  | 'section'
+  | 'section_hierarchy'
+  | 'type'
+  | 'priority'
+  | 'estimate'
+  | 'references'
+  | 'preconditions'
+  | 'steps'
+  | 'expected'
+  | 'step'
+  | 'step_expected'
+
+export interface TestRailColumns {
+  columns: string[]
+  detected: Partial<Record<TestRailField, string>>
+}
+
+export interface TestRailImportResult {
+  created: number
+  updated: number
+  skipped: number
+  suites_created: string[]
+  links_created: number
+  new_ids: string[]
+  errors: string[]
+}
+
 export const importApi = {
   import: async (projectId: number, data: ImportRequest): Promise<ImportResult> => {
     const response = await api.post<ImportResult>(`/projects/${projectId}/import`, data)
@@ -1770,6 +1800,32 @@ export const importApi = {
     const qs = defaultType ? `?default_type=${defaultType}` : ''
     const response = await api.post<MarkdownImportResult>(
       `/projects/${projectId}/import/markdown${qs}`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    return response.data
+  },
+  testRailColumns: async (projectId: number, file: File): Promise<TestRailColumns> => {
+    const form = new FormData()
+    form.append('file', file)
+    const response = await api.post<TestRailColumns>(
+      `/projects/${projectId}/import/testrail/columns`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    return response.data
+  },
+  importTestRail: async (
+    projectId: number,
+    file: File,
+    format: 'xml' | 'csv',
+    mapping?: Partial<Record<TestRailField, string>>,
+  ): Promise<TestRailImportResult> => {
+    const form = new FormData()
+    form.append('file', file)
+    if (mapping) form.append('mapping', JSON.stringify(mapping))
+    const response = await api.post<TestRailImportResult>(
+      `/projects/${projectId}/import/testrail?format=${format}`,
       form,
       { headers: { 'Content-Type': 'multipart/form-data' } },
     )

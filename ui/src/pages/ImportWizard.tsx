@@ -5,10 +5,11 @@ import { ArrowLeft, Check, ChevronRight, Download, AlertCircle, FileUp } from 'l
 import { docsApi, projectsApi, importApi } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { useDebounced } from '../hooks/useDebounced'
+import TestRailImport from '../components/TestRailImport'
 import type { ImportResult, ReqIFImportResult, TestCaseImportResult, MarkdownImportResult } from '../api/client'
 
 type WizardStep = 1 | 2 | 3 | 4 | 5
-type ImportMode = 'project' | 'reqif' | 'file' | 'md'
+type ImportMode = 'project' | 'reqif' | 'file' | 'md' | 'testrail'
 
 /** How many source documents the picker shows at once. */
 const IMPORT_PAGE = 100
@@ -162,6 +163,7 @@ export default function ImportWizard() {
           { key: 'reqif', label: 'From ReqIF file' },
           { key: 'file', label: 'From CSV/XML file' },
           { key: 'md', label: 'From Markdown file' },
+          { key: 'testrail', label: 'From TestRail' },
         ] as const).map((m) => (
           <button
             key={m.key}
@@ -367,6 +369,8 @@ export default function ImportWizard() {
         )}
       </div>
       )}
+
+      {mode === 'testrail' && <TestRailImport projectId={projectId} prefix={prefix} />}
 
       {mode === 'md' && (
       <div className="bg-card rounded-lg border border-border shadow-elegant p-6 space-y-4">

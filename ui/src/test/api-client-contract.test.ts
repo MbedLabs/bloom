@@ -281,6 +281,18 @@ const CALLS: Array<[string, unknown[], string, string]> = [
     'post',
     '/projects/5/import/markdown',
   ],
+  [
+    'importApi.testRailColumns',
+    [5, new File(['ID,Title'], 'cases.csv')],
+    'post',
+    '/projects/5/import/testrail/columns',
+  ],
+  [
+    'importApi.importTestRail',
+    [5, new File(['<suite/>'], 'suite.xml'), 'xml'],
+    'post',
+    '/projects/5/import/testrail?format=xml',
+  ],
   ['companyLogoApi.setLogo', [new File(['x'], 'logo.png')], 'put', '/company-logo/logo'],
   ['companyLogoApi.fetchLogo', [], 'get', '/company-logo/logo'],
   ['companyLogoApi.deleteLogo', [], 'delete', '/company-logo/logo'],

@@ -3,17 +3,20 @@ Cross-project import service for docs (REQ/TC).
 """
 
 import csv
+import functools
 import io
+import json
 import re
 from typing import Dict, List, Optional
 
 from defusedxml import ElementTree as SafeET
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import log_artefact_activity
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.id_generator import format_doc_id, next_doc_id
 from app.core.md_import import parameter_name_collisions, parse_markdown_document
@@ -27,7 +30,16 @@ from app.core.reqif import (
 from app.core.reqif_policy import read_reqif_upload
 from app.core.security import require_project_access, require_role
 from app.core.tc_steps import text_to_rows
+from app.core.testrail import (
+    TestRailCase,
+    TestRailParseError,
+    detect_columns,
+    parse_testrail_csv,
+    parse_testrail_xml,
+    read_csv_header,
+)
 from app.models import (
+    ArtefactLink,
     ChangeRequest,
     Defect,
     DesignItem,
@@ -39,11 +51,17 @@ from app.models import (
     RiskItem,
     TestCase,
     TestConcept,
+    TestSuite,
+    TestSuiteItem,
 )
 from app.models.user import User, UserRole
 from app.services.import_attempts import begin_import_attempt, finish_import_attempt
 from app.services.notification_service import notify
-from app.services.reqif_worker import ReqIFProcessingTimeout, parse_reqif_in_worker
+from app.services.reqif_worker import (
+    ReqIFProcessingTimeout,
+    parse_in_worker,
+    parse_reqif_in_worker,
+)
 
 router = APIRouter()
 
@@ -830,3 +848,262 @@ async def import_markdown(
             for section in parsed.sections
         ],
     )
+
+
+class TestRailImportResult(BaseModel):
+    created: int
+    updated: int
+    skipped: int
+    suites_created: list[str]
+    links_created: int
+    new_ids: list[str]
+    errors: list[str]
+
+
+class TestRailColumns(BaseModel):
+    columns: list[str]
+    detected: dict[str, str]
+
+
+def _testrail_body(case: TestRailCase, unmatched: list) -> str:
+    """The metadata paragraph a TestRail case leaves in the test case body."""
+    facts = [
+        (
+            f"Imported from TestRail case {case.case_id}."
+            if case.case_id
+            else "Imported from TestRail."
+        )
+    ]
+    for label, value in (
+        ("Type", case.case_type),
+        ("Priority", case.priority),
+        ("Estimate", case.estimate),
+    ):
+        if value:
+            facts.append(f"{label}: {value}.")
+    if unmatched:
+        facts.append("References: " + ", ".join(unmatched) + ".")
+    return " ".join(facts)
+
+
+async def _testrail_project(db: AsyncSession, project_id: int, current_user: User) -> Project:
+    """The target project, after the maintainer access check."""
+    project = (
+        await db.execute(select(Project).where(Project.id == project_id))
+    ).scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="Target project not found")
+    await require_project_access(
+        db, current_user, project.id, roles={UserRole.admin.value, UserRole.maintainer.value}
+    )
+    return project
+
+
+@router.post("/projects/{project_id}/import/testrail/columns", response_model=TestRailColumns)
+async def testrail_csv_columns(
+    project_id: int,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+):
+    """The columns of a TestRail CSV export and the fields Bloom recognised in them."""
+    await _testrail_project(db, project_id, current_user)
+    try:
+        raw = await read_reqif_upload(file)
+        header = read_csv_header(raw)
+    except ReqIFParseError:
+        raise HTTPException(status_code=413, detail="The file exceeds the 25 MiB import limit.")
+    except TestRailParseError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return TestRailColumns(columns=header, detected=detect_columns(header))
+
+
+@router.post(
+    "/projects/{project_id}/import/testrail",
+    response_model=TestRailImportResult,
+    status_code=201,
+)
+async def import_testrail(
+    project_id: int,
+    format: str = Query("xml", pattern="^(xml|csv)$"),
+    file: UploadFile = File(...),
+    mapping: Optional[str] = Form(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+):
+    """Import a TestRail XML or CSV export as test cases, suites and requirement links.
+
+    A case carries ``source_ref = testrail:C123``, so importing the same export again
+    updates the cases instead of duplicating them.
+    """
+    project = await _testrail_project(db, project_id, current_user)
+    column_mapping = None
+    if mapping:
+        try:
+            column_mapping = json.loads(mapping)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="The column mapping is not valid JSON.")
+        if not isinstance(column_mapping, dict):
+            raise HTTPException(status_code=422, detail="The column mapping must be an object.")
+
+    attempt = await begin_import_attempt(db, user_id=current_user.id, project_id=project.id)
+    attempt_id = attempt.id
+    parser = (
+        parse_testrail_xml
+        if format == "xml"
+        else functools.partial(parse_testrail_csv, mapping=column_mapping)
+    )
+    try:
+        raw = await read_reqif_upload(file)
+        cases = await parse_in_worker(parser, raw, error_cls=TestRailParseError, label="TestRail")
+    except ReqIFParseError:
+        await finish_import_attempt(db, attempt_id, "failed")
+        raise HTTPException(status_code=413, detail="The file exceeds the 25 MiB import limit.")
+    except ReqIFProcessingTimeout as exc:
+        await finish_import_attempt(db, attempt_id, "timeout")
+        raise HTTPException(status_code=504, detail=str(exc))
+    except TestRailParseError as exc:
+        await finish_import_attempt(db, attempt_id, "failed")
+        raise HTTPException(status_code=422, detail=f"Could not read the TestRail file: {exc}")
+
+    requirements = {
+        req_id.upper(): req_pk
+        for req_pk, req_id in (
+            await db.execute(
+                select(Requirement.id, Requirement.req_id).where(
+                    Requirement.project_id == project.id
+                )
+            )
+        ).all()
+    }
+    suites = {
+        suite.name: suite
+        for suite in (await db.execute(select(TestSuite).where(TestSuite.project_id == project.id)))
+        .scalars()
+        .all()
+    }
+    result = TestRailImportResult(
+        created=0, updated=0, skipped=0, suites_created=[], links_created=0, new_ids=[], errors=[]
+    )
+    prefix = project.prefix
+    next_num = await _get_next_tc_num(db, project.id, prefix)
+
+    for index, case in enumerate(cases, start=1):
+        if not case.title:
+            result.skipped += 1
+            result.errors.append(f"case {case.case_id or index}: missing title")
+            continue
+        matched = [requirements[t.upper()] for t in case.references if t.upper() in requirements]
+        unmatched = [t for t in case.references if t.upper() not in requirements]
+        description = _testrail_body(case, unmatched)
+        source_ref = f"testrail:{case.case_id}"[:100] if case.case_id else None
+        test_case = None
+        if source_ref:
+            test_case = (
+                await db.execute(
+                    select(TestCase).where(
+                        TestCase.project_id == project.id, TestCase.source_ref == source_ref
+                    )
+                )
+            ).scalar_one_or_none()
+        if test_case is not None:
+            test_case.title = case.title
+            test_case.description = description
+            test_case.preconditions = case.preconditions or None
+            test_case.steps = case.rows or None
+            await db.flush()
+            await log_artefact_activity(
+                db,
+                "test-case",
+                test_case.id,
+                "updated",
+                f"{current_user.full_name} updated {test_case.tc_id} from TestRail {case.case_id}",
+            )
+            result.updated += 1
+        else:
+            tc_id = format_doc_id(prefix, "TC", next_num)
+            next_num += 1
+            test_case = TestCase(
+                project_id=project.id,
+                tc_id=tc_id,
+                title=case.title,
+                description=description,
+                preconditions=case.preconditions or None,
+                steps=case.rows or None,
+                status="Draft",
+                source_ref=source_ref,
+            )
+            db.add(test_case)
+            await db.flush()
+            await log_artefact_activity(
+                db,
+                "test-case",
+                test_case.id,
+                "created",
+                f"{current_user.full_name} imported {tc_id} from TestRail",
+            )
+            result.created += 1
+            result.new_ids.append(tc_id)
+
+        for requirement_pk in matched:
+            linked = (
+                await db.execute(
+                    select(ArtefactLink.id).where(
+                        ArtefactLink.project_id == project.id,
+                        ArtefactLink.source_type == "TC",
+                        ArtefactLink.source_id == test_case.id,
+                        ArtefactLink.target_type == "REQ",
+                        ArtefactLink.target_id == requirement_pk,
+                        ArtefactLink.role == "verifies",
+                    )
+                )
+            ).scalar_one_or_none()
+            if linked is None:
+                db.add(
+                    ArtefactLink(
+                        project_id=project.id,
+                        source_type="TC",
+                        source_id=test_case.id,
+                        target_type="REQ",
+                        target_id=requirement_pk,
+                        role="verifies",
+                    )
+                )
+                result.links_created += 1
+
+        if case.sections and case.sections[0]:
+            name = case.sections[0][:255]
+            suite = suites.get(name)
+            if suite is None:
+                suite = TestSuite(
+                    project_id=project.id,
+                    suite_id=await next_doc_id(
+                        db, TestSuite, TestSuite.suite_id, project.id, prefix, "TS"
+                    ),
+                    name=name,
+                )
+                db.add(suite)
+                await db.flush()
+                suites[name] = suite
+                result.suites_created.append(suite.suite_id)
+            in_suite = (
+                await db.execute(
+                    select(TestSuiteItem.id).where(
+                        TestSuiteItem.suite_id == suite.id,
+                        TestSuiteItem.test_case_id == test_case.id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if in_suite is None:
+                order = len(
+                    (
+                        await db.execute(
+                            select(TestSuiteItem.id).where(TestSuiteItem.suite_id == suite.id)
+                        )
+                    ).all()
+                )
+                db.add(TestSuiteItem(suite_id=suite.id, test_case_id=test_case.id, order=order))
+        await db.flush()
+
+    await finish_import_attempt(db, attempt_id, "completed")
+    return result
