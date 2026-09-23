@@ -770,7 +770,7 @@ async def import_markdown(
     notifications_created = 0
     for section in parsed.sections:
         title = section.title.strip()
-        if not title or title.lower() == "parameters":
+        if not title:
             continue
         factory = ARTEFACT_FACTORY.get(section.type_code or "")
         if factory is None:

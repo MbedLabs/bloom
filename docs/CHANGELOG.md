@@ -5,7 +5,7 @@
 ### Added
 
 - Admin company logo on PDF reports: an administrator uploads a company logo in Settings; it renders on the report letterhead (top-left) alongside the EmbedLabs tamper-evidence footer, which is always present. The Settings preview loads through the authenticated client so the admin sees exactly what was stored.
-- Markdown document import: classifies a Markdown document into artefacts (by heading tag, front matter, or an at-import marker); a parameters section declares `parameter:`/`value:` pairs and a name collision requires an action rather than overwriting; classified sections are persisted as artefacts; an unlinked imported artefact raises a notification to link it; documented per template. A Markdown mode is added to the Import Wizard.
+- Markdown document import: classifies a Markdown document into artefacts (by heading tag, front matter, or an at-import marker); a parameter is written inside a sentence as `{{parameter: NAME, value: VALUE}}`, created on import and replaced with `{{NAME}}`, and a name collision requires an action rather than overwriting; classified sections are persisted as artefacts; an unlinked imported artefact raises a notification to link it; documented per template. A Markdown mode is added to the Import Wizard.
 - Test-case import from CSV and XML, round-tripping with the export, on the `POST /projects/{id}/import` convention; a CSV/XML mode in the Import Wizard.
 - Export test cases as Markdown, CSV and XML.
 - Address artefacts and their backlinks by public id, not only the database id (additive; database ids continue to resolve).

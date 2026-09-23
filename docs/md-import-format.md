@@ -8,8 +8,8 @@ each template accepts.
 
 An artefact type is chosen, in priority order, by:
 
-1. a **heading tag** on the section — `## [REQ] Title`, `## [DES] Title`, …
-2. **frontmatter** at the top of the file — `type: requirement`
+1. a **heading tag** on the section: `## [REQ] Title`, `## [DES] Title`
+2. **frontmatter** at the top of the file: `type: requirement`
 3. the **type specified at import** time (a default applied to unmarked sections)
 
 Recognised type tokens (case-insensitive): `req`/`requirement`, `spec`,
@@ -28,22 +28,32 @@ Body text for this requirement.
 Body text for this design.
 ```
 
-## Parameters section
+## Parameters
 
-Parameters are declared as `parameter:`/`value:` pairs; the backend uses them to
-fill the document.
+Write a parameter inside the sentence where it is used, wrapped as
+`{{parameter: NAME, value: VALUE}}`. On import Bloom creates the parameter and
+replaces the wrapped form with `{{NAME}}`.
 
 ```markdown
-## Parameters
-parameter: BOOT_BUDGET_MS
-value: 500
-parameter: MAX_TEMP_C
-value: 85
+## [REQ] Boot time
+The system shall boot within {{parameter: BOOT_BUDGET_MS, value: 500}} ms of power-on.
 ```
 
+imports as a requirement whose text reads:
+
+```markdown
+The system shall boot within {{BOOT_BUDGET_MS}} ms of power-on.
+```
+
+The app shows the parameter value in the text, so write the sentence around it:
+`repeat {{parameter: BOOT_CYCLES, value: 3}} times` reads "repeat 3 times".
+
+A `{{NAME}}` without `parameter:` and `value:` is a reference to an existing
+parameter and is kept as it is.
+
 Each parameter has a **name** and a **value**. On import the backend checks each
-name: **if a parameter with that name already exists it alerts and requires an
-action — it is never silently overwritten.**
+name: if a parameter with that name already exists, it alerts and requires an
+action. It is never silently overwritten.
 
 ## Links
 

@@ -1,11 +1,12 @@
 """Parse and classify a Markdown document into Bloom artefacts.
 
 The import format lets an uploaded Markdown file declare, per section, which
-artefact type it becomes, plus a parameters section the backend uses to fill the
-document. Classification is driven by a heading tag (``## [REQ] Title``), by
-frontmatter (``type: requirement``), or by a default type chosen at import.
-Parameters are ``parameter:``/``value:`` pairs; a name that already exists is a
-collision that requires an action and is never silently overwritten.
+artefact type it becomes. Classification is driven by a heading tag
+(``## [REQ] Title``), by frontmatter (``type: requirement``), or by a default type
+chosen at import. A parameter is written inside a sentence as
+``{{parameter: NAME, value: VALUE}}``; the backend recognises it wherever it appears,
+records it, and replaces it in place with ``{{NAME}}``. A name that already exists is
+a collision that requires an action and is never silently overwritten.
 """
 
 import re
@@ -37,13 +38,15 @@ TYPE_TOKENS = {
 
 _HEADING_TAG_RE = re.compile(r"^\s*#{1,6}\s*\[(?P<tag>[A-Za-z-]+)\]\s*(?P<title>.*)$")
 _HEADING_RE = re.compile(r"^\s*#{1,6}\s+(?P<title>.*)$")
-_PARAM_RE = re.compile(r"^\s*parameter\s*:\s*(?P<name>.+?)\s*$", re.IGNORECASE)
-_VALUE_RE = re.compile(r"^\s*value\s*:\s*(?P<value>.*)$", re.IGNORECASE)
+_PARAM_RE = re.compile(
+    r"\{\{\s*parameter\s*:\s*(?P<name>[^{},]+?)\s*,\s*value\s*:\s*(?P<value>[^{}]*?)\s*\}\}",
+    re.IGNORECASE,
+)
 
 
 @dataclass
 class Parameter:
-    """A ``parameter:``/``value:`` pair declared in the document."""
+    """A ``{{parameter: NAME, value: VALUE}}`` written in the document."""
 
     name: str
     value: str
@@ -88,6 +91,17 @@ def _parse_frontmatter(lines: list) -> tuple:
     return {}, lines
 
 
+def _replace_parameters(line: str, parameters: list) -> str:
+    """Record each wrapped parameter in the line and replace it with ``{{NAME}}``."""
+
+    def _placeholder(match: re.Match) -> str:
+        name = match.group("name").strip()
+        parameters.append(Parameter(name=name, value=match.group("value").strip()))
+        return "{{" + name + "}}"
+
+    return _PARAM_RE.sub(_placeholder, line)
+
+
 def parse_markdown_document(text: str, default_type: Optional[str] = None) -> ParsedMarkdown:
     """Parse a Markdown document into its doc type, parameters and classified sections."""
     lines = text.splitlines()
@@ -97,21 +111,9 @@ def parse_markdown_document(text: str, default_type: Optional[str] = None) -> Pa
     parameters = []
     sections = []
     current = None
-    pending_param = None
 
-    for line in body_lines:
-        param_match = _PARAM_RE.match(line)
-        if param_match:
-            pending_param = param_match.group("name").strip()
-            continue
-        value_match = _VALUE_RE.match(line)
-        if value_match and pending_param is not None:
-            parameters.append(
-                Parameter(name=pending_param, value=value_match.group("value").strip())
-            )
-            pending_param = None
-            continue
-
+    for raw_line in body_lines:
+        line = _replace_parameters(raw_line, parameters)
         tag_match = _HEADING_TAG_RE.match(line)
         if tag_match:
             current = Section(

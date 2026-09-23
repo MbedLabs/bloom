@@ -30,13 +30,30 @@ def test_default_type_used_when_unmarked():
     assert doc.sections[0].type_code == "DES"
 
 
-def test_parameters_parsed():
-    text = "## Parameters\nparameter: BOOT_MS\nvalue: 500\nparameter: MAX_TEMP\nvalue: 85C"
+def test_wrapped_parameters_in_a_sentence_become_placeholders():
+    text = (
+        "## [REQ] Boot\n"
+        "Boot within {{parameter: BOOT_MS, value: 500}} ms of power-on, "
+        "below {{parameter: MAX_TEMP, value: 85C}}.\n"
+    )
     doc = parse_markdown_document(text)
     assert [(p.name, p.value) for p in doc.parameters] == [
         ("BOOT_MS", "500"),
         ("MAX_TEMP", "85C"),
     ]
+    assert doc.sections[0].body == "Boot within {{BOOT_MS}} ms of power-on, below {{MAX_TEMP}}."
+
+
+def test_existing_parameter_reference_is_left_alone():
+    doc = parse_markdown_document("## [REQ] Boot\nBoot within {{BOOT_MS}} ms.\n")
+    assert doc.parameters == []
+    assert doc.sections[0].body == "Boot within {{BOOT_MS}} ms."
+
+
+def test_parameter_in_a_heading_is_replaced():
+    doc = parse_markdown_document("## [REQ] Boot in {{parameter: BOOT_MS, value: 500}} ms\n")
+    assert doc.sections[0].title == "Boot in {{BOOT_MS}} ms"
+    assert [(p.name, p.value) for p in doc.parameters] == [("BOOT_MS", "500")]
 
 
 def test_parameter_collisions_require_action():

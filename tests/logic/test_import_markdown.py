@@ -49,15 +49,10 @@ MD = (
     "---\n"
     "type: requirement\n"
     "---\n"
-    "## Parameters\n"
-    "parameter: BOOT_MS\n"
-    "value: 500\n"
-    "parameter: NEW_ONE\n"
-    "value: hello\n"
     "## [REQ] Fast boot\n"
-    "body\n"
+    "Boot within {{parameter: BOOT_MS, value: 500}} ms\n"
     "## [DES] Boot design\n"
-    "body2\n"
+    "Greets with {{parameter: NEW_ONE, value: hello}}\n"
 ).encode()
 
 
@@ -82,16 +77,17 @@ async def test_collision_requires_action_and_never_overwrites(session):
     sections = {s.title: s.type_code for s in result.sections}
     assert sections["Fast boot"] == "REQ"
     assert sections["Boot design"] == "DES"
-    # the tagged sections became artefacts; the Parameters section did not
     assert result.artefacts_created == 2
     req = (
         await session.execute(select(Requirement).where(Requirement.title == "Fast boot"))
     ).scalar_one()
     assert req.req_id.startswith("ALP-REQ-")
+    assert req.description == "Boot within {{BOOT_MS}} ms"
     des = (
         await session.execute(select(DesignItem).where(DesignItem.title == "Boot design"))
     ).scalar_one()
     assert des.design_id.startswith("ALP-DES-")
+    assert des.description == "Greets with {{NEW_ONE}}"
     # each unlinked artefact prompts the uploader to link it, with the review wording
     assert result.notifications_created == 2
     notes = (await session.execute(select(Notification))).scalars().all()
@@ -101,7 +97,7 @@ async def test_collision_requires_action_and_never_overwrites(session):
 
 async def test_no_collision_creates_all(session):
     admin = await _admin(session)
-    md = b"## Parameters\nparameter: FRESH_A\nvalue: 1\nparameter: FRESH_B\nvalue: 2\n"
+    md = b"## [REQ] Fresh\nUses {{parameter: FRESH_A, value: 1}} and {{parameter: FRESH_B, value: 2}}\n"
     result = await import_markdown(
         project_id=1, default_type=None, file=_upload(md), db=session, current_user=admin
     )
