@@ -13,6 +13,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Iterable, Optional
 
+from app.core.tc_steps import continue_row, parse_row
+
 TYPE_TOKENS = {
     "req": "REQ",
     "requirement": "REQ",
@@ -38,16 +40,6 @@ TYPE_TOKENS = {
 
 _HEADING_TAG_RE = re.compile(r"^\s*#{1,6}\s*\[(?P<tag>[A-Za-z-]+)\]\s*(?P<title>.*)$")
 _HEADING_RE = re.compile(r"^\s*#{1,6}\s+(?P<title>.*)$")
-_STEP_ROW_RE = re.compile(
-    r"^(?P<indent>[ \t]*)[-*]\s+(?P<label>pre-?condition|step|loop)\s*:\s*(?P<text>.*)$",
-    re.IGNORECASE,
-)
-_ROW_TYPES = {
-    "pre-condition": ("precondition", "Pre-Condition"),
-    "precondition": ("precondition", "Pre-Condition"),
-    "step": ("step", "Step"),
-    "loop": ("loop", "Loop"),
-}
 _PARAM_RE = re.compile(
     r"\{\{\s*parameter\s*:\s*(?P<name>[^{},]+?)\s*,\s*value\s*:\s*(?P<value>[^{}]*?)\s*\}\}",
     re.IGNORECASE,
@@ -113,25 +105,6 @@ def _replace_parameters(line: str, parameters: list) -> str:
     return _PARAM_RE.sub(_placeholder, line)
 
 
-def _step_row(line: str, index: int) -> Optional[dict]:
-    """Turn a ``- Step: action => expected`` line into a test-case step row."""
-    match = _STEP_ROW_RE.match(line)
-    if not match:
-        return None
-    row_type, label = _ROW_TYPES[match.group("label").lower()]
-    description, _, expected = match.group("text").partition(" => ")
-    indent = match.group("indent").replace("\t", "  ")
-    return {
-        "id": f"md-row-{index + 1}",
-        "row_type": row_type,
-        "label": label,
-        "description": description.strip(),
-        "expected_result": expected.strip(),
-        "indent_level": len(indent) // 2,
-        "collapsed": False,
-    }
-
-
 def parse_markdown_document(text: str, default_type: Optional[str] = None) -> ParsedMarkdown:
     """Parse a Markdown document into its doc type, parameters and classified sections."""
     lines = text.splitlines()
@@ -161,9 +134,12 @@ def parse_markdown_document(text: str, default_type: Optional[str] = None) -> Pa
             sections.append(current)
             continue
         if current is not None and current.type_code == "TC":
-            row = _step_row(line, len(current.steps))
+            row = parse_row(line, len(current.steps))
             if row is not None:
                 current.steps.append(row)
+                continue
+            if current.steps and line[:1] in (" ", "\t") and line.strip():
+                continue_row(current.steps[-1], line)
                 continue
         if current is not None:
             current.body += line + "\n"

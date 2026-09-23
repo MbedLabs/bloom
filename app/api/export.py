@@ -33,6 +33,7 @@ ASSETS = Path(__file__).resolve().parent.parent / "assets"
 BLOOM_LOGO = ASSETS / "bloom-logo.png"
 EMBEDLABS_LOGO = ASSETS / "embedlabs-logo.png"
 EMBEDLABS_URL = "https://www.embedlabs.net"
+from app.core.tc_steps import has_precondition_rows, rows_to_text
 
 
 def _fit(iw: int, ih: int, max_w: float, max_h: float) -> tuple[float, float]:
@@ -321,55 +322,26 @@ async def _load_test_cases(db: AsyncSession, project_id: int) -> list[TestCase]:
     )
 
 
-def _steps_to_text(steps) -> str:
-    """Flatten a test case's steps JSON into readable plain text."""
-    if not steps:
-        return ""
-    if isinstance(steps, dict):
-        inner = steps.get("steps")
-        if isinstance(inner, list):
-            return _steps_to_text(inner)
-        return "\n".join(f"{key}: {value}" for key, value in steps.items())
-    if isinstance(steps, list):
-        lines = []
-        for index, step in enumerate(steps, start=1):
-            if isinstance(step, dict):
-                action = step.get("action") or step.get("step") or ""
-                expected = step.get("expected") or step.get("expected_result") or ""
-                line = f"{index}. {action}".rstrip()
-                if expected:
-                    line = f"{line} => {expected}"
-                lines.append(line)
-            else:
-                lines.append(f"{index}. {step}")
-        return "\n".join(lines)
-    return str(steps)
-
-
 def _test_cases_markdown(project: Project, test_cases: list[TestCase]) -> str:
-    """Render the test cases as a Markdown document."""
+    """Render the test cases in the Markdown import format, so the file re-imports."""
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     parts = [
-        f"# {project.name} - Test Cases",
-        "",
-        f"Project {project.prefix} - generated {generated} - {len(test_cases)} test case(s)",
+        f"Test cases of {project.name} ({project.prefix}), exported {generated}, "
+        f"{len(test_cases)} test case(s).",
         "",
     ]
     for tc in test_cases:
-        parts.append(f"## {tc.tc_id}  {tc.title}")
-        parts.append("")
-        parts.append(f"- **Status:** {tc.status}")
-        parts.append(f"- **Visibility:** {tc.visibility}")
-        if tc.last_execution_status:
-            parts.append(f"- **Last execution:** {tc.last_execution_status}")
-        parts.append("")
-        if tc.preconditions:
-            parts.extend(["**Preconditions**", "", tc.preconditions, ""])
-        steps = _steps_to_text(tc.steps)
-        if steps:
-            parts.extend(["**Steps**", "", steps, ""])
+        parts.extend([f"## [TC] {tc.title}", ""])
         if tc.description:
             parts.extend([tc.description, ""])
+        rows = []
+        if tc.preconditions and not has_precondition_rows(tc.steps):
+            rows.append(f"- Pre-Condition: {tc.preconditions}")
+        steps = rows_to_text(tc.steps)
+        if steps:
+            rows.append(steps)
+        if rows:
+            parts.extend([*rows, ""])
     return "\n".join(parts).rstrip() + "\n"
 
 
@@ -390,7 +362,7 @@ def _test_cases_xml(project: Project, test_cases: list[TestCase]) -> bytes:
         ET.SubElement(node, "status").text = tc.status or ""
         ET.SubElement(node, "visibility").text = tc.visibility or ""
         ET.SubElement(node, "preconditions").text = tc.preconditions or ""
-        ET.SubElement(node, "steps").text = _steps_to_text(tc.steps)
+        ET.SubElement(node, "steps").text = rows_to_text(tc.steps)
         ET.SubElement(node, "description").text = tc.description or ""
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
@@ -430,7 +402,7 @@ async def export_test_cases(
             tc.status,
             tc.visibility,
             tc.preconditions or "",
-            _steps_to_text(tc.steps),
+            rows_to_text(tc.steps),
             tc.description or "",
             tc.last_execution_status or "",
             tc.created_at.isoformat() if tc.created_at else "",

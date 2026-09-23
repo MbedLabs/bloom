@@ -74,6 +74,8 @@ Measures the cold boot time of the device under test.
   - Step: measure the time from relay on to boot banner => within {{parameter: BOOT_BUDGET_MS, value: 500}} ms +- {{parameter: BOOT_TOLERANCE_MS, value: 50}} ms
 ```
 
+The CSV and XML test-case exports write the steps column in this same row form, one row per line, so an exported file imports back without losing rows.
+
 ## Links
 
 When an imported document classifies as a specification, test concept, design or

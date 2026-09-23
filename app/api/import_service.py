@@ -26,6 +26,7 @@ from app.core.reqif import (
 )
 from app.core.reqif_policy import read_reqif_upload
 from app.core.security import require_project_access, require_role
+from app.core.tc_steps import text_to_rows
 from app.models import (
     ChangeRequest,
     Defect,
@@ -468,27 +469,6 @@ async def import_reqif(
     return result
 
 
-def _parse_steps_text(text):
-    """Reverse the exported steps text back into a steps JSON list."""
-    if not text or not text.strip():
-        return None
-    steps = []
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-        body = line
-        dot = body.find(". ")
-        if dot != -1 and body[:dot].isdigit():
-            body = body[dot + 2 :]
-        if " => " in body:
-            action, expected = body.split(" => ", 1)
-            steps.append({"action": action.strip(), "expected": expected.strip()})
-        else:
-            steps.append({"action": body.strip()})
-    return steps or None
-
-
 def _import_rows_from_csv(raw: bytes) -> List[dict]:
     """Parse the exported CSV into per-test-case dicts."""
     reader = csv.DictReader(io.StringIO(raw.decode("utf-8-sig")))
@@ -567,7 +547,7 @@ async def import_test_cases_file(
             errors.append(f"row {index}: missing title")
             continue
         tc_id = (row.get("tc_id") or "").strip()
-        steps = _parse_steps_text(row.get("steps"))
+        steps = text_to_rows(row.get("steps"))
         status = (row.get("status") or "").strip() or "Draft"
         visibility = (row.get("visibility") or "").strip()
         description = (row.get("description") or "").strip() or None

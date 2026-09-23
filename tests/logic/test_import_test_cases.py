@@ -65,7 +65,9 @@ async def test_csv_import_updates_existing_and_creates_new(session):
         await session.execute(select(TestCase).where(TestCase.tc_id == "ALP-TC-001"))
     ).scalar_one()
     assert tc.title == "Updated login"
-    assert tc.steps == [{"action": "Open", "expected": "Form"}]
+    assert [(s["row_type"], s["description"], s["expected_result"]) for s in tc.steps] == [
+        ("step", "Open", "Form")
+    ]
     assert (await session.execute(select(TestCase))).scalars().all().__len__() == 2
 
 
@@ -81,7 +83,9 @@ async def test_xml_import_creates(session):
     )
     assert result.created == 1
     tc = (await session.execute(select(TestCase).where(TestCase.title == "From XML"))).scalar_one()
-    assert tc.steps == [{"action": "Click", "expected": "Opens"}]
+    assert [(s["row_type"], s["description"], s["expected_result"]) for s in tc.steps] == [
+        ("step", "Click", "Opens")
+    ]
     assert tc.tc_id.startswith("ALP-TC-")
 
 

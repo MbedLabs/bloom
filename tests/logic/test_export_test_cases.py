@@ -85,9 +85,10 @@ async def test_test_cases_markdown(session):
     assert response.media_type.startswith("text/markdown")
     assert 'filename="ALP-test-cases.md"' in response.headers["content-disposition"]
     body = response.body.decode("utf-8")
-    assert "# Alpha - Test Cases" in body
-    assert "## ALP-TC-001  Verify login" in body
-    assert "1. Open login => Form shown" in body
+    assert body.startswith("Test cases of Alpha (ALP)")
+    assert "## [TC] Verify login" in body
+    assert "- Pre-Condition: User exists" in body
+    assert "- Step: Open login => Form shown" in body
 
 
 async def test_test_cases_xml_is_wellformed(session):

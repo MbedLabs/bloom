@@ -15,6 +15,7 @@
 ### Fixed
 
 - Requirements and test cases return their editor body.
+- Test-case export and CSV/XML import keep every step row (preconditions, loops, nesting, multi-line text, expected results) instead of flattening them; files exported in the older numbered form still import, and the Markdown export re-imports as the same test cases.
 
 ## 1.1.0 - 2026-09-16
 
