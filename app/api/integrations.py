@@ -25,12 +25,26 @@ from app.models import (
     DefectSyncEvent,
     IntegrationSetting,
     Project,
+    TestCase,
     WebhookDelivery,
 )
 from app.models.user import User, UserRole
 from app.services.integration_secrets import (
     decrypt_integration_secret,
     encrypt_integration_secret,
+)
+from app.services.jira_inbound import (
+    BLOOM_LEVELS,
+    REMOVED_STATE,
+    adf_to_text,
+    bloom_level,
+    build_jql,
+    is_resolved,
+    issue_matches,
+    issue_types,
+    issue_url,
+    referenced_tc_ids,
+    search_fields,
 )
 
 logger = logging.getLogger(__name__)
@@ -51,6 +65,12 @@ class IntegrationSettingCreate(BaseModel):
     webhook_secret: Optional[str] = None
     jira_project_key: Optional[str] = None
     create_defects_on_inbound: bool = True
+    jira_issue_types: Optional[list[str]] = None
+    jira_label: Optional[str] = None
+    jira_jql: Optional[str] = None
+    jira_reference_field: Optional[str] = None
+    jira_priority_map: Optional[dict[str, str]] = None
+    two_way: bool = False
     enabled: bool = True
 
 
@@ -64,6 +84,12 @@ class IntegrationSettingResponse(BaseModel):
     has_webhook_secret: bool
     jira_project_key: Optional[str] = None
     create_defects_on_inbound: bool = True
+    jira_issue_types: list[str] = []
+    jira_label: Optional[str] = None
+    jira_jql: Optional[str] = None
+    jira_reference_field: Optional[str] = None
+    jira_priority_map: Optional[dict[str, str]] = None
+    two_way: bool = False
     enabled: bool
     created_at: datetime
     updated_at: datetime
@@ -79,6 +105,12 @@ class IntegrationSettingUpdate(BaseModel):
     webhook_secret: Optional[str] = None
     jira_project_key: Optional[str] = None
     create_defects_on_inbound: Optional[bool] = None
+    jira_issue_types: Optional[list[str]] = None
+    jira_label: Optional[str] = None
+    jira_jql: Optional[str] = None
+    jira_reference_field: Optional[str] = None
+    jira_priority_map: Optional[dict[str, str]] = None
+    two_way: Optional[bool] = None
     enabled: Optional[bool] = None
 
 
@@ -97,6 +129,20 @@ class SyncEventResponse(BaseModel):
         from_attributes = True
 
 
+def _validate_jira_filter(issue_types_value, priority_map) -> None:
+    """Issue types must be names; a priority map may only point at Bloom's levels."""
+    if issue_types_value is not None and not all(
+        isinstance(t, str) and t.strip() for t in issue_types_value
+    ):
+        raise HTTPException(status_code=400, detail="Issue types must be non-empty names.")
+    unknown = sorted(set((priority_map or {}).values()) - set(BLOOM_LEVELS))
+    if unknown:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown Bloom priorities {unknown}. Allowed: {list(BLOOM_LEVELS)}",
+        )
+
+
 def _setting_response(s: IntegrationSetting) -> IntegrationSettingResponse:
     return IntegrationSettingResponse(
         id=s.id,
@@ -108,6 +154,12 @@ def _setting_response(s: IntegrationSetting) -> IntegrationSettingResponse:
         has_webhook_secret=bool(s.webhook_secret),
         jira_project_key=s.jira_project_key,
         create_defects_on_inbound=s.create_defects_on_inbound,
+        jira_issue_types=issue_types(s),
+        jira_label=s.jira_label,
+        jira_jql=s.jira_jql,
+        jira_reference_field=s.jira_reference_field,
+        jira_priority_map=s.jira_priority_map,
+        two_way=s.two_way,
         enabled=s.enabled,
         created_at=s.created_at,
         updated_at=s.updated_at,
@@ -168,6 +220,7 @@ async def create_integration_setting(
             status_code=400,
             detail=f"Integration for {data.tracker} already exists in this project",
         )
+    _validate_jira_filter(data.jira_issue_types, data.jira_priority_map)
 
     setting = IntegrationSetting(
         project_id=data.project_id,
@@ -180,6 +233,12 @@ async def create_integration_setting(
         ),
         jira_project_key=data.jira_project_key,
         create_defects_on_inbound=data.create_defects_on_inbound,
+        jira_issue_types=data.jira_issue_types,
+        jira_label=data.jira_label or None,
+        jira_jql=data.jira_jql or None,
+        jira_reference_field=data.jira_reference_field or None,
+        jira_priority_map=data.jira_priority_map,
+        two_way=data.two_way,
         enabled=data.enabled,
     )
     db.add(setting)
@@ -223,6 +282,16 @@ async def update_integration_setting(
         setting.jira_project_key = data.jira_project_key
     if data.create_defects_on_inbound is not None:
         setting.create_defects_on_inbound = data.create_defects_on_inbound
+    _validate_jira_filter(data.jira_issue_types, data.jira_priority_map)
+    if "jira_issue_types" in data.model_fields_set:
+        setting.jira_issue_types = data.jira_issue_types or None
+    for name in ("jira_label", "jira_jql", "jira_reference_field"):
+        if name in data.model_fields_set:
+            setattr(setting, name, getattr(data, name) or None)
+    if "jira_priority_map" in data.model_fields_set:
+        setting.jira_priority_map = data.jira_priority_map or None
+    if data.two_way is not None:
+        setting.two_way = data.two_way
     if data.enabled is not None:
         setting.enabled = data.enabled
 
@@ -572,7 +641,8 @@ JIRA_CATEGORY_STATUS_MAP = {
     "done": "Closed",
 }
 
-JIRA_ISSUE_EVENTS = {"jira:issue_created", "jira:issue_updated"}
+JIRA_ISSUE_EVENTS = {"jira:issue_created", "jira:issue_updated", "jira:issue_deleted"}
+MAX_PULLED_ISSUES = 1000
 
 
 def _verify_jira_signature(body: bytes, secret: str, signature: str) -> bool:
@@ -623,24 +693,34 @@ async def _find_jira_target(db: AsyncSession, project_key: str, issue_number: in
     return None
 
 
-async def _create_defect_from_jira_issue(
-    db: AsyncSession,
-    *,
-    project_key: str,
-    issue_number: int,
-    fields: dict,
-    issue_state: str,
-    category: str,
-    body: bytes,
-    signature: Optional[str],
-    delivery: Optional[str],
-) -> dict:
-    """Create a Bloom defect from an inbound Jira issue when its project is mapped.
+def _issue_state(fields: dict) -> str:
+    status = fields.get("status", {}) or {}
+    category = (status.get("statusCategory", {}) or {}).get("key", "")
+    return (status.get("name") or category or "")[:30]
 
-    Falls back to the historical 404 when no enabled jira integration claims the
-    project key or creation is disabled, so unmapped issues stay rejected.
-    """
-    setting = (
+
+def _jira_status(fields: dict) -> Optional[str]:
+    """The Bloom status a Jira issue implies: closed once resolved, else by category."""
+    if is_resolved(fields):
+        return "Closed"
+    status = fields.get("status", {}) or {}
+    category = (status.get("statusCategory", {}) or {}).get("key", "")
+    return JIRA_CATEGORY_STATUS_MAP.get(category)
+
+
+def _set_defect_status(defect: Defect, bloom_status: Optional[str]) -> None:
+    if not bloom_status or defect.status == bloom_status:
+        return
+    defect.status = bloom_status
+    if bloom_status == "Closed" and not defect.closed_at:
+        defect.closed_at = datetime.utcnow()
+    elif bloom_status != "Closed":
+        defect.closed_at = None
+
+
+async def _jira_setting_for_key(db: AsyncSession, project_key: str) -> Optional[IntegrationSetting]:
+    """The enabled Jira integration that owns a Jira project key."""
+    return (
         await db.execute(
             select(IntegrationSetting).where(
                 IntegrationSetting.tracker == "jira",
@@ -649,6 +729,123 @@ async def _create_defect_from_jira_issue(
             )
         )
     ).scalar_one_or_none()
+
+
+async def _link_referenced_test_case(
+    db: AsyncSession, defect: Defect, project: Project, setting: IntegrationSetting, fields: dict
+) -> None:
+    """Point the defect's source at the first test case of the project the issue names."""
+    for tc_id in referenced_tc_ids(project.prefix, setting, fields):
+        test_case_pk = (
+            await db.execute(
+                select(TestCase.id).where(
+                    TestCase.project_id == project.id, func.upper(TestCase.tc_id) == tc_id
+                )
+            )
+        ).scalar_one_or_none()
+        if test_case_pk is not None:
+            defect.source_type = "TC"
+            defect.source_id = test_case_pk
+            return
+
+
+async def _new_defect_from_issue(
+    db: AsyncSession,
+    setting: IntegrationSetting,
+    project_key: str,
+    issue_number: int,
+    fields: dict,
+    *,
+    event_type: str,
+    external_event_id: Optional[str] = None,
+) -> Defect:
+    """Create the Bloom defect for a Jira issue: summary, description, priority and
+    severity from the Jira priority, the issue URL and state, and the test case it names."""
+    project = (
+        await db.execute(select(Project).where(Project.id == setting.project_id))
+    ).scalar_one()
+    issue_key = f"{project_key}-{issue_number}"
+    level = bloom_level(setting, fields)
+    defect = Defect(
+        project_id=project.id,
+        defect_id=await next_doc_id(
+            db, Defect, Defect.defect_id, project.id, project.prefix, "DEF"
+        ),
+        title=(fields.get("summary") or issue_key)[:500],
+        description=adf_to_text(fields.get("description")) or None,
+        severity=level,
+        priority=level,
+        status="Open",
+        external_tracker="jira",
+        external_repo_full_name=project_key,
+        external_issue_number=issue_number,
+        external_issue_url=issue_url(setting, issue_key),
+        external_issue_state=_issue_state(fields),
+        external_last_event_at=datetime.utcnow(),
+    )
+    _set_defect_status(defect, _jira_status(fields))
+    await _link_referenced_test_case(db, defect, project, setting, fields)
+    db.add(defect)
+    await db.flush()
+    _log_target_sync_event(
+        db,
+        "defect",
+        defect.id,
+        "inbound",
+        "jira",
+        event_type,
+        payload_summary=f"created from {issue_key}",
+        external_event_id=external_event_id,
+    )
+    return defect
+
+
+def _follow_issue(
+    kind: str, target, setting: IntegrationSetting, event: str, fields: dict, issue_key: str
+) -> None:
+    """Carry a Jira event onto the linked defect or change request."""
+    target.external_last_event_at = datetime.utcnow()
+    if event == "jira:issue_deleted":
+        target.external_issue_state = REMOVED_STATE
+        return
+    target.external_issue_state = _issue_state(fields)
+    if kind != "defect":
+        status = fields.get("status", {}) or {}
+        bloom_status = JIRA_CATEGORY_STATUS_MAP.get(
+            (status.get("statusCategory", {}) or {}).get("key", "")
+        )
+        if bloom_status and target.status != bloom_status:
+            target.status = bloom_status
+        return
+    _set_defect_status(target, _jira_status(fields))
+    if fields.get("summary"):
+        target.title = fields["summary"][:500]
+    if "description" in fields:
+        target.description = adf_to_text(fields.get("description")) or None
+    if fields.get("priority"):
+        target.priority = bloom_level(setting, fields)
+    if not target.external_issue_url:
+        target.external_issue_url = issue_url(setting, issue_key)
+
+
+async def _create_defect_from_jira_issue(
+    db: AsyncSession,
+    *,
+    project_key: str,
+    issue_number: int,
+    fields: dict,
+    event: str,
+    body: bytes,
+    signature: Optional[str],
+    delivery: Optional[str],
+) -> dict:
+    """Create a Bloom defect from an inbound Jira issue the mapped project takes in.
+
+    Falls back to the historical 404 when no enabled jira integration claims the
+    project key or creation is disabled, so unmapped issues stay rejected. An issue
+    outside the project's filter, or a deletion of an issue Bloom never had, is ignored.
+    """
+    setting = await _jira_setting_for_key(db, project_key)
     if setting is None or not setting.webhook_secret or not setting.create_defects_on_inbound:
         raise HTTPException(status_code=404, detail="No matching webhook target.")
     if not signature or not _verify_jira_signature(
@@ -659,32 +856,16 @@ async def _create_defect_from_jira_issue(
         raise HTTPException(status_code=400, detail="Missing Jira webhook identifier.")
     if not await _reserve_webhook_delivery(db, setting, "jira", delivery):
         return {"status": "duplicate", "delivery": delivery}
+    if event == "jira:issue_deleted" or not issue_matches(setting, fields):
+        return {"status": "ignored", "reason": "issue not taken in by this project"}
 
-    project = (
-        await db.execute(select(Project).where(Project.id == setting.project_id))
-    ).scalar_one()
-    defect_id = await next_doc_id(db, Defect, Defect.defect_id, project.id, project.prefix, "DEF")
-    defect = Defect(
-        project_id=project.id,
-        defect_id=defect_id,
-        title=(fields.get("summary") or f"{project_key}-{issue_number}")[:500],
-        status=JIRA_CATEGORY_STATUS_MAP.get(category, "Open"),
-        external_tracker="jira",
-        external_repo_full_name=project_key,
-        external_issue_number=issue_number,
-        external_issue_state=issue_state,
-        external_last_event_at=datetime.utcnow(),
-    )
-    db.add(defect)
-    await db.flush()
-    _log_target_sync_event(
+    defect = await _new_defect_from_issue(
         db,
-        "defect",
-        defect.id,
-        "inbound",
-        "jira",
-        "created",
-        payload_summary=f"created from {project_key}-{issue_number}",
+        setting,
+        project_key,
+        issue_number,
+        fields,
+        event_type="created",
         external_event_id=delivery,
     )
     await db.flush()
@@ -698,17 +879,16 @@ async def jira_webhook(
     x_hub_signature: Optional[str] = Header(None),
     x_atlassian_webhook_identifier: Optional[str] = Header(None),
 ):
+    """Jira to Bloom: create, follow and mark removed the defects of mapped projects."""
     body = await _read_webhook_body(request)
     payload = _json_payload(body)
 
-    if payload.get("webhookEvent", "") not in JIRA_ISSUE_EVENTS:
+    event = payload.get("webhookEvent", "")
+    if event not in JIRA_ISSUE_EVENTS:
         return {"status": "ignored", "reason": "not an issue event"}
 
     issue = payload.get("issue", {}) or {}
     fields = issue.get("fields", {}) or {}
-    status = fields.get("status", {}) or {}
-    category = (status.get("statusCategory", {}) or {}).get("key", "")
-    issue_state = status.get("name") or category
 
     split = _split_jira_key(issue.get("key", "") or "")
     if not split:
@@ -722,16 +902,13 @@ async def jira_webhook(
             project_key=project_key,
             issue_number=issue_number,
             fields=fields,
-            issue_state=issue_state,
-            category=category,
+            event=event,
             body=body,
             signature=x_hub_signature,
             delivery=x_atlassian_webhook_identifier,
         )
     kind, target = found
 
-    # When a webhook secret is configured, a valid signature is REQUIRED —
-    # a missing header must reject, otherwise omitting it bypasses auth.
     setting = (
         await db.execute(
             select(IntegrationSetting).where(
@@ -763,31 +940,107 @@ async def jira_webhook(
         return {"status": "duplicate", "delivery": x_atlassian_webhook_identifier}
 
     old_state = target.external_issue_state
-    target.external_issue_state = issue_state
-    target.external_last_event_at = datetime.utcnow()
-
-    bloom_status = JIRA_CATEGORY_STATUS_MAP.get(category)
-    if bloom_status and target.status != bloom_status:
-        target.status = bloom_status
-        if kind == "defect":
-            if bloom_status == "Closed" and not target.closed_at:
-                target.closed_at = datetime.utcnow()
-            elif bloom_status != "Closed":
-                target.closed_at = None
-
+    _follow_issue(kind, target, setting, event, fields, f"{project_key}-{issue_number}")
     _log_target_sync_event(
         db,
         kind,
         target.id,
         "inbound",
         "jira",
-        payload.get("webhookEvent", "jira:issue_updated"),
-        payload_summary=f"state: {old_state} -> {issue_state}",
+        event,
+        payload_summary=f"state: {old_state} -> {target.external_issue_state}",
         external_event_id=x_atlassian_webhook_identifier,
     )
 
     await db.flush()
     return {"status": "processed", "target": kind, "id": target.id}
+
+
+class JiraPullResult(BaseModel):
+    searched: int
+    created: int
+    already_linked: int
+    skipped: int
+    new_ids: list[str]
+
+
+async def _search_jira(setting: IntegrationSetting) -> list[dict]:
+    """Every issue the project's filter matches, page by page, up to the pull cap."""
+    headers = {
+        "Authorization": _jira_auth_header(setting),
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    url = f"{setting.base_url.rstrip('/')}/rest/api/3/search/jql"
+    request = {"jql": build_jql(setting), "fields": search_fields(setting), "maxResults": 100}
+    issues: list[dict] = []
+    async with httpx.AsyncClient(timeout=30) as client:
+        while len(issues) < MAX_PULLED_ISSUES:
+            resp = await client.post(url, json=request, headers=headers)
+            resp.raise_for_status()
+            page = resp.json()
+            issues.extend(page.get("issues") or [])
+            token = page.get("nextPageToken")
+            if page.get("isLast", True) or not token:
+                break
+            request = {**request, "nextPageToken": token}
+    return issues[:MAX_PULLED_ISSUES]
+
+
+@router.post("/settings/{setting_id}/jira/pull", response_model=JiraPullResult)
+async def pull_jira_issues(
+    setting_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.admin)),
+):
+    """Create the defects for existing Jira issues the project takes in.
+
+    The only outbound call in one-way mode: it searches Jira and writes nothing there.
+    Issues already linked to a defect or change request are left alone.
+    """
+    setting = (
+        await db.execute(select(IntegrationSetting).where(IntegrationSetting.id == setting_id))
+    ).scalar_one_or_none()
+    if not setting:
+        raise HTTPException(status_code=404, detail="Integration setting not found")
+    await require_project_access(db, current_user, setting.project_id, roles={UserRole.admin.value})
+    if setting.tracker != "jira" or not (
+        setting.base_url
+        and setting.account_email
+        and setting.token_encrypted
+        and setting.jira_project_key
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Pulling needs a Jira integration with the site URL, account email, "
+            "API token and Jira project key.",
+        )
+    try:
+        issues = await _search_jira(setting)
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=502, detail=f"Jira answered {exc.response.status_code} to the search."
+        )
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail=f"Jira is unreachable: {exc}")
+
+    result = JiraPullResult(
+        searched=len(issues), created=0, already_linked=0, skipped=0, new_ids=[]
+    )
+    for issue in issues:
+        split = _split_jira_key(issue.get("key", "") or "")
+        fields = issue.get("fields", {}) or {}
+        if not split or not issue_matches(setting, fields):
+            result.skipped += 1
+            continue
+        if await _find_jira_target(db, *split) is not None:
+            result.already_linked += 1
+            continue
+        defect = await _new_defect_from_issue(db, setting, *split, fields, event_type="pulled")
+        result.created += 1
+        result.new_ids.append(defect.defect_id)
+    await db.flush()
+    return result
 
 
 # ==================== Outbound sync ====================
@@ -813,6 +1066,8 @@ async def sync_defect_to_tracker(
     ).scalar_one_or_none()
 
     if not setting or not setting.token_encrypted:
+        return
+    if setting.tracker == "jira" and not setting.two_way:
         return
 
     try:
@@ -1006,6 +1261,8 @@ async def sync_change_request_to_tracker(
     ).scalar_one_or_none()
 
     if not setting or not setting.token_encrypted:
+        return
+    if setting.tracker == "jira" and not setting.two_way:
         return
 
     try:

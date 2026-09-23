@@ -4,9 +4,10 @@ import hashlib
 import hmac
 import json
 
+import httpx
 import pytest
 import pytest_asyncio
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -21,6 +22,8 @@ from app.models import (
     IntegrationSetting,
     Project,
 )
+from app.models import TestCase as TestCaseModel
+from app.models.user import User, UserRole
 from app.services.integration_secrets import encrypt_integration_secret
 
 SECRET = "jira-hook-secret-123"
@@ -104,6 +107,7 @@ def _payload(
                 "key": issue_key,
                 "fields": {
                     "summary": summary,
+                    "issuetype": {"name": "Bug"},
                     "status": {"name": status_name, "statusCategory": {"key": category}},
                 },
             },
@@ -342,3 +346,262 @@ async def test_inbound_does_not_create_when_disabled(env):
     await _map_project_for_creation(maker, create=False)
     body = _payload("PROJ-502")
     assert _post(client, body, signature=_sign(body), delivery="off-1").status_code == 404
+
+
+def _issue_payload(issue_key, event="jira:issue_created", **fields):
+    base = {
+        "summary": "Sensor fails",
+        "issuetype": {"name": "Bug"},
+        "status": {"name": "To Do", "statusCategory": {"key": "new"}},
+    }
+    base.update(fields)
+    return json.dumps({"webhookEvent": event, "issue": {"key": issue_key, "fields": base}}).encode()
+
+
+@pytest.mark.asyncio
+async def test_created_defect_copies_the_issue(env):
+    """Description, priority, severity, URL and the named test case come from the issue."""
+    client, maker = env
+    await _map_project_for_creation(maker, create=True)
+    async with maker() as session:
+        session.add(TestCaseModel(project_id=1, tc_id="ALP-TC-004", title="Boot"))
+        await session.commit()
+    description = {
+        "type": "doc",
+        "content": [{"type": "paragraph", "content": [{"type": "text", "text": "See ALP-TC-004"}]}],
+    }
+    body = _issue_payload("PROJ-600", description=description, priority={"name": "Highest"})
+    assert (
+        _post(client, body, signature=_sign(body), delivery="c-600").json()["status"] == "created"
+    )
+    async with maker() as session:
+        defect = (
+            await session.execute(select(Defect).where(Defect.external_issue_number == 600))
+        ).scalar_one()
+        test_case = (await session.execute(select(TestCaseModel))).scalar_one()
+    assert defect.description == "See ALP-TC-004"
+    assert (defect.priority, defect.severity) == ("Critical", "Critical")
+    assert defect.external_issue_url == "https://acme.atlassian.net/browse/PROJ-600"
+    assert (defect.source_type, defect.source_id) == ("TC", test_case.id)
+    assert defect.external_issue_state == "To Do"
+
+
+@pytest.mark.asyncio
+async def test_issues_outside_the_filter_are_ignored(env):
+    client, maker = env
+    await _map_project_for_creation(maker, create=True)
+    task = _issue_payload("PROJ-601", issuetype={"name": "Task"})
+    assert _post(client, task, signature=_sign(task), delivery="t-1").json()["status"] == "ignored"
+    async with maker() as session:
+        setting = (await session.execute(select(IntegrationSetting))).scalar_one()
+        setting.jira_label = "bench"
+        await session.commit()
+    unlabelled = _issue_payload("PROJ-602")
+    assert _post(client, unlabelled, signature=_sign(unlabelled), delivery="t-2").json() == {
+        "status": "ignored",
+        "reason": "issue not taken in by this project",
+    }
+    labelled = _issue_payload("PROJ-603", labels=["bench"])
+    assert (
+        _post(client, labelled, signature=_sign(labelled), delivery="t-3").json()["status"]
+        == "created"
+    )
+    gone = _issue_payload("PROJ-604", event="jira:issue_deleted")
+    assert _post(client, gone, signature=_sign(gone), delivery="t-4").json()["status"] == "ignored"
+
+
+@pytest.mark.asyncio
+async def test_linked_defect_follows_the_issue_and_closes_on_resolution(env):
+    client, maker = env
+    body = _issue_payload(
+        "PROJ-42",
+        event="jira:issue_updated",
+        summary="Login broken on reset",
+        description="Steps in the log",
+        priority={"name": "Low"},
+    )
+    assert (
+        _post(client, body, signature=_sign(body), delivery="u-1").json()["status"] == "processed"
+    )
+    async with maker() as session:
+        defect = (await session.execute(select(Defect))).scalar_one()
+    assert (defect.title, defect.description, defect.priority) == (
+        "Login broken on reset",
+        "Steps in the log",
+        "Low",
+    )
+    assert defect.status == "Open"
+    assert defect.external_issue_url == "https://acme.atlassian.net/browse/PROJ-42"
+
+    resolved = _issue_payload(
+        "PROJ-42",
+        event="jira:issue_updated",
+        status={"name": "In Review", "statusCategory": {"key": "indeterminate"}},
+        resolution={"name": "Fixed"},
+    )
+    _post(client, resolved, signature=_sign(resolved), delivery="u-2")
+    async with maker() as session:
+        defect = (await session.execute(select(Defect))).scalar_one()
+    assert defect.status == "Closed" and defect.closed_at is not None
+
+
+@pytest.mark.asyncio
+async def test_deleted_issue_keeps_the_defect(env):
+    client, maker = env
+    body = _issue_payload("PROJ-42", event="jira:issue_deleted")
+    assert (
+        _post(client, body, signature=_sign(body), delivery="x-1").json()["status"] == "processed"
+    )
+    async with maker() as session:
+        defect = (await session.execute(select(Defect))).scalar_one()
+        change = (await session.execute(select(ChangeRequest))).scalar_one()
+    assert defect.external_issue_state == "Removed in Jira"
+    assert defect.title == "Broken login"
+    gone = _issue_payload("PROJ-99", event="jira:issue_deleted")
+    _post(client, gone, signature=_sign(gone), delivery="x-2")
+    async with maker() as session:
+        change = (await session.execute(select(ChangeRequest))).scalar_one()
+    assert change.external_issue_state == "Removed in Jira"
+
+
+@pytest.mark.asyncio
+async def test_push_to_jira_only_when_two_way(env, monkeypatch):
+    _, maker = env
+    pushed = []
+
+    async def fake_push(target, setting, changed):
+        pushed.append(target.id)
+
+    monkeypatch.setattr(integrations, "_push_to_jira", fake_push)
+    async with maker() as session:
+        setting = (await session.execute(select(IntegrationSetting))).scalar_one()
+        setting.token_encrypted = encrypt_integration_secret("api-token")
+        await session.commit()
+    async with maker() as session:
+        defect = (await session.execute(select(Defect))).scalar_one()
+        change = (await session.execute(select(ChangeRequest))).scalar_one()
+        await integrations.sync_defect_to_tracker(session, defect, {"title": "x"})
+        await integrations.sync_change_request_to_tracker(session, change, {"title": "x"})
+        assert pushed == []
+        setting = (await session.execute(select(IntegrationSetting))).scalar_one()
+        setting.two_way = True
+        await session.flush()
+        await integrations.sync_defect_to_tracker(session, defect, {"title": "x"})
+        await integrations.sync_change_request_to_tracker(session, change, {"title": "x"})
+    assert pushed == [defect.id, change.id]
+
+
+def _search_transport(pages, seen):
+    def handler(request):
+        seen.append(json.loads(request.content))
+        return httpx.Response(200, json=pages[len(seen) - 1])
+
+    return httpx.MockTransport(handler)
+
+
+@pytest.mark.asyncio
+async def test_pull_creates_the_missing_defects(env, monkeypatch):
+    _, maker = env
+    await _map_project_for_creation(maker, create=True)
+    seen = []
+    pages = [
+        {
+            "issues": [
+                {"key": "PROJ-42", "fields": {"issuetype": {"name": "Bug"}, "summary": "linked"}},
+                {"key": "PROJ-700", "fields": {"issuetype": {"name": "Bug"}, "summary": "new"}},
+            ],
+            "nextPageToken": "p2",
+            "isLast": False,
+        },
+        {
+            "issues": [
+                {"key": "PROJ-701", "fields": {"issuetype": {"name": "Task"}}},
+                {"key": "bad", "fields": {"issuetype": {"name": "Bug"}}},
+            ],
+            "isLast": True,
+        },
+    ]
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        integrations.httpx,
+        "AsyncClient",
+        lambda **kw: real_client(transport=_search_transport(pages, seen), **kw),
+    )
+    async with maker() as session:
+        setting = (await session.execute(select(IntegrationSetting))).scalar_one()
+        setting.token_encrypted = encrypt_integration_secret("api-token")
+        admin = User(email="a@acme.test", full_name="Ada", hashed_password="x", role=UserRole.admin)
+        session.add(admin)
+        await session.flush()
+        result = await integrations.pull_jira_issues(setting.id, db=session, current_user=admin)
+        await session.commit()
+    assert (result.searched, result.created, result.already_linked, result.skipped) == (4, 1, 1, 2)
+    assert result.new_ids == ["ALP-DEF-002"]
+    assert seen[0]["jql"] == 'project = "PROJ" AND issuetype in ("Bug") ORDER BY created ASC'
+    assert seen[1]["nextPageToken"] == "p2"
+    async with maker() as session:
+        pulled = (
+            await session.execute(select(Defect).where(Defect.external_issue_number == 700))
+        ).scalar_one()
+        event = (
+            await session.execute(
+                select(DefectSyncEvent).where(DefectSyncEvent.defect_id == pulled.id)
+            )
+        ).scalar_one()
+    assert event.event_type == "pulled"
+
+
+@pytest.mark.asyncio
+async def test_pull_reports_what_it_needs_and_jira_errors(env, monkeypatch):
+    _, maker = env
+    async with maker() as session:
+        setting = (await session.execute(select(IntegrationSetting))).scalar_one()
+        admin = User(email="b@acme.test", full_name="Bo", hashed_password="x", role=UserRole.admin)
+        session.add(admin)
+        await session.flush()
+        with pytest.raises(HTTPException) as missing:
+            await integrations.pull_jira_issues(setting.id, db=session, current_user=admin)
+        assert missing.value.status_code == 400
+        with pytest.raises(HTTPException) as unknown:
+            await integrations.pull_jira_issues(999, db=session, current_user=admin)
+        assert unknown.value.status_code == 404
+
+        setting.jira_project_key = "PROJ"
+        setting.token_encrypted = encrypt_integration_secret("api-token")
+        await session.flush()
+        real_client = httpx.AsyncClient
+        monkeypatch.setattr(
+            integrations.httpx,
+            "AsyncClient",
+            lambda **kw: real_client(
+                transport=httpx.MockTransport(lambda request: httpx.Response(401)), **kw
+            ),
+        )
+        with pytest.raises(HTTPException) as refused:
+            await integrations.pull_jira_issues(setting.id, db=session, current_user=admin)
+        assert (refused.value.status_code, refused.value.detail) == (
+            502,
+            "Jira answered 401 to the search.",
+        )
+
+        def unreachable(request):
+            raise httpx.ConnectError("no route", request=request)
+
+        monkeypatch.setattr(
+            integrations.httpx,
+            "AsyncClient",
+            lambda **kw: real_client(transport=httpx.MockTransport(unreachable), **kw),
+        )
+        with pytest.raises(HTTPException) as down:
+            await integrations.pull_jira_issues(setting.id, db=session, current_user=admin)
+        assert down.value.status_code == 502
+        assert down.value.detail.startswith("Jira is unreachable")
+
+
+def test_filter_validation():
+    integrations._validate_jira_filter(["Bug"], {"Highest": "Critical"})
+    with pytest.raises(HTTPException):
+        integrations._validate_jira_filter([" "], None)
+    with pytest.raises(HTTPException) as bad:
+        integrations._validate_jira_filter(None, {"Highest": "Urgent"})
+    assert "Urgent" in bad.value.detail

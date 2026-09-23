@@ -120,6 +120,46 @@ same file, document, MIME, and disk-capacity checks.
 
 These controls limit resource exhaustion; they are not a malware scanner.
 
+## Jira defects
+
+A Jira project can feed a Bloom project: a matching Jira issue creates a defect, and
+the defect then follows the issue. The direction is Jira to Bloom unless the project
+turns on two-way sync, which also pushes defect title and status changes to Jira.
+
+In Bloom, as an administrator, open the project settings, choose Jira under External
+issue tracker and fill in:
+
+- Site URL (`https://your-site.atlassian.net`), account email and API token of the
+  Atlassian account Bloom reads with.
+- Webhook secret: any long random string; the same value goes into Jira.
+- Jira project key, issue types (default `Bug`), and optionally a label, a custom field
+  that holds Bloom test-case ids, and extra JQL used by the pull.
+- The Jira priority to Bloom priority map.
+
+In Jira, as a site administrator, open Settings, System, WebHooks and create a webhook:
+
+- URL: `https://<bloom-host>/api/integrations/jira/webhook`
+- Secret: the webhook secret entered in Bloom. Jira signs each delivery with it and
+  Bloom rejects unsigned or wrongly signed deliveries.
+- Events: Issue created, updated and deleted. A JQL filter such as `project = PROJ`
+  keeps the events of other projects away.
+
+What Bloom does with an event:
+
+- Created or updated, for an issue with no defect yet: a defect is created when the
+  issue matches the project's issue types and label. It takes the summary, the
+  description as text, the priority (also as severity) through the map, the issue URL
+  and state. A Bloom test-case id of the project in the summary, the description or
+  the reference field becomes the defect's source.
+- Updated, for a linked issue: title, description, priority and state follow Jira; a
+  resolution closes the defect.
+- Deleted: the defect stays and its issue state reads `Removed in Jira`.
+- A delivery Jira retries with the same identifier is processed once.
+
+Pull existing issues, on the same panel, searches Jira once with the saved filter and
+creates the defects that do not exist yet (at most 1000 issues per pull). It only reads
+from Jira.
+
 ## Upgrades
 
 1. Back up first (see above).

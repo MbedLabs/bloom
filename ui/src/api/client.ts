@@ -1609,8 +1609,39 @@ export interface IntegrationSetting {
   has_token: boolean
   has_webhook_secret: boolean
   enabled: boolean
+  account_email?: string | null
+  jira_project_key?: string | null
+  create_defects_on_inbound?: boolean
+  jira_issue_types?: string[]
+  jira_label?: string | null
+  jira_jql?: string | null
+  jira_reference_field?: string | null
+  jira_priority_map?: Record<string, string> | null
+  two_way?: boolean
   created_at: string
   updated_at: string
+}
+
+/** Outcome of pulling existing Jira issues into defects. */
+export interface JiraPullResult {
+  searched: number
+  created: number
+  already_linked: number
+  skipped: number
+  new_ids: string[]
+}
+
+/** Jira settings a create or update may carry. */
+export interface JiraSettingFields {
+  account_email?: string
+  jira_project_key?: string
+  create_defects_on_inbound?: boolean
+  jira_issue_types?: string[]
+  jira_label?: string
+  jira_jql?: string
+  jira_reference_field?: string
+  jira_priority_map?: Record<string, string>
+  two_way?: boolean
 }
 
 export interface SyncEvent {
@@ -1630,16 +1661,20 @@ export const integrationsApi = {
     const response = await api.get<IntegrationSetting[]>('/integrations/settings', { params: { project_id: projectId } })
     return response.data
   },
-  createSetting: async (data: { project_id: number; tracker: string; base_url?: string; token?: string; webhook_secret?: string; enabled?: boolean }) => {
+  createSetting: async (data: { project_id: number; tracker: string; base_url?: string; token?: string; webhook_secret?: string; enabled?: boolean } & JiraSettingFields) => {
     const response = await api.post<IntegrationSetting>('/integrations/settings', data)
     return response.data
   },
-  updateSetting: async (id: number, data: { base_url?: string; token?: string; webhook_secret?: string; enabled?: boolean }) => {
+  updateSetting: async (id: number, data: { base_url?: string; token?: string; webhook_secret?: string; enabled?: boolean } & JiraSettingFields) => {
     const response = await api.patch<IntegrationSetting>(`/integrations/settings/${id}`, data)
     return response.data
   },
   deleteSetting: async (id: number) => {
     await api.delete(`/integrations/settings/${id}`)
+  },
+  pullJira: async (id: number) => {
+    const response = await api.post<JiraPullResult>(`/integrations/settings/${id}/jira/pull`)
+    return response.data
   },
   listSyncEvents: async (defectId: number) => {
     const response = await api.get<SyncEvent[]>('/integrations/sync-events', { params: { defect_id: defectId } })

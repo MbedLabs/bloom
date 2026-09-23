@@ -741,8 +741,9 @@ function ExternalIssueCard({
   refreshError: string | null
 }) {
   const tracker = defect.external_tracker
-  const trackerLabel = tracker === 'github' ? 'GitHub' : tracker === 'gitlab' ? 'GitLab' : null
-  const webhookPath = tracker === 'gitlab' ? '/api/integrations/gitlab/webhook' : '/api/integrations/github/webhook'
+  const trackerLabel = tracker === 'github' ? 'GitHub' : tracker === 'gitlab' ? 'GitLab' : tracker === 'jira' ? 'Jira' : null
+  const webhookPath = `/api/integrations/${tracker === 'gitlab' || tracker === 'jira' ? tracker : 'github'}/webhook`
+  const issueLabel = tracker === 'jira' ? `${defect.external_repo_full_name}-${defect.external_issue_number}` : null
 
   if (!tracker) {
     return (
@@ -764,8 +765,12 @@ function ExternalIssueCard({
               className="inline-flex items-center gap-2 text-primary hover:text-primary/80 text-sm font-medium"
             >
               <ExternalLink className="h-4 w-4" />
-              {defect.external_repo_full_name || 'External issue'}
-              {defect.external_issue_number ? ` #${defect.external_issue_number}` : ''}
+              {issueLabel ?? (
+                <>
+                  {defect.external_repo_full_name || 'External issue'}
+                  {defect.external_issue_number ? ` #${defect.external_issue_number}` : ''}
+                </>
+              )}
             </a>
           ) : (
             <span className="text-sm text-muted-foreground">

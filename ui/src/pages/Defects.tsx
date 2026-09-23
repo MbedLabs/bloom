@@ -432,7 +432,10 @@ export default function Defects() {
                           onClick={(e) => e.stopPropagation()}
                           className="inline-flex items-center gap-1 text-primary hover:text-primary/80 text-xs"
                         >
-                          <ExternalLink className="h-3 w-3" />#{defect.external_issue_number}
+                          <ExternalLink className="h-3 w-3" />
+                          {defect.external_tracker === 'jira'
+                            ? `Jira ${defect.external_repo_full_name}-${defect.external_issue_number}`
+                            : `#${defect.external_issue_number}`}
                         </a>
                       ) : (
                         <span className="text-muted-foreground text-xs">—</span>

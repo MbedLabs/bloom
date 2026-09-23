@@ -670,6 +670,12 @@ class IntegrationSetting(Base):
     jira_project_key: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     # Jira only: when true, an inbound issue with no matching defect creates one.
     create_defects_on_inbound: Mapped[bool] = mapped_column(default=True)
+    jira_issue_types: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    jira_label: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    jira_jql: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    jira_reference_field: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    jira_priority_map: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    two_way: Mapped[bool] = mapped_column(default=False)
     enabled: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(

@@ -248,6 +248,7 @@ const CALLS: Array<[string, unknown[], string, string]> = [
   ],
   ['integrationsApi.updateSetting', [131, { base_url: 'x' }], 'patch', '/integrations/settings/131'],
   ['integrationsApi.deleteSetting', [131], 'delete', '/integrations/settings/131'],
+  ['integrationsApi.pullJira', [131], 'post', '/integrations/settings/131/jira/pull'],
   ['integrationsApi.listSyncEvents', [121], 'get', '/integrations/sync-events'],
   ['integrationsApi.refreshExternal', [121], 'post', '/defects/121/refresh-external'],
 
