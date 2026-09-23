@@ -18,9 +18,9 @@ from app.core.database import Base
 class Policy(Base):
     """A named permission set: a base role floor plus an (action x resource) matrix.
 
-    The default policies (the shipped personas) carry is_default=True and are
+    The shipped default policies carry is_default=True and are
     protected from deletion and base_role change. A policy may nest under a parent,
-    inheriting then refining its matrix (deeper personas, spec'd later).
+    inheriting then extending its matrix.
     """
 
     __tablename__ = "policies"

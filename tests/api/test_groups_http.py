@@ -76,7 +76,7 @@ def test_default_policies_are_listed(api_client: TestClient):
     resp = api_client.get("/api/policies", headers=headers)
     assert resp.status_code == 200, resp.text
     names = {p["name"] for p in resp.json()}
-    assert {"Administrator", "Customer/Stakeholder", "Developer", "Viewer"} <= names
+    assert {"Administrator", "External Reader", "Design Author", "Read Only"} <= names
     admin_policy = next(p for p in resp.json() if p["name"] == "Administrator")
     assert admin_policy["is_default"] is True
     assert admin_policy["base_role"] == "admin"

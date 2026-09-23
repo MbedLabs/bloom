@@ -44,12 +44,12 @@ def _create(api_client, headers, kind, project_id):
     )
 
 
-def test_viewer_group_reads_but_cannot_write(api_client: TestClient):
+def test_read_only_group_reads_but_cannot_write(api_client: TestClient):
     admin = _admin_headers(api_client)
     project = create_project(api_client, admin, "Viewed")["id"]
     user = _create_user(api_client, admin, role="maintainer")
     headers = _headers_for(api_client, user["email"])
-    _grant(api_client, admin, "Viewer", user["id"], project)
+    _grant(api_client, admin, "Read Only", user["id"], project)
 
     listed = api_client.get(f"/api/requirements?project_id={project}", headers=headers)
     assert listed.status_code == 200, listed.text
@@ -67,7 +67,7 @@ def test_group_policy_adds_to_an_external_role(api_client: TestClient):
     project = create_project(api_client, admin, "Tested")["id"]
     user = _create_user(api_client, admin, role="external")
     headers = _headers_for(api_client, user["email"])
-    _grant(api_client, admin, "QA/Test Engineer", user["id"], project)
+    _grant(api_client, admin, "Test Author", user["id"], project)
 
     assert _create(api_client, headers, "test-cases", project).status_code == 201
     denied = _create(api_client, headers, "requirements", project)
@@ -92,7 +92,7 @@ def test_direct_maintainer_is_unchanged_and_members_need_a_policy(api_client: Te
     assert members.status_code == 403
     assert members.json()["detail"] == "Missing permission: view on member."
 
-    _grant(api_client, admin, "Project Manager", user["id"], project)
+    _grant(api_client, admin, "Project Administrator", user["id"], project)
     assert api_client.get(f"/api/projects/{project}/members", headers=headers).status_code == 200
 
 

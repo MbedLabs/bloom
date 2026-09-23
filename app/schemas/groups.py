@@ -1,7 +1,7 @@
 """Pydantic schemas for the admin-managed entitlement layer: policies and groups.
 
 See app/models/groups.py for the tables and app/core/policy_seed.py for the
-shipped default policies (the personas).
+shipped default policies.
 """
 
 from datetime import datetime

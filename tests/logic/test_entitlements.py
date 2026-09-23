@@ -146,7 +146,7 @@ async def test_removing_from_group_removes_access(session):
 def test_default_policies_are_well_formed():
     names = [spec["name"] for spec in DEFAULT_POLICIES]
     assert len(names) == len(set(names)) == 9
-    assert {"Administrator", "Customer/Stakeholder"} <= set(names)
+    assert {"Administrator", "External Reader"} <= set(names)
     for spec in DEFAULT_POLICIES:
         assert spec["base_role"] in {"admin", "maintainer", "external"}
         scope = spec.get("doc_tag_scope")
@@ -195,6 +195,6 @@ async def test_no_group_external_still_forbidden(session):
 
 
 def test_default_customer_policy_scopes_doc_types():
-    customer = next(spec for spec in DEFAULT_POLICIES if spec["name"] == "Customer/Stakeholder")
+    customer = next(spec for spec in DEFAULT_POLICIES if spec["name"] == "External Reader")
     assert customer["base_role"] == "external"
     assert set(customer["doc_tag_scope"]) == {"REQ", "TC", "CPT", "CMP"}

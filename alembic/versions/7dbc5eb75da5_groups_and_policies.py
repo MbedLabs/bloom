@@ -74,8 +74,8 @@ def upgrade() -> None:
 
 
 def _seed_default_policies() -> None:
-    """Insert the shipped default policies (the personas). Their definitions live in
-    app.core.policy_seed, the single source for the personas."""
+    """Insert the shipped default policies. Their definitions live in
+    app.core.policy_seed, their single source."""
     from app.core.policy_seed import DEFAULT_POLICIES
 
     policies = sa.table(

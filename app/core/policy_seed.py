@@ -1,4 +1,4 @@
-"""Default policies (the shipped personas). Migration 7dbc5eb75da5 seeds them.
+"""The default policies Bloom ships. Migration 7dbc5eb75da5 seeds them.
 
 Each default Policy carries is_default=True: an instance base_role plus an
 (action x resource) matrix. The base_role drives project access through group
@@ -33,9 +33,9 @@ DEFAULT_POLICIES = [
         "doc_tag_scope": None,
     },
     {
-        "name": "Product Owner",
+        "name": "Requirements Manager",
         "base_role": "maintainer",
-        "description": "Owns requirements and specifications; authors and approves requirements, specs and change requests.",
+        "description": "Create, edit, delete and approve requirements, specifications and change requests; edit risks and parameters; import and export requirements.",
         "permissions": _merge(
             _all("view", "comment"),
             {
@@ -50,9 +50,9 @@ DEFAULT_POLICIES = [
         "doc_tag_scope": None,
     },
     {
-        "name": "Project Manager",
+        "name": "Project Administrator",
         "base_role": "maintainer",
-        "description": "Plans and baselines, manages members and reports, owns the risk register, approves change requests.",
+        "description": "Manage project members, campaigns and baselines; review and approve change requests and risks; review requirements; export requirements and test cases.",
         "permissions": _merge(
             _all("view", "comment"),
             {
@@ -70,9 +70,9 @@ DEFAULT_POLICIES = [
         "doc_tag_scope": None,
     },
     {
-        "name": "Business Analyst",
+        "name": "Requirements Author",
         "base_role": "maintainer",
-        "description": "Authors requirements, specifications and risks; comments on design and tests.",
+        "description": "Create, edit and delete requirements, specifications, risks and parameters; import and export requirements; view and comment on everything else.",
         "permissions": _merge(
             _all("view", "comment"),
             {
@@ -86,9 +86,9 @@ DEFAULT_POLICIES = [
         "doc_tag_scope": None,
     },
     {
-        "name": "Developer",
+        "name": "Design Author",
         "base_role": "maintainer",
-        "description": "Authors design; creates and resolves defects; cannot approve requirements.",
+        "description": "Create, edit and delete designs and defects; view and comment on everything else.",
         "permissions": _merge(
             _all("view", "comment"),
             {
@@ -100,9 +100,9 @@ DEFAULT_POLICIES = [
         "doc_tag_scope": None,
     },
     {
-        "name": "QA/Test Engineer",
+        "name": "Test Author",
         "base_role": "maintainer",
-        "description": "Authors test concepts and cases, plans suites and campaigns, executes runs, logs defects.",
+        "description": "Create, edit and delete test concepts, test cases, suites and campaigns; plan suites and campaigns; execute runs; log defects; import and export test cases.",
         "permissions": _merge(
             _all("view", "comment"),
             {
@@ -119,23 +119,23 @@ DEFAULT_POLICIES = [
         "doc_tag_scope": None,
     },
     {
-        "name": "Reviewer/Approver",
+        "name": "Approver",
         "base_role": "maintainer",
-        "description": "Reviews and approves any artefact and comments; no authoring.",
+        "description": "Review, approve and comment on every artefact; no create or edit.",
         "permissions": _all("view", "comment", "review", "approve"),
         "doc_tag_scope": None,
     },
     {
-        "name": "Customer/Stakeholder",
+        "name": "External Reader",
         "base_role": "external",
-        "description": "Views and comments on customer-visible artefacts of the allowed document types.",
+        "description": "View and comment on customer-visible artefacts of the allowed document types.",
         "permissions": {r: ["view", "comment"] for r in _ARTEFACTS if r != "parameter"},
         "doc_tag_scope": sorted(DEFAULT_EXTERNAL_DOC_TYPES),
     },
     {
-        "name": "Viewer",
+        "name": "Read Only",
         "base_role": "maintainer",
-        "description": "Views internal artefacts; read-only.",
+        "description": "View internal artefacts; no changes.",
         "permissions": _all("view"),
         "doc_tag_scope": None,
     },
