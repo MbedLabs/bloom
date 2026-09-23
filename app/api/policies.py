@@ -1,7 +1,7 @@
 """Policies API (admin only): the named permission sets that groups carry.
 
 The shipped default policies (the personas) are protected: they cannot be deleted
-and their base_role is fixed, since resolve_project_role relies on it. Their
+and their base_role is fixed, since group project access relies on it. Their
 description, permissions and doc-tag scope stay editable so an operator can tune a
 persona in place.
 """

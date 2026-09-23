@@ -1,15 +1,11 @@
-"""Default policies (the shipped personas), seeded at startup.
+"""Default policies (the shipped personas). Migration 7dbc5eb75da5 seeds them.
 
 Each default Policy carries is_default=True: an instance base_role plus an
-(action x resource) matrix. The base_role drives project-role resolution today
-(resolve_project_role); require_permission reads the matrix, whose enforcement is
-spec'd next. Defaults are protected: undeletable and their base_role is fixed.
+(action x resource) matrix. The base_role drives project access through group
+grants (see require_project_access); the matrix is stored but not yet enforced.
+Defaults are protected: undeletable and their base_role is fixed.
 """
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.models.groups import Policy
 from app.schemas.memberships import DEFAULT_EXTERNAL_DOC_TYPES
 
 _ARTEFACTS = [
@@ -149,31 +145,3 @@ DEFAULT_POLICIES = [
         "doc_tag_scope": None,
     },
 ]
-
-DEFAULT_POLICY_NAMES = {spec["name"] for spec in DEFAULT_POLICIES}
-
-
-async def seed_default_policies(db: AsyncSession) -> int:
-    """Create any missing default policies. Idempotent: matches by name and never
-    duplicates or overwrites an existing one. Returns the number created."""
-    existing = set(
-        (await db.execute(select(Policy.name).where(Policy.is_default.is_(True)))).scalars().all()
-    )
-    created = 0
-    for spec in DEFAULT_POLICIES:
-        if spec["name"] in existing:
-            continue
-        db.add(
-            Policy(
-                name=spec["name"],
-                description=spec["description"],
-                base_role=spec["base_role"],
-                permissions=spec["permissions"],
-                doc_tag_scope=spec.get("doc_tag_scope"),
-                is_default=True,
-            )
-        )
-        created += 1
-    if created:
-        await db.commit()
-    return created

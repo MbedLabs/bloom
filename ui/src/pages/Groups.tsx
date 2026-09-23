@@ -13,12 +13,10 @@ import {
   usersApi,
 } from '../api/client'
 import { useToast } from '../components/useToast'
+import { DOC_TYPE_LABELS, type DocType } from '../types/doc'
 
-// The document types an external policy may be scoped to. Mirrors the backend
-// EXTERNAL_DOC_TYPES allowlist in app/schemas/memberships.py.
-const EXTERNAL_DOC_TYPES = [
-  'REQ', 'SPEC', 'TC', 'DES', 'RSK', 'CHG', 'CPT', 'DEF', 'CMP', 'TS', 'PRT', 'RPT', 'STD',
-]
+// The document types an external policy may be scoped to: every DocType.
+const EXTERNAL_DOC_TYPES = Object.keys(DOC_TYPE_LABELS) as DocType[]
 
 const BASE_ROLES: BaseRole[] = ['external', 'maintainer', 'admin']
 

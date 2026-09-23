@@ -171,13 +171,11 @@ def apply_external_visibility_filter(query, model, current_user: User):
 _ROLE_STRENGTH = {"external": 1, "maintainer": 2, "admin": 3}
 
 
-async def _group_project_role(db: AsyncSession, user_id: int, project_id: int) -> Optional[str]:
-    """Strongest policy base_role from the user's groups granted this project.
-
-    A grant with a NULL project is an all-projects grant that covers every project.
-    """
+async def _group_policy_values(db: AsyncSession, user_id: int, project_id: int, column) -> list:
+    """One column of every policy that reaches this user on this project through a
+    group grant. A grant with a NULL project is an all-projects grant."""
     result = await db.execute(
-        select(Policy.base_role)
+        select(column)
         .select_from(GroupMembership)
         .join(Group, Group.id == GroupMembership.group_id)
         .join(GroupProjectGrant, GroupProjectGrant.group_id == Group.id)
@@ -187,7 +185,12 @@ async def _group_project_role(db: AsyncSession, user_id: int, project_id: int) -
             (GroupProjectGrant.project_id == project_id) | (GroupProjectGrant.project_id.is_(None)),
         )
     )
-    roles = [r for r in result.scalars().all() if r]
+    return list(result.scalars().all())
+
+
+async def _group_project_role(db: AsyncSession, user_id: int, project_id: int) -> Optional[str]:
+    """Strongest policy base_role from the user's groups granted this project."""
+    roles = [r for r in await _group_policy_values(db, user_id, project_id, Policy.base_role) if r]
     if not roles:
         return None
     return max(roles, key=lambda r: _ROLE_STRENGTH.get(r, 0))
@@ -201,45 +204,13 @@ async def _group_doc_type_scope(
     Unions the doc_tag_scope of every applicable group policy. A policy whose scope
     is NULL grants every type, so the union collapses to None (no restriction).
     """
-    result = await db.execute(
-        select(Policy.doc_tag_scope)
-        .select_from(GroupMembership)
-        .join(Group, Group.id == GroupMembership.group_id)
-        .join(GroupProjectGrant, GroupProjectGrant.group_id == Group.id)
-        .join(Policy, Policy.id == Group.policy_id)
-        .where(
-            GroupMembership.user_id == user_id,
-            (GroupProjectGrant.project_id == project_id) | (GroupProjectGrant.project_id.is_(None)),
-        )
-    )
+    scopes = await _group_policy_values(db, user_id, project_id, Policy.doc_tag_scope)
     allowed: set[str] = set()
-    for scope in result.scalars().all():
+    for scope in scopes:
         if scope is None:
             return None
         allowed.update(scope)
     return allowed
-
-
-async def resolve_project_role(
-    db: AsyncSession, current_user: User, project_id: int
-) -> Optional[str]:
-    """The user's effective role on a project: the strongest of the global admin
-    baseline, the direct ProjectMembership.role, and any group grant. Returns None
-    when the user has no access. Additive: a user in no group resolves exactly to
-    their direct membership role, so existing access never changes.
-    """
-    if current_user.role == UserRole.admin:
-        return "admin"
-    candidates: list[str] = []
-    membership = await _get_project_membership(db, current_user.id, project_id)
-    if membership is not None:
-        candidates.append(membership.role)
-    group_role = await _group_project_role(db, current_user.id, project_id)
-    if group_role is not None:
-        candidates.append(group_role)
-    if not candidates:
-        return None
-    return max(candidates, key=lambda r: _ROLE_STRENGTH.get(r, 0))
 
 
 async def user_can_access_project(

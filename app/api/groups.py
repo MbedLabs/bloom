@@ -3,7 +3,7 @@ granted projects.
 
 A group grant adds project access on top of a user's direct memberships; it never
 removes any. The effective role resolution lives in
-app.core.security.resolve_project_role, so a user in no group behaves exactly as
+app.core.security.require_project_access, so a user in no group behaves exactly as
 their role does today.
 """
 

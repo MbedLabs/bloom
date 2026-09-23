@@ -1,8 +1,8 @@
 """Admin-managed user groups and policies: an additive entitlement layer.
 
 The instance roles (admin, maintainer, external) are unchanged. A Group gathers
-users, carries a Policy, and is granted projects. resolve_project_role and
-require_permission read the effective set; a user with no group behaves exactly
+users, carries a Policy, and is granted projects. require_project_access reads
+the group grants after direct membership; a user with no group behaves exactly
 as their role does today, so this layer never regresses existing access.
 """
 
