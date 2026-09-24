@@ -16,6 +16,7 @@ from app.core.service_auth import (
 )
 from app.models import ServiceCredential
 from app.models.user import User, UserRole
+from app.services.audit import record_audit_event
 
 router = APIRouter()
 
@@ -78,6 +79,13 @@ async def create_credential(
         name=data.name,
         expires_in_days=data.expires_in_days,
     )
+    await record_audit_event(
+        db,
+        "service_credential.issued",
+        target_type="service_credential",
+        target_id=credential.id,
+        details={"name": credential.name, "prefix": credential.token_prefix},
+    )
     summary = ServiceCredentialSummary.model_validate(credential)
     return ServiceCredentialCreated(
         **summary.model_dump(),
@@ -97,6 +105,13 @@ async def rotate_credential(
     name = existing.name
     await revoke_service_credential(db, credential_id)
     credential, token = await create_service_credential(db, created_by_user_id=admin.id, name=name)
+    await record_audit_event(
+        db,
+        "service_credential.rotated",
+        target_type="service_credential",
+        target_id=credential.id,
+        details={"name": name, "replaced_id": credential_id, "prefix": credential.token_prefix},
+    )
     summary = ServiceCredentialSummary.model_validate(credential)
     return ServiceCredentialCreated(
         **summary.model_dump(),
@@ -111,3 +126,6 @@ async def revoke_credential(
     _admin: User = Depends(require_role(UserRole.admin)),
 ):
     await revoke_service_credential(db, credential_id)
+    await record_audit_event(
+        db, "service_credential.revoked", target_type="service_credential", target_id=credential_id
+    )

@@ -29,6 +29,7 @@ from app.models import (
     WebhookDelivery,
 )
 from app.models.user import User, UserRole
+from app.services.audit import record_audit_event
 from app.services.integration_secrets import (
     decrypt_integration_secret,
     encrypt_integration_secret,
@@ -243,6 +244,14 @@ async def create_integration_setting(
     )
     db.add(setting)
     await db.flush()
+    await record_audit_event(
+        db,
+        "integration.created",
+        target_type="integration_setting",
+        target_id=setting.id,
+        project_id=setting.project_id,
+        details={"tracker": setting.tracker, "enabled": setting.enabled},
+    )
     await db.refresh(setting)
     return _setting_response(setting)
 
@@ -295,7 +304,14 @@ async def update_integration_setting(
     if data.enabled is not None:
         setting.enabled = data.enabled
 
-    await db.flush()
+    await record_audit_event(
+        db,
+        "integration.updated",
+        target_type="integration_setting",
+        target_id=setting.id,
+        project_id=setting.project_id,
+        details={"tracker": setting.tracker, "fields": sorted(data.model_fields_set)},
+    )
     await db.refresh(setting)
     return _setting_response(setting)
 
@@ -318,6 +334,14 @@ async def delete_integration_setting(
         roles={UserRole.admin.value},
     )
     await db.delete(setting)
+    await record_audit_event(
+        db,
+        "integration.deleted",
+        target_type="integration_setting",
+        target_id=setting_id,
+        project_id=setting.project_id,
+        details={"tracker": setting.tracker},
+    )
 
 
 # ==================== Sync log ====================
@@ -1051,7 +1075,14 @@ async def pull_jira_issues(
         defect = await _new_defect_from_issue(db, setting, *split, fields, event_type="pulled")
         result.created += 1
         result.new_ids.append(defect.defect_id)
-    await db.flush()
+    await record_audit_event(
+        db,
+        "integration.jira_pulled",
+        target_type="integration_setting",
+        target_id=setting.id,
+        project_id=setting.project_id,
+        details={"searched": result.searched, "created": result.created},
+    )
     return result
 
 

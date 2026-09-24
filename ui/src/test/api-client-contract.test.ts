@@ -320,6 +320,7 @@ const CALLS: Array<[string, unknown[], string, string]> = [
   ['policiesApi.update', [2, { description: 'x' }], 'patch', '/policies/2'],
   ['policiesApi.delete', [2], 'delete', '/policies/2'],
 
+  ['auditApi.list', [{ action: 'auth.' }], 'get', '/audit'],
   ['groupsApi.list', [], 'get', '/groups'],
   ['groupsApi.create', [{ name: 'G' }], 'post', '/groups'],
   ['groupsApi.update', [10, { name: 'G2' }], 'patch', '/groups/10'],

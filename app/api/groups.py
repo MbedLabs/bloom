@@ -25,6 +25,7 @@ from app.schemas.groups import (
     GroupResponse,
     GroupUpdate,
 )
+from app.services.audit import record_audit_event
 
 router = APIRouter()
 
@@ -105,6 +106,13 @@ async def create_group(
     group = Group(name=data.name, description=data.description, policy_id=data.policy_id)
     db.add(group)
     await db.flush()
+    await record_audit_event(
+        db,
+        "group.created",
+        target_type="group",
+        target_id=group.id,
+        details={"name": group.name, "policy_id": group.policy_id},
+    )
     await db.refresh(group)
     return await _group_response(db, group)
 
@@ -139,7 +147,13 @@ async def update_group(
         if data.policy_id is not None:
             await _policy_exists_or_400(db, data.policy_id)
         group.policy_id = data.policy_id
-    await db.flush()
+    await record_audit_event(
+        db,
+        "group.updated",
+        target_type="group",
+        target_id=group.id,
+        details={"fields": sorted(data.model_fields_set), "policy_id": group.policy_id},
+    )
     await db.refresh(group)
     return await _group_response(db, group)
 
@@ -150,7 +164,10 @@ async def delete_group(
     _admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
-    await _get_group_or_404(db, group_id)
+    group = await _get_group_or_404(db, group_id)
+    await record_audit_event(
+        db, "group.deleted", target_type="group", target_id=group_id, details={"name": group.name}
+    )
     await db.execute(delete(GroupMembership).where(GroupMembership.group_id == group_id))
     await db.execute(delete(GroupProjectGrant).where(GroupProjectGrant.group_id == group_id))
     await db.execute(delete(Group).where(Group.id == group_id))
@@ -178,7 +195,13 @@ async def add_member(
     if existing:
         raise HTTPException(status_code=409, detail="User is already a member of this group")
     db.add(GroupMembership(group_id=group_id, user_id=data.user_id))
-    await db.flush()
+    await record_audit_event(
+        db,
+        "group.member_added",
+        target_type="group",
+        target_id=group_id,
+        details={"user_id": data.user_id},
+    )
     return await _group_response(db, group)
 
 
@@ -201,7 +224,13 @@ async def remove_member(
     if row is None:
         raise HTTPException(status_code=404, detail="Membership not found")
     await db.delete(row)
-    await db.flush()
+    await record_audit_event(
+        db,
+        "group.member_removed",
+        target_type="group",
+        target_id=group_id,
+        details={"user_id": user_id},
+    )
 
 
 @router.post("/{group_id}/grants", response_model=GroupResponse, status_code=201)
@@ -227,7 +256,14 @@ async def add_grant(
     if (await db.execute(select(GroupProjectGrant).where(clause))).scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Group already has this grant")
     db.add(GroupProjectGrant(group_id=group_id, project_id=data.project_id))
-    await db.flush()
+    await record_audit_event(
+        db,
+        "group.grant_added",
+        target_type="group",
+        target_id=group_id,
+        project_id=data.project_id,
+        details={"all_projects": data.project_id is None},
+    )
     return await _group_response(db, group)
 
 
@@ -250,4 +286,11 @@ async def remove_grant(
     if row is None:
         raise HTTPException(status_code=404, detail="Grant not found")
     await db.delete(row)
-    await db.flush()
+    await record_audit_event(
+        db,
+        "group.grant_removed",
+        target_type="group",
+        target_id=group_id,
+        project_id=row.project_id,
+        details={"all_projects": row.project_id is None},
+    )

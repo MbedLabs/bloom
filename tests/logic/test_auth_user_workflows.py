@@ -17,6 +17,15 @@ from app.schemas.auth import ForgotPasswordRequest, ResetPasswordRequest
 from app.services.token_service import TokenValidationError
 
 
+@pytest.fixture(autouse=True)
+def _no_audit_rows(monkeypatch):
+    """These handlers run on a fake session; audit rows are covered in tests/sec."""
+    for module in (auth_api, users_api):
+        for name in ("record_audit_event", "record_audit_failure"):
+            if hasattr(module, name):
+                monkeypatch.setattr(module, name, AsyncMock())
+
+
 class _ScalarResult:
     def __init__(self, value):
         self._value = value

@@ -59,6 +59,7 @@ from app.models import (
     TestSuiteItem,
 )
 from app.models.user import User
+from app.services.audit import record_audit_event
 from app.services.import_attempts import begin_import_attempt, finish_import_attempt
 from app.services.notification_service import notify
 from app.services.reqif_worker import (
@@ -137,6 +138,14 @@ async def import_docs(
     )
 
     result = ImportResult(imported=0, skipped=0, new_ids=[], errors=[])
+    await record_audit_event(
+        db,
+        "import.run",
+        target_type="project",
+        target_id=target_project.id,
+        project_id=target_project.id,
+        details={"kind": "copy", "doc_type": data.doc_type, "source_project_id": source_project.id},
+    )
 
     if data.doc_type == "REQ":
         await _import_requirements(db, data.doc_ids, source_project, target_project, result)
@@ -377,6 +386,14 @@ async def import_reqif(
     )
 
     attempt = await begin_import_attempt(db, user_id=current_user.id, project_id=target_project.id)
+    await record_audit_event(
+        db,
+        "import.run",
+        target_type="project",
+        target_id=target_project.id,
+        project_id=target_project.id,
+        details={"kind": "reqif"},
+    )
     attempt_id = attempt.id
     try:
         raw = await read_reqif_upload(file)
@@ -551,6 +568,14 @@ async def import_test_cases_file(
     )
 
     attempt = await begin_import_attempt(db, user_id=current_user.id, project_id=target_project.id)
+    await record_audit_event(
+        db,
+        "import.run",
+        target_type="project",
+        target_id=target_project.id,
+        project_id=target_project.id,
+        details={"kind": "test_cases_file"},
+    )
     attempt_id = attempt.id
     raw = await file.read()
     if len(raw) > 5_000_000:
@@ -761,6 +786,14 @@ async def import_markdown(
         raise HTTPException(status_code=422, detail=str(exc))
 
     attempt = await begin_import_attempt(db, user_id=current_user.id, project_id=target_project.id)
+    await record_audit_event(
+        db,
+        "import.run",
+        target_type="project",
+        target_id=target_project.id,
+        project_id=target_project.id,
+        details={"kind": "markdown"},
+    )
     attempt_id = attempt.id
     raw = await file.read()
     if len(raw) > 5_000_000:
@@ -1026,6 +1059,14 @@ async def import_testrail(
             raise HTTPException(status_code=422, detail="The column mapping must be an object.")
 
     attempt = await begin_import_attempt(db, user_id=current_user.id, project_id=project.id)
+    await record_audit_event(
+        db,
+        "import.run",
+        target_type="project",
+        target_id=project.id,
+        project_id=project.id,
+        details={"kind": "testrail"},
+    )
     attempt_id = attempt.id
     parser = (
         parse_testrail_xml

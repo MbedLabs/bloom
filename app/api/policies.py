@@ -17,6 +17,7 @@ from app.models.groups import Group, Policy
 from app.models.user import User, UserRole
 from app.schemas.groups import PolicyCreate, PolicyResponse, PolicyUpdate
 from app.schemas.memberships import EXTERNAL_DOC_TYPES
+from app.services.audit import record_audit_event
 
 router = APIRouter()
 
@@ -80,6 +81,13 @@ async def create_policy(
     )
     db.add(policy)
     await db.flush()
+    await record_audit_event(
+        db,
+        "policy.created",
+        target_type="policy",
+        target_id=policy.id,
+        details={"name": policy.name, "base_role": policy.base_role},
+    )
     await db.refresh(policy)
     return PolicyResponse.model_validate(policy)
 
@@ -116,7 +124,13 @@ async def update_policy(
                 detail="A default policy's base role cannot be changed",
             )
         policy.base_role = data.base_role
-    await db.flush()
+    await record_audit_event(
+        db,
+        "policy.updated",
+        target_type="policy",
+        target_id=policy.id,
+        details={"name": policy.name, "fields": sorted(data.model_fields_set)},
+    )
     await db.refresh(policy)
     return PolicyResponse.model_validate(policy)
 
@@ -139,4 +153,10 @@ async def delete_policy(
             detail="Policy is assigned to one or more groups and cannot be deleted",
         )
     await db.delete(policy)
-    await db.flush()
+    await record_audit_event(
+        db,
+        "policy.deleted",
+        target_type="policy",
+        target_id=policy_id,
+        details={"name": policy.name},
+    )

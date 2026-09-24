@@ -22,6 +22,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user, require_project_access
 from app.models import ArtefactLink, CompanyLogo, Project, Requirement, TestCase
 from app.models.user import User
+from app.services.audit import record_audit_event
 
 router = APIRouter()
 
@@ -205,6 +206,14 @@ async def export_requirements(
 ):
     """Export the project's requirements as CSV or a PDF specification."""
     project = await _load_project(db, project_id, current_user, "requirement")
+    await record_audit_event(
+        db,
+        "export.generated",
+        target_type="project",
+        target_id=project.id,
+        project_id=project.id,
+        details={"kind": "requirements", "format": format},
+    )
     requirements = await _load_requirements(db, project_id)
 
     if format == "pdf":
@@ -258,6 +267,14 @@ async def export_traceability(
 ):
     """Export the requirement <-> verifying-test-case matrix as CSV."""
     project = await _load_project(db, project_id, current_user, "requirement")
+    await record_audit_event(
+        db,
+        "export.generated",
+        target_type="project",
+        target_id=project.id,
+        project_id=project.id,
+        details={"kind": "traceability"},
+    )
     requirements = await _load_requirements(db, project_id)
 
     link_rows = (
@@ -376,6 +393,14 @@ async def export_test_cases(
 ):
     """Export the project's test cases as CSV, Markdown or XML."""
     project = await _load_project(db, project_id, current_user, "test_case")
+    await record_audit_event(
+        db,
+        "export.generated",
+        target_type="project",
+        target_id=project.id,
+        project_id=project.id,
+        details={"kind": "test_cases", "format": format},
+    )
     test_cases = await _load_test_cases(db, project_id)
 
     if format == "md":

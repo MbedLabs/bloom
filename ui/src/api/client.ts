@@ -429,6 +429,46 @@ export const groupsApi = {
   },
 }
 
+export interface AuditEvent {
+  id: number
+  occurred_at: string
+  actor_user_id: number | null
+  actor_name: string | null
+  actor_type: string
+  action: string
+  target_type: string | null
+  target_id: string | null
+  project_id: number | null
+  request_id: string | null
+  ip: string | null
+  user_agent: string | null
+  outcome: string
+  details: Record<string, unknown> | null
+}
+
+export interface AuditEventPage {
+  items: AuditEvent[]
+  total: number
+}
+
+export interface AuditFilters {
+  actor_user_id?: number
+  action?: string
+  target_type?: string
+  target_id?: string
+  project_id?: number
+  outcome?: string
+  since?: string
+  until?: string
+  limit?: number
+  offset?: number
+}
+
+export const auditApi = {
+  list: async (filters: AuditFilters = {}) =>
+    (await api.get<AuditEventPage>('/audit', { params: filters })).data,
+}
+
 export interface DashboardStats {
   total_projects: number
   active_projects: number

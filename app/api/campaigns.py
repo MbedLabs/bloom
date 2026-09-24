@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.artefact_utils import audit_artefact_deleted, audit_visibility_change
 from app.api.link_read_utils import get_verified_requirement_links_for_test_case
 from app.core.config import settings
 from app.core.database import get_db
@@ -399,7 +400,9 @@ async def update_campaign(
     if data.description is not None:
         campaign.description = data.description
     if data.visibility is not None:
+        previous_visibility = campaign.visibility
         campaign.visibility = data.visibility
+        await audit_visibility_change(db, "campaign", campaign, previous_visibility)
     # Handle suite_ids (multi-suite) or legacy suite_id
     resolved_suite_ids = data.suite_ids
     if resolved_suite_ids is None and data.suite_id is not None:
@@ -470,6 +473,7 @@ async def delete_campaign(
         campaign.project_id,
         permission=("delete", "campaign"),
     )
+    await audit_artefact_deleted(db, "campaign", campaign)
     await db.delete(campaign)
 
 

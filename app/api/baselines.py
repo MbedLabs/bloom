@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.artefact_utils import audit_artefact_deleted, audit_visibility_change
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_project_access
@@ -19,6 +20,7 @@ from app.models import (
 )
 from app.models.user import User, UserRole
 from app.schemas import BaselineCreate, BaselineResponse, BaselineUpdate
+from app.services.audit import record_audit_event
 
 router = APIRouter()
 
@@ -130,6 +132,13 @@ async def create_baseline(
     )
     db.add(item)
     await db.flush()
+    await record_audit_event(
+        db,
+        "baseline.created",
+        target_type="baseline",
+        target_id=item.baseline_id,
+        project_id=item.project_id,
+    )
     await db.refresh(item)
     return _baseline_response(item, current_user)
 
@@ -169,8 +178,10 @@ async def update_baseline(
         permission=("edit", "baseline"),
     )
 
+    previous_visibility = getattr(item, "visibility", None)
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(item, field, value)
+    await audit_visibility_change(db, "baseline", item, previous_visibility)
 
     await db.flush()
     await db.refresh(item)
@@ -194,4 +205,5 @@ async def delete_baseline(
         item.project_id,
         permission=("delete", "baseline"),
     )
+    await audit_artefact_deleted(db, "baseline", item)
     await db.delete(item)

@@ -40,6 +40,7 @@ from app.models import (
 from app.models.project_membership import ProjectMembership
 from app.models.user import User, UserRole
 from app.schemas import ProjectCreate, ProjectResponse, ProjectUpdate
+from app.services.audit import record_audit_event
 from app.services.coverage import coverage_percent as coverage_percent_of
 from app.services.coverage import covered_requirement_ids
 
@@ -439,5 +440,12 @@ async def delete_project(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
+    await record_audit_event(
+        db,
+        "project.deleted",
+        target_type="project",
+        target_id=project.id,
+        details={"name": project.name, "prefix": project.prefix},
+    )
     await _delete_project_scoped_data(db, project_id)
     await db.delete(project)

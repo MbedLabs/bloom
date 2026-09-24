@@ -19,6 +19,7 @@ from app.models import ArtefactVisibility, Project
 from app.models.groups import Group, GroupMembership, GroupProjectGrant, Policy
 from app.models.project_membership import ProjectExternalDocType, ProjectMembership
 from app.models.user import User, UserRole
+from app.services.audit import set_audit_actor
 
 ALGORITHM = "HS256"
 
@@ -78,6 +79,7 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="User account is deactivated"
         )
+    set_audit_actor("user", user.id)
     return user
 
 

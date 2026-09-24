@@ -14,7 +14,7 @@ import {
   LayoutDashboard, FolderKanban, FileText, CheckSquare,
   GitBranch, BarChart3, Sun, Moon, Bell,
   ExternalLink, ChevronDown, ChevronLeft, ChevronRight, Search,
-  BookOpen, Bug, Layers, FlaskConical, LogOut, Users, PenTool, AlertTriangle, GitPullRequest, Settings, SlidersHorizontal, ShieldCheck,
+  BookOpen, Bug, Layers, FlaskConical, LogOut, Users, PenTool, AlertTriangle, GitPullRequest, Settings, SlidersHorizontal, ShieldCheck, ScrollText,
 } from 'lucide-react'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
 
@@ -353,6 +353,21 @@ function LayoutInner() {
             >
               <ShieldCheck className="h-[18px] w-[18px] shrink-0 text-violet-400/50 group-hover:text-violet-300" />
               {!sidebarCollapsed && 'Groups'}
+            </Link>
+          )}
+          {user?.role === 'admin' && (
+            <Link
+              to="/audit"
+              className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-2 rounded-lg text-sm font-medium text-violet-100/70 hover:bg-sidebar-hover hover:text-white transition-all duration-200 group`}
+              title={sidebarCollapsed ? 'Audit log' : undefined}
+              onClick={() => {
+                if (sidebarCollapsed && location.pathname !== '/audit') {
+                  setSidebarCollapsed(false)
+                }
+              }}
+            >
+              <ScrollText className="h-[18px] w-[18px] shrink-0 text-violet-400/50 group-hover:text-violet-300" />
+              {!sidebarCollapsed && 'Audit log'}
             </Link>
           )}
         </nav>

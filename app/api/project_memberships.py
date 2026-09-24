@@ -22,6 +22,7 @@ from app.schemas.memberships import (
     ProjectMembershipCreate,
     ProjectMembershipUpdate,
 )
+from app.services.audit import record_audit_event
 
 router = APIRouter()
 
@@ -115,6 +116,17 @@ async def add_project_member(
             db.add(ProjectExternalDocType(membership_id=membership.id, doc_type=dt))
         await db.flush()
 
+    await record_audit_event(
+        db,
+        "project_member.added",
+        target_type="user",
+        target_id=membership.user_id,
+        project_id=project_id,
+        details={
+            "role": membership.role,
+            "doc_types": sorted(doc_types) if data.role == "external" and doc_types else [],
+        },
+    )
     await db.refresh(membership)
     return await _build_member_response(db, membership)
 
@@ -156,9 +168,19 @@ async def update_project_member(
     if membership is None:
         raise HTTPException(status_code=404, detail="Membership not found")
 
+    previous_role = membership.role
     if data.role is not None:
         membership.role = data.role
         await db.flush()
+    if membership.role != previous_role:
+        await record_audit_event(
+            db,
+            "project_member.role_changed",
+            target_type="user",
+            target_id=membership.user_id,
+            project_id=project_id,
+            details={"from": previous_role, "to": membership.role},
+        )
 
     if data.doc_types is not None:
         await db.execute(
@@ -177,6 +199,14 @@ async def update_project_member(
             for dt in sorted(data.doc_types):
                 db.add(ProjectExternalDocType(membership_id=membership.id, doc_type=dt))
         await db.flush()
+        await record_audit_event(
+            db,
+            "project_member.doc_types_changed",
+            target_type="user",
+            target_id=membership.user_id,
+            project_id=project_id,
+            details={"doc_types": sorted(data.doc_types) if membership.role == "external" else []},
+        )
 
     await db.refresh(membership)
     return await _build_member_response(db, membership)
@@ -199,6 +229,14 @@ async def remove_project_member(
     if membership is None:
         raise HTTPException(status_code=404, detail="Membership not found")
     await db.delete(membership)
+    await record_audit_event(
+        db,
+        "project_member.removed",
+        target_type="user",
+        target_id=membership.user_id,
+        project_id=project_id,
+        details={"role": membership.role},
+    )
 
 
 @router.get("/{project_id}/permissions", response_model=dict[str, list[str]])

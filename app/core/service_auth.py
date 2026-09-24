@@ -15,6 +15,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import oauth2_scheme
 from app.models import ServiceCredential
+from app.services.audit import set_audit_actor
 
 SERVICE_SCOPE = "test-results:write"
 TOKEN_PREFIX = "blm_sync_"
@@ -93,4 +94,5 @@ async def require_bud_sync_token(
         raise unauthorized
     credential.last_used_at = now
     await db.flush()
+    set_audit_actor("service")
     return credential

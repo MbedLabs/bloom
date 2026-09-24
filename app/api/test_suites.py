@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.artefact_utils import audit_artefact_deleted, audit_visibility_change
 from app.api.link_read_utils import get_requirement_ids_verified_by_test_cases
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
@@ -342,8 +343,10 @@ async def update_suite(
         permission=("edit", "suite"),
     )
 
+    previous_visibility = getattr(suite, "visibility", None)
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(suite, field, value)
+    await audit_visibility_change(db, "test-suite", suite, previous_visibility)
 
     await db.flush()
     await db.refresh(suite)
@@ -367,6 +370,7 @@ async def delete_suite(
         suite.project_id,
         permission=("delete", "suite"),
     )
+    await audit_artefact_deleted(db, "test-suite", suite)
     await db.delete(suite)
 
 

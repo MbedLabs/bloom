@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
+    audit_artefact_deleted,
     log_artefact_activity,
     log_document_workflow_activity_from_patch,
     should_log_generic_document_update,
@@ -374,6 +375,7 @@ async def delete_document(
         "deleted",
         f"{current_user.full_name} deleted document {document.doc_id}",
     )
+    await audit_artefact_deleted(db, "document", document)
     await db.delete(document)
 
 

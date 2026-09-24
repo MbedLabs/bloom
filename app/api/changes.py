@@ -5,6 +5,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
+    audit_artefact_deleted,
+    audit_visibility_change,
     log_artefact_activity,
     log_document_workflow_activity_from_patch,
     should_log_generic_document_update,
@@ -164,8 +166,10 @@ async def update_change_request(
     fields_set = data.model_fields_set
     previous_status = item.status if "status" in fields_set else None
 
+    previous_visibility = getattr(item, "visibility", None)
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(item, field, value)
+    await audit_visibility_change(db, "change", item, previous_visibility)
     if item.content_json is not None and "content_json" in fields_set:
         await sync_tag_links(
             db,
@@ -231,4 +235,5 @@ async def delete_change_request(
         "deleted",
         f"{current_user.full_name} deleted change request {item.change_id}",
     )
+    await audit_artefact_deleted(db, "change", item)
     await db.delete(item)

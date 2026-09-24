@@ -10,6 +10,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
+    audit_artefact_deleted,
+    audit_visibility_change,
     log_artefact_activity,
     log_document_workflow_activity_from_patch,
     should_log_generic_document_update,
@@ -183,8 +185,10 @@ async def update_defect(
 
     new_status = updates.get("status")
 
+    previous_visibility = getattr(item, "visibility", None)
     for field, value in updates.items():
         setattr(item, field, value)
+    await audit_visibility_change(db, "defect", item, previous_visibility)
 
     if new_status and new_status in TERMINAL_STATUSES and item.closed_at is None:
         item.closed_at = datetime.utcnow()
@@ -244,6 +248,7 @@ async def delete_defect(
         "deleted",
         f"{current_user.full_name} deleted defect {item.defect_id}",
     )
+    await audit_artefact_deleted(db, "defect", item)
     await db.delete(item)
 
 

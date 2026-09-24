@@ -38,6 +38,7 @@ from app.schemas.auth import (
     UserUpdate,
     VerifyEmailRequest,
 )
+from app.services.audit import record_audit_event, record_audit_failure
 from app.services.mail_service import (
     MailConfigurationError,
     send_email_change_authorization_email,
@@ -110,11 +111,25 @@ async def login(
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(data.password, user.hashed_password):
+        await record_audit_failure(
+            db,
+            "auth.login",
+            target_type="user",
+            target_id=user.id if user else None,
+            details={"email": data.email, "reason": "invalid_credentials"},
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
         )
     if not user.is_active:
+        await record_audit_failure(
+            db,
+            "auth.login",
+            target_type="user",
+            target_id=user.id,
+            details={"email": data.email, "reason": "deactivated"},
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is deactivated",
@@ -124,6 +139,9 @@ async def login(
         data={"sub": str(user.id), "type": "user", "ver": user.session_version}
     )
     await _issue_refresh_cookie(db, response, user.id)
+    await record_audit_event(
+        db, "auth.login", actor_user_id=user.id, target_type="user", target_id=user.id
+    )
 
     return TokenResponse(
         access_token=access_token,
@@ -154,15 +172,26 @@ async def refresh(
         claimed = await claim_token(db, token=refresh_token, purpose=UserTokenPurpose.refresh)
     except TokenValidationError:
         _clear_refresh_cookie(response)
+        await record_audit_failure(db, "auth.refresh", details={"reason": "invalid_token"})
         raise unauthorized
 
     user = await db.get(User, claimed.user_id)
     if user is None or not user.is_active:
         _clear_refresh_cookie(response)
+        await record_audit_failure(
+            db,
+            "auth.refresh",
+            target_type="user",
+            target_id=claimed.user_id,
+            details={"reason": "inactive_or_missing_user"},
+        )
         raise unauthorized
 
     # Consumed above; issue the replacement in the same transaction.
     await _issue_refresh_cookie(db, response, user.id)
+    await record_audit_event(
+        db, "auth.refresh", actor_user_id=user.id, target_type="user", target_id=user.id
+    )
     access_token = create_access_token(
         data={"sub": str(user.id), "type": "user", "ver": user.session_version}
     )
@@ -184,6 +213,13 @@ async def logout(
         token_row = await find_token(db, token=refresh_token, purpose=UserTokenPurpose.refresh)
         if token_row is not None and token_row.used_at is None:
             await mark_token_used(db, token_row)
+            await record_audit_event(
+                db,
+                "auth.logout",
+                actor_user_id=token_row.user_id,
+                target_type="user",
+                target_id=token_row.user_id,
+            )
     _clear_refresh_cookie(response)
     return GenericMessageResponse(message="Logged out")
 
@@ -262,13 +298,25 @@ async def request_email_change(
             )
         except MailConfigurationError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
-        await db.flush()
+        await record_audit_event(
+            db,
+            "auth.email_change_requested",
+            target_type="user",
+            target_id=current_user.id,
+            details={"new_email": new_email, "status": current_user.email_change_status},
+        )
         return GenericMessageResponse(
             message="Authorization link sent to your current email address."
         )
 
     current_user.email_change_status = "requested"
-    await db.flush()
+    await record_audit_event(
+        db,
+        "auth.email_change_requested",
+        target_type="user",
+        target_id=current_user.id,
+        details={"new_email": new_email, "status": "requested"},
+    )
     return GenericMessageResponse(
         message="Email change requested. An administrator must approve it before a confirmation email is sent."
     )
@@ -293,7 +341,9 @@ async def cancel_email_change(
     current_user.email_change_status = None
     current_user.email_change_requested_at = None
     await invalidate_tokens(db, current_user.id, purpose=UserTokenPurpose.email_change)
-    await db.flush()
+    await record_audit_event(
+        db, "auth.email_change_cancelled", target_type="user", target_id=current_user.id
+    )
     return GenericMessageResponse(message="Pending email change cancelled")
 
 
@@ -374,7 +424,14 @@ async def confirm_email_change(
             )
         except MailConfigurationError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
-        await db.flush()
+        await record_audit_event(
+            db,
+            "auth.email_change_confirmed",
+            actor_user_id=user.id,
+            target_type="user",
+            target_id=user.id,
+            details={"stage": "current_address"},
+        )
         return GenericMessageResponse(
             message="Current email confirmed. A verification link was sent to the new email address."
         )
@@ -388,7 +445,14 @@ async def confirm_email_change(
     user.session_version += 1
     await invalidate_all_refresh_tokens(db, user.id)
     _clear_refresh_cookie(response)
-    await db.flush()
+    await record_audit_event(
+        db,
+        "auth.email_change_confirmed",
+        actor_user_id=user.id,
+        target_type="user",
+        target_id=user.id,
+        details={"stage": "new_address", "email": user.email},
+    )
     return GenericMessageResponse(message="Email address updated. Please log in again.")
 
 
@@ -400,6 +464,13 @@ async def change_password(
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     if not verify_password(data.current_password, current_user.hashed_password):
+        await record_audit_failure(
+            db,
+            "auth.password_changed",
+            target_type="user",
+            target_id=current_user.id,
+            details={"reason": "wrong_current_password"},
+        )
         raise HTTPException(status_code=400, detail="Current password is incorrect")
     current_user.hashed_password = get_password_hash(data.new_password)
     current_user.password_set_at = datetime.utcnow()
@@ -408,7 +479,9 @@ async def change_password(
     current_user.session_version += 1
     await invalidate_all_refresh_tokens(db, current_user.id)
     _clear_refresh_cookie(response)
-    await db.flush()
+    await record_audit_event(
+        db, "auth.password_changed", target_type="user", target_id=current_user.id
+    )
     await db.refresh(current_user)
     return UserResponse.model_validate(current_user)
 
@@ -458,7 +531,9 @@ async def accept_invite(
     # verification.
     user.email_verified_at = now
 
-    await db.flush()
+    await record_audit_event(
+        db, "auth.invite_accepted", actor_user_id=user.id, target_type="user", target_id=user.id
+    )
     return AcceptInviteResponse(
         requires_email_verification=False,
         email=user.email,
@@ -486,7 +561,9 @@ async def verify_email(
         raise HTTPException(status_code=400, detail="Email already verified")
 
     user.email_verified_at = datetime.utcnow()
-    await db.flush()
+    await record_audit_event(
+        db, "auth.email_verified", actor_user_id=user.id, target_type="user", target_id=user.id
+    )
     return GenericMessageResponse(message="Email verified successfully")
 
 
@@ -537,6 +614,14 @@ async def forgot_password(
     result = await db.execute(select(User).where(User.email == data.email))
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
+        await record_audit_event(
+            db,
+            "auth.password_reset_requested",
+            target_type="user",
+            target_id=user.id if user else None,
+            outcome="ignored",
+            details={"email": data.email},
+        )
         return response
 
     reset_token = await create_user_token(
@@ -556,6 +641,13 @@ async def forgot_password(
     except MailConfigurationError:
         logger.exception("Password reset email could not be sent for user_id=%s", user.id)
 
+    await record_audit_event(
+        db,
+        "auth.password_reset_requested",
+        target_type="user",
+        target_id=user.id,
+        details={"email": data.email},
+    )
     await db.flush()
     return response
 
@@ -573,6 +665,9 @@ async def reset_password(
             purpose=UserTokenPurpose.password_reset,
         )
     except TokenValidationError as exc:
+        await record_audit_failure(
+            db, "auth.password_reset_completed", details={"reason": "invalid_token"}
+        )
         raise HTTPException(status_code=400, detail=exc.detail) from exc
 
     user = await db.get(User, claimed.user_id)
@@ -585,6 +680,13 @@ async def reset_password(
     user.session_version += 1
     await invalidate_all_refresh_tokens(db, user.id)
     _clear_refresh_cookie(response)
+    await record_audit_event(
+        db,
+        "auth.password_reset_completed",
+        actor_user_id=user.id,
+        target_type="user",
+        target_id=user.id,
+    )
     await db.flush()
     return GenericMessageResponse(message="Password reset successfully")
 

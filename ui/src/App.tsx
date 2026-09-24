@@ -39,6 +39,7 @@ const TraceabilityMatrix = lazy(() => import('./pages/TraceabilityMatrix'))
 const UnifiedDocDetail = lazy(() => import('./pages/UnifiedDocDetail'))
 const Users = lazy(() => import('./pages/Users'))
 const Groups = lazy(() => import('./pages/Groups'))
+const Audit = lazy(() => import('./pages/Audit'))
 /* v8 ignore stop */
 
 function NotFound() {
@@ -90,6 +91,7 @@ function App() {
         <Route path="baselines" element={<Baselines />} />
         <Route path="users" element={<Users />} />
         <Route path="groups" element={<Groups />} />
+        <Route path="audit" element={<Audit />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<NotFound />} />
       </Route>

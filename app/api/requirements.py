@@ -11,6 +11,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
+    audit_artefact_deleted,
+    audit_visibility_change,
     log_artefact_activity,
     log_document_workflow_activity_from_patch,
     should_log_generic_document_update,
@@ -552,6 +554,7 @@ async def update_requirement(
         requirement.description = data.description
     if data.status is not None:
         requirement.status = data.status
+    previous_visibility = requirement.visibility
     if data.priority is not None:
         requirement.priority = data.priority
     if data.req_type is not None:
@@ -572,6 +575,7 @@ async def update_requirement(
     if data.content_html is not None:
         requirement.content_html = data.content_html
     requirement.visibility = _visibility_for_requirement_origin(requirement.req_origin)
+    await audit_visibility_change(db, "requirement", requirement, previous_visibility)
 
     if "parent_id" in fields_set:
         if data.parent_id is None:
@@ -713,6 +717,7 @@ async def delete_requirement(
         "deleted",
         f"{current_user.full_name} deleted requirement {requirement.req_id}",
     )
+    await audit_artefact_deleted(db, "requirement", requirement)
     await db.delete(requirement)
 
 

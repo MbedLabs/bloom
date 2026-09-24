@@ -32,6 +32,7 @@ from app.schemas import (
     RelatedRequirementSummary,
     RelatedTestCaseSummary,
 )
+from app.services.audit import record_audit_event
 
 ARTEFACT_MODELS = {
     "design": DesignItem,
@@ -464,3 +465,47 @@ async def build_related_response(
 
 def build_status_summary(user: User, current_status: str, next_status: str) -> str:
     return f"{user.full_name} changed status from {current_status} to {next_status}"
+
+
+AUDIT_PUBLIC_ID_ATTRS = {
+    **ARTEFACT_PUBLIC_ID_ATTRS,
+    "test-suite": "suite_id",
+    "campaign": "campaign_id",
+    "baseline": "baseline_id",
+}
+
+
+def _audit_public_id(artefact_type: str, artefact: Any) -> str:
+    """The public id of an artefact, or its database id when it has none."""
+    value = getattr(artefact, AUDIT_PUBLIC_ID_ATTRS.get(artefact_type, "id"), None)
+    return str(value if value is not None else artefact.id)
+
+
+async def audit_artefact_deleted(db: AsyncSession, artefact_type: str, artefact: Any) -> None:
+    """Record the deletion of an artefact in the audit log."""
+    await record_audit_event(
+        db,
+        "artefact.deleted",
+        target_type=artefact_type,
+        target_id=_audit_public_id(artefact_type, artefact),
+        project_id=getattr(artefact, "project_id", None),
+    )
+
+
+async def audit_visibility_change(
+    db: AsyncSession, artefact_type: str, artefact: Any, previous: Any
+) -> None:
+    """Record a change of an artefact's visibility in the audit log, if it changed."""
+    current = getattr(artefact, "visibility", None)
+    previous_value = getattr(previous, "value", previous)
+    current_value = getattr(current, "value", current)
+    if previous_value == current_value:
+        return
+    await record_audit_event(
+        db,
+        "artefact.visibility_changed",
+        target_type=artefact_type,
+        target_id=_audit_public_id(artefact_type, artefact),
+        project_id=getattr(artefact, "project_id", None),
+        details={"from": previous_value, "to": current_value},
+    )

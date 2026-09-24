@@ -33,6 +33,7 @@ from app.services.attachment_upload_policy import (
     release_attachment_upload,
     reserve_attachment_upload,
 )
+from app.services.audit import record_audit_event
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +122,19 @@ async def upload_attachment(
             uploaded_by_id=current_user.id,
         )
         db.add(attachment)
+        await db.flush()
+        await record_audit_event(
+            db,
+            "attachment.uploaded",
+            target_type="document",
+            target_id=document.doc_id,
+            project_id=document.project_id,
+            details={
+                "attachment_id": attachment.id,
+                "filename": display_name,
+                "size": written.size_bytes,
+            },
+        )
         await db.commit()
         await db.refresh(attachment)
         return attachment
@@ -198,6 +212,14 @@ async def delete_attachment(
     )
 
     storage_path = attachment.storage_path
+    await record_audit_event(
+        db,
+        "attachment.deleted",
+        target_type="document",
+        target_id=attachment.document.doc_id,
+        project_id=attachment.document.project_id,
+        details={"attachment_id": attachment.id, "filename": attachment.original_filename},
+    )
     await db.delete(attachment)
     await db.commit()
     await storage.remove(storage_path)
