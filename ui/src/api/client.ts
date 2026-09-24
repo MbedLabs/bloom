@@ -1764,10 +1764,21 @@ export interface TestCaseImportResult {
   errors: string[]
 }
 
+/** A parameter name of an import that already exists in the project. */
+export interface MarkdownCollision {
+  name: string
+  existing_value: string
+  imported_value: string
+}
+
+/** Keep the project's value, or import the file's value under a new name. */
+export type MarkdownCollisionAction = { action: 'existing' } | { action: 'rename'; to: string }
+
 export interface MarkdownImportResult {
   doc_type: string | null
   parameters_created: number
   parameter_collisions: string[]
+  parameters_renamed?: Record<string, string>
   artefacts_created: number
   artefacts_skipped: number
   sections: { type_code: string | null; title: string }[]
@@ -1836,9 +1847,11 @@ export const importApi = {
     projectId: number,
     file: File,
     defaultType?: string,
+    collisionActions?: Record<string, MarkdownCollisionAction>,
   ): Promise<MarkdownImportResult> => {
     const form = new FormData()
     form.append('file', file)
+    if (collisionActions) form.append('collision_actions', JSON.stringify(collisionActions))
     const qs = defaultType ? `?default_type=${defaultType}` : ''
     const response = await api.post<MarkdownImportResult>(
       `/projects/${projectId}/import/markdown${qs}`,

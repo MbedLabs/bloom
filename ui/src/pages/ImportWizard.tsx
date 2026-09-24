@@ -6,7 +6,16 @@ import { docsApi, projectsApi, importApi } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { useDebounced } from '../hooks/useDebounced'
 import TestRailImport from '../components/TestRailImport'
-import type { ImportResult, ReqIFImportResult, TestCaseImportResult, MarkdownImportResult } from '../api/client'
+import type {
+  ImportResult,
+  MarkdownCollision,
+  MarkdownCollisionAction,
+  MarkdownImportResult,
+  ReqIFImportResult,
+  TestCaseImportResult,
+} from '../api/client'
+import ParameterCollisions from '../components/ParameterCollisions'
+import { collisionsResolved } from '../utils/parameters'
 
 type WizardStep = 1 | 2 | 3 | 4 | 5
 type ImportMode = 'project' | 'reqif' | 'file' | 'md' | 'testrail'
@@ -38,6 +47,8 @@ export default function ImportWizard() {
   const [mdFile, setMdFile] = useState<File | null>(null)
   const [mdResult, setMdResult] = useState<MarkdownImportResult | null>(null)
   const [mdError, setMdError] = useState<string | null>(null)
+  const [mdCollisions, setMdCollisions] = useState<MarkdownCollision[] | null>(null)
+  const [mdChoices, setMdChoices] = useState<Record<string, MarkdownCollisionAction>>({})
 
   const { data: projects } = useQuery({
     queryKey: ['projects'],
@@ -123,16 +134,26 @@ export default function ImportWizard() {
   })
 
   const mdMutation = useMutation({
-    mutationFn: (file: File) => importApi.importMarkdown(projectId, file),
+    mutationFn: ({ file, actions }: { file: File; actions?: Record<string, MarkdownCollisionAction> }) =>
+      importApi.importMarkdown(projectId, file, undefined, actions),
     onSuccess: (data) => {
       setMdResult(data)
       setMdError(null)
-      queryClient.invalidateQueries({ queryKey: ['project-variables', projectId] })
+      setMdCollisions(null)
+      queryClient.invalidateQueries({ queryKey: ['projectVariables', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
     },
-    onError: (error: { response?: { data?: { detail?: string } } }) => {
+    onError: (error: {
+      response?: { status?: number; data?: { detail?: string | { collisions?: MarkdownCollision[] } } }
+    }) => {
       setMdResult(null)
-      setMdError(error.response?.data?.detail || 'Import failed. Check the file and try again.')
+      const detail = error.response?.data?.detail
+      if (error.response?.status === 409 && typeof detail === 'object' && detail?.collisions) {
+        setMdCollisions(detail.collisions)
+        setMdError(null)
+        return
+      }
+      setMdError(typeof detail === 'string' && detail ? detail : 'Import failed. Check the file and try again.')
     },
   })
 
@@ -377,8 +398,9 @@ export default function ImportWizard() {
         <h3 className="text-lg font-semibold text-foreground">Import from Markdown</h3>
         <p className="text-sm text-muted-foreground">
           Upload a <span className="font-mono">.md</span> file. Its parameters become project
-          variables and its sections are classified by type. A parameter whose name already exists
-          is flagged for you to act on and is never overwritten.
+          variables and each classified section becomes an artefact. A parameter whose name already
+          exists is never overwritten: you choose, per name, to keep the project&apos;s value or to
+          import the file&apos;s value under a new name.
         </p>
 
         <label className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border p-8 cursor-pointer hover:border-primary/40 hover:bg-accent/30 transition-colors">
@@ -395,20 +417,30 @@ export default function ImportWizard() {
               setMdFile(e.target.files?.[0] ?? null)
               setMdResult(null)
               setMdError(null)
+              setMdCollisions(null)
+              setMdChoices({})
             }}
           />
         </label>
 
         <div className="flex justify-end">
           <button
-            onClick={() => mdFile && mdMutation.mutate(mdFile)}
-            disabled={!mdFile || mdMutation.isPending}
+            onClick={() =>
+              mdFile && mdMutation.mutate({ file: mdFile, actions: mdCollisions ? mdChoices : undefined })
+            }
+            disabled={
+              !mdFile || mdMutation.isPending || (!!mdCollisions && !collisionsResolved(mdCollisions, mdChoices))
+            }
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50 inline-flex items-center gap-2"
           >
             <Download className="h-4 w-4" />
-            {mdMutation.isPending ? 'Importing...' : 'Import Markdown'}
+            {mdMutation.isPending ? 'Importing...' : mdCollisions ? 'Import with these choices' : 'Import Markdown'}
           </button>
         </div>
+
+        {mdCollisions && (
+          <ParameterCollisions collisions={mdCollisions} choices={mdChoices} onChange={setMdChoices} />
+        )}
 
         {mdError && (
           <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-4 flex items-center gap-2 text-sm text-red-700 dark:text-red-400">
@@ -427,14 +459,16 @@ export default function ImportWizard() {
               </div>
             </div>
             {mdResult.parameter_collisions.length > 0 && (
-              <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-4 space-y-1">
-                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-medium">
-                  <AlertCircle className="h-4 w-4" />
-                  Action required &mdash; already exists, not overwritten
-                </div>
-                <div className="text-sm text-amber-700 dark:text-amber-400">
-                  {mdResult.parameter_collisions.join(', ')}
-                </div>
+              <div className="text-sm text-muted-foreground">
+                Kept the project&apos;s value: {mdResult.parameter_collisions.join(', ')}
+              </div>
+            )}
+            {Object.keys(mdResult.parameters_renamed ?? {}).length > 0 && (
+              <div className="text-sm text-muted-foreground">
+                Imported under a new name:{' '}
+                {Object.entries(mdResult.parameters_renamed ?? {})
+                  .map(([from, to]) => `${from} as ${to}`)
+                  .join(', ')}
               </div>
             )}
           </div>

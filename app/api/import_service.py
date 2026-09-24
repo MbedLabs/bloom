@@ -19,7 +19,11 @@ from app.api.artefact_utils import log_artefact_activity
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.id_generator import format_doc_id, next_doc_id
-from app.core.md_import import parameter_name_collisions, parse_markdown_document
+from app.core.md_import import (
+    parameter_name_collisions,
+    parse_markdown_document,
+    rename_parameters,
+)
 from app.core.reqif import (
     FOREIGN_ID_HINTS,
     TEXT_ATTRIBUTE_HINTS,
@@ -684,10 +688,36 @@ class MarkdownImportResult(BaseModel):
     doc_type: Optional[str]
     parameters_created: int
     parameter_collisions: List[str]
+    parameters_renamed: dict[str, str] = {}
     artefacts_created: int
     artefacts_skipped: int
     notifications_created: int
     sections: List[ClassifiedSection]
+
+
+def _collision_actions(raw: Optional[str]) -> dict:
+    """The uploader's action per colliding parameter name, keyed by the lower-cased name."""
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        raise ValueError("The collision actions are not valid JSON.")
+    if not isinstance(data, dict):
+        raise ValueError("The collision actions must be an object keyed by parameter name.")
+    actions = {}
+    for name, choice in data.items():
+        action = choice.get("action") if isinstance(choice, dict) else None
+        if action == "existing":
+            actions[str(name).strip().lower()] = {"action": "existing"}
+        elif action == "rename" and str(choice.get("to") or "").strip():
+            new = str(choice["to"]).strip()
+            if not re.fullmatch(r"[^{}:,\n]+", new):
+                raise ValueError(f"The new name {new!r} for {name} is not a valid parameter name.")
+            actions[str(name).strip().lower()] = {"action": "rename", "to": new}
+        else:
+            raise ValueError(f"Choose 'existing' or 'rename' with a new name for {name}.")
+    return actions
 
 
 @router.post(
@@ -699,14 +729,19 @@ async def import_markdown(
     project_id: int,
     default_type: Optional[str] = Query(None),
     file: UploadFile = File(...),
+    collision_actions: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Import a Markdown document: create its parameters and classify its sections.
+    """Import a Markdown document: create its parameters and one artefact per
+    classified section.
 
-    A parameter whose key already exists is a collision - it is reported for the
-    uploader to act on and is never overwritten. Section persistence follows in a
-    later change; for now their classification is returned.
+    A parameter whose name already exists in the project is never overwritten. While
+    any such name has no action, nothing is imported and the answer (409) lists each
+    one with its existing and imported value. ``collision_actions`` maps a name to
+    ``{"action": "existing"}`` (keep the project's value; the text refers to it) or
+    ``{"action": "rename", "to": NEW}`` (create NEW with the imported value and refer
+    to NEW in the imported text).
     """
     target_project = (
         await db.execute(select(Project).where(Project.id == project_id))
@@ -720,6 +755,11 @@ async def import_markdown(
         permission=("import", "document"),
     )
 
+    try:
+        actions = _collision_actions(collision_actions)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
     attempt = await begin_import_attempt(db, user_id=current_user.id, project_id=target_project.id)
     attempt_id = attempt.id
     raw = await file.read()
@@ -732,22 +772,57 @@ async def import_markdown(
         await finish_import_attempt(db, attempt_id, "failed")
         raise HTTPException(status_code=400, detail="File is not valid UTF-8 text")
 
-    parsed = parse_markdown_document(text, default_type=default_type)
-
-    existing_keys = (
-        (
+    existing = {
+        key.strip().lower(): value
+        for key, value in (
             await db.execute(
-                select(ProjectVariable.key).where(
-                    ProjectVariable.project_id == target_project.id,
-                    ProjectVariable.kind == "variable",
+                select(ProjectVariable.key, ProjectVariable.value).where(
+                    ProjectVariable.project_id == target_project.id
                 )
             )
+        ).all()
+    }
+    parsed = parse_markdown_document(text, default_type=default_type)
+    collisions = parameter_name_collisions(parsed.parameters, existing)
+    imported_values = {p.name.strip().lower(): p.value for p in parsed.parameters}
+    unresolved = [name for name in collisions if name.strip().lower() not in actions]
+    if unresolved:
+        await finish_import_attempt(db, attempt_id, "failed")
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Parameter names already exist in the project. Choose an action for each.",
+                "collisions": [
+                    {
+                        "name": name,
+                        "existing_value": existing.get(name.strip().lower(), ""),
+                        "imported_value": imported_values.get(name.strip().lower(), ""),
+                    }
+                    for name in unresolved
+                ],
+            },
         )
-        .scalars()
-        .all()
-    )
-    collisions = parameter_name_collisions(parsed.parameters, existing_keys)
-    blocked = {name.strip().lower() for name in collisions}
+    renames = {
+        name: actions[name.strip().lower()]["to"]
+        for name in collisions
+        if actions[name.strip().lower()]["action"] == "rename"
+    }
+    kept = [name for name in collisions if name not in renames]
+    if renames:
+        taken = set(existing) | {name.strip().lower() for name in imported_values} - {
+            old.strip().lower() for old in renames
+        }
+        for old, new in renames.items():
+            if new.strip().lower() in taken:
+                await finish_import_attempt(db, attempt_id, "failed")
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"The new name {new!r} for {old} is already taken.",
+                )
+        parsed = parse_markdown_document(
+            rename_parameters(text, renames), default_type=default_type
+        )
+    blocked = {name.strip().lower() for name in kept} | set(existing)
 
     created = 0
     done: set = set()
@@ -844,7 +919,8 @@ async def import_markdown(
     return MarkdownImportResult(
         doc_type=parsed.doc_type,
         parameters_created=created,
-        parameter_collisions=collisions,
+        parameter_collisions=kept,
+        parameters_renamed=renames,
         artefacts_created=artefacts_created,
         artefacts_skipped=artefacts_skipped,
         notifications_created=notifications_created,

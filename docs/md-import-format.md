@@ -52,8 +52,12 @@ A `{{NAME}}` without `parameter:` and `value:` is a reference to an existing
 parameter and is kept as it is.
 
 Each parameter has a **name** and a **value**. On import the backend checks each
-name: if a parameter with that name already exists, it alerts and requires an
-action. It is never silently overwritten.
+name. A name that already exists in the project, as a parameter or a variable, is
+never overwritten: the import stops before creating anything and lists each such name
+with the project's value and the file's value. For each one, choose to keep the
+project's value (the imported text then refers to it) or to import the file's value
+under a new name (the new parameter is created and every `{{NAME}}` of the imported
+text refers to the new name). The import runs once every name has a choice.
 
 ## Test cases
 

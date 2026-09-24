@@ -160,3 +160,24 @@ def parameter_name_collisions(parameters: list, existing_names: Iterable) -> lis
             collisions.append(parameter.name)
             seen.add(key)
     return collisions
+
+
+_BARE_PARAM_RE = re.compile(r"\{\{\s*([^{}:,\n]+?)\s*\}\}")
+
+
+def rename_parameters(text: str, renames: dict) -> str:
+    """Give parameters new names, in their wrapped form and in every ``{{NAME}}``
+    reference; names are matched without regard to case."""
+    lookup = {old.strip().lower(): new.strip() for old, new in renames.items()}
+
+    def _wrapped(match: re.Match) -> str:
+        new = lookup.get(match.group("name").strip().lower())
+        if not new:
+            return match.group(0)
+        return "{{parameter: " + new + ", value: " + match.group("value").strip() + "}}"
+
+    def _bare(match: re.Match) -> str:
+        new = lookup.get(match.group(1).strip().lower())
+        return "{{" + new + "}}" if new else match.group(0)
+
+    return _BARE_PARAM_RE.sub(_bare, _PARAM_RE.sub(_wrapped, text))
