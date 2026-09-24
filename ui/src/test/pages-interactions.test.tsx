@@ -1197,3 +1197,19 @@ describe('a controlled document in detail', () => {
     await waitFor(() => expect(client.documentsApi.delete).toHaveBeenCalledWith(docShell.id))
   })
 })
+
+describe('project exports', () => {
+  it('offers every report from one Export menu', async () => {
+    const { exportApi } = await import('../api/client')
+    renderAt('/projects/:prefix/traceability', '/projects/VCU/traceability', <TraceabilityMatrix />)
+    await settle()
+    fireEvent.click(await screen.findByRole('button', { name: /Export/ }))
+    const menu = screen.getByRole('menu')
+    expect(within(menu).getAllByRole('menuitem')).toHaveLength(9)
+    fireEvent.click(within(menu).getByText('Verification dossier (PDF)'))
+    await waitFor(() =>
+      expect(exportApi.download).toHaveBeenCalledWith(project.id, 'verification-dossier', 'pdf'),
+    )
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+})

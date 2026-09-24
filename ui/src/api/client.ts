@@ -2042,8 +2042,8 @@ export const exportApi = {
   /** Download a server-side export, preserving the backend's filename. */
   download: async (
     projectId: number,
-    kind: 'requirements' | 'traceability',
-    format?: 'csv' | 'pdf'
+    kind: 'requirements' | 'traceability' | 'test-cases' | 'verification-dossier',
+    format?: 'csv' | 'pdf' | 'md' | 'xml'
   ): Promise<void> => {
     const response = await api.get<Blob>(`/projects/${projectId}/export/${kind}`, {
       params: format ? { format } : {},

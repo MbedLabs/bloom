@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
-import { traceabilityApi, projectsApi, exportApi } from '../api/client'
+import { traceabilityApi, projectsApi, exportApi, extractApiErrorMessage } from '../api/client'
 import { docUrl } from '../types/doc'
 import { ArrowLeft, CheckCircle, AlertCircle, XCircle, Shield, Filter, GitBranch, AlertTriangle, X, Download } from 'lucide-react'
 
@@ -134,33 +134,7 @@ export default function TraceabilityMatrix() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => projId && exportApi.download(projId, 'traceability')}
-            disabled={!projId}
-            title="Export the requirement-to-test-case matrix as CSV"
-            className="inline-flex items-center gap-1.5 px-3 py-2 border border-input text-foreground rounded-md text-sm font-medium hover:bg-accent/50 disabled:opacity-50"
-          >
-            <Download className="h-4 w-4" />
-            Matrix CSV
-          </button>
-          <button
-            onClick={() => projId && exportApi.download(projId, 'requirements', 'csv')}
-            disabled={!projId}
-            title="Export all requirements as CSV"
-            className="inline-flex items-center gap-1.5 px-3 py-2 border border-input text-foreground rounded-md text-sm font-medium hover:bg-accent/50 disabled:opacity-50"
-          >
-            <Download className="h-4 w-4" />
-            Reqs CSV
-          </button>
-          <button
-            onClick={() => projId && exportApi.download(projId, 'requirements', 'pdf')}
-            disabled={!projId}
-            title="Export the requirements specification as PDF"
-            className="inline-flex items-center gap-1.5 px-3 py-2 border border-input text-foreground rounded-md text-sm font-medium hover:bg-accent/50 disabled:opacity-50"
-          >
-            <Download className="h-4 w-4" />
-            Spec PDF
-          </button>
+          <ExportMenu projectId={projId} />
         <button
           onClick={() => setShowGaps(!showGaps)}
           className={`inline-flex items-center px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
@@ -567,5 +541,68 @@ function PriorityBadge({ priority }: { priority: string }) {
     <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[priority] || 'bg-gray-500/10 text-gray-700 dark:text-gray-400'}`}>
       {priority}
     </span>
+  )
+}
+
+const EXPORTS: {
+  label: string
+  kind: 'requirements' | 'traceability' | 'test-cases' | 'verification-dossier'
+  format: 'csv' | 'pdf' | 'md' | 'xml'
+}[] = [
+  { label: 'Traceability matrix (PDF)', kind: 'traceability', format: 'pdf' },
+  { label: 'Traceability matrix (CSV)', kind: 'traceability', format: 'csv' },
+  { label: 'Verification dossier (PDF)', kind: 'verification-dossier', format: 'pdf' },
+  { label: 'Requirements specification (PDF)', kind: 'requirements', format: 'pdf' },
+  { label: 'Requirements (CSV)', kind: 'requirements', format: 'csv' },
+  { label: 'Test cases (PDF)', kind: 'test-cases', format: 'pdf' },
+  { label: 'Test cases (CSV)', kind: 'test-cases', format: 'csv' },
+  { label: 'Test cases (Markdown)', kind: 'test-cases', format: 'md' },
+  { label: 'Test cases (XML)', kind: 'test-cases', format: 'xml' },
+]
+
+/** One Export button listing every project report and export this page offers. */
+function ExportMenu({ projectId }: { projectId: number | undefined }) {
+  const [open, setOpen] = useState(false)
+  const [failed, setFailed] = useState<string | null>(null)
+
+  const download = async (entry: (typeof EXPORTS)[number]) => {
+    setOpen(false)
+    setFailed(null)
+    if (!projectId) return
+    try {
+      await exportApi.download(projectId, entry.kind, entry.format)
+    } catch (error) {
+      setFailed(`${entry.label}: ${extractApiErrorMessage(error, 'the export failed')}`)
+    }
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        disabled={!projectId}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="inline-flex items-center gap-1.5 px-3 py-2 border border-input text-foreground rounded-md text-sm font-medium hover:bg-accent/50 disabled:opacity-50"
+      >
+        <Download className="h-4 w-4" />
+        Export
+      </button>
+      {open && (
+        <div role="menu" className="absolute right-0 mt-1 w-64 bg-card border border-border rounded-md shadow-lg z-20 py-1">
+          {EXPORTS.map((entry) => (
+            <button
+              key={entry.label}
+              role="menuitem"
+              onClick={() => download(entry)}
+              className="w-full text-left px-3 py-1.5 text-sm text-foreground hover:bg-accent/50"
+            >
+              {entry.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {failed && <p className="absolute right-0 mt-1 w-64 text-xs text-destructive">{failed}</p>}
+    </div>
   )
 }
