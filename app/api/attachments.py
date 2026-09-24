@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import base64
 import binascii
+import logging
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -27,10 +28,13 @@ from app.schemas import (
     TestReportPublishResponse,
 )
 from app.services import attachment_storage as storage
+from app.services import object_store
 from app.services.attachment_upload_policy import (
     release_attachment_upload,
     reserve_attachment_upload,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -104,6 +108,7 @@ async def upload_attachment(
         root = storage.ensure_attachment_dir()
         stored_name = storage.storage_name(display_name)
         written = await storage.write_stream(file, root / stored_name, max_bytes=budget)
+        await storage.persist(root / stored_name, stored_name, content_type)
 
         attachment = DocumentAttachment(
             document_id=document.id,
@@ -145,20 +150,28 @@ async def download_attachment(
     await require_project_access(db, current_user, attachment.document.project_id)
 
     path = storage.resolve_stored_path(attachment.storage_path)
+    name = attachment.original_filename
+    headers = {
+        "Content-Disposition": (f"attachment; filename=\"{name}\"; filename*=UTF-8''{quote(name)}"),
+        "X-Content-Type-Options": "nosniff",
+    }
+    if object_store.s3_enabled():
+        try:
+            body = await object_store.fetch(attachment.storage_path)
+            return StreamingResponse(
+                object_store.iter_body(body), media_type=attachment.content_type, headers=headers
+            )
+        except Exception as exc:
+            if not (object_store.keeps_local_copy() and path.exists()):
+                raise HTTPException(status_code=503, detail="The file store is unreachable.")
+            logger.warning(
+                "Object storage read failed for %s; serving the local mirror: %s",
+                object_store.object_key(attachment.storage_path),
+                exc,
+            )
     if not path.exists():
         raise HTTPException(status_code=404, detail="File not found on disk")
-
-    name = attachment.original_filename
-    return FileResponse(
-        path=str(path),
-        media_type=attachment.content_type,
-        headers={
-            "Content-Disposition": (
-                f"attachment; filename=\"{name}\"; filename*=UTF-8''{quote(name)}"
-            ),
-            "X-Content-Type-Options": "nosniff",
-        },
-    )
+    return FileResponse(path=str(path), media_type=attachment.content_type, headers=headers)
 
 
 @router.delete("/attachments/{attachment_id}", status_code=204)
@@ -187,7 +200,7 @@ async def delete_attachment(
     storage_path = attachment.storage_path
     await db.delete(attachment)
     await db.commit()
-    storage.unlink_quietly(storage_path)
+    await storage.remove(storage_path)
     return Response(status_code=204)
 
 
@@ -294,12 +307,13 @@ async def _replace_report_file(
     root = storage.ensure_attachment_dir()
     stored_name = storage.storage_name(display_name)
     written = storage.write_bytes(payload, root / stored_name, max_bytes=budget)
+    await storage.persist(root / stored_name, stored_name, content_type)
 
     if previous is not None:
         stale = previous.storage_path
         await db.delete(previous)
         await db.flush()
-        storage.unlink_quietly(stale)
+        await storage.remove(stale)
 
     attachment = DocumentAttachment(
         document_id=document.id,

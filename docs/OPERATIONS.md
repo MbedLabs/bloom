@@ -160,6 +160,34 @@ Pull existing issues, on the same panel, searches Jira once with the saved filte
 creates the defects that do not exist yet (at most 1000 issues per pull). It only reads
 from Jira.
 
+## Object storage (S3)
+
+Attachments are kept in `BLOOM_ATTACHMENT_DIR` by default. To keep them in an
+S3-compatible bucket (AWS S3, MinIO, Hetzner, Ceph) instead:
+
+- `BLOOM_STORAGE_BACKEND=s3` and `BLOOM_S3_BUCKET`. The bucket must exist.
+- `BLOOM_S3_ENDPOINT_URL` for anything that is not AWS (for MinIO, for example
+  `http://minio:9000`); `BLOOM_S3_REGION` where the store needs one.
+- `BLOOM_S3_PREFIX` (default `bloom`) keeps several instances apart in one bucket.
+- `BLOOM_S3_ACCESS_KEY_ID` and `BLOOM_S3_SECRET_ACCESS_KEY`, or neither, in which
+  case the ambient AWS credentials (an instance role) are used.
+- `BLOOM_STORAGE_LOCAL_MIRROR` (default `true`) also keeps every file in
+  `BLOOM_ATTACHMENT_DIR`. Reads come from the bucket and fall back to the mirror when the
+  bucket does not answer; the log then names the key as a warning. The free-space
+  reserve applies to this directory; quotas in the bucket are the operator's.
+
+Existing files are copied with `python -m app.storage migrate --to s3`. Each file
+keeps its storage name under the prefix, sizes are checked after the copy, and files
+already in the bucket are skipped, so the command can be run again. The local files
+stay where they are.
+
+`GET /api/ready` reports `storage`: `local`, `s3`, or `s3-unreachable` when the bucket
+did not answer. It stays `200` in that case, because the database decides readiness
+and reads can still come from the mirror. Orphan cleanup lists the bucket; a file is
+counted missing when the bucket lacks it. On Cloudron the variables are set with
+`cloudron env set`; keep the mirror, as it lives under `/app/data` and is part of
+Cloudron's backup.
+
 ## Upgrades
 
 1. Back up first (see above).

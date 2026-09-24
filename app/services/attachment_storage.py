@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models import DocumentAttachment
+from app.services import object_store
 
 CHUNK_BYTES = 1024 * 1024
 
@@ -139,3 +140,29 @@ def write_bytes(payload: bytes, final_path: Path, *, max_bytes: int) -> StoredFi
 def unlink_quietly(storage_path: str) -> None:
     with contextlib.suppress(OSError, HTTPException):
         resolve_stored_path(storage_path).unlink()
+
+
+async def persist(final_path: Path, name: str, content_type: str) -> None:
+    """Put a stored file in the bucket when S3 is on; drop the local copy unless it
+    is kept as the mirror. The local file is removed when the bucket refuses it."""
+    if not object_store.s3_enabled():
+        return
+    try:
+        await object_store.put_file(final_path, name, content_type)
+    except Exception as exc:
+        with contextlib.suppress(OSError):
+            final_path.unlink()
+        raise HTTPException(
+            status_code=503, detail="The file store did not accept the file."
+        ) from exc
+    if not object_store.keeps_local_copy():
+        with contextlib.suppress(OSError):
+            final_path.unlink()
+
+
+async def remove(storage_path: str) -> None:
+    """Delete a stored file wherever it is kept; a missing file is not an error."""
+    unlink_quietly(storage_path)
+    if object_store.s3_enabled():
+        with contextlib.suppress(Exception):
+            await object_store.delete(storage_path)
