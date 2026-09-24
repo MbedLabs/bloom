@@ -7,6 +7,8 @@ import { docsApi, projectsApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import { docRegistryListLabel, docRegistryListUrl } from '../lib/docRegistryParams'
 import ProjectDocTopology from '../components/ProjectDocTopology'
+import AccessDenied from '../components/AccessDenied'
+import { isAccessDenied } from '../lib/accessDenied'
 
 const LEGACY_TAB_ROUTES: Record<string, string> = {
   'requirements': 'docs?type=REQ',
@@ -52,7 +54,7 @@ export default function ProjectDetail() {
     }
   }, [searchParams, prefix, navigate])
 
-  const { data: project, isLoading: projectLoading } = useQuery({
+  const { data: project, isLoading: projectLoading, error: projectError } = useQuery({
     queryKey: ['project-by-prefix', prefix],
     queryFn: () => projectsApi.getByPrefix(prefix!),
     enabled: !!prefix,
@@ -74,6 +76,10 @@ export default function ProjectDetail() {
 
   if (projectLoading) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
+  }
+
+  if (isAccessDenied(projectError)) {
+    return <AccessDenied resourceType="project" resourceRef={prefix ?? ''} projectPrefix={prefix} />
   }
 
   if (!project) {

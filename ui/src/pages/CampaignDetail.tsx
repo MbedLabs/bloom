@@ -12,6 +12,8 @@ import { docRegistryListUrl } from '../lib/docRegistryParams'
 import { formatDateTime } from '../test/date-utils'
 import { buildBudRunUrl } from '../lib/budLinks'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import AccessDenied from '../components/AccessDenied'
+import { isAccessDenied } from '../lib/accessDenied'
 
 const CAMPAIGN_STATUSES = ['Planned', 'Scope', 'In Progress', 'Completed', 'Aborted']
 
@@ -42,7 +44,7 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
 
   const editNameRef = useRef<HTMLInputElement>(null)
 
-  const { data: campaign, isLoading } = useQuery({
+  const { data: campaign, isLoading, error: campaignError } = useQuery({
     queryKey: ['campaign', campId],
     queryFn: () => campaignsApi.get(campId),
     enabled: !!campId,
@@ -127,6 +129,10 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
+  }
+
+  if (isAccessDenied(campaignError)) {
+    return <AccessDenied resourceType="campaign" resourceRef={campaignId ?? ''} projectPrefix={prefix} />
   }
 
   if (!campaign) {

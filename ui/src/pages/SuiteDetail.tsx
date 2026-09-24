@@ -13,6 +13,8 @@ import { useToast } from '../components/useToast'
 import { formatDateTime } from '../test/date-utils'
 import BudRunLink from '../components/BudRunLink'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import AccessDenied from '../components/AccessDenied'
+import { isAccessDenied } from '../lib/accessDenied'
 
 const SUITE_STATUSES = ['Draft', 'Active', 'Archived']
 
@@ -42,7 +44,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
 
 
 
-  const { data: suite, isLoading } = useQuery({
+  const { data: suite, isLoading, error: suiteError } = useQuery({
     queryKey: ['testSuite', parsedSuiteId],
     queryFn: () => testSuitesApi.get(parsedSuiteId),
     enabled: !!parsedSuiteId,
@@ -169,6 +171,10 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
+  }
+
+  if (isAccessDenied(suiteError)) {
+    return <AccessDenied resourceType="test-suite" resourceRef={suiteId ?? ''} projectPrefix={prefix} />
   }
 
   if (!suite) {

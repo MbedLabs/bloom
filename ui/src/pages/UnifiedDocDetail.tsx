@@ -8,16 +8,22 @@ import DocumentDetail from './DocumentDetail'
 import ArtefactDetail from './ArtefactDetail'
 import CampaignDetail from './CampaignDetail'
 import SuiteDetail from './SuiteDetail'
+import AccessDenied from '../components/AccessDenied'
+import { docResourceType, isAccessDenied } from '../lib/accessDenied'
 
 export default function UnifiedDocDetail() {
   const { prefix, kind, docId } = useParams<{ prefix: string; kind: string; docId: string }>()
-  const { data: project } = useProjectByPrefix(prefix)
+  const { data: project, error: projectError } = useProjectByPrefix(prefix)
 
-  const { data: doc, isLoading } = useQuery({
+  const { data: doc, isLoading, error: docError } = useQuery({
     queryKey: ['doc-facade', prefix, kind, docId],
     queryFn: () => docsApi.get(prefix!, kind!, docId!),
     enabled: !!prefix && !!kind && !!docId,
   })
+
+  if (isAccessDenied(docError) || isAccessDenied(projectError)) {
+    return <AccessDenied resourceType={docResourceType(kind)} resourceRef={docId ?? ''} projectPrefix={prefix} />
+  }
 
   if (isLoading || !project) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>

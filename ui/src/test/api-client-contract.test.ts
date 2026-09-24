@@ -321,6 +321,10 @@ const CALLS: Array<[string, unknown[], string, string]> = [
   ['policiesApi.delete', [2], 'delete', '/policies/2'],
 
   ['auditApi.list', [{ action: 'auth.' }], 'get', '/audit'],
+  ['accessRequestsApi.create', [{ resource_type: 'requirement', resource_ref: 'APO-REQ-001' }], 'post', '/access-requests'],
+  ['accessRequestsApi.mine', [{ resource_type: 'requirement', resource_ref: 'APO-REQ-001' }], 'get', '/access-requests/mine'],
+  ['accessRequestsApi.list', [], 'get', '/access-requests'],
+  ['accessRequestsApi.decide', [3, 'granted'], 'post', '/access-requests/3/decision'],
   ['groupsApi.list', [], 'get', '/groups'],
   ['groupsApi.create', [{ name: 'G' }], 'post', '/groups'],
   ['groupsApi.update', [10, { name: 'G2' }], 'patch', '/groups/10'],

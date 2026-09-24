@@ -13,6 +13,7 @@ import {
   usersApi,
 } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
+import AccessRequestsPanel from '../components/AccessRequestsPanel'
 import { useToast } from '../components/useToast'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import {
@@ -348,6 +349,7 @@ export default function ProjectEdit() {
       )}
 
       <IntegrationSettingsPanel projectId={project.id} />
+      {user?.role === 'admin' && <AccessRequestsPanel projectPrefix={project.prefix} />}
       <ProjectMembersPanel
         projectId={project.id}
         members={projectMembers ?? []}

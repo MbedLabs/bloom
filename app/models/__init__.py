@@ -1,5 +1,6 @@
 """Models package initialization."""
 
+from app.models.access_request import AccessRequest
 from app.models.audit import AuditEvent
 from app.models.groups import Group, GroupMembership, GroupProjectGrant, Policy
 from app.models.models import (
@@ -43,6 +44,7 @@ from app.models.user import User, UserRole
 from app.models.user_token import UserToken, UserTokenPurpose
 
 __all__ = [
+    "AccessRequest",
     "AuditEvent",
     "AttachmentUploadAttempt",
     "AttachmentUploadLease",

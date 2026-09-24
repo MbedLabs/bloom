@@ -30,6 +30,8 @@ import {
 import { useProjectPermissions, type PermissionResource } from '../hooks/useProjectPermissions'
 import { useParameterValues } from '../hooks/useParameterValues'
 import { useArtefactLabels } from '../hooks/useArtefactLabels'
+import AccessDenied from '../components/AccessDenied'
+import { isAccessDenied } from '../lib/accessDenied'
 
 type ArtefactKind = 'design' | 'risk' | 'change' | 'test-concept' | 'defect'
 const KIND_RESOURCES: Record<ArtefactKind, PermissionResource> = {
@@ -170,7 +172,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
   const [form, setForm] = useState<Record<string, string>>({})
 
 
-  const { data: artefact, isLoading } = useQuery<ArtefactRecord>({
+  const { data: artefact, isLoading, error: loadError } = useQuery<ArtefactRecord>({
     queryKey: [config.queryKey, recordId],
     queryFn: () => config.get(recordId) as Promise<ArtefactRecord>,
     enabled: !!recordId,
@@ -344,6 +346,9 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
   }
 
   if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
+  if (isAccessDenied(loadError)) {
+    return <AccessDenied resourceType={kind} resourceRef={itemId ?? String(recordId)} projectPrefix={prefix} />
+  }
   if (!artefact || !artefactRecord) return <div className="text-center text-destructive">{config.singular} not found.</div>
 
   const code = String(artefactRecord[config.idField] ?? '')

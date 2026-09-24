@@ -15,6 +15,7 @@ from slowapi.errors import RateLimitExceeded
 from sqlalchemy import or_, select, text
 from sqlalchemy.exc import IntegrityError
 
+from app.api import access_requests as access_requests_api
 from app.api import artefacts, attachments
 from app.api import audit as audit_api
 from app.api import auth as auth_api
@@ -446,6 +447,9 @@ app.include_router(
 )
 app.include_router(users_api.router, prefix="/api/users", tags=["Users"])
 app.include_router(audit_api.router, prefix="/api/audit", tags=["Audit"])
+app.include_router(
+    access_requests_api.router, prefix="/api/access-requests", tags=["Access requests"]
+)
 app.include_router(groups.router, prefix="/api/groups", tags=["Groups"])
 app.include_router(policies.router, prefix="/api/policies", tags=["Policies"])
 app.include_router(setup.router, prefix="/api", tags=["Setup"])
