@@ -872,7 +872,28 @@ export const projectsApi = {
 /** Effective permissions on a project: resource (or `*`) to actions (or `*`). */
 export type ProjectPermissions = Record<string, string[]>
 
+/** Why a person has access to a project: a direct membership, or a group granted it. */
+export interface AccessOrigin {
+  kind: 'direct' | 'group'
+  role: string | null
+  group: string | null
+  policy: string | null
+  all_projects: boolean
+}
+
+/** A person with access to a project, with every reason they have it. */
+export interface ProjectAccessEntry {
+  user_id: number
+  email: string
+  full_name: string
+  origins: AccessOrigin[]
+}
+
 export const projectMembersApi = {
+  access: async (projectId: number): Promise<ProjectAccessEntry[]> => {
+    const response = await api.get<ProjectAccessEntry[]>(`/projects/${projectId}/access`)
+    return response.data
+  },
   permissions: async (projectId: number): Promise<ProjectPermissions> => {
     const response = await api.get<ProjectPermissions>(`/projects/${projectId}/permissions`)
     return response.data

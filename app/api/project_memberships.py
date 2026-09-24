@@ -1,6 +1,7 @@
-"""Project membership management (admin only)."""
+"""Project membership management, and who has access to a project and why."""
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +12,7 @@ from app.core.security import (
     get_current_user,
     require_permission,
 )
+from app.models.groups import Group, GroupMembership, GroupProjectGrant, Policy
 from app.models.project_membership import ProjectExternalDocType, ProjectMembership
 from app.models.user import User, UserRole
 from app.schemas.memberships import (
@@ -210,3 +212,67 @@ async def get_my_project_permissions(
     ``*`` stands for every resource or every action. An empty object means no access.
     """
     return as_lists(await effective_permissions(db, current_user, project_id))
+
+
+class AccessOrigin(BaseModel):
+    kind: str
+    role: str | None = None
+    group: str | None = None
+    policy: str | None = None
+    all_projects: bool = False
+
+
+class ProjectAccessEntry(BaseModel):
+    user_id: int
+    email: str
+    full_name: str
+    origins: list[AccessOrigin]
+
+
+@router.get("/{project_id}/access", response_model=list[ProjectAccessEntry])
+async def list_project_access(
+    project_id: int,
+    _allowed: User = Depends(require_permission("view", "member")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Everyone with access to the project and why: a direct membership with its role,
+    and every group granted the project (or all projects) with its policy."""
+    entries: dict[int, ProjectAccessEntry] = {}
+
+    def entry_for(user: User) -> ProjectAccessEntry:
+        if user.id not in entries:
+            entries[user.id] = ProjectAccessEntry(
+                user_id=user.id, email=user.email, full_name=user.full_name, origins=[]
+            )
+        return entries[user.id]
+
+    direct = await db.execute(
+        select(User, ProjectMembership.role)
+        .join(ProjectMembership, ProjectMembership.user_id == User.id)
+        .where(ProjectMembership.project_id == project_id)
+    )
+    for user, role in direct.all():
+        entry_for(user).origins.append(AccessOrigin(kind="direct", role=role))
+
+    via_groups = await db.execute(
+        select(User, Group.name, Policy.name, GroupProjectGrant.project_id)
+        .select_from(GroupMembership)
+        .join(User, User.id == GroupMembership.user_id)
+        .join(Group, Group.id == GroupMembership.group_id)
+        .join(GroupProjectGrant, GroupProjectGrant.group_id == Group.id)
+        .outerjoin(Policy, Policy.id == Group.policy_id)
+        .where(
+            (GroupProjectGrant.project_id == project_id) | (GroupProjectGrant.project_id.is_(None))
+        )
+        .order_by(Group.name)
+    )
+    for user, group_name, policy_name, granted_project in via_groups.all():
+        entry_for(user).origins.append(
+            AccessOrigin(
+                kind="group",
+                group=group_name,
+                policy=policy_name,
+                all_projects=granted_project is None,
+            )
+        )
+    return sorted(entries.values(), key=lambda e: e.full_name.lower())

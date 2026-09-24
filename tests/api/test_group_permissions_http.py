@@ -133,3 +133,51 @@ def test_policy_matrix_is_validated(api_client: TestClient):
     )
     assert patched.status_code == 400
     assert "unknown action 'fly' on 'requirement'" in patched.json()["detail"]
+
+
+def test_access_lists_everyone_with_access_and_why(api_client: TestClient):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, "Origins")["id"]
+    direct = _create_user(api_client, admin, role="maintainer")
+    grouped = _create_user(api_client, admin, role="maintainer")
+    everywhere = _create_user(api_client, admin, role="external")
+    api_client.post(
+        f"/api/projects/{project}/members",
+        headers=admin,
+        json={"user_id": direct["id"], "role": "maintainer"},
+    )
+    _grant(api_client, admin, "Test Author", grouped["id"], project)
+    _grant(api_client, admin, "Test Author", direct["id"], project)
+    all_group = _create_group(
+        api_client, admin, policy_id=_default_policy_id(api_client, admin, "Read Only")
+    )
+    granted = api_client.post(
+        f"/api/groups/{all_group['id']}/grants", headers=admin, json={"project_id": None}
+    )
+    assert granted.status_code == 201, granted.text
+    api_client.post(
+        f"/api/groups/{all_group['id']}/members", headers=admin, json={"user_id": everywhere["id"]}
+    )
+
+    access = api_client.get(f"/api/projects/{project}/access", headers=admin)
+    assert access.status_code == 200, access.text
+    by_user = {entry["user_id"]: entry["origins"] for entry in access.json()}
+    assert by_user[direct["id"]][0] == {
+        "kind": "direct",
+        "role": "maintainer",
+        "group": None,
+        "policy": None,
+        "all_projects": False,
+    }
+    assert [(o["kind"], o["policy"]) for o in by_user[direct["id"]][1:]] == [
+        ("group", "Test Author")
+    ]
+    assert by_user[grouped["id"]][0]["policy"] == "Test Author"
+    assert by_user[grouped["id"]][0]["all_projects"] is False
+    assert by_user[everywhere["id"]][0]["all_projects"] is True
+    assert by_user[everywhere["id"]][0]["group"] == all_group["name"]
+
+    denied = api_client.get(
+        f"/api/projects/{project}/access", headers=_headers_for(api_client, direct["email"])
+    )
+    assert denied.status_code == 403

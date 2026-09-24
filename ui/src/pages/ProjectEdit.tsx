@@ -6,6 +6,8 @@ import {
   extractApiErrorMessage,
   projectMembersApi,
   projectsApi,
+  type AccessOrigin,
+  type ProjectAccessEntry,
   type ProjectMember,
   type ProjectMemberRole,
   usersApi,
@@ -112,6 +114,12 @@ export default function ProjectEdit() {
     queryKey: ['users'],
     queryFn: usersApi.list,
     enabled: isAdmin,
+  })
+
+  const { data: projectAccess } = useQuery({
+    queryKey: ['project-access', project?.id],
+    queryFn: () => projectMembersApi.access(project!.id),
+    enabled: isAdmin && !!project?.id,
   })
 
   if (isLoading) {
@@ -344,19 +352,31 @@ export default function ProjectEdit() {
         projectId={project.id}
         members={projectMembers ?? []}
         users={users ?? []}
+        access={projectAccess ?? []}
       />
     </div>
   )
+}
+
+/** One reason for access, as a reader would say it. */
+function originLabel(origin: AccessOrigin): string {
+  if (origin.kind === 'direct') {
+    return `Direct (${origin.role === 'external' ? 'Reviewer' : 'Maintainer'})`
+  }
+  const policy = origin.policy ? ` (${origin.policy})` : ''
+  return `Via ${origin.group}${policy}${origin.all_projects ? ', all projects' : ''}`
 }
 
 function ProjectMembersPanel({
   projectId,
   members,
   users,
+  access,
 }: {
   projectId: number
   members: ProjectMember[]
   users: Array<{ id: number; email: string; full_name: string; role: 'admin' | 'maintainer' | 'external' }>
+  access: ProjectAccessEntry[]
 }) {
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -382,6 +402,7 @@ function ProjectMembersPanel({
       setSelectedRole('external')
       setSelectedDocTypes(['REQ', 'TC', 'CPT', 'CMP'])
       queryClient.invalidateQueries({ queryKey: ['project-members', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['project-access', projectId] })
       toast.notify('Member added', 'success')
     },
     onError: (mutationError) => {
@@ -406,6 +427,7 @@ function ProjectMembersPanel({
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project-members', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['project-access', projectId] })
       toast.saved('Member access')
     },
     onError: (error) => toast.failed('Saving the member access', error),
@@ -415,6 +437,7 @@ function ProjectMembersPanel({
     mutationFn: (membershipId: number) => projectMembersApi.remove(projectId, membershipId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project-members', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['project-access', projectId] })
       toast.notify('Member removed', 'success')
     },
     onError: (error) => toast.failed('Removing the member', error),
@@ -523,6 +546,38 @@ function ProjectMembersPanel({
               isRemoving={removeMutation.isPending}
             />
           ))
+        )}
+      </div>
+
+      <div className="mt-6">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-foreground">Who has access</h4>
+        <p className="mt-1 mb-3 text-sm text-muted-foreground">
+          Direct members, and members of groups granted this project or all projects. Group access is
+          changed on the Groups page.
+        </p>
+        {access.length === 0 ? (
+          <div className="rounded-md border border-border bg-background/40 px-4 py-3 text-sm text-muted-foreground">
+            No one has access to this project yet.
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="py-1.5 pr-4 font-medium">Name</th>
+                <th className="py-1.5 pr-4 font-medium">Email</th>
+                <th className="py-1.5 font-medium">Origin</th>
+              </tr>
+            </thead>
+            <tbody>
+              {access.map((entry) => (
+                <tr key={entry.user_id} className="border-t border-border">
+                  <td className="py-1.5 pr-4 text-foreground">{entry.full_name}</td>
+                  <td className="py-1.5 pr-4 text-muted-foreground">{entry.email}</td>
+                  <td className="py-1.5 text-foreground">{entry.origins.map(originLabel).join('; ')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     </section>

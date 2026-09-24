@@ -419,3 +419,46 @@ describe('project members', () => {
     expect(await screen.findByText(/no explicit project members yet/i)).toBeTruthy()
   })
 })
+
+describe('who has access', () => {
+  it('lists each person with every reason they have access', async () => {
+    vi.mocked(client.projectMembersApi.list).mockResolvedValue([projectMember] as never)
+    vi.mocked(client.projectMembersApi.access).mockResolvedValue([
+      {
+        user_id: 7,
+        email: 'ada@example.com',
+        full_name: 'Ada Direct',
+        origins: [
+          { kind: 'direct', role: 'maintainer', group: null, policy: null, all_projects: false },
+          { kind: 'group', role: null, group: 'Developers', policy: 'Design Author', all_projects: false },
+        ],
+      },
+      {
+        user_id: 8,
+        email: 'rex@example.com',
+        full_name: 'Rex Reviewer',
+        origins: [{ kind: 'direct', role: 'external', group: null, policy: null, all_projects: false }],
+      },
+      {
+        user_id: 9,
+        email: 'mo@example.com',
+        full_name: 'Mo Manager',
+        origins: [{ kind: 'group', role: null, group: 'Management', policy: null, all_projects: true }],
+      },
+    ] as never)
+    renderEdit()
+
+    expect(await screen.findByText('Who has access')).toBeTruthy()
+    expect(await screen.findByText('Direct (Maintainer); Via Developers (Design Author)')).toBeTruthy()
+    expect(screen.getByText('Direct (Reviewer)')).toBeTruthy()
+    expect(screen.getByText('Via Management, all projects')).toBeTruthy()
+    expect(client.projectMembersApi.access).toHaveBeenCalledWith(project.id)
+  })
+
+  it('says so when no one has access', async () => {
+    vi.mocked(client.projectMembersApi.list).mockResolvedValue([] as never)
+    vi.mocked(client.projectMembersApi.access).mockResolvedValue([] as never)
+    renderEdit()
+    expect(await screen.findByText('No one has access to this project yet.')).toBeTruthy()
+  })
+})
