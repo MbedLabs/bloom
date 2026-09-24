@@ -13,6 +13,7 @@ import { formatDateTime } from '../test/date-utils'
 import { useToast } from '../components/useToast'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
 import { useParameterValues } from '../hooks/useParameterValues'
+import { useArtefactLabels } from '../hooks/useArtefactLabels'
 
 function flattenSections(sections: DocumentSection[]): DocumentSection[] {
   const result: DocumentSection[] = []
@@ -63,6 +64,7 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
     enabled: !!docId,
   })
 
+  const artefactLabels = useArtefactLabels(prefix, doc?.content_json)
   const { data: project } = useQuery({
     queryKey: ['project', doc?.project_id],
     queryFn: () => projectsApi.get(doc!.project_id),
@@ -186,7 +188,7 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
             <DocEditor
               content={doc.content_json as Record<string, unknown>}
               editable={false}
-              parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues}
+              parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues} artefactLabels={artefactLabels}
             artefactHref={(type, _id, label) => docUrl(prefix, type as DocType, label)}
               minHeight="min-h-[40vh]"
             />

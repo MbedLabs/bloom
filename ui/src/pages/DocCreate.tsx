@@ -32,6 +32,7 @@ import {
 } from './docCreateIdPolicy'
 import { DOC_TYPE_RESOURCES, useProjectPermissions } from '../hooks/useProjectPermissions'
 import { useParameterValues } from '../hooks/useParameterValues'
+import { useArtefactLabels } from '../hooks/useArtefactLabels'
 
 function artefactActivityTypeForDocType(docType: DocType): string | null {
   if (docType === 'REQ') return 'requirement'
@@ -193,6 +194,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       : `Back to ${docRegistryListLabel(docType)}`
   const { can } = useProjectPermissions(prefix, projectId)
   const parameterValues = useParameterValues(prefix, projectId)
+  const artefactLabels = useArtefactLabels(prefix, contentJson)
   const canEditDocs = can(editMode ? 'edit' : 'create', DOC_TYPE_RESOURCES[docType])
   // The server allocates ids with MAX(suffix)+1, so ask it rather than assuming
   // -001, which was almost always already taken.
@@ -671,6 +673,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                   artefactSearch={artefactSearch}
                   artefactHref={artefactHref}
                   parameterValues={parameterValues}
+                  artefactLabels={artefactLabels}
                 />
               )}
             </div>

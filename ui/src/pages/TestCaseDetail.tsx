@@ -26,6 +26,7 @@ import {
 } from '../lib/membershipLinks'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
 import { useParameterValues } from '../hooks/useParameterValues'
+import { useArtefactLabels } from '../hooks/useArtefactLabels'
 
 function normalizeSteps(steps: unknown): TcsRow[] {
   return normalizeTcsRows(steps) as TcsRow[]
@@ -67,6 +68,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
     enabled: !!tcId,
   })
 
+  const artefactLabels = useArtefactLabels(prefix, testCase?.content_json)
   const { data: project } = useQuery({
     queryKey: ['project', testCase?.project_id],
     queryFn: () => projectsApi.get(testCase!.project_id),
@@ -318,7 +320,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
           <DocEditor
             content={testCase.content_json as Record<string, unknown>}
             editable={false}
-            parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues}
+            parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues} artefactLabels={artefactLabels}
             artefactHref={(type, _id, label) => docUrl(prefix, type as DocType, label)}
             minHeight="min-h-[120px]"
             className="border-0"

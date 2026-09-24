@@ -29,6 +29,7 @@ import {
 } from '../api/client'
 import { useProjectPermissions, type PermissionResource } from '../hooks/useProjectPermissions'
 import { useParameterValues } from '../hooks/useParameterValues'
+import { useArtefactLabels } from '../hooks/useArtefactLabels'
 
 type ArtefactKind = 'design' | 'risk' | 'change' | 'test-concept' | 'defect'
 const KIND_RESOURCES: Record<ArtefactKind, PermissionResource> = {
@@ -178,6 +179,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
   const projectId = artefact ? (artefact as unknown as Record<string, unknown>).project_id as number : undefined
   const { can } = useProjectPermissions(prefix, projectId)
   const parameterValues = useParameterValues(prefix, projectId)
+  const artefactLabels = useArtefactLabels(prefix, (artefact as unknown as Record<string, unknown> | undefined)?.content_json)
   const { data: projectData } = useQuery({
     queryKey: ['project', projectId],
     queryFn: () => projectsApi.get(projectId!),
@@ -539,7 +541,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
                 <DocEditor
                   content={artefactRecord.content_json as Record<string, unknown>}
                   editable={false}
-                  parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues}
+                  parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues} artefactLabels={artefactLabels}
             artefactHref={(type, _id, label) => docUrl(prefix, type as DocType, label)}
                   minHeight="min-h-[120px]"
                   className="border-0"

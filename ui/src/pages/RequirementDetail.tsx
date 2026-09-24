@@ -18,6 +18,7 @@ import {
 } from '../lib/membershipLinks'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
 import { useParameterValues } from '../hooks/useParameterValues'
+import { useArtefactLabels } from '../hooks/useArtefactLabels'
 
 function TypeBadge({ reqType }: { reqType: string }) {
   return (
@@ -79,6 +80,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
     enabled: !!reqId,
   })
 
+  const artefactLabels = useArtefactLabels(prefix, requirement?.content_json)
   const { data: project } = useQuery({
     queryKey: ['project', requirement?.project_id],
     queryFn: () => projectsApi.get(requirement!.project_id),
@@ -327,7 +329,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
           <DocEditor
             content={requirement.content_json as Record<string, unknown>}
             editable={false}
-            parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues}
+            parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues} artefactLabels={artefactLabels}
             artefactHref={(type, _id, label) => docUrl(prefix, type as DocType, label)}
             minHeight="min-h-[120px]"
             className="border-0"

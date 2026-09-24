@@ -53,6 +53,11 @@ interface DocEditorProps {
    * key and its value on hover; while reading, it shows the value.
    */
   parameterValues?: Record<string, string>
+  /**
+   * The current public id of each tagged artefact by `TYPE:id`; null when the target
+   * is gone. A tag shows the current id and reads as plain text once its target is gone.
+   */
+  artefactLabels?: Record<string, string | null>
 }
 
 type MentionSpec = [string, Record<string, string>, string]
@@ -74,6 +79,7 @@ export default function DocEditor({
   artefactHref,
   parameterHref,
   parameterValues,
+  artefactLabels,
 }: DocEditorProps) {
   const mentionItemsRef = useRef(mentionItems)
   const userMentionItemsRef = useRef(userMentionItems)
@@ -83,6 +89,7 @@ export default function DocEditor({
   const parameterHrefRef = useRef(parameterHref)
   const artefactSearchRef = useRef(artefactSearch)
   const parameterValuesRef = useRef(parameterValues)
+  const artefactLabelsRef = useRef(artefactLabels)
   const mentionViewsRef = useRef(new Set<() => void>())
   const artefactHrefRef = useRef(artefactHref)
 
@@ -100,6 +107,11 @@ export default function DocEditor({
   }, [parameterValues])
 
   useEffect(() => {
+    artefactLabelsRef.current = artefactLabels
+    mentionViewsRef.current.forEach((render) => render())
+  }, [artefactLabels])
+
+  useEffect(() => {
     artefactHrefRef.current = artefactHref
   }, [artefactHref])
 
@@ -115,17 +127,22 @@ export default function DocEditor({
     const label = String(node.attrs.label ?? node.attrs.id)
     if (node.attrs.mentionSuggestionChar === '#') {
       const [docType, rawId] = String(node.attrs.id).split(':')
+      const resolved = editing === null ? undefined : artefactLabelsRef.current?.[String(node.attrs.id)]
+      if (resolved === null) {
+        return ['span', { 'data-type': 'mention', class: 'mention-artefact-gone' }, label]
+      }
+      const shown = resolved ?? label
       const build = artefactHrefRef.current
-      const target = build && docType && rawId ? build(docType, Number(rawId), label) : undefined
+      const target = build && docType && rawId ? build(docType, Number(rawId), shown) : undefined
       const attrs: Record<string, string> = {
         'data-type': 'mention',
         class: 'mention-artefact text-primary font-medium',
       }
       if (target) {
         attrs.href = target
-        attrs.title = label
+        attrs.title = shown
       }
-      return [target ? 'a' : 'span', attrs, label]
+      return [target ? 'a' : 'span', attrs, shown]
     }
     if (node.attrs.mentionSuggestionChar === '@') {
       return ['span', { 'data-type': 'mention', class: 'mention-user text-blue-500 font-medium' }, `@${label}`]
