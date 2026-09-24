@@ -18,6 +18,7 @@
 
 ### Fixed
 
+- A database error while committing a request, such as a constraint violation, is answered with 409 or 500 and the request id; the commit now runs before the response is built instead of after it had started.
 - Requirements and test cases return their editor body.
 - A `#` tag shows the current id of the artefact it points at, looked up once per document, instead of the text captured when it was typed; a tag whose target is gone reads as plain text.
 

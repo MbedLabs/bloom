@@ -53,7 +53,7 @@ def _validate_permissions(permissions: dict) -> None:
 @router.get("", response_model=list[PolicyResponse])
 async def list_policies(
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(select(Policy).order_by(Policy.is_default.desc(), Policy.name.asc()))
     return [PolicyResponse.model_validate(p) for p in result.scalars().all()]
@@ -63,7 +63,7 @@ async def list_policies(
 async def create_policy(
     data: PolicyCreate,
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     existing = await db.execute(select(Policy).where(Policy.name == data.name))
     if existing.scalar_one_or_none():
@@ -88,7 +88,7 @@ async def create_policy(
 async def get_policy(
     policy_id: int,
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return PolicyResponse.model_validate(await _get_policy_or_404(db, policy_id))
 
@@ -98,7 +98,7 @@ async def update_policy(
     policy_id: int,
     data: PolicyUpdate,
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     policy = await _get_policy_or_404(db, policy_id)
     if data.description is not None:
@@ -125,7 +125,7 @@ async def update_policy(
 async def delete_policy(
     policy_id: int,
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     policy = await _get_policy_or_404(db, policy_id)
     if policy.is_default:

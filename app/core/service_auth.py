@@ -68,7 +68,7 @@ async def revoke_service_credential(db: AsyncSession, credential_id: int) -> Non
 
 async def require_bud_sync_token(
     token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> ServiceCredential:
     unauthorized = HTTPException(
         status_code=401,

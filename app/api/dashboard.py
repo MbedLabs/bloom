@@ -45,7 +45,7 @@ router = APIRouter()
 
 @router.get("/stats")
 async def get_dashboard_stats(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     user_scope = f"user:{current_user.id}" if current_user.role != UserRole.admin else "admin"

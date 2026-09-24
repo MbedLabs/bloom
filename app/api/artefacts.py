@@ -37,7 +37,7 @@ router = APIRouter()
 async def list_comments(
     artefact_type: str,
     artefact_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     artefact = await get_artefact_or_404(db, artefact_type, artefact_id, current_user)
@@ -69,7 +69,7 @@ async def create_comment(
     artefact_type: str,
     artefact_id: str,
     data: ArtefactCommentCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     artefact = await get_artefact_or_404(db, artefact_type, artefact_id, current_user)
@@ -123,7 +123,7 @@ async def create_comment(
 async def list_activity(
     artefact_type: str,
     artefact_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     artefact = await get_artefact_or_404(db, artefact_type, artefact_id, current_user)
@@ -150,7 +150,7 @@ async def list_activity(
 async def get_related_items(
     artefact_type: str,
     artefact_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     artefact = await get_artefact_or_404(db, artefact_type, artefact_id, current_user)
@@ -164,7 +164,7 @@ async def transition_status(
     artefact_type: str,
     artefact_id: str,
     data: ArtefactTransitionRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     artefact = await get_artefact_or_404(db, artefact_type, artefact_id, current_user)

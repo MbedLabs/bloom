@@ -203,7 +203,7 @@ async def get_traceability_matrix(
     sort_by: Optional[str] = Query("req_id", description="Sort: req_id, priority, coverage"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """The matrix lists every requirement in the project, which runs to thousands."""
@@ -306,7 +306,7 @@ async def get_traceability_matrix(
 async def get_impact_analysis(
     requirement_id: int,
     depth: int = Query(5, description="Max traversal depth"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(
@@ -447,7 +447,7 @@ async def get_impact_analysis(
 @router.get("/coverage-gaps/{project_id}", response_model=CoverageGapReport)
 async def get_coverage_gaps(
     project_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)

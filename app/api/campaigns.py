@@ -105,7 +105,7 @@ def _apply_result_to_campaign_item(item: TestCampaignItem, res) -> None:
 @router.post("/sync-results", response_model=SyncResultsResponse)
 async def sync_results_global(
     data: SyncResultsRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _service_credential=Depends(require_bud_sync_token),
 ):
     """
@@ -217,7 +217,7 @@ async def list_campaigns(
     status: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)
@@ -245,7 +245,7 @@ async def list_campaigns(
 @router.post("", response_model=TestCampaignDetailResponse, status_code=201)
 async def create_campaign(
     data: TestCampaignCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     proj_row = await db.execute(select(Project).where(Project.id == data.project_id))
@@ -359,7 +359,7 @@ async def create_campaign(
 @router.get("/{campaign_id}", response_model=TestCampaignDetailResponse)
 async def get_campaign(
     campaign_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(
@@ -380,7 +380,7 @@ async def get_campaign(
 async def update_campaign(
     campaign_id: int,
     data: TestCampaignUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
@@ -457,7 +457,7 @@ async def update_campaign(
 @router.delete("/{campaign_id}", status_code=204)
 async def delete_campaign(
     campaign_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
@@ -477,7 +477,7 @@ async def delete_campaign(
 async def add_campaign_item(
     campaign_id: int,
     test_case_id: int = Query(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
@@ -522,7 +522,7 @@ async def add_campaign_item(
 async def remove_campaign_item(
     campaign_id: int,
     item_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     campaign = (
@@ -553,7 +553,7 @@ async def update_campaign_item(
     campaign_id: int,
     item_id: int,
     data: TestCampaignItemUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     campaign = (

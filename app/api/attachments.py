@@ -67,7 +67,7 @@ async def _writable_document(db: AsyncSession, document_id: int, user: User) -> 
 @router.get("/documents/{document_id}/attachments", response_model=list[DocumentAttachmentResponse])
 async def list_attachments(
     document_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """Everything held against this document, oldest first."""
@@ -90,7 +90,7 @@ async def list_attachments(
 async def upload_attachment(
     document_id: int,
     file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """Attach a file to a document."""
@@ -134,7 +134,7 @@ async def upload_attachment(
 @router.get("/attachments/{attachment_id}/download")
 async def download_attachment(
     attachment_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """Download one attachment."""
@@ -177,7 +177,7 @@ async def download_attachment(
 @router.delete("/attachments/{attachment_id}", status_code=204)
 async def delete_attachment(
     attachment_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """Remove an attachment and the file behind it."""
@@ -211,7 +211,7 @@ async def delete_attachment(
 )
 async def publish_test_report(
     data: TestReportPublish,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _service_credential=Depends(require_bud_sync_token),
 ):
     """Receive a Bud run's report as a Report (RPT) document."""

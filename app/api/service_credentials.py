@@ -53,7 +53,7 @@ def _validate_scope(scope: str) -> None:
 
 @router.get("", response_model=list[ServiceCredentialSummary])
 async def list_service_credentials(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _admin: User = Depends(require_role(UserRole.admin)),
 ):
     return list(
@@ -68,7 +68,7 @@ async def list_service_credentials(
 @router.post("", response_model=ServiceCredentialCreated, status_code=201)
 async def create_credential(
     data: ServiceCredentialCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     admin: User = Depends(require_role(UserRole.admin)),
 ):
     _validate_scope(data.scope)
@@ -88,7 +88,7 @@ async def create_credential(
 @router.post("/{credential_id}/rotate", response_model=ServiceCredentialCreated)
 async def rotate_credential(
     credential_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     admin: User = Depends(require_role(UserRole.admin)),
 ):
     existing = await db.get(ServiceCredential, credential_id)
@@ -107,7 +107,7 @@ async def rotate_credential(
 @router.delete("/{credential_id}", status_code=204)
 async def revoke_credential(
     credential_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _admin: User = Depends(require_role(UserRole.admin)),
 ):
     await revoke_service_credential(db, credential_id)

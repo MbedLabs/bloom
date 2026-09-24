@@ -169,7 +169,7 @@ def _setting_response(s: IntegrationSetting) -> IntegrationSettingResponse:
 @router.get("/settings", response_model=list[IntegrationSettingResponse])
 async def list_integration_settings(
     project_id: int = Query(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)
@@ -191,7 +191,7 @@ async def list_integration_settings(
 @router.post("/settings", response_model=IntegrationSettingResponse, status_code=201)
 async def create_integration_setting(
     data: IntegrationSettingCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_role(UserRole.admin)),
 ):
     project = (
@@ -251,7 +251,7 @@ async def create_integration_setting(
 async def update_integration_setting(
     setting_id: int,
     data: IntegrationSettingUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_role(UserRole.admin)),
 ):
     setting = (
@@ -303,7 +303,7 @@ async def update_integration_setting(
 @router.delete("/settings/{setting_id}", status_code=204)
 async def delete_integration_setting(
     setting_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_role(UserRole.admin)),
 ):
     setting = (
@@ -326,7 +326,7 @@ async def delete_integration_setting(
 @router.get("/sync-events", response_model=list[SyncEventResponse])
 async def list_sync_events(
     defect_id: int = Query(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     defect = (await db.execute(select(Defect).where(Defect.id == defect_id))).scalar_one_or_none()
@@ -437,7 +437,7 @@ def _verify_github_signature(body: bytes, secret: str, signature: str) -> bool:
 @router.post("/github/webhook", status_code=200)
 async def github_webhook(
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     x_hub_signature_256: Optional[str] = Header(None),
     x_github_event: Optional[str] = Header(None),
     x_github_delivery: Optional[str] = Header(None),
@@ -540,7 +540,7 @@ def _verify_gitlab_token(secret: str, header_token: str) -> bool:
 @router.post("/gitlab/webhook", status_code=200)
 async def gitlab_webhook(
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     x_gitlab_token: Optional[str] = Header(None),
     x_gitlab_event: Optional[str] = Header(None),
     x_gitlab_event_uuid: Optional[str] = Header(None),
@@ -887,7 +887,7 @@ async def _create_defect_from_jira_issue(
 @router.post("/jira/webhook", status_code=200)
 async def jira_webhook(
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     x_hub_signature: Optional[str] = Header(None),
     x_atlassian_webhook_identifier: Optional[str] = Header(None),
 ):
@@ -1002,7 +1002,7 @@ async def _search_jira(setting: IntegrationSetting) -> list[dict]:
 @router.post("/settings/{setting_id}/jira/pull", response_model=JiraPullResult)
 async def pull_jira_issues(
     setting_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_role(UserRole.admin)),
 ):
     """Create the defects for existing Jira issues the project takes in.

@@ -147,7 +147,7 @@ async def list_links(
     source_id: int | None = Query(None),
     target_type: str | None = Query(None),
     target_id: int | None = Query(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)
@@ -202,7 +202,7 @@ async def list_links(
 @router.post("", response_model=ArtefactLinkResponse, status_code=201)
 async def create_link(
     data: ArtefactLinkCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     data.source_type = normalize_linkable_type(data.source_type)
@@ -272,7 +272,7 @@ async def create_link(
 @router.delete("/{link_id}", status_code=204)
 async def delete_link(
     link_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     link = (

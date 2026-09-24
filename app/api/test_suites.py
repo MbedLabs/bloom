@@ -223,7 +223,7 @@ async def list_suites(
     project_id: int = Query(...),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)
@@ -247,7 +247,7 @@ async def list_suites(
 @router.post("", response_model=TestSuiteDetailResponse, status_code=201)
 async def create_suite(
     data: TestSuiteCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     project = (
@@ -304,7 +304,7 @@ async def create_suite(
 @router.get("/{suite_id}", response_model=TestSuiteDetailResponse)
 async def get_suite(
     suite_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     suite = (
@@ -326,7 +326,7 @@ async def get_suite(
 async def update_suite(
     suite_id: int,
     data: TestSuiteUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     suite = (
@@ -353,7 +353,7 @@ async def update_suite(
 @router.delete("/{suite_id}", status_code=204)
 async def delete_suite(
     suite_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     suite = (
@@ -374,7 +374,7 @@ async def delete_suite(
 async def add_suite_item(
     suite_id: int,
     test_case_id: int = Query(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     suite = (
@@ -427,7 +427,7 @@ async def add_suite_item(
 async def remove_suite_item(
     suite_id: int,
     item_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     suite = (

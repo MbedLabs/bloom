@@ -46,7 +46,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -312,7 +312,7 @@ def require_permission(action: str, resource: str):
     async def permission_checker(
         project_id: int,
         current_user: User = Depends(get_current_user),
-        db: AsyncSession = Depends(get_db),
+        db: AsyncSession = Depends(get_db, scope="function"),
     ) -> User:
         if current_user.role == UserRole.admin:
             return current_user

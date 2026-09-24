@@ -84,7 +84,7 @@ async def _build_snapshot(db: AsyncSession, project_id: int) -> dict:
 @router.get("", response_model=list[BaselineResponse])
 async def list_baselines(
     project_id: int | None = Query(None, description="Optional project filter"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     if project_id is not None:
@@ -101,7 +101,7 @@ async def list_baselines(
 @router.post("", response_model=BaselineResponse, status_code=201)
 async def create_baseline(
     data: BaselineCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     project = (
@@ -137,7 +137,7 @@ async def create_baseline(
 @router.get("/{baseline_id}", response_model=BaselineResponse)
 async def get_baseline(
     baseline_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (
@@ -153,7 +153,7 @@ async def get_baseline(
 async def update_baseline(
     baseline_id: int,
     data: BaselineUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (
@@ -180,7 +180,7 @@ async def update_baseline(
 @router.delete("/{baseline_id}", status_code=204)
 async def delete_baseline(
     baseline_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (

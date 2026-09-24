@@ -109,7 +109,7 @@ async def _send_email_change_confirmation(
 @router.get("", response_model=list[UserResponse])
 async def list_users(
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(select(User).order_by(User.created_at.desc()))
     return [UserResponse.model_validate(u) for u in result.scalars().all()]
@@ -119,7 +119,7 @@ async def list_users(
 @router.get("/mentionable", response_model=list[MentionableUserResponse])
 async def list_mentionable_users(
     project_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """Who may be addressed with `@` in one project."""
@@ -145,7 +145,7 @@ async def list_mentionable_users(
 async def create_user(
     data: UserCreate,
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     existing = await db.execute(select(User).where(User.email == data.email))
     if existing.scalar_one_or_none():
@@ -167,7 +167,7 @@ async def create_user(
 async def invite_user(
     data: InviteCreateRequest,
     admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     existing = await db.execute(select(User).where(User.email == data.email))
     user = existing.scalar_one_or_none()
@@ -230,7 +230,7 @@ async def invite_user(
 async def resend_invite(
     user_id: int,
     admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
@@ -274,7 +274,7 @@ async def resend_invite(
 async def revoke_invite(
     user_id: int,
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
@@ -293,7 +293,7 @@ async def revoke_invite(
 async def get_user(
     user_id: int,
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
@@ -307,7 +307,7 @@ async def start_email_change(
     user_id: int,
     data: AdminEmailChangeRequest,
     admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Start the verified email-change workflow for a user."""
     user = await _get_user_or_404(db, user_id)
@@ -321,7 +321,7 @@ async def start_email_change(
 async def approve_email_change(
     user_id: int,
     admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     user = await _get_user_or_404(db, user_id)
     if not user.pending_email or user.email_change_status != "requested":
@@ -338,7 +338,7 @@ async def approve_email_change(
 async def reject_email_change(
     user_id: int,
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     user = await _get_user_or_404(db, user_id)
     if not user.pending_email:
@@ -357,7 +357,7 @@ async def update_user(
     user_id: int,
     data: UserUpdate,
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
@@ -384,7 +384,7 @@ async def update_user(
 async def delete_user(
     user_id: int,
     admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()

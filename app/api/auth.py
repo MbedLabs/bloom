@@ -104,7 +104,7 @@ async def login(
     request: Request,
     data: LoginRequest,
     response: Response,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(select(User).where(User.email == data.email))
     user = result.scalar_one_or_none()
@@ -136,7 +136,7 @@ async def login(
 async def refresh(
     request: Request,
     response: Response,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     refresh_token: Optional[str] = Cookie(default=None, alias=REFRESH_COOKIE_NAME),
 ):
     """Exchange a valid refresh cookie for a new access token, rotating the
@@ -176,7 +176,7 @@ async def refresh(
 @router.post("/logout", response_model=GenericMessageResponse)
 async def logout(
     response: Response,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     refresh_token: Optional[str] = Cookie(default=None, alias=REFRESH_COOKIE_NAME),
 ):
     """Revoke the current refresh token server-side and clear the cookie."""
@@ -197,7 +197,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
 async def update_me(
     data: UserUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     if data.full_name is not None:
         current_user.full_name = data.full_name
@@ -213,7 +213,7 @@ async def update_me(
 async def request_email_change(
     data: EmailChangeRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Request a verified email change."""
     current_user = await db.get(
@@ -277,7 +277,7 @@ async def request_email_change(
 @router.delete("/me/email", response_model=GenericMessageResponse)
 async def cancel_email_change(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Cancel a pending email change: clear the pending address and burn any
     outstanding confirmation tokens."""
@@ -301,7 +301,7 @@ async def cancel_email_change(
 async def confirm_email_change(
     data: ConfirmEmailChangeRequest,
     response: Response,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Advance or complete a verified email change."""
     try:
@@ -397,7 +397,7 @@ async def change_password(
     data: PasswordChange,
     response: Response,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     if not verify_password(data.current_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
@@ -414,7 +414,9 @@ async def change_password(
 
 
 @router.post("/invite-info", response_model=InviteInfoResponse)
-async def get_invite_info(data: InviteInfoRequest, db: AsyncSession = Depends(get_db)):
+async def get_invite_info(
+    data: InviteInfoRequest, db: AsyncSession = Depends(get_db, scope="function")
+):
     user_token = await find_token(db, token=data.token, purpose=UserTokenPurpose.invite)
     if user_token is None:
         raise HTTPException(status_code=400, detail="Invalid token")
@@ -434,7 +436,9 @@ async def get_invite_info(data: InviteInfoRequest, db: AsyncSession = Depends(ge
 
 
 @router.post("/accept-invite", response_model=AcceptInviteResponse)
-async def accept_invite(data: AcceptInviteRequest, db: AsyncSession = Depends(get_db)):
+async def accept_invite(
+    data: AcceptInviteRequest, db: AsyncSession = Depends(get_db, scope="function")
+):
     try:
         claimed = await claim_token(db, token=data.token, purpose=UserTokenPurpose.invite)
     except TokenValidationError as exc:
@@ -463,7 +467,9 @@ async def accept_invite(data: AcceptInviteRequest, db: AsyncSession = Depends(ge
 
 
 @router.post("/verify-email", response_model=GenericMessageResponse)
-async def verify_email(data: VerifyEmailRequest, db: AsyncSession = Depends(get_db)):
+async def verify_email(
+    data: VerifyEmailRequest, db: AsyncSession = Depends(get_db, scope="function")
+):
     try:
         claimed = await claim_token(
             db,
@@ -489,7 +495,7 @@ async def verify_email(data: VerifyEmailRequest, db: AsyncSession = Depends(get_
 async def resend_verification(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     if current_user.email_verified_at is not None:
         raise HTTPException(status_code=400, detail="Email already verified")
@@ -522,7 +528,7 @@ async def resend_verification(
 async def forgot_password(
     request: Request,
     data: ForgotPasswordRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     response = GenericMessageResponse(
         message="If the account exists, a password reset email has been sent"
@@ -558,7 +564,7 @@ async def forgot_password(
 async def reset_password(
     data: ResetPasswordRequest,
     response: Response,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     try:
         claimed = await claim_token(

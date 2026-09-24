@@ -86,7 +86,7 @@ async def _policy_exists_or_400(db: AsyncSession, policy_id: int) -> None:
 @router.get("", response_model=list[GroupResponse])
 async def list_groups(
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     groups = (await db.execute(select(Group).order_by(Group.name.asc()))).scalars().all()
     return [await _group_response(db, group) for group in groups]
@@ -96,7 +96,7 @@ async def list_groups(
 async def create_group(
     data: GroupCreate,
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     if (await db.execute(select(Group).where(Group.name == data.name))).scalar_one_or_none():
         raise HTTPException(status_code=400, detail="A group with this name already exists")
@@ -113,7 +113,7 @@ async def create_group(
 async def get_group(
     group_id: int,
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     return await _group_response(db, await _get_group_or_404(db, group_id))
 
@@ -123,7 +123,7 @@ async def update_group(
     group_id: int,
     data: GroupUpdate,
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     group = await _get_group_or_404(db, group_id)
     if data.name is not None and data.name != group.name:
@@ -148,7 +148,7 @@ async def update_group(
 async def delete_group(
     group_id: int,
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     await _get_group_or_404(db, group_id)
     await db.execute(delete(GroupMembership).where(GroupMembership.group_id == group_id))
@@ -162,7 +162,7 @@ async def add_member(
     group_id: int,
     data: GroupMemberCreate,
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     group = await _get_group_or_404(db, group_id)
     if await db.get(User, data.user_id) is None:
@@ -187,7 +187,7 @@ async def remove_member(
     group_id: int,
     user_id: int,
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     await _get_group_or_404(db, group_id)
     row = (
@@ -209,7 +209,7 @@ async def add_grant(
     group_id: int,
     data: GroupGrantCreate,
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     group = await _get_group_or_404(db, group_id)
     if data.project_id is not None and await db.get(Project, data.project_id) is None:
@@ -236,7 +236,7 @@ async def remove_grant(
     group_id: int,
     grant_id: int,
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     await _get_group_or_404(db, group_id)
     row = (

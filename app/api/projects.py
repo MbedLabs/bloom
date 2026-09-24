@@ -224,7 +224,7 @@ async def _project_counts_bulk(
 
 @router.get("", response_model=list[ProjectResponse])
 async def list_projects(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -266,7 +266,7 @@ async def list_projects(
 @router.post("", response_model=ProjectResponse, status_code=201)
 async def create_project(
     data: ProjectCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
 ):
     """
@@ -314,7 +314,7 @@ async def create_project(
 @router.get("/by-prefix/{prefix}", response_model=ProjectResponse)
 async def get_project_by_prefix(
     prefix: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -345,7 +345,7 @@ async def get_project_by_prefix(
 @router.get("/{project_id}", response_model=ProjectResponse)
 async def get_project(
     project_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -374,7 +374,7 @@ async def get_project(
 async def update_project(
     project_id: int,
     data: ProjectUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_role(UserRole.admin)),
 ):
     """
@@ -427,7 +427,7 @@ async def update_project(
 @router.delete("/{project_id}", status_code=204)
 async def delete_project(
     project_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _current_user: User = Depends(require_role(UserRole.admin)),
 ):
     """

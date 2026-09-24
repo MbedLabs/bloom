@@ -46,7 +46,7 @@ async def list_defects(
     severity: str | None = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)
@@ -71,7 +71,7 @@ async def list_defects(
 @router.post("", response_model=DefectResponse, status_code=201)
 async def create_defect(
     data: DefectCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     project = (
@@ -135,7 +135,7 @@ async def create_defect(
 @router.get("/{defect_pk}", response_model=DefectResponse)
 async def get_defect(
     defect_pk: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (
@@ -155,7 +155,7 @@ async def get_defect(
 async def update_defect(
     defect_pk: int,
     data: DefectUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (await db.execute(select(Defect).where(Defect.id == defect_pk))).scalar_one_or_none()
@@ -225,7 +225,7 @@ async def update_defect(
 @router.delete("/{defect_pk}", status_code=204)
 async def delete_defect(
     defect_pk: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (await db.execute(select(Defect).where(Defect.id == defect_pk))).scalar_one_or_none()
@@ -258,7 +258,7 @@ class RefreshTokenPayload(BaseModel):
 async def refresh_external_issue(
     defect_pk: int,
     payload: RefreshTokenPayload | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """Fetch current state from GitHub/GitLab and update cached fields."""

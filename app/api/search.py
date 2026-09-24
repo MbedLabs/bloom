@@ -157,7 +157,7 @@ async def global_search(
     q: str = Query(..., min_length=MIN_QUERY_LENGTH, max_length=200),
     project_id: Optional[int] = Query(default=None),
     limit: int = Query(default=25, ge=1, le=50),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     return await run_global_search(db, current_user, q=q, project_id=project_id, limit=limit)

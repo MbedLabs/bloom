@@ -39,7 +39,7 @@ async def list_risk_items(
     project_id: int = Query(..., description="Filter by project ID"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)
@@ -57,7 +57,7 @@ async def list_risk_items(
 @router.post("", response_model=RiskItemResponse, status_code=201)
 async def create_risk_item(
     data: RiskItemCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     project = (
@@ -124,7 +124,7 @@ async def create_risk_item(
 @router.get("/{risk_id}", response_model=RiskItemResponse)
 async def get_risk_item(
     risk_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (
@@ -144,7 +144,7 @@ async def get_risk_item(
 async def update_risk_item(
     risk_id: int,
     data: RiskItemUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (await db.execute(select(RiskItem).where(RiskItem.id == risk_id))).scalar_one_or_none()
@@ -198,7 +198,7 @@ async def update_risk_item(
 @router.delete("/{risk_id}", status_code=204)
 async def delete_risk_item(
     risk_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (await db.execute(select(RiskItem).where(RiskItem.id == risk_id))).scalar_one_or_none()

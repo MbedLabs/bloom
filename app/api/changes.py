@@ -39,7 +39,7 @@ async def list_change_requests(
     project_id: int = Query(..., description="Filter by project ID"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)
@@ -57,7 +57,7 @@ async def list_change_requests(
 @router.post("", response_model=ChangeRequestResponse, status_code=201)
 async def create_change_request(
     data: ChangeRequestCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     project = (
@@ -123,7 +123,7 @@ async def create_change_request(
 @router.get("/{change_id}", response_model=ChangeRequestResponse)
 async def get_change_request(
     change_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (
@@ -145,7 +145,7 @@ async def get_change_request(
 async def update_change_request(
     change_id: int,
     data: ChangeRequestUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (
@@ -210,7 +210,7 @@ async def update_change_request(
 @router.delete("/{change_id}", status_code=204)
 async def delete_change_request(
     change_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (

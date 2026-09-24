@@ -57,7 +57,7 @@ async def _build_member_response(
 async def list_project_members(
     project_id: int,
     _allowed: User = Depends(require_permission("view", "member")),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
         select(ProjectMembership).where(ProjectMembership.project_id == project_id)
@@ -71,7 +71,7 @@ async def add_project_member(
     project_id: int,
     data: ProjectMembershipCreate,
     _allowed: User = Depends(require_permission("manage", "member")),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     user_row = await db.execute(select(User).where(User.id == data.user_id))
     user = user_row.scalar_one_or_none()
@@ -124,7 +124,7 @@ async def get_project_member(
     project_id: int,
     membership_id: int,
     _allowed: User = Depends(require_permission("view", "member")),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
         select(ProjectMembership).where(
@@ -144,7 +144,7 @@ async def update_project_member(
     membership_id: int,
     data: ProjectMembershipUpdate,
     _allowed: User = Depends(require_permission("manage", "member")),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
         select(ProjectMembership).where(
@@ -187,7 +187,7 @@ async def remove_project_member(
     project_id: int,
     membership_id: int,
     _allowed: User = Depends(require_permission("manage", "member")),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
         select(ProjectMembership).where(
@@ -205,7 +205,7 @@ async def remove_project_member(
 async def get_my_project_permissions(
     project_id: int,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """The current user's effective permissions on the project, as {resource: [action]}.
 
@@ -233,7 +233,7 @@ class ProjectAccessEntry(BaseModel):
 async def list_project_access(
     project_id: int,
     _allowed: User = Depends(require_permission("view", "member")),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Everyone with access to the project and why: a direct membership with its role,
     and every group granted the project (or all projects) with its policy."""

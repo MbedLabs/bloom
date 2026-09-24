@@ -332,7 +332,7 @@ async def list_requirements(
     status: Optional[str] = Query(None, description="Filter by status"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -383,7 +383,7 @@ async def list_requirements(
 @router.post("", response_model=RequirementResponse, status_code=201)
 async def create_requirement(
     data: RequirementCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -497,7 +497,7 @@ async def create_requirement(
 @router.get("/{requirement_id}", response_model=RequirementResponse)
 async def get_requirement(
     requirement_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -524,7 +524,7 @@ async def get_requirement(
 async def update_requirement(
     requirement_id: int,
     data: RequirementUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -687,7 +687,7 @@ async def update_requirement(
 @router.delete("/{requirement_id}", status_code=204)
 async def delete_requirement(
     requirement_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -724,7 +724,7 @@ async def delete_requirement(
 async def link_test_run(
     requirement_id: int,
     data: TestRunLinkCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _current_user: User = Depends(get_current_user),
 ):
     """
@@ -763,7 +763,7 @@ async def link_test_run(
 )
 async def get_linked_test_runs(
     requirement_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """

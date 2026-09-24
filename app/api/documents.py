@@ -43,7 +43,7 @@ async def list_documents(
     project_id: int,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)
@@ -101,7 +101,7 @@ async def list_documents(
 async def create_document(
     project_id: int,
     data: DocumentCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     from app.models import Project
@@ -183,7 +183,7 @@ async def create_document(
 @router.get("/documents/{document_id}", response_model=DocumentDetailResponse)
 async def get_document(
     document_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(
@@ -261,7 +261,7 @@ async def get_document(
 async def update_document(
     document_id: int,
     data: DocumentUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(Document).where(Document.id == document_id))
@@ -351,7 +351,7 @@ async def update_document(
 @router.delete("/documents/{document_id}", status_code=204)
 async def delete_document(
     document_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(Document).where(Document.id == document_id))
@@ -385,7 +385,7 @@ async def delete_document(
 async def create_section(
     document_id: int,
     data: DocumentSectionCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(Document).where(Document.id == document_id))
@@ -432,7 +432,7 @@ async def create_section(
 async def update_section(
     section_id: int,
     data: DocumentSectionUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(DocumentSection).where(DocumentSection.id == section_id))
@@ -504,7 +504,7 @@ async def update_section(
 @router.delete("/document-sections/{section_id}", status_code=204)
 async def delete_section(
     section_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(DocumentSection).where(DocumentSection.id == section_id))
@@ -532,7 +532,7 @@ async def delete_section(
 async def reorder_sections(
     document_id: int,
     data: SectionReorder,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(select(Document).where(Document.id == document_id))

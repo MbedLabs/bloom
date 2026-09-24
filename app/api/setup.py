@@ -30,7 +30,7 @@ async def _user_count(db: AsyncSession) -> int:
 
 
 @router.get("/setup/status", response_model=SetupStatusResponse)
-async def setup_status(db: AsyncSession = Depends(get_db)) -> SetupStatusResponse:
+async def setup_status(db: AsyncSession = Depends(get_db, scope="function")) -> SetupStatusResponse:
     """Report whether the instance still needs its first administrator."""
     return SetupStatusResponse(setup_required=await _user_count(db) == 0)
 
@@ -44,7 +44,7 @@ async def setup_status(db: AsyncSession = Depends(get_db)) -> SetupStatusRespons
 async def create_first_admin(
     request: Request,
     data: CreateFirstAdminRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> GenericMessageResponse:
     """Create the first administrator, once, on an instance that has no users."""
     # Serialise concurrent attempts so two simultaneous requests cannot both see

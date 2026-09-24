@@ -55,7 +55,7 @@ async def list_test_concepts(
     project_id: int = Query(..., description="Filter by project ID"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)
@@ -73,7 +73,7 @@ async def list_test_concepts(
 @router.post("", response_model=TestConceptResponse, status_code=201)
 async def create_test_concept(
     data: TestConceptCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     project = (
@@ -137,7 +137,7 @@ async def create_test_concept(
 @router.get("/{concept_id}", response_model=TestConceptResponse)
 async def get_test_concept(
     concept_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (
@@ -159,7 +159,7 @@ async def get_test_concept(
 async def update_test_concept(
     concept_id: int,
     data: TestConceptUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (
@@ -215,7 +215,7 @@ async def update_test_concept(
 @router.delete("/{concept_id}", status_code=204)
 async def delete_test_concept(
     concept_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (

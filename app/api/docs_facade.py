@@ -491,7 +491,7 @@ async def list_all_docs(
     include_link_counts: bool = Query(True),
     skip: int = Query(0, ge=0),
     limit: int | None = Query(None, ge=1, le=500),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """List all docs across all types for a project."""
@@ -730,7 +730,7 @@ class DocTypeSummaryResponse(BaseModel):
 )
 async def get_doc_type_summary(
     project_ref: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """How many documents of each type this user can see, and how many suspect links."""
@@ -828,7 +828,7 @@ _DOCUMENT_TYPE_CODES = {"SPEC", "PRT", "RPT", "STD"}
 async def get_next_doc_id(
     project_ref: str,
     type_code: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """Report the identifier the server would assign to the next document."""
@@ -859,7 +859,7 @@ async def get_doc_by_kind_and_string_id(
     project_ref: str,
     kind_slug: str,
     doc_id_str: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """Look up a doc by its kind-aware slug and human-readable string ID."""

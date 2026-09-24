@@ -108,7 +108,7 @@ def _copied_resource(doc_type: str) -> str:
 async def import_docs(
     project_id: int,
     data: ImportRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     target_project = (
@@ -362,7 +362,7 @@ def _requirement_title(obj: ReqIFObject) -> str:
 async def import_reqif(
     project_id: int,
     file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """Import a ReqIF (``.reqif`` / ``.reqifz``) export as project requirements."""
@@ -530,7 +530,7 @@ async def import_test_cases_file(
     project_id: int,
     format: str = Query("csv", pattern="^(csv|xml)$"),
     file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """Import test cases from a CSV or XML file in Bloom's export format (round-trip).
@@ -730,7 +730,7 @@ async def import_markdown(
     default_type: Optional[str] = Query(None),
     file: UploadFile = File(...),
     collision_actions: Optional[str] = Form(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """Import a Markdown document: create its parameters and one artefact per
@@ -982,7 +982,7 @@ async def _testrail_project(db: AsyncSession, project_id: int, current_user: Use
 async def testrail_csv_columns(
     project_id: int,
     file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """The columns of a TestRail CSV export and the fields Bloom recognised in them."""
@@ -1007,7 +1007,7 @@ async def import_testrail(
     format: str = Query("xml", pattern="^(xml|csv)$"),
     file: UploadFile = File(...),
     mapping: Optional[str] = Form(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """Import a TestRail XML or CSV export as test cases, suites and requirement links.

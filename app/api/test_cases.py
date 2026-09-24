@@ -205,7 +205,7 @@ async def list_test_cases(
     project_id: int = Query(..., description="Filter by project ID"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -253,7 +253,7 @@ async def list_test_cases(
 @router.post("", response_model=TestCaseResponse, status_code=201)
 async def create_test_case(
     data: TestCaseCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -315,7 +315,7 @@ async def create_test_case(
 @router.get("/{test_case_id}", response_model=TestCaseResponse)
 async def get_test_case(
     test_case_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -342,7 +342,7 @@ async def get_test_case(
 async def update_test_case(
     test_case_id: int,
     data: TestCaseUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -453,7 +453,7 @@ async def update_test_case(
 @router.delete("/{test_case_id}", status_code=204)
 async def delete_test_case(
     test_case_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """

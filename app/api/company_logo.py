@@ -28,7 +28,7 @@ async def _company_logo_row(db: AsyncSession) -> CompanyLogo:
 @router.put("/logo")
 async def set_company_logo(
     file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_role(UserRole.admin)),
 ):
     """Store the company logo used on report letterheads (admin only)."""
@@ -47,7 +47,7 @@ async def set_company_logo(
 
 @router.get("/logo")
 async def get_company_logo(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """Return the stored company logo, or 404 when none is set."""
@@ -59,7 +59,7 @@ async def get_company_logo(
 
 @router.delete("/logo", status_code=204)
 async def delete_company_logo(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_role(UserRole.admin)),
 ):
     """Remove the stored company logo (admin only)."""

@@ -45,7 +45,7 @@ async def list_notifications(
     unread_only: bool = Query(default=False),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     base = select(Notification).where(Notification.user_id == current_user.id)
@@ -80,7 +80,7 @@ async def list_notifications(
 
 @router.get("/unread-count", response_model=UnreadCountResponse)
 async def unread_count(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     unread = (
@@ -96,7 +96,7 @@ async def unread_count(
 @router.post("/{notification_id}/read", response_model=NotificationResponse)
 async def mark_read(
     notification_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     notification = (
@@ -117,7 +117,7 @@ async def mark_read(
 
 @router.post("/read-all", response_model=UnreadCountResponse)
 async def mark_all_read(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     await db.execute(

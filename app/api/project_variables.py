@@ -20,7 +20,7 @@ router = APIRouter()
 @router.get("", response_model=list[ProjectVariableResponse])
 async def list_project_variables(
     project_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     project = (
@@ -47,7 +47,7 @@ async def list_project_variables(
 @router.post("", response_model=ProjectVariableResponse, status_code=201)
 async def create_project_variable(
     data: ProjectVariableCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     project = (
@@ -92,7 +92,7 @@ async def create_project_variable(
 async def update_project_variable(
     item_id: int,
     data: ProjectVariableUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (
@@ -142,7 +142,7 @@ async def update_project_variable(
 @router.delete("/{item_id}", status_code=204)
 async def delete_project_variable(
     item_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (

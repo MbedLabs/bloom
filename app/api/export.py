@@ -200,7 +200,7 @@ def _requirements_pdf(
 async def export_requirements(
     project_id: int,
     format: str = Query(default="csv", pattern="^(csv|pdf)$"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """Export the project's requirements as CSV or a PDF specification."""
@@ -253,7 +253,7 @@ async def export_requirements(
 @router.get("/projects/{project_id}/export/traceability")
 async def export_traceability(
     project_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """Export the requirement <-> verifying-test-case matrix as CSV."""
@@ -371,7 +371,7 @@ def _test_cases_xml(project: Project, test_cases: list[TestCase]) -> bytes:
 async def export_test_cases(
     project_id: int,
     format: str = Query(default="csv", pattern="^(csv|md|xml)$"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """Export the project's test cases as CSV, Markdown or XML."""

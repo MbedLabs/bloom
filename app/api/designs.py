@@ -39,7 +39,7 @@ async def list_design_items(
     project_id: int = Query(..., description="Filter by project ID"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)
@@ -57,7 +57,7 @@ async def list_design_items(
 @router.post("", response_model=DesignItemResponse, status_code=201)
 async def create_design_item(
     data: DesignItemCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     project = (
@@ -122,7 +122,7 @@ async def create_design_item(
 @router.get("/{design_id}", response_model=DesignItemResponse)
 async def get_design_item(
     design_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (
@@ -142,7 +142,7 @@ async def get_design_item(
 async def update_design_item(
     design_id: int,
     data: DesignItemUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (
@@ -198,7 +198,7 @@ async def update_design_item(
 @router.delete("/{design_id}", status_code=204)
 async def delete_design_item(
     design_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (
