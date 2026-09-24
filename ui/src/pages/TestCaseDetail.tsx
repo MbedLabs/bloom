@@ -25,6 +25,7 @@ import {
   membershipLinksForSuites,
 } from '../lib/membershipLinks'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import { useParameterValues } from '../hooks/useParameterValues'
 
 function normalizeSteps(steps: unknown): TcsRow[] {
   return normalizeTcsRows(steps) as TcsRow[]
@@ -52,6 +53,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
   const { user } = useAuth()
   const { prefix, itemId } = useParams<{ prefix: string; itemId: string }>()
   const { can } = useProjectPermissions(prefix)
+  const parameterValues = useParameterValues(prefix)
   const tcId = resolvedId || parseInt(itemId || '0')
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -316,7 +318,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
           <DocEditor
             content={testCase.content_json as Record<string, unknown>}
             editable={false}
-            parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined}
+            parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues}
             artefactHref={(type, _id, label) => docUrl(prefix, type as DocType, label)}
             minHeight="min-h-[120px]"
             className="border-0"
@@ -329,7 +331,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
       ) : null}
 
       {tcsRows.length > 0 && (
-        <TcsArteTable rows={tcsRows} onChange={() => {}} editable={false} parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} />
+        <TcsArteTable rows={tcsRows} onChange={() => {}} editable={false} parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues} />
       )}
 
       <DocumentActivityPanel artefactType="test-case" artefactId={tcId} />

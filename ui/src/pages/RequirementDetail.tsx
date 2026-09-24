@@ -17,6 +17,7 @@ import {
   membershipLinksForSuites,
 } from '../lib/membershipLinks'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import { useParameterValues } from '../hooks/useParameterValues'
 
 function TypeBadge({ reqType }: { reqType: string }) {
   return (
@@ -66,6 +67,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
   const { user } = useAuth()
   const { prefix, itemId } = useParams<{ prefix: string; itemId: string }>()
   const { can } = useProjectPermissions(prefix)
+  const parameterValues = useParameterValues(prefix)
   const reqId = resolvedId || parseInt(itemId || '0')
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -325,7 +327,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
           <DocEditor
             content={requirement.content_json as Record<string, unknown>}
             editable={false}
-            parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined}
+            parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues}
             artefactHref={(type, _id, label) => docUrl(prefix, type as DocType, label)}
             minHeight="min-h-[120px]"
             className="border-0"

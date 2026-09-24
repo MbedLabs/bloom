@@ -12,6 +12,7 @@ import { docEditUrl, docUrl, kindSlugToType, type DocType } from '../types/doc'
 import { formatDateTime } from '../test/date-utils'
 import { useToast } from '../components/useToast'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import { useParameterValues } from '../hooks/useParameterValues'
 
 function flattenSections(sections: DocumentSection[]): DocumentSection[] {
   const result: DocumentSection[] = []
@@ -53,6 +54,7 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
 
   const resolvedDocType = kindSlugToType(kind || '')
   const { can } = useProjectPermissions(prefix)
+  const parameterValues = useParameterValues(prefix)
   const canEditDocs = can('edit', 'document')
 
   const { data: doc, isLoading } = useQuery({
@@ -184,7 +186,7 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
             <DocEditor
               content={doc.content_json as Record<string, unknown>}
               editable={false}
-              parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined}
+              parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues}
             artefactHref={(type, _id, label) => docUrl(prefix, type as DocType, label)}
               minHeight="min-h-[40vh]"
             />

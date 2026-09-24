@@ -75,6 +75,8 @@ interface TcsArteTableProps {
   userMentionItems?: MentionSuggestion[]
   /** Where a `{{parameter}}` in a step should take the reader. */
   parameterHref?: string
+  /** Parameter and variable values by key; a step shows the value of each reference. */
+  parameterValues?: Record<string, string>
 }
 
 export function TcsArteTable({
@@ -84,6 +86,7 @@ export function TcsArteTable({
   mentionItems = [],
   userMentionItems = [],
   parameterHref,
+  parameterValues,
 }: TcsArteTableProps) {
   if (editable) {
     return (
@@ -95,7 +98,7 @@ export function TcsArteTable({
       />
     )
   }
-  return <TcsArteTableView rows={rows} parameterHref={parameterHref} />
+  return <TcsArteTableView rows={rows} parameterHref={parameterHref} parameterValues={parameterValues} />
 }
 
 /**
@@ -106,20 +109,26 @@ export function TcsArteTable({
  * step, "{{BOOT_BUDGET_MS}}" says nothing about what the budget actually is,
  * so each reference becomes a link to the screen that owns the value.
  */
-function withParameterLinks(text: string, href?: string): ReactNode {
-  if (!href || !text.includes('{{')) return text
-  return text.split(/(\{\{[^{}\n]+\}\})/g).map((part, index) => (
-    /^\{\{[^{}\n]+\}\}$/.test(part)
-      ? (
-        <a key={index} href={parameterKeyHref(href, part.slice(2, -2))} className="mention" title={`Open parameter ${part.slice(2, -2)}`}>
-          {part}
-        </a>
-      )
-      : part
-  ))
+function withParameterLinks(text: string, href?: string, values?: Record<string, string>): ReactNode {
+  if (!text.includes('{{') || (!href && !values)) return text
+  return text.split(/(\{\{[^{}\n]+\}\})/g).map((part, index) => {
+    if (!/^\{\{[^{}\n]+\}\}$/.test(part)) return part
+    const key = part.slice(2, -2)
+    const shown = values?.[key] || part
+    const title = values?.[key] ? part : `Open parameter ${key}`
+    return href ? (
+      <a key={index} href={parameterKeyHref(href, key)} className="mention" title={title}>
+        {shown}
+      </a>
+    ) : (
+      <span key={index} className="mention" title={title}>
+        {shown}
+      </span>
+    )
+  })
 }
 
-function TcsArteTableView({ rows, parameterHref }: { rows: TcsRow[]; parameterHref?: string }) {
+function TcsArteTableView({ rows, parameterHref, parameterValues }: { rows: TcsRow[]; parameterHref?: string; parameterValues?: Record<string, string> }) {
   if (!rows || rows.length === 0) return null
   const visibleRows = getVisibleRows(rows)
 
@@ -134,7 +143,7 @@ function TcsArteTableView({ rows, parameterHref }: { rows: TcsRow[]; parameterHr
           </div>
           <div className="divide-y divide-border">
             {visibleRows.map(({ row }) => (
-              <TcsViewRow key={row.id} row={row} parameterHref={parameterHref} hasChildren={hasChildRows(rows, rows.findIndex((candidate) => candidate.id === row.id))} />
+              <TcsViewRow key={row.id} row={row} parameterHref={parameterHref} parameterValues={parameterValues} hasChildren={hasChildRows(rows, rows.findIndex((candidate) => candidate.id === row.id))} />
             ))}
           </div>
         </div>
@@ -143,7 +152,7 @@ function TcsArteTableView({ rows, parameterHref }: { rows: TcsRow[]; parameterHr
   )
 }
 
-function TcsViewRow({ row, hasChildren, parameterHref }: { row: TcsRow; hasChildren: boolean; parameterHref?: string }) {
+function TcsViewRow({ row, hasChildren, parameterHref, parameterValues }: { row: TcsRow; hasChildren: boolean; parameterHref?: string; parameterValues?: Record<string, string> }) {
   const styles = ROW_TYPE_STYLES[row.row_type]
   const isLoop = row.row_type === 'loop'
 
@@ -166,12 +175,12 @@ function TcsViewRow({ row, hasChildren, parameterHref }: { row: TcsRow; hasChild
       </div>
       <div className={`border-r border-border/70 px-4 py-3 text-sm ${isLoop ? 'font-medium text-foreground' : 'text-foreground'} whitespace-pre-wrap`}>
         {row.description
-          ? withParameterLinks(row.description, parameterHref)
+          ? withParameterLinks(row.description, parameterHref, parameterValues)
           : <span className="text-muted-foreground">-</span>}
       </div>
       <div className="px-4 py-3 text-sm text-foreground whitespace-pre-wrap">
         {row.expected_result
-          ? withParameterLinks(row.expected_result, parameterHref)
+          ? withParameterLinks(row.expected_result, parameterHref, parameterValues)
           : <span className="text-muted-foreground">-</span>}
       </div>
     </div>

@@ -48,7 +48,14 @@ interface DocEditorProps {
   artefactHref?: (docType: string, id: number, label: string) => string
   /** Where a `{{parameter}}` links to. Omitted, the chip is not a link. */
   parameterHref?: string
+  /**
+   * Parameter and variable values by key. While editing, a `{{KEY}}` chip shows the
+   * key and its value on hover; while reading, it shows the value.
+   */
+  parameterValues?: Record<string, string>
 }
+
+type MentionSpec = [string, Record<string, string>, string]
 
 export default function DocEditor({
   content,
@@ -66,6 +73,7 @@ export default function DocEditor({
   artefactSearch,
   artefactHref,
   parameterHref,
+  parameterValues,
 }: DocEditorProps) {
   const mentionItemsRef = useRef(mentionItems)
   const userMentionItemsRef = useRef(userMentionItems)
@@ -74,6 +82,8 @@ export default function DocEditor({
   // the render that created the editor.
   const parameterHrefRef = useRef(parameterHref)
   const artefactSearchRef = useRef(artefactSearch)
+  const parameterValuesRef = useRef(parameterValues)
+  const mentionViewsRef = useRef(new Set<() => void>())
   const artefactHrefRef = useRef(artefactHref)
 
   useEffect(() => {
@@ -83,6 +93,11 @@ export default function DocEditor({
   useEffect(() => {
     artefactSearchRef.current = artefactSearch
   }, [artefactSearch])
+
+  useEffect(() => {
+    parameterValuesRef.current = parameterValues
+    mentionViewsRef.current.forEach((render) => render())
+  }, [parameterValues])
 
   useEffect(() => {
     artefactHrefRef.current = artefactHref
@@ -95,6 +110,40 @@ export default function DocEditor({
   useEffect(() => {
     userMentionItemsRef.current = userMentionItems
   }, [userMentionItems])
+
+  const mentionSpec = useCallback((node: { attrs: Record<string, unknown> }, editing: boolean | null): MentionSpec => {
+    const label = String(node.attrs.label ?? node.attrs.id)
+    if (node.attrs.mentionSuggestionChar === '#') {
+      const [docType, rawId] = String(node.attrs.id).split(':')
+      const build = artefactHrefRef.current
+      const target = build && docType && rawId ? build(docType, Number(rawId), label) : undefined
+      const attrs: Record<string, string> = {
+        'data-type': 'mention',
+        class: 'mention-artefact text-primary font-medium',
+      }
+      if (target) {
+        attrs.href = target
+        attrs.title = label
+      }
+      return [target ? 'a' : 'span', attrs, label]
+    }
+    if (node.attrs.mentionSuggestionChar === '@') {
+      return ['span', { 'data-type': 'mention', class: 'mention-user text-blue-500 font-medium' }, `@${label}`]
+    }
+    const href = parameterHrefRef.current
+    const attrs: Record<string, string> = { 'data-type': 'mention', class: 'mention' }
+    if (href) {
+      attrs.href = parameterKeyHref(href, label)
+      attrs.title = `Open parameter ${label}`
+    }
+    const value = parameterValuesRef.current?.[label]
+    if (editing !== null && value) {
+      attrs['data-parameter'] = label
+      attrs.title = editing ? value : `{{${label}}}`
+      if (!editing) return [href ? 'a' : 'span', attrs, value]
+    }
+    return [href ? 'a' : 'span', attrs, `{{${label}}}`]
+  }, [])
 
   const renderParameterMentionList = useCallback(() => {
     let component: ReactRenderer<MentionListRef> | null = null
@@ -214,7 +263,36 @@ export default function DocEditor({
         codeBlock: false,
         heading: { levels: [1, 2, 3, 4, 5, 6] },
       }),
-      Mention.configure({
+      Mention.extend({
+        addNodeView() {
+          return ({ node: initial, editor: host }) => {
+            let node = initial
+            const dom = document.createElement('span')
+            const render = () => {
+              const [tag, attrs, text] = mentionSpec(node, host.isEditable)
+              const inner = document.createElement(tag)
+              Object.entries(attrs).forEach(([name, value]) => inner.setAttribute(name, value))
+              inner.textContent = text
+              dom.replaceChildren(inner)
+            }
+            render()
+            mentionViewsRef.current.add(render)
+            return {
+              dom,
+              update: (next) => {
+                if (next.type !== node.type) return false
+                node = next
+                render()
+                return true
+              },
+              ignoreMutation: () => true,
+              destroy: () => {
+                mentionViewsRef.current.delete(render)
+              },
+            }
+          }
+        },
+      }).configure({
         HTMLAttributes: { class: 'mention' },
         renderText: ({ node }) => {
           const label = String(node.attrs.label ?? node.attrs.id)
@@ -222,37 +300,7 @@ export default function DocEditor({
           if (node.attrs.mentionSuggestionChar === '#') return label
           return `{{${label}}}`
         },
-        renderHTML: ({ node }) => {
-          const label = String(node.attrs.label ?? node.attrs.id)
-          if (node.attrs.mentionSuggestionChar === '#') {
-            const [docType, rawId] = String(node.attrs.id).split(':')
-            const build = artefactHrefRef.current
-            const target = build && docType && rawId ? build(docType, Number(rawId), label) : undefined
-            const attrs: Record<string, string> = {
-              'data-type': 'mention',
-              class: 'mention-artefact text-primary font-medium',
-            }
-            if (target) {
-              attrs.href = target
-              attrs.title = label
-            }
-            return [target ? 'a' : 'span', attrs, label]
-          }
-          if (node.attrs.mentionSuggestionChar === '@') {
-            return [
-              'span',
-              { 'data-type': 'mention', class: 'mention-user text-blue-500 font-medium' },
-              `@${label}`,
-            ]
-          }
-          const href = parameterHrefRef.current
-          const attrs: Record<string, string> = { 'data-type': 'mention', class: 'mention' }
-          if (href) {
-            attrs.href = parameterKeyHref(href, label)
-            attrs.title = `Open parameter ${label}`
-          }
-          return [href ? 'a' : 'span', attrs, `{{${label}}}`]
-        },
+        renderHTML: ({ node }) => mentionSpec(node, null),
         suggestions: [
           {
             char: PARAMETER_MENTION_TRIGGER,
@@ -369,6 +417,7 @@ export default function DocEditor({
 
   useEffect(() => {
     editor?.setEditable(editable)
+    mentionViewsRef.current.forEach((render) => render())
   }, [editable, editor])
 
   const addLink = useCallback(() => {

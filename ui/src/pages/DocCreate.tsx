@@ -31,6 +31,7 @@ import {
   usesDocumentEditor,
 } from './docCreateIdPolicy'
 import { DOC_TYPE_RESOURCES, useProjectPermissions } from '../hooks/useProjectPermissions'
+import { useParameterValues } from '../hooks/useParameterValues'
 
 function artefactActivityTypeForDocType(docType: DocType): string | null {
   if (docType === 'REQ') return 'requirement'
@@ -191,6 +192,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       ? 'Back'
       : `Back to ${docRegistryListLabel(docType)}`
   const { can } = useProjectPermissions(prefix, projectId)
+  const parameterValues = useParameterValues(prefix, projectId)
   const canEditDocs = can(editMode ? 'edit' : 'create', DOC_TYPE_RESOURCES[docType])
   // The server allocates ids with MAX(suffix)+1, so ask it rather than assuming
   // -001, which was almost always already taken.
@@ -651,7 +653,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                   editable
                   mentionItems={parameterMentionItems}
                   userMentionItems={userMentionItems}
-                  parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined}
+                  parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues}
                 />
               ) : (
                 <DocEditor
@@ -668,6 +670,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                   userMentionItems={userMentionItems}
                   artefactSearch={artefactSearch}
                   artefactHref={artefactHref}
+                  parameterValues={parameterValues}
                 />
               )}
             </div>
