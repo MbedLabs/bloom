@@ -749,6 +749,17 @@ async def _link_referenced_test_case(
             return
 
 
+async def _integration_account_user(db: AsyncSession, setting: IntegrationSetting) -> Optional[int]:
+    """The Bloom user behind the integration's Jira account (its account email), if any."""
+    if not setting.account_email:
+        return None
+    return (
+        await db.execute(
+            select(User.id).where(func.lower(User.email) == setting.account_email.strip().lower())
+        )
+    ).scalar_one_or_none()
+
+
 async def _new_defect_from_issue(
     db: AsyncSession,
     setting: IntegrationSetting,
@@ -782,6 +793,7 @@ async def _new_defect_from_issue(
         external_issue_url=issue_url(setting, issue_key),
         external_issue_state=_issue_state(fields),
         external_last_event_at=datetime.utcnow(),
+        reporter_id=await _integration_account_user(db, setting),
     )
     _set_defect_status(defect, _jira_status(fields))
     await _link_referenced_test_case(db, defect, project, setting, fields)

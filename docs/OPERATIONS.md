@@ -151,6 +151,8 @@ What Bloom does with an event:
   description as text, the priority (also as severity) through the map, the issue URL
   and state. A Bloom test-case id of the project in the summary, the description or
   the reference field becomes the defect's source.
+  The defect's reporter is the Bloom user whose email is the integration's account
+  email; with no such user it has no reporter.
 - Updated, for a linked issue: title, description, priority and state follow Jira; a
   resolution closes the defect.
 - Deleted: the defect stays and its issue state reads `Removed in Jira`.

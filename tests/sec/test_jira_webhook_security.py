@@ -365,6 +365,13 @@ async def test_created_defect_copies_the_issue(env):
     await _map_project_for_creation(maker, create=True)
     async with maker() as session:
         session.add(TestCaseModel(project_id=1, tc_id="ALP-TC-004", title="Boot"))
+        bot = User(
+            email="Bot@Acme.test",
+            full_name="Jira bot",
+            hashed_password="x",
+            role=UserRole.maintainer,
+        )
+        session.add(bot)
         await session.commit()
     description = {
         "type": "doc",
@@ -384,6 +391,7 @@ async def test_created_defect_copies_the_issue(env):
     assert defect.external_issue_url == "https://acme.atlassian.net/browse/PROJ-600"
     assert (defect.source_type, defect.source_id) == ("TC", test_case.id)
     assert defect.external_issue_state == "To Do"
+    assert defect.reporter_id == bot.id
 
 
 @pytest.mark.asyncio
@@ -406,6 +414,11 @@ async def test_issues_outside_the_filter_are_ignored(env):
         _post(client, labelled, signature=_sign(labelled), delivery="t-3").json()["status"]
         == "created"
     )
+    async with maker() as session:
+        created = (
+            await session.execute(select(Defect).where(Defect.external_issue_number == 603))
+        ).scalar_one()
+    assert created.reporter_id is None
     gone = _issue_payload("PROJ-604", event="jira:issue_deleted")
     assert _post(client, gone, signature=_sign(gone), delivery="t-4").json()["status"] == "ignored"
 
