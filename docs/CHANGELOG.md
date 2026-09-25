@@ -21,6 +21,7 @@
 
 ### Fixed
 
+- A database created before the locked migration baseline gets `integration_settings.account_email` and the `change_request_sync_events` table it lacked; the integration settings no longer answer 500 on such an instance.
 - A database error while committing a request, such as a constraint violation, is answered with 409 or 500 and the request id; the commit now runs before the response is built instead of after it had started.
 - Requirements and test cases return their editor body.
 - A `#` tag shows the current id of the artefact it points at, looked up once per document, instead of the text captured when it was typed; a tag whose target is gone reads as plain text.
