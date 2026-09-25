@@ -143,7 +143,12 @@ issue tracker and fill in:
   id.atlassian.com, Security, API tokens). They are needed only to migrate the issues
   that are already open (Pull existing issues) and for two-way sync, and the email
   also makes that Bloom user the reporter of the defects. Webhook deliveries need
-  neither. They are stored for this project only, encrypted.
+  neither. They are stored for this project only, encrypted. Both kinds of token work:
+  a classic API token acts with the account's own Jira permissions; an API token with
+  scopes needs `read:jira-work` and `read:jira-user`, plus `write:jira-work` for
+  two-way sync, and Bloom calls Jira for it through Atlassian's API gateway for the
+  site. Bloom checks the credential before each pull or push and reports a token Jira
+  does not accept.
 - Webhook secret: any long random string; the same value goes into Jira.
 - Jira project key, issue types (default `Bug`), and optionally a label, a custom field
   that holds Bloom test-case ids, and extra JQL used by the pull.
@@ -172,8 +177,8 @@ What Bloom does with an event:
 - A delivery Jira retries with the same identifier is processed once.
 
 Pull existing issues, on the same panel, migrates the issues that were open before the
-webhook existed: it searches Jira once with the saved filter and creates the defects
-that do not exist yet (at most 1000 issues per pull). It signs in with the account
+webhook existed: it searches Jira once with the saved filter, skips the issues already
+in a Done status, and creates the defects that do not exist yet (at most 1000 issues per pull). It signs in with the account
 email and API token above, so it needs a Jira login that can browse the project, and
 it only reads from Jira.
 

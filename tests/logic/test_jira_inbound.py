@@ -104,10 +104,12 @@ def test_jql_fields_and_url():
         jira_issue_types=["Bug", 'Say "hi"'], jira_label="bench", jira_jql="priority = High"
     )
     assert build_jql(setting) == (
-        'project = "PROJ" AND issuetype in ("Bug", "Say \\"hi\\"") AND labels = "bench" '
-        "AND (priority = High) ORDER BY created ASC"
+        'project = "PROJ" AND issuetype in ("Bug", "Say \\"hi\\"") AND statusCategory != Done '
+        'AND labels = "bench" AND (priority = High) ORDER BY created ASC'
     )
-    assert build_jql(_setting()) == 'project = "PROJ" AND issuetype in ("Bug") ORDER BY created ASC'
+    assert build_jql(_setting()) == (
+        'project = "PROJ" AND issuetype in ("Bug") AND statusCategory != Done ORDER BY created ASC'
+    )
     assert search_fields(_setting(jira_reference_field="customfield_1"))[-1] == "customfield_1"
     assert issue_url(_setting(), "PROJ-7") == "https://acme.atlassian.net/browse/PROJ-7"
     assert issue_url(_setting(base_url=None), "PROJ-7") is None

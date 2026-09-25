@@ -104,11 +104,12 @@ def _quote(value: str) -> str:
 
 
 def build_jql(setting) -> str:
-    """The backfill search: the mapped project, the issue types, the label and the
-    JQL fragment, when set."""
+    """The backfill search: the open issues of the mapped project, the issue types, the
+    label and the JQL fragment, when set."""
     clauses = [
         f"project = {_quote(setting.jira_project_key)}",
         "issuetype in (" + ", ".join(_quote(t) for t in issue_types(setting)) + ")",
+        "statusCategory != Done",
     ]
     if setting.jira_label:
         clauses.append(f"labels = {_quote(setting.jira_label)}")

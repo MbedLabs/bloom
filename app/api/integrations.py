@@ -1007,10 +1007,10 @@ async def _search_jira(setting: IntegrationSetting) -> list[dict]:
         "Accept": "application/json",
         "Content-Type": "application/json",
     }
-    url = f"{setting.base_url.rstrip('/')}/rest/api/3/search/jql"
     request = {"jql": build_jql(setting), "fields": search_fields(setting), "maxResults": 100}
     issues: list[dict] = []
     async with httpx.AsyncClient(timeout=30) as client:
+        url = f"{await _jira_api_base(client, setting, headers)}/rest/api/3/search/jql"
         while len(issues) < MAX_PULLED_ISSUES:
             resp = await client.post(url, json=request, headers=headers)
             resp.raise_for_status()
@@ -1053,6 +1053,8 @@ async def pull_jira_issues(
         )
     try:
         issues = await _search_jira(setting)
+    except JiraCredentialError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except httpx.HTTPStatusError as exc:
         raise HTTPException(
             status_code=502, detail=f"Jira answered {exc.response.status_code} to the search."
@@ -1216,6 +1218,43 @@ async def _push_to_gitlab(
         resp.raise_for_status()
 
 
+ATLASSIAN_GATEWAY = "https://api.atlassian.com/ex/jira"
+
+
+class JiraCredentialError(ValueError):
+    """Jira accepted the account email and API token neither on the site nor through the gateway."""
+
+
+async def _jira_api_base(
+    client: httpx.AsyncClient, setting: IntegrationSetting, headers: dict
+) -> str:
+    """The REST base that accepts the integration's token.
+
+    A classic API token works on the site. A scoped API token works only through
+    Atlassian's API gateway for the site's cloud, whose id the site publishes.
+    """
+    site = setting.base_url.rstrip("/")
+    resp = await client.get(f"{site}/rest/api/3/myself", headers=headers)
+    if resp.status_code == 200:
+        return site
+    cloud_id = None
+    info = await client.get(f"{site}/_edge/tenant_info")
+    if info.status_code == 200:
+        try:
+            cloud_id = info.json().get("cloudId")
+        except ValueError:
+            cloud_id = None
+    if cloud_id:
+        gateway = f"{ATLASSIAN_GATEWAY}/{cloud_id}"
+        resp = await client.get(f"{gateway}/rest/api/3/myself", headers=headers)
+        if resp.status_code == 200:
+            return gateway
+    raise JiraCredentialError(
+        "Jira did not accept the account email and API token. Check both; a token with "
+        "scopes needs read:jira-work and read:jira-user, and write:jira-work for two-way sync."
+    )
+
+
 def _jira_auth_header(setting: IntegrationSetting) -> str:
     """Jira Cloud uses Basic auth over `email:api_token`."""
     if not setting.account_email:
@@ -1231,7 +1270,6 @@ async def _push_to_jira(target, setting: IntegrationSetting, changed_fields: dic
         raise ValueError("Jira integration requires the site base URL.")
 
     issue_key = jira_issue_key(target)
-    base_url = setting.base_url.rstrip("/")
     headers = {
         "Authorization": _jira_auth_header(setting),
         "Accept": "application/json",
@@ -1239,6 +1277,7 @@ async def _push_to_jira(target, setting: IntegrationSetting, changed_fields: dic
     }
 
     async with httpx.AsyncClient(timeout=15) as client:
+        base_url = await _jira_api_base(client, setting, headers)
         if "title" in changed_fields:
             resp = await client.put(
                 f"{base_url}/rest/api/3/issue/{issue_key}",

@@ -504,8 +504,14 @@ async def test_push_to_jira_only_when_two_way(env, monkeypatch):
     assert pushed == [defect.id, change.id]
 
 
-def _search_transport(pages, seen):
+def _search_transport(pages, seen, hosts=None):
+    """A Jira that accepts the credential on the site and answers searches page by page."""
+
     def handler(request):
+        if request.url.path.endswith("/rest/api/3/myself"):
+            return httpx.Response(200, json={"accountId": "acc"})
+        if hosts is not None:
+            hosts.append(str(request.url))
         seen.append(json.loads(request.content))
         return httpx.Response(200, json=pages[len(seen) - 1])
 
@@ -550,7 +556,9 @@ async def test_pull_creates_the_missing_defects(env, monkeypatch):
         await session.commit()
     assert (result.searched, result.created, result.already_linked, result.skipped) == (4, 1, 1, 2)
     assert result.new_ids == ["ALP-DEF-002"]
-    assert seen[0]["jql"] == 'project = "PROJ" AND issuetype in ("Bug") ORDER BY created ASC'
+    assert seen[0]["jql"] == (
+        'project = "PROJ" AND issuetype in ("Bug") AND statusCategory != Done ORDER BY created ASC'
+    )
     assert seen[1]["nextPageToken"] == "p2"
     async with maker() as session:
         pulled = (
@@ -592,10 +600,8 @@ async def test_pull_reports_what_it_needs_and_jira_errors(env, monkeypatch):
         )
         with pytest.raises(HTTPException) as refused:
             await integrations.pull_jira_issues(setting.id, db=session, current_user=admin)
-        assert (refused.value.status_code, refused.value.detail) == (
-            502,
-            "Jira answered 401 to the search.",
-        )
+        assert refused.value.status_code == 400
+        assert refused.value.detail.startswith("Jira did not accept the account email")
 
         def unreachable(request):
             raise httpx.ConnectError("no route", request=request)
@@ -618,3 +624,56 @@ def test_filter_validation():
     with pytest.raises(HTTPException) as bad:
         integrations._validate_jira_filter(None, {"Highest": "Urgent"})
     assert "Urgent" in bad.value.detail
+
+
+@pytest.mark.asyncio
+async def test_a_scoped_token_is_used_through_the_atlassian_gateway(env, monkeypatch):
+    _, maker = env
+    await _map_project_for_creation(maker, create=True)
+    calls = []
+
+    def handler(request):
+        url = str(request.url)
+        calls.append(url)
+        if url.endswith("/_edge/tenant_info"):
+            return httpx.Response(200, json={"cloudId": "cloud-1"})
+        if url.startswith("https://api.atlassian.com/ex/jira/cloud-1/"):
+            if request.url.path.endswith("/myself"):
+                return httpx.Response(200, json={"accountId": "acc"})
+            return httpx.Response(
+                200,
+                json={
+                    "issues": [
+                        {
+                            "key": "PROJ-800",
+                            "fields": {"issuetype": {"name": "Bug"}, "summary": "s"},
+                        }
+                    ],
+                    "isLast": True,
+                },
+            )
+        return httpx.Response(401)
+
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        integrations.httpx,
+        "AsyncClient",
+        lambda **kw: real_client(transport=httpx.MockTransport(handler), **kw),
+    )
+    async with maker() as session:
+        setting = (await session.execute(select(IntegrationSetting))).scalar_one()
+        setting.token_encrypted = encrypt_integration_secret("scoped-token")
+        admin = User(email="c@acme.test", full_name="Cy", hashed_password="x", role=UserRole.admin)
+        session.add(admin)
+        await session.flush()
+        result = await integrations.pull_jira_issues(setting.id, db=session, current_user=admin)
+        await session.commit()
+        site = setting.base_url.rstrip("/")
+    assert result.created == 1
+    search = [c for c in calls if c.endswith("/rest/api/3/search/jql")]
+    assert search == ["https://api.atlassian.com/ex/jira/cloud-1/rest/api/3/search/jql"]
+    async with maker() as session:
+        pulled = (
+            await session.execute(select(Defect).where(Defect.external_issue_number == 800))
+        ).scalar_one()
+    assert pulled.external_issue_url == f"{site}/browse/PROJ-800"
