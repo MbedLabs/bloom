@@ -91,7 +91,7 @@ async def test_group_grant_applies(session):
     assert await _group_project_role(session, user.id, proj.id) == "maintainer"
     assert await user_can_access_project(session, user, proj.id, roles={"maintainer"}) is True
     membership = await require_project_access(session, user, proj.id, roles={"maintainer"})
-    assert membership is None  # access via the group, no direct membership row
+    assert membership is None
 
 
 @pytest.mark.asyncio
@@ -101,7 +101,6 @@ async def test_strongest_wins(session):
     session.add(ProjectMembership(user_id=user.id, project_id=proj.id, role="external"))
     await session.flush()
     await _grant_group(session, user, "maintainer", project=proj)
-    # The direct external membership alone would not satisfy a maintainer check.
     assert await user_can_access_project(session, user, proj.id, roles={"maintainer"}) is True
 
 
@@ -159,7 +158,6 @@ async def test_group_external_doc_scope_enforced(session):
     user = await _user(session, UserRole.external)
     proj = await _project(session)
     await _grant_group(session, user, "external", project=proj, doc_tag_scope=["REQ", "TC"])
-    # No direct membership, so the group policy's doc_tag_scope is the allowlist.
     assert await get_external_doc_types(session, user, proj.id) == {"REQ", "TC"}
 
 
@@ -168,7 +166,6 @@ async def test_group_external_doc_scope_none_means_all(session):
     user = await _user(session, UserRole.external)
     proj = await _project(session)
     await _grant_group(session, user, "external", project=proj, doc_tag_scope=None)
-    # A NULL scope grants every type.
     assert await get_external_doc_types(session, user, proj.id) is None
 
 
@@ -186,7 +183,6 @@ async def test_group_maintainer_sees_every_doc_type(session):
     user = await _user(session, UserRole.maintainer)
     proj = await _project(session)
     await _grant_group(session, user, "maintainer", project=proj, doc_tag_scope=["REQ"])
-    # A maintainer is never scoped by the external doc-type allowlist.
     assert await get_external_doc_types(session, user, proj.id) is None
 
 

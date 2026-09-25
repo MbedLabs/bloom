@@ -15,7 +15,6 @@ import {
 import { useToast } from '../components/useToast'
 import { DOC_TYPE_LABELS, type DocType } from '../types/doc'
 
-// The document types an external policy may be scoped to: every DocType.
 const EXTERNAL_DOC_TYPES = Object.keys(DOC_TYPE_LABELS) as DocType[]
 
 const BASE_ROLES: BaseRole[] = ['external', 'maintainer', 'admin']
@@ -59,7 +58,6 @@ export default function GroupsPage() {
 
   return (
     <div className="p-6 space-y-10">
-      {/* Groups */}
       <section>
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -136,7 +134,6 @@ export default function GroupsPage() {
         </div>
       </section>
 
-      {/* Policies */}
       <section>
         <div className="flex items-center justify-between mb-4">
           <div>

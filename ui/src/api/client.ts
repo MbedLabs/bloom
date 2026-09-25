@@ -349,7 +349,6 @@ export const usersApi = {
   },
 }
 
-// ─── Groups & policies (admin) ────────────────────────────────────────────
 export type BaseRole = 'admin' | 'maintainer' | 'external'
 
 export interface Policy {
@@ -380,7 +379,6 @@ export interface GroupMember {
 
 export interface GroupGrant {
   id: number
-  // null is an all-projects grant.
   project_id: number | null
 }
 

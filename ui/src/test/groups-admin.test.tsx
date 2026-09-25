@@ -79,7 +79,6 @@ describe('Groups & policies admin screen', () => {
     renderPage()
     expect(await screen.findByText('QA Reviewers')).toBeTruthy()
     expect(screen.getByText('Administrator')).toBeTruthy()
-    // 'Field Auditor' shows both as a policy row and as the group's policy column.
     expect(screen.getAllByText('Field Auditor').length).toBeGreaterThanOrEqual(2)
     expect(screen.getByText('All projects')).toBeTruthy()
   })
@@ -109,7 +108,7 @@ describe('Groups & policies admin screen', () => {
     await screen.findByText('Administrator')
     fireEvent.click(screen.getByText('New policy'))
     fireEvent.change(await screen.findByTitle('Policy name'), { target: { value: 'Client View' } })
-    fireEvent.click(screen.getByText('TC')) // toggle a document type on
+    fireEvent.click(screen.getByText('TC'))
     fireEvent.click(screen.getByText('Save policy'))
     await waitFor(() =>
       expect(api.policiesApi.create).toHaveBeenCalledWith(
@@ -143,7 +142,6 @@ describe('Groups & policies admin screen', () => {
 
   it('edits a non-default policy', async () => {
     renderPage()
-    // 'Field Auditor' also appears as the group's policy, so wait on the unique button.
     fireEvent.click(await screen.findByTitle('Edit Field Auditor'))
     fireEvent.change(await screen.findByTitle('Description'), { target: { value: 'Updated' } })
     fireEvent.click(screen.getByText('Save policy'))
@@ -166,13 +164,11 @@ describe('Groups & policies admin screen', () => {
     fireEvent.click(screen.getByTitle('Manage members and projects'))
     const dialog = (await screen.findByText(/Manage QA Reviewers/)).closest('div')!.parentElement!
 
-    // Add the non-member user (wait for the async user list to fill the select).
     await within(dialog).findByRole('option', { name: /Dev Eloper/ })
     fireEvent.change(within(dialog).getByTitle('Add member'), { target: { value: '6' } })
     fireEvent.click(within(dialog).getByText('Add'))
     await waitFor(() => expect(api.groupsApi.addMember).toHaveBeenCalledWith(10, 6))
 
-    // Grant a specific project (wait for the async project list).
     await within(dialog).findByRole('option', { name: 'Apollo' })
     fireEvent.change(within(dialog).getByTitle('Grant a project'), { target: { value: '7' } })
     fireEvent.click(within(dialog).getByText('Grant'))

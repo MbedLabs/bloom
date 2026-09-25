@@ -28,12 +28,8 @@ class Policy(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
     description: Mapped[str] = mapped_column(String(500), nullable=False, default="")
-    # The instance role a member behaves as for the role-based guards
-    # (admin, maintainer, external). The finer gate is `permissions`.
     base_role: Mapped[str] = mapped_column(String(20), nullable=False, default="external")
-    # {resource: [action, ...]} matrix, unioned with the base role's implicit set.
     permissions: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
-    # Optional document-tag allow-list; generalises the external doc-type allowlist.
     doc_tag_scope: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("policies.id"), nullable=True)
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

@@ -9,7 +9,6 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-# The instance roles a policy may floor to, unchanged from the existing model.
 _BASE_ROLE_PATTERN = "^(admin|maintainer|external)$"
 
 
@@ -51,7 +50,6 @@ class GroupMemberResponse(BaseModel):
 
 class GroupGrantResponse(BaseModel):
     id: int
-    # None is an all-projects grant that covers every project, present and future.
     project_id: Optional[int] = None
 
 
@@ -83,5 +81,4 @@ class GroupMemberCreate(BaseModel):
 
 
 class GroupGrantCreate(BaseModel):
-    # Omit or null to grant every project (present and future).
     project_id: Optional[int] = None

@@ -230,25 +230,6 @@ class Settings(BaseSettings):
     SMTP_HOST: str = Field(
         default="", validation_alias=AliasChoices("BLOOM_SMTP_HOST", "SMTP_HOST")
     )
-    # Outbound webhook: when a URL is set, notable events are POSTed to it. Empty
-    # (the default) disables it entirely. The secret, when set, signs each body with
-    # HMAC-SHA256 in the X-Bloom-Signature header.
-    OUTBOUND_WEBHOOK_URL: str = Field(
-        default="",
-        validation_alias=AliasChoices("BLOOM_OUTBOUND_WEBHOOK_URL", "OUTBOUND_WEBHOOK_URL"),
-    )
-    OUTBOUND_WEBHOOK_SECRET: str = Field(
-        default="",
-        validation_alias=AliasChoices("BLOOM_OUTBOUND_WEBHOOK_SECRET", "OUTBOUND_WEBHOOK_SECRET"),
-    )
-    OUTBOUND_WEBHOOK_TIMEOUT_SECONDS: float = Field(
-        default=5.0,
-        gt=0,
-        le=30,
-        validation_alias=AliasChoices(
-            "BLOOM_OUTBOUND_WEBHOOK_TIMEOUT_SECONDS", "OUTBOUND_WEBHOOK_TIMEOUT_SECONDS"
-        ),
-    )
     ATTACHMENT_DIR: str = Field(
         default="./attachments",
         validation_alias=AliasChoices("BLOOM_ATTACHMENT_DIR", "ATTACHMENT_DIR"),

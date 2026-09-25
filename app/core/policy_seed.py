@@ -34,8 +34,6 @@ def _merge(base: dict, overrides: dict) -> dict:
     return merged
 
 
-# name -> (base_role, description, permissions, doc_tag_scope). base_role is one of
-# the unchanged instance roles (admin, maintainer, external).
 DEFAULT_POLICIES = [
     {
         "name": "Administrator",
@@ -133,8 +131,6 @@ DEFAULT_POLICIES = [
         "base_role": "external",
         "description": "Views and comments on customer-visible artefacts of the allowed document types.",
         "permissions": _all("view", "comment"),
-        # doc_tag_scope is the external document-type allowlist (the same codes a
-        # direct external membership uses); None would mean every type.
         "doc_tag_scope": sorted(DEFAULT_EXTERNAL_DOC_TYPES),
     },
     {

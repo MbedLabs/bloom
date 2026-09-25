@@ -113,9 +113,6 @@ async def get_external_doc_types(
 
     membership = await _get_project_membership(db, current_user.id, project_id)
     if membership is None:
-        # No direct membership: a group grant may still admit the user. External
-        # members are then scoped by the group policy's document-type allowlist
-        # (doc_tag_scope) instead of a per-membership ProjectExternalDocType set.
         group_role = await _group_project_role(db, current_user.id, project_id)
         if group_role is None:
             raise HTTPException(
