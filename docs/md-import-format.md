@@ -80,6 +80,25 @@ Measures the cold boot time of the device under test.
 
 The CSV and XML test-case exports write the steps column in this same row form, one row per line, so an exported file imports back without losing rows.
 
+## Writing a document with an AI assistant
+
+An AI assistant can turn existing notes, a specification or a test plan into this
+format. Give it this file and ask it to follow it exactly:
+
+- one `##` section per artefact, with the type tag in the heading (`## [REQ]`,
+  `## [TC]`, ...);
+- every value that can change written as `{{parameter: NAME, value: VALUE}}` inside
+  the sentence where it is used, with the same NAME wherever it is the same value;
+- in a `[TC]` section, one action per `- Step:` line and its expected result after
+  `=>`, preconditions as `- Pre-Condition:`, repetitions as `- Loop:` with the looped
+  steps indented by two spaces;
+- nothing invented: a value or an expected result that is not in the source is left
+  out or marked for review, not guessed.
+
+Read the result before importing it. The import shows every parameter whose name
+already exists in the project and asks what to do with it, and each imported artefact
+starts unlinked, so the links are checked by a person.
+
 ## Links
 
 When an imported document classifies as a specification, test concept, design or
