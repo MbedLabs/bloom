@@ -19,6 +19,7 @@ import {
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
 import { useParameterValues } from '../hooks/useParameterValues'
 import { useArtefactLabels } from '../hooks/useArtefactLabels'
+import BudRunLink from '../components/BudRunLink'
 
 function TypeBadge({ reqType }: { reqType: string }) {
   return (
@@ -312,6 +313,22 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
               </button>
             </div>
           </SectionCard>
+
+          {requirement.linked_test_runs?.length > 0 && (
+            <SectionCard title="Test runs">
+              <ul className="space-y-2">
+                {requirement.linked_test_runs.map((run) => (
+                  <li key={run.id} className="text-sm">
+                    <BudRunLink runId={run.test_run_id} label={run.test_run_name || undefined} />
+                    <div className="text-xs text-muted-foreground">{run.status || 'Status not recorded'}</div>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-muted-foreground mt-3">
+                A run opens in Bud, where its report can be downloaded.
+              </p>
+            </SectionCard>
+          )}
         </>
       }
     >
