@@ -7,7 +7,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.artefact_utils import audit_artefact_deleted, audit_visibility_change
+from app.api.artefact_utils import (
+    audit_artefact_deleted,
+    audit_visibility_change,
+    get_row_or_404,
+    get_visible_row,
+    load_with_permission,
+    page_of,
+    requirement_summary,
+)
 from app.api.link_read_utils import get_verified_requirement_links_for_test_case
 from app.core.config import settings
 from app.core.database import get_db
@@ -228,12 +236,7 @@ async def list_campaigns(
     if status:
         base = base.where(TestCampaign.status == status)
 
-    total_q = select(func.count()).select_from(base.subquery())
-    total = (await db.execute(total_q)).scalar() or 0
-
-    query = base.order_by(TestCampaign.created_at.desc()).offset(skip).limit(limit)
-    result = await db.execute(query)
-    campaigns = result.scalars().all()
+    campaigns, total = await page_of(db, base, TestCampaign, skip, limit)
 
     return PaginatedResponse(
         items=await _build_campaign_responses_batch(campaigns, db, current_user),
@@ -249,10 +252,7 @@ async def create_campaign(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    proj_row = await db.execute(select(Project).where(Project.id == data.project_id))
-    project = proj_row.scalar_one_or_none()
-    if not project:
-        raise HTTPException(404, "Project not found")
+    project = await get_row_or_404(db, Project, data.project_id, "Project not found")
     await require_project_access(
         db,
         current_user,
@@ -363,17 +363,9 @@ async def get_campaign(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(
-        apply_external_visibility_filter(
-            select(TestCampaign).where(TestCampaign.id == campaign_id),
-            TestCampaign,
-            current_user,
-        )
+    campaign = await get_visible_row(
+        db, TestCampaign, campaign_id, "Campaign not found", current_user
     )
-    campaign = result.scalar_one_or_none()
-    if not campaign:
-        raise HTTPException(404, "Campaign not found")
-    await require_project_access(db, current_user, campaign.project_id)
     return await _build_campaign_detail(campaign, db, current_user)
 
 
@@ -529,26 +521,16 @@ async def remove_campaign_item(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    campaign = (
-        await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
-    ).scalar_one_or_none()
-    if not campaign:
-        raise HTTPException(404, "Campaign not found")
-    await require_project_access(
+    await load_with_permission(
+        db, current_user, TestCampaign, campaign_id, "Campaign not found", ("plan", "CMP")
+    )
+    item = await get_row_or_404(
         db,
-        current_user,
-        campaign.project_id,
-        permission=("plan", "CMP"),
+        TestCampaignItem,
+        item_id,
+        "Campaign item not found",
+        TestCampaignItem.campaign_id == campaign_id,
     )
-    result = await db.execute(
-        select(TestCampaignItem).where(
-            TestCampaignItem.id == item_id,
-            TestCampaignItem.campaign_id == campaign_id,
-        )
-    )
-    item = result.scalar_one_or_none()
-    if not item:
-        raise HTTPException(404, "Campaign item not found")
     await db.delete(item)
 
 
@@ -842,9 +824,7 @@ async def _build_campaign_detail(
             )
         links_result = await db.execute(requirement_links_query)
         for link, req in links_result.all():
-            summary = RequirementSummary(
-                id=req.id, req_id=req.req_id, title=req.title, status=req.status
-            )
+            summary = requirement_summary(req)
             linked_reqs_by_tc.setdefault(link.source_id, []).append(summary)
             requirement_ids.add(req.id)
 
@@ -903,10 +883,7 @@ async def _build_campaign_detail(
             .scalars()
             .all()
         )
-        related_requirements = [
-            RequirementSummary(id=req.id, req_id=req.req_id, title=req.title, status=req.status)
-            for req in reqs
-        ]
+        related_requirements = [requirement_summary(req) for req in reqs]
 
     # Related concepts: find CPTs linked to any TC in the campaign via ArtefactLink
     tc_ids = [item.test_case_id for item in items]
@@ -1021,9 +998,7 @@ async def _build_test_case_response(
 ) -> TestCaseResponse:
     linked_requirements = []
     for _link, req in await get_verified_requirement_links_for_test_case(tc.id, db, current_user):
-        linked_requirements.append(
-            RequirementSummary(id=req.id, req_id=req.req_id, title=req.title, status=req.status)
-        )
+        linked_requirements.append(requirement_summary(req))
     return TestCaseResponse(
         id=tc.id,
         project_id=tc.project_id,

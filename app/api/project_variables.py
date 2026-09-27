@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.artefact_utils import delete_project_row, get_row_or_404
 from app.core.database import get_db
 from app.core.security import get_current_user, require_project_access
 from app.models import Project, ProjectVariable
@@ -23,11 +24,7 @@ async def list_project_variables(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    project = (
-        await db.execute(select(Project).where(Project.id == project_id))
-    ).scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    await get_row_or_404(db, Project, project_id, "Project not found")
 
     await require_project_access(
         db,
@@ -50,11 +47,7 @@ async def create_project_variable(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    project = (
-        await db.execute(select(Project).where(Project.id == data.project_id))
-    ).scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    await get_row_or_404(db, Project, data.project_id, "Project not found")
 
     await require_project_access(
         db,
@@ -145,15 +138,11 @@ async def delete_project_variable(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    item = (
-        await db.execute(select(ProjectVariable).where(ProjectVariable.id == item_id))
-    ).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Variable not found")
-    await require_project_access(
+    await delete_project_row(
         db,
         current_user,
-        item.project_id,
-        permission=("delete", "parameter"),
+        ProjectVariable,
+        item_id,
+        "Variable not found",
+        resource="parameter",
     )
-    await db.delete(item)

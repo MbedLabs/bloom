@@ -4,11 +4,8 @@ import { Link, useParams, useSearchParams, useNavigate } from 'react-router'
 import { format } from 'date-fns'
 import {
   ArrowLeft,
-  ArrowUpDown,
   BookOpen,
   Calendar,
-  ChevronDown,
-  ChevronUp,
   Filter,
   Plus,
   Search,
@@ -34,6 +31,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useDebounced } from '../hooks/useDebounced'
 import BudRunLink from '../components/BudRunLink'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import { FilterChip, FiltersToggle, Pager, SortableHeader } from '../components/ListControls'
 
 const TYPE_BADGES: Record<DocType, { label: string; color: string }> = {
   REQ: { label: 'Requirement', color: 'bg-amber-500/10 text-amber-700 dark:text-amber-400' },
@@ -496,19 +494,15 @@ export default function Documents() {
     'inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors'
 
   const SortHeader = ({ field, children, compact = false }: { field: SortField; children: React.ReactNode; compact?: boolean }) => (
-    <th
+    <SortableHeader
+      field={field}
+      sortField={sortField}
+      sortDir={sortDir}
+      onSort={toggleSort}
       className={`${compact ? 'px-3' : 'px-5'} py-2.5 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer select-none hover:text-foreground transition-colors`}
-      onClick={() => toggleSort(field)}
     >
-      <div className="flex items-center gap-1">
-        {children}
-        {sortField === field ? (
-          sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
-        ) : (
-          <ArrowUpDown className="h-3 w-3 opacity-30" />
-        )}
-      </div>
-    </th>
+      {children}
+    </SortableHeader>
   )
 
   const filterSummaryChips = (
@@ -618,23 +612,12 @@ export default function Documents() {
               <option key={option.field} value={option.field}>Sort by {option.label}</option>
             ))}
           </select>
-          <button
-            type="button"
-            onClick={() => setFiltersOpen((open) => !open)}
-            className={`inline-flex items-center justify-center gap-2 rounded-md border px-2.5 py-1.5 text-sm font-medium transition-colors ${
-              filtersOpen || hasActiveFilters
-                ? 'border-primary bg-primary/10 text-primary'
-                : 'border-input bg-background text-foreground hover:bg-accent'
-            }`}
-            aria-expanded={filtersOpen}
-            aria-controls="documents-filter-panel"
-          >
-            <Filter className="h-4 w-4" />
-            Filters
-            {hasActiveFilters && (
-              <span className="rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">On</span>
-            )}
-          </button>
+          <FiltersToggle
+            open={filtersOpen}
+            active={hasActiveFilters}
+            onToggle={() => setFiltersOpen((open) => !open)}
+            controls="documents-filter-panel"
+          />
         </div>
 
         {showFilterSummary && (
@@ -904,38 +887,12 @@ export default function Documents() {
                   </select>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  disabled={page === 0}
-                  onClick={() => setPage((p) => p - 1)}
-                  className="px-3 py-1 border border-border rounded hover:bg-accent/50 disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  Prev
-                </button>
-                <span className="px-2 text-muted-foreground">
-                  {page + 1} / {totalPages || 1}
-                </span>
-                <button
-                  disabled={page >= totalPages - 1}
-                  onClick={() => setPage((p) => p + 1)}
-                  className="px-3 py-1 border border-border rounded hover:bg-accent/50 disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              </div>
+              <Pager page={page} totalPages={totalPages} setPage={setPage} />
             </div>
           )}
         </div>
       )}
     </div>
-  )
-}
-
-function FilterChip({ label, muted = false }: { label: string; muted?: boolean }) {
-  return (
-    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs ${muted ? 'border-border text-muted-foreground' : 'border-primary/20 bg-primary/10 text-primary'}`}>
-      {label}
-    </span>
   )
 }
 

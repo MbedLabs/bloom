@@ -183,13 +183,13 @@ def test_validate_external_fields_none_fields():
 
 
 def test_github_hmac_signature():
-    from app.api.integrations import _verify_github_signature
+    from app.api.integrations import _verify_sha256_signature
 
     secret = "my-webhook-secret"
     body = b'{"action":"opened"}'
     sig = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-    assert _verify_github_signature(body, secret, sig) is True
-    assert _verify_github_signature(body, secret, "sha256=wrong") is False
+    assert _verify_sha256_signature(body, secret, sig) is True
+    assert _verify_sha256_signature(body, secret, "sha256=wrong") is False
 
 
 def test_gitlab_token_verification():

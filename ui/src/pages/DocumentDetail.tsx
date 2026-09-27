@@ -14,6 +14,7 @@ import { useToast } from '../components/useToast'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
 import { useParameterValues } from '../hooks/useParameterValues'
 import { useArtefactLabels } from '../hooks/useArtefactLabels'
+import ConfirmDelete from '../components/ConfirmDelete'
 
 function flattenSections(sections: DocumentSection[]): DocumentSection[] {
   const result: DocumentSection[] = []
@@ -155,19 +156,11 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
               Delete
             </button>
           ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Are you sure?</span>
-              <button
-                onClick={() => { setDeleteConfirm(false); deleteDocumentMutation.mutate(); }}
-                disabled={deleteDocumentMutation.isPending}
-                className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm disabled:opacity-50"
-              >
-                {deleteDocumentMutation.isPending ? 'Deleting...' : 'Delete'}
-              </button>
-              <button onClick={() => setDeleteConfirm(false)} className="px-3 py-1.5 border border-input rounded-md text-sm hover:bg-accent/40">
-                Cancel
-              </button>
-            </div>
+            <ConfirmDelete
+              pending={deleteDocumentMutation.isPending}
+              onConfirm={() => { setDeleteConfirm(false); deleteDocumentMutation.mutate(); }}
+              onCancel={() => setDeleteConfirm(false)}
+            />
           )}
         </>
       ) : undefined}

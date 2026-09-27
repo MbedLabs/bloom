@@ -4,7 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.artefact_utils import audit_artefact_deleted, audit_visibility_change
+from app.api.artefact_utils import (
+    apply_update,
+    delete_project_row,
+    get_row_or_404,
+    load_with_permission,
+)
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_project_access
@@ -106,11 +111,7 @@ async def create_baseline(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    project = (
-        await db.execute(select(Project).where(Project.id == data.project_id))
-    ).scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = await get_row_or_404(db, Project, data.project_id, "Project not found")
 
     await require_project_access(
         db,
@@ -165,26 +166,10 @@ async def update_baseline(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    item = (
-        await db.execute(select(Baseline).where(Baseline.id == baseline_id))
-    ).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Baseline not found")
-
-    await require_project_access(
-        db,
-        current_user,
-        item.project_id,
-        permission=("edit", "baseline"),
+    item = await load_with_permission(
+        db, current_user, Baseline, baseline_id, "Baseline not found", ("edit", "baseline")
     )
-
-    previous_visibility = getattr(item, "visibility", None)
-    for field, value in data.model_dump(exclude_unset=True).items():
-        setattr(item, field, value)
-    await audit_visibility_change(db, "baseline", item, previous_visibility)
-
-    await db.flush()
-    await db.refresh(item)
+    await apply_update(db, item, data, "baseline")
     return _baseline_response(item, current_user)
 
 
@@ -194,16 +179,12 @@ async def delete_baseline(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    item = (
-        await db.execute(select(Baseline).where(Baseline.id == baseline_id))
-    ).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Baseline not found")
-    await require_project_access(
+    await delete_project_row(
         db,
         current_user,
-        item.project_id,
-        permission=("delete", "baseline"),
+        Baseline,
+        baseline_id,
+        "Baseline not found",
+        resource="baseline",
+        audit_type="baseline",
     )
-    await audit_artefact_deleted(db, "baseline", item)
-    await db.delete(item)

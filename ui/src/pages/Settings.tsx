@@ -9,6 +9,7 @@ import {
   type ServiceCredential,
 } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
+import { useDarkMode } from '../hooks/useDarkMode'
 
 const COMMON_TIMEZONES = [
   { label: 'Auto (Browser)', value: 'auto' },
@@ -39,26 +40,6 @@ const COMMON_TIMEZONES = [
   { label: 'UTC-11', value: 'Etc/GMT+11' },
   { label: 'UTC-12', value: 'Etc/GMT+12' },
 ]
-
-function useDarkMode() {
-  const [dark, setDark] = useState(() => {
-    const stored = localStorage.getItem('bloom-theme')
-    if (stored) return stored === 'dark'
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
-  })
-
-  useEffect(() => {
-    const root = document.documentElement
-    if (dark) {
-      root.classList.add('dark')
-    } else {
-      root.classList.remove('dark')
-    }
-    localStorage.setItem('bloom-theme', dark ? 'dark' : 'light')
-  }, [dark])
-
-  return [dark, setDark] as const
-}
 
 export default function Settings() {
   const { user, refreshUser } = useAuth()

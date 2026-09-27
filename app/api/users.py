@@ -11,6 +11,7 @@ from sqlalchemy import delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.artefact_utils import get_row_or_404
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import (
@@ -131,11 +132,7 @@ async def list_mentionable_users(
     current_user: User = Depends(get_current_user),
 ):
     """Who may be addressed with `@` in one project."""
-    project = (
-        await db.execute(select(Project).where(Project.id == project_id))
-    ).scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    await get_row_or_404(db, Project, project_id, "Project not found")
 
     await require_project_access(db, current_user, project_id)
 

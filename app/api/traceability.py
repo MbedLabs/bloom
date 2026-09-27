@@ -43,9 +43,6 @@ from app.services.coverage import (
     DRAFT_STATUS,
     PARTIAL,
     UNCOVERED,
-    VERIFY_LINK_ROLE,
-    VERIFY_SOURCE_TYPE,
-    VERIFY_TARGET_TYPE,
     coverage_percent,
     coverage_status,
 )

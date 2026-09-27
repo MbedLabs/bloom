@@ -1,14 +1,15 @@
 """Shared helpers for generic artefact detail endpoints."""
 
-from typing import Any
+from datetime import datetime, timezone
+from typing import Any, Optional
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.link_read_utils import get_test_case_ids_verifying_requirements
 from app.core.document_kinds import normalize_document_kind
-from app.core.security import apply_external_visibility_filter
+from app.core.security import apply_external_visibility_filter, require_project_access
 from app.models import (
     ArtefactActivity,
     ArtefactLink,
@@ -31,8 +32,30 @@ from app.schemas import (
     RelatedProjectSummary,
     RelatedRequirementSummary,
     RelatedTestCaseSummary,
+    RequirementSummary,
+    TestCaseSummary,
 )
 from app.services.audit import record_audit_event
+
+
+def naive_utc(value: Optional[datetime]) -> Optional[datetime]:
+    """The value as a naive UTC datetime; a naive value is returned unchanged."""
+    if value is None:
+        return None
+    if value.tzinfo is not None:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
+
+
+def requirement_summary(req: Requirement) -> RequirementSummary:
+    """The id, public id, title and status of a requirement."""
+    return RequirementSummary(id=req.id, req_id=req.req_id, title=req.title, status=req.status)
+
+
+def test_case_summary(tc: TestCase) -> TestCaseSummary:
+    """The id, public id, title and status of a test case."""
+    return TestCaseSummary(id=tc.id, tc_id=tc.tc_id, title=tc.title, status=tc.status)
+
 
 ARTEFACT_MODELS = {
     "design": DesignItem,
@@ -509,3 +532,103 @@ async def audit_visibility_change(
         project_id=getattr(artefact, "project_id", None),
         details={"from": previous_value, "to": current_value},
     )
+
+
+async def get_row_or_404(db: AsyncSession, model, item_id: int, detail: str, *conditions):
+    """The row of the model with the id that meets the conditions, or a 404 with the detail."""
+    row = (
+        await db.execute(select(model).where(model.id == item_id, *conditions))
+    ).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail=detail)
+    return row
+
+
+async def delete_project_row(
+    db: AsyncSession,
+    current_user: User,
+    model,
+    item_id: int,
+    not_found: str,
+    *,
+    resource: str | None = None,
+    audit_type: str | None = None,
+    activity: tuple[str, str] | None = None,
+) -> None:
+    """Delete a project row after the delete permission check on the resource.
+
+    Without a resource the row's own document type is checked. ``activity`` is the
+    label and public id attribute of an activity entry under ``audit_type``; with an
+    ``audit_type`` the deletion is audited.
+    """
+    row = await get_row_or_404(db, model, item_id, not_found)
+    await require_project_access(
+        db,
+        current_user,
+        row.project_id,
+        permission=("delete", resource or row.doc_type),
+    )
+    if activity:
+        label, id_attr = activity
+        await log_artefact_activity(
+            db,
+            audit_type,
+            row.id,
+            "deleted",
+            f"{current_user.full_name} deleted {label} {getattr(row, id_attr)}",
+        )
+    if audit_type:
+        await audit_artefact_deleted(db, audit_type, row)
+    await db.delete(row)
+
+
+async def get_visible_row(
+    db: AsyncSession, model, item_id: int, not_found: str, current_user: User
+):
+    """The row with the id when the user may see it and may open its project, else a 404."""
+    row = (
+        await db.execute(
+            apply_external_visibility_filter(
+                select(model).where(model.id == item_id), model, current_user
+            )
+        )
+    ).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail=not_found)
+    await require_project_access(db, current_user, row.project_id)
+    return row
+
+
+async def load_with_permission(
+    db: AsyncSession,
+    current_user: User,
+    model,
+    item_id: int,
+    not_found: str,
+    permission: tuple[str, str],
+):
+    """The row with the id after the permission check on its project, else a 404."""
+    row = await get_row_or_404(db, model, item_id, not_found)
+    await require_project_access(db, current_user, row.project_id, permission=permission)
+    return row
+
+
+async def apply_update(db: AsyncSession, row, data, audit_type: str) -> None:
+    """Set the update's fields on the row, audit a visibility change and reload the row."""
+    previous_visibility = getattr(row, "visibility", None)
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(row, field, value)
+    await audit_visibility_change(db, audit_type, row, previous_visibility)
+    await db.flush()
+    await db.refresh(row)
+
+
+async def page_of(db: AsyncSession, base, model, skip: int, limit: int) -> tuple[list, int]:
+    """One page of the query's rows, newest first, and the total number of rows."""
+    total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
+    rows = (
+        (await db.execute(base.order_by(model.created_at.desc()).offset(skip).limit(limit)))
+        .scalars()
+        .all()
+    )
+    return list(rows), total

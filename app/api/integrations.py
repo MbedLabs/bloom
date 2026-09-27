@@ -5,8 +5,9 @@ import hashlib
 import hmac
 import json
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Callable, Optional
 
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
@@ -15,6 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.artefact_utils import get_row_or_404
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_project_access, require_role
@@ -195,11 +197,7 @@ async def create_integration_setting(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_role(UserRole.admin)),
 ):
-    project = (
-        await db.execute(select(Project).where(Project.id == data.project_id))
-    ).scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    await get_row_or_404(db, Project, data.project_id, "Project not found")
 
     await require_project_access(
         db,
@@ -453,9 +451,117 @@ async def _reserve_webhook_delivery(
     return True
 
 
-def _verify_github_signature(body: bytes, secret: str, signature: str) -> bool:
+def _verify_sha256_signature(body: bytes, secret: str, signature: str) -> bool:
+    """True when the signature is ``sha256=`` and the HMAC-SHA256 of the body with the secret."""
     expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
+
+
+@dataclass(frozen=True)
+class _IssueWebhook:
+    """The parts of an issue webhook that differ between GitHub and GitLab."""
+
+    tracker: str
+    status_map: dict
+    failed_event: str
+    failed_error: str
+    failed_detail: str
+    missing_id_detail: str
+    duplicate_key: str
+
+
+async def _apply_issue_webhook(
+    db: AsyncSession,
+    spec: _IssueWebhook,
+    repo: str,
+    number: int,
+    state: str,
+    event: str,
+    delivery_id: Optional[str],
+    verified: Callable[[IntegrationSetting], bool],
+) -> dict:
+    """Update the defect linked to an external issue from one webhook delivery.
+
+    The project's enabled setting for the tracker must hold a webhook secret, and
+    ``verified`` must accept the delivery against it.
+    """
+    defect = (
+        await db.execute(
+            select(Defect).where(
+                Defect.external_tracker == spec.tracker,
+                Defect.external_repo_full_name == repo,
+                Defect.external_issue_number == number,
+            )
+        )
+    ).scalar_one_or_none()
+
+    if not defect:
+        raise HTTPException(status_code=404, detail="No matching webhook target.")
+
+    setting = (
+        await db.execute(
+            select(IntegrationSetting).where(
+                IntegrationSetting.project_id == defect.project_id,
+                IntegrationSetting.tracker == spec.tracker,
+            )
+        )
+    ).scalar_one_or_none()
+    if not setting or not setting.enabled or not setting.webhook_secret:
+        raise HTTPException(status_code=403, detail="Webhook is not securely configured.")
+    if not verified(setting):
+        _log_target_sync_event(
+            db,
+            "defect",
+            defect.id,
+            "inbound",
+            spec.tracker,
+            spec.failed_event,
+            success=False,
+            error=spec.failed_error,
+        )
+        await db.flush()
+        raise HTTPException(status_code=403, detail=spec.failed_detail)
+    if not delivery_id:
+        raise HTTPException(status_code=400, detail=spec.missing_id_detail)
+    if not await _reserve_webhook_delivery(db, setting, spec.tracker, delivery_id):
+        return {"status": "duplicate", spec.duplicate_key: delivery_id}
+
+    old_state = defect.external_issue_state
+    defect.external_issue_state = state
+    defect.external_last_event_at = datetime.utcnow()
+
+    bloom_status = spec.status_map.get(state)
+    if bloom_status and defect.status != bloom_status:
+        defect.status = bloom_status
+        if bloom_status == "Closed" and not defect.closed_at:
+            defect.closed_at = datetime.utcnow()
+        elif bloom_status != "Closed":
+            defect.closed_at = None
+
+    _log_target_sync_event(
+        db,
+        "defect",
+        defect.id,
+        "inbound",
+        spec.tracker,
+        event,
+        payload_summary=f"state: {old_state} -> {state}",
+        external_event_id=delivery_id,
+    )
+
+    await db.flush()
+    return {"status": "processed", "defect_id": defect.id}
+
+
+_GITHUB_WEBHOOK = _IssueWebhook(
+    tracker="github",
+    status_map=GITHUB_STATUS_MAP,
+    failed_event="signature_failed",
+    failed_error="Missing or invalid HMAC signature",
+    failed_detail="Invalid signature",
+    missing_id_detail="Missing GitHub delivery id.",
+    duplicate_key="delivery",
+)
 
 
 @router.post("/github/webhook", status_code=200)
@@ -482,74 +588,19 @@ async def github_webhook(
     if not repo_full_name or not issue_number:
         return {"status": "ignored", "reason": "missing repo or issue number"}
 
-    defect = (
-        await db.execute(
-            select(Defect).where(
-                Defect.external_tracker == "github",
-                Defect.external_repo_full_name == repo_full_name,
-                Defect.external_issue_number == issue_number,
-            )
-        )
-    ).scalar_one_or_none()
-
-    if not defect:
-        raise HTTPException(status_code=404, detail="No matching webhook target.")
-
-    # When a webhook secret is configured, a valid signature is REQUIRED —
-    # a missing header must reject, otherwise omitting it bypasses auth.
-    setting = (
-        await db.execute(
-            select(IntegrationSetting).where(
-                IntegrationSetting.project_id == defect.project_id,
-                IntegrationSetting.tracker == "github",
-            )
-        )
-    ).scalar_one_or_none()
-    if not setting or not setting.enabled or not setting.webhook_secret:
-        raise HTTPException(status_code=403, detail="Webhook is not securely configured.")
-    if not x_hub_signature_256 or not _verify_github_signature(
-        body, decrypt_integration_secret(setting.webhook_secret), x_hub_signature_256
-    ):
-        _log_sync_event(
-            db,
-            defect.id,
-            "inbound",
-            "github",
-            "signature_failed",
-            success=False,
-            error="Missing or invalid HMAC signature",
-        )
-        await db.flush()
-        raise HTTPException(status_code=403, detail="Invalid signature")
-    if not x_github_delivery:
-        raise HTTPException(status_code=400, detail="Missing GitHub delivery id.")
-    if not await _reserve_webhook_delivery(db, setting, "github", x_github_delivery):
-        return {"status": "duplicate", "delivery": x_github_delivery}
-
-    old_state = defect.external_issue_state
-    defect.external_issue_state = issue_state
-    defect.external_last_event_at = datetime.utcnow()
-
-    bloom_status = GITHUB_STATUS_MAP.get(issue_state)
-    if bloom_status and defect.status != bloom_status:
-        defect.status = bloom_status
-        if bloom_status == "Closed" and not defect.closed_at:
-            defect.closed_at = datetime.utcnow()
-        elif bloom_status != "Closed":
-            defect.closed_at = None
-
-    _log_sync_event(
+    return await _apply_issue_webhook(
         db,
-        defect.id,
-        "inbound",
-        "github",
+        _GITHUB_WEBHOOK,
+        repo_full_name,
+        issue_number,
+        issue_state,
         f"issues.{action}",
-        payload_summary=f"state: {old_state} -> {issue_state}",
-        external_event_id=x_github_delivery,
+        x_github_delivery,
+        lambda setting: bool(x_hub_signature_256)
+        and _verify_sha256_signature(
+            body, decrypt_integration_secret(setting.webhook_secret), x_hub_signature_256
+        ),
     )
-
-    await db.flush()
-    return {"status": "processed", "defect_id": defect.id}
 
 
 # ==================== GitLab webhook ====================
@@ -559,6 +610,17 @@ GITLAB_STATUS_MAP = {"opened": "Open", "closed": "Closed"}
 
 def _verify_gitlab_token(secret: str, header_token: str) -> bool:
     return hmac.compare_digest(secret, header_token)
+
+
+_GITLAB_WEBHOOK = _IssueWebhook(
+    tracker="gitlab",
+    status_map=GITLAB_STATUS_MAP,
+    failed_event="token_failed",
+    failed_error="Missing or invalid GitLab token",
+    failed_detail="Invalid token",
+    missing_id_detail="Missing GitLab event UUID.",
+    duplicate_key="uuid",
+)
 
 
 @router.post("/gitlab/webhook", status_code=200)
@@ -585,74 +647,19 @@ async def gitlab_webhook(
     if not namespace or not iid:
         return {"status": "ignored", "reason": "missing namespace or IID"}
 
-    defect = (
-        await db.execute(
-            select(Defect).where(
-                Defect.external_tracker == "gitlab",
-                Defect.external_repo_full_name == namespace,
-                Defect.external_issue_number == iid,
-            )
-        )
-    ).scalar_one_or_none()
-
-    if not defect:
-        raise HTTPException(status_code=404, detail="No matching webhook target.")
-
-    # When a webhook secret is configured, a valid token is REQUIRED —
-    # a missing header must reject, otherwise omitting it bypasses auth.
-    setting = (
-        await db.execute(
-            select(IntegrationSetting).where(
-                IntegrationSetting.project_id == defect.project_id,
-                IntegrationSetting.tracker == "gitlab",
-            )
-        )
-    ).scalar_one_or_none()
-    if not setting or not setting.enabled or not setting.webhook_secret:
-        raise HTTPException(status_code=403, detail="Webhook is not securely configured.")
-    if not x_gitlab_token or not _verify_gitlab_token(
-        decrypt_integration_secret(setting.webhook_secret), x_gitlab_token
-    ):
-        _log_sync_event(
-            db,
-            defect.id,
-            "inbound",
-            "gitlab",
-            "token_failed",
-            success=False,
-            error="Missing or invalid GitLab token",
-        )
-        await db.flush()
-        raise HTTPException(status_code=403, detail="Invalid token")
-    if not x_gitlab_event_uuid:
-        raise HTTPException(status_code=400, detail="Missing GitLab event UUID.")
-    if not await _reserve_webhook_delivery(db, setting, "gitlab", x_gitlab_event_uuid):
-        return {"status": "duplicate", "uuid": x_gitlab_event_uuid}
-
-    old_state = defect.external_issue_state
-    defect.external_issue_state = issue_state
-    defect.external_last_event_at = datetime.utcnow()
-
-    bloom_status = GITLAB_STATUS_MAP.get(issue_state)
-    if bloom_status and defect.status != bloom_status:
-        defect.status = bloom_status
-        if bloom_status == "Closed" and not defect.closed_at:
-            defect.closed_at = datetime.utcnow()
-        elif bloom_status != "Closed":
-            defect.closed_at = None
-
-    _log_sync_event(
+    return await _apply_issue_webhook(
         db,
-        defect.id,
-        "inbound",
-        "gitlab",
+        _GITLAB_WEBHOOK,
+        namespace,
+        iid,
+        issue_state,
         f"issue.{action}",
-        payload_summary=f"state: {old_state} -> {issue_state}",
-        external_event_id=x_gitlab_event_uuid,
+        x_gitlab_event_uuid,
+        lambda setting: bool(x_gitlab_token)
+        and _verify_gitlab_token(
+            decrypt_integration_secret(setting.webhook_secret), x_gitlab_token
+        ),
     )
-
-    await db.flush()
-    return {"status": "processed", "defect_id": defect.id}
 
 
 # ==================== Jira webhook ====================
@@ -667,12 +674,6 @@ JIRA_CATEGORY_STATUS_MAP = {
 
 JIRA_ISSUE_EVENTS = {"jira:issue_created", "jira:issue_updated", "jira:issue_deleted"}
 MAX_PULLED_ISSUES = 1000
-
-
-def _verify_jira_signature(body: bytes, secret: str, signature: str) -> bool:
-    """Jira Cloud signs the webhook body with HMAC-SHA256 when a secret is set."""
-    expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, signature)
 
 
 def _split_jira_key(issue_key: str) -> Optional[tuple[str, int]]:
@@ -884,7 +885,7 @@ async def _create_defect_from_jira_issue(
     setting = await _jira_setting_for_key(db, project_key)
     if setting is None or not setting.webhook_secret or not setting.create_defects_on_inbound:
         raise HTTPException(status_code=404, detail="No matching webhook target.")
-    if not signature or not _verify_jira_signature(
+    if not signature or not _verify_sha256_signature(
         body, decrypt_integration_secret(setting.webhook_secret), signature
     ):
         raise HTTPException(status_code=403, detail="Invalid signature")
@@ -955,7 +956,7 @@ async def jira_webhook(
     ).scalar_one_or_none()
     if not setting or not setting.enabled or not setting.webhook_secret:
         raise HTTPException(status_code=403, detail="Webhook is not securely configured.")
-    if not x_hub_signature or not _verify_jira_signature(
+    if not x_hub_signature or not _verify_sha256_signature(
         body, decrypt_integration_secret(setting.webhook_secret), x_hub_signature
     ):
         _log_target_sync_event(
@@ -1091,20 +1092,21 @@ async def pull_jira_issues(
 # ==================== Outbound sync ====================
 
 
-async def sync_defect_to_tracker(
+async def _sync_to_tracker(
     db: AsyncSession,
-    defect: Defect,
+    kind: str,
+    item: Defect | ChangeRequest,
     changed_fields: dict,
 ) -> None:
-    """Push defect changes to the linked external tracker if configured."""
-    if not defect.external_tracker or not defect.external_repo_full_name:
+    """Push the changed fields of a defect or change request to its linked tracker."""
+    if not item.external_tracker or not item.external_repo_full_name:
         return
 
     setting = (
         await db.execute(
             select(IntegrationSetting).where(
-                IntegrationSetting.project_id == defect.project_id,
-                IntegrationSetting.tracker == defect.external_tracker,
+                IntegrationSetting.project_id == item.project_id,
+                IntegrationSetting.tracker == item.external_tracker,
                 IntegrationSetting.enabled == True,  # noqa: E712
             )
         )
@@ -1116,33 +1118,44 @@ async def sync_defect_to_tracker(
         return
 
     try:
-        if defect.external_tracker == "github":
-            await _push_to_github(defect, setting, changed_fields)
-        elif defect.external_tracker == "gitlab":
-            await _push_to_gitlab(defect, setting, changed_fields)
-        elif defect.external_tracker == "jira":
-            await _push_to_jira(defect, setting, changed_fields)
+        if item.external_tracker == "github":
+            await _push_to_github(item, setting, changed_fields)
+        elif item.external_tracker == "gitlab":
+            await _push_to_gitlab(item, setting, changed_fields)
+        elif item.external_tracker == "jira":
+            await _push_to_jira(item, setting, changed_fields)
 
-        _log_sync_event(
+        _log_target_sync_event(
             db,
-            defect.id,
+            kind,
+            item.id,
             "outbound",
-            defect.external_tracker,
+            item.external_tracker,
             "update_pushed",
             payload_summary=f"fields: {', '.join(changed_fields.keys())}",
         )
-        defect.external_last_event_at = datetime.utcnow()
+        item.external_last_event_at = datetime.utcnow()
     except Exception as exc:
-        logger.warning("Outbound sync failed for defect %s: %s", defect.id, exc)
-        _log_sync_event(
+        logger.warning("Outbound sync failed for %s %s: %s", kind.replace("_", " "), item.id, exc)
+        _log_target_sync_event(
             db,
-            defect.id,
+            kind,
+            item.id,
             "outbound",
-            defect.external_tracker,
+            item.external_tracker,
             "update_failed",
             success=False,
             error=str(exc),
         )
+
+
+async def sync_defect_to_tracker(
+    db: AsyncSession,
+    defect: Defect,
+    changed_fields: dict,
+) -> None:
+    """Push defect changes to the linked external tracker if configured."""
+    await _sync_to_tracker(db, "defect", defect, changed_fields)
 
 
 # Terminal statuses across both artefact types: defects use Closed/Rejected,
@@ -1329,55 +1342,15 @@ async def sync_change_request_to_tracker(
     changed_fields: dict,
 ) -> None:
     """Push change request updates to the linked external tracker if configured."""
-    if not change_request.external_tracker or not change_request.external_repo_full_name:
-        return
-
-    setting = (
-        await db.execute(
-            select(IntegrationSetting).where(
-                IntegrationSetting.project_id == change_request.project_id,
-                IntegrationSetting.tracker == change_request.external_tracker,
-                IntegrationSetting.enabled == True,  # noqa: E712
-            )
-        )
-    ).scalar_one_or_none()
-
-    if not setting or not setting.token_encrypted:
-        return
-    if setting.tracker == "jira" and not setting.two_way:
-        return
-
-    try:
-        if change_request.external_tracker == "github":
-            await _push_to_github(change_request, setting, changed_fields)
-        elif change_request.external_tracker == "gitlab":
-            await _push_to_gitlab(change_request, setting, changed_fields)
-        elif change_request.external_tracker == "jira":
-            await _push_to_jira(change_request, setting, changed_fields)
-
-        _log_change_request_sync_event(
-            db,
-            change_request.id,
-            "outbound",
-            change_request.external_tracker,
-            "update_pushed",
-            payload_summary=f"fields: {', '.join(changed_fields.keys())}",
-        )
-        change_request.external_last_event_at = datetime.utcnow()
-    except Exception as exc:
-        logger.warning("Outbound sync failed for change request %s: %s", change_request.id, exc)
-        _log_change_request_sync_event(
-            db,
-            change_request.id,
-            "outbound",
-            change_request.external_tracker,
-            "update_failed",
-            success=False,
-            error=str(exc),
-        )
+    await _sync_to_tracker(db, "change_request", change_request, changed_fields)
 
 
-# ==================== Helpers ====================
+
+
+_SYNC_EVENT_TABLES = {
+    "defect": (DefectSyncEvent, "defect_id"),
+    "change_request": (ChangeRequestSyncEvent, "change_request_id"),
+}
 
 
 def _log_target_sync_event(
@@ -1392,60 +1365,11 @@ def _log_target_sync_event(
     error: Optional[str] = None,
     external_event_id: Optional[str] = None,
 ) -> None:
-    """Route a sync event to the defect or change-request log."""
-    log = _log_sync_event if kind == "defect" else _log_change_request_sync_event
-    log(
-        db,
-        target_id,
-        direction,
-        tracker,
-        event_type,
-        payload_summary=payload_summary,
-        success=success,
-        error=error,
-        external_event_id=external_event_id,
-    )
-
-
-def _log_change_request_sync_event(
-    db: AsyncSession,
-    change_request_id: int,
-    direction: str,
-    tracker: str,
-    event_type: str,
-    payload_summary: Optional[str] = None,
-    success: bool = True,
-    error: Optional[str] = None,
-    external_event_id: Optional[str] = None,
-) -> None:
+    """Record one sync event in the defect or change-request log."""
+    model, owner = _SYNC_EVENT_TABLES[kind]
     db.add(
-        ChangeRequestSyncEvent(
-            change_request_id=change_request_id,
-            direction=direction,
-            tracker=tracker,
-            event_type=event_type,
-            payload_summary=payload_summary,
-            success=success,
-            error_message=error,
-            external_event_id=external_event_id,
-        )
-    )
-
-
-def _log_sync_event(
-    db: AsyncSession,
-    defect_id: int,
-    direction: str,
-    tracker: str,
-    event_type: str,
-    payload_summary: Optional[str] = None,
-    success: bool = True,
-    error: Optional[str] = None,
-    external_event_id: Optional[str] = None,
-) -> None:
-    db.add(
-        DefectSyncEvent(
-            defect_id=defect_id,
+        model(
+            **{owner: target_id},
             direction=direction,
             tracker=tracker,
             event_type=event_type,

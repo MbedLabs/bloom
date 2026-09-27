@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.api.artefact_utils import get_row_or_404
 from app.api.docs_facade import resolve_project
 from app.core.config import settings
 from app.core.database import get_db
@@ -40,27 +41,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def _readable_document(db: AsyncSession, document_id: int, user: User) -> Document:
-    document = (
-        await db.execute(select(Document).where(Document.id == document_id))
-    ).scalar_one_or_none()
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    await require_project_access(db, user, document.project_id)
-    return document
-
-
-async def _writable_document(db: AsyncSession, document_id: int, user: User) -> Document:
-    document = (
-        await db.execute(select(Document).where(Document.id == document_id))
-    ).scalar_one_or_none()
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
+async def _document(
+    db: AsyncSession, document_id: int, user: User, action: str | None = None
+) -> Document:
+    """The document after the project access check, or the check of the action on its type."""
+    document = await get_row_or_404(db, Document, document_id, "Document not found")
     await require_project_access(
         db,
         user,
         document.project_id,
-        permission=("edit", document.doc_type),
+        permission=(action, document.doc_type) if action else None,
     )
     return document
 
@@ -72,7 +62,7 @@ async def list_attachments(
     current_user: User = Depends(get_current_user),
 ):
     """Everything held against this document, oldest first."""
-    await _readable_document(db, document_id, current_user)
+    await _document(db, document_id, current_user)
     rows = (
         await db.execute(
             select(DocumentAttachment)
@@ -95,7 +85,7 @@ async def upload_attachment(
     current_user: User = Depends(get_current_user),
 ):
     """Attach a file to a document."""
-    document = await _writable_document(db, document_id, current_user)
+    document = await _document(db, document_id, current_user, "edit")
     display_name = storage.safe_display_name(file.filename)
     content_type = storage.require_allowed_type(file.content_type)
 

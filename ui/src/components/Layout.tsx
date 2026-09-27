@@ -17,31 +17,12 @@ import {
   BookOpen, Bug, Layers, FlaskConical, LogOut, Users, PenTool, AlertTriangle, GitPullRequest, Settings, SlidersHorizontal, ShieldCheck, ScrollText,
 } from 'lucide-react'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import { useDarkMode } from '../hooks/useDarkMode'
 
 /** Must match Tailwind `w-60` / `w-14` and main `ml-*` — also positions the seam toggle. */
 const SIDEBAR_EDGE = { expanded: '15rem', collapsed: '3.5rem' } as const
 
 const BUD_APP_URL = getBudAppBaseUrl()
-
-function useDarkMode() {
-  const [dark, setDark] = useState(() => {
-    const stored = localStorage.getItem('bloom-theme')
-    if (stored) return stored === 'dark'
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
-  })
-
-  useEffect(() => {
-    const root = document.documentElement
-    if (dark) {
-      root.classList.add('dark')
-    } else {
-      root.classList.remove('dark')
-    }
-    localStorage.setItem('bloom-theme', dark ? 'dark' : 'light')
-  }, [dark])
-
-  return [dark, setDark] as const
-}
 
 const mainNav = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },

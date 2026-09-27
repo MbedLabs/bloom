@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.artefact_utils import get_row_or_404
 from app.core.database import get_db
 from app.core.security import (
     get_current_user,
@@ -381,11 +382,7 @@ async def update_project(
     """
     Update a project.
     """
-    result = await db.execute(select(Project).where(Project.id == project_id))
-    project = result.scalar_one_or_none()
-
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = await get_row_or_404(db, Project, project_id, "Project not found")
 
     if data.name is not None:
         existing = await db.execute(
@@ -434,11 +431,7 @@ async def delete_project(
     """
     Delete a project.
     """
-    result = await db.execute(select(Project).where(Project.id == project_id))
-    project = result.scalar_one_or_none()
-
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = await get_row_or_404(db, Project, project_id, "Project not found")
 
     await record_audit_event(
         db,

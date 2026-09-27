@@ -3,19 +3,23 @@ Requirements API endpoints.
 """
 
 from collections import defaultdict
-from datetime import timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
-    audit_artefact_deleted,
     audit_visibility_change,
+    delete_project_row,
+    get_row_or_404,
+    get_visible_row,
     log_artefact_activity,
     log_document_workflow_activity_from_patch,
+    naive_utc,
+    page_of,
     should_log_generic_document_update,
+    test_case_summary,
     updated_summary,
 )
 from app.api.link_read_utils import (
@@ -23,6 +27,7 @@ from app.api.link_read_utils import (
     VERIFY_SOURCE_TYPE,
     VERIFY_TARGET_TYPE,
     get_verifying_test_case_links_for_requirement,
+    verify_link_counts,
 )
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
@@ -51,7 +56,6 @@ from app.schemas import (
     RequirementUpdate,
     RequirementVerifiedByLinkResponse,
     TestCampaignSummary,
-    TestCaseSummary,
     TestRunLinkCreate,
     TestRunLinkResponse,
     TestSuiteSummary,
@@ -66,18 +70,6 @@ def _visibility_for_requirement_origin(req_origin: str | None) -> str:
     return "customer" if (req_origin or "").strip().lower() == "customer" else "internal"
 
 
-def _normalize_datetime(value):
-    if value is None:
-        return None
-    if value.tzinfo is not None:
-        return value.astimezone(timezone.utc).replace(tzinfo=None)
-    return value
-
-
-def _build_test_case_summary(tc: TestCase) -> TestCaseSummary:
-    return TestCaseSummary(id=tc.id, tc_id=tc.tc_id, title=tc.title, status=tc.status)
-
-
 async def _get_verified_by(
     req_id: int,
     db: AsyncSession,
@@ -89,7 +81,7 @@ async def _get_verified_by(
             id=link.id,
             link_type=link.role,
             created_at=link.created_at,
-            test_case=_build_test_case_summary(tc),
+            test_case=test_case_summary(tc),
         )
         for link, tc in link_rows
     ]
@@ -162,7 +154,7 @@ async def _build_prefetch_context(
                     id=link.id,
                     link_type=link.role,
                     created_at=link.created_at,
-                    test_case=_build_test_case_summary(tc),
+                    test_case=test_case_summary(tc),
                 )
             )
 
@@ -347,29 +339,10 @@ async def list_requirements(
     if status:
         base = base.where(Requirement.status == status)
 
-    total_q = select(func.count()).select_from(base.subquery())
-    total = (await db.execute(total_q)).scalar() or 0
-
-    query = base.order_by(Requirement.created_at.desc()).offset(skip).limit(limit)
-    result = await db.execute(query)
-    requirements = result.scalars().all()
-    requirement_ids = [req.id for req in requirements]
-
-    test_case_counts = {req_id: 0 for req_id in requirement_ids}
-    if requirement_ids:
-        count_rows = (
-            await db.execute(
-                select(ArtefactLink.target_id, func.count(ArtefactLink.id))
-                .where(
-                    ArtefactLink.source_type == VERIFY_SOURCE_TYPE,
-                    ArtefactLink.target_type == VERIFY_TARGET_TYPE,
-                    ArtefactLink.target_id.in_(requirement_ids),
-                    ArtefactLink.role == VERIFY_LINK_ROLE,
-                )
-                .group_by(ArtefactLink.target_id)
-            )
-        ).all()
-        test_case_counts.update({req_id: count for req_id, count in count_rows})
+    requirements, total = await page_of(db, base, Requirement, skip, limit)
+    test_case_counts = await verify_link_counts(
+        db, ArtefactLink.target_id, [req.id for req in requirements]
+    )
 
     return PaginatedResponse(
         items=[
@@ -391,11 +364,7 @@ async def create_requirement(
     """
     Create a new requirement; server assigns req_id.
     """
-    project_result = await db.execute(select(Project).where(Project.id == data.project_id))
-    project = project_result.scalar_one_or_none()
-
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = await get_row_or_404(db, Project, data.project_id, "Project not found")
 
     await require_project_access(
         db,
@@ -505,20 +474,9 @@ async def get_requirement(
     """
     Get a requirement by ID, including children and linked test cases.
     """
-    result = await db.execute(
-        apply_external_visibility_filter(
-            select(Requirement).where(Requirement.id == requirement_id),
-            Requirement,
-            current_user,
-        )
+    requirement = await get_visible_row(
+        db, Requirement, requirement_id, "Requirement not found", current_user
     )
-    requirement = result.scalar_one_or_none()
-
-    if not requirement:
-        raise HTTPException(status_code=404, detail="Requirement not found")
-
-    await require_project_access(db, current_user, requirement.project_id)
-
     return await _build_requirement_response(requirement, db, current_user=current_user)
 
 
@@ -637,9 +595,9 @@ async def update_requirement(
                 raise HTTPException(status_code=404, detail="Approved-by user not found")
             requirement.approved_by_id = data.approved_by_id
     if "reviewed_at" in fields_set:
-        requirement.reviewed_at = _normalize_datetime(data.reviewed_at)
+        requirement.reviewed_at = naive_utc(data.reviewed_at)
     if "approved_at" in fields_set:
-        requirement.approved_at = _normalize_datetime(data.approved_at)
+        requirement.approved_at = naive_utc(data.approved_at)
 
     await db.flush()
     await db.refresh(requirement)
@@ -697,28 +655,16 @@ async def delete_requirement(
     """
     Delete a requirement.
     """
-    result = await db.execute(select(Requirement).where(Requirement.id == requirement_id))
-    requirement = result.scalar_one_or_none()
-
-    if not requirement:
-        raise HTTPException(status_code=404, detail="Requirement not found")
-
-    await require_project_access(
+    await delete_project_row(
         db,
         current_user,
-        requirement.project_id,
-        permission=("delete", "REQ"),
+        Requirement,
+        requirement_id,
+        "Requirement not found",
+        resource="REQ",
+        audit_type="requirement",
+        activity=("requirement", "req_id"),
     )
-
-    await log_artefact_activity(
-        db,
-        "requirement",
-        requirement.id,
-        "deleted",
-        f"{current_user.full_name} deleted requirement {requirement.req_id}",
-    )
-    await audit_artefact_deleted(db, "requirement", requirement)
-    await db.delete(requirement)
 
 
 @router.post(

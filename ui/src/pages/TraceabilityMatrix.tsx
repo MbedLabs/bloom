@@ -4,6 +4,7 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { traceabilityApi, projectsApi, exportApi, extractApiErrorMessage } from '../api/client'
 import { docUrl } from '../types/doc'
 import { ArrowLeft, CheckCircle, AlertCircle, XCircle, Shield, Filter, GitBranch, AlertTriangle, X, Download } from 'lucide-react'
+import { FilterChip, FiltersToggle } from '../components/ListControls'
 
 const COVERAGE_OPTIONS = ['Covered', 'Partial', 'Uncovered'] as const
 const PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Critical']
@@ -268,23 +269,12 @@ export default function TraceabilityMatrix() {
               ))}
             </select>
           </label>
-          <button
-            type="button"
-            onClick={() => setFiltersOpen((open) => !open)}
-            className={`inline-flex items-center justify-center gap-2 rounded-md border px-2.5 py-1.5 text-sm font-medium transition-colors ${
-              filtersOpen || hasActiveFilters
-                ? 'border-primary bg-primary/10 text-primary'
-                : 'border-input bg-background text-foreground hover:bg-accent'
-            }`}
-            aria-expanded={filtersOpen}
-            aria-controls="traceability-filter-panel"
-          >
-            <Filter className="h-4 w-4" />
-            Filters
-            {hasActiveFilters && (
-              <span className="rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">On</span>
-            )}
-          </button>
+          <FiltersToggle
+            open={filtersOpen}
+            active={hasActiveFilters}
+            onToggle={() => setFiltersOpen((open) => !open)}
+            controls="traceability-filter-panel"
+          />
         </div>
 
         {showFilterSummary && (
@@ -443,14 +433,6 @@ export default function TraceabilityMatrix() {
         )}
       </section>
     </div>
-  )
-}
-
-function FilterChip({ label, muted = false }: { label: string; muted?: boolean }) {
-  return (
-    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs ${muted ? 'border-border text-muted-foreground' : 'border-primary/20 bg-primary/10 text-primary'}`}>
-      {label}
-    </span>
   )
 }
 

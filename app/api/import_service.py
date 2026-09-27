@@ -15,8 +15,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.artefact_utils import log_artefact_activity
-from app.core.config import settings
+from app.api.artefact_utils import get_row_or_404, log_artefact_activity
 from app.core.database import get_db
 from app.core.id_generator import format_doc_id, next_doc_id
 from app.core.md_import import (
@@ -112,17 +111,11 @@ async def import_docs(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    target_project = (
-        await db.execute(select(Project).where(Project.id == project_id))
-    ).scalar_one_or_none()
-    if not target_project:
-        raise HTTPException(status_code=404, detail="Target project not found")
+    target_project = await get_row_or_404(db, Project, project_id, "Target project not found")
 
-    source_project = (
-        await db.execute(select(Project).where(Project.id == data.source_project_id))
-    ).scalar_one_or_none()
-    if not source_project:
-        raise HTTPException(status_code=404, detail="Source project not found")
+    source_project = await get_row_or_404(
+        db, Project, data.source_project_id, "Source project not found"
+    )
 
     if project_id == data.source_project_id:
         raise HTTPException(status_code=400, detail="Cannot import from the same project")
@@ -147,10 +140,8 @@ async def import_docs(
         details={"kind": "copy", "doc_type": data.doc_type, "source_project_id": source_project.id},
     )
 
-    if data.doc_type == "REQ":
-        await _import_requirements(db, data.doc_ids, source_project, target_project, result)
-    elif data.doc_type == "TC":
-        await _import_test_cases(db, data.doc_ids, source_project, target_project, result)
+    if data.doc_type in _COPIED_FIELDS:
+        await _import_docs(db, data.doc_type, data.doc_ids, source_project, target_project, result)
     else:
         raise HTTPException(
             status_code=400,
@@ -160,14 +151,20 @@ async def import_docs(
     return result
 
 
-async def _get_next_req_num(db: AsyncSession, project_id: int, prefix: str) -> int:
-    search_prefix = f"{prefix}-REQ-"
+_NUMBERED = {"REQ": (Requirement, "req_id"), "TC": (TestCase, "tc_id")}
+
+
+async def _next_number(db: AsyncSession, project_id: int, prefix: str, type_code: str) -> int:
+    """One more than the highest number of the project's ids of the type."""
+    model, id_attr = _NUMBERED[type_code]
+    id_column = getattr(model, id_attr)
+    search_prefix = f"{prefix}-{type_code}-"
     rows = (
         (
             await db.execute(
-                select(Requirement.req_id).where(
-                    Requirement.project_id == project_id,
-                    Requirement.req_id.like(f"{search_prefix}%"),
+                select(id_column).where(
+                    model.project_id == project_id,
+                    id_column.like(f"{search_prefix}%"),
                 )
             )
         )
@@ -182,48 +179,48 @@ async def _get_next_req_num(db: AsyncSession, project_id: int, prefix: str) -> i
     return max_num + 1
 
 
-async def _get_next_tc_num(db: AsyncSession, project_id: int, prefix: str) -> int:
-    search_prefix = f"{prefix}-TC-"
-    rows = (
+_COPIED_FIELDS = {
+    "REQ": (
+        "Requirement",
         (
-            await db.execute(
-                select(TestCase.tc_id).where(
-                    TestCase.project_id == project_id,
-                    TestCase.tc_id.like(f"{search_prefix}%"),
-                )
-            )
-        )
-        .scalars()
-        .all()
-    )
-    max_num = 0
-    for rid in rows:
-        num = _extract_numeric_suffix(rid, len(search_prefix))
-        if num > max_num:
-            max_num = num
-    return max_num + 1
+            "title",
+            "description",
+            "content_json",
+            "content_html",
+            "priority",
+            "req_type",
+            "req_origin",
+        ),
+    ),
+    "TC": (
+        "TestCase",
+        ("title", "description", "content_json", "content_html", "preconditions", "steps"),
+    ),
+}
 
 
-async def _import_requirements(
+async def _import_docs(
     db: AsyncSession,
+    type_code: str,
     doc_ids: list[int],
     source_project: Project,
     target_project: Project,
     result: ImportResult,
 ):
-    next_num = await _get_next_req_num(db, target_project.id, target_project.prefix)
+    """Copy the selected requirements or test cases into the target project as drafts."""
+    model, id_attr = _NUMBERED[type_code]
+    label, fields = _COPIED_FIELDS[type_code]
+    next_num = await _next_number(db, target_project.id, target_project.prefix, type_code)
 
-    # Load the whole selection up front: an import of several hundred rows was otherwise
-    # a statement per row.
     sources_by_id = (
         {
             row.id: row
             for row in (
                 (
                     await db.execute(
-                        select(Requirement).where(
-                            Requirement.id.in_(doc_ids),
-                            Requirement.project_id == source_project.id,
+                        select(model).where(
+                            model.id.in_(doc_ids),
+                            model.project_id == source_project.id,
                         )
                     )
                 )
@@ -238,87 +235,21 @@ async def _import_requirements(
     for src_id in doc_ids:
         src = sources_by_id.get(src_id)
         if not src:
-            result.errors.append(f"Requirement {src_id} not found in source project")
+            result.errors.append(f"{label} {src_id} not found in source project")
             result.skipped += 1
             continue
 
-        new_req_id = format_doc_id(target_project.prefix, "REQ", next_num)
-        imported = Requirement(
+        new_id = format_doc_id(target_project.prefix, type_code, next_num)
+        imported = model(
             project_id=target_project.id,
-            req_id=new_req_id,
-            title=src.title,
-            description=src.description,
-            content_json=src.content_json,
-            content_html=src.content_html,
             status="Draft",
-            priority=src.priority,
-            req_type=src.req_type,
-            req_origin=src.req_origin,
-            source_ref=src.req_id,
+            source_ref=getattr(src, id_attr),
             source_project_id=source_project.id,
+            **{id_attr: new_id},
+            **{field: getattr(src, field) for field in fields},
         )
         db.add(imported)
-        result.new_ids.append(new_req_id)
-        result.imported += 1
-        next_num += 1
-
-    await db.flush()
-
-
-async def _import_test_cases(
-    db: AsyncSession,
-    doc_ids: list[int],
-    source_project: Project,
-    target_project: Project,
-    result: ImportResult,
-):
-    next_num = await _get_next_tc_num(db, target_project.id, target_project.prefix)
-
-    # Load the whole selection up front: an import of several hundred rows was otherwise
-    # a statement per row.
-    sources_by_id = (
-        {
-            row.id: row
-            for row in (
-                (
-                    await db.execute(
-                        select(TestCase).where(
-                            TestCase.id.in_(doc_ids),
-                            TestCase.project_id == source_project.id,
-                        )
-                    )
-                )
-                .scalars()
-                .all()
-            )
-        }
-        if doc_ids
-        else {}
-    )
-
-    for src_id in doc_ids:
-        src = sources_by_id.get(src_id)
-        if not src:
-            result.errors.append(f"TestCase {src_id} not found in source project")
-            result.skipped += 1
-            continue
-
-        new_tc_id = format_doc_id(target_project.prefix, "TC", next_num)
-        imported = TestCase(
-            project_id=target_project.id,
-            tc_id=new_tc_id,
-            title=src.title,
-            description=src.description,
-            content_json=src.content_json,
-            content_html=src.content_html,
-            preconditions=src.preconditions,
-            steps=src.steps,
-            status="Draft",
-            source_ref=src.tc_id,
-            source_project_id=source_project.id,
-        )
-        db.add(imported)
-        result.new_ids.append(new_tc_id)
+        result.new_ids.append(new_id)
         result.imported += 1
         next_num += 1
 
@@ -375,11 +306,7 @@ async def import_reqif(
     current_user: User = Depends(get_current_user),
 ):
     """Import a ReqIF (``.reqif`` / ``.reqifz``) export as project requirements."""
-    target_project = (
-        await db.execute(select(Project).where(Project.id == project_id))
-    ).scalar_one_or_none()
-    if not target_project:
-        raise HTTPException(status_code=404, detail="Target project not found")
+    target_project = await get_row_or_404(db, Project, project_id, "Target project not found")
 
     await require_project_access(db, current_user, target_project.id, permission=("import", "REQ"))
 
@@ -414,7 +341,7 @@ async def import_reqif(
     )
 
     prefix = target_project.prefix
-    next_num = await _get_next_req_num(db, target_project.id, prefix)
+    next_num = await _next_number(db, target_project.id, prefix, "REQ")
 
     # Existing source_refs let a re-import reuse rather than duplicate objects.
     existing_rows = (
@@ -553,11 +480,7 @@ async def import_test_cases_file(
     A row whose tc_id already exists updates that test case; a new or absent tc_id
     creates one with a minted id. Returns created/updated/skipped counts.
     """
-    target_project = (
-        await db.execute(select(Project).where(Project.id == project_id))
-    ).scalar_one_or_none()
-    if not target_project:
-        raise HTTPException(status_code=404, detail="Target project not found")
+    target_project = await get_row_or_404(db, Project, project_id, "Target project not found")
     await require_project_access(
         db,
         current_user,
@@ -589,7 +512,7 @@ async def import_test_cases_file(
     new_ids: List[str] = []
     errors: List[str] = []
     prefix = target_project.prefix
-    next_num = await _get_next_tc_num(db, target_project.id, prefix)
+    next_num = await _next_number(db, target_project.id, prefix, "TC")
     for index, row in enumerate(rows, start=1):
         title = (row.get("title") or "").strip()
         if not title:
@@ -766,11 +689,7 @@ async def import_markdown(
     ``{"action": "rename", "to": NEW}`` (create NEW with the imported value and refer
     to NEW in the imported text).
     """
-    target_project = (
-        await db.execute(select(Project).where(Project.id == project_id))
-    ).scalar_one_or_none()
-    if not target_project:
-        raise HTTPException(status_code=404, detail="Target project not found")
+    target_project = await get_row_or_404(db, Project, project_id, "Target project not found")
     await require_project_access(db, current_user, target_project.id)
 
     try:
@@ -1015,11 +934,7 @@ def _testrail_body(case: TestRailCase, unmatched: list) -> str:
 
 async def _testrail_project(db: AsyncSession, project_id: int, current_user: User) -> Project:
     """The target project, after the test-case import permission check."""
-    project = (
-        await db.execute(select(Project).where(Project.id == project_id))
-    ).scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Target project not found")
+    project = await get_row_or_404(db, Project, project_id, "Target project not found")
     await require_project_access(db, current_user, project.id, permission=("import", "TC"))
     return project
 
@@ -1119,7 +1034,7 @@ async def import_testrail(
         created=0, updated=0, skipped=0, suites_created=[], links_created=0, new_ids=[], errors=[]
     )
     prefix = project.prefix
-    next_num = await _get_next_tc_num(db, project.id, prefix)
+    next_num = await _next_number(db, project.id, prefix, "TC")
 
     for index, case in enumerate(cases, start=1):
         if not case.title:

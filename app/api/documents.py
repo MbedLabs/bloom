@@ -7,7 +7,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
-    audit_artefact_deleted,
+    delete_project_row,
+    get_row_or_404,
     log_artefact_activity,
     log_document_workflow_activity_from_patch,
     should_log_generic_document_update,
@@ -107,11 +108,7 @@ async def create_document(
 ):
     from app.models import Project
 
-    project = (
-        await db.execute(select(Project).where(Project.id == project_id))
-    ).scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = await get_row_or_404(db, Project, project_id, "Project not found")
 
     await require_project_access(
         db,
@@ -362,28 +359,15 @@ async def delete_document(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Document).where(Document.id == document_id))
-    document = result.scalar_one_or_none()
-
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    await require_project_access(
+    await delete_project_row(
         db,
         current_user,
-        document.project_id,
-        permission=("delete", document.doc_type),
+        Document,
+        document_id,
+        "Document not found",
+        audit_type="document",
+        activity=("document", "doc_id"),
     )
-
-    await log_artefact_activity(
-        db,
-        "document",
-        document.id,
-        "deleted",
-        f"{current_user.full_name} deleted document {document.doc_id}",
-    )
-    await audit_artefact_deleted(db, "document", document)
-    await db.delete(document)
 
 
 @router.post(

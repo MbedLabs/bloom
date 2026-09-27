@@ -2,24 +2,25 @@
 Test cases API endpoints.
 """
 
-from datetime import timezone
-
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
-    audit_artefact_deleted,
+    delete_project_row,
+    get_row_or_404,
+    get_visible_row,
     log_artefact_activity,
     log_document_workflow_activity_from_patch,
+    naive_utc,
+    page_of,
+    requirement_summary,
     should_log_generic_document_update,
     updated_summary,
 )
 from app.api.link_read_utils import (
-    VERIFY_LINK_ROLE,
-    VERIFY_SOURCE_TYPE,
-    VERIFY_TARGET_TYPE,
     get_verified_requirement_links_for_test_case,
+    verify_link_counts,
 )
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
@@ -31,7 +32,6 @@ from app.core.security import (
 from app.models import (
     ArtefactLink,
     Project,
-    Requirement,
     TestCampaign,
     TestCampaignItem,
     TestCase,
@@ -42,7 +42,6 @@ from app.models.user import User
 from app.models.user import User as UserModel
 from app.schemas import (
     PaginatedResponse,
-    RequirementSummary,
     TestCampaignSummary,
     TestCaseCreate,
     TestCaseResponse,
@@ -52,18 +51,6 @@ from app.schemas import (
 )
 
 router = APIRouter()
-
-
-def _normalize_datetime(value):
-    if value is None:
-        return None
-    if value.tzinfo is not None:
-        return value.astimezone(timezone.utc).replace(tzinfo=None)
-    return value
-
-
-def _build_requirement_summary(req: Requirement) -> RequirementSummary:
-    return RequirementSummary(id=req.id, req_id=req.req_id, title=req.title, status=req.status)
 
 
 async def _build_test_case_response(
@@ -77,7 +64,7 @@ async def _build_test_case_response(
     verifies = []
     linked_requirements = []
     for link, req in link_rows:
-        req_summary = _build_requirement_summary(req)
+        req_summary = requirement_summary(req)
         linked_requirements.append(req_summary)
         verifies.append(
             TestCaseVerifiesLinkResponse(
@@ -216,29 +203,10 @@ async def list_test_cases(
 
     base = select(TestCase).where(TestCase.project_id == project_id)
     base = apply_external_visibility_filter(base, TestCase, current_user)
-    total_q = select(func.count()).select_from(base.subquery())
-    total = (await db.execute(total_q)).scalar() or 0
-
-    query = base.order_by(TestCase.created_at.desc()).offset(skip).limit(limit)
-    result = await db.execute(query)
-    test_cases = result.scalars().all()
-    test_case_ids = [tc.id for tc in test_cases]
-
-    requirement_counts = {tc_id: 0 for tc_id in test_case_ids}
-    if test_case_ids:
-        count_rows = (
-            await db.execute(
-                select(ArtefactLink.source_id, func.count(ArtefactLink.id))
-                .where(
-                    ArtefactLink.source_type == VERIFY_SOURCE_TYPE,
-                    ArtefactLink.target_type == VERIFY_TARGET_TYPE,
-                    ArtefactLink.source_id.in_(test_case_ids),
-                    ArtefactLink.role == VERIFY_LINK_ROLE,
-                )
-                .group_by(ArtefactLink.source_id)
-            )
-        ).all()
-        requirement_counts.update({tc_id: count for tc_id, count in count_rows})
+    test_cases, total = await page_of(db, base, TestCase, skip, limit)
+    requirement_counts = await verify_link_counts(
+        db, ArtefactLink.source_id, [tc.id for tc in test_cases]
+    )
 
     return PaginatedResponse(
         items=[
@@ -260,11 +228,7 @@ async def create_test_case(
     """
     Create a new test case; server assigns tc_id.
     """
-    project_result = await db.execute(select(Project).where(Project.id == data.project_id))
-    project = project_result.scalar_one_or_none()
-
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = await get_row_or_404(db, Project, data.project_id, "Project not found")
 
     await require_project_access(
         db,
@@ -322,20 +286,9 @@ async def get_test_case(
     """
     Get a test case by ID.
     """
-    result = await db.execute(
-        apply_external_visibility_filter(
-            select(TestCase).where(TestCase.id == test_case_id),
-            TestCase,
-            current_user,
-        )
+    test_case = await get_visible_row(
+        db, TestCase, test_case_id, "Test case not found", current_user
     )
-    test_case = result.scalar_one_or_none()
-
-    if not test_case:
-        raise HTTPException(status_code=404, detail="Test case not found")
-
-    await require_project_access(db, current_user, test_case.project_id)
-
     return await _build_test_case_response(test_case, db, current_user)
 
 
@@ -423,9 +376,9 @@ async def update_test_case(
                 raise HTTPException(status_code=404, detail="Approved-by user not found")
             test_case.approved_by_id = data.approved_by_id
     if "reviewed_at" in fields_set:
-        test_case.reviewed_at = _normalize_datetime(data.reviewed_at)
+        test_case.reviewed_at = naive_utc(data.reviewed_at)
     if "approved_at" in fields_set:
-        test_case.approved_at = _normalize_datetime(data.approved_at)
+        test_case.approved_at = naive_utc(data.approved_at)
 
     await db.flush()
     await db.refresh(test_case)
@@ -460,25 +413,13 @@ async def delete_test_case(
     """
     Delete a test case.
     """
-    result = await db.execute(select(TestCase).where(TestCase.id == test_case_id))
-    test_case = result.scalar_one_or_none()
-
-    if not test_case:
-        raise HTTPException(status_code=404, detail="Test case not found")
-
-    await require_project_access(
+    await delete_project_row(
         db,
         current_user,
-        test_case.project_id,
-        permission=("delete", "TC"),
+        TestCase,
+        test_case_id,
+        "Test case not found",
+        resource="TC",
+        audit_type="test-case",
+        activity=("test case", "tc_id"),
     )
-
-    await log_artefact_activity(
-        db,
-        "test-case",
-        test_case.id,
-        "deleted",
-        f"{current_user.full_name} deleted test case {test_case.tc_id}",
-    )
-    await audit_artefact_deleted(db, "test-case", test_case)
-    await db.delete(test_case)

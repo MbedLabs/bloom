@@ -2,6 +2,10 @@
 
 from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS, normalize_document_kind
 
+VERIFY_SOURCE_TYPE = "TC"
+VERIFY_TARGET_TYPE = "REQ"
+VERIFY_LINK_ROLE = "verifies"
+
 LINKABLE_ARTEFACT_KINDS = ("REQ", "TC", "DES", "RSK", "CHG", "CPT", "DEF", "CMP", "TS")
 LINKABLE_DOC_KINDS = LINKABLE_ARTEFACT_KINDS + tuple(CANONICAL_DOCUMENT_KINDS)
 

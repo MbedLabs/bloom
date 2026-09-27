@@ -2,11 +2,12 @@ import { useMemo, useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { defectsApi, Defect, extractApiErrorMessage } from '../api/client'
-import { ArrowLeft, ArrowUpDown, ChevronDown, ChevronUp, Plus, Bug, ExternalLink, Search } from 'lucide-react'
+import { ArrowLeft, Plus, Bug, ExternalLink, Search } from 'lucide-react'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { useToast } from '../components/useToast'
 import { formatDateTime } from '../test/date-utils'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import { Pager, SortableHeader } from '../components/ListControls'
 
 const SEVERITY_COLORS: Record<string, string> = {
   Critical: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
@@ -156,19 +157,15 @@ export default function Defects() {
   }
 
   const SortHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
-    <th
+    <SortableHeader
+      field={field}
+      sortField={sortField}
+      sortDir={sortDir}
+      onSort={toggleSort}
       className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer select-none hover:text-foreground transition-colors"
-      onClick={() => toggleSort(field)}
     >
-      <div className="flex items-center gap-1">
-        {children}
-        {sortField === field ? (
-          sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
-        ) : (
-          <ArrowUpDown className="h-3 w-3 opacity-30" />
-        )}
-      </div>
-    </th>
+      {children}
+    </SortableHeader>
   )
 
   if (!project) {
@@ -452,25 +449,7 @@ export default function Defects() {
               <span className="text-muted-foreground">
                 Showing {page * PAGE_SIZE + 1}&ndash;{Math.min((page + 1) * PAGE_SIZE, sortedFiltered.length)} of {sortedFiltered.length}
               </span>
-              <div className="flex items-center gap-2">
-                <button
-                  disabled={page === 0}
-                  onClick={() => setPage((p) => p - 1)}
-                  className="px-3 py-1 border border-border rounded hover:bg-accent/50 disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  Prev
-                </button>
-                <span className="px-2 text-muted-foreground">
-                  {page + 1} / {totalPages || 1}
-                </span>
-                <button
-                  disabled={page >= totalPages - 1}
-                  onClick={() => setPage((p) => p + 1)}
-                  className="px-3 py-1 border border-border rounded hover:bg-accent/50 disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              </div>
+              <Pager page={page} totalPages={totalPages} setPage={setPage} />
             </div>
           )}
         </div>

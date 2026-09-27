@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router'
 import { APP_VERSION, extractApiErrorMessage, setupApi } from '../api/client'
 import { BLOOM_LOGO_DARK, BLOOM_LOGO_LIGHT } from '../brandAssets'
+import { newPasswordProblem } from '../lib/passwordRules'
 
 /**
  * First-run administrator creation.
@@ -43,12 +44,9 @@ export default function Setup() {
     e.preventDefault()
     setSubmitError('')
 
-    if (password.length < 12) {
-      setSubmitError('Password must be at least 12 characters long')
-      return
-    }
-    if (password !== confirmPassword) {
-      setSubmitError('Passwords do not match')
+    const passwordProblem = newPasswordProblem(password, confirmPassword)
+    if (passwordProblem) {
+      setSubmitError(passwordProblem)
       return
     }
 

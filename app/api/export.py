@@ -10,13 +10,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 from fpdf import FPDF
 from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.artefact_utils import get_row_or_404
 from app.api.link_read_utils import (
     VERIFY_LINK_ROLE,
     VERIFY_SOURCE_TYPE,
@@ -121,11 +122,7 @@ class _BrandedPDF(FPDF):
 async def _load_project(
     db: AsyncSession, project_id: int, current_user: User, resource: str
 ) -> Project:
-    project = (
-        await db.execute(select(Project).where(Project.id == project_id))
-    ).scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = await get_row_or_404(db, Project, project_id, "Project not found")
     await require_project_access(db, current_user, project_id, permission=("export", resource))
     return project
 

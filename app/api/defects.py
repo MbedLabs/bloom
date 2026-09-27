@@ -6,14 +6,17 @@ from datetime import datetime
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
-    audit_artefact_deleted,
     audit_visibility_change,
+    delete_project_row,
+    get_row_or_404,
+    get_visible_row,
     log_artefact_activity,
     log_document_workflow_activity_from_patch,
+    page_of,
     should_log_generic_document_update,
     updated_summary,
 )
@@ -60,12 +63,8 @@ async def list_defects(
     if severity:
         base = base.where(Defect.severity == severity)
 
-    total_q = select(func.count()).select_from(base.subquery())
-    total = (await db.execute(total_q)).scalar() or 0
-
-    query = base.order_by(Defect.created_at.desc()).offset(skip).limit(limit)
-    result = await db.execute(query)
-    items = [_defect_response(item) for item in result.scalars().all()]
+    rows, total = await page_of(db, base, Defect, skip, limit)
+    items = [_defect_response(item) for item in rows]
 
     return PaginatedResponse(items=items, total=total, skip=skip, limit=limit)
 
@@ -76,11 +75,7 @@ async def create_defect(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    project = (
-        await db.execute(select(Project).where(Project.id == data.project_id))
-    ).scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = await get_row_or_404(db, Project, data.project_id, "Project not found")
 
     await require_project_access(
         db,
@@ -140,16 +135,7 @@ async def get_defect(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    item = (
-        await db.execute(
-            apply_external_visibility_filter(
-                select(Defect).where(Defect.id == defect_pk), Defect, current_user
-            )
-        )
-    ).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Defect not found")
-    await require_project_access(db, current_user, item.project_id)
+    item = await get_visible_row(db, Defect, defect_pk, "Defect not found", current_user)
     return _defect_response(item)
 
 
@@ -232,24 +218,16 @@ async def delete_defect(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    item = (await db.execute(select(Defect).where(Defect.id == defect_pk))).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Defect not found")
-    await require_project_access(
+    await delete_project_row(
         db,
         current_user,
-        item.project_id,
-        permission=("delete", "DEF"),
+        Defect,
+        defect_pk,
+        "Defect not found",
+        resource="DEF",
+        audit_type="defect",
+        activity=("defect", "defect_id"),
     )
-    await log_artefact_activity(
-        db,
-        "defect",
-        item.id,
-        "deleted",
-        f"{current_user.full_name} deleted defect {item.defect_id}",
-    )
-    await audit_artefact_deleted(db, "defect", item)
-    await db.delete(item)
 
 
 # ==================== External issue refresh ====================

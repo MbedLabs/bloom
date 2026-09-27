@@ -5,13 +5,12 @@ import {
   type TcsRow,
   projectsApi,
   testCasesApi,
-  usersApi,
-} from '../api/client'
+  } from '../api/client'
 import { TcsArteTable } from '../components/TcsArteTable'
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import { normalizeTcsRows } from '../utils/tcs'
-import { Pencil, UserCheck, UserCog, Trash2 } from 'lucide-react'
+import { Pencil, Trash2 } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
 import { docEditUrl, docUrl, type DocType } from '../types/doc'
 import { DocEditor } from '../components/editor'
@@ -27,14 +26,12 @@ import {
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
 import { useParameterValues } from '../hooks/useParameterValues'
 import { useArtefactLabels } from '../hooks/useArtefactLabels'
+import ConfirmDelete from '../components/ConfirmDelete'
+import SignOffCards from '../components/SignOffCards'
+import { useSignOff, useSignOffPeople } from '../hooks/useSignOff'
 
 function normalizeSteps(steps: unknown): TcsRow[] {
   return normalizeTcsRows(steps) as TcsRow[]
-}
-
-function resolveUserName(users: Array<{ id: number; full_name: string }> | undefined, userId: number | null) {
-  if (!userId) return 'Unassigned'
-  return users?.find((u) => u.id === userId)?.full_name || `User #${userId}`
 }
 
 function ExecutionBadge({ status }: { status: string }) {
@@ -75,26 +72,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
     enabled: !!testCase?.project_id,
   })
 
-  // Reviewer and approver are shown by name, so this page has to turn ids into names.
-  const { data: projectPeople } = useQuery({
-    queryKey: ['mentionableUsers', testCase?.project_id],
-    queryFn: () => usersApi.listMentionable(testCase!.project_id),
-    enabled: !!testCase?.project_id,
-  })
-
-  // Admins keep reading the directory too: reviewed_by and approved_by are
-  // historical, and whoever signed off may since have left the project or been
-  // deactivated, so they are no longer in the project's own list.
-  const { data: directory } = useQuery({
-    queryKey: ['users'],
-    queryFn: usersApi.list,
-    enabled: user?.role === 'admin',
-  })
-
-  const users = useMemo<Array<{ id: number; full_name: string }>>(
-    () => [...(projectPeople ?? []), ...(directory ?? [])],
-    [projectPeople, directory],
-  )
+  const users = useSignOffPeople(testCase?.project_id, user?.role === 'admin')
 
   const derivedMembershipLinks = useMemo(() => {
     if (!testCase) return []
@@ -114,40 +92,12 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
     ]
   }, [testCase])
 
-  const markReviewedMutation = useMutation({
-    mutationFn: (reviewedById: number) => testCasesApi.setReviewed(tcId, reviewedById),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(['testCase', tcId], (old: unknown) => {
-        if (old && typeof old === 'object') {
-          return { ...(old as object), ...(updated as object) }
-        }
-        return updated
-      })
-      queryClient.invalidateQueries({ queryKey: ['testCase', tcId] })
-      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'test-case', tcId] })
-      toast.notify('Test case marked as reviewed', 'success')
-    },
-    onError: (err: unknown) => {
-      toast.failed('Marking the test case reviewed', err)
-    },
-  })
-
-  const markApprovedMutation = useMutation({
-    mutationFn: (approvedById: number) => testCasesApi.setApproved(tcId, approvedById),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(['testCase', tcId], (old: unknown) => {
-        if (old && typeof old === 'object') {
-          return { ...(old as object), ...(updated as object) }
-        }
-        return updated
-      })
-      queryClient.invalidateQueries({ queryKey: ['testCase', tcId] })
-      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'test-case', tcId] })
-      toast.notify('Test case approved', 'success')
-    },
-    onError: (err: unknown) => {
-      toast.failed('Approving the test case', err)
-    },
+  const { markReviewed: markReviewedMutation, markApproved: markApprovedMutation } = useSignOff({
+    queryKey: ['testCase', tcId],
+    activityKey: ['artefactActivity', 'test-case', tcId],
+    noun: 'test case',
+    setReviewed: (reviewedById: number) => testCasesApi.setReviewed(tcId, reviewedById),
+    setApproved: (approvedById: number) => testCasesApi.setApproved(tcId, approvedById),
   })
 
   const [deleteConfirm, setDeleteConfirm] = useState(false)
@@ -217,19 +167,11 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
               Delete
             </button>
           ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Are you sure?</span>
-              <button
-                onClick={() => { setDeleteConfirm(false); deleteMutation.mutate(); }}
-                disabled={deleteMutation.isPending}
-                className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm disabled:opacity-50"
-              >
-                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
-              </button>
-              <button onClick={() => setDeleteConfirm(false)} className="px-3 py-1.5 border border-input rounded-md text-sm hover:bg-accent/40">
-                Cancel
-              </button>
-            </div>
+            <ConfirmDelete
+              pending={deleteMutation.isPending}
+              onConfirm={() => { setDeleteConfirm(false); deleteMutation.mutate(); }}
+              onCancel={() => setDeleteConfirm(false)}
+            />
           )}
         </div>
       ) : undefined}
@@ -262,49 +204,13 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
             )}
           </SectionCard>
 
-          <SectionCard title="Review">
-            <div className="space-y-3">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Reviewer</div>
-                <div className="text-sm text-foreground">{resolveUserName(users, testCase.reviewer_id)}</div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Reviewed by</div>
-                <div className="text-sm text-foreground">{resolveUserName(users, testCase.reviewed_by_id)}</div>
-                {testCase.reviewed_at && <div className="text-xs text-muted-foreground mt-0.5">{formatDateTime(testCase.reviewed_at)}</div>}
-              </div>
-              <button
-                disabled={!canEditDocs || !testCase.reviewer_id || markReviewedMutation.isPending}
-                onClick={() => testCase.reviewer_id && markReviewedMutation.mutate(testCase.reviewer_id)}
-                className="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-amber-500/90 text-white text-xs font-medium hover:bg-amber-500 disabled:opacity-50"
-              >
-                <UserCheck className="h-3.5 w-3.5 mr-1" />
-                Mark Reviewed
-              </button>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Approval">
-            <div className="space-y-3">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Approver</div>
-                <div className="text-sm text-foreground">{resolveUserName(users, testCase.approver_id)}</div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Approved by</div>
-                <div className="text-sm text-foreground">{resolveUserName(users, testCase.approved_by_id)}</div>
-                {testCase.approved_at && <div className="text-xs text-muted-foreground mt-0.5">{formatDateTime(testCase.approved_at)}</div>}
-              </div>
-              <button
-                disabled={!canEditDocs || !testCase.approver_id || markApprovedMutation.isPending}
-                onClick={() => testCase.approver_id && markApprovedMutation.mutate(testCase.approver_id)}
-                className="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-500 disabled:opacity-50"
-              >
-                <UserCog className="h-3.5 w-3.5 mr-1" />
-                Mark Approved
-              </button>
-            </div>
-          </SectionCard>
+          <SignOffCards
+            item={testCase}
+            users={users}
+            canEdit={canEditDocs}
+            markReviewed={markReviewedMutation}
+            markApproved={markApprovedMutation}
+          />
 
           <SectionCard title="Metadata">
             <div className="space-y-4">

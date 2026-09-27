@@ -31,6 +31,25 @@ from app.services.notification_service import notify
 router = APIRouter()
 
 
+async def _artefact_rows(
+    db: AsyncSession, model, artefact_type: str, artefact_id: str, current_user: User
+) -> list:
+    """The artefact's comment or activity rows, newest first, after the access check."""
+    artefact = await get_artefact_or_404(db, artefact_type, artefact_id, current_user)
+    await require_project_access(db, current_user, artefact.project_id)
+    return list(
+        (
+            await db.execute(
+                select(model)
+                .where(model.artefact_type == artefact_type, model.artefact_id == artefact.id)
+                .order_by(model.created_at.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+
 @router.get(
     "/{artefact_type}/{artefact_id}/comments",
     response_model=list[ArtefactCommentResponse],
@@ -41,23 +60,7 @@ async def list_comments(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    artefact = await get_artefact_or_404(db, artefact_type, artefact_id, current_user)
-    artefact_id = artefact.id
-    await require_project_access(db, current_user, artefact.project_id)
-    comments = (
-        (
-            await db.execute(
-                select(ArtefactComment)
-                .where(
-                    ArtefactComment.artefact_type == artefact_type,
-                    ArtefactComment.artefact_id == artefact_id,
-                )
-                .order_by(ArtefactComment.created_at.desc())
-            )
-        )
-        .scalars()
-        .all()
-    )
+    comments = await _artefact_rows(db, ArtefactComment, artefact_type, artefact_id, current_user)
     return [ArtefactCommentResponse.model_validate(comment) for comment in comments]
 
 
@@ -127,23 +130,7 @@ async def list_activity(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    artefact = await get_artefact_or_404(db, artefact_type, artefact_id, current_user)
-    artefact_id = artefact.id
-    await require_project_access(db, current_user, artefact.project_id)
-    rows = (
-        (
-            await db.execute(
-                select(ArtefactActivity)
-                .where(
-                    ArtefactActivity.artefact_type == artefact_type,
-                    ArtefactActivity.artefact_id == artefact_id,
-                )
-                .order_by(ArtefactActivity.created_at.desc())
-            )
-        )
-        .scalars()
-        .all()
-    )
+    rows = await _artefact_rows(db, ArtefactActivity, artefact_type, artefact_id, current_user)
     return [build_activity_response(row) for row in rows]
 
 

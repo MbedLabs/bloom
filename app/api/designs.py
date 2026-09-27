@@ -1,25 +1,19 @@
 """Design items API endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.artefact_utils import (
-    audit_artefact_deleted,
-    audit_visibility_change,
-    log_artefact_activity,
-    log_document_workflow_activity_from_patch,
-    should_log_generic_document_update,
-    updated_summary,
+from app.api.artefact_crud import (
+    ArtefactKind,
+    create_item,
+    get_item,
+    list_items,
+    update_item,
 )
+from app.api.artefact_utils import delete_project_row
 from app.core.database import get_db
-from app.core.id_generator import next_doc_id
-from app.core.security import (
-    apply_external_visibility_filter,
-    get_current_user,
-    require_project_access,
-)
-from app.models import DesignItem, Project
+from app.core.security import get_current_user
+from app.models import DesignItem
 from app.models.user import User
 from app.schemas import (
     DesignItemCreate,
@@ -27,9 +21,19 @@ from app.schemas import (
     DesignItemUpdate,
     PaginatedResponse,
 )
-from app.services.tag_links import sync_tag_links
 
 router = APIRouter()
+
+KIND = ArtefactKind(
+    model=DesignItem,
+    type_code="DES",
+    id_attr="design_id",
+    activity_type="design",
+    created_label="design item",
+    updated_label="design item",
+    not_found="Design item not found",
+    exists="Design item with this ID already exists",
+)
 
 
 def _design_response(item: DesignItem) -> DesignItemResponse:
@@ -44,16 +48,7 @@ async def list_design_items(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    await require_project_access(db, current_user, project_id)
-
-    base = select(DesignItem).where(DesignItem.project_id == project_id)
-    base = apply_external_visibility_filter(base, DesignItem, current_user)
-    total_q = select(func.count()).select_from(base.subquery())
-    total = (await db.execute(total_q)).scalar() or 0
-    query = base.order_by(DesignItem.created_at.desc()).offset(skip).limit(limit)
-    result = await db.execute(query)
-    items = [_design_response(item) for item in result.scalars().all()]
-    return PaginatedResponse(items=items, total=total, skip=skip, limit=limit)
+    return await list_items(db, KIND, project_id, skip, limit, current_user, _design_response)
 
 
 @router.post("", response_model=DesignItemResponse, status_code=201)
@@ -62,61 +57,22 @@ async def create_design_item(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    project = (
-        await db.execute(select(Project).where(Project.id == data.project_id))
-    ).scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    await require_project_access(
+    item = await create_item(
         db,
-        current_user,
+        KIND,
         data.project_id,
-        permission=("create", "DES"),
-    )
-
-    design_id = await next_doc_id(
-        db, DesignItem, DesignItem.design_id, data.project_id, project.prefix, "DES"
-    )
-
-    existing = await db.execute(
-        select(DesignItem).where(
-            DesignItem.project_id == data.project_id,
-            DesignItem.design_id == design_id,
-        )
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Design item with this ID already exists")
-
-    item = DesignItem(
-        project_id=data.project_id,
-        design_id=design_id,
-        title=data.title,
-        description=data.description,
-        status=data.status,
-        priority=data.priority,
-        design_type=data.design_type,
-        visibility=data.visibility,
-        linked_requirement_id=None,
-        content_json=data.content_json,
-        content_html=data.content_html,
-    )
-    db.add(item)
-    await db.flush()
-    await db.refresh(item)
-    await sync_tag_links(
-        db,
-        project_id=item.project_id,
-        source_type="DES",
-        source_id=item.id,
-        content_json=item.content_json,
-    )
-    await log_artefact_activity(
-        db,
-        "design",
-        item.id,
-        "created",
-        f"{current_user.full_name} created design item {item.design_id}",
+        {
+            "title": data.title,
+            "description": data.description,
+            "status": data.status,
+            "priority": data.priority,
+            "design_type": data.design_type,
+            "visibility": data.visibility,
+            "linked_requirement_id": None,
+            "content_json": data.content_json,
+            "content_html": data.content_html,
+        },
+        current_user,
     )
     return _design_response(item)
 
@@ -127,17 +83,7 @@ async def get_design_item(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    item = (
-        await db.execute(
-            apply_external_visibility_filter(
-                select(DesignItem).where(DesignItem.id == design_id), DesignItem, current_user
-            )
-        )
-    ).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Design item not found")
-    await require_project_access(db, current_user, item.project_id)
-    return _design_response(item)
+    return _design_response(await get_item(db, KIND, design_id, current_user))
 
 
 @router.patch("/{design_id}", response_model=DesignItemResponse)
@@ -147,55 +93,7 @@ async def update_design_item(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    item = (
-        await db.execute(select(DesignItem).where(DesignItem.id == design_id))
-    ).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Design item not found")
-
-    await require_project_access(
-        db,
-        current_user,
-        item.project_id,
-        permission=("edit", "DES"),
-    )
-
-    fields_set = data.model_fields_set
-    previous_status = item.status if "status" in fields_set else None
-
-    previous_visibility = getattr(item, "visibility", None)
-    for field, value in data.model_dump(exclude_unset=True).items():
-        setattr(item, field, value)
-    await audit_visibility_change(db, "design", item, previous_visibility)
-    if item.content_json is not None and "content_json" in fields_set:
-        await sync_tag_links(
-            db,
-            project_id=item.project_id,
-            source_type="DES",
-            source_id=item.id,
-            content_json=item.content_json,
-        )
-
-    await db.flush()
-    await db.refresh(item)
-    await log_document_workflow_activity_from_patch(
-        db,
-        artefact_type="design",
-        artefact_id=item.id,
-        public_id=item.design_id,
-        actor=current_user,
-        fields_set=fields_set,
-        previous_status=previous_status,
-        next_status=item.status,
-    )
-    if should_log_generic_document_update(fields_set):
-        await log_artefact_activity(
-            db,
-            "design",
-            item.id,
-            "updated",
-            updated_summary(current_user.full_name, "design item", item.design_id, fields_set),
-        )
+    item = await update_item(db, KIND, design_id, data, current_user)
     return _design_response(item)
 
 
@@ -205,23 +103,13 @@ async def delete_design_item(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    item = (
-        await db.execute(select(DesignItem).where(DesignItem.id == design_id))
-    ).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Design item not found")
-    await require_project_access(
+    await delete_project_row(
         db,
         current_user,
-        item.project_id,
-        permission=("delete", "DES"),
+        DesignItem,
+        design_id,
+        "Design item not found",
+        resource="DES",
+        audit_type="design",
+        activity=("design item", "design_id"),
     )
-    await log_artefact_activity(
-        db,
-        "design",
-        item.id,
-        "deleted",
-        f"{current_user.full_name} deleted design item {item.design_id}",
-    )
-    await audit_artefact_deleted(db, "design", item)
-    await db.delete(item)

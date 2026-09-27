@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.artefact_utils import delete_project_row, get_row_or_404
 from app.core.database import get_db
 from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS
 from app.core.link_rules import (
@@ -208,11 +209,7 @@ async def create_link(
     data.source_type = normalize_linkable_type(data.source_type)
     data.target_type = normalize_linkable_type(data.target_type)
 
-    project = (
-        await db.execute(select(Project).where(Project.id == data.project_id))
-    ).scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    await get_row_or_404(db, Project, data.project_id, "Project not found")
     await require_project_access(
         db,
         current_user,
@@ -275,15 +272,11 @@ async def delete_link(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    link = (
-        await db.execute(select(ArtefactLink).where(ArtefactLink.id == link_id))
-    ).scalar_one_or_none()
-    if not link:
-        raise HTTPException(status_code=404, detail="Link not found")
-    await require_project_access(
+    await delete_project_row(
         db,
         current_user,
-        link.project_id,
-        permission=("delete", "link"),
+        ArtefactLink,
+        link_id,
+        "Link not found",
+        resource="link",
     )
-    await db.delete(link)
