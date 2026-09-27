@@ -19,39 +19,7 @@ export type PermissionAction =
   | 'export'
   | 'manage'
 
-export type PermissionResource =
-  | 'requirement'
-  | 'design'
-  | 'test_concept'
-  | 'test_case'
-  | 'risk'
-  | 'change_request'
-  | 'defect'
-  | 'document'
-  | 'suite'
-  | 'campaign'
-  | 'run'
-  | 'baseline'
-  | 'parameter'
-  | 'link'
-  | 'member'
-
-/** The permission resource each document type is checked against. */
-export const DOC_TYPE_RESOURCES: Record<DocType, PermissionResource> = {
-  REQ: 'requirement',
-  SPEC: 'document',
-  TC: 'test_case',
-  DES: 'design',
-  RSK: 'risk',
-  CHG: 'change_request',
-  CPT: 'test_concept',
-  DEF: 'defect',
-  CMP: 'campaign',
-  TS: 'suite',
-  PRT: 'document',
-  RPT: 'document',
-  STD: 'document',
-}
+export type PermissionResource = DocType | 'baseline' | 'parameter' | 'link' | 'member'
 
 /** What the role alone allows, used until the server's effective set arrives. */
 function roleBaseline(role: string | undefined): ProjectPermissions {

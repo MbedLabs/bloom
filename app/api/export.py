@@ -354,7 +354,7 @@ async def export_requirements(
     current_user: User = Depends(get_current_user),
 ):
     """Export the project's requirements as CSV or a PDF specification."""
-    project = await _load_project(db, project_id, current_user, "requirement")
+    project = await _load_project(db, project_id, current_user, "REQ")
     await record_audit_event(
         db,
         "export.generated",
@@ -410,7 +410,7 @@ async def export_traceability(
     current_user: User = Depends(get_current_user),
 ):
     """Export the requirement <-> verifying-test-case matrix as CSV or PDF."""
-    project = await _load_project(db, project_id, current_user, "requirement")
+    project = await _load_project(db, project_id, current_user, "REQ")
     await record_audit_event(
         db,
         "export.generated",
@@ -518,7 +518,7 @@ async def export_test_cases(
     current_user: User = Depends(get_current_user),
 ):
     """Export the project's test cases as CSV, Markdown, XML or PDF."""
-    project = await _load_project(db, project_id, current_user, "test_case")
+    project = await _load_project(db, project_id, current_user, "TC")
     await record_audit_event(
         db,
         "export.generated",
@@ -586,8 +586,8 @@ async def export_verification_dossier(
     current_user: User = Depends(get_current_user),
 ):
     """Export the verification dossier: requirements, verifying test cases, results and runs."""
-    project = await _load_project(db, project_id, current_user, "requirement")
-    await require_project_access(db, current_user, project_id, permission=("export", "test_case"))
+    project = await _load_project(db, project_id, current_user, "REQ")
+    await require_project_access(db, current_user, project_id, permission=("export", "TC"))
     await record_audit_event(
         db,
         "export.generated",

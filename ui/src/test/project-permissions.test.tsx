@@ -28,9 +28,9 @@ function Probe({ prefix, projectId }: { prefix?: string; projectId?: number }) {
   const { can, canAny } = useProjectPermissions(prefix, projectId)
   return (
     <ul>
-      <li>test case create: {String(can('create', 'test_case'))}</li>
-      <li>requirement create: {String(can('create', 'requirement'))}</li>
-      <li>requirement view: {String(can('view', 'requirement'))}</li>
+      <li>test case create: {String(can('create', 'TC'))}</li>
+      <li>requirement create: {String(can('create', 'REQ'))}</li>
+      <li>requirement view: {String(can('view', 'REQ'))}</li>
       <li>any create: {String(canAny('create'))}</li>
     </ul>
   )
@@ -55,7 +55,7 @@ describe('useProjectPermissions', () => {
   it('uses the server set, so a group policy adds to an external role', async () => {
     vi.mocked(client.projectMembersApi.permissions).mockResolvedValue({
       '*': ['view', 'comment'],
-      test_case: ['create', 'edit'],
+      TC: ['create', 'edit'],
     })
     renderProbe({ prefix: 'VCU' })
     await screen.findByText('test case create: true')
@@ -66,7 +66,7 @@ describe('useProjectPermissions', () => {
 
   it('holds a maintainer to a read-only set', async () => {
     currentUser = { id: 4, role: 'maintainer' }
-    vi.mocked(client.projectMembersApi.permissions).mockResolvedValue({ requirement: ['view'] })
+    vi.mocked(client.projectMembersApi.permissions).mockResolvedValue({ REQ: ['view'] })
     renderProbe({ projectId: 5 })
     await screen.findByText('requirement create: false')
     expect(screen.getByText('requirement view: true')).toBeTruthy()
@@ -95,8 +95,8 @@ describe('useProjectPermissions', () => {
 describe('allows', () => {
   it('reads resource and wildcard entries', () => {
     expect(allows({ '*': ['*'] }, 'delete', 'member')).toBe(true)
-    expect(allows({ design: ['*'] }, 'approve', 'design')).toBe(true)
-    expect(allows({ design: ['view'] }, 'edit', 'design')).toBe(false)
-    expect(allows({}, 'view', 'design')).toBe(false)
+    expect(allows({ DES: ['*'] }, 'approve', 'DES')).toBe(true)
+    expect(allows({ DES: ['view'] }, 'edit', 'DES')).toBe(false)
+    expect(allows({}, 'view', 'DES')).toBe(false)
   })
 })

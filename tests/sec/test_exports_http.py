@@ -152,7 +152,7 @@ def _external_exporter(session_maker, project):
         Policy(
             name="Exporting reader",
             base_role="external",
-            permissions={"requirement": ["view", "export"], "test_case": ["view", "export"]},
+            permissions={"REQ": ["view", "export"], "TC": ["view", "export"]},
         ),
     )
     [group] = _add(session_maker, Group(name="Readers", policy_id=policy.id))
@@ -214,7 +214,7 @@ def test_the_dossier_needs_test_case_export_too(harness):
         Policy(
             name="Requirement exporter",
             base_role="external",
-            permissions={"requirement": ["view", "export"]},
+            permissions={"REQ": ["view", "export"]},
         ),
     )
     [group] = _add(session_maker, Group(name="Authors", policy_id=policy.id))

@@ -188,7 +188,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
   const projectPrefix = project?.prefix || ''
   const tcsRows = normalizeSteps(testCase.steps)
   const editUrl = docEditUrl(projectPrefix, 'TC', testCase.tc_id)
-  const canEditDocs = can('edit', 'test_case')
+  const canEditDocs = can('edit', 'TC')
 
   return (
     <>

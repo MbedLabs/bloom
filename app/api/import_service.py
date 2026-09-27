@@ -101,8 +101,8 @@ def _extract_numeric_suffix(item_id: str, prefix_len: int) -> int:
 
 
 def _copied_resource(doc_type: str) -> str:
-    """The permission resource of the documents a project-to-project copy moves."""
-    return "requirement" if doc_type == "REQ" else "test_case"
+    """The document type a project-to-project copy moves: requirements, else test cases."""
+    return "REQ" if doc_type == "REQ" else "TC"
 
 
 @router.post("/projects/{project_id}/import", response_model=ImportResult, status_code=201)
@@ -381,9 +381,7 @@ async def import_reqif(
     if not target_project:
         raise HTTPException(status_code=404, detail="Target project not found")
 
-    await require_project_access(
-        db, current_user, target_project.id, permission=("import", "requirement")
-    )
+    await require_project_access(db, current_user, target_project.id, permission=("import", "REQ"))
 
     attempt = await begin_import_attempt(db, user_id=current_user.id, project_id=target_project.id)
     await record_audit_event(
@@ -564,7 +562,7 @@ async def import_test_cases_file(
         db,
         current_user,
         target_project.id,
-        permission=("import", "test_case"),
+        permission=("import", "TC"),
     )
 
     attempt = await begin_import_attempt(db, user_id=current_user.id, project_id=target_project.id)
@@ -773,12 +771,7 @@ async def import_markdown(
     ).scalar_one_or_none()
     if not target_project:
         raise HTTPException(status_code=404, detail="Target project not found")
-    await require_project_access(
-        db,
-        current_user,
-        target_project.id,
-        permission=("import", "document"),
-    )
+    await require_project_access(db, current_user, target_project.id)
 
     try:
         actions = _collision_actions(collision_actions)
@@ -856,6 +849,26 @@ async def import_markdown(
             rename_parameters(text, renames), default_type=default_type
         )
     blocked = {name.strip().lower() for name in kept} | set(existing)
+
+    imported_types = sorted(
+        {
+            section.type_code
+            for section in parsed.sections
+            if section.title.strip() and ARTEFACT_FACTORY.get(section.type_code or "")
+        }
+    )
+    try:
+        for type_code in imported_types:
+            await require_project_access(
+                db, current_user, target_project.id, permission=("import", type_code)
+            )
+        if parsed.parameters:
+            await require_project_access(
+                db, current_user, target_project.id, permission=("create", "parameter")
+            )
+    except HTTPException:
+        await finish_import_attempt(db, attempt_id, "failed")
+        raise
 
     created = 0
     done: set = set()
@@ -1007,7 +1020,7 @@ async def _testrail_project(db: AsyncSession, project_id: int, current_user: Use
     ).scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Target project not found")
-    await require_project_access(db, current_user, project.id, permission=("import", "test_case"))
+    await require_project_access(db, current_user, project.id, permission=("import", "TC"))
     return project
 
 

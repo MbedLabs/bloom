@@ -27,24 +27,17 @@ import {
   testConceptsApi,
   projectsApi,
 } from '../api/client'
-import { useProjectPermissions, type PermissionResource } from '../hooks/useProjectPermissions'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
 import { useParameterValues } from '../hooks/useParameterValues'
 import { useArtefactLabels } from '../hooks/useArtefactLabels'
 import AccessDenied from '../components/AccessDenied'
 import { isAccessDenied } from '../lib/accessDenied'
 
 type ArtefactKind = 'design' | 'risk' | 'change' | 'test-concept' | 'defect'
-const KIND_RESOURCES: Record<ArtefactKind, PermissionResource> = {
-  design: 'design',
-  risk: 'risk',
-  change: 'change_request',
-  'test-concept': 'test_concept',
-  defect: 'defect',
-}
 type ArtefactRecord = DesignItem | RiskItem | ChangeRequest | TestConcept | Defect
 type DetailTab = 'overview' | 'comments' | 'activity' | 'related' | 'sync'
 
-const SOURCE_TYPE_CODES: Record<ArtefactKind, string> = {
+const SOURCE_TYPE_CODES: Record<ArtefactKind, DocType> = {
   design: 'DES',
   risk: 'RSK',
   change: 'CHG',
@@ -355,7 +348,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
   const title = String(artefactRecord[config.titleField] ?? config.singular)
   const description = String(artefactRecord[config.descriptionField] ?? '')
   const editUrl = docEditUrl(projectPrefix, config.docType, code)
-  const canEditDocs = can('edit', KIND_RESOURCES[kind])
+  const canEditDocs = can('edit', SOURCE_TYPE_CODES[kind])
 
   return (
     <>

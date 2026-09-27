@@ -52,7 +52,7 @@ def _create_policy(api_client, headers, base_role="external", doc_tag_scope=None
         "name": unique_name("Policy"),
         "description": "Test policy",
         "base_role": base_role,
-        "permissions": {"requirement": ["view", "comment"]},
+        "permissions": {"REQ": ["view", "comment"]},
     }
     if doc_tag_scope is not None:
         body["doc_tag_scope"] = doc_tag_scope

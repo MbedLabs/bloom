@@ -60,7 +60,7 @@ async def _writable_document(db: AsyncSession, document_id: int, user: User) -> 
         db,
         user,
         document.project_id,
-        permission=("edit", "document"),
+        permission=("edit", document.doc_type),
     )
     return document
 
@@ -208,7 +208,7 @@ async def delete_attachment(
         db,
         current_user,
         attachment.document.project_id,
-        permission=("edit", "document"),
+        permission=("edit", attachment.document.doc_type),
     )
 
     storage_path = attachment.storage_path

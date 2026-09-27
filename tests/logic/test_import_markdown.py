@@ -13,7 +13,17 @@ from starlette.datastructures import UploadFile
 from app.api.import_service import import_markdown
 from app.core.database import Base
 from app.core.md_import import rename_parameters
-from app.models import DesignItem, Notification, Project, ProjectVariable, Requirement
+from app.models import (
+    DesignItem,
+    Group,
+    GroupMembership,
+    GroupProjectGrant,
+    Notification,
+    Policy,
+    Project,
+    ProjectVariable,
+    Requirement,
+)
 from app.models import TestCase as TestCaseModel
 from app.models.user import User, UserRole
 
@@ -200,3 +210,44 @@ async def test_test_case_imports_with_step_rows(session):
         ("precondition", "relay open", ""),
         ("step", "close the relay", "boot banner within {{RELAY_MS}} ms"),
     ]
+
+
+async def test_the_import_needs_import_on_every_imported_type(session):
+    author = User(
+        email="author@test.local",
+        full_name="Rae Author",
+        hashed_password="x",
+        role=UserRole.maintainer,
+    )
+    policy = Policy(
+        name="Requirement importer",
+        base_role="maintainer",
+        permissions={"REQ": ["view", "import"], "parameter": ["view", "create"]},
+    )
+    session.add_all([author, policy])
+    await session.flush()
+    group = Group(name="Importers", policy_id=policy.id)
+    session.add(group)
+    await session.flush()
+    session.add_all(
+        [
+            GroupMembership(group_id=group.id, user_id=author.id),
+            GroupProjectGrant(group_id=group.id, project_id=1),
+        ]
+    )
+    await session.commit()
+
+    with pytest.raises(HTTPException) as denied:
+        await import_markdown(
+            project_id=1,
+            default_type=None,
+            file=_upload(MD),
+            collision_actions=json.dumps({"BOOT_MS": {"action": "existing"}}),
+            db=session,
+            current_user=author,
+        )
+
+    assert denied.value.status_code == 403
+    assert denied.value.detail == "Missing permission: import on DES."
+    assert await _count(session, Requirement) == 0
+    assert await _count(session, DesignItem) == 0

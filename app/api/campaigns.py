@@ -257,7 +257,7 @@ async def create_campaign(
         db,
         current_user,
         data.project_id,
-        permission=("create", "campaign"),
+        permission=("create", "CMP"),
     )
 
     # Resolve suite_ids: prefer new field, fall back to legacy suite_id
@@ -392,7 +392,7 @@ async def update_campaign(
         db,
         current_user,
         campaign.project_id,
-        permission=("edit", "campaign"),
+        permission=("edit", "CMP"),
     )
 
     if data.name is not None:
@@ -471,7 +471,7 @@ async def delete_campaign(
         db,
         current_user,
         campaign.project_id,
-        permission=("delete", "campaign"),
+        permission=("delete", "CMP"),
     )
     await audit_artefact_deleted(db, "campaign", campaign)
     await db.delete(campaign)
@@ -492,7 +492,7 @@ async def add_campaign_item(
         db,
         current_user,
         campaign.project_id,
-        permission=("plan", "campaign"),
+        permission=("plan", "CMP"),
     )
 
     tc_result = await db.execute(select(TestCase).where(TestCase.id == test_case_id))
@@ -538,7 +538,7 @@ async def remove_campaign_item(
         db,
         current_user,
         campaign.project_id,
-        permission=("plan", "campaign"),
+        permission=("plan", "CMP"),
     )
     result = await db.execute(
         select(TestCampaignItem).where(
@@ -569,7 +569,7 @@ async def update_campaign_item(
         db,
         current_user,
         campaign.project_id,
-        permission=("plan", "campaign"),
+        permission=("plan", "CMP"),
     )
     item = (
         await db.execute(

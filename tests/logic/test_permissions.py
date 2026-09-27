@@ -17,7 +17,7 @@ def test_role_baseline_matches_the_role_gates():
     assert role_baseline("maintainer", None) == {}
     maintainer = role_baseline("maintainer", "maintainer")
     assert set(maintainer) == set(RESOURCES)
-    assert has_permission(maintainer, "delete", "requirement")
+    assert has_permission(maintainer, "delete", "REQ")
     assert not has_permission(maintainer, "manage", "member")
     for instance, member in (
         ("external", "external"),
@@ -25,27 +25,27 @@ def test_role_baseline_matches_the_role_gates():
         ("external", "maintainer"),
     ):
         reader = role_baseline(instance, member)
-        assert has_permission(reader, "view", "requirement")
-        assert has_permission(reader, "comment", "test_case")
-        assert not has_permission(reader, "edit", "requirement")
+        assert has_permission(reader, "view", "REQ")
+        assert has_permission(reader, "comment", "TC")
+        assert not has_permission(reader, "edit", "REQ")
         assert not has_permission(reader, "view", "parameter")
 
 
 def test_merge_only_adds():
     permissions = role_baseline("external", "external")
-    merge(permissions, {"test_case": ["create"], "member": ["view"]})
+    merge(permissions, {"TC": ["create"], "member": ["view"]})
     merge(permissions, None)
-    assert has_permission(permissions, "create", "test_case")
-    assert has_permission(permissions, "view", "test_case")
+    assert has_permission(permissions, "create", "TC")
+    assert has_permission(permissions, "view", "TC")
     assert has_permission(permissions, "view", "member")
-    assert not has_permission(permissions, "create", "requirement")
+    assert not has_permission(permissions, "create", "REQ")
 
 
 def test_wildcards():
-    assert has_permission({ANY: {"view"}}, "view", "design")
-    assert not has_permission({ANY: {"view"}}, "edit", "design")
-    assert has_permission({"design": {ANY}}, "approve", "design")
-    assert not has_permission({}, "view", "design")
+    assert has_permission({ANY: {"view"}}, "view", "DES")
+    assert not has_permission({ANY: {"view"}}, "edit", "DES")
+    assert has_permission({"DES": {ANY}}, "approve", "DES")
+    assert not has_permission({}, "view", "DES")
 
 
 def test_transition_action():
@@ -58,13 +58,13 @@ def test_transition_action():
 
 
 def test_invalid_entries_and_lists():
-    assert invalid_entries({"requirement": ["view"], ANY: [ANY], "member": ["manage"]}) == []
-    assert invalid_entries({"widget": ["view"], "design": ["fly"], "risk": "view"}) == [
+    assert invalid_entries({"REQ": ["view"], ANY: [ANY], "member": ["manage"]}) == []
+    assert invalid_entries({"widget": ["view"], "DES": ["fly"], "RSK": "view"}) == [
         "unknown resource 'widget'",
-        "unknown action 'fly' on 'design'",
-        "actions for 'risk' must be a list",
+        "unknown action 'fly' on 'DES'",
+        "actions for 'RSK' must be a list",
     ]
-    assert as_lists({"risk": {"view", "edit"}, ANY: {"view"}}) == {
+    assert as_lists({"RSK": {"view", "edit"}, ANY: {"view"}}) == {
         ANY: ["view"],
-        "risk": ["edit", "view"],
+        "RSK": ["edit", "view"],
     }

@@ -30,7 +30,7 @@ import {
   isServerAssignedDocIdOnCreate,
   usesDocumentEditor,
 } from './docCreateIdPolicy'
-import { DOC_TYPE_RESOURCES, useProjectPermissions } from '../hooks/useProjectPermissions'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
 import { useParameterValues } from '../hooks/useParameterValues'
 import { useArtefactLabels } from '../hooks/useArtefactLabels'
 
@@ -195,7 +195,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const { can } = useProjectPermissions(prefix, projectId)
   const parameterValues = useParameterValues(prefix, projectId)
   const artefactLabels = useArtefactLabels(prefix, contentJson)
-  const canEditDocs = can(editMode ? 'edit' : 'create', DOC_TYPE_RESOURCES[docType])
+  const canEditDocs = can(editMode ? 'edit' : 'create', docType)
   // The server allocates ids with MAX(suffix)+1, so ask it rather than assuming
   // -001, which was almost always already taken.
   const { data: nextDocId } = useQuery({

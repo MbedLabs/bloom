@@ -72,7 +72,7 @@ async def create_design_item(
         db,
         current_user,
         data.project_id,
-        permission=("create", "design"),
+        permission=("create", "DES"),
     )
 
     design_id = await next_doc_id(
@@ -157,7 +157,7 @@ async def update_design_item(
         db,
         current_user,
         item.project_id,
-        permission=("edit", "design"),
+        permission=("edit", "DES"),
     )
 
     fields_set = data.model_fields_set
@@ -214,7 +214,7 @@ async def delete_design_item(
         db,
         current_user,
         item.project_id,
-        permission=("delete", "design"),
+        permission=("delete", "DES"),
     )
     await log_artefact_activity(
         db,

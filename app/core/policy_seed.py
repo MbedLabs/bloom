@@ -6,6 +6,7 @@ grants (see require_project_access); require_permission enforces the matrix.
 Defaults are protected: undeletable and their base_role is fixed.
 """
 
+from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS
 from app.core.permissions import RESOURCES
 from app.schemas.memberships import DEFAULT_EXTERNAL_DOC_TYPES
 
@@ -16,6 +17,10 @@ _LINKS = {"link": _AUTHOR}
 
 def _all(*actions: str) -> dict:
     return {r: list(actions) for r in _ARTEFACTS}
+
+
+def _documents(actions: list[str]) -> dict:
+    return {kind: list(actions) for kind in CANONICAL_DOCUMENT_KINDS}
 
 
 def _merge(base: dict, overrides: dict) -> dict:
@@ -39,10 +44,10 @@ DEFAULT_POLICIES = [
         "permissions": _merge(
             _all("view", "comment"),
             {
-                "requirement": _AUTHOR + ["approve", "import", "export"],
-                "document": _AUTHOR + ["approve", "import"],
-                "change_request": _AUTHOR + ["approve"],
-                "risk": _AUTHOR,
+                "REQ": _AUTHOR + ["approve", "import", "export"],
+                **_documents(_AUTHOR + ["approve", "import"]),
+                "CHG": _AUTHOR + ["approve"],
+                "RSK": _AUTHOR,
                 "parameter": _AUTHOR,
                 **_LINKS,
             },
@@ -56,13 +61,13 @@ DEFAULT_POLICIES = [
         "permissions": _merge(
             _all("view", "comment"),
             {
-                "change_request": _AUTHOR + ["review", "approve"],
-                "risk": _AUTHOR + ["review"],
-                "campaign": _AUTHOR + ["plan"],
-                "suite": ["view", "comment", "plan"],
+                "CHG": _AUTHOR + ["review", "approve"],
+                "RSK": _AUTHOR + ["review"],
+                "CMP": _AUTHOR + ["plan"],
+                "TS": ["view", "comment", "plan"],
                 "baseline": _AUTHOR + ["approve"],
-                "requirement": ["view", "comment", "review", "export"],
-                "test_case": ["view", "comment", "export"],
+                "REQ": ["view", "comment", "review", "export"],
+                "TC": ["view", "comment", "export"],
                 "member": ["view", "manage"],
                 **_LINKS,
             },
@@ -76,9 +81,9 @@ DEFAULT_POLICIES = [
         "permissions": _merge(
             _all("view", "comment"),
             {
-                "requirement": _AUTHOR + ["import", "export"],
-                "document": _AUTHOR + ["import"],
-                "risk": _AUTHOR,
+                "REQ": _AUTHOR + ["import", "export"],
+                **_documents(_AUTHOR + ["import"]),
+                "RSK": _AUTHOR,
                 "parameter": _AUTHOR,
                 **_LINKS,
             },
@@ -92,8 +97,8 @@ DEFAULT_POLICIES = [
         "permissions": _merge(
             _all("view", "comment"),
             {
-                "design": _AUTHOR,
-                "defect": _AUTHOR,
+                "DES": _AUTHOR,
+                "DEF": _AUTHOR,
                 **_LINKS,
             },
         ),
@@ -106,12 +111,11 @@ DEFAULT_POLICIES = [
         "permissions": _merge(
             _all("view", "comment"),
             {
-                "test_concept": _AUTHOR,
-                "test_case": _AUTHOR + ["import", "export"],
-                "suite": _AUTHOR + ["plan"],
-                "campaign": _AUTHOR + ["plan"],
-                "run": ["view", "comment", "execute"],
-                "defect": ["view", "comment", "create"],
+                "CPT": _AUTHOR,
+                "TC": _AUTHOR + ["import", "export"],
+                "TS": _AUTHOR + ["plan"],
+                "CMP": _AUTHOR + ["plan"],
+                "DEF": ["view", "comment", "create"],
                 "parameter": _AUTHOR,
                 **_LINKS,
             },

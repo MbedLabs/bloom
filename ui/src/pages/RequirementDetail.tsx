@@ -208,7 +208,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
     )
   }
 
-  const canEditDocs = can('edit', 'requirement')
+  const canEditDocs = can('edit', 'REQ')
 
   return (
     <>

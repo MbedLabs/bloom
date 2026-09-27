@@ -21,7 +21,7 @@ const SORT_OPTIONS: { field: CampaignSortField; label: string }[] = [
 export default function TestCampaigns() {
   const { prefix } = useParams<{ prefix: string }>()
   const { can } = useProjectPermissions(prefix)
-  const canEditDocs = can('create', 'campaign')
+  const canEditDocs = can('create', 'CMP')
   const [searchParams, setSearchParams] = useSearchParams()
   const { data: project } = useProjectByPrefix(prefix)
   const projectId = project?.id || 0
@@ -439,7 +439,7 @@ export default function TestCampaigns() {
         </div>
       )}
 
-      {can('create', 'suite') && showCreateSuite && (
+      {can('create', 'TS') && showCreateSuite && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-card rounded-lg shadow-elegant max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
             <div className="px-6 py-4 border-b border-border">

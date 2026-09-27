@@ -401,7 +401,7 @@ async def create_requirement(
         db,
         current_user,
         data.project_id,
-        permission=("create", "requirement"),
+        permission=("create", "REQ"),
     )
 
     if data.parent_id is not None:
@@ -542,7 +542,7 @@ async def update_requirement(
         db,
         current_user,
         requirement.project_id,
-        permission=("edit", "requirement"),
+        permission=("edit", "REQ"),
     )
 
     fields_set = data.model_fields_set
@@ -707,7 +707,7 @@ async def delete_requirement(
         db,
         current_user,
         requirement.project_id,
-        permission=("delete", "requirement"),
+        permission=("delete", "REQ"),
     )
 
     await log_artefact_activity(
@@ -744,7 +744,7 @@ async def link_test_run(
         db,
         _current_user,
         requirement.project_id,
-        permission=("edit", "requirement"),
+        permission=("edit", "REQ"),
     )
 
     link = TestRunLink(

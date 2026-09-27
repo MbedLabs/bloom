@@ -72,7 +72,7 @@ async def create_risk_item(
         db,
         current_user,
         data.project_id,
-        permission=("create", "risk"),
+        permission=("create", "RSK"),
     )
 
     risk_id = await next_doc_id(
@@ -157,7 +157,7 @@ async def update_risk_item(
         db,
         current_user,
         item.project_id,
-        permission=("edit", "risk"),
+        permission=("edit", "RSK"),
     )
 
     fields_set = data.model_fields_set
@@ -212,7 +212,7 @@ async def delete_risk_item(
         db,
         current_user,
         item.project_id,
-        permission=("delete", "risk"),
+        permission=("delete", "RSK"),
     )
     await log_artefact_activity(
         db,

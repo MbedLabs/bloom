@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
+    ARTEFACT_LINK_TYPES,
     artefact_public_id,
     build_activity_response,
     build_related_response,
@@ -14,7 +15,7 @@ from app.api.artefact_utils import (
     log_workflow_status_transition,
 )
 from app.core.database import get_db
-from app.core.permissions import TRANSITION_RESOURCES, transition_action
+from app.core.permissions import transition_action
 from app.core.security import get_current_user, require_project_access
 from app.models import ArtefactActivity, ArtefactComment
 from app.models.user import User
@@ -175,7 +176,7 @@ async def transition_status(
         artefact.project_id,
         permission=(
             transition_action(artefact.status, data.status),
-            TRANSITION_RESOURCES.get(artefact_type, artefact_type),
+            ARTEFACT_LINK_TYPES.get(artefact_type, artefact_type),
         ),
     )
     allowed = get_allowed_transitions(artefact_type, artefact.status)

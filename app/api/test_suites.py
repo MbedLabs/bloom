@@ -261,7 +261,7 @@ async def create_suite(
         db,
         current_user,
         data.project_id,
-        permission=("create", "suite"),
+        permission=("create", "TS"),
     )
 
     suite_id = await next_doc_id(
@@ -340,7 +340,7 @@ async def update_suite(
         db,
         current_user,
         suite.project_id,
-        permission=("edit", "suite"),
+        permission=("edit", "TS"),
     )
 
     previous_visibility = getattr(suite, "visibility", None)
@@ -368,7 +368,7 @@ async def delete_suite(
         db,
         current_user,
         suite.project_id,
-        permission=("delete", "suite"),
+        permission=("delete", "TS"),
     )
     await audit_artefact_deleted(db, "test-suite", suite)
     await db.delete(suite)
@@ -390,7 +390,7 @@ async def add_suite_item(
         db,
         current_user,
         suite.project_id,
-        permission=("plan", "suite"),
+        permission=("plan", "TS"),
     )
     tc = (
         await db.execute(select(TestCase).where(TestCase.id == test_case_id))
@@ -443,7 +443,7 @@ async def remove_suite_item(
         db,
         current_user,
         suite.project_id,
-        permission=("plan", "suite"),
+        permission=("plan", "TS"),
     )
     item = (
         await db.execute(

@@ -117,7 +117,7 @@ async def create_document(
         db,
         current_user,
         project_id,
-        permission=("create", "document"),
+        permission=("create", data.doc_type),
     )
 
     if data.project_id != project_id:
@@ -275,8 +275,15 @@ async def update_document(
         db,
         current_user,
         document.project_id,
-        permission=("edit", "document"),
+        permission=("edit", document.doc_type),
     )
+    if data.doc_type is not None and data.doc_type != document.doc_type:
+        await require_project_access(
+            db,
+            current_user,
+            document.project_id,
+            permission=("edit", data.doc_type),
+        )
 
     fields_set = data.model_fields_set
     previous_status = document.status if "status" in fields_set else None
@@ -365,7 +372,7 @@ async def delete_document(
         db,
         current_user,
         document.project_id,
-        permission=("delete", "document"),
+        permission=("delete", document.doc_type),
     )
 
     await log_artefact_activity(
@@ -400,7 +407,7 @@ async def create_section(
         db,
         current_user,
         document.project_id,
-        permission=("edit", "document"),
+        permission=("edit", document.doc_type),
     )
 
     section = DocumentSection(
@@ -452,7 +459,7 @@ async def update_section(
         db,
         current_user,
         document.project_id,
-        permission=("edit", "document"),
+        permission=("edit", document.doc_type),
     )
 
     if data.title is not None:
@@ -524,7 +531,7 @@ async def delete_section(
         db,
         current_user,
         document.project_id,
-        permission=("edit", "document"),
+        permission=("edit", document.doc_type),
     )
 
     await db.delete(section)
@@ -547,7 +554,7 @@ async def reorder_sections(
         db,
         current_user,
         document.project_id,
-        permission=("edit", "document"),
+        permission=("edit", document.doc_type),
     )
 
     # Load every section being reordered at once. Scoping by document_id is kept

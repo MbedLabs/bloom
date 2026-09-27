@@ -97,7 +97,7 @@ afterEach(cleanup)
 
 describe('the files attached to a document', () => {
   function attachmentsPanel() {
-    return renderPanel(<DocumentAttachmentsPanel documentId={11} />)
+    return renderPanel(<DocumentAttachmentsPanel documentId={11} docType="SPEC" />)
   }
 
   it('shows the files and their source', async () => {

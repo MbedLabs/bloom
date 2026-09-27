@@ -88,7 +88,7 @@ async def create_test_concept(
         db,
         current_user,
         data.project_id,
-        permission=("create", "test_concept"),
+        permission=("create", "CPT"),
     )
 
     concept_id = await next_doc_id(
@@ -174,7 +174,7 @@ async def update_test_concept(
         db,
         current_user,
         item.project_id,
-        permission=("edit", "test_concept"),
+        permission=("edit", "CPT"),
     )
 
     fields_set = data.model_fields_set
@@ -231,7 +231,7 @@ async def delete_test_concept(
         db,
         current_user,
         item.project_id,
-        permission=("delete", "test_concept"),
+        permission=("delete", "CPT"),
     )
     await log_artefact_activity(
         db,

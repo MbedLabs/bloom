@@ -55,10 +55,10 @@ def test_read_only_group_reads_but_cannot_write(api_client: TestClient):
     assert listed.status_code == 200, listed.text
     denied = _create(api_client, headers, "requirements", project)
     assert denied.status_code == 403
-    assert denied.json()["detail"] == "Missing permission: create on requirement."
+    assert denied.json()["detail"] == "Missing permission: create on REQ."
 
     mine = api_client.get(f"/api/projects/{project}/permissions", headers=headers).json()
-    assert mine["requirement"] == ["view"]
+    assert mine["REQ"] == ["view"]
     assert "member" not in mine
 
 
@@ -72,7 +72,7 @@ def test_group_policy_adds_to_an_external_role(api_client: TestClient):
     assert _create(api_client, headers, "test-cases", project).status_code == 201
     denied = _create(api_client, headers, "requirements", project)
     assert denied.status_code == 403
-    assert denied.json()["detail"] == "Missing permission: create on requirement."
+    assert denied.json()["detail"] == "Missing permission: create on REQ."
 
 
 def test_direct_maintainer_is_unchanged_and_members_need_a_policy(api_client: TestClient):
@@ -124,15 +124,15 @@ def test_policy_matrix_is_validated(api_client: TestClient):
     assert created.status_code == 400
     assert created.json()["detail"] == "Invalid permissions: unknown resource 'widget'"
 
-    body["permissions"] = {"requirement": ["view"]}
+    body["permissions"] = {"REQ": ["view"]}
     policy = api_client.post("/api/policies", headers=admin, json=body).json()
     patched = api_client.patch(
         f"/api/policies/{policy['id']}",
         headers=admin,
-        json={"permissions": {"requirement": ["fly"]}},
+        json={"permissions": {"REQ": ["fly"]}},
     )
     assert patched.status_code == 400
-    assert "unknown action 'fly' on 'requirement'" in patched.json()["detail"]
+    assert "unknown action 'fly' on 'REQ'" in patched.json()["detail"]
 
 
 def test_access_lists_everyone_with_access_and_why(api_client: TestClient):
@@ -181,3 +181,54 @@ def test_access_lists_everyone_with_access_and_why(api_client: TestClient):
         f"/api/projects/{project}/access", headers=_headers_for(api_client, direct["email"])
     )
     assert denied.status_code == 403
+
+
+def test_document_permissions_follow_the_document_type(api_client: TestClient):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, "Typed")["id"]
+    policy = api_client.post(
+        "/api/policies",
+        headers=admin,
+        json={
+            "name": unique_name("Specifications"),
+            "base_role": "maintainer",
+            "permissions": {"SPEC": ["view", "edit"], "PRT": ["view"]},
+        },
+    )
+    assert policy.status_code == 201, policy.text
+    group = _create_group(api_client, admin, policy_id=policy.json()["id"])
+    granted = api_client.post(
+        f"/api/groups/{group['id']}/grants", headers=admin, json={"project_id": project}
+    )
+    assert granted.status_code == 201, granted.text
+    user = _create_user(api_client, admin, role="maintainer")
+    added = api_client.post(
+        f"/api/groups/{group['id']}/members", headers=admin, json={"user_id": user["id"]}
+    )
+    assert added.status_code == 201, added.text
+    headers = _headers_for(api_client, user["email"])
+
+    def document(doc_type):
+        created = api_client.post(
+            f"/api/projects/{project}/documents",
+            headers=admin,
+            json={"project_id": project, "title": unique_name(doc_type), "doc_type": doc_type},
+        )
+        assert created.status_code == 201, created.text
+        return created.json()["id"]
+
+    specification, protocol = document("SPEC"), document("PRT")
+    edited = api_client.patch(
+        f"/api/documents/{specification}", headers=headers, json={"title": "Edited"}
+    )
+    assert edited.status_code == 200, edited.text
+    denied = api_client.patch(
+        f"/api/documents/{protocol}", headers=headers, json={"title": "Edited"}
+    )
+    assert denied.status_code == 403
+    assert denied.json()["detail"] == "Missing permission: edit on PRT."
+    retyped = api_client.patch(
+        f"/api/documents/{specification}", headers=headers, json={"doc_type": "PRT"}
+    )
+    assert retyped.status_code == 403
+    assert retyped.json()["detail"] == "Missing permission: edit on PRT."

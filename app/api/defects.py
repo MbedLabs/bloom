@@ -86,7 +86,7 @@ async def create_defect(
         db,
         current_user,
         data.project_id,
-        permission=("create", "defect"),
+        permission=("create", "DEF"),
     )
 
     defect_id = await next_doc_id(db, Defect, Defect.defect_id, project.id, project.prefix, "DEF")
@@ -168,7 +168,7 @@ async def update_defect(
         db,
         current_user,
         item.project_id,
-        permission=("edit", "defect"),
+        permission=("edit", "DEF"),
     )
 
     fields_set = data.model_fields_set
@@ -239,7 +239,7 @@ async def delete_defect(
         db,
         current_user,
         item.project_id,
-        permission=("delete", "defect"),
+        permission=("delete", "DEF"),
     )
     await log_artefact_activity(
         db,
@@ -274,7 +274,7 @@ async def refresh_external_issue(
         db,
         current_user,
         item.project_id,
-        permission=("edit", "defect"),
+        permission=("edit", "DEF"),
     )
     if (
         not item.external_tracker

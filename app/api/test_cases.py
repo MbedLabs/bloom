@@ -270,7 +270,7 @@ async def create_test_case(
         db,
         current_user,
         data.project_id,
-        permission=("create", "test_case"),
+        permission=("create", "TC"),
     )
 
     tc_id = await next_doc_id(db, TestCase, TestCase.tc_id, data.project_id, project.prefix, "TC")
@@ -359,7 +359,7 @@ async def update_test_case(
         db,
         current_user,
         test_case.project_id,
-        permission=("edit", "test_case"),
+        permission=("edit", "TC"),
     )
 
     fields_set = data.model_fields_set
@@ -470,7 +470,7 @@ async def delete_test_case(
         db,
         current_user,
         test_case.project_id,
-        permission=("delete", "test_case"),
+        permission=("delete", "TC"),
     )
 
     await log_artefact_activity(

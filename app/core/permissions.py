@@ -5,28 +5,20 @@ before groups existed: an admin everything, a maintainer member every project ac
 except managing members, any other member view and comment. A group granted the project
 adds its policy's (action x resource) matrix, including what the policy inherits from
 its parent. Groups only add; they never take away what the role baseline gives.
+
+A resource is a document type (REQ, TC, SPEC, ...) or one of the project objects that
+are not documents: baseline, parameter and link. ``member`` covers project membership.
 """
 
 from typing import Optional
 
+from app.schemas.memberships import EXTERNAL_DOC_TYPES
+
 ANY = "*"
 
-RESOURCES = (
-    "requirement",
-    "design",
-    "test_concept",
-    "test_case",
-    "risk",
-    "change_request",
-    "defect",
-    "document",
-    "suite",
-    "campaign",
-    "run",
-    "baseline",
-    "parameter",
-    "link",
-)
+DOC_TYPE_RESOURCES = tuple(sorted(EXTERNAL_DOC_TYPES))
+OBJECT_RESOURCES = ("baseline", "parameter", "link")
+RESOURCES = DOC_TYPE_RESOURCES + OBJECT_RESOURCES
 MEMBER = "member"
 ACTIONS = (
     "view",
@@ -43,13 +35,7 @@ ACTIONS = (
     "manage",
 )
 
-TRANSITION_RESOURCES = {
-    "design": "design",
-    "risk": "risk",
-    "change": "change_request",
-    "test-concept": "test_concept",
-    "defect": "defect",
-}
+
 _DECISION_STATES = {"Approved", "Rejected"}
 _REVIEW_STATES = {"Review", "Analysis"}
 

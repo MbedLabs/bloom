@@ -146,7 +146,7 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
     )
   }
 
-  const canEditDocs = can('edit', 'campaign')
+  const canEditDocs = can('edit', 'CMP')
   const suiteScopes = campaign.suite_scopes ?? []
   const adHocItems = campaign.ad_hoc_items ?? []
   const campaignBudRunUrl = campaign.bud_run_url || (campaign.bud_run_id ? buildBudRunUrl(campaign.bud_run_id) : null)

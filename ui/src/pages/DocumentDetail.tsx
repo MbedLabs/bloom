@@ -56,13 +56,13 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
   const resolvedDocType = kindSlugToType(kind || '')
   const { can } = useProjectPermissions(prefix)
   const parameterValues = useParameterValues(prefix)
-  const canEditDocs = can('edit', 'document')
-
   const { data: doc, isLoading } = useQuery({
     queryKey: ['document', docId],
     queryFn: () => documentsApi.get(docId),
     enabled: !!docId,
   })
+  const docType = (doc?.doc_type as DocType | undefined) ?? resolvedDocType
+  const canEditDocs = docType ? can('edit', docType) : false
 
   const artefactLabels = useArtefactLabels(prefix, doc?.content_json)
   const { data: project } = useQuery({
@@ -236,7 +236,7 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
         </div>
       )}
 
-      <DocumentAttachmentsPanel documentId={docId} />
+      <DocumentAttachmentsPanel documentId={docId} docType={docType} />
 
       <DocumentActivityPanel artefactType="document" artefactId={docId} />
 

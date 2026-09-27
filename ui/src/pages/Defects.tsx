@@ -138,7 +138,7 @@ export default function Defects() {
   })
 
   const { can } = useProjectPermissions(prefix, project?.id)
-  const canEdit = can('create', 'defect')
+  const canEdit = can('create', 'DEF')
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault()

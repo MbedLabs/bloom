@@ -6,6 +6,7 @@ import { SectionCard } from './DocDetailShell'
 import { useToast } from './useToast'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
 import { useParams } from 'react-router'
+import type { DocType } from '../types/doc'
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -13,14 +14,20 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export default function DocumentAttachmentsPanel({ documentId }: { documentId: number }) {
+export default function DocumentAttachmentsPanel({
+  documentId,
+  docType,
+}: {
+  documentId: number
+  docType: DocType | null
+}) {
   const queryClient = useQueryClient()
   const toast = useToast()
   const fileInput = useRef<HTMLInputElement>(null)
   const [busyId, setBusyId] = useState<number | null>(null)
   const { prefix } = useParams<{ prefix: string }>()
   const { can } = useProjectPermissions(prefix)
-  const canEdit = can('edit', 'document')
+  const canEdit = docType ? can('edit', docType) : false
 
   const { data: attachments, isLoading } = useQuery({
     queryKey: ['attachments', documentId],
