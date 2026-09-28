@@ -7,7 +7,7 @@ from datetime import date, datetime, time
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 from sqlalchemy import (
     DateTime,
     Integer,
@@ -85,11 +85,19 @@ class DocShellResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    @field_serializer("last_executed_at", "created_at", "updated_at")
+    def serialize_dt(self, dt: Optional[datetime], _info):
+        return f"{dt.isoformat()}Z" if dt else None
+
 
 class DocDetailFacadeResponse(DocShellResponse):
     description: str | None = None
     content_json: dict | None = None
     content_html: str | None = None
+
+    @field_serializer("last_executed_at", "created_at", "updated_at")
+    def serialize_dt(self, dt: Optional[datetime], _info):
+        return f"{dt.isoformat()}Z" if dt else None
 
 
 async def resolve_project(db: AsyncSession, identifier: str) -> Project:

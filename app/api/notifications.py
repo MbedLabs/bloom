@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +25,10 @@ class NotificationResponse(BaseModel):
     project_id: Optional[int] = None
     read_at: Optional[datetime] = None
     created_at: datetime
+
+    @field_serializer("read_at", "created_at")
+    def serialize_dt(self, dt: Optional[datetime], _info):
+        return f"{dt.isoformat()}Z" if dt else None
 
     class Config:
         from_attributes = True

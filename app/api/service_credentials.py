@@ -1,9 +1,10 @@
 """Admin lifecycle endpoints for scoped machine credentials."""
 
 from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,9 +40,17 @@ class ServiceCredentialSummary(BaseModel):
 
     model_config = {"from_attributes": True}
 
+    @field_serializer("expires_at", "revoked_at", "last_used_at", "created_at")
+    def serialize_dt(self, dt: Optional[datetime], _info):
+        return f"{dt.isoformat()}Z" if dt else None
+
 
 class ServiceCredentialCreated(ServiceCredentialSummary):
     token: str
+
+    @field_serializer("expires_at", "revoked_at", "last_used_at", "created_at")
+    def serialize_dt(self, dt: Optional[datetime], _info):
+        return f"{dt.isoformat()}Z" if dt else None
 
 
 def _validate_scope(scope: str) -> None:

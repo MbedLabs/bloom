@@ -30,7 +30,7 @@
 - Requirements and test cases return their editor body.
 - A `#` tag shows the current id of the artefact it points at, looked up once per document, instead of the text captured when it was typed; a tag whose target is gone reads as plain text.
 - Test execution times reported by a results sync were stored in the server's time zone instead of UTC, so a server not running in UTC stored and showed them shifted by its offset.
-- User and project-member timestamps in API responses carry the UTC marker (`Z`); without it the Users page showed the time of an email change request shifted by the viewer's UTC offset.
+- User, project member, document, integration setting, sync event, notification and service credential timestamps in API responses carry the UTC marker (`Z`); without it the Users page showed the time of an email change request shifted by the viewer's UTC offset.
 
 ## 1.1.0 - 2026-09-16
 

@@ -11,7 +11,7 @@ from typing import Callable, Optional
 
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -97,6 +97,10 @@ class IntegrationSettingResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    @field_serializer("created_at", "updated_at")
+    def serialize_dt(self, dt: Optional[datetime], _info):
+        return f"{dt.isoformat()}Z" if dt else None
+
     class Config:
         from_attributes = True
 
@@ -127,6 +131,10 @@ class SyncEventResponse(BaseModel):
     success: bool
     error_message: Optional[str] = None
     created_at: datetime
+
+    @field_serializer("created_at")
+    def serialize_dt(self, dt: Optional[datetime], _info):
+        return f"{dt.isoformat()}Z" if dt else None
 
     class Config:
         from_attributes = True

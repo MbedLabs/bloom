@@ -641,7 +641,7 @@ function LayoutInner() {
                                 <div className="truncate text-xs text-muted-foreground">{n.body}</div>
                               )}
                               <div className="mt-0.5 text-[10px] uppercase text-muted-foreground">
-                                {formatDateTime(n.created_at + 'Z')}
+                                {formatDateTime(n.created_at)}
                               </div>
                             </div>
                           </div>
