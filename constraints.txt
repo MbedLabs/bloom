@@ -6,7 +6,7 @@
 #
 aiofiles==25.1.0
     # via bloom-app (pyproject.toml)
-alembic==1.19.2
+alembic==1.20.0
     # via bloom-app (pyproject.toml)
 annotated-doc==0.0.5
     # via fastapi
@@ -55,7 +55,7 @@ email-validator==2.3.0
     # via pydantic
 fastapi==0.141.1
     # via bloom-app (pyproject.toml)
-fonttools==4.64.0
+fonttools==4.65.0
     # via fpdf2
 fpdf2==2.8.8
     # via bloom-app (pyproject.toml)
@@ -133,7 +133,7 @@ six==1.17.0
     #   python-dateutil
 slowapi==0.1.10
     # via bloom-app (pyproject.toml)
-sqlalchemy==2.0.53
+sqlalchemy==2.0.54
     # via
     #   alembic
     #   bloom-app (pyproject.toml)
