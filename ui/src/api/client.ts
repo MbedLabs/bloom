@@ -2,7 +2,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { type DocType, DOC_TYPE_SLUGS } from '../types/doc'
 import type { TcsRow } from '../utils/tcs'
 export type { TcsRow } from '../utils/tcs'
-import { clearAuthToken, getAuthToken, setAuthToken } from '../lib/tokenStorage'
+import { clearAuthToken, getAuthToken, getSessionUserId, setAuthToken } from '../lib/tokenStorage'
 import packageJson from '../../package.json'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api'
@@ -40,11 +40,17 @@ let refreshPromise: Promise<string | null> | null = null
 async function refreshAccessToken(): Promise<string | null> {
   try {
     // Bare axios (no interceptors) so a 401 here cannot recurse into itself.
-    const resp = await axios.post<{ access_token: string }>(
+    const resp = await axios.post<{ access_token: string; user?: { id: number } }>(
       `${API_URL}/auth/refresh`,
       {},
       { withCredentials: true },
     )
+    const signedIn = getSessionUserId()
+    if (signedIn !== null && resp.data.user?.id !== signedIn) {
+      clearAuthToken()
+      window.location.replace('/login')
+      return null
+    }
     setAuthToken(resp.data.access_token)
     return resp.data.access_token
   } catch {
@@ -204,7 +210,7 @@ export const authApi = {
   },
   logout: async (): Promise<void> => {
     try {
-      await api.post('/auth/logout')
+      await api.post('/auth/logout', undefined, { timeout: 10000 })
     } finally {
       clearAuthToken()
     }

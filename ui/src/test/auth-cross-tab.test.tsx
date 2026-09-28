@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -51,9 +52,11 @@ describe('Bloom cross-tab session restoration', () => {
     })
 
     render(
-      <AuthProvider>
-        <AuthState />
-      </AuthProvider>,
+      <QueryClientProvider client={new QueryClient()}>
+        <AuthProvider>
+          <AuthState />
+        </AuthProvider>
+      </QueryClientProvider>,
     )
 
     expect(await screen.findByText('already-logged-in@example.com')).toBeInTheDocument()
@@ -65,9 +68,11 @@ describe('Bloom cross-tab session restoration', () => {
     refreshMock.mockRejectedValueOnce(new Error('Invalid or expired session'))
 
     render(
-      <AuthProvider>
-        <AuthState />
-      </AuthProvider>,
+      <QueryClientProvider client={new QueryClient()}>
+        <AuthProvider>
+          <AuthState />
+        </AuthProvider>
+      </QueryClientProvider>,
     )
 
     expect(await screen.findByText('Signed out')).toBeInTheDocument()

@@ -248,9 +248,12 @@ function LayoutInner() {
   const { can } = useProjectPermissions(undefined, currentProjectId)
   const canEditProjectParameters = can('edit', 'parameter')
 
+  const [signingOut, setSigningOut] = useState(false)
+
   const handleLogout = () => {
-    logout()
-    navigate('/login')
+    if (signingOut) return
+    setSigningOut(true)
+    logout().catch(() => setSigningOut(false))
   }
 
   const userInitials = user?.full_name
@@ -687,10 +690,11 @@ function LayoutInner() {
                     <div className="py-1">
                       <button
                         onClick={handleLogout}
+                        disabled={signingOut}
                         className="w-full flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                       >
                         <LogOut className="h-4 w-4" />
-                        Sign out
+                        {signingOut ? 'Signing out...' : 'Sign out'}
                       </button>
                     </div>
                   </div>
