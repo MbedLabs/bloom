@@ -47,6 +47,12 @@ def naive_utc(value: Optional[datetime]) -> Optional[datetime]:
     return value
 
 
+def minute_utc(value: Optional[datetime]) -> str:
+    """The time as ``YYYY-MM-DD HH:MM UTC``, Bloom's precision for people; empty when None."""
+    stamp = naive_utc(value)
+    return stamp.strftime("%Y-%m-%d %H:%M UTC") if stamp else ""
+
+
 def requirement_summary(req: Requirement) -> RequirementSummary:
     """The id, public id, title and status of a requirement."""
     return RequirementSummary(id=req.id, req_id=req.req_id, title=req.title, status=req.status)

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
 import { useDarkMode } from '../hooks/useDarkMode'
+import { formatDateTime } from '../test/date-utils'
 
 /** Must match Tailwind `w-60` / `w-14` and main `ml-*` — also positions the seam toggle. */
 const SIDEBAR_EDGE = { expanded: '15rem', collapsed: '3.5rem' } as const
@@ -640,7 +641,7 @@ function LayoutInner() {
                                 <div className="truncate text-xs text-muted-foreground">{n.body}</div>
                               )}
                               <div className="mt-0.5 text-[10px] uppercase text-muted-foreground">
-                                {new Date(n.created_at + 'Z').toLocaleString()}
+                                {formatDateTime(n.created_at + 'Z')}
                               </div>
                             </div>
                           </div>

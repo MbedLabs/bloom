@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.artefact_utils import minute_utc
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.observability import request_id_var
@@ -175,7 +176,7 @@ async def request_access(
                 requester_email=current_user.email,
                 resource=resource,
                 project=data.project_prefix or "",
-                requested_at=row.created_at.strftime("%Y-%m-%d %H:%M UTC"),
+                requested_at=minute_utc(row.created_at),
                 request_id=request_id_var.get(),
                 review_link=_review_link(data.project_prefix),
             )

@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.artefact_utils import get_row_or_404
+from app.api.artefact_utils import get_row_or_404, minute_utc
 from app.api.docs_facade import resolve_project
 from app.core.config import settings
 from app.core.database import get_db
@@ -274,7 +274,7 @@ async def publish_test_report(
 
 
 def _report_summary(data: TestReportPublish) -> str:
-    executed = data.executed_at.isoformat() if data.executed_at else "unknown"
+    executed = minute_utc(data.executed_at) or "unknown"
     lines = [
         f"Bud run {data.bud_run_id} ({data.status or 'Completed'}) executed {executed}.",
         f"{data.passed_tests} passed, {data.failed_tests} failed, of {data.total_tests}.",

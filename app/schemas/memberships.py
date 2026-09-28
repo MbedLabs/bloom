@@ -5,7 +5,7 @@ Pydantic schemas for project-scoped user membership management.
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 # ── Doc types exposed to external visibility configuration ──────────────
 # Mirrors the UI DocType union in ui/src/types/doc.ts
@@ -67,6 +67,10 @@ class ProjectMembershipResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    @field_serializer("created_at", "updated_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
+
     class Config:
         from_attributes = True
 
@@ -82,6 +86,10 @@ class ProjectMemberResponse(BaseModel):
     doc_types: List[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
+
+    @field_serializer("created_at", "updated_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return f"{dt.isoformat()}Z"
 
     class Config:
         from_attributes = True

@@ -7,7 +7,7 @@ shipped default policies.
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 _BASE_ROLE_PATTERN = "^(admin|maintainer|external)$"
 
@@ -37,6 +37,10 @@ class PolicyResponse(BaseModel):
     is_default: bool
     created_at: datetime
     updated_at: datetime
+
+    @field_serializer("created_at", "updated_at")
+    def serialize_dt(self, dt: Optional[datetime], _info):
+        return f"{dt.isoformat()}Z" if dt else None
 
     class Config:
         from_attributes = True
@@ -74,6 +78,10 @@ class GroupResponse(BaseModel):
     updated_at: datetime
     members: List[GroupMemberResponse] = Field(default_factory=list)
     grants: List[GroupGrantResponse] = Field(default_factory=list)
+
+    @field_serializer("created_at", "updated_at")
+    def serialize_dt(self, dt: Optional[datetime], _info):
+        return f"{dt.isoformat()}Z" if dt else None
 
 
 class GroupMemberCreate(BaseModel):

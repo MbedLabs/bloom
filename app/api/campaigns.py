@@ -13,6 +13,7 @@ from app.api.artefact_utils import (
     get_row_or_404,
     get_visible_row,
     load_with_permission,
+    naive_utc,
     page_of,
     requirement_summary,
 )
@@ -75,23 +76,15 @@ def suite_frontend_url(project_prefix: str, suite_id: int) -> str | None:
     return f"{base}/projects/{project_prefix}/suites/{suite_id}" if base else None
 
 
-def _normalize_datetime(value: Optional[datetime]) -> Optional[datetime]:
-    if value is None:
-        return None
-    if value.tzinfo is not None:
-        return value.astimezone().replace(tzinfo=None)
-    return value
-
-
 def _resolved_execution_time(value: Optional[datetime]) -> datetime:
     resolved = value or datetime.utcnow()
-    return _normalize_datetime(resolved) or datetime.utcnow()
+    return naive_utc(resolved) or datetime.utcnow()
 
 
 def _apply_result_to_test_case(tc: TestCase, res) -> bool:
     executed_at = _resolved_execution_time(res.executed_at)
-    current = _normalize_datetime(tc.last_executed_at)
-    incoming = _normalize_datetime(executed_at)
+    current = naive_utc(tc.last_executed_at)
+    incoming = naive_utc(executed_at)
 
     if current and incoming and incoming < current:
         return False

@@ -17,7 +17,7 @@ from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.artefact_utils import get_row_or_404
+from app.api.artefact_utils import get_row_or_404, minute_utc
 from app.api.link_read_utils import (
     VERIFY_LINK_ROLE,
     VERIFY_SOURCE_TYPE,
@@ -179,7 +179,7 @@ def _report_start(logo: bytes | None, title: str, project: Project, summary: str
     pdf.set_font("Helvetica", "B", 20)
     pdf.multi_cell(0, 12, _pdf_safe(f"{project.name} - {title}"), new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 10)
-    generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    generated = minute_utc(datetime.now(timezone.utc))
     pdf.multi_cell(
         0,
         7,
@@ -378,8 +378,8 @@ async def export_requirements(
             r.visibility,
             id_by_pk.get(r.parent_id, "") if r.parent_id else "",
             r.description or "",
-            r.created_at.isoformat() if r.created_at else "",
-            r.updated_at.isoformat() if r.updated_at else "",
+            minute_utc(r.created_at),
+            minute_utc(r.updated_at),
         ]
         for r in requirements
     ]
@@ -464,7 +464,7 @@ async def _load_test_cases(db: AsyncSession, project_id: int, current_user: User
 
 def _test_cases_markdown(project: Project, test_cases: list[TestCase]) -> str:
     """Render the test cases in the Markdown import format, so the file re-imports."""
-    generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    generated = minute_utc(datetime.now(timezone.utc))
     parts = [
         f"Test cases of {project.name} ({project.prefix}), exported {generated}, "
         f"{len(test_cases)} test case(s).",
@@ -556,8 +556,8 @@ async def export_test_cases(
             rows_to_text(tc.steps),
             tc.description or "",
             tc.last_execution_status or "",
-            tc.created_at.isoformat() if tc.created_at else "",
-            tc.updated_at.isoformat() if tc.updated_at else "",
+            minute_utc(tc.created_at),
+            minute_utc(tc.updated_at),
         ]
         for tc in test_cases
     ]

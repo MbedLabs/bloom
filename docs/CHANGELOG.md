@@ -16,8 +16,12 @@
 - Address artefacts and their backlinks by public id, not only the database id (additive; database ids continue to resolve).
 - Jira to Bloom defects: a Jira issue of a mapped project creates a defect when it matches the project's issue types (default Bug) and optional label, with its description, priority and severity (through a configurable priority map), link and state, reported by the Bloom user behind the integration's account email. The defect then follows the issue (title, description, priority, state; a resolution closes it); a deleted issue leaves the defect marked `Removed in Jira`; a Bloom test-case id in the issue becomes the defect's source. Pull existing issues creates defects for the issues still open, from a one-time JQL search. The account email and API token are checked with Jira first, and a classic API token or an API token with scopes (read:jira-work, read:jira-user, and write:jira-work for two-way sync) works; a token with scopes is used through Atlassian's API gateway for the site. A credential Jira does not accept is reported instead of an empty search. The push to Jira is behind a per-project two-way switch, off by default. Jira is configured in the project's External issue tracker panel; setup is in docs/OPERATIONS.md.
 - Open a mentioned artefact, and the exact parameter, from a document body; mention links resolve by public id.
-- Audit log: security-relevant events (authentication, accounts, project members, external document types, groups, policies and artefact visibility, configuration, deletions, exports, imports, attachments) are recorded with the acting user, the request id, the client address, the outcome and details without secrets; a failed sign-in is recorded although the request fails. Administrators read it under Audit log (`GET /api/audit`, filtered by actor, action, target, project, outcome and time). No endpoint changes or deletes an event; `python -m app.audit prune --older-than-days N` removes old events on the operator's schedule.
+- Audit log: security-relevant events (authentication, accounts, project members, external document types, groups, policies and artefact visibility, configuration, deletions, exports, imports, attachments) are recorded with the acting user, the request id, the client address, the outcome and details without secrets; a failed sign-in is recorded although the request fails. Administrators read it under Audit log (`GET /api/audit`, filtered by actor, action, target, project, outcome and time). No endpoint changes or deletes an event; `python -m app.audit prune --older-than-days N` removes old events on the operator's schedule. Event times are shown in the viewer's time zone.
 - Access-denied page: a signed-in user who opens a project, document, artefact, suite or campaign they may not see gets one page that names it only by the address (public id and project), with a Request access button. The administrators are emailed with the requester, the resource, the time, the request id and a link to the project's members; one request per user and resource per 24 hours, and the page says when one is pending. Administrators mark a request granted or refused on the project's members page. The request and the decision are recorded in the audit log. A mail failure is reported to the user and the request is kept.
+
+### Changed
+
+- Times shown to people stop at the minute: dates and times in the web app, the CSV exports of requirements and test cases, the summary of a published Bud report, and the time in access-request emails (in UTC).
 
 ### Fixed
 
@@ -25,6 +29,8 @@
 - A database error while committing a request, such as a constraint violation, is answered with 409 or 500 and the request id; the commit now runs before the response is built instead of after it had started.
 - Requirements and test cases return their editor body.
 - A `#` tag shows the current id of the artefact it points at, looked up once per document, instead of the text captured when it was typed; a tag whose target is gone reads as plain text.
+- Test execution times reported by a results sync were stored in the server's time zone instead of UTC, so a server not running in UTC stored and showed them shifted by its offset.
+- User and project-member timestamps in API responses carry the UTC marker (`Z`); without it the Users page showed the time of an email change request shifted by the viewer's UTC offset.
 
 ## 1.1.0 - 2026-09-16
 

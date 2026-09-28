@@ -4,6 +4,7 @@ import { extractApiErrorMessage, InviteUserResponse, User, usersApi } from '../a
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
 import { UserPlus, Edit2, Trash2, X, Shield, Wrench, Eye, Copy, Check, Mail } from 'lucide-react'
+import { formatDateTime } from '../test/date-utils'
 
 const ROLE_CONFIG = {
   admin: { label: 'Admin', color: 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400', icon: Shield },
@@ -170,7 +171,7 @@ export default function UsersPage() {
                                 ? 'Waiting for admin approval'
                                 : 'Waiting for mailbox confirmation'}
                               {u.email_change_requested_at
-                                ? ` · ${new Date(u.email_change_requested_at).toLocaleString()}`
+                                ? ` · ${formatDateTime(u.email_change_requested_at)}`
                                 : ''}
                             </p>
                           </div>
