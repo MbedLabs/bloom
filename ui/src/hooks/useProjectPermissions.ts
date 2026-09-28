@@ -17,9 +17,8 @@ export type PermissionAction =
   | 'plan'
   | 'import'
   | 'export'
-  | 'manage'
 
-export type PermissionResource = DocType | 'baseline' | 'parameter' | 'link' | 'member'
+export type PermissionResource = DocType | 'baseline' | 'parameter' | 'link'
 
 /** What the role alone allows, used until the server's effective set arrives. */
 function roleBaseline(role: string | undefined): ProjectPermissions {

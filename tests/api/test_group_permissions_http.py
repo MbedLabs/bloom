@@ -75,10 +75,11 @@ def test_group_policy_adds_to_an_external_role(api_client: TestClient):
     assert denied.json()["detail"] == "Missing permission: create on REQ."
 
 
-def test_direct_maintainer_is_unchanged_and_members_need_a_policy(api_client: TestClient):
+def test_project_members_and_access_are_admin_only(api_client: TestClient):
     admin = _admin_headers(api_client)
     project = create_project(api_client, admin, "Direct")["id"]
     user = _create_user(api_client, admin, role="maintainer")
+    other = _create_user(api_client, admin, role="maintainer")
     headers = _headers_for(api_client, user["email"])
     added = api_client.post(
         f"/api/projects/{project}/members",
@@ -86,14 +87,26 @@ def test_direct_maintainer_is_unchanged_and_members_need_a_policy(api_client: Te
         json={"user_id": user["id"], "role": "maintainer"},
     )
     assert added.status_code == 201, added.text
+    membership = added.json()["id"]
+    _grant(api_client, admin, "Project Administrator", user["id"], project)
 
     assert _create(api_client, headers, "requirements", project).status_code == 201
-    members = api_client.get(f"/api/projects/{project}/members", headers=headers)
-    assert members.status_code == 403
-    assert members.json()["detail"] == "Missing permission: view on member."
-
-    _grant(api_client, admin, "Project Administrator", user["id"], project)
-    assert api_client.get(f"/api/projects/{project}/members", headers=headers).status_code == 200
+    mine = api_client.get(f"/api/projects/{project}/permissions", headers=headers).json()
+    assert "member" not in mine
+    base = f"/api/projects/{project}"
+    for method, path, body in (
+        ("GET", f"{base}/members", None),
+        ("POST", f"{base}/members", {"user_id": other["id"], "role": "maintainer"}),
+        ("GET", f"{base}/members/{membership}", None),
+        ("PATCH", f"{base}/members/{membership}", {"role": "external"}),
+        ("DELETE", f"{base}/members/{membership}", None),
+        ("GET", f"{base}/access", None),
+    ):
+        denied = api_client.request(method, path, headers=headers, json=body)
+        assert denied.status_code == 403, (method, path, denied.text)
+        assert denied.json()["detail"] == "Role 'maintainer' not authorized. Required: ['admin']"
+    assert api_client.get(f"{base}/members", headers=admin).status_code == 200
+    assert api_client.get(f"{base}/access", headers=admin).status_code == 200
 
 
 def test_no_access_and_admin(api_client: TestClient):

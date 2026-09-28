@@ -1,4 +1,4 @@
-"""Project membership management, and who has access to a project and why."""
+"""Project membership management, and who has access to a project and why, for administrators."""
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -7,11 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.permissions import as_lists
-from app.core.security import (
-    effective_permissions,
-    get_current_user,
-    require_permission,
-)
+from app.core.security import effective_permissions, get_current_user, require_role
 from app.models.groups import Group, GroupMembership, GroupProjectGrant, Policy
 from app.models.project_membership import ProjectExternalDocType, ProjectMembership
 from app.models.user import User, UserRole
@@ -25,6 +21,8 @@ from app.schemas.memberships import (
 from app.services.audit import record_audit_event
 
 router = APIRouter()
+
+require_admin = require_role(UserRole.admin)
 
 
 async def _build_member_response(
@@ -57,7 +55,7 @@ async def _build_member_response(
 @router.get("/{project_id}/members", response_model=list[ProjectMemberResponse])
 async def list_project_members(
     project_id: int,
-    _allowed: User = Depends(require_permission("view", "member")),
+    _admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
@@ -71,7 +69,7 @@ async def list_project_members(
 async def add_project_member(
     project_id: int,
     data: ProjectMembershipCreate,
-    _allowed: User = Depends(require_permission("manage", "member")),
+    _admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     user_row = await db.execute(select(User).where(User.id == data.user_id))
@@ -135,7 +133,7 @@ async def add_project_member(
 async def get_project_member(
     project_id: int,
     membership_id: int,
-    _allowed: User = Depends(require_permission("view", "member")),
+    _admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
@@ -155,7 +153,7 @@ async def update_project_member(
     project_id: int,
     membership_id: int,
     data: ProjectMembershipUpdate,
-    _allowed: User = Depends(require_permission("manage", "member")),
+    _admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
@@ -216,7 +214,7 @@ async def update_project_member(
 async def remove_project_member(
     project_id: int,
     membership_id: int,
-    _allowed: User = Depends(require_permission("manage", "member")),
+    _admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
@@ -270,7 +268,7 @@ class ProjectAccessEntry(BaseModel):
 @router.get("/{project_id}/access", response_model=list[ProjectAccessEntry])
 async def list_project_access(
     project_id: int,
-    _allowed: User = Depends(require_permission("view", "member")),
+    _admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Everyone with access to the project and why: a direct membership with its role,

@@ -1,13 +1,13 @@
 """Effective project permissions: the role baseline plus the policies of the user's groups.
 
 The instance roles are unchanged. A direct member keeps exactly what the role allowed
-before groups existed: an admin everything, a maintainer member every project action
-except managing members, any other member view and comment. A group granted the project
+before groups existed: an admin everything, a maintainer member every project action,
+any other member view and comment. A group granted the project
 adds its policy's (action x resource) matrix, including what the policy inherits from
 its parent. Groups only add; they never take away what the role baseline gives.
 
 A resource is a document type (REQ, TC, SPEC, ...) or one of the project objects that
-are not documents: baseline, parameter and link. ``member`` covers project membership.
+are not documents: baseline, parameter and link.
 """
 
 from typing import Optional
@@ -19,7 +19,6 @@ ANY = "*"
 DOC_TYPE_RESOURCES = tuple(sorted(EXTERNAL_DOC_TYPES))
 OBJECT_RESOURCES = ("baseline", "parameter", "link")
 RESOURCES = DOC_TYPE_RESOURCES + OBJECT_RESOURCES
-MEMBER = "member"
 ACTIONS = (
     "view",
     "comment",
@@ -32,7 +31,6 @@ ACTIONS = (
     "plan",
     "import",
     "export",
-    "manage",
 )
 
 
@@ -83,7 +81,7 @@ def as_lists(permissions: Permissions) -> dict[str, list[str]]:
 
 def invalid_entries(matrix: dict) -> list[str]:
     """The resources and actions of a policy matrix that the vocabulary does not know."""
-    known_resources = set(RESOURCES) | {MEMBER, ANY}
+    known_resources = set(RESOURCES) | {ANY}
     known_actions = set(ACTIONS) | {ANY}
     problems: list[str] = []
     for resource, actions in matrix.items():

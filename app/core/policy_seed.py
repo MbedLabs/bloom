@@ -57,7 +57,7 @@ DEFAULT_POLICIES = [
     {
         "name": "Project Administrator",
         "base_role": "maintainer",
-        "description": "Manage project members, campaigns and baselines; review and approve change requests and risks; review requirements; export requirements and test cases.",
+        "description": "Manage campaigns and baselines; review and approve change requests and risks; review requirements; export requirements and test cases.",
         "permissions": _merge(
             _all("view", "comment"),
             {
@@ -68,7 +68,6 @@ DEFAULT_POLICIES = [
                 "baseline": _AUTHOR + ["approve"],
                 "REQ": ["view", "comment", "review", "export"],
                 "TC": ["view", "comment", "export"],
-                "member": ["view", "manage"],
                 **_LINKS,
             },
         ),

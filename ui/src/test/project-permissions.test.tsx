@@ -94,7 +94,7 @@ describe('useProjectPermissions', () => {
 
 describe('allows', () => {
   it('reads resource and wildcard entries', () => {
-    expect(allows({ '*': ['*'] }, 'delete', 'member')).toBe(true)
+    expect(allows({ '*': ['*'] }, 'delete', 'baseline')).toBe(true)
     expect(allows({ DES: ['*'] }, 'approve', 'DES')).toBe(true)
     expect(allows({ DES: ['view'] }, 'edit', 'DES')).toBe(false)
     expect(allows({}, 'view', 'DES')).toBe(false)

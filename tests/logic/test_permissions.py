@@ -18,7 +18,7 @@ def test_role_baseline_matches_the_role_gates():
     maintainer = role_baseline("maintainer", "maintainer")
     assert set(maintainer) == set(RESOURCES)
     assert has_permission(maintainer, "delete", "REQ")
-    assert not has_permission(maintainer, "manage", "member")
+    assert "member" not in RESOURCES
     for instance, member in (
         ("external", "external"),
         ("maintainer", "external"),
@@ -33,11 +33,11 @@ def test_role_baseline_matches_the_role_gates():
 
 def test_merge_only_adds():
     permissions = role_baseline("external", "external")
-    merge(permissions, {"TC": ["create"], "member": ["view"]})
+    merge(permissions, {"TC": ["create"], "baseline": ["approve"]})
     merge(permissions, None)
     assert has_permission(permissions, "create", "TC")
     assert has_permission(permissions, "view", "TC")
-    assert has_permission(permissions, "view", "member")
+    assert has_permission(permissions, "approve", "baseline")
     assert not has_permission(permissions, "create", "REQ")
 
 
@@ -58,7 +58,7 @@ def test_transition_action():
 
 
 def test_invalid_entries_and_lists():
-    assert invalid_entries({"REQ": ["view"], ANY: [ANY], "member": ["manage"]}) == []
+    assert invalid_entries({"REQ": ["view"], ANY: [ANY], "link": ["create"]}) == []
     assert invalid_entries({"widget": ["view"], "DES": ["fly"], "RSK": "view"}) == [
         "unknown resource 'widget'",
         "unknown action 'fly' on 'DES'",
@@ -68,3 +68,10 @@ def test_invalid_entries_and_lists():
         ANY: ["view"],
         "RSK": ["edit", "view"],
     }
+
+
+def test_project_members_are_not_in_the_vocabulary():
+    assert invalid_entries({"member": ["view"], "REQ": ["manage"]}) == [
+        "unknown resource 'member'",
+        "unknown action 'manage' on 'REQ'",
+    ]
