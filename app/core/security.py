@@ -262,12 +262,19 @@ async def require_project_access(
     *,
     roles: Optional[set[str]] = None,
     permission: Optional[tuple[str, str]] = None,
+    outsider: Optional[HTTPException] = None,
 ) -> ProjectMembership | None:
     """Admit the user to the project or raise 403.
 
     With ``permission=(action, resource)`` the check is the effective permission set
-    (role baseline plus group policies); with ``roles`` it is the role gate.
+    (role baseline plus group policies); with ``roles`` it is the role gate, which a
+    group policy's base_role never passes as admin. ``outsider``, when given, is the error
+    for a user who is not in the project.
     """
+    not_assigned = outsider or HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="User is not assigned to this project.",
+    )
     if current_user.role == UserRole.admin:
         project = await db.get(Project, project_id)
         if project is None:
@@ -281,10 +288,7 @@ async def require_project_access(
         if has_permission(permissions, action, resource):
             return membership
         if not permissions:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="User is not assigned to this project.",
-            )
+            raise not_assigned
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Missing permission: {action} on {resource}.",
@@ -294,13 +298,12 @@ async def require_project_access(
     ):
         return membership
     group_role = await _group_project_role(db, current_user.id, project_id)
-    if group_role is not None and (roles is None or group_role in roles):
+    if group_role is not None and (
+        roles is None or (group_role in roles and group_role != UserRole.admin.value)
+    ):
         return None
-    if membership is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User is not assigned to this project.",
-        )
+    if membership is None and group_role is None:
+        raise not_assigned
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail=f"User is not assigned to this project with one of: {sorted(roles)}.",

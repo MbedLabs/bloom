@@ -119,16 +119,8 @@ async def create_item(
 
 async def update_item(db: AsyncSession, kind: ArtefactKind, item_id: int, data, current_user: User):
     """Apply the set fields of the update to the artefact and log what changed."""
-    model = kind.model
-    item = (await db.execute(select(model).where(model.id == item_id))).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail=kind.not_found)
-
-    await require_project_access(
-        db,
-        current_user,
-        item.project_id,
-        permission=("edit", kind.type_code),
+    item = await get_visible_row(
+        db, kind.model, item_id, kind.not_found, current_user, permission=("edit", kind.type_code)
     )
 
     fields_set = data.model_fields_set

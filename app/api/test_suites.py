@@ -9,7 +9,6 @@ from app.api.artefact_utils import (
     delete_project_row,
     get_row_or_404,
     get_visible_row,
-    load_with_permission,
     page_of,
     requirement_summary,
     test_case_summary,
@@ -310,8 +309,8 @@ async def update_suite(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    suite = await load_with_permission(
-        db, current_user, TestSuite, suite_id, "Test suite not found", ("edit", "TS")
+    suite = await get_visible_row(
+        db, TestSuite, suite_id, "Test suite not found", current_user, permission=("edit", "TS")
     )
     await apply_update(db, suite, data, "test-suite")
     return await _build_suite_detail(suite, db, current_user)
@@ -394,8 +393,8 @@ async def remove_suite_item(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    await load_with_permission(
-        db, current_user, TestSuite, suite_id, "Test suite not found", ("plan", "TS")
+    await get_visible_row(
+        db, TestSuite, suite_id, "Test suite not found", current_user, permission=("plan", "TS")
     )
     item = await get_row_or_404(
         db, TestSuiteItem, item_id, "Suite item not found", TestSuiteItem.suite_id == suite_id

@@ -8,7 +8,7 @@ from app.api.artefact_utils import (
     apply_update,
     delete_project_row,
     get_row_or_404,
-    load_with_permission,
+    get_visible_row,
 )
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
@@ -166,8 +166,8 @@ async def update_baseline(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    item = await load_with_permission(
-        db, current_user, Baseline, baseline_id, "Baseline not found", ("edit", "baseline")
+    item = await get_visible_row(
+        db, Baseline, baseline_id, "Baseline not found", current_user, permission=("edit", "baseline")
     )
     await apply_update(db, item, data, "baseline")
     return _baseline_response(item, current_user)

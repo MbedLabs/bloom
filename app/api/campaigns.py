@@ -12,7 +12,6 @@ from app.api.artefact_utils import (
     audit_visibility_change,
     get_row_or_404,
     get_visible_row,
-    load_with_permission,
     naive_utc,
     page_of,
     requirement_summary,
@@ -514,8 +513,8 @@ async def remove_campaign_item(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    await load_with_permission(
-        db, current_user, TestCampaign, campaign_id, "Campaign not found", ("plan", "CMP")
+    await get_visible_row(
+        db, TestCampaign, campaign_id, "Campaign not found", current_user, permission=("plan", "CMP")
     )
     item = await get_row_or_404(
         db,

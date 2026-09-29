@@ -9,7 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.link_read_utils import get_test_case_ids_verifying_requirements
 from app.core.document_kinds import normalize_document_kind
-from app.core.security import apply_external_visibility_filter, require_project_access
+from app.core.permissions import DOC_TYPE_RESOURCES
+from app.core.security import (
+    apply_external_visibility_filter,
+    external_doc_type_allowed,
+    get_external_doc_types,
+    require_project_access,
+)
 from app.models import (
     ArtefactActivity,
     ArtefactLink,
@@ -24,7 +30,7 @@ from app.models import (
     TestCase,
     TestConcept,
 )
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas import (
     ArtefactActivityResponse,
     ArtefactRelatedResponse,
@@ -567,12 +573,8 @@ async def delete_project_row(
     label and public id attribute of an activity entry under ``audit_type``; with an
     ``audit_type`` the deletion is audited.
     """
-    row = await get_row_or_404(db, model, item_id, not_found)
-    await require_project_access(
-        db,
-        current_user,
-        row.project_id,
-        permission=("delete", resource or row.doc_type),
+    row = await get_visible_row(
+        db, model, item_id, not_found, current_user, permission=("delete", resource)
     )
     if activity:
         label, id_attr = activity
@@ -589,33 +591,45 @@ async def delete_project_row(
 
 
 async def get_visible_row(
-    db: AsyncSession, model, item_id: int, not_found: str, current_user: User
-):
-    """The row with the id when the user may see it and may open its project, else a 404."""
-    row = (
-        await db.execute(
-            apply_external_visibility_filter(
-                select(model).where(model.id == item_id), model, current_user
-            )
-        )
-    ).scalar_one_or_none()
-    if not row:
-        raise HTTPException(status_code=404, detail=not_found)
-    await require_project_access(db, current_user, row.project_id)
-    return row
-
-
-async def load_with_permission(
     db: AsyncSession,
-    current_user: User,
     model,
     item_id: int,
     not_found: str,
-    permission: tuple[str, str],
+    current_user: User,
+    *,
+    permission: tuple[str, str | None] | None = None,
 ):
-    """The row with the id after the permission check on its project, else a 404."""
-    row = await get_row_or_404(db, model, item_id, not_found)
-    await require_project_access(db, current_user, row.project_id, permission=permission)
+    """The row with the id when the user may see it and act on it, else 404 or 403.
+
+    A row the user may not see, or one in a project the user is not in, is a 404. With
+    ``permission=(action, resource)`` the action is checked on the resource, the row's
+    own document type when the resource is None, and a document type outside an
+    external user's allowlist is a 404; a missing permission is a 403.
+    """
+    query = select(model).where(model.id == item_id)
+    if hasattr(model, "visibility"):
+        query = apply_external_visibility_filter(query, model, current_user)
+    row = (await db.execute(query)).scalar_one_or_none()
+    hidden = HTTPException(status_code=404, detail=not_found)
+    if not row:
+        raise hidden
+    action, resource = permission or (None, None)
+    resource = resource or getattr(row, "doc_type", None)
+    await require_project_access(
+        db,
+        current_user,
+        row.project_id,
+        permission=(action, resource) if action else None,
+        outsider=hidden,
+    )
+    if (
+        current_user.role == UserRole.external
+        and resource in DOC_TYPE_RESOURCES
+        and not external_doc_type_allowed(
+            current_user, await get_external_doc_types(db, current_user, row.project_id), resource
+        )
+    ):
+        raise hidden
     return row
 
 
