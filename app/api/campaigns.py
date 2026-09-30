@@ -514,7 +514,12 @@ async def remove_campaign_item(
     current_user: User = Depends(get_current_user),
 ):
     await get_visible_row(
-        db, TestCampaign, campaign_id, "Campaign not found", current_user, permission=("plan", "CMP")
+        db,
+        TestCampaign,
+        campaign_id,
+        "Campaign not found",
+        current_user,
+        permission=("plan", "CMP"),
     )
     item = await get_row_or_404(
         db,

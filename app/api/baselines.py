@@ -167,7 +167,12 @@ async def update_baseline(
     current_user: User = Depends(get_current_user),
 ):
     item = await get_visible_row(
-        db, Baseline, baseline_id, "Baseline not found", current_user, permission=("edit", "baseline")
+        db,
+        Baseline,
+        baseline_id,
+        "Baseline not found",
+        current_user,
+        permission=("edit", "baseline"),
     )
     await apply_update(db, item, data, "baseline")
     return _baseline_response(item, current_user)
