@@ -146,15 +146,8 @@ async def update_defect(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    item = (await db.execute(select(Defect).where(Defect.id == defect_pk))).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Defect not found")
-
-    await require_project_access(
-        db,
-        current_user,
-        item.project_id,
-        permission=("edit", "DEF"),
+    item = await get_visible_row(
+        db, Defect, defect_pk, "Defect not found", current_user, permission=("edit", "DEF")
     )
 
     fields_set = data.model_fields_set
@@ -245,14 +238,8 @@ async def refresh_external_issue(
     current_user: User = Depends(get_current_user),
 ):
     """Fetch current state from GitHub/GitLab and update cached fields."""
-    item = (await db.execute(select(Defect).where(Defect.id == defect_pk))).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Defect not found")
-    await require_project_access(
-        db,
-        current_user,
-        item.project_id,
-        permission=("edit", "DEF"),
+    item = await get_visible_row(
+        db, Defect, defect_pk, "Defect not found", current_user, permission=("edit", "DEF")
     )
     if (
         not item.external_tracker

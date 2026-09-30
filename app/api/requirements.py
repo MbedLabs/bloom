@@ -490,16 +490,12 @@ async def update_requirement(
     """
     Update a requirement.
     """
-    result = await db.execute(select(Requirement).where(Requirement.id == requirement_id))
-    requirement = result.scalar_one_or_none()
-
-    if not requirement:
-        raise HTTPException(status_code=404, detail="Requirement not found")
-
-    await require_project_access(
+    requirement = await get_visible_row(
         db,
+        Requirement,
+        requirement_id,
+        "Requirement not found",
         current_user,
-        requirement.project_id,
         permission=("edit", "REQ"),
     )
 
@@ -681,15 +677,12 @@ async def link_test_run(
     """
     Link an externally hosted Bud test run to a requirement.
     """
-    req_result = await db.execute(select(Requirement).where(Requirement.id == requirement_id))
-    requirement = req_result.scalar_one_or_none()
-    if not requirement:
-        raise HTTPException(status_code=404, detail="Requirement not found")
-
-    await require_project_access(
+    await get_visible_row(
         db,
+        Requirement,
+        requirement_id,
+        "Requirement not found",
         _current_user,
-        requirement.project_id,
         permission=("edit", "REQ"),
     )
 

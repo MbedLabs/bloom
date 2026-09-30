@@ -368,14 +368,12 @@ async def update_campaign(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
-    campaign = result.scalar_one_or_none()
-    if not campaign:
-        raise HTTPException(404, "Campaign not found")
-    await require_project_access(
+    campaign = await get_visible_row(
         db,
+        TestCampaign,
+        campaign_id,
+        "Campaign not found",
         current_user,
-        campaign.project_id,
         permission=("edit", "CMP"),
     )
 
@@ -447,14 +445,12 @@ async def delete_campaign(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
-    campaign = result.scalar_one_or_none()
-    if not campaign:
-        raise HTTPException(404, "Campaign not found")
-    await require_project_access(
+    campaign = await get_visible_row(
         db,
+        TestCampaign,
+        campaign_id,
+        "Campaign not found",
         current_user,
-        campaign.project_id,
         permission=("delete", "CMP"),
     )
     await audit_artefact_deleted(db, "campaign", campaign)
@@ -468,21 +464,18 @@ async def add_campaign_item(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
-    campaign = result.scalar_one_or_none()
-    if not campaign:
-        raise HTTPException(404, "Campaign not found")
-    await require_project_access(
+    campaign = await get_visible_row(
         db,
+        TestCampaign,
+        campaign_id,
+        "Campaign not found",
         current_user,
-        campaign.project_id,
         permission=("plan", "CMP"),
     )
 
-    tc_result = await db.execute(select(TestCase).where(TestCase.id == test_case_id))
-    test_case = tc_result.scalar_one_or_none()
-    if not test_case:
-        raise HTTPException(404, "Test case not found")
+    test_case = await get_visible_row(
+        db, TestCase, test_case_id, "Test case not found", current_user, permission=("view", "TC")
+    )
     if test_case.project_id != campaign.project_id:
         raise HTTPException(404, "Test case not found")
 
@@ -539,15 +532,12 @@ async def update_campaign_item(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    campaign = (
-        await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
-    ).scalar_one_or_none()
-    if not campaign:
-        raise HTTPException(404, "Campaign not found")
-    await require_project_access(
+    await get_visible_row(
         db,
+        TestCampaign,
+        campaign_id,
+        "Campaign not found",
         current_user,
-        campaign.project_id,
         permission=("plan", "CMP"),
     )
     item = (

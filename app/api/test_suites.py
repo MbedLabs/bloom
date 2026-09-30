@@ -340,21 +340,18 @@ async def add_suite_item(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    suite = (
-        await db.execute(select(TestSuite).where(TestSuite.id == suite_id))
-    ).scalar_one_or_none()
-    if not suite:
-        raise HTTPException(status_code=404, detail="Test suite not found")
-    await require_project_access(
-        db,
-        current_user,
-        suite.project_id,
-        permission=("plan", "TS"),
+    suite = await get_visible_row(
+        db, TestSuite, suite_id, "Test suite not found", current_user, permission=("plan", "TS")
     )
-    tc = (
-        await db.execute(select(TestCase).where(TestCase.id == test_case_id))
-    ).scalar_one_or_none()
-    if not tc or tc.project_id != suite.project_id:
+    tc = await get_visible_row(
+        db,
+        TestCase,
+        test_case_id,
+        "Test case not found in suite project",
+        current_user,
+        permission=("view", "TC"),
+    )
+    if tc.project_id != suite.project_id:
         raise HTTPException(status_code=404, detail="Test case not found in suite project")
     existing = (
         await db.execute(

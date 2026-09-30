@@ -13,12 +13,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.artefact_utils import get_row_or_404, minute_utc
+from app.api.artefact_utils import get_visible_row, minute_utc
 from app.api.docs_facade import resolve_project
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_project_access
+from app.core.security import get_current_user
 from app.core.service_auth import require_bud_sync_token
 from app.models import Document, DocumentAttachment
 from app.models.user import User
@@ -41,20 +41,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def _document(
-    db: AsyncSession, document_id: int, user: User, action: str | None = None
-) -> Document:
-    """The document after the project access check, or the check of the action on its type."""
-    document = await get_row_or_404(db, Document, document_id, "Document not found")
-    await require_project_access(
-        db,
-        user,
-        document.project_id,
-        permission=(action, document.doc_type) if action else None,
-    )
-    return document
-
-
 @router.get("/documents/{document_id}/attachments", response_model=list[DocumentAttachmentResponse])
 async def list_attachments(
     document_id: int,
@@ -62,7 +48,7 @@ async def list_attachments(
     current_user: User = Depends(get_current_user),
 ):
     """Everything held against this document, oldest first."""
-    await _document(db, document_id, current_user)
+    await get_visible_row(db, Document, document_id, "Document not found", current_user)
     rows = (
         await db.execute(
             select(DocumentAttachment)
@@ -85,7 +71,9 @@ async def upload_attachment(
     current_user: User = Depends(get_current_user),
 ):
     """Attach a file to a document."""
-    document = await _document(db, document_id, current_user, "edit")
+    document = await get_visible_row(
+        db, Document, document_id, "Document not found", current_user, permission=("edit", None)
+    )
     display_name = storage.safe_display_name(file.filename)
     content_type = storage.require_allowed_type(file.content_type)
 
@@ -151,7 +139,9 @@ async def download_attachment(
     ).scalar_one_or_none()
     if attachment is None:
         raise HTTPException(status_code=404, detail="Attachment not found")
-    await require_project_access(db, current_user, attachment.document.project_id)
+    await get_visible_row(
+        db, Document, attachment.document_id, "Attachment not found", current_user
+    )
 
     path = storage.resolve_stored_path(attachment.storage_path)
     name = attachment.original_filename
@@ -194,11 +184,13 @@ async def delete_attachment(
     ).scalar_one_or_none()
     if attachment is None:
         raise HTTPException(status_code=404, detail="Attachment not found")
-    await require_project_access(
+    await get_visible_row(
         db,
+        Document,
+        attachment.document_id,
+        "Attachment not found",
         current_user,
-        attachment.document.project_id,
-        permission=("edit", attachment.document.doc_type),
+        permission=("edit", None),
     )
 
     storage_path = attachment.storage_path

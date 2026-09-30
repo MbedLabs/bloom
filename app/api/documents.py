@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.artefact_utils import (
     delete_project_row,
     get_row_or_404,
+    get_visible_row,
     log_artefact_activity,
     log_document_workflow_activity_from_patch,
     should_log_generic_document_update,
@@ -262,17 +263,8 @@ async def update_document(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Document).where(Document.id == document_id))
-    document = result.scalar_one_or_none()
-
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    await require_project_access(
-        db,
-        current_user,
-        document.project_id,
-        permission=("edit", document.doc_type),
+    document = await get_visible_row(
+        db, Document, document_id, "Document not found", current_user, permission=("edit", None)
     )
     if data.doc_type is not None and data.doc_type != document.doc_type:
         await require_project_access(
@@ -381,17 +373,8 @@ async def create_section(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Document).where(Document.id == document_id))
-    document = result.scalar_one_or_none()
-
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    await require_project_access(
-        db,
-        current_user,
-        document.project_id,
-        permission=("edit", document.doc_type),
+    await get_visible_row(
+        db, Document, document_id, "Document not found", current_user, permission=("edit", None)
     )
 
     section = DocumentSection(
@@ -434,16 +417,13 @@ async def update_section(
     if not section:
         raise HTTPException(status_code=404, detail="Section not found")
 
-    document = (
-        await db.execute(select(Document).where(Document.id == section.document_id))
-    ).scalar_one_or_none()
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-    await require_project_access(
+    await get_visible_row(
         db,
+        Document,
+        section.document_id,
+        "Document not found",
         current_user,
-        document.project_id,
-        permission=("edit", document.doc_type),
+        permission=("edit", None),
     )
 
     if data.title is not None:
@@ -506,16 +486,13 @@ async def delete_section(
     if not section:
         raise HTTPException(status_code=404, detail="Section not found")
 
-    document = (
-        await db.execute(select(Document).where(Document.id == section.document_id))
-    ).scalar_one_or_none()
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-    await require_project_access(
+    await get_visible_row(
         db,
+        Document,
+        section.document_id,
+        "Document not found",
         current_user,
-        document.project_id,
-        permission=("edit", document.doc_type),
+        permission=("edit", None),
     )
 
     await db.delete(section)
@@ -528,17 +505,8 @@ async def reorder_sections(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Document).where(Document.id == document_id))
-    document = result.scalar_one_or_none()
-
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    await require_project_access(
-        db,
-        current_user,
-        document.project_id,
-        permission=("edit", document.doc_type),
+    await get_visible_row(
+        db, Document, document_id, "Document not found", current_user, permission=("edit", None)
     )
 
     # Load every section being reordered at once. Scoping by document_id is kept

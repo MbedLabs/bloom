@@ -245,3 +245,109 @@ def test_document_permissions_follow_the_document_type(api_client: TestClient):
     )
     assert retyped.status_code == 403
     assert retyped.json()["detail"] == "Missing permission: edit on PRT."
+
+
+def test_an_external_user_cannot_change_what_they_cannot_see(api_client: TestClient):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, "Hidden")["id"]
+    requirement = _create(api_client, admin, "requirements", project).json()
+    test_case = _create(api_client, admin, "test-cases", project).json()
+    assert requirement["visibility"] == "internal"
+    user = _create_user(api_client, admin, role="external")
+    headers = _headers_for(api_client, user["email"])
+    _grant(api_client, admin, "Requirements Author", user["id"], project)
+    _grant(api_client, admin, "Test Author", user["id"], project)
+
+    for kind, row in (("requirements", requirement), ("test-cases", test_case)):
+        edited = api_client.patch(f"/api/{kind}/{row['id']}", headers=headers, json={"title": "x"})
+        assert edited.status_code == 404, edited.text
+        deleted = api_client.delete(f"/api/{kind}/{row['id']}", headers=headers)
+        assert deleted.status_code == 404, deleted.text
+    assert (
+        api_client.get(f"/api/requirements/{requirement['id']}", headers=admin).json()["title"]
+        == requirement["title"]
+    )
+
+
+def test_a_user_outside_the_project_gets_404_by_id(api_client: TestClient):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, "Elsewhere")["id"]
+    requirement = _create(api_client, admin, "requirements", project).json()
+    user = _create_user(api_client, admin, role="maintainer")
+    headers = _headers_for(api_client, user["email"])
+
+    edited = api_client.patch(
+        f"/api/requirements/{requirement['id']}", headers=headers, json={"title": "x"}
+    )
+    assert edited.status_code == 404
+    assert edited.json()["detail"] == "Requirement not found"
+
+
+def test_every_change_by_id_hides_what_an_external_user_cannot_see(api_client: TestClient):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, "Guarded")["id"]
+
+    def made(path, body):
+        response = api_client.post(path, headers=admin, json=body)
+        assert response.status_code == 201, response.text
+        return response.json()["id"]
+
+    defect = made("/api/defects", {"project_id": project, "title": unique_name("defect")})
+    campaign = made("/api/campaigns", {"project_id": project, "name": unique_name("campaign")})
+    open_campaign = made(
+        "/api/campaigns",
+        {"project_id": project, "name": unique_name("campaign"), "visibility": "customer"},
+    )
+    suite = made("/api/test-suites", {"project_id": project, "name": unique_name("suite")})
+    test_case = made("/api/test-cases", {"project_id": project, "title": unique_name("case")})
+    document = made(
+        f"/api/projects/{project}/documents", {"project_id": project, "title": unique_name("doc")}
+    )
+    section = made(f"/api/documents/{document}/sections", {"title": "Scope"})
+    user = _create_user(api_client, admin, role="external")
+    headers = _headers_for(api_client, user["email"])
+    for policy in ("Requirements Author", "Test Author", "Design Author"):
+        _grant(api_client, admin, policy, user["id"], project)
+
+    attempts = [
+        ("patch", f"/api/defects/{defect}", {"title": "x"}),
+        ("post", f"/api/defects/{defect}/refresh-external", None),
+        ("delete", f"/api/defects/{defect}", None),
+        ("patch", f"/api/campaigns/{campaign}", {"name": "x"}),
+        ("post", f"/api/campaigns/{campaign}/items?test_case_id={test_case}", None),
+        ("delete", f"/api/campaigns/{campaign}", None),
+        ("post", f"/api/test-suites/{suite}/items?test_case_id={test_case}", None),
+        ("patch", f"/api/documents/{document}", {"title": "x"}),
+        ("post", f"/api/documents/{document}/sections", {"title": "x"}),
+        ("patch", f"/api/document-sections/{section}", {"title": "x"}),
+        ("post", f"/api/documents/{document}/sections/reorder", {"section_orders": []}),
+        ("delete", f"/api/document-sections/{section}", None),
+        ("post", f"/api/campaigns/{open_campaign}/items?test_case_id={test_case}", None),
+    ]
+    for method, path, body in attempts:
+        kwargs = {"headers": headers}
+        if body is not None:
+            kwargs["json"] = body
+        response = getattr(api_client, method)(path, **kwargs)
+        assert response.status_code == 404, (method, path, response.status_code, response.text)
+        assert response.json()["detail"] != "Not Found", (method, path)
+
+
+def test_an_external_user_still_changes_a_customer_row_they_can_see(api_client: TestClient):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, "Shared")["id"]
+    shared = api_client.post(
+        "/api/test-cases",
+        headers=admin,
+        json={"project_id": project, "title": unique_name("case"), "visibility": "customer"},
+    )
+    assert shared.status_code == 201, shared.text
+    user = _create_user(api_client, admin, role="external")
+    headers = _headers_for(api_client, user["email"])
+    _grant(api_client, admin, "Test Author", user["id"], project)
+
+    edited = api_client.patch(
+        f"/api/test-cases/{shared.json()['id']}", headers=headers, json={"title": "Renamed"}
+    )
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["title"] == "Renamed"

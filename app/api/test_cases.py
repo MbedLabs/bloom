@@ -302,17 +302,8 @@ async def update_test_case(
     """
     Update a test case.
     """
-    result = await db.execute(select(TestCase).where(TestCase.id == test_case_id))
-    test_case = result.scalar_one_or_none()
-
-    if not test_case:
-        raise HTTPException(status_code=404, detail="Test case not found")
-
-    await require_project_access(
-        db,
-        current_user,
-        test_case.project_id,
-        permission=("edit", "TC"),
+    test_case = await get_visible_row(
+        db, TestCase, test_case_id, "Test case not found", current_user, permission=("edit", "TC")
     )
 
     fields_set = data.model_fields_set
