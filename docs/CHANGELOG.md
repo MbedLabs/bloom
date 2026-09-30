@@ -21,6 +21,7 @@
 
 ### Changed
 
+- A read by id of an artefact in a project the user is not in answers 404, as for an artefact the user may not see (was 403).
 - Times shown to people stop at the minute: dates and times in the web app, the CSV exports of requirements and test cases, the summary of a published Bud report, and the time in access-request emails (in UTC).
 
 ### Fixed

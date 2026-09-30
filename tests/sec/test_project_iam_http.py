@@ -180,7 +180,7 @@ def test_unassigned_maintainer_cannot_access_other_project_data(iam_http_harness
     blocked_get = iam_http_harness.client.get(
         f"/api/requirements/{seeded['blocked_requirement'].id}"
     )
-    assert blocked_get.status_code == 403
+    assert blocked_get.status_code == 404
 
     blocked_traceability = iam_http_harness.client.get(
         "/api/traceability",
