@@ -351,3 +351,28 @@ def test_an_external_user_still_changes_a_customer_row_they_can_see(api_client: 
     )
     assert edited.status_code == 200, edited.text
     assert edited.json()["title"] == "Renamed"
+
+
+def test_an_external_user_cannot_change_an_item_of_a_hidden_campaign(api_client: TestClient):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, "Items")["id"]
+    case = _create(api_client, admin, "test-cases", project).json()["id"]
+    created = api_client.post(
+        "/api/campaigns",
+        headers=admin,
+        json={"project_id": project, "name": unique_name("c"), "test_case_ids": [case]},
+    )
+    assert created.status_code == 201, created.text
+    campaign = created.json()["id"]
+    item_id = created.json()["items"][0]["id"]
+    user = _create_user(api_client, admin, role="external")
+    headers = _headers_for(api_client, user["email"])
+    _grant(api_client, admin, "Test Author", user["id"], project)
+
+    changed = api_client.patch(
+        f"/api/campaigns/{campaign}/items/{item_id}",
+        headers=headers,
+        json={"comment": "x"},
+    )
+    assert changed.status_code == 404, changed.text
+    assert changed.json()["detail"] == "Campaign not found"

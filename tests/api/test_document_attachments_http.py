@@ -422,3 +422,28 @@ class TestPublishingABudReport:
             },
         )
         assert response.status_code == 401
+
+
+def test_an_external_user_reaches_no_attachment_of_a_hidden_document(
+    api_client: TestClient, auth_headers, project, document
+):
+    from tests.api.test_group_permissions_http import _grant
+    from tests.api.test_groups_http import _create_user, _headers_for
+
+    created = _upload(api_client, auth_headers, document["id"], "r.pdf", PDF, "application/pdf")
+    assert created.status_code == 201, created.text
+    user = _create_user(api_client, auth_headers, role="external")
+    headers = _headers_for(api_client, user["email"])
+    _grant(api_client, auth_headers, "Requirements Author", user["id"], project["id"])
+
+    attempts = [
+        ("get", f"/api/documents/{document['id']}/attachments"),
+        ("get", f"/api/attachments/{created.json()['id']}/download"),
+        ("delete", f"/api/attachments/{created.json()['id']}"),
+    ]
+    for method, path in attempts:
+        response = getattr(api_client, method)(path, headers=headers)
+        assert response.status_code == 404, (method, path, response.text)
+        assert response.json()["detail"] != "Not Found", (method, path)
+    listed = api_client.get(f"/api/documents/{document['id']}/attachments", headers=auth_headers)
+    assert [a["id"] for a in listed.json()] == [created.json()["id"]]
