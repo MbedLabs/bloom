@@ -8,6 +8,7 @@ from app.api.import_service import ImportResult, _import_docs, _next_number
 from app.core.database import Base
 from app.models import Project, Requirement
 from app.models import TestCase as TestCaseModel
+from app.models.user import User, UserRole
 
 
 @pytest_asyncio.fixture
@@ -55,6 +56,10 @@ def _result() -> ImportResult:
     return ImportResult(imported=0, skipped=0, new_ids=[], errors=[])
 
 
+def _admin() -> User:
+    return User(email="admin@test.local", full_name="Ada Admin", role=UserRole.admin)
+
+
 async def test_requirements_are_copied_as_drafts_after_the_highest_id(projects):
     db, source, target = projects
     source_ids = [
@@ -65,7 +70,7 @@ async def test_requirements_are_copied_as_drafts_after_the_highest_id(projects):
     ]
     result = _result()
 
-    await _import_docs(db, "REQ", source_ids + [99999], source, target, result)
+    await _import_docs(db, _admin(), "REQ", source_ids + [99999], source, target, result)
 
     assert (result.imported, result.skipped, result.new_ids) == (1, 1, ["DST-REQ-008"])
     assert result.errors == ["Requirement 99999 not found in source project"]
@@ -97,7 +102,7 @@ async def test_test_cases_keep_their_steps_and_preconditions(projects):
     ]
     result = _result()
 
-    await _import_docs(db, "TC", source_ids, source, target, result)
+    await _import_docs(db, _admin(), "TC", source_ids, source, target, result)
 
     assert result.new_ids == ["DST-TC-001"]
     copy = (

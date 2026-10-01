@@ -6,7 +6,7 @@ import json
 import pytest
 import pytest_asyncio
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from starlette.datastructures import UploadFile
 
@@ -149,3 +149,35 @@ async def test_csv_columns_preview(session):
     )
     assert preview.columns[:2] == ["ID", "Title"]
     assert preview.detected["section_hierarchy"] == "Section Hierarchy"
+
+
+def _export(suite, first, count):
+    cases = "".join(
+        f"<case><id>C{n}</id><title>Case {n}</title><references>ALP-REQ-001</references></case>"
+        for n in range(first, first + count)
+    )
+    return (
+        f"<suite><sections><section><name>{suite}</name><cases>{cases}</cases>"
+        "</section></sections></suite>"
+    ).encode()
+
+
+async def test_the_lookups_do_not_grow_with_the_number_of_cases(session):
+    statements = []
+
+    def record(conn, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().upper().startswith("SELECT"):
+            statements.append(statement)
+
+    engine = session.bind.sync_engine
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        await _import(session, _export("One", 100, 1))
+        one = len(statements)
+        statements.clear()
+        twenty = await _import(session, _export("Twenty", 200, 20))
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
+
+    assert (twenty.created, twenty.links_created) == (20, 20)
+    assert len(statements) == one

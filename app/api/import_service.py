@@ -12,7 +12,7 @@ from typing import Dict, List, Optional
 from defusedxml import ElementTree as SafeET
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import get_row_or_404, log_artefact_activity
@@ -23,6 +23,7 @@ from app.core.md_import import (
     parse_markdown_document,
     rename_parameters,
 )
+from app.core.permissions import has_permission
 from app.core.reqif import (
     FOREIGN_ID_HINTS,
     TEXT_ATTRIBUTE_HINTS,
@@ -31,7 +32,13 @@ from app.core.reqif import (
     ReqIFParseError,
 )
 from app.core.reqif_policy import read_reqif_upload
-from app.core.security import get_current_user, require_project_access
+from app.core.security import (
+    apply_external_visibility_filter,
+    doc_type_visible,
+    effective_permissions,
+    get_current_user,
+    require_project_access,
+)
 from app.core.tc_steps import text_to_rows
 from app.core.testrail import (
     TestRailCase,
@@ -141,7 +148,9 @@ async def import_docs(
     )
 
     if data.doc_type in _COPIED_FIELDS:
-        await _import_docs(db, data.doc_type, data.doc_ids, source_project, target_project, result)
+        await _import_docs(
+            db, current_user, data.doc_type, data.doc_ids, source_project, target_project, result
+        )
     else:
         raise HTTPException(
             status_code=400,
@@ -201,6 +210,7 @@ _COPIED_FIELDS = {
 
 async def _import_docs(
     db: AsyncSession,
+    current_user: User,
     type_code: str,
     doc_ids: list[int],
     source_project: Project,
@@ -218,9 +228,13 @@ async def _import_docs(
             for row in (
                 (
                     await db.execute(
-                        select(model).where(
-                            model.id.in_(doc_ids),
-                            model.project_id == source_project.id,
+                        apply_external_visibility_filter(
+                            select(model).where(
+                                model.id.in_(doc_ids),
+                                model.project_id == source_project.id,
+                            ),
+                            model,
+                            current_user,
                         )
                     )
                 )
@@ -228,14 +242,23 @@ async def _import_docs(
                 .all()
             )
         }
-        if doc_ids
+        if doc_ids and await doc_type_visible(db, current_user, source_project.id, type_code)
         else {}
     )
 
+    may_create = has_permission(
+        await effective_permissions(db, current_user, target_project.id),
+        "create",
+        _copied_resource(type_code),
+    )
     for src_id in doc_ids:
         src = sources_by_id.get(src_id)
         if not src:
             result.errors.append(f"{label} {src_id} not found in source project")
+            result.skipped += 1
+            continue
+        if not may_create:
+            result.errors.append(f"{label} {src_id}: not permitted")
             result.skipped += 1
             continue
 
@@ -345,16 +368,29 @@ async def import_reqif(
 
     # Existing source_refs let a re-import reuse rather than duplicate objects.
     existing_rows = (
-        await db.execute(
-            select(Requirement.source_ref, Requirement.id).where(
-                Requirement.project_id == target_project.id,
-                Requirement.source_ref.isnot(None),
+        (
+            await db.execute(
+                apply_external_visibility_filter(
+                    select(Requirement.source_ref, Requirement.id)
+                    .where(
+                        Requirement.project_id == target_project.id,
+                        Requirement.source_ref.isnot(None),
+                    )
+                    .order_by(Requirement.id.desc()),
+                    Requirement,
+                    current_user,
+                )
             )
-        )
-    ).all()
+        ).all()
+        if await doc_type_visible(db, current_user, target_project.id, "REQ")
+        else []
+    )
     ref_to_req_id: Dict[str, int] = {ref: rid for ref, rid in existing_rows if ref}
 
     created: List[Requirement] = []
+    rights = await effective_permissions(db, current_user, target_project.id)
+    may_create = has_permission(rights, "create", "REQ")
+    may_link = has_permission(rights, "create", "link")
 
     for object_ref, parent_ref in bundle.ordered_object_refs():
         obj = bundle.objects.get(object_ref)
@@ -364,6 +400,10 @@ async def import_reqif(
         source_ref = obj.identifier[:100]
         if source_ref in ref_to_req_id:
             result.skipped += 1
+            continue
+        if not may_create:
+            result.skipped += 1
+            result.errors.append(f"object {source_ref}: not permitted")
             continue
 
         parent_id = ref_to_req_id.get(parent_ref[:100]) if parent_ref else None
@@ -420,6 +460,9 @@ async def import_reqif(
         if dedupe in seen_links:
             continue
         seen_links.add(dedupe)
+        if not may_link:
+            result.errors.append(f"relation {rel.identifier}: not permitted")
+            continue
         db.add(RequirementLink(source_id=src_id, target_id=tgt_id, link_type=link_type))
         result.links_created += 1
 
@@ -513,6 +556,31 @@ async def import_test_cases_file(
     errors: List[str] = []
     prefix = target_project.prefix
     next_num = await _next_number(db, target_project.id, prefix, "TC")
+    rights = await effective_permissions(db, current_user, target_project.id)
+    may_create = has_permission(rights, "create", "TC")
+    may_edit = has_permission(rights, "edit", "TC")
+    named_ids = {(row.get("tc_id") or "").strip() for row in rows} - {""}
+    visible_by_tc_id = (
+        {
+            case.tc_id: case
+            for case in (
+                await db.execute(
+                    apply_external_visibility_filter(
+                        select(TestCase).where(
+                            TestCase.project_id == target_project.id,
+                            TestCase.tc_id.in_(named_ids),
+                        ),
+                        TestCase,
+                        current_user,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        }
+        if named_ids and await doc_type_visible(db, current_user, target_project.id, "TC")
+        else {}
+    )
     for index, row in enumerate(rows, start=1):
         title = (row.get("title") or "").strip()
         if not title:
@@ -525,16 +593,11 @@ async def import_test_cases_file(
         visibility = (row.get("visibility") or "").strip()
         description = (row.get("description") or "").strip() or None
         preconditions = (row.get("preconditions") or "").strip() or None
-        existing = None
-        if tc_id:
-            existing = (
-                await db.execute(
-                    select(TestCase).where(
-                        TestCase.project_id == target_project.id,
-                        TestCase.tc_id == tc_id,
-                    )
-                )
-            ).scalar_one_or_none()
+        existing = visible_by_tc_id.get(tc_id) if tc_id else None
+        if not (may_edit if existing else may_create):
+            skipped += 1
+            errors.append(f"row {index}: not permitted")
+            continue
         if existing:
             existing.title = title
             existing.description = description
@@ -569,6 +632,7 @@ async def import_test_cases_file(
             test_case = TestCase(**kwargs)
             db.add(test_case)
             await db.flush()
+            visible_by_tc_id[new_tc_id] = test_case
             await log_artefact_activity(
                 db,
                 "test-case",
@@ -639,6 +703,7 @@ class MarkdownImportResult(BaseModel):
     artefacts_skipped: int
     notifications_created: int
     sections: List[ClassifiedSection]
+    errors: List[str] = []
 
 
 def _collision_actions(raw: Optional[str]) -> dict:
@@ -811,6 +876,8 @@ async def import_markdown(
     artefacts_created = 0
     artefacts_skipped = 0
     notifications_created = 0
+    rights = await effective_permissions(db, current_user, target_project.id)
+    errors: List[str] = []
     for section in parsed.sections:
         title = section.title.strip()
         if not title:
@@ -819,17 +886,29 @@ async def import_markdown(
         if factory is None:
             artefacts_skipped += 1
             continue
+        if not has_permission(rights, "create", section.type_code):
+            artefacts_skipped += 1
+            errors.append(f"section {title}: not permitted")
+            continue
         model, id_attr, id_type_code, title_attr, extra = factory
         source_marker = f"md:{section.type_code}:{title}"[:100]
         if hasattr(model, "source_ref"):
             duplicate = (
-                await db.execute(
-                    select(model.id).where(
-                        model.project_id == target_project.id,
-                        model.source_ref == source_marker,
+                (
+                    await db.execute(
+                        apply_external_visibility_filter(
+                            select(model.id).where(
+                                model.project_id == target_project.id,
+                                model.source_ref == source_marker,
+                            ),
+                            model,
+                            current_user,
+                        )
                     )
-                )
-            ).scalar_one_or_none()
+                ).first()
+                if await doc_type_visible(db, current_user, target_project.id, section.type_code)
+                else None
+            )
             if duplicate is not None:
                 artefacts_skipped += 1
                 continue
@@ -889,6 +968,7 @@ async def import_markdown(
         artefacts_created=artefacts_created,
         artefacts_skipped=artefacts_skipped,
         notifications_created=notifications_created,
+        errors=errors,
         sections=[
             ClassifiedSection(type_code=section.type_code, title=section.title)
             for section in parsed.sections
@@ -1014,22 +1094,117 @@ async def import_testrail(
         await finish_import_attempt(db, attempt_id, "failed")
         raise HTTPException(status_code=422, detail=f"Could not read the TestRail file: {exc}")
 
-    requirements = {
-        req_id.upper(): req_pk
-        for req_pk, req_id in (
-            await db.execute(
-                select(Requirement.id, Requirement.req_id).where(
-                    Requirement.project_id == project.id
+    requirements = (
+        {
+            req_id.upper(): req_pk
+            for req_pk, req_id in (
+                await db.execute(
+                    apply_external_visibility_filter(
+                        select(Requirement.id, Requirement.req_id).where(
+                            Requirement.project_id == project.id
+                        ),
+                        Requirement,
+                        current_user,
+                    )
+                )
+            ).all()
+        }
+        if await doc_type_visible(db, current_user, project.id, "REQ")
+        else {}
+    )
+    suite_names = {case.sections[0][:255] for case in cases if case.sections and case.sections[0]}
+    suites = (
+        {
+            suite.name: suite
+            for suite in (
+                await db.execute(
+                    apply_external_visibility_filter(
+                        select(TestSuite)
+                        .where(TestSuite.project_id == project.id, TestSuite.name.in_(suite_names))
+                        .order_by(TestSuite.id.desc()),
+                        TestSuite,
+                        current_user,
+                    )
                 )
             )
-        ).all()
-    }
-    suites = {
-        suite.name: suite
-        for suite in (await db.execute(select(TestSuite).where(TestSuite.project_id == project.id)))
-        .scalars()
-        .all()
-    }
+            .scalars()
+            .all()
+        }
+        if suite_names and await doc_type_visible(db, current_user, project.id, "TS")
+        else {}
+    )
+    source_refs = {f"testrail:{case.case_id}"[:100] for case in cases if case.case_id}
+    by_source_ref: Dict[str, TestCase] = {}
+    if source_refs and await doc_type_visible(db, current_user, project.id, "TC"):
+        for known in (
+            await db.execute(
+                apply_external_visibility_filter(
+                    select(TestCase)
+                    .where(TestCase.project_id == project.id, TestCase.source_ref.in_(source_refs))
+                    .order_by(TestCase.id),
+                    TestCase,
+                    current_user,
+                )
+            )
+        ).scalars():
+            by_source_ref.setdefault(known.source_ref, known)
+    known_cases = [known.id for known in by_source_ref.values()]
+    verify_links = (
+        {
+            (source_id, target_id)
+            for source_id, target_id in (
+                await db.execute(
+                    select(ArtefactLink.source_id, ArtefactLink.target_id).where(
+                        ArtefactLink.project_id == project.id,
+                        ArtefactLink.source_type == "TC",
+                        ArtefactLink.source_id.in_(known_cases),
+                        ArtefactLink.target_type == "REQ",
+                        ArtefactLink.role == "verifies",
+                    )
+                )
+            ).all()
+        }
+        if known_cases
+        else set()
+    )
+    known_suites = [suite.id for suite in suites.values()]
+    suite_items = (
+        set(
+            (
+                await db.execute(
+                    select(TestSuiteItem.suite_id, TestSuiteItem.test_case_id).where(
+                        TestSuiteItem.suite_id.in_(known_suites),
+                        TestSuiteItem.test_case_id.in_(known_cases),
+                    )
+                )
+            )
+            .tuples()
+            .all()
+        )
+        if known_suites and known_cases
+        else set()
+    )
+    suite_sizes: Dict[int, int] = (
+        dict(
+            (
+                await db.execute(
+                    select(TestSuiteItem.suite_id, func.count(TestSuiteItem.id))
+                    .where(TestSuiteItem.suite_id.in_(known_suites))
+                    .group_by(TestSuiteItem.suite_id)
+                )
+            )
+            .tuples()
+            .all()
+        )
+        if known_suites
+        else {}
+    )
+    rights = await effective_permissions(db, current_user, project.id)
+    may_create = has_permission(rights, "create", "TC")
+    may_edit = has_permission(rights, "edit", "TC")
+    may_link = has_permission(rights, "create", "link")
+    may_create_suite = has_permission(rights, "create", "TS")
+    may_plan = has_permission(rights, "plan", "TS")
     result = TestRailImportResult(
         created=0, updated=0, skipped=0, suites_created=[], links_created=0, new_ids=[], errors=[]
     )
@@ -1041,19 +1216,16 @@ async def import_testrail(
             result.skipped += 1
             result.errors.append(f"case {case.case_id or index}: missing title")
             continue
-        matched = [requirements[t.upper()] for t in case.references if t.upper() in requirements]
-        unmatched = [t for t in case.references if t.upper() not in requirements]
+        linkable = [t for t in case.references if t.upper() in requirements] if may_link else []
+        matched = [requirements[t.upper()] for t in linkable]
+        unmatched = [t for t in case.references if t not in linkable]
         description = _testrail_body(case, unmatched)
         source_ref = f"testrail:{case.case_id}"[:100] if case.case_id else None
-        test_case = None
-        if source_ref:
-            test_case = (
-                await db.execute(
-                    select(TestCase).where(
-                        TestCase.project_id == project.id, TestCase.source_ref == source_ref
-                    )
-                )
-            ).scalar_one_or_none()
+        test_case = by_source_ref.get(source_ref) if source_ref else None
+        if not (may_edit if test_case is not None else may_create):
+            result.skipped += 1
+            result.errors.append(f"case {case.case_id or index}: not permitted")
+            continue
         if test_case is not None:
             test_case.title = case.title
             test_case.description = description
@@ -1083,6 +1255,8 @@ async def import_testrail(
             )
             db.add(test_case)
             await db.flush()
+            if source_ref:
+                by_source_ref[source_ref] = test_case
             await log_artefact_activity(
                 db,
                 "test-case",
@@ -1093,20 +1267,11 @@ async def import_testrail(
             result.created += 1
             result.new_ids.append(tc_id)
 
+        if not may_link and any(t.upper() in requirements for t in case.references):
+            result.errors.append(f"case {case.case_id or index}: links not permitted")
         for requirement_pk in matched:
-            linked = (
-                await db.execute(
-                    select(ArtefactLink.id).where(
-                        ArtefactLink.project_id == project.id,
-                        ArtefactLink.source_type == "TC",
-                        ArtefactLink.source_id == test_case.id,
-                        ArtefactLink.target_type == "REQ",
-                        ArtefactLink.target_id == requirement_pk,
-                        ArtefactLink.role == "verifies",
-                    )
-                )
-            ).scalar_one_or_none()
-            if linked is None:
+            if (test_case.id, requirement_pk) not in verify_links:
+                verify_links.add((test_case.id, requirement_pk))
                 db.add(
                     ArtefactLink(
                         project_id=project.id,
@@ -1122,7 +1287,16 @@ async def import_testrail(
         if case.sections and case.sections[0]:
             name = case.sections[0][:255]
             suite = suites.get(name)
-            if suite is None:
+            if not may_plan:
+                result.errors.append(
+                    f"case {case.case_id or index}: adding to suite {name} not permitted"
+                )
+                suite = None
+            elif suite is None and not may_create_suite:
+                result.errors.append(
+                    f"case {case.case_id or index}: creating suite {name} not permitted"
+                )
+            elif suite is None:
                 suite = TestSuite(
                     project_id=project.id,
                     suite_id=await next_doc_id(
@@ -1134,22 +1308,10 @@ async def import_testrail(
                 await db.flush()
                 suites[name] = suite
                 result.suites_created.append(suite.suite_id)
-            in_suite = (
-                await db.execute(
-                    select(TestSuiteItem.id).where(
-                        TestSuiteItem.suite_id == suite.id,
-                        TestSuiteItem.test_case_id == test_case.id,
-                    )
-                )
-            ).scalar_one_or_none()
-            if in_suite is None:
-                order = len(
-                    (
-                        await db.execute(
-                            select(TestSuiteItem.id).where(TestSuiteItem.suite_id == suite.id)
-                        )
-                    ).all()
-                )
+            if suite is not None and (suite.id, test_case.id) not in suite_items:
+                order = suite_sizes.get(suite.id, 0)
+                suite_items.add((suite.id, test_case.id))
+                suite_sizes[suite.id] = order + 1
                 db.add(TestSuiteItem(suite_id=suite.id, test_case_id=test_case.id, order=order))
         await db.flush()
 

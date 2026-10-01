@@ -8,6 +8,7 @@ import os
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characters-long")
 
+import pytest
 from fastapi.testclient import TestClient
 
 from tests.api.test_groups_http import (
@@ -17,6 +18,7 @@ from tests.api.test_groups_http import (
     _headers_for,
 )
 from tests.conftest import create_project, unique_name
+from tests.logic.test_reqif_import import SAMPLE_REQIF
 
 
 def _default_policy_id(api_client, headers, name) -> int:
@@ -508,3 +510,292 @@ def test_an_empty_suite_list_keeps_suites_outside_the_allowed_types(api_client: 
     assert updated.status_code == 200, updated.text
     linked = api_client.get(f"/api/campaigns/{campaign}", headers=admin).json()["suites"]
     assert [s["id"] for s in linked] == [suite]
+
+
+@pytest.fixture
+def many_imports(monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "REQIF_IMPORTS_PER_15_MINUTES", 100)
+
+
+def _policy_user(api_client, admin, permissions, *projects, role="maintainer", scope=None):
+    policy = api_client.post(
+        "/api/policies",
+        headers=admin,
+        json={
+            "name": unique_name("Policy"),
+            "base_role": role,
+            "permissions": permissions,
+            "doc_tag_scope": scope,
+        },
+    )
+    assert policy.status_code == 201, policy.text
+    group = _create_group(api_client, admin, policy_id=policy.json()["id"])
+    for project in projects:
+        granted = api_client.post(
+            f"/api/groups/{group['id']}/grants", headers=admin, json={"project_id": project}
+        )
+        assert granted.status_code == 201, granted.text
+    user = _create_user(api_client, admin, role=role)
+    added = api_client.post(
+        f"/api/groups/{group['id']}/members", headers=admin, json={"user_id": user["id"]}
+    )
+    assert added.status_code == 201, added.text
+    return _headers_for(api_client, user["email"])
+
+
+def _upload(api_client, headers, project, kind, name, content, **params):
+    return api_client.post(
+        f"/api/projects/{project}/import/{kind}",
+        headers=headers,
+        params=params,
+        files={"file": (name, content, "application/octet-stream")},
+    )
+
+
+@pytest.mark.usefixtures("many_imports")
+def test_a_copy_leaves_out_source_rows_the_user_cannot_see(api_client: TestClient):
+    admin = _admin_headers(api_client)
+    source = create_project(api_client, admin, "Copy source")["id"]
+    target = create_project(api_client, admin, "Copy target")["id"]
+    hidden = _create(api_client, admin, "requirements", source).json()["id"]
+    shown = api_client.post(
+        "/api/requirements",
+        headers=admin,
+        json={"project_id": source, "title": unique_name("req"), "req_origin": "customer"},
+    ).json()["id"]
+    user = _create_user(api_client, admin, role="external")
+    for project in (source, target):
+        _grant(api_client, admin, "Requirements Author", user["id"], project)
+    headers = _headers_for(api_client, user["email"])
+
+    copied = api_client.post(
+        f"/api/projects/{target}/import",
+        headers=headers,
+        json={"source_project_id": source, "doc_type": "REQ", "doc_ids": [hidden, shown]},
+    )
+    assert copied.status_code == 201, copied.text
+    assert (copied.json()["imported"], copied.json()["skipped"]) == (1, 1)
+    assert copied.json()["errors"] == [f"Requirement {hidden} not found in source project"]
+
+
+@pytest.mark.usefixtures("many_imports")
+def test_a_test_case_file_import_checks_edit_and_create_per_row(api_client: TestClient):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, "Rows")["id"]
+    existing = _create(api_client, admin, "test-cases", project).json()
+    content = f"tc_id,title\n{existing['tc_id']},Changed\n,Brand new\n".encode()
+
+    creator = _policy_user(api_client, admin, {"TC": ["view", "import", "create"]}, project)
+    created = _upload(api_client, creator, project, "test-cases", "c.csv", content, format="csv")
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert (body["created"], body["updated"], body["skipped"]) == (1, 0, 1)
+    assert body["errors"] == ["row 1: not permitted"]
+    kept = api_client.get(f"/api/test-cases/{existing['id']}", headers=admin).json()
+    assert kept["title"] == existing["title"]
+
+    editor = _policy_user(api_client, admin, {"TC": ["view", "import", "edit"]}, project)
+    edited = _upload(api_client, editor, project, "test-cases", "c.csv", content, format="csv")
+    assert edited.status_code == 201, edited.text
+    body = edited.json()
+    assert (body["created"], body["updated"], body["skipped"]) == (0, 1, 1)
+    assert body["errors"] == ["row 2: not permitted"]
+    changed = api_client.get(f"/api/test-cases/{existing['id']}", headers=admin).json()
+    assert changed["title"] == "Changed"
+
+
+@pytest.mark.usefixtures("many_imports")
+def test_a_test_case_file_import_treats_a_hidden_test_case_as_new(api_client: TestClient):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, "Hidden rows")["id"]
+    hidden = _create(api_client, admin, "test-cases", project).json()
+    headers = _external_on(api_client, admin, project, "Test Author")
+    content = f"tc_id,title\n{hidden['tc_id']},Taken over\n".encode()
+
+    imported = _upload(api_client, headers, project, "test-cases", "c.csv", content, format="csv")
+    assert imported.status_code == 201, imported.text
+    body = imported.json()
+    assert (body["created"], body["updated"]) == (1, 0)
+    assert body["new_ids"] != [hidden["tc_id"]]
+    kept = api_client.get(f"/api/test-cases/{hidden['id']}", headers=admin).json()
+    assert kept["title"] == hidden["title"]
+
+
+@pytest.mark.usefixtures("many_imports")
+def test_a_testrail_import_neither_reuses_nor_links_hidden_rows(api_client: TestClient):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, "Rail")["id"]
+    hidden = _create(api_client, admin, "requirements", project).json()["req_id"]
+    shown = api_client.post(
+        "/api/requirements",
+        headers=admin,
+        json={"project_id": project, "title": unique_name("req"), "req_origin": "customer"},
+    ).json()["req_id"]
+    export = (
+        "<suite><sections><section><name>Boot</name><cases><case><id>C1</id>"
+        f"<title>Cold boot</title><references>{hidden}, {shown}</references>"
+        "</case></cases></section></sections></suite>"
+    ).encode()
+
+    def run(headers):
+        response = _upload(api_client, headers, project, "testrail", "t.xml", export, format="xml")
+        assert response.status_code == 201, response.text
+        body = response.json()
+        return body["created"], body["updated"], body["links_created"], len(body["suites_created"])
+
+    assert run(admin) == (1, 0, 2, 1)
+    assert run(_external_on(api_client, admin, project, "Test Author")) == (1, 0, 1, 1)
+    assert run(admin) == (0, 1, 0, 0)
+
+
+@pytest.mark.usefixtures("many_imports")
+def test_a_reqif_import_does_not_reuse_hidden_requirements(api_client: TestClient):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, "ReqIF rows")["id"]
+
+    def run(headers):
+        response = _upload(api_client, headers, project, "reqif", "s.reqif", SAMPLE_REQIF)
+        assert response.status_code == 201, response.text
+        body = response.json()
+        return body["imported"], body["skipped"], body["links_created"]
+
+    assert run(admin) == (2, 0, 1)
+    assert run(_external_on(api_client, admin, project, "Requirements Author")) == (2, 0, 1)
+    assert run(admin) == (0, 2, 0)
+
+
+@pytest.mark.usefixtures("many_imports")
+def test_a_markdown_import_does_not_count_hidden_rows_as_duplicates(api_client: TestClient):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, "Markdown rows")["id"]
+    document = f"## [TC] {unique_name('case')}\nPower the board\n".encode()
+
+    def run(headers):
+        response = _upload(api_client, headers, project, "markdown", "d.md", document)
+        assert response.status_code == 201, response.text
+        return response.json()["artefacts_created"], response.json()["artefacts_skipped"]
+
+    assert run(admin) == (1, 0)
+    assert run(_external_on(api_client, admin, project, "Test Author")) == (1, 0)
+    assert run(admin) == (0, 1)
+
+
+@pytest.mark.usefixtures("many_imports")
+def test_each_imported_row_needs_the_right_its_own_route_needs(api_client: TestClient):
+    admin = _admin_headers(api_client)
+    source = create_project(api_client, admin, "Rights source")["id"]
+    target = create_project(api_client, admin, "Rights target")["id"]
+    requirement = _create(api_client, admin, "requirements", source).json()
+
+    copier = _policy_user(api_client, admin, {"REQ": ["view", "import", "export"]}, source, target)
+    copied = api_client.post(
+        f"/api/projects/{target}/import",
+        headers=copier,
+        json={"source_project_id": source, "doc_type": "REQ", "doc_ids": [requirement["id"]]},
+    )
+    assert copied.status_code == 201, copied.text
+    assert copied.json()["errors"] == [f"Requirement {requirement['id']}: not permitted"]
+
+    reader = _policy_user(api_client, admin, {"REQ": ["view", "import"]}, target)
+    refused = _upload(api_client, reader, target, "reqif", "s.reqif", SAMPLE_REQIF)
+    assert refused.status_code == 201, refused.text
+    assert (refused.json()["imported"], refused.json()["skipped"]) == (0, 2)
+    assert refused.json()["errors"] == [
+        "object OBJ-1: not permitted",
+        "object OBJ-2: not permitted",
+    ]
+
+    author = _policy_user(api_client, admin, {"REQ": ["view", "import", "create"]}, target)
+    unlinked = _upload(api_client, author, target, "reqif", "s.reqif", SAMPLE_REQIF)
+    assert unlinked.status_code == 201, unlinked.text
+    assert (unlinked.json()["imported"], unlinked.json()["links_created"]) == (2, 0)
+    assert unlinked.json()["errors"] == ["relation REL-1: not permitted"]
+
+    tester = _policy_user(
+        api_client, admin, {"REQ": ["view"], "TC": ["view", "import", "create"]}, source
+    )
+    export = (
+        "<suite><sections><section><name>Boot</name><cases><case><id>C1</id>"
+        f"<title>Cold boot</title><references>{requirement['req_id']}</references>"
+        "</case></cases></section></sections></suite>"
+    ).encode()
+    railed = _upload(api_client, tester, source, "testrail", "t.xml", export, format="xml")
+    assert railed.status_code == 201, railed.text
+    body = railed.json()
+    assert (body["created"], body["links_created"], body["suites_created"]) == (1, 0, [])
+    assert body["errors"] == [
+        "case C1: links not permitted",
+        "case C1: adding to suite Boot not permitted",
+    ]
+    cases = api_client.get(f"/api/test-cases?project_id={source}", headers=admin).json()["items"]
+    imported = next(c for c in cases if c["tc_id"] == body["new_ids"][0])
+    assert requirement["req_id"] in imported["description"]
+
+    title = unique_name("case")
+    document = f"## [TC] {title}\nPower the board\n".encode()
+    marked = _upload(
+        api_client,
+        _policy_user(api_client, admin, {"TC": ["view", "import"]}, target),
+        target,
+        "markdown",
+        "d.md",
+        document,
+    )
+    assert marked.status_code == 201, marked.text
+    assert (marked.json()["artefacts_created"], marked.json()["artefacts_skipped"]) == (0, 1)
+    assert marked.json()["errors"] == [f"section {title}: not permitted"]
+
+
+@pytest.mark.usefixtures("many_imports")
+def test_a_testrail_case_or_suite_without_its_right_is_reported(api_client: TestClient):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, "Rail rights")["id"]
+
+    def export(*ids):
+        cases = "".join(f"<case><id>{i}</id><title>Case {i}</title></case>" for i in ids)
+        return (
+            f"<suite><sections><section><name>Boot</name><cases>{cases}</cases>"
+            "</section></sections></suite>"
+        ).encode()
+
+    planner = _policy_user(
+        api_client, admin, {"TC": ["view", "import", "create"], "TS": ["view", "plan"]}, project
+    )
+    planned = _upload(api_client, planner, project, "testrail", "t.xml", export("C1"), format="xml")
+    assert planned.status_code == 201, planned.text
+    assert (planned.json()["created"], planned.json()["suites_created"]) == (1, [])
+    assert planned.json()["errors"] == ["case C1: creating suite Boot not permitted"]
+
+    reader = _policy_user(api_client, admin, {"TC": ["view", "import"]}, project)
+    refused = _upload(
+        api_client, reader, project, "testrail", "t.xml", export("C1", "C2"), format="xml"
+    )
+    assert refused.status_code == 201, refused.text
+    body = refused.json()
+    assert (body["created"], body["updated"], body["skipped"]) == (0, 0, 2)
+    assert body["errors"] == ["case C1: not permitted", "case C2: not permitted"]
+
+
+@pytest.mark.usefixtures("many_imports")
+def test_a_markdown_duplicate_of_a_hidden_type_is_not_a_duplicate(api_client: TestClient):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, "Markdown types")["id"]
+    document = f"## [TC] {unique_name('case')}\nPower the board\n".encode()
+    outside = _policy_user(
+        api_client,
+        admin,
+        {"TC": ["view", "import", "create"]},
+        project,
+        role="external",
+        scope=["REQ"],
+    )
+
+    def run(headers):
+        response = _upload(api_client, headers, project, "markdown", "d.md", document)
+        assert response.status_code == 201, response.text
+        return response.json()["artefacts_created"], response.json()["artefacts_skipped"]
+
+    assert run(admin) == (1, 0)
+    assert run(outside) == (1, 0)
