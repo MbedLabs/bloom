@@ -799,3 +799,28 @@ def test_a_markdown_duplicate_of_a_hidden_type_is_not_a_duplicate(api_client: Te
 
     assert run(admin) == (1, 0)
     assert run(outside) == (1, 0)
+
+
+def test_adding_a_test_case_to_a_campaign_returns_the_item(api_client: TestClient):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, "Items added")["id"]
+    planner = _policy_user(api_client, admin, {"CMP": ["view", "plan"], "TC": ["view"]}, project)
+
+    for headers in (admin, planner):
+        case = _create(api_client, admin, "test-cases", project).json()
+        campaign = api_client.post(
+            "/api/campaigns", headers=admin, json={"project_id": project, "name": unique_name("c")}
+        ).json()["id"]
+        added = api_client.post(
+            f"/api/campaigns/{campaign}/items?test_case_id={case['id']}", headers=headers
+        )
+        assert added.status_code == 201, added.text
+        body = added.json()
+        assert (body["campaign_id"], body["test_case_id"], body["status"]) == (
+            campaign,
+            case["id"],
+            "Pending",
+        )
+        assert body["test_case"]["tc_id"] == case["tc_id"]
+        saved = api_client.get(f"/api/campaigns/{campaign}", headers=admin).json()["items"]
+        assert [(i["id"], i["test_case_id"]) for i in saved] == [(body["id"], case["id"])]

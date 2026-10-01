@@ -533,7 +533,7 @@ async def add_campaign_item(
     db.add(item)
     await db.flush()
     await db.refresh(item)
-    return item
+    return await _campaign_item_response(item, test_case, db, current_user)
 
 
 @router.delete("/{campaign_id}/items/{item_id}", status_code=204)
@@ -597,6 +597,13 @@ async def update_campaign_item(
     tc = (
         await db.execute(select(TestCase).where(TestCase.id == item.test_case_id))
     ).scalar_one_or_none()
+    return await _campaign_item_response(item, tc, db, current_user)
+
+
+async def _campaign_item_response(
+    item: TestCampaignItem, tc: TestCase | None, db: AsyncSession, current_user: User
+) -> TestCampaignItemResponse:
+    """The campaign item as the API reports it, with its test case."""
     tc_resp = await _build_test_case_response(tc, db, current_user) if tc else None
     return TestCampaignItemResponse(
         id=item.id,
