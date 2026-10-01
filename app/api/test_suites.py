@@ -18,6 +18,7 @@ from app.core.database import get_db
 from app.core.id_generator import next_doc_id
 from app.core.security import (
     apply_external_visibility_filter,
+    doc_type_visible,
     get_current_user,
     require_project_access,
 )
@@ -271,13 +272,17 @@ async def create_suite(
 
     # One statement for the whole selection. Ids that do not exist, or belong to
     # another project, are still skipped silently rather than rejected.
-    if data.test_case_ids:
+    if data.test_case_ids and await doc_type_visible(db, current_user, data.project_id, "TC"):
         valid_test_case_ids = set(
             (
                 await db.execute(
-                    select(TestCase.id).where(
-                        TestCase.id.in_(data.test_case_ids),
-                        TestCase.project_id == data.project_id,
+                    apply_external_visibility_filter(
+                        select(TestCase.id).where(
+                            TestCase.id.in_(data.test_case_ids),
+                            TestCase.project_id == data.project_id,
+                        ),
+                        TestCase,
+                        current_user,
                     )
                 )
             )

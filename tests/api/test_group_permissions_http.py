@@ -376,3 +376,135 @@ def test_an_external_user_cannot_change_an_item_of_a_hidden_campaign(api_client:
     )
     assert changed.status_code == 404, changed.text
     assert changed.json()["detail"] == "Campaign not found"
+
+
+def _external_on(api_client, admin, project, *policies):
+    user = _create_user(api_client, admin, role="external")
+    for policy in policies:
+        _grant(api_client, admin, policy, user["id"], project)
+    return _headers_for(api_client, user["email"])
+
+
+def test_a_request_body_cannot_reach_a_hidden_artefact(api_client: TestClient):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, "Bodies")["id"]
+    hidden_requirement = _create(api_client, admin, "requirements", project).json()["id"]
+    hidden_case = _create(api_client, admin, "test-cases", project).json()["id"]
+    shown_case = api_client.post(
+        "/api/test-cases",
+        headers=admin,
+        json={"project_id": project, "title": unique_name("case"), "visibility": "customer"},
+    ).json()["id"]
+    hidden_suite = api_client.post(
+        "/api/test-suites", headers=admin, json={"project_id": project, "name": unique_name("s")}
+    ).json()["id"]
+    headers = _external_on(api_client, admin, project, "Requirements Author", "Test Author")
+
+    child = api_client.post(
+        "/api/requirements",
+        headers=headers,
+        json={"project_id": project, "title": unique_name("req"), "parent_id": hidden_requirement},
+    )
+    assert child.status_code == 404
+    assert child.json()["detail"] == "Parent requirement not found"
+
+    suite = api_client.post(
+        "/api/test-suites",
+        headers=headers,
+        json={
+            "project_id": project,
+            "name": unique_name("s"),
+            "test_case_ids": [hidden_case, shown_case],
+        },
+    )
+    assert suite.status_code == 201, suite.text
+    assert [item["test_case_id"] for item in suite.json()["items"]] == [shown_case]
+
+    campaign = api_client.post(
+        "/api/campaigns",
+        headers=headers,
+        json={"project_id": project, "name": unique_name("c"), "suite_ids": [hidden_suite]},
+    )
+    assert campaign.status_code == 404
+    assert campaign.json()["detail"] == f"Suite {hidden_suite} not found"
+
+
+def test_a_campaign_update_keeps_the_suites_the_editor_cannot_see(api_client: TestClient):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, "Kept")["id"]
+
+    def suite(visibility):
+        return api_client.post(
+            "/api/test-suites",
+            headers=admin,
+            json={"project_id": project, "name": unique_name("s"), "visibility": visibility},
+        ).json()["id"]
+
+    hidden, first, second = suite("internal"), suite("customer"), suite("customer")
+    campaign = api_client.post(
+        "/api/campaigns",
+        headers=admin,
+        json={
+            "project_id": project,
+            "name": unique_name("c"),
+            "visibility": "customer",
+            "suite_ids": [hidden, first],
+        },
+    ).json()["id"]
+    headers = _external_on(api_client, admin, project, "Test Author")
+
+    updated = api_client.patch(
+        f"/api/campaigns/{campaign}", headers=headers, json={"suite_ids": [second]}
+    )
+    assert updated.status_code == 200, updated.text
+    linked = api_client.get(f"/api/campaigns/{campaign}", headers=admin).json()["suites"]
+    assert sorted(s["id"] for s in linked) == sorted([hidden, second])
+
+
+def test_an_empty_suite_list_keeps_suites_outside_the_allowed_types(api_client: TestClient):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, "Typed suites")["id"]
+    suite = api_client.post(
+        "/api/test-suites",
+        headers=admin,
+        json={"project_id": project, "name": unique_name("s"), "visibility": "customer"},
+    ).json()["id"]
+    campaign = api_client.post(
+        "/api/campaigns",
+        headers=admin,
+        json={
+            "project_id": project,
+            "name": unique_name("c"),
+            "visibility": "customer",
+            "suite_ids": [suite],
+        },
+    ).json()["id"]
+    policy = api_client.post(
+        "/api/policies",
+        headers=admin,
+        json={
+            "name": unique_name("Campaigns only"),
+            "base_role": "external",
+            "permissions": {"CMP": ["view", "comment", "edit", "plan"]},
+            "doc_tag_scope": ["CMP"],
+        },
+    )
+    assert policy.status_code == 201, policy.text
+    group = _create_group(api_client, admin, policy_id=policy.json()["id"])
+    granted = api_client.post(
+        f"/api/groups/{group['id']}/grants", headers=admin, json={"project_id": project}
+    )
+    assert granted.status_code == 201, granted.text
+    user = _create_user(api_client, admin, role="external")
+    added = api_client.post(
+        f"/api/groups/{group['id']}/members", headers=admin, json={"user_id": user["id"]}
+    )
+    assert added.status_code == 201, added.text
+    headers = _headers_for(api_client, user["email"])
+
+    updated = api_client.patch(
+        f"/api/campaigns/{campaign}", headers=headers, json={"suite_ids": []}
+    )
+    assert updated.status_code == 200, updated.text
+    linked = api_client.get(f"/api/campaigns/{campaign}", headers=admin).json()["suites"]
+    assert [s["id"] for s in linked] == [suite]

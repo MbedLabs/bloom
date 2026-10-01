@@ -22,6 +22,7 @@ from app.core.database import get_db
 from app.core.id_generator import next_doc_id
 from app.core.security import (
     apply_external_visibility_filter,
+    doc_type_visible,
     get_current_user,
     require_project_access,
 )
@@ -262,12 +263,20 @@ async def create_campaign(
         {
             suite.id: suite
             for suite in (
-                (await db.execute(select(TestSuite).where(TestSuite.id.in_(resolved_suite_ids))))
+                (
+                    await db.execute(
+                        apply_external_visibility_filter(
+                            select(TestSuite).where(TestSuite.id.in_(resolved_suite_ids)),
+                            TestSuite,
+                            current_user,
+                        )
+                    )
+                )
                 .scalars()
                 .all()
             )
         }
-        if resolved_suite_ids
+        if resolved_suite_ids and await doc_type_visible(db, current_user, data.project_id, "TS")
         else {}
     )
     validated_suites: list[TestSuite] = []
@@ -322,13 +331,17 @@ async def create_campaign(
         )
         selected_test_case_ids.update(suite_item_rows)
 
-    if selected_test_case_ids:
+    if selected_test_case_ids and await doc_type_visible(db, current_user, data.project_id, "TC"):
         tc_rows = (
             (
                 await db.execute(
-                    select(TestCase).where(
-                        TestCase.id.in_(selected_test_case_ids),
-                        TestCase.project_id == data.project_id,
+                    apply_external_visibility_filter(
+                        select(TestCase).where(
+                            TestCase.id.in_(selected_test_case_ids),
+                            TestCase.project_id == data.project_id,
+                        ),
+                        TestCase,
+                        current_user,
                     )
                 )
             )
@@ -390,42 +403,66 @@ async def update_campaign(
     if resolved_suite_ids is None and data.suite_id is not None:
         resolved_suite_ids = [data.suite_id]
     if resolved_suite_ids is not None:
+        suites_visible = await doc_type_visible(db, current_user, campaign.project_id, "TS")
         existing_suites = (
             {
                 suite.id: suite
                 for suite in (
                     (
                         await db.execute(
-                            select(TestSuite).where(TestSuite.id.in_(resolved_suite_ids))
+                            apply_external_visibility_filter(
+                                select(TestSuite).where(TestSuite.id.in_(resolved_suite_ids)),
+                                TestSuite,
+                                current_user,
+                            )
                         )
                     )
                     .scalars()
                     .all()
                 )
             }
-            if resolved_suite_ids
+            if resolved_suite_ids and suites_visible
             else {}
         )
         for sid in resolved_suite_ids:
             suite = existing_suites.get(sid)
             if not suite or suite.project_id != campaign.project_id:
                 raise HTTPException(404, f"Suite {sid} not found")
-        # Delete existing CampaignSuite rows
-        existing_cs = (
+        visible_links = (
             (
                 await db.execute(
-                    select(CampaignSuite).where(CampaignSuite.campaign_id == campaign.id)
+                    apply_external_visibility_filter(
+                        select(CampaignSuite)
+                        .join(TestSuite, TestSuite.id == CampaignSuite.suite_id)
+                        .where(CampaignSuite.campaign_id == campaign.id),
+                        TestSuite,
+                        current_user,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+            if suites_visible
+            else []
+        )
+        for cs in visible_links:
+            await db.delete(cs)
+        kept_suite_ids = (
+            (
+                await db.execute(
+                    select(CampaignSuite.suite_id).where(
+                        CampaignSuite.campaign_id == campaign.id,
+                        CampaignSuite.id.not_in([cs.id for cs in visible_links]),
+                    )
                 )
             )
             .scalars()
             .all()
         )
-        for cs in existing_cs:
-            await db.delete(cs)
-        # Insert new CampaignSuite rows
         for sid in resolved_suite_ids:
             db.add(CampaignSuite(campaign_id=campaign.id, suite_id=sid))
-        campaign.suite_id = resolved_suite_ids[0] if resolved_suite_ids else None
+        linked = list(resolved_suite_ids) + list(kept_suite_ids)
+        campaign.suite_id = linked[0] if linked else None
     if data.bud_run_id is not None:
         campaign.bud_run_id = data.bud_run_id
     if data.bud_run_url is not None:

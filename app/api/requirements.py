@@ -374,12 +374,14 @@ async def create_requirement(
     )
 
     if data.parent_id is not None:
-        parent_result = await db.execute(
-            select(Requirement).where(Requirement.id == data.parent_id)
+        parent = await get_visible_row(
+            db,
+            Requirement,
+            data.parent_id,
+            "Parent requirement not found",
+            current_user,
+            permission=("view", "REQ"),
         )
-        parent = parent_result.scalar_one_or_none()
-        if not parent:
-            raise HTTPException(status_code=404, detail="Parent requirement not found")
         if parent.project_id != data.project_id:
             raise HTTPException(
                 status_code=400, detail="Parent requirement must belong to same project"
@@ -537,12 +539,14 @@ async def update_requirement(
         else:
             if data.parent_id == requirement_id:
                 raise HTTPException(status_code=400, detail="Requirement cannot be its own parent")
-            parent_result = await db.execute(
-                select(Requirement).where(Requirement.id == data.parent_id)
+            parent = await get_visible_row(
+                db,
+                Requirement,
+                data.parent_id,
+                "Parent requirement not found",
+                current_user,
+                permission=("view", "REQ"),
             )
-            parent = parent_result.scalar_one_or_none()
-            if not parent:
-                raise HTTPException(status_code=404, detail="Parent requirement not found")
             if parent.project_id != requirement.project_id:
                 raise HTTPException(
                     status_code=400, detail="Parent requirement must belong to same project"

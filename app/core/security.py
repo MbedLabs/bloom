@@ -144,8 +144,7 @@ async def require_external_doc_type_access(
     doc_type: str,
 ) -> None:
     """Enforce the external member document-type allowlist for a project."""
-    allowed = await get_external_doc_types(db, current_user, project_id)
-    if allowed is not None and doc_type not in allowed:
+    if not await doc_type_visible(db, current_user, project_id, doc_type):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"External user is not authorized for document type '{doc_type}'.",
@@ -160,6 +159,17 @@ def external_doc_type_allowed(
     if current_user.role != UserRole.external:
         return True
     return allowed_doc_types is None or doc_type in allowed_doc_types
+
+
+async def doc_type_visible(
+    db: AsyncSession, current_user: User, project_id: int, doc_type: str
+) -> bool:
+    """False when an external user's allowlist on the project leaves out the document type."""
+    if current_user.role != UserRole.external:
+        return True
+    return external_doc_type_allowed(
+        current_user, await get_external_doc_types(db, current_user, project_id), doc_type
+    )
 
 
 def apply_external_visibility_filter(query, model, current_user: User):

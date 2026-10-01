@@ -12,8 +12,7 @@ from app.core.document_kinds import normalize_document_kind
 from app.core.permissions import DOC_TYPE_RESOURCES
 from app.core.security import (
     apply_external_visibility_filter,
-    external_doc_type_allowed,
-    get_external_doc_types,
+    doc_type_visible,
     require_project_access,
 )
 from app.models import (
@@ -30,7 +29,7 @@ from app.models import (
     TestCase,
     TestConcept,
 )
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas import (
     ArtefactActivityResponse,
     ArtefactRelatedResponse,
@@ -622,12 +621,8 @@ async def get_visible_row(
         permission=(action, resource) if action else None,
         outsider=hidden,
     )
-    if (
-        current_user.role == UserRole.external
-        and resource in DOC_TYPE_RESOURCES
-        and not external_doc_type_allowed(
-            current_user, await get_external_doc_types(db, current_user, row.project_id), resource
-        )
+    if resource in DOC_TYPE_RESOURCES and not await doc_type_visible(
+        db, current_user, row.project_id, resource
     ):
         raise hidden
     return row
