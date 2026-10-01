@@ -416,6 +416,7 @@ async def create_requirement(
 
     requirement = Requirement(
         project_id=data.project_id,
+        created_by_id=current_user.id,
         parent_id=data.parent_id,
         req_id=req_id,
         title=data.title,

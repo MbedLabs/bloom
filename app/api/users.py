@@ -22,6 +22,7 @@ from app.core.security import (
 )
 from app.models import Project
 from app.models.models import (
+    ARTEFACT_MODELS,
     Defect,
     DocumentAttachment,
     ImportAttempt,
@@ -520,6 +521,11 @@ async def delete_user(
             .where(DocumentAttachment.uploaded_by_id == user_id)
             .values(uploaded_by_id=None)
         )
+
+        for model in ARTEFACT_MODELS:
+            await db.execute(
+                update(model).where(model.created_by_id == user_id).values(created_by_id=None)
+            )
 
         deleted_email = user.email
         await db.delete(user)

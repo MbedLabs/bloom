@@ -96,7 +96,12 @@ async def create_item(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail=kind.exists)
 
-    item = model(project_id=project_id, **{kind.id_attr: public_id}, **fields)
+    item = model(
+        project_id=project_id,
+        created_by_id=current_user.id,
+        **{kind.id_attr: public_id},
+        **fields,
+    )
     db.add(item)
     await db.flush()
     await db.refresh(item)

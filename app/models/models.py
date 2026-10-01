@@ -119,6 +119,7 @@ class Requirement(Base):
     req_type: Mapped[str] = mapped_column(String(30), default="Functional")
     req_origin: Mapped[str] = mapped_column(String(50), default="Internal")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     reviewer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     approver_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     reviewed_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
@@ -168,6 +169,7 @@ class TestCase(Base):
     steps: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Draft")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     reviewer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     approver_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     reviewed_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
@@ -242,6 +244,7 @@ class Document(Base):
     doc_type: Mapped[str] = mapped_column(String(30), default="SPEC")
     status: Mapped[str] = mapped_column(String(20), default="Draft")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     version: Mapped[str] = mapped_column(String(20), default="1.0")
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     content_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
@@ -312,6 +315,7 @@ class TestSuite(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Draft")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -356,6 +360,7 @@ class TestCampaign(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Planned")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     bud_run_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     bud_run_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     bud_run_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
@@ -449,6 +454,7 @@ class DesignItem(Base):
     content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Draft")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     priority: Mapped[str] = mapped_column(String(20), default="Medium")
     design_type: Mapped[str] = mapped_column(String(30), default="Architecture")
     linked_requirement_id: Mapped[Optional[int]] = mapped_column(
@@ -483,6 +489,7 @@ class RiskItem(Base):
     content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Open")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     severity: Mapped[str] = mapped_column(String(20), default="Medium")
     probability: Mapped[str] = mapped_column(String(20), default="Medium")
     mitigation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -528,6 +535,7 @@ class ChangeRequest(Base):
     content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Submitted")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     priority: Mapped[str] = mapped_column(String(20), default="Medium")
     change_type: Mapped[str] = mapped_column(String(30), default="Enhancement")
     impact_assessment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -589,6 +597,7 @@ class TestConcept(Base):
     content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Draft")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     linked_requirement_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     coverage: Mapped[float] = mapped_column(Float, default=0)
     source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -619,6 +628,7 @@ class Defect(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Open")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     severity: Mapped[str] = mapped_column(String(20), default="Medium")
     priority: Mapped[str] = mapped_column(String(20), default="Medium")
     source_type: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
@@ -881,3 +891,17 @@ class CompanyLogo(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
+
+
+ARTEFACT_MODELS = (
+    Requirement,
+    TestCase,
+    Document,
+    TestSuite,
+    TestCampaign,
+    DesignItem,
+    RiskItem,
+    ChangeRequest,
+    TestConcept,
+    Defect,
+)

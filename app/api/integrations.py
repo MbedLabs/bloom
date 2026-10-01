@@ -810,8 +810,10 @@ async def _new_defect_from_issue(
     ).scalar_one()
     issue_key = f"{project_key}-{issue_number}"
     level = bloom_level(setting, fields)
+    account_user = await _integration_account_user(db, setting)
     defect = Defect(
         project_id=project.id,
+        created_by_id=account_user,
         defect_id=await next_doc_id(
             db, Defect, Defect.defect_id, project.id, project.prefix, "DEF"
         ),
@@ -826,7 +828,7 @@ async def _new_defect_from_issue(
         external_issue_url=issue_url(setting, issue_key),
         external_issue_state=_issue_state(fields),
         external_last_event_at=datetime.utcnow(),
-        reporter_id=await _integration_account_user(db, setting),
+        reporter_id=account_user,
     )
     _set_defect_status(defect, _jira_status(fields))
     await _link_referenced_test_case(db, defect, project, setting, fields)

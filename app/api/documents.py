@@ -134,6 +134,7 @@ async def create_document(
         raise HTTPException(status_code=400, detail="Document with this ID already exists")
     document = Document(
         project_id=project_id,
+        created_by_id=current_user.id,
         doc_id=doc_id,
         title=data.title,
         doc_type=type_code,

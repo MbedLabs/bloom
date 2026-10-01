@@ -236,6 +236,7 @@ async def publish_test_report(
     if created:
         document = Document(
             project_id=project.id,
+            created_by_id=_service_credential.created_by_user_id,
             doc_id=await next_doc_id(
                 db, Document, Document.doc_id, project.id, project.prefix, "RPT"
             ),

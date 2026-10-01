@@ -297,6 +297,7 @@ async def create_campaign(
 
     campaign = TestCampaign(
         project_id=data.project_id,
+        created_by_id=current_user.id,
         campaign_id=campaign_public_id,
         name=data.name,
         description=data.description,

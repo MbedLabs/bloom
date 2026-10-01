@@ -97,6 +97,7 @@ async def create_defect(
 
     item = Defect(
         project_id=data.project_id,
+        created_by_id=current_user.id,
         defect_id=defect_id,
         title=data.title,
         description=data.description,

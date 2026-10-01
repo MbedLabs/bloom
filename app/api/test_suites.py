@@ -260,6 +260,7 @@ async def create_suite(
     )
     suite = TestSuite(
         project_id=data.project_id,
+        created_by_id=current_user.id,
         suite_id=suite_id,
         name=data.name,
         description=data.description,

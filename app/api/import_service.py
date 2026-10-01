@@ -265,6 +265,7 @@ async def _import_docs(
         new_id = format_doc_id(target_project.prefix, type_code, next_num)
         imported = model(
             project_id=target_project.id,
+            created_by_id=current_user.id,
             status="Draft",
             source_ref=getattr(src, id_attr),
             source_project_id=source_project.id,
@@ -412,6 +413,7 @@ async def import_reqif(
 
         requirement = Requirement(
             project_id=target_project.id,
+            created_by_id=current_user.id,
             parent_id=parent_id,
             req_id=new_req_id,
             title=_requirement_title(obj),
@@ -620,6 +622,7 @@ async def import_test_cases_file(
             next_num += 1
             kwargs = dict(
                 project_id=target_project.id,
+                created_by_id=current_user.id,
                 tc_id=new_tc_id,
                 title=title,
                 description=description,
@@ -920,7 +923,13 @@ async def import_markdown(
             target_project.prefix,
             id_type_code,
         )
-        kwargs = {"project_id": target_project.id, id_attr: new_id, title_attr: title, **extra}
+        kwargs = {
+            "project_id": target_project.id,
+            "created_by_id": current_user.id,
+            id_attr: new_id,
+            title_attr: title,
+            **extra,
+        }
         instance = model(**kwargs)
         if section.body and hasattr(instance, "description"):
             instance.description = section.body
@@ -1245,6 +1254,7 @@ async def import_testrail(
             next_num += 1
             test_case = TestCase(
                 project_id=project.id,
+                created_by_id=current_user.id,
                 tc_id=tc_id,
                 title=case.title,
                 description=description,
@@ -1299,6 +1309,7 @@ async def import_testrail(
             elif suite is None:
                 suite = TestSuite(
                     project_id=project.id,
+                    created_by_id=current_user.id,
                     suite_id=await next_doc_id(
                         db, TestSuite, TestSuite.suite_id, project.id, prefix, "TS"
                     ),
