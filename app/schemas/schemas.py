@@ -474,6 +474,7 @@ class DocumentCreate(StrictModel):
     title: str = Field(..., min_length=1, max_length=500)
     doc_type: str = Field(default="SPEC", pattern="^(SPEC|PRT|RPT|STD)$")
     visibility: str = Field(default="internal", pattern=ARTEFACT_VISIBILITY_PATTERN)
+    status: str = Field(default="Draft", pattern="^Draft$")
     description: Optional[str] = None
     content_json: Optional[Dict[str, Any]] = None
     content_html: Optional[str] = None
