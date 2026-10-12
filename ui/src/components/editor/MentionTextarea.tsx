@@ -163,7 +163,7 @@ export default function MentionTextarea({
       />
       {trigger && anchor && (
         <div
-          className="mention-suggestion-popover fixed z-[120]"
+          className="mention-suggestion-popover fixed z-120"
           style={{ left: anchor.left, top: anchor.top }}
         >
           <MentionList

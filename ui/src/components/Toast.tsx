@@ -73,7 +73,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={api}>
       {children}
       <div
-        className="fixed bottom-4 right-4 z-[60] flex flex-col gap-2"
+        className="fixed bottom-4 right-4 z-60 flex flex-col gap-2"
         role="status"
         aria-live="polite"
       >
@@ -107,7 +107,7 @@ function ToastItem({
       className={`flex max-w-md items-start gap-2 rounded-md border px-4 py-3 text-sm shadow-lg animate-slide-in-left ${styles.wrapper}`}
     >
       <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${styles.icon}`} />
-      <span className="flex-1 break-words">{toast.message}</span>
+      <span className="flex-1 wrap-break-word">{toast.message}</span>
       <button
         type="button"
         onClick={() => onDismiss(toast.id)}

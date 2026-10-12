@@ -1,9 +1,13 @@
 [1.2.0]
-* Admin company logo on PDF reports, alongside the EmbedLabs branding.
-* Import Markdown documents (classified into artefacts) and test cases from CSV and XML.
-* Export test cases as Markdown, CSV and XML.
-* Address artefacts and backlinks by public id.
-* Create a Bloom defect from an inbound Jira issue.
+* Assign groups of policies per project, with separate application and access management.
+* Control document access by type and origin, with independent review permissions.
+* Review and approve controlled documents with notifications and email requests.
+* Preserve approved content; linked approved changes advance Version and Revision on Save. Corrections keep their existing numbers.
+* Upload and remove profile pictures; show them alongside users, comments and activity.
+* Add a company logo to generated PDF reports.
+* Import Markdown documents and test cases from CSV, XML and TestRail; export test cases and project PDF reports.
+* Open linked test runs in Bud.
+* Create Bloom defects from Jira issues.
 
 [1.1.0]
 * Inline artefact references and campaign/suite topology membership.

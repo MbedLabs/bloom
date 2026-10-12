@@ -18,13 +18,17 @@ import { settle } from './settle'
 import { ToastProvider } from '../components/Toast'
 import {
   RESPONSES,
+  campaignDetail,
   defect,
+  design,
   docShell,
   project,
   requirement,
   testCase,
   testSuite,
   user,
+  resetApiMocks,
+  workflowFixture,
 } from './apiFixtures'
 
 vi.mock('../api/client', async (importOriginal) => {
@@ -49,9 +53,12 @@ vi.mock('../api/client', async (importOriginal) => {
   return mocked
 })
 
+/** The signed-in user, swapped per test to check what an external user sees. */
+let currentUser: Record<string, unknown> = user
+
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({
-    user,
+    user: currentUser,
     isLoading: false,
     isAuthenticated: true,
     login: vi.fn(),
@@ -70,6 +77,12 @@ vi.mock('../components/ProjectDocTopology', () => ({
 }))
 
 const client = await import('../api/client')
+
+/** Wait until the page has the server's answer for which changes the row allows. */
+async function rowAnswered() {
+  await waitFor(() => expect(client.docsApi.get).toHaveBeenCalled())
+  await settle()
+}
 const Documents = (await import('../pages/Documents')).default
 const Defects = (await import('../pages/Defects')).default
 const Users = (await import('../pages/Users')).default
@@ -107,6 +120,8 @@ function renderAt(routePath: string, url: string, element: React.ReactElement) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  resetApiMocks(client as unknown as Record<string, unknown>, vi)
+  currentUser = user
   window.sessionStorage.clear()
   window.localStorage.clear()
   window.confirm = () => true
@@ -169,7 +184,8 @@ describe('the document registry', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /^Filters/ })[0])
 
     fireEvent.change(await screen.findByLabelText(/Priority/i), { target: { value: 'Low' } })
-    fireEvent.change(screen.getByLabelText(/Reviewer/i), { target: { value: 'assigned' } })
+    fireEvent.click(screen.getByRole('combobox', { name: 'Reviewer' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Any assigned' }))
     fireEvent.change(screen.getByLabelText(/Links/i), { target: { value: 'suspect' } })
 
     await waitFor(() => {
@@ -403,6 +419,42 @@ describe('the registry table', () => {
 
 
 describe('creating a document', () => {
+  it.each(['REQ', 'DES', 'CHG'])('offers one working Priority selector when creating a %s', async (type) => {
+    renderAt('/projects/:prefix/docs/new', `/projects/VCU/docs/new?type=${type}`, <DocCreate />)
+    await screen.findByTitle('Select priority')
+    const priorities = screen.getAllByRole('combobox').filter((element) =>
+      ['Select priority', 'Priority'].includes(element.getAttribute('title') ?? '')
+    )
+    expect(priorities).toHaveLength(1)
+    fireEvent.change(priorities[0], { target: { value: 'High' } })
+    expect((priorities[0] as HTMLSelectElement).value).toBe('High')
+  })
+
+  it('omits unsupported Specification metadata controls', async () => {
+    renderAt('/projects/:prefix/docs/new', '/projects/VCU/docs/new?type=SPEC', <DocCreate />)
+    await screen.findByTitle('Select status')
+    expect(screen.queryByTitle('Select priority')).toBeNull()
+    expect(screen.queryByTitle('Priority')).toBeNull()
+    expect(screen.queryByTitle('Specification Type')).toBeNull()
+  })
+
+  it.each(['SPEC', 'PRT', 'RPT', 'STD'])('offers and submits only Draft when creating a %s', async (type) => {
+    renderAt('/projects/:prefix/docs/new', `/projects/VCU/docs/new?type=${type}`, <DocCreate />)
+    const status = await screen.findByTitle('Select status') as HTMLSelectElement
+    expect([...status.options].map((option) => option.value)).toEqual(['Draft'])
+    expect(status.value).toBe('Draft')
+
+    fireEvent.change(screen.getByPlaceholderText('Untitled'), { target: { value: `New ${type}` } })
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+    await waitFor(() => expect(client.documentsApi.create).toHaveBeenCalledWith(expect.objectContaining({
+      doc_type: type,
+      project_id: project.id,
+      title: `New ${type}`,
+      status: 'Draft',
+    })))
+  })
+
   it('shows the identifier the server would actually assign', async () => {
     renderAt('/projects/:prefix/docs/new', '/projects/VCU/docs/new?type=REQ', <DocCreate />)
 
@@ -478,7 +530,6 @@ describe('creating a document', () => {
     await screen.findByText(/VCU-REQ-004/)
 
     fireEvent.change(screen.getByPlaceholderText('Untitled'), { target: { value: 'A requirement' } })
-    fireEvent.change(screen.getByTitle('Select status'), { target: { value: 'Approved' } })
     fireEvent.change(screen.getByPlaceholderText(/brief description/i), {
       target: { value: 'Why it exists.' },
     })
@@ -486,7 +537,7 @@ describe('creating a document', () => {
 
     await waitFor(() => {
       const [payload] = lastCall(client.requirementsApi.create) as [Record<string, unknown>]
-      expect(payload.status).toBe('Approved')
+      expect(payload.status).toBe('Draft')
       expect(payload.description).toBe('Why it exists.')
     })
   })
@@ -505,6 +556,22 @@ describe('creating a document', () => {
 })
 
 describe('editing an existing document', () => {
+  it.each([
+    ['RPT', ['Draft', 'Final', 'Approved']],
+    ['STD', ['Draft', 'Active', 'Superseded']],
+  ])('preserves the existing status choices when editing a %s', async (type, choices) => {
+    vi.mocked(client.docsApi.get).mockResolvedValueOnce({ ...docShell, doc_type: type, status: 'Draft' } as never)
+    renderAt(
+      '/projects/:prefix/docs/:kind/:docId/edit',
+      `/projects/VCU/docs/documents/VCU-${type}-001/edit`,
+      <DocCreate editMode />,
+    )
+
+    await rowAnswered()
+    const status = await screen.findByTitle('Select status') as HTMLSelectElement
+    expect([...status.options].map((option) => option.value)).toEqual(choices)
+  })
+
   function renderEdit() {
     return renderAt(
       '/projects/:prefix/docs/:kind/:docId/edit',
@@ -778,6 +845,7 @@ describe('a test suite in detail', () => {
   it('renames the suite', async () => {
     renderSuite()
     await screen.findAllByText(/Smoke suite/)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
     const nameField = (await screen.findAllByRole('textbox'))[0]
@@ -794,6 +862,7 @@ describe('a test suite in detail', () => {
   it('asks before deleting the suite', async () => {
     renderSuite()
     await screen.findAllByText(/Smoke suite/)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
     await settle()
@@ -808,6 +877,7 @@ describe('a test suite in detail', () => {
   it('adds a test case to the suite', async () => {
     renderSuite()
     await screen.findAllByText(/Smoke suite/)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /add test case/i }))
     const candidate = await screen.findByText('VCU-TC-001')
@@ -870,51 +940,30 @@ describe('project settings', () => {
 
   it('lists the project members', async () => {
     renderProjectEdit()
-    expect(await screen.findByText(/Ext Ernal/)).toBeTruthy()
+    expect(await screen.findByText(/^Ext Ernal$/)).toBeTruthy()
   })
 
-  it('will not add a member until a user is picked', async () => {
+  it('shows default policy groups before selecting people', async () => {
     renderProjectEdit()
-    await screen.findByText(/Ext Ernal/)
-
-    expect((screen.getByRole('button', { name: /add member/i }) as HTMLButtonElement).disabled).toBe(
-      true,
-    )
-    expect(client.projectMembersApi.create).not.toHaveBeenCalled()
+    for (const name of ['Administrators', 'Developers', 'Product Owners', 'Testers']) {
+      expect(await screen.findByRole('region', { name })).toBeTruthy()
+    }
+    expect(client.groupsApi.assign).not.toHaveBeenCalled()
   })
 
-  it('never offers an administrator as a project member', async () => {
+  it('assigns a project bundle to people selected within its section', async () => {
+    vi.mocked(client.groupsApi.assignmentOptions).mockResolvedValue({ projects: [project], users: [{ id: 99, email: 'additional@example.com', full_name: 'Additional Contributor', role: 'maintainer' }] })
     renderProjectEdit()
-    await screen.findByText(/Ext Ernal/)
-
-    // An administrator already reaches every project; the only user the
-    // fixture returns is one, so there is nobody left to add.
-    const picker = screen.getByTitle('Select user to add') as HTMLSelectElement
-    expect(Array.from(picker.options).map((option) => option.textContent)).toEqual([
-      'Select a user',
-    ])
-  })
-
-  it('offers document visibility only for an external member', async () => {
-    renderProjectEdit()
-    await screen.findByText(/Ext Ernal/)
-    // The role value is still 'external'; the label reads Reviewer.
-    const pickers = () => screen.queryAllByText(/reviewer document visibility/i).length
-    // The existing member holds that role, so one picker is always on screen;
-    // the add form contributes a second while its own role matches.
-    expect(pickers()).toBe(2)
-
-    fireEvent.change(screen.getByTitle('Project role'), { target: { value: 'maintainer' } })
-    // A maintainer sees every document, so there is nothing to pick.
-    await waitFor(() => expect(pickers()).toBe(1))
-
-    fireEvent.change(screen.getByTitle('Project role'), { target: { value: 'external' } })
-    await waitFor(() => expect(pickers()).toBe(2))
+    const roster = within(await screen.findByRole('region', { name: 'Developers' }))
+    fireEvent.click(roster.getByRole('button', { name: 'Choose people' }))
+    fireEvent.click(roster.getByRole('checkbox', { name: 'Select Additional Contributor' }))
+    fireEvent.click(roster.getByRole('button', { name: 'Save selection' }))
+    await waitFor(() => expect(client.groupsApi.assign).toHaveBeenCalledWith(10, project.id, [99]))
   })
 
   it('removes a member', async () => {
     renderProjectEdit()
-    await screen.findByText(/Ext Ernal/)
+    await screen.findByText(/^Ext Ernal$/)
 
     const remove = screen
       .getAllByRole('button')
@@ -935,10 +984,8 @@ describe('project settings', () => {
     expect(openDelete).toBeTruthy()
     fireEvent.click(openDelete as HTMLElement)
 
-    // Two buttons read "Delete project": the one that opens the dialog and the
-    // one inside it. The second stays out of reach until the phrase matches.
-    const deleteButtons = await screen.findAllByRole('button', { name: /delete project/i })
-    const confirm = deleteButtons[deleteButtons.length - 1] as HTMLButtonElement
+    const dialog = await screen.findByRole('dialog', { name: 'Delete project' })
+    const confirm = within(dialog).getByRole('button', { name: /^delete project$/i }) as HTMLButtonElement
     expect(confirm.disabled).toBe(true)
 
     fireEvent.click(confirm)
@@ -973,6 +1020,7 @@ describe('a campaign in detail', () => {
   it('changes the campaign status', async () => {
     renderCampaign()
     await screen.findAllByText(/Release candidate sweep/)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
     fireEvent.change(await screen.findByLabelText(/status/i), { target: { value: 'Completed' } })
@@ -988,6 +1036,7 @@ describe('a campaign in detail', () => {
   it('asks before deleting the campaign', async () => {
     renderCampaign()
     await screen.findAllByText(/Release candidate sweep/)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
     await settle()
@@ -1059,50 +1108,34 @@ describe('a requirement in detail', () => {
     expect(lastCall(client.requirementsApi.get)[0]).toBe(requirement.id)
   })
 
-  it('records the review against the named reviewer', async () => {
+  it('requests approval only when the workflow permits the reviewer handoff', async () => {
+    vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowFixture, actions: { ...workflowFixture.actions, request_approval: true } })
     renderRequirement()
-    await screen.findAllByText(new RegExp(requirement.title))
-
-    fireEvent.click(screen.getByRole('button', { name: /mark reviewed/i }))
-
-    await waitFor(() => expect(client.requirementsApi.setReviewed).toHaveBeenCalled())
-    const [id, reviewerId] = lastCall(client.requirementsApi.setReviewed) as [number, number]
-    expect(id).toBe(requirement.id)
-    expect(reviewerId).toBe(requirement.reviewer_id)
+    fireEvent.click(await screen.findByRole('button', { name: /^mark reviewed$/i }))
+    await waitFor(() => expect(client.workflowApi.request).toHaveBeenCalledWith('requirement', requirement.id, 'approval'))
+    expect(client.requirementsApi.setReviewed).not.toHaveBeenCalled()
   })
 
-  it('records the approval against the named approver', async () => {
+  it('approves through the shared workflow command', async () => {
+    vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowFixture, actions: { ...workflowFixture.actions, approve: true } })
     renderRequirement()
-    await screen.findAllByText(new RegExp(requirement.title))
-
-    fireEvent.click(screen.getByRole('button', { name: /mark approved/i }))
-
-    await waitFor(() => expect(client.requirementsApi.setApproved).toHaveBeenCalled())
-    const [id, approverId] = lastCall(client.requirementsApi.setApproved) as [number, number]
-    expect(id).toBe(requirement.id)
-    expect(approverId).toBe(requirement.approver_id)
+    fireEvent.click(await screen.findByRole('button', { name: /^mark approved$/i }))
+    await waitFor(() => expect(client.workflowApi.approve).toHaveBeenCalledWith('requirement', requirement.id))
+    expect(client.requirementsApi.setApproved).not.toHaveBeenCalled()
   })
 
-  it('cannot be signed off when nobody is named to do it', async () => {
-    vi.mocked(client.requirementsApi.get).mockResolvedValue({
-      ...requirement,
-      reviewer_id: null,
-      approver_id: null,
-    } as Awaited<ReturnType<typeof client.requirementsApi.get>>)
+  it('disables handoff buttons when the workflow supplies no action', async () => {
+    vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowFixture, reviewer: null, approver: null })
     renderRequirement()
-    await screen.findAllByText(new RegExp(requirement.title))
-
-    expect(
-      (screen.getByRole('button', { name: /mark reviewed/i }) as HTMLButtonElement).disabled,
-    ).toBe(true)
-    expect(
-      (screen.getByRole('button', { name: /mark approved/i }) as HTMLButtonElement).disabled,
-    ).toBe(true)
+    await screen.findByRole('heading', { name: 'Review' })
+    expect((screen.getByRole('button', { name: /^mark reviewed$/i }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: /^mark approved$/i }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('asks before deleting', async () => {
     renderRequirement()
     await screen.findAllByText(new RegExp(requirement.title))
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
     await settle()
@@ -1142,22 +1175,20 @@ describe('a test case in detail', () => {
     expect(screen.queryByTitle('Row actions')).toBeNull()
   })
 
-  it('records review and approval against the named people', async () => {
+  it('uses workflow commands for test-case reviewer and approver handoffs', async () => {
+    vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowFixture, actions: { ...workflowFixture.actions, request_approval: true, approve: true } })
     renderTestCase()
-    await screen.findAllByText(new RegExp(testCase.title))
-
-    fireEvent.click(screen.getByRole('button', { name: /mark reviewed/i }))
-    await waitFor(() => expect(client.testCasesApi.setReviewed).toHaveBeenCalled())
-    expect(lastCall(client.testCasesApi.setReviewed)).toEqual([testCase.id, testCase.reviewer_id])
-
-    fireEvent.click(screen.getByRole('button', { name: /mark approved/i }))
-    await waitFor(() => expect(client.testCasesApi.setApproved).toHaveBeenCalled())
-    expect(lastCall(client.testCasesApi.setApproved)).toEqual([testCase.id, testCase.approver_id])
+    fireEvent.click(await screen.findByRole('button', { name: /^mark reviewed$/i }))
+    await waitFor(() => expect(client.workflowApi.request).toHaveBeenCalledWith('test-case', testCase.id, 'approval'))
+    await waitFor(() => expect((screen.getByRole('button', { name: /^mark approved$/i }) as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(screen.getByRole('button', { name: /^mark approved$/i }))
+    await waitFor(() => expect(client.workflowApi.approve).toHaveBeenCalledWith('test-case', testCase.id))
   })
 
   it('asks before deleting', async () => {
     renderTestCase()
     await screen.findAllByText(new RegExp(testCase.title))
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
     await settle()
@@ -1187,6 +1218,7 @@ describe('a controlled document in detail', () => {
   it('asks before deleting', async () => {
     renderDocument()
     await screen.findAllByText(new RegExp(docShell.title))
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
     await settle()
@@ -1211,5 +1243,247 @@ describe('project exports', () => {
       expect(exportApi.download).toHaveBeenCalledWith(project.id, 'verification-dossier', 'pdf'),
     )
     expect(screen.queryByRole('menu')).toBeNull()
+  })
+})
+
+describe('the changes one artefact allows', () => {
+  const external = { ...user, role: 'external' }
+  const writes = { '*': ['view', 'comment', 'create', 'edit', 'delete', 'plan', 'review'] }
+
+  it('shows Edit without Delete when the row allows edit only', async () => {
+    renderAt(
+      '/projects/:prefix/docs/:kind/:docId',
+      '/projects/VCU/docs/requirements/VCU-REQ-001',
+      <RequirementDetail resolvedId={requirement.id} allowedActions={['edit']} />,
+    )
+    await screen.findAllByText(new RegExp(requirement.title))
+
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^delete$/i })).toBeNull()
+  })
+
+  it('shows no edit, delete or workflow handoff when their authority is absent', async () => {
+    renderAt('/projects/:prefix/docs/:kind/:docId', '/projects/VCU/docs/requirements/VCU-REQ-001', <RequirementDetail resolvedId={requirement.id} allowedActions={[]} />)
+    await screen.findByRole('heading', { name: 'Review' })
+    expect(screen.queryByRole('button', { name: /^edit$/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^delete$/i })).toBeNull()
+    expect((screen.getByRole('button', { name: /^mark reviewed$/i }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('hides the suite controls the row does not allow', async () => {
+    renderAt(
+      '/projects/:prefix/suites/:suiteId',
+      '/projects/VCU/suites/41',
+      <SuiteDetail allowedActions={['edit']} />,
+    )
+    await screen.findAllByText(new RegExp(testSuite.name))
+
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^delete$/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /add test case/i })).toBeNull()
+  })
+
+  it('uses the server flag to offer a working Draft for an external reader', async () => {
+    currentUser = external
+    vi.mocked(client.designsApi.get).mockResolvedValue({ ...design, status: 'Review' } as never)
+    vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowFixture, actions: { ...workflowFixture.actions, start_draft: true } })
+    renderAt('/projects/:prefix/docs/:kind/:docId', '/projects/VCU/docs/designs/VCU-DES-001', <ArtefactDetail kind="design" resolvedId={design.id} allowedActions={['edit', 'review']} />)
+    fireEvent.click(await screen.findByRole('button', { name: /^start working draft$/i }))
+    await waitFor(() => expect(client.workflowApi.startDraft).toHaveBeenCalledWith('design', design.id))
+    expect(client.artefactsApi.transition).not.toHaveBeenCalled()
+  })
+
+  it('creates as an external user with customer and Customer, offering no other choice', async () => {
+    currentUser = external
+    vi.mocked(client.projectMembersApi.permissions).mockResolvedValue(writes as never)
+    renderAt('/projects/:prefix/docs/new', '/projects/VCU/docs/new?type=REQ', <DocCreate />)
+    await screen.findByText(/VCU-REQ-004/)
+    await waitFor(() => expect(client.projectMembersApi.permissions).toHaveBeenCalled())
+    await settle()
+
+    expect(screen.queryByTitle('Select visibility')).toBeNull()
+    expect(screen.queryByTitle('Origin')).toBeNull()
+    const status = screen.getByTitle('Select status') as HTMLSelectElement
+    expect([...status.options].map((option) => option.value)).toEqual(['Draft'])
+
+    fireEvent.change(screen.getByPlaceholderText('Untitled'), { target: { value: 'Boots' } })
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+    await waitFor(() => {
+      const [payload] = lastCall(client.requirementsApi.create) as [Record<string, unknown>]
+      expect(payload).toMatchObject({ visibility: 'customer', req_origin: 'Customer' })
+    })
+  })
+
+  it('shows an external user no status or visibility when editing a campaign', async () => {
+    currentUser = external
+    vi.mocked(client.projectMembersApi.permissions).mockResolvedValue(writes as never)
+    renderAt(
+      '/projects/:prefix/campaigns/:campaignId',
+      `/projects/VCU/campaigns/${campaignDetail.id}`,
+      <CampaignDetail allowedActions={['edit']} />,
+    )
+    fireEvent.click(await screen.findByRole('button', { name: /^edit$/i }))
+
+    expect(await screen.findByLabelText('Name')).toBeTruthy()
+    expect(screen.queryByLabelText('Status')).toBeNull()
+    expect(screen.queryByLabelText('Visibility')).toBeNull()
+  })
+})
+
+describe('the changes one artefact allows, on every control', () => {
+  const external = { ...user, role: 'external' }
+  const writes = { '*': ['view', 'comment', 'create', 'edit', 'delete', 'plan', 'review'] }
+
+  function renderEdit() {
+    return renderAt(
+      '/projects/:prefix/docs/:kind/:docId/edit',
+      '/projects/VCU/docs/requirements/VCU-REQ-001/edit',
+      <DocCreate editMode />,
+    )
+  }
+
+  it('shows the edit page as without access when the row does not allow edit', async () => {
+    vi.mocked(client.docsApi.get).mockResolvedValue({ ...RESPONSES['docsApi.get'] as object, allowed_actions: [] } as never)
+    renderEdit()
+    expect(await screen.findByText('You do not have edit access')).toBeTruthy()
+  })
+
+  it('keeps Save and hides Delete on the edit page when the row allows edit only', async () => {
+    vi.mocked(client.docsApi.get).mockResolvedValue({ ...RESPONSES['docsApi.get'] as object, allowed_actions: ['edit'] } as never)
+    renderEdit()
+    await screen.findByPlaceholderText('Untitled')
+    expect(screen.getByRole('button', { name: /^save$/i })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^delete$/i })).toBeNull()
+  })
+
+  it('hides the controls while the row answer is pending', async () => {
+    vi.mocked(client.docsApi.get).mockReturnValue(new Promise(() => {}) as never)
+    renderAt(
+      '/projects/:prefix/docs/:kind/:docId',
+      '/projects/VCU/docs/requirements/VCU-REQ-001',
+      <RequirementDetail resolvedId={requirement.id} />,
+    )
+    await screen.findAllByText(new RegExp(requirement.title))
+    await settle()
+    expect(screen.queryByRole('button', { name: /^edit$/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^delete$/i })).toBeNull()
+  })
+
+  it('puts suite item removal inside its row menu only with plan on the row', async () => {
+    vi.mocked(client.testSuitesApi.get).mockResolvedValue({
+      ...testSuite,
+      items: [{ id: 5, suite_id: testSuite.id, test_case_id: testCase.id, order: 0, test_case: testCase }],
+    } as never)
+    const view = renderAt(
+      '/projects/:prefix/suites/:suiteId',
+      '/projects/VCU/suites/41',
+      <SuiteDetail allowedActions={['edit']} />,
+    )
+    await screen.findAllByText(new RegExp(testCase.title))
+    expect(screen.queryByTitle('Row actions')).toBeNull()
+    expect(screen.queryByRole('button', { name: /^remove$/i })).toBeNull()
+    view.unmount()
+
+    renderAt(
+      '/projects/:prefix/suites/:suiteId',
+      '/projects/VCU/suites/41',
+      <SuiteDetail allowedActions={['edit', 'plan']} />,
+    )
+    const actions = await screen.findByTitle('Row actions')
+    expect(screen.queryByRole('button', { name: /^remove$/i })).toBeNull()
+    fireEvent.click(actions)
+    fireEvent.click(await screen.findByRole('button', { name: /^remove$/i }))
+    await waitFor(() => expect(client.testSuitesApi.removeItem).toHaveBeenCalledWith(testSuite.id, 5))
+    expect(client.testCasesApi.delete).not.toHaveBeenCalled()
+  })
+
+  it('keeps controlled status and visibility out of an external suite editor', async () => {
+    currentUser = external
+    vi.mocked(client.projectMembersApi.permissions).mockResolvedValue(writes as never)
+    renderAt('/projects/:prefix/suites/:suiteId', '/projects/VCU/suites/41', <SuiteDetail allowedActions={['edit']} />)
+    fireEvent.click(await screen.findByRole('button', { name: /^edit$/i }))
+    expect(await screen.findByText('Edit Suite')).toBeTruthy()
+    expect(screen.queryByText('Visibility', { selector: 'label' })).toBeNull()
+    expect(screen.queryByText('Status', { selector: 'label' })).toBeNull()
+  })
+
+  it("leaves status and visibility out of an external user's defect form", async () => {
+    currentUser = external
+    vi.mocked(client.projectMembersApi.permissions).mockResolvedValue(writes as never)
+    renderAt(
+      '/projects/:prefix/defects/:itemId',
+      `/projects/VCU/defects/${defect.id}`,
+      <ArtefactDetail kind="defect" resolvedId={defect.id} allowedActions={['edit']} />,
+    )
+    fireEvent.click(await screen.findByRole('button', { name: /^edit$/i }))
+
+    expect(await screen.findByText('Severity', { selector: 'label' })).toBeTruthy()
+    expect(screen.queryByText('Status', { selector: 'label' })).toBeNull()
+    expect(screen.queryByText('Visibility', { selector: 'label' })).toBeNull()
+  })
+
+  it("creates an external user's campaign as customer without a visibility choice", async () => {
+    currentUser = external
+    vi.mocked(client.projectMembersApi.permissions).mockResolvedValue(writes as never)
+    renderAt('/projects/:prefix/campaigns', '/projects/VCU/campaigns', <TestCampaigns />)
+    await screen.findAllByText(/Release candidate sweep/)
+
+    fireEvent.click(await screen.findByRole('button', { name: /new campaign/i }))
+    fireEvent.change(await screen.findByPlaceholderText('Campaign name'), {
+      target: { value: 'Customer sweep' },
+    })
+    expect(screen.queryByText('Visibility', { selector: 'label' })).toBeNull()
+    fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.click(screen.getByRole('button', { name: /^create campaign$/i }))
+
+    await waitFor(() => {
+      const [payload] = lastCall(client.campaignsApi.create) as [{ visibility: string }]
+      expect(payload.visibility).toBe('customer')
+    })
+  })
+})
+
+describe('who may sign off', () => {
+  beforeEach(() => {
+    vi.mocked(client.requirementsApi.get).mockResolvedValue(requirement as never)
+  })
+
+  function renderRequirement(allowedActions: string[]) {
+    return renderAt(
+      '/projects/:prefix/docs/:kind/:docId',
+      '/projects/VCU/docs/requirements/VCU-REQ-001',
+      <RequirementDetail resolvedId={requirement.id} allowedActions={allowedActions} />,
+    )
+  }
+
+  it('offers a reviewer handoff without the edit right when the server permits it', async () => {
+    vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowFixture, actions: { ...workflowFixture.actions, edit_current: false, request_approval: true } })
+    renderRequirement(['review'])
+    expect(await screen.findByRole('button', { name: /^mark reviewed$/i })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^edit$/i })).toBeNull()
+    expect((screen.getByRole('button', { name: /^mark approved$/i }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('does not infer a sign-off action from the edit right', async () => {
+    renderRequirement(['edit'])
+    await screen.findByRole('heading', { name: 'Review' })
+    expect((screen.getByRole('button', { name: /^mark reviewed$/i }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: /^mark approved$/i }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('retains the assigned person when no eligible replacement is supplied', async () => {
+    vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowFixture, options: { ...workflowFixture.options, reviewers: [] } })
+    renderRequirement(['review', 'approve'])
+    expect((await screen.findAllByText(user.full_name)).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('combobox', { name: 'Select reviewer' })).toBeNull()
+  })
+
+  it('does not infer sign-off from an external account or raw permissions', async () => {
+    currentUser = { ...user, role: 'external' }
+    vi.mocked(client.projectMembersApi.permissions).mockResolvedValue({ '*': ['view', 'review', 'approve'] } as never)
+    renderRequirement(['review', 'approve'])
+    await screen.findByRole('heading', { name: 'Review' })
+    expect((screen.getByRole('button', { name: /^mark reviewed$/i }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: /^mark approved$/i }) as HTMLButtonElement).disabled).toBe(true)
   })
 })

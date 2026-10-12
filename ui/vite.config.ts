@@ -7,6 +7,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     setupFiles: ['./src/test/setup.ts'],
+    css: { include: [/index\.css/] },
     // The first case in a file pays for transforming the whole app graph, and
     // v8 instrumentation makes that slower still; the 5s default was close
     // enough to the real cost that `npm test -- --coverage` failed at random.

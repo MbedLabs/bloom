@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import json
 import logging
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Callable, Optional
@@ -16,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.artefact_utils import get_row_or_404
+from app.api.artefact_utils import get_row_or_404, get_visible_row
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_project_access, require_role
@@ -32,6 +33,7 @@ from app.models import (
 )
 from app.models.user import User, UserRole
 from app.services.audit import record_audit_event
+from app.services.document_workflow import permit_workflow_write
 from app.services.integration_secrets import (
     decrypt_integration_secret,
     encrypt_integration_secret,
@@ -211,7 +213,6 @@ async def create_integration_setting(
         db,
         current_user,
         data.project_id,
-        roles={UserRole.admin.value},
     )
 
     existing = (
@@ -279,7 +280,6 @@ async def update_integration_setting(
         db,
         current_user,
         setting.project_id,
-        roles={UserRole.admin.value},
     )
 
     if data.base_url is not None:
@@ -337,7 +337,6 @@ async def delete_integration_setting(
         db,
         current_user,
         setting.project_id,
-        roles={UserRole.admin.value},
     )
     await db.delete(setting)
     await record_audit_event(
@@ -359,10 +358,9 @@ async def list_sync_events(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    defect = (await db.execute(select(Defect).where(Defect.id == defect_id))).scalar_one_or_none()
-    if not defect:
-        raise HTTPException(status_code=404, detail="Defect not found")
-    await require_project_access(db, current_user, defect.project_id)
+    await get_visible_row(
+        db, Defect, defect_id, "Defect not found", current_user, permission=("view", "DEF")
+    )
 
     rows = (
         (
@@ -987,19 +985,28 @@ async def jira_webhook(
         return {"status": "duplicate", "delivery": x_atlassian_webhook_identifier}
 
     old_state = target.external_issue_state
-    _follow_issue(kind, target, setting, event, fields, f"{project_key}-{issue_number}")
-    _log_target_sync_event(
-        db,
-        kind,
-        target.id,
-        "inbound",
-        "jira",
-        event,
-        payload_summary=f"state: {old_state} -> {target.external_issue_state}",
-        external_event_id=x_atlassian_webhook_identifier,
+    legacy_closure = (
+        kind == "change_request"
+        and target.status == "Submitted"
+        and event != "jira:issue_deleted"
+        and JIRA_CATEGORY_STATUS_MAP.get(
+            ((fields.get("status") or {}).get("statusCategory") or {}).get("key")
+        )
+        == "Closed"
     )
-
-    await db.flush()
+    with permit_workflow_write(db, target) if legacy_closure else nullcontext():
+        _follow_issue(kind, target, setting, event, fields, f"{project_key}-{issue_number}")
+        _log_target_sync_event(
+            db,
+            kind,
+            target.id,
+            "inbound",
+            "jira",
+            event,
+            payload_summary=f"state: {old_state} -> {target.external_issue_state}",
+            external_event_id=x_atlassian_webhook_identifier,
+        )
+        await db.flush()
     return {"status": "processed", "target": kind, "id": target.id}
 
 
@@ -1050,7 +1057,7 @@ async def pull_jira_issues(
     ).scalar_one_or_none()
     if not setting:
         raise HTTPException(status_code=404, detail="Integration setting not found")
-    await require_project_access(db, current_user, setting.project_id, roles={UserRole.admin.value})
+    await require_project_access(db, current_user, setting.project_id)
     if setting.tracker != "jira" or not (
         setting.base_url
         and setting.account_email

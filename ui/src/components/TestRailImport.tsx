@@ -22,7 +22,15 @@ const MAPPED_FIELDS: { key: TestRailField; label: string }[] = [
 ]
 
 /** Import a TestRail XML or CSV export, with a column-mapping step for CSV. */
-export default function TestRailImport({ projectId, prefix }: { projectId: number; prefix?: string }) {
+export default function TestRailImport({
+  projectId,
+  prefix,
+  tagIds,
+}: {
+  projectId: number
+  prefix?: string
+  tagIds?: number[]
+}) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -44,7 +52,7 @@ export default function TestRailImport({ projectId, prefix }: { projectId: numbe
 
   const run = useMutation({
     mutationFn: () =>
-      importApi.importTestRail(projectId, file as File, format, format === 'csv' ? mapping : undefined),
+      importApi.importTestRail(projectId, file as File, format, format === 'csv' ? mapping : undefined, tagIds),
     onSuccess: (data) => {
       setResult(data)
       toast.notify(`TestRail import: ${data.created} created, ${data.updated} updated`, 'success')

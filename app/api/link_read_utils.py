@@ -111,22 +111,36 @@ async def get_test_case_ids_verifying_requirements(
     )
 
 
-async def verify_link_counts(db: AsyncSession, anchor_column, anchor_ids: list[int]) -> dict:
-    """How many verify links each id has at the anchor end; an id without links counts 0."""
+async def verify_link_counts(
+    db: AsyncSession,
+    anchor_column,
+    anchor_ids: list[int],
+    *,
+    other_column=None,
+    other_model=None,
+    current_user=None,
+) -> dict:
+    """How many verify links each id has at the anchor end; an id without links counts 0.
+
+    With ``other_column`` (the link column of the other end), ``other_model`` and
+    ``current_user``, only links whose other end the user may see are counted."""
     counts = {anchor_id: 0 for anchor_id in anchor_ids}
     if anchor_ids:
-        rows = (
-            await db.execute(
-                select(anchor_column, func.count(ArtefactLink.id))
-                .where(
-                    ArtefactLink.source_type == VERIFY_SOURCE_TYPE,
-                    ArtefactLink.target_type == VERIFY_TARGET_TYPE,
-                    anchor_column.in_(anchor_ids),
-                    ArtefactLink.role == VERIFY_LINK_ROLE,
-                )
-                .group_by(anchor_column)
+        query = (
+            select(anchor_column, func.count(ArtefactLink.id))
+            .where(
+                ArtefactLink.source_type == VERIFY_SOURCE_TYPE,
+                ArtefactLink.target_type == VERIFY_TARGET_TYPE,
+                anchor_column.in_(anchor_ids),
+                ArtefactLink.role == VERIFY_LINK_ROLE,
             )
-        ).all()
+            .group_by(anchor_column)
+        )
+        if other_model is not None:
+            query = apply_external_visibility_filter(
+                query.join(other_model, other_model.id == other_column), other_model, current_user
+            )
+        rows = (await db.execute(query)).all()
         counts.update({anchor_id: count for anchor_id, count in rows})
     return counts
 

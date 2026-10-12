@@ -324,6 +324,7 @@ describe('reviewing and running the import', () => {
           doc_type: 'REQ',
           doc_ids: [first.id],
           include_links: true,
+          tag_ids: [],
         },
       ]),
     )

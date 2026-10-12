@@ -1,17 +1,25 @@
 """Reusable test suite API endpoints."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
     apply_update,
+    check_create_status_right,
+    check_external_change,
+    check_status_right,
+    check_visibility_right,
     delete_project_row,
+    external_create_values,
     get_row_or_404,
     get_visible_row,
     page_of,
+    prepare_workflow_update,
     requirement_summary,
     test_case_summary,
+    type_visible,
+    visible_types,
 )
 from app.api.link_read_utils import get_requirement_ids_verified_by_test_cases
 from app.core.database import get_db
@@ -44,12 +52,17 @@ from app.schemas import (
     TestSuiteResponse,
     TestSuiteUpdate,
 )
+from app.services.artefact_tags import attach_tags, creation_tags
+from app.services.document_workflow import prepare_content_write
 
 router = APIRouter()
 
 
 async def _build_suite_response(
-    suite: TestSuite, db: AsyncSession, current_user: User | None = None
+    suite: TestSuite,
+    db: AsyncSession,
+    current_user: User | None = None,
+    tc_visible: bool = True,
 ) -> TestSuiteResponse:
     total_items_query = (
         select(func.count(TestSuiteItem.id))
@@ -60,6 +73,8 @@ async def _build_suite_response(
         total_items_query = apply_external_visibility_filter(
             total_items_query, TestCase, current_user
         )
+    if not tc_visible:
+        total_items_query = total_items_query.where(false())
     total_items = (await db.execute(total_items_query)).scalar() or 0
     latest_execution_query = (
         select(
@@ -76,6 +91,8 @@ async def _build_suite_response(
         latest_execution_query = apply_external_visibility_filter(
             latest_execution_query, TestCase, current_user
         )
+    if not tc_visible:
+        latest_execution_query = latest_execution_query.where(false())
     latest_execution = (await db.execute(latest_execution_query)).one_or_none()
     return TestSuiteResponse(
         id=suite.id,
@@ -97,7 +114,10 @@ async def _build_suite_response(
 async def _build_suite_detail(
     suite: TestSuite, db: AsyncSession, current_user: User | None = None
 ) -> TestSuiteDetailResponse:
-    base = await _build_suite_response(suite, db, current_user)
+    types = await visible_types(db, current_user, suite.project_id) if current_user else None
+    base = await _build_suite_response(
+        suite, db, current_user, tc_visible=type_visible(types, "TC")
+    )
     items_query = (
         select(TestSuiteItem, TestCase)
         .join(TestCase, TestCase.id == TestSuiteItem.test_case_id)
@@ -106,6 +126,8 @@ async def _build_suite_detail(
     )
     if current_user is not None:
         items_query = apply_external_visibility_filter(items_query, TestCase, current_user)
+    if not type_visible(types, "TC"):
+        items_query = items_query.where(false())
     items_result = await db.execute(items_query)
 
     item_responses = []
@@ -128,7 +150,7 @@ async def _build_suite_detail(
         requirement_ids.update(await get_requirement_ids_verified_by_test_cases(tc_ids, db))
 
     requirements = []
-    if requirement_ids:
+    if requirement_ids and type_visible(types, "REQ"):
         reqs = (
             (
                 await db.execute(
@@ -152,7 +174,7 @@ async def _build_suite_detail(
                 apply_external_visibility_filter(
                     select(TestCampaign)
                     .join(CampaignSuite, CampaignSuite.campaign_id == TestCampaign.id)
-                    .where(CampaignSuite.suite_id == suite.id)
+                    .where(CampaignSuite.suite_id == suite.id, type_visible(types, "CMP"))
                     .order_by(TestCampaign.created_at.desc()),
                     TestCampaign,
                     current_user,
@@ -174,7 +196,7 @@ async def _build_suite_detail(
 
     # Related concepts: find CPTs linked to any TC in this suite via ArtefactLink
     related_concepts: list[TestConceptSummary] = []
-    if tc_ids:
+    if tc_ids and type_visible(types, "CPT"):
         concept_links = (
             (
                 await db.execute(
@@ -227,13 +249,20 @@ async def list_suites(
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)
+    types = await visible_types(db, current_user, project_id)
+    if not type_visible(types, "TS"):
+        return PaginatedResponse(items=[], total=0, skip=skip, limit=limit)
 
     base = select(TestSuite).where(TestSuite.project_id == project_id)
     base = apply_external_visibility_filter(base, TestSuite, current_user)
     suites, total = await page_of(db, base, TestSuite, skip, limit)
+    tc_visible = type_visible(types, "TC")
 
     return PaginatedResponse(
-        items=[await _build_suite_response(item, db, current_user) for item in suites],
+        items=[
+            await _build_suite_response(item, db, current_user, tc_visible=tc_visible)
+            for item in suites
+        ],
         total=total,
         skip=skip,
         limit=limit,
@@ -254,21 +283,26 @@ async def create_suite(
         data.project_id,
         permission=("create", "TS"),
     )
+    named = data.model_dump(exclude_unset=True)
+    forced = external_create_values(current_user, "TS", named)
+    await check_create_status_right(db, current_user, data.project_id, "TS", named)
 
     suite_id = await next_doc_id(
         db, TestSuite, TestSuite.suite_id, data.project_id, project.prefix, "TS"
     )
+    tag_ids = await creation_tags(db, current_user, data.project_id, data.tag_ids)
     suite = TestSuite(
         project_id=data.project_id,
         created_by_id=current_user.id,
         suite_id=suite_id,
         name=data.name,
         description=data.description,
-        status=data.status,
-        visibility=data.visibility,
+        status=forced.get("status", data.status),
+        visibility=forced.get("visibility", data.visibility),
     )
     db.add(suite)
     await db.flush()
+    await attach_tags(db, "test-suite", suite, tag_ids, current_user)
     await db.refresh(suite)
 
     # One statement for the whole selection. Ids that do not exist, or belong to
@@ -304,7 +338,9 @@ async def get_suite(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    suite = await get_visible_row(db, TestSuite, suite_id, "Test suite not found", current_user)
+    suite = await get_visible_row(
+        db, TestSuite, suite_id, "Test suite not found", current_user, permission=("view", "TS")
+    )
     return await _build_suite_detail(suite, db, current_user)
 
 
@@ -318,6 +354,12 @@ async def update_suite(
     suite = await get_visible_row(
         db, TestSuite, suite_id, "Test suite not found", current_user, permission=("edit", "TS")
     )
+    changes = data.model_dump(exclude_unset=True)
+    check_external_change(current_user, "TS", suite, changes)
+    await check_status_right(db, current_user, "TS", suite, changes)
+    await check_visibility_right(db, current_user, "TS", suite, changes)
+    await prepare_workflow_update(db, suite, data, current_user)
+
     await apply_update(db, suite, data, "test-suite")
     return await _build_suite_detail(suite, db, current_user)
 
@@ -375,6 +417,7 @@ async def add_suite_item(
             select(func.count(TestSuiteItem.id)).where(TestSuiteItem.suite_id == suite_id)
         )
     ).scalar() or 0
+    await prepare_content_write(db, suite, current_user)
     item = TestSuiteItem(suite_id=suite_id, test_case_id=test_case_id, order=current_count)
     db.add(item)
     await db.flush()
@@ -396,10 +439,11 @@ async def remove_suite_item(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    await get_visible_row(
+    suite = await get_visible_row(
         db, TestSuite, suite_id, "Test suite not found", current_user, permission=("plan", "TS")
     )
     item = await get_row_or_404(
         db, TestSuiteItem, item_id, "Suite item not found", TestSuiteItem.suite_id == suite_id
     )
+    await prepare_content_write(db, suite, current_user)
     await db.delete(item)

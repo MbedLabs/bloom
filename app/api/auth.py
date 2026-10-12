@@ -2,19 +2,33 @@
 Auth API endpoints: login, get current user, update profile.
 """
 
+import io
 import logging
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
+from fastapi import (
+    APIRouter,
+    Cookie,
+    Depends,
+    File,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
+from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import limiter
+from app.core.permissions import as_lists
 from app.core.security import (
     create_access_token,
+    effective_permissions,
     get_current_user,
     get_password_hash,
     verify_password,
@@ -59,6 +73,70 @@ from app.services.token_service import (
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+PICTURE_FORMATS = {"image/png": "PNG", "image/jpeg": "JPEG", "image/webp": "WEBP"}
+MAX_PICTURE_BYTES = 2_000_000
+MAX_PICTURE_PIXELS = 16_000_000
+
+
+@router.get("/me/picture")
+async def get_profile_picture(current_user: User = Depends(get_current_user)):
+    """Return the signed-in account's stored profile image."""
+    if not current_user.profile_picture:
+        raise HTTPException(status_code=404, detail="No profile picture is set.")
+    return Response(
+        current_user.profile_picture,
+        media_type="image/png",
+        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+    )
+
+
+@router.put("/me/picture", response_model=UserResponse)
+async def set_profile_picture(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
+):
+    """Validate, normalize and store the signed-in account's profile image."""
+    expected_format = PICTURE_FORMATS.get(file.content_type)
+    if expected_format is None:
+        raise HTTPException(status_code=415, detail="Use a PNG, JPEG or WebP picture.")
+    data = await file.read(MAX_PICTURE_BYTES + 1)
+    if len(data) > MAX_PICTURE_BYTES:
+        raise HTTPException(status_code=413, detail="The picture must be at most 2 MB.")
+    try:
+        with Image.open(io.BytesIO(data)) as source:
+            if source.format != expected_format:
+                raise HTTPException(
+                    status_code=415, detail="The picture format does not match its type."
+                )
+            if source.width * source.height > MAX_PICTURE_PIXELS:
+                raise ValueError("Picture dimensions are too large")
+            source.load()
+            picture = ImageOps.exif_transpose(source).convert("RGBA")
+            picture.thumbnail((256, 256), Image.Resampling.LANCZOS)
+            picture.info.clear()
+            output = io.BytesIO()
+            picture.save(output, format="PNG")
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
+        raise HTTPException(status_code=422, detail="The picture is invalid or too large.")
+    current_user.profile_picture = output.getvalue()
+    await db.flush()
+    await db.refresh(current_user)
+    return UserResponse.model_validate(current_user)
+
+
+@router.delete("/me/picture", response_model=UserResponse)
+async def delete_profile_picture(
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
+):
+    """Remove the signed-in account's stored profile image."""
+    current_user.profile_picture = None
+    await db.flush()
+    await db.refresh(current_user)
+    return UserResponse.model_validate(current_user)
+
 
 # Refresh token is delivered as an httpOnly cookie scoped to the auth endpoints,
 # rotated on every use, and revocable via the user_tokens table.
@@ -143,6 +221,7 @@ async def login(
         db, "auth.login", actor_user_id=user.id, target_type="user", target_id=user.id
     )
 
+    user.application_permissions = as_lists(await effective_permissions(db, user, None))
     return TokenResponse(
         access_token=access_token,
         user=UserResponse.model_validate(user),
@@ -196,6 +275,7 @@ async def refresh(
         data={"sub": str(user.id), "type": "user", "ver": user.session_version}
     )
 
+    user.application_permissions = as_lists(await effective_permissions(db, user, None))
     return TokenResponse(
         access_token=access_token,
         user=UserResponse.model_validate(user),
@@ -503,6 +583,7 @@ async def get_invite_info(
     return InviteInfoResponse(
         email=user.email,
         full_name=user.full_name,
+        profile_picture_url=user.profile_picture_url,
         valid=not expired and not used,
         expired=expired,
     )

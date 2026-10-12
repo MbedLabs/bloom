@@ -20,11 +20,13 @@ from sqlalchemy import (
     null,
     or_,
     select,
+    true,
     union_all,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
+from app.api.artefact_utils import allowed_actions, holds, type_visible, visible_types
 from app.core.database import get_db
 from app.core.document_kinds import (
     CANONICAL_DOCUMENT_KINDS,
@@ -56,10 +58,17 @@ from app.models import (
     TestConcept,
     TestSuite,
     TestSuiteItem,
-    UserRole,
 )
+from app.models.tags import TAG_TYPE_OF_MODEL
 from app.models.user import User
+from app.models.workflow import ArtefactWorkflow
 from app.schemas import PaginatedResponse
+from app.services.document_workflow import (
+    CONTROLLED_TYPES,
+    LEGACY_CHANGE_STATUSES,
+    WORKFLOW_PHASES,
+    current_status,
+)
 
 router = APIRouter()
 
@@ -69,7 +78,7 @@ class DocShellResponse(BaseModel):
     doc_id: str
     doc_type: str
     title: str
-    status: str
+    status: str | None
     visibility: str = ArtefactVisibility.internal.value
     priority: str | None = None
     req_type: str | None = None
@@ -91,9 +100,12 @@ class DocShellResponse(BaseModel):
 
 
 class DocDetailFacadeResponse(DocShellResponse):
+    """One artefact with its body, and the changing actions the reader may take on it."""
+
     description: str | None = None
     content_json: dict | None = None
     content_html: str | None = None
+    allowed_actions: list[str] = []
 
     @field_serializer("last_executed_at", "created_at", "updated_at")
     def serialize_dt(self, dt: Optional[datetime], _info):
@@ -155,9 +167,14 @@ def _resolved_doc_type(type_code: str, row) -> str:
 
 
 async def _count_links(
-    db: AsyncSession, project_id: int, type_code: str, row_ids: list[int]
+    db: AsyncSession,
+    project_id: int,
+    type_code: str,
+    row_ids: list[int],
+    types: frozenset[str] | None = None,
 ) -> dict[int, dict]:
-    """Return {row_id: {incoming, outgoing, suspect}} for the given rows."""
+    """Return {row_id: {incoming, outgoing, suspect}} for the given rows, counting only
+    links whose other end is of a type in ``types`` (None: every type)."""
     if not row_ids:
         return {}
     incoming_q = (
@@ -170,6 +187,7 @@ async def _count_links(
             ArtefactLink.project_id == project_id,
             ArtefactLink.target_type == type_code,
             ArtefactLink.target_id.in_(row_ids),
+            true() if types is None else ArtefactLink.source_type.in_(types),
         )
         .group_by(ArtefactLink.target_id)
     )
@@ -183,6 +201,7 @@ async def _count_links(
             ArtefactLink.project_id == project_id,
             ArtefactLink.source_type == type_code,
             ArtefactLink.source_id.in_(row_ids),
+            true() if types is None else ArtefactLink.target_type.in_(types),
         )
         .group_by(ArtefactLink.source_id)
     )
@@ -342,7 +361,22 @@ def _shell_arm(model, type_code: str, id_col_name: str):
     else:
         priority_col = cast(null(), String)
 
-    return select(
+    status_col = model.status
+    if type_code in CONTROLLED_TYPES:
+        phase = func.coalesce(
+            ArtefactWorkflow.phase,
+            case(
+                {phase.lower(): phase for phase in WORKFLOW_PHASES},
+                value=func.lower(func.trim(model.status)),
+                else_=null(),
+            ),
+        )
+        status_col = (
+            case((model.status.in_(LEGACY_CHANGE_STATUSES), model.status), else_=phase)
+            if type_code == "CHG"
+            else phase
+        )
+    query = select(
         model.id.label("row_id"),
         # Campaigns may carry no campaign_id, and older documents no doc_id;
         # both used to fall back to "TYPE-<row id>" in Python.
@@ -354,7 +388,7 @@ def _shell_arm(model, type_code: str, id_col_name: str):
         ).label("doc_id"),
         literal(type_code).label("doc_type"),
         title_col.label("title"),
-        model.status.label("status"),
+        status_col.label("status"),
         model.visibility.label("visibility"),
         priority_col.label("priority"),
         _optional_column(model, "req_type", String).label("req_type"),
@@ -366,10 +400,22 @@ def _shell_arm(model, type_code: str, id_col_name: str):
         model.created_at.label("created_at"),
         model.updated_at.label("updated_at"),
     )
+    if type_code in CONTROLLED_TYPES:
+        slug = TAG_TYPE_OF_MODEL[model]
+        query = query.outerjoin(
+            ArtefactWorkflow,
+            and_(
+                ArtefactWorkflow.artefact_type == slug,
+                ArtefactWorkflow.artefact_id == model.id,
+                ArtefactWorkflow.project_id == model.project_id,
+            ),
+        )
+    return query
 
 
-def _link_count_subqueries(project_id: int):
-    """Per-document incoming and outgoing link tallies, as two grouped subqueries."""
+def _link_count_subqueries(project_id: int, types: frozenset[str] | None = None):
+    """Per-document incoming and outgoing link tallies, as two grouped subqueries, counting
+    only links whose other end is of a type in ``types`` (None: every type)."""
     suspect_sum = func.coalesce(
         func.sum(case((ArtefactLink.suspect.is_(True), 1), else_=0)), 0
     ).label("suspect_count")
@@ -381,7 +427,10 @@ def _link_count_subqueries(project_id: int):
             func.count().label("link_count"),
             suspect_sum,
         )
-        .where(ArtefactLink.project_id == project_id)
+        .where(
+            ArtefactLink.project_id == project_id,
+            true() if types is None else ArtefactLink.source_type.in_(types),
+        )
         .group_by(ArtefactLink.target_type, ArtefactLink.target_id)
         .subquery("incoming_links")
     )
@@ -392,7 +441,10 @@ def _link_count_subqueries(project_id: int):
             func.count().label("link_count"),
             suspect_sum,
         )
-        .where(ArtefactLink.project_id == project_id)
+        .where(
+            ArtefactLink.project_id == project_id,
+            true() if types is None else ArtefactLink.target_type.in_(types),
+        )
         .group_by(ArtefactLink.source_type, ArtefactLink.source_id)
         .subquery("outgoing_links")
     )
@@ -406,15 +458,16 @@ async def _registry_union(
     *,
     type_filter: Optional[list[str]],
     related_keys: Optional[set[tuple[str, int]]],
+    types: frozenset[str] | None,
 ):
-    """The set of documents this user may see in this project, as one union."""
-    allowed_doc_types = await get_external_doc_types(db, current_user, project.id)
+    """The set of documents of the ``types`` (from `visible_types`) this user may see in
+    this project, as one union."""
     arms = []
 
     for type_code, (model, id_col_name, _slug) in TYPE_MAP.items():
         if type_filter and type_code not in type_filter:
             continue
-        if not external_doc_type_allowed(current_user, allowed_doc_types, type_code):
+        if not type_visible(types, type_code):
             continue
 
         allowed_ids = None
@@ -435,8 +488,7 @@ async def _registry_union(
         for kind in (type_filter if type_filter else CANONICAL_DOCUMENT_KINDS)
         if kind in CANONICAL_DOCUMENT_KINDS
     ]
-    if current_user.role == UserRole.external and allowed_doc_types is not None:
-        document_kinds = [kind for kind in document_kinds if kind in allowed_doc_types]
+    document_kinds = [kind for kind in document_kinds if type_visible(types, kind)]
 
     for kind in document_kinds:
         allowed_ids = None
@@ -536,12 +588,14 @@ async def list_all_docs(
         if not related_keys:
             return empty
 
+    types = await visible_types(db, current_user, project.id)
     registry = await _registry_union(
         db,
         project,
         current_user,
         type_filter=type_filter,
         related_keys=related_keys,
+        types=types,
     )
     if registry is None:
         return empty
@@ -550,7 +604,7 @@ async def list_all_docs(
     # if the caller did not ask for the numbers themselves.
     want_counts = include_link_counts or links is not None
     if want_counts:
-        incoming, outgoing = _link_count_subqueries(project.id)
+        incoming, outgoing = _link_count_subqueries(project.id, types)
         incoming_links = func.coalesce(incoming.c.link_count, 0)
         outgoing_links = func.coalesce(outgoing.c.link_count, 0)
         suspect_links = func.coalesce(incoming.c.suspect_count, 0) + func.coalesce(
@@ -745,11 +799,14 @@ async def get_doc_type_summary(
     project = await resolve_project(db, project_ref)
     await require_project_access(db, current_user, project.id)
 
-    registry = await _registry_union(db, project, current_user, type_filter=None, related_keys=None)
+    visible = await visible_types(db, current_user, project.id)
+    registry = await _registry_union(
+        db, project, current_user, type_filter=None, related_keys=None, types=visible
+    )
     if registry is None:
         return DocTypeSummaryResponse(types=[], total=0, membership_edges=[])
 
-    incoming, outgoing = _link_count_subqueries(project.id)
+    incoming, outgoing = _link_count_subqueries(project.id, visible)
     suspect_links = func.coalesce(incoming.c.suspect_count, 0) + func.coalesce(
         outgoing.c.suspect_count, 0
     )
@@ -788,11 +845,15 @@ async def get_doc_type_summary(
     return DocTypeSummaryResponse(
         types=types,
         total=sum(t.count for t in types),
-        membership_edges=await _membership_edges(db, project.id),
+        membership_edges=await _membership_edges(db, project.id, visible),
     )
 
 
-async def _membership_edges(db: AsyncSession, project_id: int) -> List[MembershipEdge]:
+async def _membership_edges(
+    db: AsyncSession, project_id: int, types: frozenset[str] | None
+) -> List[MembershipEdge]:
+    """How many suites are in campaigns and test cases in suites and campaigns, for the
+    pairs whose two types are in ``types`` (None: every type)."""
     suites_in_campaigns = (
         select(func.count())
         .select_from(CampaignSuite)
@@ -820,7 +881,7 @@ async def _membership_edges(db: AsyncSession, project_id: int) -> List[Membershi
     return [
         MembershipEdge(source_type=source, target_type=target, role=role, count=count)
         for source, target, role, count in counted
-        if count
+        if count and type_visible(types, source) and type_visible(types, target)
     ]
 
 
@@ -850,6 +911,8 @@ async def get_next_doc_id(
     elif code in _DOCUMENT_TYPE_CODES:
         model, id_column = Document, Document.doc_id
     else:
+        raise HTTPException(status_code=400, detail=f"Unsupported document type: {type_code}")
+    if not type_visible(await visible_types(db, current_user, project.id), code):
         raise HTTPException(status_code=400, detail=f"Unsupported document type: {type_code}")
 
     try:
@@ -893,16 +956,24 @@ async def get_doc_by_kind_and_string_id(
         document_query = apply_external_visibility_filter(document_query, Document, current_user)
         result = await db.execute(document_query)
         row = result.scalar_one_or_none()
+        if row and not await holds(db, current_user, project.id, "view", requested_kind):
+            raise HTTPException(status_code=404, detail="Document not found")
         if row:
-            link_data = (await _count_links(db, project.id, requested_kind, [row.id])).get(
-                row.id, {"incoming": 0, "outgoing": 0, "suspect": 0}
-            )
+            link_data = (
+                await _count_links(
+                    db,
+                    project.id,
+                    requested_kind,
+                    [row.id],
+                    await visible_types(db, current_user, project.id),
+                )
+            ).get(row.id, {"incoming": 0, "outgoing": 0, "suspect": 0})
             return DocDetailFacadeResponse(
                 id=row.id,
                 doc_id=row.doc_id,
                 doc_type=requested_kind,
                 title=row.title,
-                status=row.status,
+                status=await current_status(db, row),
                 visibility=row.visibility,
                 priority=_get_priority(Document, row),
                 project_id=project.id,
@@ -915,6 +986,7 @@ async def get_doc_by_kind_and_string_id(
                 content_html=row.content_html,
                 created_at=row.created_at,
                 updated_at=row.updated_at,
+                allowed_actions=await allowed_actions(db, current_user, row, requested_kind),
             )
     else:
         for type_code, (model, id_col_name, slug) in TYPE_MAP.items():
@@ -938,6 +1010,10 @@ async def get_doc_by_kind_and_string_id(
             typed_query = apply_external_visibility_filter(typed_query, model, current_user)
             result = await db.execute(typed_query)
             row = result.scalar_one_or_none()
+            if row and not await holds(
+                db, current_user, project.id, "view", _resolved_doc_type(type_code, row)
+            ):
+                continue
             if row:
                 doc_id_val = getattr(row, id_col_name)
                 title_val = row.title if hasattr(row, "title") else row.name
@@ -945,7 +1021,13 @@ async def get_doc_by_kind_and_string_id(
                 cj = row.content_json if hasattr(row, "content_json") else None
                 ch = row.content_html if hasattr(row, "content_html") else None
                 resolved_type = _resolved_doc_type(type_code, row)
-                lc = await _count_links(db, project.id, resolved_type, [row.id])
+                lc = await _count_links(
+                    db,
+                    project.id,
+                    resolved_type,
+                    [row.id],
+                    await visible_types(db, current_user, project.id),
+                )
                 link_data = lc.get(row.id, {"incoming": 0, "outgoing": 0, "suspect": 0})
 
                 return DocDetailFacadeResponse(
@@ -953,7 +1035,7 @@ async def get_doc_by_kind_and_string_id(
                     doc_id=str(doc_id_val),
                     doc_type=resolved_type,
                     title=title_val,
-                    status=row.status,
+                    status=await current_status(db, row),
                     visibility=getattr(row, "visibility", ArtefactVisibility.internal.value),
                     priority=_get_priority(model, row),
                     project_id=project.id,
@@ -966,6 +1048,7 @@ async def get_doc_by_kind_and_string_id(
                     content_html=ch,
                     created_at=row.created_at,
                     updated_at=row.updated_at,
+                    allowed_actions=await allowed_actions(db, current_user, row, resolved_type),
                 )
 
     raise HTTPException(

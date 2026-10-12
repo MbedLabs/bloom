@@ -9,6 +9,7 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characte
 import pytest
 from fastapi.testclient import TestClient
 
+from tests.access_fixtures import add_policy_member
 from tests.conftest import create_project, unique_email
 
 
@@ -46,6 +47,14 @@ def registry(api_client: TestClient, auth_headers, reviewer):
     """A project whose documents disagree on every axis the registry filters by."""
     project = create_project(api_client, auth_headers, "Registry")
     pid = project["id"]
+    member = add_policy_member(
+        api_client,
+        headers=auth_headers,
+        url=f"/api/projects/{pid}/members",
+        user_id=reviewer["id"],
+        permissions={"*": ["*"]},
+    )
+    assert member.status_code == 201, member.text
 
     def post(path: str, body: dict) -> dict:
         response = api_client.post(path, headers=auth_headers, json={"project_id": pid, **body})
@@ -56,7 +65,7 @@ def registry(api_client: TestClient, auth_headers, reviewer):
         "/api/requirements",
         {
             "title": "Alpha boot timing",
-            "status": "Approved",
+            "status": "Draft",
             "priority": "High",
             "req_type": "Functional",
             "req_origin": "Customer",
@@ -67,7 +76,7 @@ def registry(api_client: TestClient, auth_headers, reviewer):
         "/api/requirements",
         {"title": "Bravo shutdown sequence", "status": "Draft", "priority": "Low"},
     )
-    charlie = post("/api/test-cases", {"title": "Charlie cold start", "status": "Review"})
+    charlie = post("/api/test-cases", {"title": "Charlie cold start", "status": "Draft"})
     delta = post(
         "/api/test-cases",
         {"title": "Delta brownout", "status": "Draft", "reviewer_id": reviewer["id"]},
@@ -95,6 +104,36 @@ def registry(api_client: TestClient, auth_headers, reviewer):
     # those pairs actually allow.
     link(charlie, "TC", alpha, "REQ", "verifies", suspect=True)
     link(charlie, "TC", delta, "TC", "relates_to", suspect=False)
+
+    alpha_path = f"/api/artefacts/requirement/{alpha['id']}"
+    for path in (alpha_path, f"/api/artefacts/test-case/{charlie['id']}"):
+        response = api_client.post(
+            path + "/requests", headers=auth_headers, json={"kind": "review"}
+        )
+        assert response.status_code == 201, response.text
+
+    login = api_client.post(
+        "/api/auth/login",
+        json={"email": reviewer["email"], "password": "Registry-Reviewer-1!"},
+    )
+    assert login.status_code == 200, login.text
+    reviewer_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    comment = api_client.post(
+        alpha_path + "/comments",
+        headers=reviewer_headers,
+        json={"body": "Reviewed the requested requirement."},
+    )
+    assert comment.status_code == 201, comment.text
+    assert comment.json()["author_user_id"] == reviewer["id"]
+    approval = api_client.post(
+        alpha_path + "/requests", headers=reviewer_headers, json={"kind": "approval"}
+    )
+    assert approval.status_code == 201, approval.text
+    signed = api_client.post(
+        alpha_path + "/sign-off", headers=auth_headers, json={"step": "approve"}
+    )
+    assert signed.status_code == 200, signed.text
+    assert signed.json()["reviewed_by_id"] == reviewer["id"]
 
     return {
         "project": project,

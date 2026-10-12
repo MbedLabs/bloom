@@ -45,28 +45,28 @@ export default function UnifiedDocDetail() {
 
   switch (doc.doc_type) {
     case 'REQ':
-      return <RequirementDetail resolvedId={doc.id} />
+      return <RequirementDetail resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     case 'TC':
-      return <TestCaseDetail resolvedId={doc.id} />
+      return <TestCaseDetail resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     case 'SPEC':
     case 'PRT':
     case 'RPT':
     case 'STD':
-      return <DocumentDetail resolvedId={doc.id} />
+      return <DocumentDetail resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     case 'DES':
-      return <ArtefactDetail kind="design" resolvedId={doc.id} />
+      return <ArtefactDetail kind="design" resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     case 'RSK':
-      return <ArtefactDetail kind="risk" resolvedId={doc.id} />
+      return <ArtefactDetail kind="risk" resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     case 'CHG':
-      return <ArtefactDetail kind="change" resolvedId={doc.id} />
+      return <ArtefactDetail kind="change" resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     case 'CPT':
-      return <ArtefactDetail kind="test-concept" resolvedId={doc.id} />
+      return <ArtefactDetail kind="test-concept" resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     case 'DEF':
-      return <ArtefactDetail kind="defect" resolvedId={doc.id} />
+      return <ArtefactDetail kind="defect" resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     case 'CMP':
-      return <CampaignDetail resolvedId={doc.id} />
+      return <CampaignDetail resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     case 'TS':
-      return <SuiteDetail resolvedId={doc.id} />
+      return <SuiteDetail resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     default:
       return <div className="text-center py-16 text-muted-foreground">Unknown document type: {doc.doc_type}</div>
   }

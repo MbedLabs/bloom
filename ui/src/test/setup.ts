@@ -1,4 +1,7 @@
+import { configure } from '@testing-library/dom'
 import { beforeEach } from 'vitest'
+
+configure({ asyncUtilTimeout: 5000 })
 
 function createStorage(): Storage {
   const values = new Map<string, string>()

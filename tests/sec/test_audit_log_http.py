@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from datetime import datetime
 
 import pytest
 from fastapi.routing import APIRoute
@@ -154,10 +155,12 @@ def test_membership_visibility_and_deletion_carry_the_project(harness):
     )
     headers = _login(client, "admin@example.com")
 
-    added = client.post(
-        f"/api/projects/{project.id}/members",
-        json={"user_id": member.id, "role": "maintainer"},
+    added = add_policy_member(
+        client,
         headers=headers,
+        url=f"/api/projects/{project.id}/members",
+        user_id=member.id,
+        permissions={"*": ["*"]},
     )
     changed = client.patch(
         f"/api/designs/{design.id}", json={"visibility": "customer"}, headers=headers
@@ -202,7 +205,9 @@ def test_only_administrators_read_the_audit_log(harness):
     member_headers = _login(client, "member@example.com")
     admin_headers = _login(client, "admin@example.com")
 
-    refused = client.get("/api/audit", headers=member_headers)
+    refused = client.get(
+        "/api/audit", params={"sort": "actor", "dir": "asc"}, headers=member_headers
+    )
     page = client.get("/api/audit", params={"action": "auth."}, headers=admin_headers)
 
     assert refused.status_code == 403
@@ -211,6 +216,68 @@ def test_only_administrators_read_the_audit_log(harness):
     assert body["total"] == 2
     assert {item["action"] for item in body["items"]} == {"auth.login"}
     assert body["items"][0]["actor_name"] == "admin"
+
+
+def test_audit_sorting_precedes_pagination_and_keeps_filters(harness):
+    client, session_maker = harness
+    admin = _user(session_maker, "admin@example.com", UserRole.admin)
+    ada = _user(session_maker, "Ada@example.com")
+    zoe = _user(session_maker, "Zoe@example.com")
+    headers = _login(client, admin.email)
+    events = _add(
+        session_maker,
+        *[
+            AuditEvent(
+                occurred_at=datetime(2026, 10, 12, hour),
+                actor_user_id=actor,
+                actor_type="anonymous" if actor is None else "user",
+                action=action,
+                target_type=target,
+                target_id=str(hour),
+                outcome=outcome,
+                ip=ip,
+                request_id=request,
+            )
+            for hour, actor, action, target, outcome, ip, request in [
+                (3, zoe.id, "sort.b", "user", "success", "10.0.0.2", "req-d"),
+                (1, ada.id, "sort.d", "project", "failure", None, "req-c"),
+                (4, None, "sort.a", "policy", "ignored", "10.0.0.3", None),
+                (2, 999, "sort.c", None, "success", "10.0.0.1", "req-a"),
+            ]
+        ],
+    )
+    actor_names = {ada.id: "Ada", zoe.id: "Zoe", 999: "User 999", None: "anonymous"}
+    keys = {
+        "occurred_at": lambda e: e.occurred_at,
+        "actor": lambda e: actor_names[e.actor_user_id],
+        "action": lambda e: e.action,
+        "target": lambda e: f"{e.target_type or ''} {e.target_id or ''}",
+        "outcome": lambda e: e.outcome,
+        "ip": lambda e: e.ip or "",
+        "request_id": lambda e: e.request_id or "",
+    }
+    for field, key in keys.items():
+        for direction in ["asc", "desc"]:
+            expected = sorted(events, key=lambda e: (key(e), e.id), reverse=direction == "desc")
+            ids = []
+            for offset in [0, 2]:
+                response = client.get(
+                    "/api/audit",
+                    headers=headers,
+                    params={
+                        "action": "sort.",
+                        "sort": field,
+                        "dir": direction,
+                        "limit": 2,
+                        "offset": offset,
+                    },
+                )
+                assert response.status_code == 200, response.text
+                assert response.json()["total"] == 4
+                ids.extend(e["id"] for e in response.json()["items"])
+            assert ids == [e.id for e in expected], (field, direction)
+    for invalid in [{"sort": "details"}, {"dir": "sideways"}]:
+        assert client.get("/api/audit", headers=headers, params=invalid).status_code == 422
 
 
 def _api_routes(routes):
@@ -232,3 +299,6 @@ def test_no_endpoint_changes_or_deletes_an_audit_event():
     }
 
     assert methods == {"GET"}
+
+
+from tests.access_fixtures import add_policy_member

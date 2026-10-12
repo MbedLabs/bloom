@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import TagPicker from '../components/TagPicker'
 import { useParams, Link, useNavigate } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Check, ChevronRight, Download, AlertCircle, FileUp } from 'lucide-react'
@@ -84,6 +85,8 @@ export default function ImportWizard() {
   const sourceDocs = sourceDocsData?.items
   const unlistedDocs = Math.max(0, (sourceDocsData?.total ?? 0) - (sourceDocs?.length ?? 0))
 
+  const [importTagIds, setImportTagIds] = useState<number[]>([])
+
   const importMutation = useMutation({
     mutationFn: () =>
       importApi.import(projectId, {
@@ -91,6 +94,7 @@ export default function ImportWizard() {
         doc_type: docType,
         doc_ids: selectedIds,
         include_links: includeLinks,
+        tag_ids: importTagIds,
       }),
     onSuccess: (data) => {
       setResult(data)
@@ -103,7 +107,7 @@ export default function ImportWizard() {
   })
 
   const reqifMutation = useMutation({
-    mutationFn: (file: File) => importApi.importReqif(projectId, file),
+    mutationFn: (file: File) => importApi.importReqif(projectId, file, importTagIds),
     onSuccess: (data) => {
       setReqifResult(data)
       setReqifError(null)
@@ -119,7 +123,7 @@ export default function ImportWizard() {
 
   const fileMutation = useMutation({
     mutationFn: (args: { file: File; format: 'csv' | 'xml' }) =>
-      importApi.importTestCases(projectId, args.file, args.format),
+      importApi.importTestCases(projectId, args.file, args.format, importTagIds),
     onSuccess: (data) => {
       setFileResult(data)
       setFileError(null)
@@ -135,7 +139,7 @@ export default function ImportWizard() {
 
   const mdMutation = useMutation({
     mutationFn: ({ file, actions }: { file: File; actions?: Record<string, MarkdownCollisionAction> }) =>
-      importApi.importMarkdown(projectId, file, undefined, actions),
+      importApi.importMarkdown(projectId, file, undefined, actions, importTagIds),
     onSuccess: (data) => {
       setMdResult(data)
       setMdError(null)
@@ -176,6 +180,10 @@ export default function ImportWizard() {
           </p>
         </div>
       </div>
+
+      {projectId > 0 && (
+        <TagPicker projectId={projectId} value={importTagIds} onChange={setImportTagIds} />
+      )}
 
       {/* Import source mode */}
       <div className="flex gap-2">
@@ -391,7 +399,7 @@ export default function ImportWizard() {
       </div>
       )}
 
-      {mode === 'testrail' && <TestRailImport projectId={projectId} prefix={prefix} />}
+      {mode === 'testrail' && <TestRailImport projectId={projectId} prefix={prefix} tagIds={importTagIds} />}
 
       {mode === 'md' && (
       <div className="bg-card rounded-lg border border-border shadow-elegant p-6 space-y-4">

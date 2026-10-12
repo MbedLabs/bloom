@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import ArtefactTags from '../components/ArtefactTags'
 import { useParams, Link, useNavigate } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { requirementsApi, projectsApi } from '../api/client'
@@ -16,13 +17,14 @@ import {
   membershipLinksForCampaigns,
   membershipLinksForSuites,
 } from '../lib/membershipLinks'
-import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import { useProjectPermissions, useRowActions } from '../hooks/useProjectPermissions'
 import { useParameterValues } from '../hooks/useParameterValues'
 import { useArtefactLabels } from '../hooks/useArtefactLabels'
 import BudRunLink from '../components/BudRunLink'
 import ConfirmDelete from '../components/ConfirmDelete'
-import SignOffCards from '../components/SignOffCards'
-import { useSignOff, useSignOffPeople } from '../hooks/useSignOff'
+import WorkflowPanel from '../components/WorkflowPanel'
+import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
+import { useSignOffPeople } from '../hooks/useSignOff'
 
 function TypeBadge({ reqType }: { reqType: string }) {
   return (
@@ -63,12 +65,16 @@ function RunStatusBadge({ status }: { status: string }) {
   )
 }
 
-export default function RequirementDetail({ resolvedId }: { resolvedId?: number } = {}) {
+export default function RequirementDetail({
+  resolvedId,
+  allowedActions,
+}: { resolvedId?: number; allowedActions?: string[] } = {}) {
   const { user } = useAuth()
   const { prefix, itemId } = useParams<{ prefix: string; itemId: string }>()
   const { can } = useProjectPermissions(prefix)
   const parameterValues = useParameterValues(prefix)
   const reqId = resolvedId || parseInt(itemId || '0')
+  const workflow = useDocumentWorkflow('requirement', reqId)
   const queryClient = useQueryClient()
   const toast = useToast()
   const navigate = useNavigate()
@@ -136,13 +142,8 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
     },
   })
 
-  const { markReviewed: markReviewedMutation, markApproved: markApprovedMutation } = useSignOff({
-    queryKey: ['requirement', reqId],
-    activityKey: ['artefactActivity', 'requirement', reqId],
-    noun: 'requirement',
-    setReviewed: (reviewedById: number) => requirementsApi.setReviewed(reqId, reviewedById),
-    setApproved: (approvedById: number) => requirementsApi.setApproved(reqId, approvedById),
-  })
+
+  const rowAllows = useRowActions(prefix, 'REQ', requirement?.req_id, allowedActions)
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
@@ -160,6 +161,8 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
   }
 
   const canEditDocs = can('edit', 'REQ')
+  const showEdit = canEditDocs && rowAllows('edit') && workflow.data?.actions?.edit_current === true
+  const showDelete = canEditDocs && can('delete', 'REQ') && rowAllows('delete')
 
   return (
     <>
@@ -170,15 +173,17 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
       title={requirement.title}
       status={requirement.status}
       priority={requirement.priority}
-      actions={canEditDocs ? (
+      actions={showEdit || showDelete ? (
         <div className="flex items-center gap-2">
+          {showEdit && (
           <button
             onClick={() => navigate(docEditUrl(projectPrefix, 'REQ', requirement.req_id))}
             className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
           >
             Edit
           </button>
-          {!deleteConfirm ? (
+          )}
+          {showDelete && (!deleteConfirm ? (
             <button
               type="button"
               onClick={() => setDeleteConfirm(true)}
@@ -193,7 +198,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
               onConfirm={() => { setDeleteConfirm(false); deleteMutation.mutate(); }}
               onCancel={() => setDeleteConfirm(false)}
             />
-          )}
+          ))}
         </div>
       ) : undefined}
       rightRail={
@@ -206,20 +211,17 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
               </div>
               <div>
                 <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Origin</div>
-                <OriginBadge origin={requirement.req_origin} />
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <OriginBadge origin={requirement.req_origin} />
+                  <ArtefactTags type="requirement" id={reqId} projectId={requirement.project_id} canEdit={showEdit} />
+                </div>
               </div>
               <MetaItem label="Created" value={formatDateTime(requirement.created_at) + ' ago'} />
               <MetaItem label="Updated" value={formatDateTime(requirement.updated_at) + ' ago'} />
             </div>
           </SectionCard>
 
-          <SignOffCards
-            item={requirement}
-            users={users}
-            canEdit={canEditDocs}
-            markReviewed={markReviewedMutation}
-            markApproved={markApprovedMutation}
-          />
+          <WorkflowPanel artefactType="requirement" artefactId={reqId} projectPrefix={projectPrefix} />
 
           {requirement.linked_test_runs?.length > 0 && (
             <SectionCard title="Test runs">
@@ -253,6 +255,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
           <DocEditor
             content={requirement.content_json as Record<string, unknown>}
             editable={false}
+            userMentionItems={users.map(person => ({ id: person.id, label: person.full_name, user: person }))}
             parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues} artefactLabels={artefactLabels}
             artefactHref={(type, _id, label) => docUrl(prefix, type as DocType, label)}
             minHeight="min-h-[120px]"
@@ -336,6 +339,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
           </div>
         </SectionCard>
       )}
+
 
       <DocumentActivityPanel artefactType="requirement" artefactId={reqId} />
 

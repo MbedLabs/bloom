@@ -11,6 +11,7 @@ from pydantic import (
     ConfigDict,
     EmailStr,
     Field,
+    computed_field,
     field_serializer,
 )
 
@@ -65,6 +66,9 @@ class UserResponse(BaseModel):
     email: str
     full_name: str
     role: UserRole
+    has_profile_picture: bool = False
+    profile_picture_url: str | None = None
+    application_permissions: dict[str, list[str]] = Field(default_factory=dict)
     is_active: bool
     invited_at: datetime | None = None
     last_invite_sent_at: datetime | None = None
@@ -92,6 +96,13 @@ class UserResponse(BaseModel):
     def serialize_dt(self, dt: Optional[datetime], _info):
         return f"{dt.isoformat()}Z" if dt else None
 
+    @computed_field
+    @property
+    def is_initial_admin(self) -> bool:
+        from app.core.config import settings
+
+        return self.email == settings.ADMIN_EMAIL
+
     class Config:
         from_attributes = True
 
@@ -101,6 +112,7 @@ class MentionableUserResponse(BaseModel):
 
     id: int
     full_name: str
+    profile_picture_url: str | None = None
 
     class Config:
         from_attributes = True
@@ -118,6 +130,7 @@ class InviteInfoRequest(BaseModel):
 class InviteInfoResponse(BaseModel):
     email: EmailStr
     full_name: str
+    profile_picture_url: str | None = None
     valid: bool
     expired: bool
 

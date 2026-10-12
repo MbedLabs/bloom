@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Edit2, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Edit2, MoreVertical, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react'
 
 import { projectVariablesApi, ProjectVariable } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
+import { MenuAction, RowMenu, type MenuPosition } from '../components/RowMenu'
 import { useToast } from '../components/useToast'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
 
@@ -14,6 +15,7 @@ export default function ProjectParameters() {
   const { prefix } = useParams<{ prefix: string }>()
   const { can } = useProjectPermissions(prefix)
   const canEditDocs = can('edit', 'parameter')
+  const canDelete = can('delete', 'parameter')
   const { data: project, isLoading: projectLoading } = useProjectByPrefix(prefix)
   const projectId = project?.id || 0
   const queryClient = useQueryClient()
@@ -22,6 +24,7 @@ export default function ProjectParameters() {
   const [showCreate, setShowCreate] = useState(false)
   const [createForm, setCreateForm] = useState({ kind: 'variable' as ProjectVariable['kind'], key: '', value: '', description: '' })
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [menu, setMenu] = useState<({ id: number } & MenuPosition) | null>(null)
   const [editForm, setEditForm] = useState({ kind: 'variable' as ProjectVariable['kind'], key: '', value: '', description: '' })
 
   const { data: variables, isLoading: variablesLoading } = useQuery({
@@ -325,22 +328,29 @@ export default function ProjectParameters() {
                       <Td>{item.description || '-'}</Td>
                       <Td>
                         {canEditDocs && (
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => setEditingId(item.id)}
-                              className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-input text-foreground hover:bg-accent/50"
-                            >
-                              <Edit2 className="h-3.5 w-3.5" />
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => deleteMutation.mutate(item.id)}
-                              className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-red-500/50 text-red-600 hover:bg-red-500/10"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              Delete
-                            </button>
-                          </div>
+                          <RowMenu
+                            icon={<MoreVertical className="h-4 w-4" />}
+                            title="Row actions"
+                            buttonClassName="flex h-8 w-8 items-center justify-center rounded border border-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
+                            menuHeight={canDelete ? 84 : 44}
+                            open={menu?.id === item.id}
+                            position={menu?.id === item.id ? menu : null}
+                            onToggle={(position) => setMenu(menu?.id === item.id ? null : { id: item.id, ...position })}
+                          >
+                            <MenuAction
+                              icon={<Edit2 className="h-3.5 w-3.5" />}
+                              label="Edit"
+                              onClick={() => { setEditingId(item.id); setMenu(null) }}
+                            />
+                            {canDelete && (
+                              <MenuAction
+                                icon={<Trash2 className="h-3.5 w-3.5" />}
+                                label="Delete"
+                                destructive
+                                onClick={() => { deleteMutation.mutate(item.id); setMenu(null) }}
+                              />
+                            )}
+                          </RowMenu>
                         )}
                       </Td>
                     </tr>

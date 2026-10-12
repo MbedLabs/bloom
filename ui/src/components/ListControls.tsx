@@ -95,7 +95,7 @@ export function FiltersToggle({ open, active, onToggle, controls }: FiltersToggl
 }
 
 /** One active filter, shown as a chip. */
-export function FilterChip({ label, muted = false }: { label: string; muted?: boolean }) {
+export function FilterChip({ label, muted = false }: { label: ReactNode; muted?: boolean }) {
   return (
     <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs ${muted ? 'border-border text-muted-foreground' : 'border-primary/20 bg-primary/10 text-primary'}`}>
       {label}

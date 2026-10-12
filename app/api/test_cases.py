@@ -7,16 +7,26 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
+    assignee_can_sign,
+    check_assignee,
+    check_assignees_keep_sight,
+    check_create_status_right,
+    check_external_change,
+    check_status_right,
+    check_visibility_right,
     delete_project_row,
+    external_create_values,
     get_row_or_404,
     get_visible_row,
     log_artefact_activity,
     log_document_workflow_activity_from_patch,
-    naive_utc,
     page_of,
+    prepare_workflow_update,
     requirement_summary,
     should_log_generic_document_update,
+    type_visible,
     updated_summary,
+    visible_types,
 )
 from app.api.link_read_utils import (
     get_verified_requirement_links_for_test_case,
@@ -32,6 +42,7 @@ from app.core.security import (
 from app.models import (
     ArtefactLink,
     Project,
+    Requirement,
     TestCampaign,
     TestCampaignItem,
     TestCase,
@@ -49,6 +60,7 @@ from app.schemas import (
     TestCaseVerifiesLinkResponse,
     TestSuiteSummary,
 )
+from app.services.artefact_tags import attach_tags, creation_tags
 
 router = APIRouter()
 
@@ -58,7 +70,12 @@ async def _build_test_case_response(
     db: AsyncSession,
     current_user: User | None = None,
 ) -> TestCaseResponse:
-    link_rows = await get_verified_requirement_links_for_test_case(tc.id, db, current_user)
+    types = await visible_types(db, current_user, tc.project_id) if current_user else None
+    link_rows = (
+        await get_verified_requirement_links_for_test_case(tc.id, db, current_user)
+        if type_visible(types, "REQ")
+        else []
+    )
     req_count = len(link_rows)
 
     verifies = []
@@ -78,7 +95,7 @@ async def _build_test_case_response(
     suite_query = (
         select(TestSuiteItem, TestSuite)
         .join(TestSuite, TestSuite.id == TestSuiteItem.suite_id)
-        .where(TestSuiteItem.test_case_id == tc.id)
+        .where(TestSuiteItem.test_case_id == tc.id, type_visible(types, "TS"))
         .order_by(TestSuiteItem.created_at.desc())
     )
     if current_user is not None:
@@ -101,7 +118,7 @@ async def _build_test_case_response(
     campaign_query = (
         select(TestCampaignItem, TestCampaign)
         .join(TestCampaign, TestCampaign.id == TestCampaignItem.campaign_id)
-        .where(TestCampaignItem.test_case_id == tc.id)
+        .where(TestCampaignItem.test_case_id == tc.id, type_visible(types, "CMP"))
         .order_by(TestCampaignItem.created_at.desc())
     )
     if current_user is not None:
@@ -200,12 +217,24 @@ async def list_test_cases(
     List test cases for a project with pagination.
     """
     await require_project_access(db, current_user, project_id)
+    types = await visible_types(db, current_user, project_id)
+    if not type_visible(types, "TC"):
+        return PaginatedResponse(items=[], total=0, skip=skip, limit=limit)
 
     base = select(TestCase).where(TestCase.project_id == project_id)
     base = apply_external_visibility_filter(base, TestCase, current_user)
     test_cases, total = await page_of(db, base, TestCase, skip, limit)
-    requirement_counts = await verify_link_counts(
-        db, ArtefactLink.source_id, [tc.id for tc in test_cases]
+    requirement_counts = (
+        await verify_link_counts(
+            db,
+            ArtefactLink.source_id,
+            [tc.id for tc in test_cases],
+            other_column=ArtefactLink.target_id,
+            other_model=Requirement,
+            current_user=current_user,
+        )
+        if type_visible(types, "REQ")
+        else {}
     )
 
     return PaginatedResponse(
@@ -236,6 +265,9 @@ async def create_test_case(
         data.project_id,
         permission=("create", "TC"),
     )
+    named = data.model_dump(exclude_unset=True)
+    forced = external_create_values(current_user, "TC", named)
+    await check_create_status_right(db, current_user, data.project_id, "TC", named)
 
     tc_id = await next_doc_id(db, TestCase, TestCase.tc_id, data.project_id, project.prefix, "TC")
 
@@ -248,6 +280,7 @@ async def create_test_case(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Test case with this ID already exists")
 
+    tag_ids = await creation_tags(db, current_user, data.project_id, data.tag_ids)
     test_case = TestCase(
         project_id=data.project_id,
         created_by_id=current_user.id,
@@ -256,8 +289,8 @@ async def create_test_case(
         description=data.description,
         preconditions=data.preconditions,
         steps=data.steps,
-        status=data.status,
-        visibility=data.visibility,
+        status=forced.get("status", data.status),
+        visibility=forced.get("visibility", data.visibility),
         reviewer_id=data.reviewer_id,
         approver_id=data.approver_id,
         content_json=data.content_json,
@@ -266,6 +299,13 @@ async def create_test_case(
 
     db.add(test_case)
     await db.flush()
+    await attach_tags(db, "test-case", test_case, tag_ids, current_user)
+    await check_assignee(
+        db, data.project_id, "TC", tc_id, "review", data.reviewer_id, row=test_case
+    )
+    await check_assignee(
+        db, data.project_id, "TC", tc_id, "approve", data.approver_id, row=test_case
+    )
     await db.refresh(test_case)
     await log_artefact_activity(
         db,
@@ -288,9 +328,19 @@ async def get_test_case(
     Get a test case by ID.
     """
     test_case = await get_visible_row(
-        db, TestCase, test_case_id, "Test case not found", current_user
+        db, TestCase, test_case_id, "Test case not found", current_user, permission=("view", "TC")
     )
-    return await _build_test_case_response(test_case, db, current_user)
+    response = await _build_test_case_response(test_case, db, current_user)
+    return response.model_copy(
+        update={
+            "reviewer_can_sign": await assignee_can_sign(
+                db, test_case.reviewer_id, test_case.project_id, "TC", "review", test_case
+            ),
+            "approver_can_sign": await assignee_can_sign(
+                db, test_case.approver_id, test_case.project_id, "TC", "approve", test_case
+            ),
+        }
+    )
 
 
 @router.patch("/{test_case_id}", response_model=TestCaseResponse)
@@ -306,6 +356,25 @@ async def update_test_case(
     test_case = await get_visible_row(
         db, TestCase, test_case_id, "Test case not found", current_user, permission=("edit", "TC")
     )
+    changes = data.model_dump(exclude_unset=True)
+    check_external_change(current_user, "TC", test_case, changes)
+    await check_status_right(db, current_user, "TC", test_case, changes)
+    await check_visibility_right(db, current_user, "TC", test_case, changes)
+    for field, step in (("reviewer_id", "review"), ("approver_id", "approve")):
+        if changes.get(field) not in (None, getattr(test_case, field, None)):
+            await check_assignee(
+                db,
+                test_case.project_id,
+                "TC",
+                test_case.tc_id,
+                step,
+                changes[field],
+                row=test_case,
+                visibility=changes.get("visibility"),
+            )
+    await check_assignees_keep_sight(db, test_case, test_case.tc_id, changes.get("visibility"))
+
+    await prepare_workflow_update(db, test_case, data, current_user)
 
     fields_set = data.model_fields_set
     previous_status = test_case.status if "status" in fields_set else None
@@ -347,30 +416,6 @@ async def update_test_case(
             if not approver:
                 raise HTTPException(status_code=404, detail="Approver not found")
             test_case.approver_id = data.approver_id
-    if "reviewed_by_id" in fields_set:
-        if data.reviewed_by_id is None:
-            test_case.reviewed_by_id = None
-        else:
-            reviewed_by = (
-                await db.execute(select(UserModel).where(UserModel.id == data.reviewed_by_id))
-            ).scalar_one_or_none()
-            if not reviewed_by:
-                raise HTTPException(status_code=404, detail="Reviewed-by user not found")
-            test_case.reviewed_by_id = data.reviewed_by_id
-    if "approved_by_id" in fields_set:
-        if data.approved_by_id is None:
-            test_case.approved_by_id = None
-        else:
-            approved_by = (
-                await db.execute(select(UserModel).where(UserModel.id == data.approved_by_id))
-            ).scalar_one_or_none()
-            if not approved_by:
-                raise HTTPException(status_code=404, detail="Approved-by user not found")
-            test_case.approved_by_id = data.approved_by_id
-    if "reviewed_at" in fields_set:
-        test_case.reviewed_at = naive_utc(data.reviewed_at)
-    if "approved_at" in fields_set:
-        test_case.approved_at = naive_utc(data.approved_at)
 
     await db.flush()
     await db.refresh(test_case)

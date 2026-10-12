@@ -23,6 +23,8 @@ import { ToastProvider } from '../components/Toast'
 import { clearRegistrySortSession } from '../lib/docRegistryParams'
 import { docShell, resetApiMocks, user } from './apiFixtures'
 
+let currentUser: Record<string, unknown> = user
+
 vi.mock('../api/client', async (importOriginal) => {
   const { mockApiModule: build } = await import('./apiFixtures')
   return build(await importOriginal<Record<string, unknown>>(), vi)
@@ -30,7 +32,7 @@ vi.mock('../api/client', async (importOriginal) => {
 
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({
-    user,
+    user: currentUser,
     isLoading: false,
     isAuthenticated: true,
     login: vi.fn(),
@@ -145,7 +147,7 @@ function fakeRegistry(rows: Shell[]) {
     let result = [...rows]
 
     if (params.type?.length) result = result.filter((d) => params.type!.includes(d.doc_type))
-    if (params.status?.length) result = result.filter((d) => params.status!.includes(d.status))
+    if (params.status?.length) result = result.filter((d) => d.status !== null && params.status!.includes(d.status))
     if (params.priority) result = result.filter((d) => (d.priority ?? '') === params.priority)
 
     if (params.reviewer === 'assigned') result = result.filter((d) => d.reviewer_id !== null)
@@ -258,6 +260,7 @@ function lastQuery(): DocListParams {
 }
 
 beforeEach(() => {
+  currentUser = user
   vi.clearAllMocks()
   resetApiMocks(client as unknown as Record<string, unknown>, vi)
   vi.mocked(client.docsApi.list).mockImplementation(fakeRegistry(ALL) as never)
@@ -271,6 +274,66 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('narrowing the registry', () => {
+  it('offers approval phases for Requirements without operational states', async () => {
+    renderRegistry('/projects/VCU/docs?type=requirements')
+    await screen.findByText('Alpha boot timing')
+    await openFilters()
+    for (const phase of ['Draft', 'Review', 'Approval', 'Approved']) {
+      expect(screen.getByRole('button', { name: phase })).toBeTruthy()
+    }
+    for (const status of ['Implemented', 'Verified', 'Accepted', 'Mitigated', 'Closed']) {
+      expect(screen.queryByRole('button', { name: status })).toBeNull()
+    }
+  })
+
+  it('offers and applies Accepted and Mitigated Risk filters', async () => {
+    vi.mocked(client.docsApi.list).mockImplementation(fakeRegistry([
+      { ...alpha, doc_type: 'RSK', doc_id: 'VCU-RSK-001', title: 'Accepted risk', status: 'Accepted' },
+      { ...bravo, doc_type: 'RSK', doc_id: 'VCU-RSK-002', title: 'Mitigated risk', status: 'Mitigated' },
+    ]) as never)
+    renderRegistry('/projects/VCU/docs?type=risks')
+    await screen.findByText('Accepted risk')
+    await openFilters()
+    for (const status of ['Open', 'Monitoring', 'Mitigated', 'Accepted', 'Closed']) {
+      expect(screen.getByRole('button', { name: status })).toBeTruthy()
+    }
+    expect(screen.queryByRole('button', { name: 'Draft' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Accepted' }))
+    await waitFor(() => expect(rows()).toEqual(['VCU-RSK-001']))
+    expect(lastQuery().type).toEqual(['RSK'])
+    expect(lastQuery().status).toEqual(['Accepted'])
+    fireEvent.click(screen.getByRole('button', { name: 'Mitigated' }))
+    await waitFor(() => expect(rows()).toHaveLength(2))
+    expect(lastQuery().status).toEqual(['Accepted', 'Mitigated'])
+  })
+
+  it('preserves existing Campaign operational filters', async () => {
+    vi.mocked(client.docsApi.list).mockImplementation(fakeRegistry([
+      { ...alpha, doc_type: 'CMP', doc_id: 'VCU-CMP-001', title: 'Aborted campaign', status: 'Aborted' },
+      { ...bravo, doc_type: 'CMP', doc_id: 'VCU-CMP-002', title: 'Scoped campaign', status: 'Scope' },
+    ]) as never)
+    renderRegistry('/projects/VCU/docs?type=campaigns')
+    await screen.findByText('Aborted campaign')
+    await openFilters()
+    for (const status of ['Planned', 'Scope', 'In Progress', 'Running', 'Completed', 'Aborted']) {
+      expect(screen.getByRole('button', { name: status })).toBeTruthy()
+    }
+    expect(screen.queryByRole('button', { name: 'Approved' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Aborted' }))
+    await waitFor(() => expect(rows()).toEqual(['VCU-CMP-001']))
+    expect(lastQuery().type).toEqual(['CMP'])
+    expect(lastQuery().status).toEqual(['Aborted'])
+  })
+
+  it('does not label an unrecorded approval phase as Draft', async () => {
+    vi.mocked(client.docsApi.list).mockImplementation(fakeRegistry([{ ...alpha, status: null }]) as never)
+    renderRegistry('/projects/VCU/docs?type=requirements')
+    await screen.findByText('Alpha boot timing')
+    const row = screen.getByText('Alpha boot timing').closest('tr')!
+    expect(within(row).queryByText('Draft')).toBeNull()
+    expect(within(row).getByText('-')).toBeTruthy()
+  })
+
   it('shows every document to begin with', async () => {
     renderRegistry()
     await screen.findByText('Alpha boot timing')
@@ -364,18 +427,22 @@ describe('narrowing the registry', () => {
     await openFilters()
     const picker = screen.getByLabelText(/Reviewer/i)
 
-    fireEvent.change(picker, { target: { value: 'unassigned' } })
+    fireEvent.click(picker)
+    fireEvent.click(screen.getByRole('option', { name: 'Unassigned' }))
     await waitFor(() => expect(rows()).toEqual(['VCU-TC-001', 'VCU-REQ-002']))
 
-    fireEvent.change(picker, { target: { value: 'assigned' } })
+    fireEvent.click(picker)
+    fireEvent.click(screen.getByRole('option', { name: 'Any assigned' }))
     await waitFor(() => expect(rows()).toEqual(['VCU-REQ-001', 'VCU-TC-002']))
 
-    fireEvent.change(picker, { target: { value: String(reviewer.id) } })
+    fireEvent.click(picker)
+    fireEvent.click(screen.getByRole('option', { name: reviewer.full_name }))
     await waitFor(() => expect(rows()).toEqual(['VCU-REQ-001', 'VCU-TC-002']))
 
     // A reviewer with nothing assigned empties the table rather than being
     // ignored.
-    fireEvent.change(picker, { target: { value: String(user.id) } })
+    fireEvent.click(picker)
+    fireEvent.click(screen.getByRole('option', { name: user.full_name }))
     await waitFor(() => expect(rows()).toHaveLength(0))
   })
 
@@ -478,9 +545,27 @@ describe('narrowing the registry', () => {
     await screen.findByText('Alpha boot timing')
     await openFilters()
 
-    fireEvent.change(screen.getByLabelText(/Reviewer/i), { target: { value: String(reviewer.id) } })
+    fireEvent.click(screen.getByRole('combobox', { name: 'Reviewer' }))
+    fireEvent.click(screen.getByRole('option', { name: reviewer.full_name }))
 
-    expect(await screen.findByText(`Reviewer: ${reviewer.full_name}`)).toBeTruthy()
+    const chip = await screen.findByText('Reviewer:')
+    expect(chip.textContent).toContain(reviewer.full_name)
+  })
+
+  it.each(['maintainer', 'external'])('resolves reviewer pictures from project people for %s accounts', async (role) => {
+    currentUser = { ...user, role }
+    const picture = 'data:image/png;base64,cHJvamVjdC1wZXJzb24='
+    vi.mocked(client.usersApi.list).mockRejectedValue(new Error('Admin directory denied'))
+    vi.mocked(client.usersApi.listMentionable).mockResolvedValue([{ ...reviewer, profile_picture_url: picture }] as never)
+    renderRegistry()
+    const images = await screen.findAllByAltText(`${reviewer.full_name}'s profile picture`)
+    expect(images.every(image => image.getAttribute('src') === picture)).toBe(true)
+    expect(client.usersApi.list).not.toHaveBeenCalled()
+    expect(client.usersApi.listMentionable).toHaveBeenCalledWith(1)
+    await openFilters()
+    fireEvent.click(screen.getByRole('combobox', { name: 'Reviewer' }))
+    fireEvent.click(screen.getByRole('option', { name: reviewer.full_name }))
+    expect(lastQuery().reviewer).toBe(String(reviewer.id))
   })
 })
 

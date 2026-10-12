@@ -90,6 +90,8 @@ async def create_test_concept(
             "content_html": data.content_html,
         },
         current_user,
+        named=data.model_dump(exclude_unset=True),
+        tag_ids=data.tag_ids,
     )
     return await _response(db, item)
 

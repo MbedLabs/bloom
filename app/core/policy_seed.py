@@ -1,145 +1,132 @@
-"""The default policies Bloom ships. Migration 7dbc5eb75da5 seeds them.
+"""Bloom's scoped default policies and initial editable policy groups."""
 
-Each default Policy carries is_default=True: an instance base_role plus an
-(action x resource) matrix. The base_role drives project access through group
-grants (see require_project_access); require_permission enforces the matrix.
-Defaults are protected: undeletable and their base_role is fixed.
-"""
+from app.core.permissions import (
+    DOC_TYPE_RESOURCES,
+    POLICY_RESOURCES,
+    RESOURCES,
+    actions_for_rule,
+)
 
-from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS
-from app.core.permissions import RESOURCES
-from app.schemas.memberships import DEFAULT_EXTERNAL_DOC_TYPES
+DOCUMENT_POLICIES = (
+    ("Requirements", "REQ"),
+    ("Specifications", "SPEC"),
+    ("Standards", "STD"),
+    ("Designs", "DES"),
+    ("Risks", "RSK"),
+    ("Change Requests", "CHG"),
+    ("Concepts", "CPT"),
+    ("Test Cases", "TC"),
+    ("Suites", "TS"),
+    ("Campaigns", "CMP"),
+    ("Defects", "DEF"),
+    ("Protocols", "PRT"),
+    ("Reports", "RPT"),
+)
 
-_ARTEFACTS = list(RESOURCES)
-_AUTHOR = ["view", "comment", "create", "edit", "delete"]
-_LINKS = {"link": _AUTHOR}
 
-
-def _all(*actions: str) -> dict:
-    return {r: list(actions) for r in _ARTEFACTS}
-
-
-def _documents(actions: list[str]) -> dict:
-    return {kind: list(actions) for kind in CANONICAL_DOCUMENT_KINDS}
-
-
-def _merge(base: dict, overrides: dict) -> dict:
-    merged = dict(base)
-    merged.update(overrides)
-    return merged
+def _policy(
+    name: str,
+    scope: str,
+    resources: tuple,
+    read_only: bool = False,
+    origin: str | None = None,
+    review_only: bool = False,
+    review_all: bool = False,
+) -> dict:
+    """Build supported resource permissions with the selected document origins."""
+    permissions = {
+        resource: actions_for_rule(
+            resource,
+            not review_only,
+            not (read_only or review_only),
+            not (read_only or review_only),
+            review=review_only or (review_all and resource in DOC_TYPE_RESOURCES),
+            approve=not (read_only or review_only),
+        )
+        for resource in resources
+    }
+    return {
+        "name": name,
+        "description": "",
+        "scope": scope,
+        "permissions": permissions,
+        "type_tags": {
+            resource: {"all": origin is None, "visibility": [origin] if origin else [], "tags": []}
+            for resource in resources
+            if resource in DOC_TYPE_RESOURCES
+        },
+    }
 
 
 DEFAULT_POLICIES = [
+    *(_policy(name, "document", (resource,)) for name, resource in DOCUMENT_POLICIES),
+    _policy("Baselines", "project", ("baseline",)),
+    _policy("Parameters", "project", ("parameter",)),
+    _policy("Traceability", "project", ("link",)),
+    _policy("Project Management", "project", ("project",)),
+    _policy("Read Internal", "project", RESOURCES, read_only=True),
+    _policy("Read Customer", "project", RESOURCES, read_only=True, origin="customer"),
+    _policy("Review Internal", "project", DOC_TYPE_RESOURCES, review_only=True),
+    _policy("Review Customer", "project", DOC_TYPE_RESOURCES, review_only=True, origin="customer"),
+    _policy("Access Management", "app", ("access",)),
+    _policy("Application Administration", "app", POLICY_RESOURCES, review_all=True),
+]
+
+DEFAULT_GROUPS = [
     {
-        "name": "Administrator",
-        "base_role": "admin",
-        "description": "Full instance control: users, groups, policies, integrations, branding, every project.",
-        "permissions": {"*": ["*"]},
-        "doc_tag_scope": None,
+        "name": "Customers",
+        "description": "",
+        "policy_names": ["Read Customer"],
     },
     {
-        "name": "Requirements Manager",
-        "base_role": "maintainer",
-        "description": "Create, edit, delete and approve requirements, specifications and change requests; edit risks and parameters; import and export requirements.",
-        "permissions": _merge(
-            _all("view", "comment"),
-            {
-                "REQ": _AUTHOR + ["approve", "import", "export"],
-                **_documents(_AUTHOR + ["approve", "import"]),
-                "CHG": _AUTHOR + ["approve"],
-                "RSK": _AUTHOR,
-                "parameter": _AUTHOR,
-                **_LINKS,
-            },
-        ),
-        "doc_tag_scope": None,
+        "name": "Product Owners",
+        "description": "",
+        "policy_names": [
+            "Read Internal",
+            "Read Customer",
+            "Requirements",
+            "Specifications",
+            "Standards",
+            "Risks",
+            "Change Requests",
+            "Baselines",
+            "Parameters",
+            "Traceability",
+        ],
     },
     {
-        "name": "Project Administrator",
-        "base_role": "maintainer",
-        "description": "Manage campaigns and baselines; review and approve change requests and risks; review requirements; export requirements and test cases.",
-        "permissions": _merge(
-            _all("view", "comment"),
-            {
-                "CHG": _AUTHOR + ["review", "approve"],
-                "RSK": _AUTHOR + ["review"],
-                "CMP": _AUTHOR + ["plan"],
-                "TS": ["view", "comment", "plan"],
-                "baseline": _AUTHOR + ["approve"],
-                "REQ": ["view", "comment", "review", "export"],
-                "TC": ["view", "comment", "export"],
-                **_LINKS,
-            },
-        ),
-        "doc_tag_scope": None,
+        "name": "Developers",
+        "description": "",
+        "policy_names": [
+            "Read Internal",
+            "Read Customer",
+            "Designs",
+            "Baselines",
+            "Parameters",
+            "Traceability",
+        ],
     },
     {
-        "name": "Requirements Author",
-        "base_role": "maintainer",
-        "description": "Create, edit and delete requirements, specifications, risks and parameters; import and export requirements; view and comment on everything else.",
-        "permissions": _merge(
-            _all("view", "comment"),
-            {
-                "REQ": _AUTHOR + ["import", "export"],
-                **_documents(_AUTHOR + ["import"]),
-                "RSK": _AUTHOR,
-                "parameter": _AUTHOR,
-                **_LINKS,
-            },
-        ),
-        "doc_tag_scope": None,
+        "name": "Testers",
+        "description": "",
+        "policy_names": [
+            "Read Internal",
+            "Read Customer",
+            "Concepts",
+            "Test Cases",
+            "Suites",
+            "Campaigns",
+            "Defects",
+            "Protocols",
+            "Reports",
+            "Baselines",
+            "Parameters",
+            "Traceability",
+        ],
     },
     {
-        "name": "Design Author",
-        "base_role": "maintainer",
-        "description": "Create, edit and delete designs and defects; view and comment on everything else.",
-        "permissions": _merge(
-            _all("view", "comment"),
-            {
-                "DES": _AUTHOR,
-                "DEF": _AUTHOR,
-                **_LINKS,
-            },
-        ),
-        "doc_tag_scope": None,
-    },
-    {
-        "name": "Test Author",
-        "base_role": "maintainer",
-        "description": "Create, edit and delete test concepts, test cases, suites and campaigns; plan suites and campaigns; execute runs; log defects; import and export test cases.",
-        "permissions": _merge(
-            _all("view", "comment"),
-            {
-                "CPT": _AUTHOR,
-                "TC": _AUTHOR + ["import", "export"],
-                "TS": _AUTHOR + ["plan"],
-                "CMP": _AUTHOR + ["plan"],
-                "DEF": ["view", "comment", "create"],
-                "parameter": _AUTHOR,
-                **_LINKS,
-            },
-        ),
-        "doc_tag_scope": None,
-    },
-    {
-        "name": "Approver",
-        "base_role": "maintainer",
-        "description": "Review, approve and comment on every artefact; no create or edit.",
-        "permissions": _all("view", "comment", "review", "approve"),
-        "doc_tag_scope": None,
-    },
-    {
-        "name": "External Reader",
-        "base_role": "external",
-        "description": "View and comment on customer-visible artefacts of the allowed document types.",
-        "permissions": {r: ["view", "comment"] for r in _ARTEFACTS if r != "parameter"},
-        "doc_tag_scope": sorted(DEFAULT_EXTERNAL_DOC_TYPES),
-    },
-    {
-        "name": "Read Only",
-        "base_role": "maintainer",
-        "description": "View internal artefacts; no changes.",
-        "permissions": _all("view"),
-        "doc_tag_scope": None,
+        "name": "Administrators",
+        "description": "",
+        "policy_names": ["Application Administration", "Project Management"],
     },
 ]

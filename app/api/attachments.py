@@ -35,6 +35,7 @@ from app.services.attachment_upload_policy import (
     reserve_attachment_upload,
 )
 from app.services.audit import record_audit_event
+from app.services.document_workflow import prepare_content_write
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,9 @@ async def list_attachments(
     current_user: User = Depends(get_current_user),
 ):
     """Everything held against this document, oldest first."""
-    await get_visible_row(db, Document, document_id, "Document not found", current_user)
+    await get_visible_row(
+        db, Document, document_id, "Document not found", current_user, permission=("view", None)
+    )
     rows = (
         await db.execute(
             select(DocumentAttachment)
@@ -74,6 +77,7 @@ async def upload_attachment(
     document = await get_visible_row(
         db, Document, document_id, "Document not found", current_user, permission=("edit", None)
     )
+    await prepare_content_write(db, document, current_user)
     display_name = storage.safe_display_name(file.filename)
     content_type = storage.require_allowed_type(file.content_type)
 
@@ -140,7 +144,12 @@ async def download_attachment(
     if attachment is None:
         raise HTTPException(status_code=404, detail="Attachment not found")
     await get_visible_row(
-        db, Document, attachment.document_id, "Attachment not found", current_user
+        db,
+        Document,
+        attachment.document_id,
+        "Attachment not found",
+        current_user,
+        permission=("view", None),
     )
 
     path = storage.resolve_stored_path(attachment.storage_path)
@@ -184,15 +193,23 @@ async def delete_attachment(
     ).scalar_one_or_none()
     if attachment is None:
         raise HTTPException(status_code=404, detail="Attachment not found")
-    await get_visible_row(
+    document = await get_visible_row(
         db,
         Document,
         attachment.document_id,
         "Attachment not found",
         current_user,
-        permission=("edit", None),
+        permission=("delete", None),
     )
 
+    await prepare_content_write(db, document, current_user)
+    from app.models import ArtefactRevisionFile
+
+    retained = await db.scalar(
+        select(ArtefactRevisionFile.id)
+        .where(ArtefactRevisionFile.storage_path == attachment.storage_path)
+        .limit(1)
+    )
     storage_path = attachment.storage_path
     await record_audit_event(
         db,
@@ -204,7 +221,8 @@ async def delete_attachment(
     )
     await db.delete(attachment)
     await db.commit()
-    await storage.remove(storage_path)
+    if not retained:
+        await storage.remove(storage_path)
     return Response(status_code=204)
 
 

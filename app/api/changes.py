@@ -74,6 +74,8 @@ async def create_change_request(
             "content_html": data.content_html,
         },
         current_user,
+        named=data.model_dump(exclude_unset=True),
+        tag_ids=data.tag_ids,
     )
     return _change_response(item)
 

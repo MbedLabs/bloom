@@ -1,7 +1,9 @@
+import UserIdentity from '../components/UserIdentity'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { auditApi, type AuditFilters } from '../api/client'
 import { formatDateTime } from '../test/date-utils'
+import { SortableHeader } from '../components/ListControls'
 
 const PAGE_SIZE = 50
 
@@ -27,6 +29,8 @@ export default function AuditPage() {
   const [since, setSince] = useState('')
   const [until, setUntil] = useState('')
   const [page, setPage] = useState(0)
+  const [sortField, setSortField] = useState<NonNullable<AuditFilters['sort']>>('occurred_at')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   const filters: AuditFilters = {
     action: action || undefined,
@@ -35,6 +39,8 @@ export default function AuditPage() {
     until: until || undefined,
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
+    sort: sortField,
+    dir: sortDir,
   }
   const { data, isLoading } = useQuery({
     queryKey: ['audit', filters],
@@ -43,6 +49,11 @@ export default function AuditPage() {
   const total = data?.total ?? 0
   const lastPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1)
   const resetPage = () => setPage(0)
+  const toggleSort = (field: NonNullable<AuditFilters['sort']>) => {
+    setSortDir(field === sortField ? (sortDir === 'asc' ? 'desc' : 'asc') : field === 'occurred_at' ? 'desc' : 'asc')
+    setSortField(field)
+    resetPage()
+  }
 
   return (
     <div className="p-6 space-y-4">
@@ -103,13 +114,15 @@ export default function AuditPage() {
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-muted-foreground">
             <tr>
-              <th className="text-left font-medium px-4 py-2">Time (UTC)</th>
-              <th className="text-left font-medium px-4 py-2">Actor</th>
-              <th className="text-left font-medium px-4 py-2">Event</th>
-              <th className="text-left font-medium px-4 py-2">Target</th>
-              <th className="text-left font-medium px-4 py-2">Outcome</th>
-              <th className="text-left font-medium px-4 py-2">Address</th>
-              <th className="text-left font-medium px-4 py-2">Request</th>
+              {([
+                ['occurred_at', 'Time'], ['actor', 'Actor'], ['action', 'Event'], ['target', 'Target'],
+                ['outcome', 'Outcome'], ['ip', 'Address'], ['request_id', 'Request'],
+              ] as const).map(([field, label]) => (
+                <SortableHeader key={field} field={field} sortField={sortField} sortDir={sortDir} onSort={toggleSort}
+                  className="text-left font-medium px-4 py-2 cursor-pointer select-none hover:text-foreground transition-colors">
+                  {label}
+                </SortableHeader>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -119,7 +132,7 @@ export default function AuditPage() {
                   {formatDateTime(event.occurred_at)}
                 </td>
                 <td className="px-4 py-2 text-foreground">
-                  {event.actor_name ?? (event.actor_user_id != null ? `User ${event.actor_user_id}` : event.actor_type)}
+                  {event.actor_user_id != null ? <UserIdentity user={{ id: event.actor_user_id, full_name: event.actor_name ?? `User ${event.actor_user_id}`, profile_picture_url: event.actor_profile_picture_url }} /> : event.actor_type}
                 </td>
                 <td className="px-4 py-2 text-foreground font-mono text-xs">{event.action}</td>
                 <td className="px-4 py-2 text-muted-foreground">
@@ -148,14 +161,14 @@ export default function AuditPage() {
             disabled={page === 0}
             className="px-3 py-1.5 border border-border rounded-lg disabled:opacity-50"
           >
-            Newer
+            Prev
           </button>
           <button
             onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
             disabled={page >= lastPage}
             className="px-3 py-1.5 border border-border rounded-lg disabled:opacity-50"
           >
-            Older
+            Next
           </button>
         </div>
       </div>

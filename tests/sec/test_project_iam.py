@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import HTTPException
 
-from app.core.security import require_project_access
+from app.core.security import AccessTerm, require_project_access
 from app.models.user import UserRole
 
 
@@ -40,20 +40,21 @@ async def test_require_project_access_rejects_unassigned_non_admin():
 
 
 @pytest.mark.asyncio
-async def test_require_project_access_rejects_wrong_project_role():
-    db = _db_with_membership(SimpleNamespace(role="external"))
-    maintainer = SimpleNamespace(id=7, role=UserRole.maintainer)
-
-    with pytest.raises(HTTPException, match="one of"):
-        await require_project_access(db, maintainer, 42, roles={"maintainer"})
+async def test_require_project_access_rejects_a_missing_action():
+    user = SimpleNamespace(
+        id=7,
+        role=UserRole.maintainer,
+        access_map={42: (AccessTerm({"REQ": {"view"}}, None, None, frozenset(), False),)},
+    )
+    with pytest.raises(HTTPException, match="Missing permission"):
+        await require_project_access(AsyncMock(), user, 42, permission=("edit", "REQ"))
 
 
 @pytest.mark.asyncio
-async def test_require_project_access_allows_matching_project_role():
-    membership = SimpleNamespace(role="maintainer")
-    db = _db_with_membership(membership)
-    maintainer = SimpleNamespace(id=7, role=UserRole.maintainer)
-
-    result = await require_project_access(db, maintainer, 42, roles={"maintainer"})
-
-    assert result is membership
+async def test_require_project_access_allows_an_explicit_action():
+    user = SimpleNamespace(
+        id=7,
+        role=UserRole.maintainer,
+        access_map={42: (AccessTerm({"REQ": {"view", "edit"}}, None, None, frozenset(), False),)},
+    )
+    assert await require_project_access(AsyncMock(), user, 42, permission=("edit", "REQ")) is None

@@ -4,7 +4,7 @@ Pydantic schemas for API request/response validation.
 
 import re
 from datetime import datetime
-from typing import Any, Dict, Generic, List, Optional, TypeVar
+from typing import Any, Dict, Generic, List, Literal, Optional, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
@@ -212,6 +212,7 @@ class RequirementCreate(StrictModel):
     """Schema for creating a requirement."""
 
     project_id: int
+    tag_ids: List[int] = Field(default_factory=list)
     parent_id: Optional[int] = None
     title: str = Field(..., min_length=1, max_length=500)
     description: Optional[str] = None
@@ -238,10 +239,6 @@ class RequirementUpdate(StrictModel):
     req_origin: Optional[str] = None
     reviewer_id: Optional[int] = None
     approver_id: Optional[int] = None
-    reviewed_by_id: Optional[int] = None
-    approved_by_id: Optional[int] = None
-    reviewed_at: Optional[datetime] = None
-    approved_at: Optional[datetime] = None
     parent_id: Optional[int] = None
     content_json: Optional[Dict[str, Any]] = None
     content_html: Optional[str] = None
@@ -267,6 +264,8 @@ class RequirementResponse(BaseModel):
     approved_by_id: Optional[int] = None
     reviewed_at: Optional[datetime] = None
     approved_at: Optional[datetime] = None
+    reviewer_can_sign: Optional[bool] = None
+    approver_can_sign: Optional[bool] = None
     created_at: datetime
     updated_at: datetime
     children: List["RequirementResponse"] = []
@@ -294,6 +293,7 @@ class TestCaseCreate(StrictModel):
     """Schema for creating a test case."""
 
     project_id: int
+    tag_ids: List[int] = Field(default_factory=list)
     title: str = Field(..., min_length=1, max_length=500)
     description: Optional[str] = None
     preconditions: Optional[str] = None
@@ -317,10 +317,6 @@ class TestCaseUpdate(StrictModel):
     visibility: Optional[str] = Field(default=None, pattern=ARTEFACT_VISIBILITY_PATTERN)
     reviewer_id: Optional[int] = None
     approver_id: Optional[int] = None
-    reviewed_by_id: Optional[int] = None
-    approved_by_id: Optional[int] = None
-    reviewed_at: Optional[datetime] = None
-    approved_at: Optional[datetime] = None
     content_json: Optional[Dict[str, Any]] = None
     content_html: Optional[str] = None
 
@@ -343,6 +339,8 @@ class TestCaseResponse(BaseModel):
     approved_by_id: Optional[int] = None
     reviewed_at: Optional[datetime] = None
     approved_at: Optional[datetime] = None
+    reviewer_can_sign: Optional[bool] = None
+    approver_can_sign: Optional[bool] = None
     last_execution_status: Optional[str] = None
     last_executed_at: Optional[datetime] = None
     last_execution_comment: Optional[str] = None
@@ -471,6 +469,7 @@ class VersionResponse(BaseModel):
 
 class DocumentCreate(StrictModel):
     project_id: int
+    tag_ids: List[int] = Field(default_factory=list)
     title: str = Field(..., min_length=1, max_length=500)
     doc_type: str = Field(default="SPEC", pattern="^(SPEC|PRT|RPT|STD)$")
     visibility: str = Field(default="internal", pattern=ARTEFACT_VISIBILITY_PATTERN)
@@ -636,6 +635,7 @@ class SectionReorder(BaseModel):
 
 class TestSuiteCreate(StrictModel):
     project_id: int
+    tag_ids: List[int] = Field(default_factory=list)
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     status: str = "Draft"
@@ -698,6 +698,7 @@ class TestSuiteDetailResponse(TestSuiteResponse):
 
 class TestCampaignCreate(StrictModel):
     project_id: int
+    tag_ids: List[int] = Field(default_factory=list)
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     visibility: str = Field(default="internal", pattern=ARTEFACT_VISIBILITY_PATTERN)
@@ -835,6 +836,7 @@ class ArtefactLinkResponse(BaseModel):
 
 class DesignItemCreate(StrictModel):
     project_id: int
+    tag_ids: List[int] = Field(default_factory=list)
     title: str = Field(..., min_length=1, max_length=500)
     description: Optional[str] = None
     status: str = "Draft"
@@ -884,6 +886,7 @@ class DesignItemResponse(BaseModel):
 
 class RiskItemCreate(StrictModel):
     project_id: int
+    tag_ids: List[int] = Field(default_factory=list)
     title: str = Field(..., min_length=1, max_length=500)
     description: Optional[str] = None
     status: str = "Open"
@@ -939,9 +942,10 @@ class RiskItemResponse(BaseModel):
 
 class ChangeRequestCreate(StrictModel):
     project_id: int
+    tag_ids: List[int] = Field(default_factory=list)
     title: str = Field(..., min_length=1, max_length=500)
     description: Optional[str] = None
-    status: str = "Submitted"
+    status: str = "Draft"
     priority: str = "Medium"
     change_type: str = "Enhancement"
     impact_assessment: Optional[str] = None
@@ -1009,6 +1013,7 @@ class ChangeRequestResponse(BaseModel):
 
 class DefectCreate(StrictModel):
     project_id: int
+    tag_ids: List[int] = Field(default_factory=list)
     title: str = Field(..., min_length=1, max_length=500)
     description: Optional[str] = None
     status: str = "Open"
@@ -1128,6 +1133,7 @@ class BaselineResponse(BaseModel):
 
 class TestConceptCreate(StrictModel):
     project_id: int
+    tag_ids: List[int] = Field(default_factory=list)
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     status: str = "Draft"
@@ -1182,6 +1188,8 @@ class ArtefactCommentResponse(BaseModel):
     artefact_type: str
     artefact_id: int
     author_name: str
+    author_user_id: Optional[int] = None
+    author_profile_picture_url: Optional[str] = None
     body: str
     created_at: datetime
 
@@ -1199,6 +1207,9 @@ class ArtefactActivityResponse(BaseModel):
     artefact_id: int
     event_type: str
     summary: str
+    actor_user_id: Optional[int] = None
+    actor_name: Optional[str] = None
+    actor_profile_picture_url: Optional[str] = None
     created_at: datetime
 
     @field_serializer("created_at")
@@ -1211,6 +1222,25 @@ class ArtefactActivityResponse(BaseModel):
 
 class ArtefactTransitionRequest(BaseModel):
     status: str = Field(..., min_length=1)
+
+
+class ArtefactSignOffRequest(StrictModel):
+    """A review or an approval of a requirement or test case."""
+
+    step: Literal["review", "approve"]
+
+
+class ArtefactSignOffResponse(BaseModel):
+    """Who reviewed and who approved a requirement or test case, and when."""
+
+    reviewed_by_id: Optional[int] = None
+    reviewed_at: Optional[datetime] = None
+    approved_by_id: Optional[int] = None
+    approved_at: Optional[datetime] = None
+
+    @field_serializer("reviewed_at", "approved_at")
+    def serialize_dt(self, dt: Optional[datetime], _info):
+        return f"{dt.isoformat()}Z" if dt else None
 
 
 class RelatedRequirementSummary(BaseModel):

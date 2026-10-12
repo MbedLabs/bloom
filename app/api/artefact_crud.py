@@ -10,19 +10,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
     audit_visibility_change,
+    check_create_status_right,
+    check_external_change,
+    check_status_right,
+    check_visibility_right,
+    external_create_values,
     get_row_or_404,
     get_visible_row,
     log_artefact_activity,
     log_document_workflow_activity_from_patch,
     page_of,
+    prepare_workflow_update,
     should_log_generic_document_update,
+    type_visible,
     updated_summary,
+    visible_types,
 )
 from app.core.id_generator import next_doc_id
 from app.core.security import apply_external_visibility_filter, require_project_access
 from app.models import Project
+from app.models.tags import TAG_TYPE_OF_MODEL
 from app.models.user import User
 from app.schemas import PaginatedResponse
+from app.services.artefact_tags import attach_tags, creation_tags
 from app.services.tag_links import sync_tag_links
 
 
@@ -57,6 +67,8 @@ async def list_items(
     """One page of the project's artefacts of the kind, newest first."""
     model = kind.model
     await require_project_access(db, current_user, project_id)
+    if not type_visible(await visible_types(db, current_user, project_id), kind.type_code):
+        return PaginatedResponse(items=[], total=0, skip=skip, limit=limit)
 
     base = select(model).where(model.project_id == project_id)
     base = apply_external_visibility_filter(base, model, current_user)
@@ -67,13 +79,26 @@ async def list_items(
 
 async def get_item(db: AsyncSession, kind: ArtefactKind, item_id: int, current_user: User):
     """The artefact of the kind with the id, when the user may see it."""
-    return await get_visible_row(db, kind.model, item_id, kind.not_found, current_user)
+    return await get_visible_row(
+        db, kind.model, item_id, kind.not_found, current_user, permission=("view", kind.type_code)
+    )
 
 
 async def create_item(
-    db: AsyncSession, kind: ArtefactKind, project_id: int, fields: dict, current_user: User
+    db: AsyncSession,
+    kind: ArtefactKind,
+    project_id: int,
+    fields: dict,
+    current_user: User,
+    *,
+    named: dict,
+    tag_ids=(),
 ):
-    """Create an artefact of the kind with the next id of the project and the fields."""
+    """Create an artefact of the kind with the next id of the project and the fields.
+
+    ``named`` holds the fields the request names; an external user's artefact takes the
+    values ``external_create_values`` gives.
+    """
     model = kind.model
     id_column = getattr(model, kind.id_attr)
     project = await get_row_or_404(db, Project, project_id, "Project not found")
@@ -84,6 +109,8 @@ async def create_item(
         project_id,
         permission=("create", kind.type_code),
     )
+    fields = {**fields, **external_create_values(current_user, kind.type_code, named)}
+    await check_create_status_right(db, current_user, project_id, kind.type_code, named)
 
     public_id = await next_doc_id(db, model, id_column, project_id, project.prefix, kind.type_code)
 
@@ -96,6 +123,7 @@ async def create_item(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail=kind.exists)
 
+    tags = await creation_tags(db, current_user, project_id, tag_ids)
     item = model(
         project_id=project_id,
         created_by_id=current_user.id,
@@ -104,6 +132,7 @@ async def create_item(
     )
     db.add(item)
     await db.flush()
+    await attach_tags(db, TAG_TYPE_OF_MODEL[model], item, tags, current_user)
     await db.refresh(item)
     await sync_tag_links(
         db,
@@ -111,6 +140,7 @@ async def create_item(
         source_type=kind.type_code,
         source_id=item.id,
         content_json=item.content_json,
+        user=current_user,
     )
     await log_artefact_activity(
         db,
@@ -127,6 +157,12 @@ async def update_item(db: AsyncSession, kind: ArtefactKind, item_id: int, data, 
     item = await get_visible_row(
         db, kind.model, item_id, kind.not_found, current_user, permission=("edit", kind.type_code)
     )
+    changes = data.model_dump(exclude_unset=True)
+    check_external_change(current_user, kind.type_code, item, changes)
+    await check_status_right(db, current_user, kind.type_code, item, changes)
+    await check_visibility_right(db, current_user, kind.type_code, item, changes)
+
+    await prepare_workflow_update(db, item, data, current_user)
 
     fields_set = data.model_fields_set
     previous_status = item.status if "status" in fields_set else None
@@ -142,6 +178,7 @@ async def update_item(db: AsyncSession, kind: ArtefactKind, item_id: int, data, 
             source_type=kind.type_code,
             source_id=item.id,
             content_json=item.content_json,
+            user=current_user,
         )
 
     await db.flush()

@@ -124,6 +124,22 @@ describe('query cache and the signed-in user', () => {
     expect(client.getQueryData(['cached', 1])).toEqual([{ id: 1 }])
   })
 
+  it('refreshes person caches after replacing or removing a picture without clearing documents', async () => {
+    const client = new QueryClient()
+    await signedIn(client)
+    const keys = ['users', 'mentionableUsers', 'access-assignment-options', 'project-members', 'project-access', 'access-requests', 'audit', 'artefactComments', 'artefactActivity', 'notifications-list']
+    const document = { content: 'Draft remains intact' }
+    client.setQueryData(['document', 1], document)
+    for (const profile_picture_url of ['data:image/png;base64,cGljdHVyZQ==', null]) {
+      keys.forEach(key => client.setQueryData([key, 1], { previousPicture: true }))
+      vi.mocked(authApi.getMe).mockResolvedValueOnce({ ...reader, profile_picture_url } as never)
+      fireEvent.click(screen.getByText('Check session'))
+      await waitFor(() => keys.forEach(key => expect(client.getQueryState([key, 1])?.isInvalidated).toBe(true)))
+      expect(client.getQueryData(['document', 1])).toEqual(document)
+      expect(location.href).toBe('')
+    }
+  })
+
   it('is emptied without a reload when someone signs in as another user', async () => {
     const client = new QueryClient()
     await signedIn(client)

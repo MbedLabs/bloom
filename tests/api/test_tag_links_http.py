@@ -164,7 +164,7 @@ def test_a_tag_at_an_unknown_type_creates_nothing(api_client: TestClient):
     suffix = unique_suffix()
     project_id = create_project(api_client, headers, f"Unknown {suffix}")["id"]
 
-    source = api_client.post(
+    refused = api_client.post(
         "/api/requirements",
         headers=headers,
         json={
@@ -172,10 +172,14 @@ def test_a_tag_at_an_unknown_type_creates_nothing(api_client: TestClient):
             "title": f"Source {suffix}",
             "content_json": _body_tagging("NOPE", 1),
         },
-    ).json()
-
-    links = _links(api_client, headers, project_id, source_type="REQ", source_id=source["id"])
-    assert links == []
+    )
+    assert refused.status_code == 422, refused.text
+    assert "NOPE" in refused.json()["detail"]
+    assert _links(api_client, headers, project_id) == []
+    requirements = api_client.get(
+        f"/api/requirements?project_id={project_id}", headers=headers
+    ).json()["items"]
+    assert requirements == []
 
 
 def test_a_parameter_mention_is_not_a_tag(api_client: TestClient):

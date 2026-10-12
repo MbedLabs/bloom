@@ -16,6 +16,7 @@
 import { renderPage } from './render'
 import type { ReactNode } from 'react'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { workflowFixture } from './apiFixtures'
 
 /** The signed-off requirement: reviewed by a member, approved by someone gone. */
 const requirement = {
@@ -67,6 +68,14 @@ vi.mock('@tanstack/react-query', async () => {
       if (queryKey[0] === 'project') data = { id: 7, name: 'Flight', prefix: 'FLT' }
       else if (queryKey[0] === 'mentionableUsers') data = ON_THE_PROJECT
       else if (queryKey[0] === 'users') data = DIRECTORY
+      else if (queryKey[0] === 'document-workflow') data = {
+        ...workflowFixture,
+        phase: 'Approved', status: 'Approved',
+        reviewer: ON_THE_PROJECT[0], approver: DIRECTORY[1],
+        reviewed_by: ON_THE_PROJECT[0], approved_by: DIRECTORY[1],
+        reviewed_at: requirement.reviewed_at, approved_at: requirement.approved_at,
+        actions: { ...workflowFixture.actions, edit_current: false },
+      }
       return { data: enabled === false ? undefined : data, isLoading: false, error: null }
     },
     useMutation: () => ({ mutate: vi.fn(), isPending: false }),
@@ -87,6 +96,7 @@ vi.mock('react-router', async () => {
 
 vi.mock('../components/DocumentLinksPanel', () => ({ DocumentLinksPanel: () => null }))
 vi.mock('../components/DocumentActivityPanel', () => ({ default: () => null }))
+vi.mock('../components/ArtefactTags', () => ({ default: () => null }))
 
 async function renderAs(role: string): Promise<string> {
   auth.role = role
@@ -115,12 +125,10 @@ describe('reviewer and approver names on a detail page', () => {
     expect(html).not.toContain('User #5')
   })
 
-  it('falls back to the id for someone who has left, for a maintainer', async () => {
+  it('names the server-returned historical actor for a maintainer', async () => {
     const html = await renderAs('maintainer')
 
-    // Accepted trade-off: the project list cannot name a former member, and an
-    // id still says who signed off.
-    expect(html).toContain('User #12')
+    expect(html).toContain('Departed Approver')
   })
 
   it('still names a departed approver for an admin', async () => {

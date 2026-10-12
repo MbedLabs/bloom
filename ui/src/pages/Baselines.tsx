@@ -113,7 +113,7 @@ export default function Baselines() {
         <div className="bg-card rounded-lg shadow-elegant p-8 text-center text-muted-foreground">Loading...</div>
       ) : !baselines || baselines.length === 0 ? (
         <div className="bg-card rounded-lg shadow-elegant p-12 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 rounded-2xl bg-linear-to-br/srgb from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-4">
             <Layers className="h-8 w-8 text-primary/40" />
           </div>
           <h3 className="text-lg font-medium text-foreground mb-2">No Baselines Yet</h3>
@@ -163,7 +163,7 @@ export default function Baselines() {
                         <div className="text-sm font-medium text-foreground capitalize">{key.replace('_', ' ')}</div>
                         <div className="text-lg font-bold text-foreground">{value?.count ?? 0}</div>
                       </div>
-                      <div className="text-xs text-muted-foreground break-words">
+                      <div className="text-xs text-muted-foreground wrap-break-word">
                         {value?.ids?.slice(0, 6).join(', ') || value?.titles?.slice(0, 6).join(', ') || 'No items'}
                       </div>
                     </div>
@@ -181,7 +181,7 @@ export default function Baselines() {
       )}
 
       {canEditDocs && showCreate && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-card border border-border rounded-xl shadow-glow max-w-md w-full">
             <div className="px-6 py-4 border-b border-border">
               <h3 className="text-lg font-semibold text-foreground">Create Baseline</h3>

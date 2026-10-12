@@ -7,13 +7,19 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
+    check_external_change,
+    check_status_right,
+    check_visibility_right,
     delete_project_row,
+    external_create_values,
     get_row_or_404,
     get_visible_row,
     log_artefact_activity,
     log_document_workflow_activity_from_patch,
+    prepare_workflow_update,
     should_log_generic_document_update,
     updated_summary,
+    visible_types,
 )
 from app.core.database import get_db
 from app.core.document_kinds import normalize_document_kind, require_document_kind
@@ -36,6 +42,8 @@ from app.schemas import (
     PaginatedResponse,
     SectionReorder,
 )
+from app.services.artefact_tags import attach_tags, creation_tags
+from app.services.document_workflow import prepare_content_write
 from app.services.tag_links import sync_tag_links
 
 router = APIRouter()
@@ -50,8 +58,11 @@ async def list_documents(
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)
+    types = await visible_types(db, current_user, project_id)
 
     base_q = select(Document).where(Document.project_id == project_id)
+    if types is not None:
+        base_q = base_q.where(Document.doc_type.in_(types))
     base_q = apply_external_visibility_filter(base_q, Document, current_user)
     total_q = select(func.count()).select_from(base_q.subquery())
     total = (await db.execute(total_q)).scalar() or 0
@@ -122,6 +133,7 @@ async def create_document(
         raise HTTPException(status_code=400, detail="project_id must match URL path")
 
     type_code = require_document_kind(data.doc_type)
+    forced = external_create_values(current_user, type_code, data.model_dump(exclude_unset=True))
     doc_id = await next_doc_id(db, Document, Document.doc_id, project_id, project.prefix, type_code)
 
     existing = await db.execute(
@@ -132,14 +144,15 @@ async def create_document(
     )
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Document with this ID already exists")
+    tag_ids = await creation_tags(db, current_user, project_id, data.tag_ids)
     document = Document(
         project_id=project_id,
         created_by_id=current_user.id,
         doc_id=doc_id,
         title=data.title,
         doc_type=type_code,
-        visibility=data.visibility,
-        status=data.status,
+        visibility=forced.get("visibility", data.visibility),
+        status=forced.get("status", data.status),
         description=data.description,
         content_json=data.content_json,
         content_html=data.content_html,
@@ -147,6 +160,7 @@ async def create_document(
 
     db.add(document)
     await db.flush()
+    await attach_tags(db, "document", document, tag_ids, current_user)
     await db.refresh(document)
     await sync_tag_links(
         db,
@@ -154,6 +168,7 @@ async def create_document(
         source_type=normalize_document_kind(document.doc_type),
         source_id=document.id,
         content_json=document.content_json,
+        user=current_user,
     )
     await log_artefact_activity(
         db,
@@ -187,19 +202,9 @@ async def get_document(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(
-        apply_external_visibility_filter(
-            select(Document).where(Document.id == document_id),
-            Document,
-            current_user,
-        )
+    document = await get_visible_row(
+        db, Document, document_id, "Document not found", current_user, permission=("view", None)
     )
-    document = result.scalar_one_or_none()
-
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    await require_project_access(db, current_user, document.project_id)
 
     sections_result = await db.execute(
         select(DocumentSection)
@@ -275,6 +280,12 @@ async def update_document(
             document.project_id,
             permission=("edit", data.doc_type),
         )
+    changes = data.model_dump(exclude_unset=True)
+    check_external_change(current_user, document.doc_type, document, changes)
+    await check_status_right(db, current_user, document.doc_type, document, changes)
+    await check_visibility_right(db, current_user, document.doc_type, document, changes)
+
+    await prepare_workflow_update(db, document, data, current_user)
 
     fields_set = data.model_fields_set
     previous_status = document.status if "status" in fields_set else None
@@ -299,6 +310,7 @@ async def update_document(
             source_type=normalize_document_kind(document.doc_type),
             source_id=document.id,
             content_json=data.content_json,
+            user=current_user,
         )
     if data.content_html is not None:
         document.content_html = data.content_html
@@ -375,9 +387,11 @@ async def create_section(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    await get_visible_row(
+    document = await get_visible_row(
         db, Document, document_id, "Document not found", current_user, permission=("edit", None)
     )
+
+    await prepare_content_write(db, document, current_user)
 
     section = DocumentSection(
         document_id=document_id,
@@ -419,7 +433,7 @@ async def update_section(
     if not section:
         raise HTTPException(status_code=404, detail="Section not found")
 
-    await get_visible_row(
+    document = await get_visible_row(
         db,
         Document,
         section.document_id,
@@ -427,6 +441,11 @@ async def update_section(
         current_user,
         permission=("edit", None),
     )
+
+    if any(
+        getattr(section, key) != value for key, value in data.model_dump(exclude_unset=True).items()
+    ):
+        await prepare_content_write(db, document, current_user)
 
     if data.title is not None:
         section.title = data.title
@@ -488,7 +507,7 @@ async def delete_section(
     if not section:
         raise HTTPException(status_code=404, detail="Section not found")
 
-    await get_visible_row(
+    document = await get_visible_row(
         db,
         Document,
         section.document_id,
@@ -497,6 +516,7 @@ async def delete_section(
         permission=("edit", None),
     )
 
+    await prepare_content_write(db, document, current_user)
     await db.delete(section)
 
 
@@ -507,12 +527,10 @@ async def reorder_sections(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    await get_visible_row(
+    document = await get_visible_row(
         db, Document, document_id, "Document not found", current_user, permission=("edit", None)
     )
 
-    # Load every section being reordered at once. Scoping by document_id is kept
-    # so ids belonging to another document are ignored exactly as before.
     requested_ids = [item["id"] for item in data.section_orders]
     sections_by_id = (
         {
@@ -533,6 +551,11 @@ async def reorder_sections(
         if requested_ids
         else {}
     )
+    if any(
+        item["id"] in sections_by_id and sections_by_id[item["id"]].order != item["order"]
+        for item in data.section_orders
+    ):
+        await prepare_content_write(db, document, current_user)
     for item in data.section_orders:
         section = sections_by_id.get(item["id"])
         if section:

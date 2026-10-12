@@ -1,3 +1,4 @@
+import UserIdentity from './UserIdentity'
 import { UserCheck, UserCog, type LucideIcon } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
 import { SectionCard } from './DocDetailShell'
@@ -10,16 +11,19 @@ interface SignOffItem {
   approver_id?: number | null
   approved_by_id?: number | null
   approved_at?: string | null
+  reviewer_can_sign?: boolean | null
+  approver_can_sign?: boolean | null
 }
 
 interface Mark {
   isPending: boolean
-  mutate: (userId: number) => void
+  mutate: () => void
 }
 
 function resolveUserName(users: SignOffPerson[] | undefined, userId: number | null | undefined) {
   if (!userId) return 'Unassigned'
-  return users?.find((u) => u.id === userId)?.full_name || `User #${userId}`
+  const person = users?.find((u) => u.id === userId)
+  return <UserIdentity user={person ?? { id: userId, full_name: `User #${userId}` }} />
 }
 
 interface SignOffCardProps {
@@ -27,10 +31,11 @@ interface SignOffCardProps {
   assigneeLabel: string
   doneLabel: string
   assigneeId?: number | null
+  assigneeCanSign?: boolean | null
   doneById?: number | null
   doneAt?: string | null
   users: SignOffPerson[]
-  canEdit: boolean
+  canSign: boolean
   mark: Mark
   buttonClassName: string
   Icon: LucideIcon
@@ -42,10 +47,11 @@ function SignOffCard({
   assigneeLabel,
   doneLabel,
   assigneeId,
+  assigneeCanSign,
   doneById,
   doneAt,
   users,
-  canEdit,
+  canSign,
   mark,
   buttonClassName,
   Icon,
@@ -57,6 +63,7 @@ function SignOffCard({
         <div>
           <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{assigneeLabel}</div>
           <div className="text-sm text-foreground">{resolveUserName(users, assigneeId)}</div>
+          {assigneeCanSign === false && <div className="text-xs text-destructive mt-0.5">cannot sign</div>}
         </div>
         <div>
           <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{doneLabel}</div>
@@ -64,8 +71,8 @@ function SignOffCard({
           {doneAt && <div className="text-xs text-muted-foreground mt-0.5">{formatDateTime(doneAt)}</div>}
         </div>
         <button
-          disabled={!canEdit || !assigneeId || mark.isPending}
-          onClick={() => assigneeId && mark.mutate(assigneeId)}
+          disabled={!canSign || !assigneeId || mark.isPending}
+          onClick={() => mark.mutate()}
           className={buttonClassName}
         >
           <Icon className="h-3.5 w-3.5 mr-1" />
@@ -79,13 +86,14 @@ function SignOffCard({
 interface SignOffCardsProps {
   item: SignOffItem
   users: SignOffPerson[]
-  canEdit: boolean
+  canReview: boolean
+  canApprove: boolean
   markReviewed: Mark
   markApproved: Mark
 }
 
-/** The Review and Approval cards of an artefact: who is assigned, who signed off and when. */
-export default function SignOffCards({ item, users, canEdit, markReviewed, markApproved }: SignOffCardsProps) {
+/** The Review and Approval cards of an artefact: who is assigned, who signed off and when; a sign-off is recorded as the person who signs. */
+export default function SignOffCards({ item, users, canReview, canApprove, markReviewed, markApproved }: SignOffCardsProps) {
   return (
     <>
       <SignOffCard
@@ -93,10 +101,11 @@ export default function SignOffCards({ item, users, canEdit, markReviewed, markA
         assigneeLabel="Reviewer"
         doneLabel="Reviewed by"
         assigneeId={item.reviewer_id}
+        assigneeCanSign={item.reviewer_can_sign}
         doneById={item.reviewed_by_id}
         doneAt={item.reviewed_at}
         users={users}
-        canEdit={canEdit}
+        canSign={canReview}
         mark={markReviewed}
         buttonClassName="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-amber-500/90 text-white text-xs font-medium hover:bg-amber-500 disabled:opacity-50"
         Icon={UserCheck}
@@ -108,10 +117,11 @@ export default function SignOffCards({ item, users, canEdit, markReviewed, markA
         assigneeLabel="Approver"
         doneLabel="Approved by"
         assigneeId={item.approver_id}
+        assigneeCanSign={item.approver_can_sign}
         doneById={item.approved_by_id}
         doneAt={item.approved_at}
         users={users}
-        canEdit={canEdit}
+        canSign={canApprove}
         mark={markApproved}
         buttonClassName="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-500 disabled:opacity-50"
         Icon={UserCog}

@@ -47,6 +47,53 @@
             "creationDate": "Fri, 11 Sep 2026 12:15:14 GMT",
             "ts": "Fri, 11 Sep 2026 12:15:14 GMT",
             "publishState": "published"
+        },
+        "1.2.0": {
+            "manifest": {
+                "manifestVersion": 2,
+                "id": "app.embedlabs.bloom",
+                "title": "Bloom PLM by EmbedLabs",
+                "tagline": "Requirements, controlled documents and traceability",
+                "version": "1.2.0",
+                "upstreamVersion": "1.2.0",
+                "icon": "file://logo.png",
+                "httpPort": 8080,
+                "healthCheckPath": "/api/ready",
+                "memoryLimit": 1073741824,
+                "addons": {
+                    "postgresql": {},
+                    "localstorage": {},
+                    "sendmail": {
+                        "optional": true
+                    }
+                },
+                "description": "Bloom PLM by EmbedLabs covers requirements, controlled documents, verification, risks, changes, defects, baselines and traceability.\n\nAssign groups of policies per project and control access by document type and origin. Review and approve controlled documents, preserve approved revisions, and link change requests to versioned changes. Import Markdown and test cases, export test cases, and generate PDF reports.\n",
+                "changelog": "* Assign groups of policies per project, with separate application and access management.\n* Control document access by type and origin, with independent review permissions.\n* Review and approve controlled documents with notifications and email requests.\n* Preserve approved content; linked approved changes advance Version and Revision on Save. Corrections keep their existing numbers.\n* Upload and remove profile pictures; show them alongside users, comments and activity.\n* Add a company logo to generated PDF reports.\n* Import Markdown documents and test cases from CSV, XML and TestRail; export test cases and project PDF reports.\n* Open linked test runs in Bud.\n* Create Bloom defects from Jira issues.\n",
+                "postInstallMessage": "Open Bloom at $CLOUDRON-APP-ORIGIN and create your administrator account.\n\nThe instance starts with no accounts, so the first visit shows a setup screen\nthat asks for your name, email address and a password. It stops being reachable\nthe moment the account exists \u2014 nobody else can claim the instance.\n\nEmail \u2014 invitations, password resets and address changes \u2014 works only if you\nenabled the Email addon for this app. Without it, the administrator you create\nhere is the only way in.\n",
+                "website": "https://embedlabs.net",
+                "documentationUrl": "https://embedlabs.net/docs#install-bloom",
+                "forumUrl": "https://github.com/MbedLabs/bloom/discussions",
+                "packagerName": "EmbedLabs",
+                "packagerUrl": "https://embedlabs.net",
+                "tags": [
+                    "plm",
+                    "requirements",
+                    "documents",
+                    "verification",
+                    "traceability",
+                    "project"
+                ],
+                "minBoxVersion": "10.0.0",
+                "iconUrl": "https://embedlabs.net/img/bloom-mark.png",
+                "mediaLinks": [
+                    "https://embedlabs.net/app-bloom-dashboard-light.png"
+                ],
+                "packageUrl": "https://github.com/MbedLabs/bloom",
+                "dockerImage": "ghcr.io/mbedlabs/bloom:dev"
+            },
+            "creationDate": "Mon, 12 Oct 2026 23:26:33 GMT",
+            "ts": "Mon, 12 Oct 2026 23:26:33 GMT",
+            "publishState": "testing"
         }
     }
 }

@@ -1,4 +1,6 @@
+import WorkflowPanel from '../components/WorkflowPanel'
 import { useState, useEffect, useRef } from 'react'
+import ArtefactTags from '../components/ArtefactTags'
 import { useParams, Link, useNavigate, useLocation } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignsApi, type TestCampaignItem } from '../api/client'
@@ -11,13 +13,17 @@ import { docUrl } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import { formatDateTime } from '../test/date-utils'
 import { buildBudRunUrl } from '../lib/budLinks'
-import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import { useProjectPermissions, useRowActions } from '../hooks/useProjectPermissions'
+import { useAuth } from '../contexts/AuthContext'
 import AccessDenied from '../components/AccessDenied'
 import { isAccessDenied } from '../lib/accessDenied'
 
 const CAMPAIGN_STATUSES = ['Planned', 'Scope', 'In Progress', 'Completed', 'Aborted']
 
-export default function CampaignDetail({ resolvedId }: { resolvedId?: number } = {}) {
+export default function CampaignDetail({
+  resolvedId,
+  allowedActions,
+}: { resolvedId?: number; allowedActions?: string[] } = {}) {
   const { prefix, campaignId } = useParams<{ prefix: string; campaignId: string }>()
   const { can } = useProjectPermissions(prefix)
   const campId = resolvedId || parseInt(campaignId || '0')
@@ -127,6 +133,10 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
     })
   }
 
+  const rowAllows = useRowActions(prefix, 'CMP', campaign?.campaign_id, allowedActions)
+  const { user } = useAuth()
+  const external = user?.role === 'external'
+
   if (isLoading) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
   }
@@ -168,21 +178,25 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
             {campaign.description && <p className="text-muted-foreground mt-0.5">{campaign.description}</p>}
           </div>
         </div>
-        {canEditDocs ? (
+        {canEditDocs && (rowAllows('edit') || rowAllows('delete')) ? (
           <div className="flex items-center gap-2">
+            {rowAllows('edit') && (
             <button onClick={openEdit} className="inline-flex items-center px-3 py-1.5 border border-input text-foreground rounded-md hover:bg-accent/50 text-sm">
               <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
             </button>
+            )}
+            {can('delete', 'CMP') && rowAllows('delete') && (
             <button onClick={() => setConfirmDelete(true)} className="inline-flex items-center px-3 py-1.5 border border-destructive/30 text-destructive rounded-md hover:bg-destructive/10 text-sm">
               <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete
             </button>
+            )}
           </div>
         ) : null}
       </div>
 
       {/* Edit modal */}
       {canEditDocs && editOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" onKeyDown={handleEditKeyDown}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50" onKeyDown={handleEditKeyDown}>
           <div className="bg-card rounded-lg shadow-elegant p-6 max-w-md w-full mx-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-foreground">Edit campaign</h3>
@@ -199,12 +213,15 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
                 <label htmlFor="edit-desc" className="block text-sm font-medium text-foreground mb-1">Description</label>
                 <textarea id="edit-desc" value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring" rows={2} />
               </div>
+              {!external && (
               <div>
                 <label htmlFor="edit-status" className="block text-sm font-medium text-foreground mb-1">Status</label>
                 <select id="edit-status" value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring">
                   {CAMPAIGN_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
+              )}
+              {!external && (
               <div>
                 <label htmlFor="edit-visibility" className="block text-sm font-medium text-foreground mb-1">Visibility</label>
                 <select
@@ -217,6 +234,7 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
                   <option value="customer">Customer</option>
                 </select>
               </div>
+              )}
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setEditOpen(false)} className="px-4 py-2 border border-input rounded-md text-foreground hover:bg-accent/50 text-sm">Cancel</button>
                 <button type="submit" disabled={updateMutation.isPending} className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm">{updateMutation.isPending ? 'Saving...' : 'Save'}</button>
@@ -228,7 +246,7 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
 
       {/* Delete confirmation modal */}
       {canEditDocs && confirmDelete && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50">
           <div className="bg-card rounded-lg shadow-elegant p-6 max-w-sm w-full mx-4">
             <h3 className="text-lg font-semibold text-foreground mb-2">Delete Campaign?</h3>
             <p className="text-sm text-muted-foreground mb-4">This action cannot be undone. All campaign test cases and scopes will be removed.</p>
@@ -362,6 +380,13 @@ export default function CampaignDetail({ resolvedId }: { resolvedId?: number } =
           </div>
         </div>
       )}
+
+      <WorkflowPanel artefactType="campaign" artefactId={campId} projectPrefix={prefix} />
+
+      <div>
+        <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Origin</div>
+        <ArtefactTags type="campaign" id={campaign.id} projectId={campaign.project_id} canEdit={canEditDocs && rowAllows('edit')} origin={campaign.visibility === 'customer' ? 'Customer' : 'Internal'} />
+      </div>
 
       {/* Linked documents */}
       <DocumentLinksPanel

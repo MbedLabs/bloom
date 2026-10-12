@@ -17,15 +17,16 @@ from app.models import (
     DesignItem,
     Group,
     GroupMembership,
-    GroupProjectGrant,
     Notification,
     Policy,
     Project,
+    ProjectAccess,
     ProjectVariable,
     Requirement,
 )
 from app.models import TestCase as TestCaseModel
 from app.models.user import User, UserRole
+from tests.access_fixtures import scenario_type_tags
 
 
 @pytest_asyncio.fixture
@@ -221,18 +222,18 @@ async def test_the_import_needs_import_on_every_imported_type(session):
     )
     policy = Policy(
         name="Requirement importer",
-        base_role="maintainer",
         permissions={"REQ": ["view", "import"], "parameter": ["view", "create"]},
+        type_tags=scenario_type_tags({"REQ": ["view"]}),
     )
     session.add_all([author, policy])
     await session.flush()
-    group = Group(name="Importers", policy_id=policy.id)
+    group = Group(name="Importers")
     session.add(group)
     await session.flush()
     session.add_all(
         [
             GroupMembership(group_id=group.id, user_id=author.id),
-            GroupProjectGrant(group_id=group.id, project_id=1),
+            ProjectAccess(group_id=group.id, project_id=1, policies=[policy]),
         ]
     )
     await session.commit()

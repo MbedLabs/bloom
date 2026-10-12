@@ -74,6 +74,7 @@ vi.mock('react-router', async () => {
 
 vi.mock('../components/DocumentLinksPanel', () => ({ DocumentLinksPanel: () => null }))
 vi.mock('../components/DocumentActivityPanel', () => ({ default: () => null }))
+vi.mock('../components/ArtefactTags', () => ({ default: () => null }))
 
 describe('a requirement lists its linked Bud runs', () => {
   beforeAll(() => {

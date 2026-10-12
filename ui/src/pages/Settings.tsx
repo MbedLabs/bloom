@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Sun, Moon, Monitor, Info, ExternalLink, Globe, ShieldCheck, Copy, Check, Loader2, RefreshCw, Mail } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Sun, Moon, Monitor, Info, ExternalLink, Globe, ShieldCheck, Copy, Check, Loader2, RefreshCw, Mail, X } from 'lucide-react'
 import {
   APP_VERSION,
   authApi,
@@ -7,9 +7,11 @@ import {
   companyLogoApi,
   serviceCredentialsApi,
   type ServiceCredential,
+  type User,
 } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import { useDarkMode } from '../hooks/useDarkMode'
+import ProfilePicture from '../components/ProfilePicture'
 
 const COMMON_TIMEZONES = [
   { label: 'Auto (Browser)', value: 'auto' },
@@ -44,35 +46,77 @@ const COMMON_TIMEZONES = [
 export default function Settings() {
   const { user, refreshUser } = useAuth()
   const isAdmin = user?.role === 'admin'
+  const [pictureFile, setPictureFile] = useState<File | null>(null)
+  const pictureInput = useRef<HTMLInputElement>(null)
+  const [pictureBusy, setPictureBusy] = useState(false)
+  const [pictureMessage, setPictureMessage] = useState('')
+  const [savedPictureUser, setSavedPictureUser] = useState<User | null>(null)
+  const pictureUser = savedPictureUser?.id === user?.id ? savedPictureUser : user
+
+  const handleRemovePicture = async () => {
+    setPictureBusy(true)
+    setPictureMessage('')
+    try {
+      setSavedPictureUser(await authApi.deleteProfilePicture())
+      setPictureFile(null)
+      await refreshUser()
+      setPictureMessage('Profile picture removed.')
+    } catch (error) {
+      setPictureMessage(extractApiErrorMessage(error, 'Could not remove the picture.'))
+    } finally {
+      setPictureBusy(false)
+    }
+  }
+
+  const handleUploadPicture = async () => {
+    if (!pictureFile) return
+    setPictureBusy(true)
+    setPictureMessage('')
+    try {
+      setSavedPictureUser(await authApi.setProfilePicture(pictureFile))
+      setPictureFile(null)
+      await refreshUser()
+      setPictureMessage('Profile picture updated.')
+    } catch (error) {
+      setPictureMessage(extractApiErrorMessage(error, 'Could not upload the picture.'))
+    } finally {
+      setPictureBusy(false)
+    }
+  }
   const [logoFile, setLogoFile] = useState<File | null>(null)
+  const logoInput = useRef<HTMLInputElement>(null)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [logoBusy, setLogoBusy] = useState(false)
   const [logoMessage, setLogoMessage] = useState('')
+  const logoPreviewRequest = useRef(0)
 
-  // Load the stored logo through the authenticated client and hand the preview
-  // a blob URL - a bare <img src="/api/..."> can't send the bearer token, so it
-  // would 401 and the admin would never see what they uploaded.
   const refreshLogoPreview = async () => {
+    const request = ++logoPreviewRequest.current
     try {
       const blob = await companyLogoApi.fetchLogo()
-      setLogoUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev)
-        return blob ? URL.createObjectURL(blob) : null
+      if (request !== logoPreviewRequest.current) return
+      if (!blob) {
+        setLogoUrl(null)
+        return
+      }
+      const url = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => typeof reader.result === 'string'
+          ? resolve(reader.result)
+          : reject(new Error('Could not load the logo preview.'))
+        reader.onerror = () => reject(new Error('Could not load the logo preview.'))
+        reader.readAsDataURL(blob)
       })
+      if (request === logoPreviewRequest.current) setLogoUrl(url)
     } catch {
-      // Upload/remove report their own status; leave the preview untouched.
+      if (request === logoPreviewRequest.current) setLogoMessage('Could not load the logo preview.')
     }
   }
 
   useEffect(() => {
     if (!isAdmin) return
     void refreshLogoPreview()
-    return () => {
-      setLogoUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev)
-        return null
-      })
-    }
+    return () => { logoPreviewRequest.current += 1 }
   }, [isAdmin])
 
   const handleUploadLogo = async () => {
@@ -96,8 +140,9 @@ export default function Settings() {
     setLogoMessage('')
     try {
       await companyLogoApi.deleteLogo()
+      logoPreviewRequest.current += 1
+      setLogoUrl(null)
       setLogoMessage('Logo removed.')
-      await refreshLogoPreview()
     } catch (err) {
       setLogoMessage(extractApiErrorMessage(err, 'Could not remove the logo.'))
     } finally {
@@ -206,6 +251,44 @@ export default function Settings() {
           <h3 className="text-sm font-semibold text-foreground">Account</h3>
         </div>
         <div className="p-5 space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="group/image relative shrink-0">
+              <ProfilePicture own user={pictureUser} className="w-16 h-16" />
+              {pictureUser?.has_profile_picture && (
+                <button type="button" aria-label="Remove profile picture" title="Remove profile picture"
+                  onClick={handleRemovePicture} disabled={pictureBusy}
+                  className="absolute -right-2 -top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-card text-red-500 opacity-0 transition-opacity group-hover/image:opacity-100 group-focus-within/image:opacity-100 [@media(hover:none)]:opacity-100 hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-wait disabled:text-muted-foreground">
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              )}
+            </div>
+            <div className="space-y-2 flex-1">
+              <label htmlFor="profile-picture" className="block text-sm font-medium text-foreground">Profile picture</label>
+              <p className="text-xs text-muted-foreground">PNG, JPEG or WebP, up to 2 MB.</p>
+              <div className="flex min-w-0 flex-wrap items-center gap-3">
+                <input ref={pictureInput} id="profile-picture" type="file" accept="image/png,image/jpeg,image/webp" disabled={pictureBusy}
+                  onChange={event => {
+                    setPictureFile(event.target.files?.[0] ?? null)
+                    event.target.value = ''
+                  }}
+                  className="hidden" />
+                <button type="button" onClick={() => pictureInput.current?.click()} disabled={pictureBusy}
+                  className="shrink-0 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50">
+                  Choose file
+                </button>
+                <span aria-live="polite" title={pictureFile?.name}
+                  className="max-w-40 truncate text-xs text-muted-foreground">
+                  {pictureFile?.name ?? 'No file selected'}
+                </span>
+                <button type="button" onClick={handleUploadPicture} disabled={!pictureFile || pictureBusy}
+                  className="inline-flex shrink-0 items-center gap-2 px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+                  {pictureBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Upload
+                </button>
+              </div>
+              {pictureMessage && <p role="status" className="text-sm text-muted-foreground">{pictureMessage}</p>}
+            </div>
+          </div>
           <div>
             <label htmlFor="current-email" className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
               Current email
@@ -307,7 +390,7 @@ export default function Settings() {
                 dark ? 'bg-primary' : 'bg-muted'
               }`}
             >
-              <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm transition-transform duration-200 ${
+              <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-xs transition-transform duration-200 ${
                 dark ? 'translate-x-6' : 'translate-x-1'
               }`}>
                 {dark ? <Moon className="h-3 w-3 text-primary" /> : <Sun className="h-3 w-3 text-amber-500" />}
@@ -330,7 +413,7 @@ export default function Settings() {
               <select
                 value={timezone}
                 onChange={(e) => handleTimezoneChange(e.target.value)}
-                className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-primary/20"
               >
                 {COMMON_TIMEZONES.map((tz) => (
                   <option key={tz.value} value={tz.value}>
@@ -365,7 +448,7 @@ export default function Settings() {
                   <textarea
                     readOnly
                     value={generatedToken}
-                    className="w-full h-24 px-3 py-2 bg-muted/50 border border-border rounded-md text-[11px] font-mono text-foreground resize-none focus:outline-none"
+                    className="w-full h-24 px-3 py-2 bg-muted/50 border border-border rounded-md text-[11px] font-mono text-foreground resize-none focus:outline-hidden"
                   />
                   <button
                     onClick={copyToClipboard}
@@ -448,37 +531,57 @@ export default function Settings() {
               generated PDF reports, alongside the EmbedLabs tamper-evidence footer, which always
               stays.
             </p>
-            {logoUrl ? (
-              <img
-                src={logoUrl}
-                alt="Company logo"
-                className="h-16 w-auto max-w-[220px] object-contain rounded border border-border bg-muted/30 p-2"
-              />
+            <div className="flex flex-wrap items-center gap-4">
+              {logoUrl ? (
+              <div className="group/image relative inline-block shrink-0">
+                <img
+                  src={logoUrl}
+                  alt="Company logo"
+                  className="h-16 w-auto max-w-[220px] object-contain rounded border border-border bg-muted/30 p-2"
+                />
+                <button type="button" aria-label="Remove company logo" title="Remove company logo"
+                  onClick={handleRemoveLogo} disabled={logoBusy}
+                  className="absolute -right-2 -top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-card text-red-500 opacity-0 transition-opacity group-hover/image:opacity-100 group-focus-within/image:opacity-100 [@media(hover:none)]:opacity-100 hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-wait disabled:text-muted-foreground">
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
             ) : (
               <p className="text-xs italic text-muted-foreground">No company logo set yet.</p>
-            )}
-            <div className="flex items-center gap-3 flex-wrap">
+              )}
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
               <input
+                ref={logoInput}
                 type="file"
+                aria-label="Company logo file"
                 accept="image/png,image/jpeg,image/gif,image/webp"
-                onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
-                className="text-sm"
+                onChange={(e) => {
+                  setLogoFile(e.target.files?.[0] ?? null)
+                  e.target.value = ''
+                }}
+                className="hidden"
               />
               <button
+                type="button"
+                onClick={() => logoInput.current?.click()}
+                disabled={logoBusy}
+                className="shrink-0 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+              >
+                Choose file
+              </button>
+              <span aria-live="polite" title={logoFile?.name}
+                className="max-w-40 truncate text-xs text-muted-foreground">
+                {logoFile?.name ?? 'No file selected'}
+              </span>
+              <button
+                type="button"
                 onClick={handleUploadLogo}
                 disabled={!logoFile || logoBusy}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+                className="inline-flex shrink-0 items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
               >
                 {logoBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Upload logo
+                Upload
               </button>
-              <button
-                onClick={handleRemoveLogo}
-                disabled={logoBusy}
-                className="text-xs font-medium text-destructive hover:underline disabled:opacity-50"
-              >
-                Remove
-              </button>
+              </div>
             </div>
             {logoMessage && (
               <p className="text-sm text-muted-foreground" role="status">{logoMessage}</p>

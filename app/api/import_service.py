@@ -7,7 +7,7 @@ import functools
 import io
 import json
 import re
-from typing import Dict, List, Optional
+from typing import Annotated, Dict, List, Optional
 
 from defusedxml import ElementTree as SafeET
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
@@ -15,15 +15,26 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.artefact_utils import get_row_or_404, log_artefact_activity
+from app.api.artefact_utils import (
+    changes_allowed,
+    check_create_status_right,
+    check_external_change,
+    check_status_right,
+    external_create_values,
+    get_row_or_404,
+    log_artefact_activity,
+    requirement_origin_visibility,
+)
+from app.api.link_read_utils import LEGACY_REQ_LINK_TYPE_TO_ROLE
 from app.core.database import get_db
 from app.core.id_generator import format_doc_id, next_doc_id
+from app.core.link_rules import is_allowed_link_role
 from app.core.md_import import (
     parameter_name_collisions,
     parse_markdown_document,
     rename_parameters,
 )
-from app.core.permissions import has_permission
+from app.core.permissions import has_permission, transition_action
 from app.core.reqif import (
     FOREIGN_ID_HINTS,
     TEXT_ATTRIBUTE_HINTS,
@@ -34,10 +45,12 @@ from app.core.reqif import (
 from app.core.reqif_policy import read_reqif_upload
 from app.core.security import (
     apply_external_visibility_filter,
+    creation_covered,
     doc_type_visible,
     effective_permissions,
     get_current_user,
     require_project_access,
+    row_allows,
 )
 from app.core.tc_steps import text_to_rows
 from app.core.testrail import (
@@ -50,6 +63,7 @@ from app.core.testrail import (
 )
 from app.models import (
     ArtefactLink,
+    ArtefactVisibility,
     ChangeRequest,
     Defect,
     DesignItem,
@@ -64,8 +78,11 @@ from app.models import (
     TestSuite,
     TestSuiteItem,
 )
-from app.models.user import User
+from app.models.tags import TAG_TYPE_OF_MODEL
+from app.models.user import User, UserRole
+from app.services.artefact_tags import attach_tags, creation_tags
 from app.services.audit import record_audit_event
+from app.services.document_workflow import prepare_content_write
 from app.services.import_attempts import begin_import_attempt, finish_import_attempt
 from app.services.notification_service import notify
 from app.services.reqif_worker import (
@@ -82,6 +99,7 @@ class ImportRequest(BaseModel):
     doc_type: str  # "REQ" or "TC"
     doc_ids: list[int]
     include_links: bool = True
+    tag_ids: list[int] = []
 
 
 class ImportResult(BaseModel):
@@ -136,6 +154,7 @@ async def import_docs(
         source_project.id,
         permission=("export", _copied_resource(data.doc_type)),
     )
+    import_tags = await creation_tags(db, current_user, target_project.id, data.tag_ids)
 
     result = ImportResult(imported=0, skipped=0, new_ids=[], errors=[])
     await record_audit_event(
@@ -149,7 +168,14 @@ async def import_docs(
 
     if data.doc_type in _COPIED_FIELDS:
         await _import_docs(
-            db, current_user, data.doc_type, data.doc_ids, source_project, target_project, result
+            db,
+            current_user,
+            data.doc_type,
+            data.doc_ids,
+            source_project,
+            target_project,
+            result,
+            import_tags,
         )
     else:
         raise HTTPException(
@@ -188,6 +214,22 @@ async def _next_number(db: AsyncSession, project_id: int, prefix: str, type_code
     return max_num + 1
 
 
+async def _covered(
+    db: AsyncSession, user: User, project_id: int, type_code: str, values: dict, tag_ids
+) -> bool:
+    """Whether the user's policies let them create a row of the type with the visibility and
+    status in ``values`` (internal and Draft when absent) and the tags, and approve it when
+    the status needs it."""
+    visibility = values.get("visibility") or ArtefactVisibility.internal.value
+    if not await creation_covered(db, user, project_id, type_code, visibility, tag_ids):
+        return False
+    if transition_action("", values.get("status") or "Draft") == "approve":
+        return await creation_covered(
+            db, user, project_id, type_code, visibility, tag_ids, "approve"
+        )
+    return True
+
+
 _COPIED_FIELDS = {
     "REQ": (
         "Requirement",
@@ -216,10 +258,13 @@ async def _import_docs(
     source_project: Project,
     target_project: Project,
     result: ImportResult,
+    tag_ids=(),
 ):
-    """Copy the selected requirements or test cases into the target project as drafts."""
+    """Copy the selected requirements or test cases into the target project as drafts,
+    each carrying the given tags."""
     model, id_attr = _NUMBERED[type_code]
     label, fields = _COPIED_FIELDS[type_code]
+    copies = []
     next_num = await _next_number(db, target_project.id, target_project.prefix, type_code)
 
     sources_by_id = (
@@ -251,13 +296,19 @@ async def _import_docs(
         "create",
         _copied_resource(type_code),
     )
+    forced = external_create_values(current_user, type_code, {})
     for src_id in doc_ids:
         src = sources_by_id.get(src_id)
         if not src:
             result.errors.append(f"{label} {src_id} not found in source project")
             result.skipped += 1
             continue
-        if not may_create:
+        values = {"status": "Draft", **{field: getattr(src, field) for field in fields}, **forced}
+        if type_code == "REQ" and "visibility" not in forced:
+            values["visibility"] = requirement_origin_visibility(values.get("req_origin"))
+        if not may_create or not await _covered(
+            db, current_user, target_project.id, type_code, values, tag_ids
+        ):
             result.errors.append(f"{label} {src_id}: not permitted")
             result.skipped += 1
             continue
@@ -266,18 +317,20 @@ async def _import_docs(
         imported = model(
             project_id=target_project.id,
             created_by_id=current_user.id,
-            status="Draft",
             source_ref=getattr(src, id_attr),
             source_project_id=source_project.id,
             **{id_attr: new_id},
-            **{field: getattr(src, field) for field in fields},
+            **values,
         )
         db.add(imported)
+        copies.append(imported)
         result.new_ids.append(new_id)
         result.imported += 1
         next_num += 1
 
     await db.flush()
+    for copy in copies:
+        await attach_tags(db, TAG_TYPE_OF_MODEL[model], copy, tag_ids, current_user)
 
 
 # ==================== ReqIF import (DOORS / Polarion / Jama) ====================
@@ -326,6 +379,7 @@ def _requirement_title(obj: ReqIFObject) -> str:
 async def import_reqif(
     project_id: int,
     file: UploadFile = File(...),
+    tag_ids: Annotated[List[int], Query()] = [],
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
@@ -333,6 +387,7 @@ async def import_reqif(
     target_project = await get_row_or_404(db, Project, project_id, "Target project not found")
 
     await require_project_access(db, current_user, target_project.id, permission=("import", "REQ"))
+    import_tags = await creation_tags(db, current_user, target_project.id, tag_ids)
 
     attempt = await begin_import_attempt(db, user_id=current_user.id, project_id=target_project.id)
     await record_audit_event(
@@ -372,7 +427,7 @@ async def import_reqif(
         (
             await db.execute(
                 apply_external_visibility_filter(
-                    select(Requirement.source_ref, Requirement.id)
+                    select(Requirement.source_ref, Requirement.id, Requirement.created_by_id)
                     .where(
                         Requirement.project_id == target_project.id,
                         Requirement.source_ref.isnot(None),
@@ -386,11 +441,15 @@ async def import_reqif(
         if await doc_type_visible(db, current_user, target_project.id, "REQ")
         else []
     )
-    ref_to_req_id: Dict[str, int] = {ref: rid for ref, rid in existing_rows if ref}
+    ref_to_req_id: Dict[str, int] = {ref: rid for ref, rid, _ in existing_rows if ref}
+    own_req_ids = {rid for _, rid, creator in existing_rows if creator == current_user.id}
 
     created: List[Requirement] = []
     rights = await effective_permissions(db, current_user, target_project.id)
-    may_create = has_permission(rights, "create", "REQ")
+    forced = external_create_values(current_user, "REQ", {})
+    may_create = has_permission(rights, "create", "REQ") and await _covered(
+        db, current_user, target_project.id, "REQ", forced, import_tags
+    )
     may_link = has_permission(rights, "create", "link")
 
     for object_ref, parent_ref in bundle.ordered_object_refs():
@@ -419,14 +478,15 @@ async def import_reqif(
             title=_requirement_title(obj),
             description=obj.first_attr(TEXT_ATTRIBUTE_HINTS),
             content_html=obj.first_html(TEXT_ATTRIBUTE_HINTS),
-            status="Draft",
             priority=priority,
-            req_origin="External",
             source_ref=source_ref,
+            **{"status": "Draft", "req_origin": "External", **forced},
         )
         db.add(requirement)
         await db.flush()
+        await attach_tags(db, "requirement", requirement, import_tags, current_user)
         ref_to_req_id[source_ref] = requirement.id
+        own_req_ids.add(requirement.id)
         # foreign id (tool's own key), if any, is stored separately for later dedupe
         foreign = obj.first_attr(FOREIGN_ID_HINTS)
         if foreign:
@@ -451,21 +511,57 @@ async def import_reqif(
             )
         ).all()
         for s_id, t_id, l_type in existing_links:
-            seen_links.add((s_id, t_id, l_type))
+            role = LEGACY_REQ_LINK_TYPE_TO_ROLE.get(l_type)
+            if role is not None:
+                seen_links.add((s_id, t_id, role))
+        seen_links.update(
+            (
+                await db.execute(
+                    select(ArtefactLink.source_id, ArtefactLink.target_id, ArtefactLink.role).where(
+                        ArtefactLink.project_id == target_project.id,
+                        ArtefactLink.source_type == "REQ",
+                        ArtefactLink.source_id.in_(known_ids),
+                        ArtefactLink.target_type == "REQ",
+                    )
+                )
+            ).all()
+        )
     for rel in bundle.relations:
         src_id = ref_to_req_id.get(rel.source_ref[:100])
         tgt_id = ref_to_req_id.get(rel.target_ref[:100])
         if not (src_id and tgt_id) or src_id == tgt_id:
             continue
         link_type = _map_link_type(rel.type_name)
-        dedupe = (src_id, tgt_id, link_type)
+        role = LEGACY_REQ_LINK_TYPE_TO_ROLE.get(link_type)
+        dedupe = (src_id, tgt_id, role)
         if dedupe in seen_links:
             continue
-        seen_links.add(dedupe)
-        if not may_link:
+        if not may_link or (
+            current_user.role == UserRole.external and not {src_id, tgt_id} <= own_req_ids
+        ):
             result.errors.append(f"relation {rel.identifier}: not permitted")
             continue
-        db.add(RequirementLink(source_id=src_id, target_id=tgt_id, link_type=link_type))
+        if role is None or not is_allowed_link_role("REQ", "REQ", role):
+            await db.rollback()
+            await finish_import_attempt(db, attempt_id, "failed")
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"relation {rel.identifier}: type {rel.type_name!r} "
+                    f"({link_type}) has no allowed REQ to REQ role"
+                ),
+            )
+        seen_links.add(dedupe)
+        db.add(
+            ArtefactLink(
+                project_id=target_project.id,
+                source_type="REQ",
+                source_id=src_id,
+                target_type="REQ",
+                target_id=tgt_id,
+                role=role,
+            )
+        )
         result.links_created += 1
 
     await db.flush()
@@ -517,6 +613,7 @@ async def import_test_cases_file(
     project_id: int,
     format: str = Query("csv", pattern="^(csv|xml)$"),
     file: UploadFile = File(...),
+    tag_ids: Annotated[List[int], Query()] = [],
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
@@ -532,6 +629,7 @@ async def import_test_cases_file(
         target_project.id,
         permission=("import", "TC"),
     )
+    import_tags = await creation_tags(db, current_user, target_project.id, tag_ids)
 
     attempt = await begin_import_attempt(db, user_id=current_user.id, project_id=target_project.id)
     await record_audit_event(
@@ -591,12 +689,77 @@ async def import_test_cases_file(
             continue
         tc_id = (row.get("tc_id") or "").strip()
         steps = text_to_rows(row.get("steps"))
-        status = (row.get("status") or "").strip() or "Draft"
+        named_status = (row.get("status") or "").strip()
+        status = named_status or "Draft"
         visibility = (row.get("visibility") or "").strip()
         description = (row.get("description") or "").strip() or None
         preconditions = (row.get("preconditions") or "").strip() or None
         existing = visible_by_tc_id.get(tc_id) if tc_id else None
-        if not (may_edit if existing else may_create):
+        named = {
+            key: value
+            for key, value in (("status", named_status), ("visibility", visibility))
+            if value
+        }
+        try:
+            if not (may_edit if existing else may_create) or (
+                existing and not changes_allowed(current_user, existing)
+            ):
+                raise HTTPException(status_code=403)
+            if existing and not (
+                await row_allows(db, current_user, existing, "edit", "TC")
+                and await row_allows(
+                    db, current_user, existing, "edit", "TC", visibility=visibility or None
+                )
+            ):
+                raise HTTPException(status_code=403)
+            if existing:
+                if not named_status:
+                    status = existing.status
+                await check_status_right(db, current_user, "TC", existing, {"status": status})
+                await prepare_content_write(
+                    db,
+                    existing,
+                    current_user,
+                    {
+                        "title": title,
+                        "description": description,
+                        "preconditions": preconditions,
+                        "steps": steps,
+                        **named,
+                    },
+                )
+                if not named_status:
+                    status = existing.status
+                elif existing.status == "Draft" and named_status == "Review":
+                    status = "Draft"
+                same = status == existing.status
+                needed = None if same else transition_action(existing.status, status)
+            else:
+                await check_create_status_right(
+                    db, current_user, target_project.id, "TC", {"status": status}
+                )
+                needed = "approve" if transition_action("Draft", status) == "approve" else None
+            if needed and not (
+                await row_allows(db, current_user, existing, needed, "TC")
+                if existing
+                else has_permission(rights, needed, "TC")
+            ):
+                raise HTTPException(status_code=403)
+            if existing:
+                check_external_change(current_user, "TC", existing, {**named, "status": status})
+                forced = {}
+            else:
+                forced = external_create_values(current_user, "TC", named)
+                if not await _covered(
+                    db,
+                    current_user,
+                    target_project.id,
+                    "TC",
+                    {**named, "status": status, **forced},
+                    import_tags,
+                ):
+                    raise HTTPException(status_code=403)
+        except HTTPException:
             skipped += 1
             errors.append(f"row {index}: not permitted")
             continue
@@ -632,9 +795,11 @@ async def import_test_cases_file(
             )
             if visibility:
                 kwargs["visibility"] = visibility
+            kwargs.update(forced)
             test_case = TestCase(**kwargs)
             db.add(test_case)
             await db.flush()
+            await attach_tags(db, "test-case", test_case, import_tags, current_user)
             visible_by_tc_id[new_tc_id] = test_case
             await log_artefact_activity(
                 db,
@@ -743,6 +908,7 @@ async def import_markdown(
     project_id: int,
     default_type: Optional[str] = Query(None),
     file: UploadFile = File(...),
+    tag_ids: Annotated[List[int], Query()] = [],
     collision_actions: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
@@ -759,6 +925,7 @@ async def import_markdown(
     """
     target_project = await get_row_or_404(db, Project, project_id, "Target project not found")
     await require_project_access(db, current_user, target_project.id)
+    import_tags = await creation_tags(db, current_user, target_project.id, tag_ids)
 
     try:
         actions = _collision_actions(collision_actions)
@@ -889,11 +1056,18 @@ async def import_markdown(
         if factory is None:
             artefacts_skipped += 1
             continue
-        if not has_permission(rights, "create", section.type_code):
+        model, id_attr, id_type_code, title_attr, extra = factory
+        if not has_permission(rights, "create", section.type_code) or not await _covered(
+            db,
+            current_user,
+            target_project.id,
+            section.type_code,
+            {**extra, **external_create_values(current_user, section.type_code, {})},
+            import_tags,
+        ):
             artefacts_skipped += 1
             errors.append(f"section {title}: not permitted")
             continue
-        model, id_attr, id_type_code, title_attr, extra = factory
         source_marker = f"md:{section.type_code}:{title}"[:100]
         if hasattr(model, "source_ref"):
             duplicate = (
@@ -929,6 +1103,7 @@ async def import_markdown(
             id_attr: new_id,
             title_attr: title,
             **extra,
+            **external_create_values(current_user, section.type_code, {}),
         }
         instance = model(**kwargs)
         if section.body and hasattr(instance, "description"):
@@ -939,6 +1114,7 @@ async def import_markdown(
             instance.source_ref = source_marker
         db.add(instance)
         await db.flush()
+        await attach_tags(db, TAG_TYPE_OF_MODEL[model], instance, import_tags, current_user)
         await log_artefact_activity(
             db,
             ARTEFACT_TYPE_FOR_CODE[section.type_code],
@@ -1056,6 +1232,7 @@ async def import_testrail(
     project_id: int,
     format: str = Query("xml", pattern="^(xml|csv)$"),
     file: UploadFile = File(...),
+    tag_ids: Annotated[List[int], Query()] = [],
     mapping: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
@@ -1066,6 +1243,7 @@ async def import_testrail(
     updates the cases instead of duplicating them.
     """
     project = await _testrail_project(db, project_id, current_user)
+    import_tags = await creation_tags(db, current_user, project.id, tag_ids)
     column_mapping = None
     if mapping:
         try:
@@ -1103,24 +1281,27 @@ async def import_testrail(
         await finish_import_attempt(db, attempt_id, "failed")
         raise HTTPException(status_code=422, detail=f"Could not read the TestRail file: {exc}")
 
-    requirements = (
-        {
-            req_id.upper(): req_pk
-            for req_pk, req_id in (
-                await db.execute(
-                    apply_external_visibility_filter(
-                        select(Requirement.id, Requirement.req_id).where(
-                            Requirement.project_id == project.id
-                        ),
-                        Requirement,
-                        current_user,
-                    )
+    requirement_rows = (
+        (
+            await db.execute(
+                apply_external_visibility_filter(
+                    select(Requirement.id, Requirement.req_id, Requirement.created_by_id).where(
+                        Requirement.project_id == project.id
+                    ),
+                    Requirement,
+                    current_user,
                 )
-            ).all()
-        }
+            )
+        ).all()
         if await doc_type_visible(db, current_user, project.id, "REQ")
-        else {}
+        else []
     )
+    requirements = {req_id.upper(): req_pk for req_pk, req_id, _ in requirement_rows}
+    linkable_requirements = {
+        req_pk
+        for req_pk, _, creator in requirement_rows
+        if current_user.role != UserRole.external or creator == current_user.id
+    }
     suite_names = {case.sections[0][:255] for case in cases if case.sections and case.sections[0]}
     suites = (
         {
@@ -1209,10 +1390,16 @@ async def import_testrail(
         else {}
     )
     rights = await effective_permissions(db, current_user, project.id)
-    may_create = has_permission(rights, "create", "TC")
+    forced_case = external_create_values(current_user, "TC", {})
+    forced_suite = external_create_values(current_user, "TS", {})
+    may_create = has_permission(rights, "create", "TC") and await _covered(
+        db, current_user, project.id, "TC", forced_case, import_tags
+    )
     may_edit = has_permission(rights, "edit", "TC")
     may_link = has_permission(rights, "create", "link")
-    may_create_suite = has_permission(rights, "create", "TS")
+    may_create_suite = has_permission(rights, "create", "TS") and await _covered(
+        db, current_user, project.id, "TS", forced_suite, import_tags
+    )
     may_plan = has_permission(rights, "plan", "TS")
     result = TestRailImportResult(
         created=0, updated=0, skipped=0, suites_created=[], links_created=0, new_ids=[], errors=[]
@@ -1225,13 +1412,28 @@ async def import_testrail(
             result.skipped += 1
             result.errors.append(f"case {case.case_id or index}: missing title")
             continue
-        linkable = [t for t in case.references if t.upper() in requirements] if may_link else []
+        linkable = (
+            [
+                t
+                for t in case.references
+                if t.upper() in requirements and requirements[t.upper()] in linkable_requirements
+            ]
+            if may_link
+            else []
+        )
         matched = [requirements[t.upper()] for t in linkable]
         unmatched = [t for t in case.references if t not in linkable]
         description = _testrail_body(case, unmatched)
         source_ref = f"testrail:{case.case_id}"[:100] if case.case_id else None
         test_case = by_source_ref.get(source_ref) if source_ref else None
-        if not (may_edit if test_case is not None else may_create):
+        if (
+            not (may_edit if test_case is not None else may_create)
+            or (test_case is not None and not changes_allowed(current_user, test_case))
+            or (
+                test_case is not None
+                and not await row_allows(db, current_user, test_case, "edit", "TC")
+            )
+        ):
             result.skipped += 1
             result.errors.append(f"case {case.case_id or index}: not permitted")
             continue
@@ -1260,11 +1462,12 @@ async def import_testrail(
                 description=description,
                 preconditions=case.preconditions or None,
                 steps=case.rows or None,
-                status="Draft",
                 source_ref=source_ref,
+                **{"status": "Draft", **forced_case},
             )
             db.add(test_case)
             await db.flush()
+            await attach_tags(db, "test-case", test_case, import_tags, current_user)
             if source_ref:
                 by_source_ref[source_ref] = test_case
             await log_artefact_activity(
@@ -1277,10 +1480,20 @@ async def import_testrail(
             result.created += 1
             result.new_ids.append(tc_id)
 
-        if not may_link and any(t.upper() in requirements for t in case.references):
+        if any(t.upper() in requirements and t not in linkable for t in case.references):
             result.errors.append(f"case {case.case_id or index}: links not permitted")
         for requirement_pk in matched:
             if (test_case.id, requirement_pk) not in verify_links:
+                if not is_allowed_link_role("TC", "REQ", "verifies"):
+                    await db.rollback()
+                    await finish_import_attempt(db, attempt_id, "failed")
+                    raise HTTPException(
+                        status_code=422,
+                        detail=(
+                            f"case {case.case_id or index}: TC verifies REQ "
+                            f"{requirement_pk} is not allowed"
+                        ),
+                    )
                 verify_links.add((test_case.id, requirement_pk))
                 db.add(
                     ArtefactLink(
@@ -1297,7 +1510,7 @@ async def import_testrail(
         if case.sections and case.sections[0]:
             name = case.sections[0][:255]
             suite = suites.get(name)
-            if not may_plan:
+            if not may_plan or (suite is not None and not changes_allowed(current_user, suite)):
                 result.errors.append(
                     f"case {case.case_id or index}: adding to suite {name} not permitted"
                 )
@@ -1314,9 +1527,11 @@ async def import_testrail(
                         db, TestSuite, TestSuite.suite_id, project.id, prefix, "TS"
                     ),
                     name=name,
+                    **forced_suite,
                 )
                 db.add(suite)
                 await db.flush()
+                await attach_tags(db, "test-suite", suite, import_tags, current_user)
                 suites[name] = suite
                 result.suites_created.append(suite.suite_id)
             if suite is not None and (suite.id, test_case.id) not in suite_items:

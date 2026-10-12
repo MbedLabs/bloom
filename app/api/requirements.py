@@ -10,17 +10,28 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
+    assignee_can_sign,
     audit_visibility_change,
+    check_assignee,
+    check_assignees_keep_sight,
+    check_create_status_right,
+    check_external_change,
+    check_status_right,
+    check_visibility_right,
     delete_project_row,
+    external_create_values,
     get_row_or_404,
     get_visible_row,
     log_artefact_activity,
     log_document_workflow_activity_from_patch,
-    naive_utc,
     page_of,
+    prepare_workflow_update,
+    requirement_origin_visibility,
     should_log_generic_document_update,
     test_case_summary,
+    type_visible,
     updated_summary,
+    visible_types,
 )
 from app.api.link_read_utils import (
     VERIFY_LINK_ROLE,
@@ -60,14 +71,11 @@ from app.schemas import (
     TestRunLinkResponse,
     TestSuiteSummary,
 )
+from app.services.artefact_tags import attach_tags, creation_tags
 from app.services.notification_service import notify_assignment
 from app.services.tag_links import sync_tag_links
 
 router = APIRouter()
-
-
-def _visibility_for_requirement_origin(req_origin: str | None) -> str:
-    return "customer" if (req_origin or "").strip().lower() == "customer" else "internal"
 
 
 async def _get_verified_by(
@@ -124,6 +132,11 @@ async def _build_prefetch_context(
         )
     all_reqs = (await db.execute(descendants_query)).scalars().all()
     req_ids = [r.id for r in all_reqs]
+    types = (
+        await visible_types(db, current_user, all_reqs[0].project_id)
+        if current_user is not None and all_reqs
+        else None
+    )
 
     for req in all_reqs:
         if req.parent_id is not None:
@@ -139,6 +152,7 @@ async def _build_prefetch_context(
                 ArtefactLink.target_type == VERIFY_TARGET_TYPE,
                 ArtefactLink.target_id.in_(req_ids),
                 ArtefactLink.role == VERIFY_LINK_ROLE,
+                type_visible(types, "TC"),
             )
             .order_by(ArtefactLink.created_at.desc(), TestCase.tc_id)
         )
@@ -178,7 +192,7 @@ async def _build_prefetch_context(
         suite_query = (
             select(TestSuiteItem, TestSuite)
             .join(TestSuite, TestSuite.id == TestSuiteItem.suite_id)
-            .where(TestSuiteItem.test_case_id.in_(tc_ids))
+            .where(TestSuiteItem.test_case_id.in_(tc_ids), type_visible(types, "TS"))
         )
         if current_user is not None:
             suite_query = apply_external_visibility_filter(suite_query, TestSuite, current_user)
@@ -197,7 +211,7 @@ async def _build_prefetch_context(
         campaign_query = (
             select(TestCampaignItem, TestCampaign)
             .join(TestCampaign, TestCampaign.id == TestCampaignItem.campaign_id)
-            .where(TestCampaignItem.test_case_id.in_(tc_ids))
+            .where(TestCampaignItem.test_case_id.in_(tc_ids), type_visible(types, "CMP"))
         )
         if current_user is not None:
             campaign_query = apply_external_visibility_filter(
@@ -333,6 +347,9 @@ async def list_requirements(
     List requirements for a project with optional status filter and pagination.
     """
     await require_project_access(db, current_user, project_id)
+    types = await visible_types(db, current_user, project_id)
+    if not type_visible(types, "REQ"):
+        return PaginatedResponse(items=[], total=0, skip=skip, limit=limit)
 
     base = select(Requirement).where(Requirement.project_id == project_id)
     base = apply_external_visibility_filter(base, Requirement, current_user)
@@ -340,8 +357,17 @@ async def list_requirements(
         base = base.where(Requirement.status == status)
 
     requirements, total = await page_of(db, base, Requirement, skip, limit)
-    test_case_counts = await verify_link_counts(
-        db, ArtefactLink.target_id, [req.id for req in requirements]
+    test_case_counts = (
+        await verify_link_counts(
+            db,
+            ArtefactLink.target_id,
+            [req.id for req in requirements],
+            other_column=ArtefactLink.source_id,
+            other_model=TestCase,
+            current_user=current_user,
+        )
+        if type_visible(types, "TC")
+        else {}
     )
 
     return PaginatedResponse(
@@ -372,6 +398,11 @@ async def create_requirement(
         data.project_id,
         permission=("create", "REQ"),
     )
+    named = data.model_dump(exclude_unset=True)
+    forced = external_create_values(current_user, "REQ", named)
+    await check_create_status_right(db, current_user, data.project_id, "REQ", named)
+    status = forced.get("status", data.status)
+    req_origin = forced.get("req_origin", data.req_origin)
 
     if data.parent_id is not None:
         parent = await get_visible_row(
@@ -414,6 +445,7 @@ async def create_requirement(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Requirement with this ID already exists")
 
+    tag_ids = await creation_tags(db, current_user, data.project_id, data.tag_ids)
     requirement = Requirement(
         project_id=data.project_id,
         created_by_id=current_user.id,
@@ -421,11 +453,11 @@ async def create_requirement(
         req_id=req_id,
         title=data.title,
         description=data.description,
-        status=data.status,
-        visibility=_visibility_for_requirement_origin(data.req_origin),
+        status=status,
+        visibility=requirement_origin_visibility(req_origin),
         priority=data.priority,
         req_type=data.req_type,
-        req_origin=data.req_origin,
+        req_origin=req_origin,
         reviewer_id=data.reviewer_id,
         approver_id=data.approver_id,
         content_json=data.content_json,
@@ -434,6 +466,13 @@ async def create_requirement(
 
     db.add(requirement)
     await db.flush()
+    await attach_tags(db, "requirement", requirement, tag_ids, current_user)
+    await check_assignee(
+        db, data.project_id, "REQ", req_id, "review", data.reviewer_id, row=requirement
+    )
+    await check_assignee(
+        db, data.project_id, "REQ", req_id, "approve", data.approver_id, row=requirement
+    )
     await db.refresh(requirement)
     await sync_tag_links(
         db,
@@ -441,6 +480,7 @@ async def create_requirement(
         source_type="REQ",
         source_id=requirement.id,
         content_json=requirement.content_json,
+        user=current_user,
     )
     await log_artefact_activity(
         db,
@@ -478,9 +518,24 @@ async def get_requirement(
     Get a requirement by ID, including children and linked test cases.
     """
     requirement = await get_visible_row(
-        db, Requirement, requirement_id, "Requirement not found", current_user
+        db,
+        Requirement,
+        requirement_id,
+        "Requirement not found",
+        current_user,
+        permission=("view", "REQ"),
     )
-    return await _build_requirement_response(requirement, db, current_user=current_user)
+    response = await _build_requirement_response(requirement, db, current_user=current_user)
+    return response.model_copy(
+        update={
+            "reviewer_can_sign": await assignee_can_sign(
+                db, requirement.reviewer_id, requirement.project_id, "REQ", "review", requirement
+            ),
+            "approver_can_sign": await assignee_can_sign(
+                db, requirement.approver_id, requirement.project_id, "REQ", "approve", requirement
+            ),
+        }
+    )
 
 
 @router.patch("/{requirement_id}", response_model=RequirementResponse)
@@ -501,6 +556,38 @@ async def update_requirement(
         current_user,
         permission=("edit", "REQ"),
     )
+    changes = data.model_dump(exclude_unset=True)
+    check_external_change(current_user, "REQ", requirement, changes)
+    await check_status_right(db, current_user, "REQ", requirement, changes)
+    await check_visibility_right(db, current_user, "REQ", requirement, changes)
+    for field, step in (("reviewer_id", "review"), ("approver_id", "approve")):
+        if changes.get(field) not in (None, getattr(requirement, field, None)):
+            await check_assignee(
+                db,
+                requirement.project_id,
+                "REQ",
+                requirement.req_id,
+                step,
+                changes[field],
+                row=requirement,
+                visibility=(
+                    requirement_origin_visibility(changes["req_origin"])
+                    if changes.get("req_origin") is not None
+                    else None
+                ),
+            )
+    await check_assignees_keep_sight(
+        db,
+        requirement,
+        requirement.req_id,
+        (
+            requirement_origin_visibility(changes["req_origin"])
+            if changes.get("req_origin") is not None
+            else None
+        ),
+    )
+
+    await prepare_workflow_update(db, requirement, data, current_user)
 
     fields_set = data.model_fields_set
     previous_status = requirement.status if "status" in fields_set else None
@@ -528,10 +615,11 @@ async def update_requirement(
             source_type="REQ",
             source_id=requirement.id,
             content_json=data.content_json,
+            user=current_user,
         )
     if data.content_html is not None:
         requirement.content_html = data.content_html
-    requirement.visibility = _visibility_for_requirement_origin(requirement.req_origin)
+    requirement.visibility = requirement_origin_visibility(requirement.req_origin)
     await audit_visibility_change(db, "requirement", requirement, previous_visibility)
 
     if "parent_id" in fields_set:
@@ -575,30 +663,6 @@ async def update_requirement(
             if not approver:
                 raise HTTPException(status_code=404, detail="Approver not found")
             requirement.approver_id = data.approver_id
-    if "reviewed_by_id" in fields_set:
-        if data.reviewed_by_id is None:
-            requirement.reviewed_by_id = None
-        else:
-            reviewed_by = (
-                await db.execute(select(UserModel).where(UserModel.id == data.reviewed_by_id))
-            ).scalar_one_or_none()
-            if not reviewed_by:
-                raise HTTPException(status_code=404, detail="Reviewed-by user not found")
-            requirement.reviewed_by_id = data.reviewed_by_id
-    if "approved_by_id" in fields_set:
-        if data.approved_by_id is None:
-            requirement.approved_by_id = None
-        else:
-            approved_by = (
-                await db.execute(select(UserModel).where(UserModel.id == data.approved_by_id))
-            ).scalar_one_or_none()
-            if not approved_by:
-                raise HTTPException(status_code=404, detail="Approved-by user not found")
-            requirement.approved_by_id = data.approved_by_id
-    if "reviewed_at" in fields_set:
-        requirement.reviewed_at = naive_utc(data.reviewed_at)
-    if "approved_at" in fields_set:
-        requirement.approved_at = naive_utc(data.approved_at)
 
     await db.flush()
     await db.refresh(requirement)
@@ -718,12 +782,14 @@ async def get_linked_test_runs(
     """
     Get all test runs linked to a requirement.
     """
-    req_result = await db.execute(select(Requirement).where(Requirement.id == requirement_id))
-    requirement = req_result.scalar_one_or_none()
-    if not requirement:
-        raise HTTPException(status_code=404, detail="Requirement not found")
-
-    await require_project_access(db, current_user, requirement.project_id)
+    await get_visible_row(
+        db,
+        Requirement,
+        requirement_id,
+        "Requirement not found",
+        current_user,
+        permission=("view", "REQ"),
+    )
 
     result = await db.execute(
         select(TestRunLink)

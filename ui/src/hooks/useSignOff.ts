@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { usersApi } from '../api/client'
+import { usersApi, type ProfilePerson } from '../api/client'
 import { useToast } from '../components/useToast'
 
-export type SignOffPerson = { id: number; full_name: string }
+export type SignOffPerson = ProfilePerson & { id: number }
 
 /** The people the sign-off cards can name: the project's people, and for an administrator the whole directory. */
 export function useSignOffPeople(projectId: number | undefined, isAdmin: boolean): SignOffPerson[] {
@@ -18,7 +18,7 @@ export function useSignOffPeople(projectId: number | undefined, isAdmin: boolean
     enabled: isAdmin,
   })
   return useMemo<SignOffPerson[]>(
-    () => [...(projectPeople ?? []), ...(directory ?? [])],
+    () => Array.from(new Map([...(projectPeople ?? []), ...(directory ?? [])].map(person => [person.id, person])).values()),
     [projectPeople, directory],
   )
 }
@@ -27,11 +27,11 @@ interface SignOffOptions {
   queryKey: readonly unknown[]
   activityKey: readonly unknown[]
   noun: string
-  setReviewed: (userId: number) => Promise<unknown>
-  setApproved: (userId: number) => Promise<unknown>
+  setReviewed: () => Promise<unknown>
+  setApproved: () => Promise<unknown>
 }
 
-/** The review and approval mutations of an artefact; each updates the cached artefact and reports the outcome. */
+/** The review and approval mutations of an artefact, signed by the signed-in user; each updates the cached artefact and reports the outcome. */
 export function useSignOff({ queryKey, activityKey, noun, setReviewed, setApproved }: SignOffOptions) {
   const queryClient = useQueryClient()
   const toast = useToast()

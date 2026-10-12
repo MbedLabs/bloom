@@ -67,6 +67,7 @@ class AccessRequestResponse(BaseModel):
     decided_at: Optional[datetime] = None
     requester_name: Optional[str] = None
     requester_email: Optional[str] = None
+    requester_profile_picture_url: Optional[str] = None
     already_requested: bool = False
     mail_sent: Optional[bool] = None
 
@@ -92,6 +93,7 @@ def _response(row: AccessRequest, user: Optional[User] = None, **extra) -> Acces
         decided_at=row.decided_at,
         requester_name=user.full_name if user else None,
         requester_email=user.email if user else None,
+        requester_profile_picture_url=user.profile_picture_url if user else None,
         **extra,
     )
 

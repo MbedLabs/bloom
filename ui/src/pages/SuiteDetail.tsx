@@ -1,7 +1,10 @@
+import WorkflowPanel from '../components/WorkflowPanel'
+import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
 import { type ReactNode, useState, useEffect } from 'react'
+import ArtefactTags from '../components/ArtefactTags'
 import { Link, useParams, useNavigate, useLocation } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, FlaskConical, Layers3, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, FlaskConical, Layers3, MoreVertical, Pencil, Plus, Trash2 } from 'lucide-react'
 
 import { campaignsApi, testCasesApi, testSuitesApi } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
@@ -12,19 +15,26 @@ import { usePageMeta } from '../contexts/PageMetaContext'
 import { useToast } from '../components/useToast'
 import { formatDateTime } from '../test/date-utils'
 import BudRunLink from '../components/BudRunLink'
-import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import { useProjectPermissions, useRowActions } from '../hooks/useProjectPermissions'
+import { useAuth } from '../contexts/AuthContext'
 import AccessDenied from '../components/AccessDenied'
 import { isAccessDenied } from '../lib/accessDenied'
+import { MenuAction, RowMenu, type MenuPosition } from '../components/RowMenu'
 
-const SUITE_STATUSES = ['Draft', 'Active', 'Archived']
 
-export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}) {
+export default function SuiteDetail({
+  resolvedId,
+  allowedActions,
+}: { resolvedId?: number; allowedActions?: string[] } = {}) {
   const { prefix, suiteId } = useParams<{ prefix: string; suiteId: string }>()
   const { can } = useProjectPermissions(prefix)
   const canEditDocs = can('edit', 'TS')
+  const { user } = useAuth()
+  const external = user?.role === 'external'
   const { data: project } = useProjectByPrefix(prefix)
   const projectId = project?.id || 0
   const parsedSuiteId = resolvedId || Number(suiteId)
+  const workflow = useDocumentWorkflow('test-suite', parsedSuiteId)
   const queryClient = useQueryClient()
   const toast = useToast()
   const navigate = useNavigate()
@@ -41,6 +51,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
     visibility: 'internal',
   })
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [menu, setMenu] = useState<({ id: number } & MenuPosition) | null>(null)
 
 
 
@@ -69,6 +80,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
       queryClient.invalidateQueries({ queryKey: ['testSuites', projectId] })
       queryClient.invalidateQueries({ queryKey: ['testCases', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['document-workflow', 'test-suite', parsedSuiteId] })
       setShowAddCase(false)
       toast.notify('Test case added', 'success')
     },
@@ -84,6 +96,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
       queryClient.invalidateQueries({ queryKey: ['testSuites', projectId] })
       queryClient.invalidateQueries({ queryKey: ['testCases', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['document-workflow', 'test-suite', parsedSuiteId] })
       toast.notify('Test case removed', 'success')
     },
     onError: (err: unknown) => {
@@ -125,6 +138,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
       })
       queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
       queryClient.invalidateQueries({ queryKey: ['testSuites', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['document-workflow', 'test-suite', parsedSuiteId] })
       setEditing(false)
       toast.notify('Suite saved', 'success')
     },
@@ -149,7 +163,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
   })
 
   const startEdit = () => {
-    if (!suite) return
+    if (!suite || !workflow.data?.actions?.edit_current) return
     setEditForm({
       name: suite.name,
       description: suite.description || '',
@@ -161,13 +175,15 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
 
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!workflow.data?.actions?.edit_current) return
     updateMutation.mutate({
       name: editForm.name,
       description: editForm.description || undefined,
-      status: editForm.status,
       visibility: editForm.visibility === 'customer' ? 'customer' : 'internal',
     })
   }
+
+  const rowAllows = useRowActions(prefix, 'TS', suite?.suite_id, allowedActions)
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
@@ -205,16 +221,31 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
               <h2 className="text-2xl font-bold text-foreground">{suite.name}</h2>
             </div>
             {suite.description && <p className="text-muted-foreground mt-1">{suite.description}</p>}
+            <div className="mt-2">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Origin</div>
+              <ArtefactTags
+                type="test-suite"
+                id={suite.id}
+                projectId={suite.project_id}
+                canEdit={canEditDocs && rowAllows('edit') && workflow.data?.actions?.edit_current === true}
+                origin={suite.visibility === 'customer' ? 'Customer' : 'Internal'}
+              />
+            </div>
           </div>
         </div>
-        {canEditDocs && (
+        {(canEditDocs || workflow.data?.actions?.plan_current) && (
           <div className="flex items-center gap-3">
+            {canEditDocs && rowAllows('edit') && workflow.data?.actions?.edit_current && (
             <button onClick={startEdit} className="inline-flex items-center px-3 py-1.5 border border-input text-foreground rounded-md hover:bg-accent/50 text-sm">
               <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
             </button>
+            )}
+            {canEditDocs && can('delete', 'TS') && rowAllows('delete') && (
             <button onClick={() => setConfirmDelete(true)} className="inline-flex items-center px-3 py-1.5 border border-destructive/30 text-destructive rounded-md hover:bg-destructive/10 text-sm">
               <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete
             </button>
+            )}
+            {rowAllows('plan') && workflow.data?.actions?.plan_current && (
             <button
               onClick={() => setShowAddCase(true)}
               className="inline-flex items-center px-4 py-2 border border-input rounded-md text-foreground hover:bg-accent/50 text-sm"
@@ -222,19 +253,20 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
               <Plus className="h-4 w-4 mr-2" />
               Add Test Case
             </button>
-            <button
+            )}
+            {canEditDocs && <button
               onClick={() => launchCampaignMutation.mutate()}
               disabled={launchCampaignMutation.isPending}
               className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm disabled:opacity-50"
             >
               <Layers3 className="h-4 w-4 mr-2" />
               Create Campaign Scope
-            </button>
+            </button>}
           </div>
         )}
       </div>
 
-      {canEditDocs && editing && (
+      {canEditDocs && workflow.data?.actions?.edit_current && editing && (
         <div className="bg-card rounded-lg shadow-elegant p-5">
           <h3 className="text-sm font-medium text-muted-foreground mb-3">Edit Suite</h3>
           <form onSubmit={handleEditSubmit} className="space-y-3">
@@ -246,12 +278,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
               <label className="block text-sm font-medium text-foreground mb-1">Description</label>
               <textarea value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring" rows={2} />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Status</label>
-              <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring">
-                {SUITE_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
+            {!external && (
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Visibility</label>
               <select
@@ -263,6 +290,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
                 <option value="customer">Customer</option>
               </select>
             </div>
+            )}
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setEditing(false)} className="px-4 py-2 border border-input rounded-md text-foreground hover:bg-accent/50 text-sm">Cancel</button>
               <button type="submit" disabled={updateMutation.isPending} className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm">{updateMutation.isPending ? 'Saving...' : 'Save'}</button>
@@ -272,7 +300,7 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
       )}
 
       {canEditDocs && confirmDelete && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50">
           <div className="bg-card rounded-lg shadow-elegant p-6 max-w-sm w-full mx-4">
             <h3 className="text-lg font-semibold text-foreground mb-2">Delete Suite?</h3>
             <p className="text-sm text-muted-foreground mb-4">This action cannot be undone. All suite test cases will be removed.</p>
@@ -314,14 +342,26 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
                     </>
                   )}
                 </div>
-                <button
-                  onClick={() => removeItemMutation.mutate(item.id)}
-                  disabled={removeItemMutation.isPending}
-                  className="inline-flex items-center px-3 py-2 rounded-md border border-red-300 text-red-600 hover:bg-red-50 text-sm disabled:opacity-50"
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Remove
-                </button>
+                {rowAllows('plan') && workflow.data?.actions?.plan_current && (
+                <fieldset disabled={removeItemMutation.isPending} className="shrink-0">
+                  <RowMenu
+                    icon={<MoreVertical className="h-4 w-4" />}
+                    title="Row actions"
+                    buttonClassName="flex h-8 w-8 items-center justify-center rounded border border-transparent text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+                    menuHeight={44}
+                    open={menu?.id === item.id}
+                    position={menu?.id === item.id ? menu : null}
+                    onToggle={(position) => setMenu(menu?.id === item.id ? null : { id: item.id, ...position })}
+                  >
+                    <MenuAction
+                      icon={<Trash2 className="h-3.5 w-3.5" />}
+                      label="Remove"
+                      destructive
+                      onClick={() => { setMenu(null); removeItemMutation.mutate(item.id) }}
+                    />
+                  </RowMenu>
+                </fieldset>
+                )}
               </div>
             ))}
           </div>
@@ -343,8 +383,8 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
         </div>
       )}
 
-      {showAddCase && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      {showAddCase && workflow.data?.actions?.plan_current && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-card rounded-lg shadow-elegant max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col">
             <div className="px-6 py-4 border-b border-border">
               <h3 className="text-lg font-semibold">Add Test Case To Suite</h3>
@@ -375,6 +415,8 @@ export default function SuiteDetail({ resolvedId }: { resolvedId?: number } = {}
           </div>
         </div>
       )}
+
+      <WorkflowPanel artefactType="test-suite" artefactId={parsedSuiteId} projectPrefix={prefix} />
 
       {/* Activity */}
       <div className="bg-card rounded-lg shadow-elegant overflow-hidden">

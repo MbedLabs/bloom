@@ -224,10 +224,12 @@ def test_nothing_about_the_resource_is_disclosed(harness, sent_mail):
         "decided_at",
         "requester_name",
         "requester_email",
+        "requester_profile_picture_url",
         "already_requested",
         "mail_sent",
     }
     assert response.json()["requester_email"] is None
+    assert response.json()["requester_profile_picture_url"] is None
 
 
 def test_an_anonymous_client_cannot_request(harness):

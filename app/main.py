@@ -45,12 +45,11 @@ from app.api import (
     search,
     service_credentials,
     setup,
-    test_cases,
-    test_concepts,
-    test_suites,
-    traceability,
 )
+from app.api import tags as tags_api
+from app.api import test_cases, test_concepts, test_suites, traceability
 from app.api import users as users_api
+from app.api import workflow
 from app.core.config import settings
 from app.core.database import async_session_maker, create_tables, engine
 from app.core.deps import limiter
@@ -452,6 +451,7 @@ app.include_router(
 )
 app.include_router(groups.router, prefix="/api/groups", tags=["Groups"])
 app.include_router(policies.router, prefix="/api/policies", tags=["Policies"])
+app.include_router(tags_api.router, prefix="/api", tags=["Tags"])
 app.include_router(setup.router, prefix="/api", tags=["Setup"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
@@ -480,6 +480,7 @@ app.include_router(integrations.router, prefix="/api/integrations", tags=["Integ
 app.include_router(baselines.router, prefix="/api/baselines", tags=["Baselines"])
 app.include_router(test_concepts.router, prefix="/api/test-concepts", tags=["Test Concepts"])
 app.include_router(artefacts.router, prefix="/api/artefacts", tags=["Artefacts"])
+app.include_router(workflow.router, prefix="/api", tags=["Document workflow"])
 app.include_router(links.router, prefix="/api/links", tags=["Links"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
 app.include_router(import_service.router, prefix="/api", tags=["Import"])

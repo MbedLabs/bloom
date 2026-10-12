@@ -46,6 +46,12 @@ vi.mock('../contexts/AuthContext', () => ({
 }))
 
 const client = await import('../api/client')
+
+/** Wait until the page has the server's answer for which changes the row allows. */
+async function rowAnswered() {
+  await waitFor(() => expect(client.docsApi.get).toHaveBeenCalled())
+  await settle()
+}
 const CampaignDetail = (await import('../pages/CampaignDetail')).default
 
 const passed = {
@@ -246,6 +252,7 @@ describe('editing a campaign', () => {
   it('opens the form filled from the campaign', async () => {
     renderCampaign()
     await screen.findByText(campaignDetail.name)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
 
@@ -263,6 +270,7 @@ describe('editing a campaign', () => {
   it('saves the name, description and visibility together', async () => {
     renderCampaign()
     await screen.findByText(campaignDetail.name)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Final sweep' } })
@@ -286,6 +294,7 @@ describe('editing a campaign', () => {
   it('sends no description rather than an empty one', async () => {
     renderCampaign()
     await screen.findByText(campaignDetail.name)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
     fireEvent.change(await screen.findByLabelText('Description'), { target: { value: '' } })
@@ -301,6 +310,7 @@ describe('editing a campaign', () => {
   it('closes on Escape without saving', async () => {
     renderCampaign()
     await screen.findByText(campaignDetail.name)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
     const name = await screen.findByLabelText('Name')
@@ -315,6 +325,7 @@ describe('editing a campaign', () => {
   it('closes on the X without saving', async () => {
     renderCampaign()
     await screen.findByText(campaignDetail.name)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
     await screen.findByLabelText('Name')
@@ -328,6 +339,7 @@ describe('editing a campaign', () => {
   it('re-fills the form from the campaign when it is reopened', async () => {
     renderCampaign()
     await screen.findByText(campaignDetail.name)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Abandoned' } })
@@ -345,6 +357,7 @@ describe('deleting a campaign', () => {
   it('backs out of the confirmation', async () => {
     renderCampaign()
     await screen.findByText(campaignDetail.name)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
     expect(await screen.findByText('Delete Campaign?')).toBeTruthy()
@@ -358,6 +371,7 @@ describe('deleting a campaign', () => {
   it('warns that the scope goes with it', async () => {
     renderCampaign()
     await screen.findByText(campaignDetail.name)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
 
@@ -374,6 +388,7 @@ describe('deleting a campaign', () => {
     )
     renderCampaign()
     await screen.findByText(campaignDetail.name)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
     const confirms = await screen.findAllByRole('button', { name: /^delete$/i })

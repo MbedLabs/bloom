@@ -55,6 +55,31 @@ def _create(api_client: TestClient, headers: dict[str, str], path: str, payload:
     return response.json()
 
 
+def _approve_test_case(api_client, headers, test_case_id) -> None:
+    """Approve the case through assigned, content-bound review and approval."""
+    path = f"/api/artefacts/test-case/{test_case_id}"
+    workflow = api_client.get(path + "/workflow", headers=headers)
+    assert workflow.status_code == 200, workflow.text
+    actor_id = workflow.json()["creator"]["id"]
+    assigned = api_client.put(
+        path + "/workflow/assignees", headers=headers, json={"reviewer_id": actor_id}
+    )
+    assert assigned.status_code == 200, assigned.text
+    review = api_client.post(path + "/requests", headers=headers, json={"kind": "review"})
+    assert review.status_code == 201, review.text
+    comment = api_client.post(
+        path + "/comments", headers=headers, json={"body": "Reviewed the requested test case."}
+    )
+    assert comment.status_code == 201, comment.text
+    assert comment.json()["author_user_id"] == actor_id
+    approval = api_client.post(path + "/requests", headers=headers, json={"kind": "approval"})
+    assert approval.status_code == 201, approval.text
+    signed = api_client.post(path + "/sign-off", headers=headers, json={"step": "approve"})
+    assert signed.status_code == 200, signed.text
+    assert signed.json()["reviewed_by_id"] == actor_id
+    assert signed.json()["approved_by_id"] == actor_id
+
+
 def _verify(api_client, headers, project_id, tc_id, req_id) -> None:
     response = api_client.post(
         "/api/links",
@@ -103,7 +128,7 @@ def test_all_coverage_percentages_include_partial_requirements(
         api_client,
         auth_headers,
         "/api/test-cases",
-        {"project_id": project_id, "title": "Approved test case", "status": "Approved"},
+        {"project_id": project_id, "title": "Approved test case", "status": "Draft"},
     )
     draft_tc = _create(
         api_client,
@@ -114,6 +139,7 @@ def test_all_coverage_percentages_include_partial_requirements(
 
     _verify(api_client, auth_headers, project_id, approved_tc["id"], covered_req["id"])
     _verify(api_client, auth_headers, project_id, draft_tc["id"], draft_only_req["id"])
+    _approve_test_case(api_client, auth_headers, approved_tc["id"])
 
     gaps = api_client.get(
         f"/api/traceability/coverage-gaps/{project_id}", headers=auth_headers
@@ -195,10 +221,11 @@ def test_one_test_case_covers_every_requirement_it_verifies(
         api_client,
         auth_headers,
         "/api/test-cases",
-        {"project_id": project_id, "title": "Verifies three", "status": "Approved"},
+        {"project_id": project_id, "title": "Verifies three", "status": "Draft"},
     )
     for requirement in requirements[:3]:
         _verify(api_client, auth_headers, project_id, test_case["id"], requirement["id"])
+    _approve_test_case(api_client, auth_headers, test_case["id"])
 
     card = api_client.get(f"/api/projects/{project_id}", headers=auth_headers).json()
     assert card["requirement_count"] == 4

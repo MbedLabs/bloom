@@ -120,6 +120,14 @@ describe('the files attached to a document', () => {
     await waitFor(() => expect(client.attachmentsApi.remove).toHaveBeenCalledWith(attachment.id))
   })
 
+  it('offers no attach or remove when the row does not allow edit', async () => {
+    renderPanel(<DocumentAttachmentsPanel documentId={11} docType="SPEC" rowAllowsEdit={false} />)
+    await screen.findByText(attachment.original_filename)
+
+    expect(screen.queryByLabelText('Attach a file')).toBeNull()
+    expect(screen.queryByTitle('Remove attachment')).toBeNull()
+  })
+
   it('downloads using the name returned by the service', async () => {
     const url = 'blob:verification-report'
     const createObjectURL = vi.fn(() => url)
@@ -584,13 +592,20 @@ describe('the external tracker of a project', () => {
       asked = true
       return true
     }
-    vi.mocked(client.integrationsApi.listSettings).mockResolvedValue([
-      { ...integrationSetting, has_token: false, has_webhook_secret: false, base_url: null },
-    ] as never)
+    let resolveSettings!: (settings: Awaited<ReturnType<typeof client.integrationsApi.listSettings>>) => void
+    vi.mocked(client.integrationsApi.listSettings).mockImplementationOnce(() => new Promise((resolve) => {
+      resolveSettings = resolve
+    }))
     trackerPanel()
-    await screen.findByRole('button', { name: /save integration/i })
+    await waitFor(() => expect(client.integrationsApi.listSettings).toHaveBeenCalledWith(1))
+    expect(screen.queryByRole('button', { name: /save integration/i })).toBeNull()
+    resolveSettings([
+      { ...integrationSetting, has_token: false, has_webhook_secret: false, base_url: null },
+    ])
+    await waitFor(() => expect((screen.getByLabelText('GitHub') as HTMLInputElement).checked).toBe(true))
 
     fireEvent.click(screen.getByLabelText('None'))
+    expect((screen.getByLabelText('None') as HTMLInputElement).checked).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: /save integration/i }))
 
     await waitFor(() => expect(client.integrationsApi.deleteSetting).toHaveBeenCalled())

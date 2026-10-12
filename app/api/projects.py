@@ -6,11 +6,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.artefact_utils import get_row_or_404
+from app.api.artefact_utils import get_row_or_404, type_visible, visible_types
 from app.core.database import get_db
 from app.core.security import (
+    accessible_project_ids,
+    apply_external_visibility_filter,
     get_current_user,
-    get_external_doc_types,
+    holds_on_project,
     require_project_access,
     require_role,
 )
@@ -25,6 +27,7 @@ from app.models import (
     Document,
     DocumentSection,
     IntegrationSetting,
+    Notification,
     Project,
     ProjectVariable,
     Requirement,
@@ -38,7 +41,8 @@ from app.models import (
     TestSuite,
     TestSuiteItem,
 )
-from app.models.project_membership import ProjectMembership
+from app.models.project_membership import ProjectAccess, ProjectMembership
+from app.models.tags import ArtefactTag
 from app.models.user import User, UserRole
 from app.schemas import ProjectCreate, ProjectResponse, ProjectUpdate
 from app.services.audit import record_audit_event
@@ -55,11 +59,14 @@ async def _delete_project_scoped_data(db: AsyncSession, project_id: int) -> None
     campaign_ids = select(TestCampaign.id).where(TestCampaign.project_id == project_id)
     suite_ids = select(TestSuite.id).where(TestSuite.project_id == project_id)
 
+    await db.execute(delete(Notification).where(Notification.project_id == project_id))
     await db.execute(delete(DefectSyncEvent).where(DefectSyncEvent.defect_id.in_(defect_ids)))
     await db.execute(delete(TestCampaignItem).where(TestCampaignItem.campaign_id.in_(campaign_ids)))
     await db.execute(delete(CampaignSuite).where(CampaignSuite.campaign_id.in_(campaign_ids)))
     await db.execute(delete(TestSuiteItem).where(TestSuiteItem.suite_id.in_(suite_ids)))
     await db.execute(delete(ArtefactLink).where(ArtefactLink.project_id == project_id))
+    await db.execute(delete(ArtefactTag).where(ArtefactTag.project_id == project_id))
+    await db.execute(delete(ProjectAccess).where(ProjectAccess.project_id == project_id))
     await db.execute(
         delete(RequirementLink).where(
             or_(
@@ -93,17 +100,14 @@ async def _project_counts(
     project_id: int,
     current_user: User,
 ) -> dict[str, int]:
-    external = current_user.role == UserRole.external
-    allowed_doc_types = (
-        await get_external_doc_types(db, current_user, project_id) if external else None
-    )
+    types = await visible_types(db, current_user, project_id)
 
     async def count_visible(model, doc_type: str) -> int:
-        if allowed_doc_types is not None and doc_type not in allowed_doc_types:
+        if not type_visible(types, doc_type):
             return 0
-        query = select(func.count(model.id)).where(model.project_id == project_id)
-        if external:
-            query = query.where(model.visibility == "customer")
+        query = apply_external_visibility_filter(
+            select(func.count(model.id)).where(model.project_id == project_id), model, current_user
+        )
         return (await db.scalar(query)) or 0
 
     req_count = await count_visible(Requirement, "REQ")
@@ -117,14 +121,14 @@ async def _project_counts(
     defect_count = await count_visible(Defect, "DEF")
 
     covered_query = covered_requirement_ids().where(ArtefactLink.project_id == project_id)
-    if external:
-        if allowed_doc_types is not None and not {"REQ", "TC"}.issubset(allowed_doc_types):
-            covered_query = None
-        else:
-            covered_query = covered_query.where(
-                Requirement.visibility == "customer",
-                TestCase.visibility == "customer",
-            )
+    if not (type_visible(types, "REQ") and type_visible(types, "TC")):
+        covered_query = None
+    else:
+        covered_query = apply_external_visibility_filter(
+            apply_external_visibility_filter(covered_query, Requirement, current_user),
+            TestCase,
+            current_user,
+        )
     if covered_query is None:
         covered_reqs = 0
     else:
@@ -172,11 +176,7 @@ async def _project_counts_bulk(
     if not project_ids:
         return {}
 
-    external = current_user.role == UserRole.external
-    allowed_by_project: dict[int, set[str] | None] = {}
-    if external:
-        for pid in project_ids:
-            allowed_by_project[pid] = await get_external_doc_types(db, current_user, pid)
+    types_by_project = {pid: await visible_types(db, current_user, pid) for pid in project_ids}
 
     counts: dict[int, dict[str, int]] = {
         pid: {key: 0 for _, _, key in _COUNTED_ARTEFACTS} for pid in project_ids
@@ -188,22 +188,23 @@ async def _project_counts_bulk(
             .where(model.project_id.in_(project_ids))
             .group_by(model.project_id)
         )
-        if external:
-            query = query.where(model.visibility == "customer")
+        query = apply_external_visibility_filter(query, model, current_user)
         for pid, total in (await db.execute(query)).all():
             # Mask types this external member may not see, matching the
             # single-project helper, which returns 0 rather than omitting them.
-            allowed = allowed_by_project.get(pid)
-            if allowed is not None and doc_type not in allowed:
+            if not type_visible(types_by_project[pid], doc_type):
                 continue
             counts[pid][key] = total or 0
 
-    covered_query = covered_requirement_ids().where(ArtefactLink.project_id.in_(project_ids))
-    if external:
-        covered_query = covered_query.where(
-            Requirement.visibility == "customer",
-            TestCase.visibility == "customer",
-        )
+    covered_query = apply_external_visibility_filter(
+        apply_external_visibility_filter(
+            covered_requirement_ids().where(ArtefactLink.project_id.in_(project_ids)),
+            Requirement,
+            current_user,
+        ),
+        TestCase,
+        current_user,
+    )
     # Distinct over (project, requirement) so a requirement verified by several
     # test cases still counts once, which is what the per-project version does.
     covered_sub = covered_query.add_columns(ArtefactLink.project_id).distinct().subquery()
@@ -213,9 +214,9 @@ async def _project_counts_bulk(
     covered_by_project = {pid: total or 0 for pid, total in covered_rows.all()}
 
     for pid in project_ids:
-        allowed = allowed_by_project.get(pid)
         covered = covered_by_project.get(pid, 0)
-        if allowed is not None and not {"REQ", "TC"}.issubset(allowed):
+        types = types_by_project[pid]
+        if not (type_visible(types, "REQ") and type_visible(types, "TC")):
             covered = 0
         req_total = counts[pid]["requirement_count"]
         counts[pid]["coverage_percent"] = coverage_percent_of(covered, req_total)
@@ -233,13 +234,9 @@ async def list_projects(
     List all projects with requirement and test case counts.
     """
     query = select(Project).order_by(Project.created_at.desc())
-    if current_user.role != UserRole.admin:
-        query = (
-            select(Project)
-            .join(ProjectMembership, ProjectMembership.project_id == Project.id)
-            .where(ProjectMembership.user_id == current_user.id)
-            .order_by(Project.created_at.desc())
-        )
+    project_ids = await accessible_project_ids(db, current_user)
+    if project_ids is not None:
+        query = query.where(Project.id.in_(project_ids))
     result = await db.execute(query)
     projects = result.scalars().all()
 
@@ -292,6 +289,8 @@ async def create_project(
     db.add(project)
     await db.flush()
     await db.refresh(project)
+    db.add(ProjectAccess(project_id=project.id, user_id=_current_user.id, owner=True))
+    await db.flush()
 
     return ProjectResponse(
         id=project.id,
@@ -372,17 +371,62 @@ async def get_project(
     )
 
 
+async def _can_edit_project(db: AsyncSession, current_user: User, project_id: int) -> bool:
+    """Return whether the current user can edit this project's metadata."""
+    if current_user.role == UserRole.admin:
+        return True
+    owner_entry = await db.scalar(
+        select(ProjectAccess.id).where(
+            ProjectAccess.project_id == project_id,
+            ProjectAccess.user_id == current_user.id,
+            ProjectAccess.owner.is_(True),
+        )
+    )
+    if owner_entry is not None:
+        return True
+    bundle_entry = await db.scalar(
+        select(ProjectAccess.id).where(
+            ProjectAccess.project_id == project_id,
+            ProjectAccess.user_id == current_user.id,
+            ProjectAccess.policy_group_id.is_not(None),
+        )
+    )
+    return bundle_entry is not None and await holds_on_project(
+        db, current_user, project_id, "edit", "project"
+    )
+
+
+@router.get("/{project_id}/capabilities", response_model=dict[str, bool])
+async def get_project_capabilities(
+    project_id: int,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the current user's project metadata and administration capabilities."""
+    await get_row_or_404(db, Project, project_id, "Project not found")
+    await require_project_access(db, current_user, project_id)
+    is_admin = current_user.role == UserRole.admin
+    return {
+        "can_edit": await _can_edit_project(db, current_user, project_id),
+        "can_delete": is_admin,
+        "can_manage_access": is_admin,
+    }
+
+
 @router.patch("/{project_id}", response_model=ProjectResponse)
 async def update_project(
     project_id: int,
     data: ProjectUpdate,
     db: AsyncSession = Depends(get_db, scope="function"),
-    current_user: User = Depends(require_role(UserRole.admin)),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Update a project.
     """
     project = await get_row_or_404(db, Project, project_id, "Project not found")
+
+    if not await _can_edit_project(db, current_user, project_id):
+        raise HTTPException(status_code=403, detail="Project Write permission is required")
 
     if data.name is not None:
         existing = await db.execute(

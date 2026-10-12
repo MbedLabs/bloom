@@ -4,9 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.artefact_utils import delete_project_row, get_row_or_404
+from app.api.artefact_utils import (
+    changes_allowed,
+    get_row_or_404,
+    get_visible_row,
+    type_visible,
+    visible_types,
+)
 from app.core.database import get_db
-from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS
 from app.core.link_rules import (
     get_allowed_link_roles,
     get_linkable_type_storage_values,
@@ -15,42 +20,17 @@ from app.core.link_rules import (
     normalize_linkable_type,
 )
 from app.core.security import (
-    external_doc_type_allowed,
+    effective_permissions,
     get_current_user,
     get_external_doc_types,
     require_project_access,
 )
-from app.models import (
-    ArtefactLink,
-    ArtefactVisibility,
-    ChangeRequest,
-    Defect,
-    DesignItem,
-    Document,
-    Project,
-    Requirement,
-    RiskItem,
-    TestCampaign,
-    TestCase,
-    TestConcept,
-    TestSuite,
-)
+from app.models import ArtefactLink, Project
 from app.models.user import User, UserRole
 from app.schemas import ArtefactLinkCreate, ArtefactLinkResponse
+from app.services.tag_links import link_end
 
 router = APIRouter()
-
-ARTEFACT_MODELS = {
-    "REQ": Requirement,
-    "TC": TestCase,
-    "DES": DesignItem,
-    "RSK": RiskItem,
-    "CHG": ChangeRequest,
-    "CPT": TestConcept,
-    "DEF": Defect,
-    "CMP": TestCampaign,
-    "TS": TestSuite,
-}
 
 
 def _link_response(row: ArtefactLink) -> ArtefactLinkResponse:
@@ -63,84 +43,6 @@ def _link_response(row: ArtefactLink) -> ArtefactLinkResponse:
     )
 
 
-async def _artefact_exists_in_project(
-    db: AsyncSession, project_id: int, artefact_type: str, artefact_id: int
-) -> bool:
-    normalized_type = normalize_linkable_type(artefact_type)
-
-    if normalized_type in ARTEFACT_MODELS:
-        model = ARTEFACT_MODELS[normalized_type]
-        row = (
-            await db.execute(
-                select(model.id).where(model.project_id == project_id, model.id == artefact_id)
-            )
-        ).scalar_one_or_none()
-        return row is not None
-
-    if normalized_type in CANONICAL_DOCUMENT_KINDS:
-        row = (
-            await db.execute(
-                select(Document.id).where(
-                    Document.project_id == project_id,
-                    Document.id == artefact_id,
-                    Document.doc_type == normalized_type,
-                )
-            )
-        ).scalar_one_or_none()
-        return row is not None
-
-    return False
-
-
-async def _link_endpoint_visible_to_current_user(
-    db: AsyncSession,
-    project_id: int,
-    artefact_type: str,
-    artefact_id: int,
-    current_user: User,
-    allowed_doc_types: set[str] | None,
-) -> bool:
-    normalized_type = normalize_linkable_type(artefact_type)
-
-    if normalized_type in ARTEFACT_MODELS:
-        model = ARTEFACT_MODELS[normalized_type]
-        row = (
-            await db.execute(
-                select(model).where(model.project_id == project_id, model.id == artefact_id)
-            )
-        ).scalar_one_or_none()
-        if row is None:
-            return False
-        if current_user.role == UserRole.external:
-            return getattr(row, "visibility", None) == ArtefactVisibility.customer.value
-        return True
-
-    if normalized_type in CANONICAL_DOCUMENT_KINDS:
-        row = (
-            await db.execute(
-                select(Document).where(
-                    Document.project_id == project_id,
-                    Document.id == artefact_id,
-                    Document.doc_type == normalized_type,
-                )
-            )
-        ).scalar_one_or_none()
-        if row is None:
-            return False
-        if current_user.role == UserRole.external:
-            return (
-                row.visibility == ArtefactVisibility.customer.value
-                and external_doc_type_allowed(
-                    current_user,
-                    allowed_doc_types,
-                    normalized_type,
-                )
-            )
-        return True
-
-    return False
-
-
 @router.get("", response_model=list[ArtefactLinkResponse])
 async def list_links(
     project_id: int = Query(...),
@@ -151,7 +53,7 @@ async def list_links(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    await require_project_access(db, current_user, project_id)
+    await require_project_access(db, current_user, project_id, permission=("view", "link"))
     allowed_doc_types = await get_external_doc_types(db, current_user, project_id)
 
     query = select(ArtefactLink).where(ArtefactLink.project_id == project_id)
@@ -168,33 +70,25 @@ async def list_links(
     if target_id is not None:
         query = query.where(ArtefactLink.target_id == target_id)
     rows = (await db.execute(query.order_by(ArtefactLink.created_at.desc()))).scalars().all()
+    types = await visible_types(db, current_user, project_id)
+    rows = [
+        row
+        for row in rows
+        if type_visible(types, normalize_linkable_type(row.source_type))
+        and type_visible(types, normalize_linkable_type(row.target_type))
+    ]
 
-    if current_user.role == UserRole.external:
+    if current_user.role != UserRole.admin:
         visible_rows = []
         for row in rows:
-            source_visible = await _link_endpoint_visible_to_current_user(
-                db,
-                project_id,
-                row.source_type,
-                row.source_id,
-                current_user,
-                allowed_doc_types,
-            )
-            if not source_visible:
-                continue
-
-            target_visible = await _link_endpoint_visible_to_current_user(
-                db,
-                project_id,
-                row.target_type,
-                row.target_id,
-                current_user,
-                allowed_doc_types,
-            )
-            if not target_visible:
-                continue
-
-            visible_rows.append(row)
+            ends = (row.source_type, row.source_id), (row.target_type, row.target_id)
+            if all(
+                [
+                    (await link_end(db, project_id, kind, item, current_user, allowed_doc_types))[1]
+                    for kind, item in ends
+                ]
+            ):
+                visible_rows.append(row)
         rows = visible_rows
 
     return [_link_response(row) for row in rows]
@@ -234,16 +128,32 @@ async def create_link(
                 f"{data.source_type} -> {data.target_type}. Allowed roles: {', '.join(allowed_roles)}"
             ),
         )
-    source_exists = await _artefact_exists_in_project(
-        db, data.project_id, data.source_type, data.source_id
+    allowed_doc_types = await get_external_doc_types(db, current_user, data.project_id)
+    permissions = await effective_permissions(db, current_user, data.project_id)
+    source, source_visible = await link_end(
+        db,
+        data.project_id,
+        data.source_type,
+        data.source_id,
+        current_user,
+        allowed_doc_types,
+        permissions,
     )
-    if not source_exists:
+    if not source_visible:
         raise HTTPException(status_code=404, detail="Source document not found in project")
-    target_exists = await _artefact_exists_in_project(
-        db, data.project_id, data.target_type, data.target_id
+    target, target_visible = await link_end(
+        db,
+        data.project_id,
+        data.target_type,
+        data.target_id,
+        current_user,
+        allowed_doc_types,
+        permissions,
     )
-    if not target_exists:
+    if not target_visible:
         raise HTTPException(status_code=404, detail="Target document not found in project")
+    if not (changes_allowed(current_user, source) and changes_allowed(current_user, target)):
+        raise HTTPException(status_code=403, detail="External users change only what they created.")
     existing = (
         await db.execute(
             select(ArtefactLink).where(
@@ -272,11 +182,20 @@ async def delete_link(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    await delete_project_row(
-        db,
-        current_user,
-        ArtefactLink,
-        link_id,
-        "Link not found",
-        resource="link",
-    )
+    link = await get_visible_row(db, ArtefactLink, link_id, "Link not found", current_user)
+    allowed_doc_types = await get_external_doc_types(db, current_user, link.project_id)
+    permissions = await effective_permissions(db, current_user, link.project_id)
+    ends = [
+        await link_end(
+            db, link.project_id, kind, item, current_user, allowed_doc_types, permissions
+        )
+        for kind, item in ((link.source_type, link.source_id), (link.target_type, link.target_id))
+    ]
+    if any(row is not None and not visible for row, visible in ends):
+        raise HTTPException(status_code=404, detail="Link not found")
+    await require_project_access(db, current_user, link.project_id, permission=("delete", "link"))
+    if current_user.role == UserRole.external and not all(
+        row is not None and changes_allowed(current_user, row) for row, _ in ends
+    ):
+        raise HTTPException(status_code=403, detail="External users change only what they created.")
+    await db.delete(link)

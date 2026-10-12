@@ -1,26 +1,50 @@
-"""Admin-managed user groups and policies: an additive entitlement layer.
+"""Admin-managed policies and groups.
 
-The instance roles (admin, maintainer, external) are unchanged. A Group gathers
-users, carries a Policy, and is granted projects. require_project_access reads
-the group grants after direct membership; a user with no group behaves exactly
-as their role does today, so this layer never regresses existing access.
+A Policy defines operations and origins; a Group owns a named set of policies.
+Project entries assign bundles to users. Earlier global memberships are retained.
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Table,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
+group_policies = Table(
+    "group_policies",
+    Base.metadata,
+    Column("group_id", Integer, ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True),
+    Column("policy_id", Integer, ForeignKey("policies.id"), primary_key=True),
+)
+
+user_application_policies = Table(
+    "user_application_policies",
+    Base.metadata,
+    Column("user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column("policy_id", Integer, ForeignKey("policies.id"), primary_key=True),
+)
+
 
 class Policy(Base):
-    """A named permission set: a base role floor plus an (action x resource) matrix.
+    """A named permission set: per resource, the actions it grants (stored as an
+    (action x resource) matrix and shown as Read or Write), and per document type the tags
+    it covers.
 
-    The shipped default policies carry is_default=True and are
-    protected from deletion and base_role change. A policy may nest under a parent,
-    inheriting then extending its matrix.
+    ``type_tags`` maps a document type to ``{"visibility": [...], "tags": [...]}``: the
+    built-in visibility tags (``internal``, ``customer``) and the ids of further tags. The
+    shipped defaults carry is_default=True and are read-only.
     """
 
     __tablename__ = "policies"
@@ -28,40 +52,33 @@ class Policy(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
     description: Mapped[str] = mapped_column(String(500), nullable=False, default="")
-    base_role: Mapped[str] = mapped_column(String(20), nullable=False, default="external")
+    scope: Mapped[str] = mapped_column(String(20), nullable=False, default="project")
     permissions: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
-    doc_tag_scope: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
-    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("policies.id"), nullable=True)
+    type_tags: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    parent: Mapped[Optional["Policy"]] = relationship(remote_side="Policy.id")
-
 
 class Group(Base):
-    """A named set of users that carries a policy and is granted projects."""
+    """A named bundle of policies assignable to users on individual projects."""
 
     __tablename__ = "groups"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
     description: Mapped[str] = mapped_column(String(500), nullable=False, default="")
-    policy_id: Mapped[Optional[int]] = mapped_column(ForeignKey("policies.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    policy: Mapped[Optional["Policy"]] = relationship()
     members: Mapped[List["GroupMembership"]] = relationship(
         back_populates="group", cascade="all, delete-orphan"
     )
-    grants: Mapped[List["GroupProjectGrant"]] = relationship(
-        back_populates="group", cascade="all, delete-orphan"
-    )
+    policies: Mapped[List[Policy]] = relationship(secondary=group_policies, lazy="selectin")
 
 
 class GroupMembership(Base):
@@ -78,18 +95,3 @@ class GroupMembership(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     group: Mapped["Group"] = relationship(back_populates="members")
-
-
-class GroupProjectGrant(Base):
-    """Grants a group its policy on a project. A NULL project_id is an all-projects
-    grant that covers every project, present and future."""
-
-    __tablename__ = "group_project_grants"
-    __table_args__ = (UniqueConstraint("group_id", "project_id", name="uq_group_project_grant"),)
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), nullable=False)
-    project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
-    group: Mapped["Group"] = relationship(back_populates="grants")

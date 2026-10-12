@@ -1,9 +1,15 @@
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { dashboardApi } from '../api/client'
 import { FolderKanban, FileText, CheckCircle, FlaskConical, AlertTriangle, ArrowRight, TrendingUp, Shield } from 'lucide-react'
+import { SortableHeader } from '../components/ListControls'
+
+type SortField = 'name' | 'status' | 'requirement_count' | 'test_case_count' | 'coverage' | 'health'
 
 export default function Reports() {
+  const [sortField, setSortField] = useState<SortField>('name')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const { data: stats, isLoading } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: dashboardApi.getStats,
@@ -38,6 +44,19 @@ export default function Reports() {
   const projectsWithUncovered = [...s.projects]
     .filter((project) => project.uncovered_requirement_count > 0)
     .sort((a, b) => a.prefix.localeCompare(b.prefix))
+  const sortedProjects = [...s.projects].sort((a, b) => {
+    const value = (project: typeof a) => sortField === 'coverage' ? getCoverage(project)
+      : sortField === 'health' ? HEALTH_LABELS[getHealth(project, getCoverage(project))]
+      : project[sortField]
+    const av = value(a)
+    const bv = value(b)
+    const order = typeof av === 'number' && typeof bv === 'number' ? av - bv : String(av).localeCompare(String(bv))
+    return order * (sortDir === 'asc' ? 1 : -1) || a.id - b.id
+  })
+  const toggleSort = (field: SortField) => {
+    setSortDir(field === sortField && sortDir === 'asc' ? 'desc' : 'asc')
+    setSortField(field)
+  }
 
   if (isLoading) {
     return (
@@ -152,21 +171,23 @@ export default function Reports() {
             <table className="min-w-full divide-y divide-border">
               <thead className="bg-muted/50">
                 <tr>
-                  <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Project</th>
-                  <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
-                  <th className="px-5 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Requirements</th>
-                  <th className="px-5 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Test Cases</th>
-                  <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Coverage</th>
-                  <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Health</th>
+                  {([
+                    ['name', 'Project'], ['status', 'Status'], ['requirement_count', 'Requirements'],
+                    ['test_case_count', 'Test Cases'], ['coverage', 'Coverage'], ['health', 'Health'],
+                  ] as const).map(([field, label]) => (
+                    <SortableHeader key={field} field={field} sortField={sortField} sortDir={sortDir} onSort={toggleSort}
+                      className={`px-5 py-3 ${field === 'requirement_count' || field === 'test_case_count' ? 'text-center' : 'text-left'} text-xs font-medium text-muted-foreground uppercase cursor-pointer select-none hover:text-foreground transition-colors`}>
+                      {label}
+                    </SortableHeader>
+                  ))}
                   <th className="px-5 py-3 text-right text-xs font-medium text-muted-foreground uppercase"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {s.projects.map((p) => {
+                {sortedProjects.map((p) => {
                   // Coverage = requirements with >=1 verifying test case / total
                   // requirements (NOT test-case count / requirement count).
-                  const coveredReqs = Math.max(0, p.requirement_count - p.uncovered_requirement_count)
-                  const cov = p.requirement_count > 0 ? Math.round((coveredReqs / p.requirement_count) * 100) : 0
+                  const cov = getCoverage(p)
                   const health = getHealth(p, cov)
                   return (
                     <tr key={p.id} className="hover:bg-accent/30">
@@ -210,7 +231,7 @@ export default function Reports() {
       {s.uncovered_requirements > 0 && projectsWithUncovered.length > 0 && (
         <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-5">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
             <div>
               <h3 className="text-sm font-semibold text-foreground">Coverage Attention Needed</h3>
               <p className="text-sm text-muted-foreground mt-1">
@@ -287,6 +308,13 @@ function HealthBadge({ level }: { level: string }) {
   }
   const cfg = config[level] || config.empty
   return <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${cfg.colors}`}>{cfg.icon}</span>
+}
+
+const HEALTH_LABELS: Record<string, string> = { good: 'Good', warning: 'Warning', critical: 'Critical', empty: 'N/A' }
+
+function getCoverage(project: { requirement_count: number; uncovered_requirement_count: number }) {
+  const covered = Math.max(0, project.requirement_count - project.uncovered_requirement_count)
+  return project.requirement_count > 0 ? Math.round((covered / project.requirement_count) * 100) : 0
 }
 
 function getHealth(p: { requirement_count: number; test_case_count: number; status: string }, cov: number): string {

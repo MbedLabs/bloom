@@ -10,11 +10,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.artefact_utils import (
     audit_artefact_deleted,
     audit_visibility_change,
+    check_external_change,
+    check_status_right,
+    check_visibility_right,
+    external_create_values,
     get_row_or_404,
     get_visible_row,
     naive_utc,
     page_of,
     requirement_summary,
+    type_visible,
+    visible_types,
 )
 from app.api.link_read_utils import get_verified_requirement_links_for_test_case
 from app.core.config import settings
@@ -58,6 +64,7 @@ from app.schemas import (
     TestConceptSummary,
     TestSuiteSummary,
 )
+from app.services.artefact_tags import attach_tags, creation_tags
 
 router = APIRouter()
 
@@ -223,6 +230,8 @@ async def list_campaigns(
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)
+    if not type_visible(await visible_types(db, current_user, project_id), "CMP"):
+        return PaginatedResponse(items=[], total=0, skip=skip, limit=limit)
 
     base = select(TestCampaign).where(TestCampaign.project_id == project_id)
     base = apply_external_visibility_filter(base, TestCampaign, current_user)
@@ -252,6 +261,7 @@ async def create_campaign(
         data.project_id,
         permission=("create", "CMP"),
     )
+    forced = external_create_values(current_user, "CMP", data.model_dump(exclude_unset=True))
 
     # Resolve suite_ids: prefer new field, fall back to legacy suite_id
     resolved_suite_ids = list(data.suite_ids) if data.suite_ids else []
@@ -295,13 +305,14 @@ async def create_campaign(
         "CMP",
     )
 
+    tag_ids = await creation_tags(db, current_user, data.project_id, data.tag_ids)
     campaign = TestCampaign(
         project_id=data.project_id,
         created_by_id=current_user.id,
         campaign_id=campaign_public_id,
         name=data.name,
         description=data.description,
-        visibility=data.visibility,
+        visibility=forced.get("visibility", data.visibility),
         suite_id=resolved_suite_ids[0] if resolved_suite_ids else None,
         bud_run_id=data.bud_run_id,
         bud_run_url=data.bud_run_url,
@@ -310,6 +321,7 @@ async def create_campaign(
     )
     db.add(campaign)
     await db.flush()
+    await attach_tags(db, "campaign", campaign, tag_ids, current_user)
     await db.refresh(campaign)
 
     # Create CampaignSuite rows for multi-suite support
@@ -370,7 +382,12 @@ async def get_campaign(
     current_user: User = Depends(get_current_user),
 ):
     campaign = await get_visible_row(
-        db, TestCampaign, campaign_id, "Campaign not found", current_user
+        db,
+        TestCampaign,
+        campaign_id,
+        "Campaign not found",
+        current_user,
+        permission=("view", "CMP"),
     )
     return await _build_campaign_detail(campaign, db, current_user)
 
@@ -390,6 +407,10 @@ async def update_campaign(
         current_user,
         permission=("edit", "CMP"),
     )
+    changes = data.model_dump(exclude_unset=True)
+    check_external_change(current_user, "CMP", campaign, changes)
+    await check_status_right(db, current_user, "CMP", campaign, changes)
+    await check_visibility_right(db, current_user, "CMP", campaign, changes)
 
     if data.name is not None:
         campaign.name = data.name
@@ -629,10 +650,11 @@ async def _build_campaign_responses_batch(
         return []
 
     campaign_ids = [c.id for c in campaigns]
+    types = await visible_types(db, current_user, campaigns[0].project_id) if current_user else None
     totals_query = (
         select(TestCampaignItem.campaign_id, func.count(TestCampaignItem.id))
         .join(TestCase, TestCase.id == TestCampaignItem.test_case_id)
-        .where(TestCampaignItem.campaign_id.in_(campaign_ids))
+        .where(TestCampaignItem.campaign_id.in_(campaign_ids), type_visible(types, "TC"))
         .group_by(TestCampaignItem.campaign_id)
     )
     if current_user is not None:
@@ -650,6 +672,7 @@ async def _build_campaign_responses_batch(
         .where(
             TestCampaignItem.campaign_id.in_(campaign_ids),
             TestCampaignItem.executed_at.is_not(None),
+            type_visible(types, "TC"),
         )
         .order_by(
             TestCampaignItem.campaign_id,
@@ -669,7 +692,7 @@ async def _build_campaign_responses_batch(
             apply_external_visibility_filter(
                 select(CampaignSuite, TestSuite)
                 .join(TestSuite, TestSuite.id == CampaignSuite.suite_id)
-                .where(CampaignSuite.campaign_id.in_(campaign_ids))
+                .where(CampaignSuite.campaign_id.in_(campaign_ids), type_visible(types, "TS"))
                 .order_by(CampaignSuite.campaign_id, CampaignSuite.id),
                 TestSuite,
                 current_user,
@@ -732,10 +755,11 @@ async def _build_campaign_responses_batch(
 async def _build_campaign_response(
     campaign: TestCampaign, db: AsyncSession, current_user: User | None = None
 ) -> TestCampaignResponse:
+    types = await visible_types(db, current_user, campaign.project_id) if current_user else None
     total_query = (
         select(func.count(TestCampaignItem.id))
         .join(TestCase, TestCase.id == TestCampaignItem.test_case_id)
-        .where(TestCampaignItem.campaign_id == campaign.id)
+        .where(TestCampaignItem.campaign_id == campaign.id, type_visible(types, "TC"))
     )
     if current_user is not None:
         total_query = apply_external_visibility_filter(total_query, TestCase, current_user)
@@ -746,6 +770,7 @@ async def _build_campaign_response(
         .where(
             TestCampaignItem.campaign_id == campaign.id,
             TestCampaignItem.executed_at.is_not(None),
+            type_visible(types, "TC"),
         )
         .order_by(TestCampaignItem.executed_at.desc(), TestCampaignItem.id.desc())
         .limit(1)
@@ -760,7 +785,7 @@ async def _build_campaign_response(
             apply_external_visibility_filter(
                 select(CampaignSuite, TestSuite)
                 .join(TestSuite, TestSuite.id == CampaignSuite.suite_id)
-                .where(CampaignSuite.campaign_id == campaign.id)
+                .where(CampaignSuite.campaign_id == campaign.id, type_visible(types, "TS"))
                 .order_by(CampaignSuite.id),
                 TestSuite,
                 current_user,
@@ -816,6 +841,7 @@ async def _build_campaign_detail(
     campaign: TestCampaign, db: AsyncSession, current_user: User | None = None
 ) -> TestCampaignDetailResponse:
     base = await _build_campaign_response(campaign, db, current_user)
+    types = await visible_types(db, current_user, campaign.project_id) if current_user else None
 
     items_result = await db.execute(
         select(TestCampaignItem).where(TestCampaignItem.campaign_id == campaign.id)
@@ -828,7 +854,7 @@ async def _build_campaign_detail(
     if tc_ids:
         tc_result = await db.execute(
             apply_external_visibility_filter(
-                select(TestCase).where(TestCase.id.in_(tc_ids)),
+                select(TestCase).where(TestCase.id.in_(tc_ids), type_visible(types, "TC")),
                 TestCase,
                 current_user,
             )
@@ -847,6 +873,7 @@ async def _build_campaign_detail(
                 ArtefactLink.target_type == "REQ",
                 ArtefactLink.source_id.in_(tc_ids),
                 ArtefactLink.role == "verifies",
+                type_visible(types, "REQ"),
             )
             .order_by(ArtefactLink.created_at.desc(), Requirement.req_id)
         )
@@ -905,7 +932,7 @@ async def _build_campaign_detail(
                 await db.execute(
                     apply_external_visibility_filter(
                         select(Requirement)
-                        .where(Requirement.id.in_(requirement_ids))
+                        .where(Requirement.id.in_(requirement_ids), type_visible(types, "REQ"))
                         .order_by(Requirement.req_id),
                         Requirement,
                         current_user,
@@ -936,7 +963,7 @@ async def _build_campaign_detail(
             .scalars()
             .all()
         )
-        if concept_links:
+        if concept_links and type_visible(types, "CPT"):
             concepts = (
                 (
                     await db.execute(
@@ -967,7 +994,7 @@ async def _build_campaign_detail(
             apply_external_visibility_filter(
                 select(CampaignSuite, TestSuite)
                 .join(TestSuite, TestSuite.id == CampaignSuite.suite_id)
-                .where(CampaignSuite.campaign_id == campaign.id)
+                .where(CampaignSuite.campaign_id == campaign.id, type_visible(types, "TS"))
                 .order_by(CampaignSuite.id),
                 TestSuite,
                 current_user,
@@ -980,7 +1007,7 @@ async def _build_campaign_detail(
             select(TestSuiteItem, TestSuite)
             .join(TestSuite, TestSuite.id == TestSuiteItem.suite_id)
             .join(CampaignSuite, CampaignSuite.suite_id == TestSuite.id)
-            .where(CampaignSuite.campaign_id == campaign.id),
+            .where(CampaignSuite.campaign_id == campaign.id, type_visible(types, "TS")),
             TestSuite,
             current_user,
         )
@@ -1029,8 +1056,12 @@ async def _build_test_case_response(
     current_user: User | None = None,
 ) -> TestCaseResponse:
     linked_requirements = []
-    for _link, req in await get_verified_requirement_links_for_test_case(tc.id, db, current_user):
-        linked_requirements.append(requirement_summary(req))
+    types = await visible_types(db, current_user, tc.project_id) if current_user else None
+    if type_visible(types, "REQ"):
+        for _link, req in await get_verified_requirement_links_for_test_case(
+            tc.id, db, current_user
+        ):
+            linked_requirements.append(requirement_summary(req))
     return TestCaseResponse(
         id=tc.id,
         project_id=tc.project_id,

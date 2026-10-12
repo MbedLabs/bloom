@@ -5,6 +5,9 @@ import { getBreadcrumbs } from '../lib/breadcrumbs'
 const projects = [{ id: 1, name: 'Vehicle Control Unit', prefix: 'VCU' }]
 
 describe('getBreadcrumbs', () => {
+  it.each([['/access', 'Access'], ['/users', 'Users']])('shows Home and %s', (path, label) => {
+    expect(getBreadcrumbs(path, '', projects)).toEqual([{ label: 'Home', href: '/' }, { label }])
+  })
   it('shows doc list label for new doc create, no New X crumb', () => {
     const crumbs = getBreadcrumbs(
       '/projects/VCU/docs/new',

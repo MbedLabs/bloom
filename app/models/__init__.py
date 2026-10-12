@@ -2,8 +2,9 @@
 
 from app.models.access_request import AccessRequest
 from app.models.audit import AuditEvent
-from app.models.groups import Group, GroupMembership, GroupProjectGrant, Policy
+from app.models.groups import Group, GroupMembership, Policy
 from app.models.models import (
+    AllowedLinkTriple,
     ArtefactActivity,
     ArtefactComment,
     ArtefactLink,
@@ -39,11 +40,32 @@ from app.models.models import (
     TestSuiteItem,
     WebhookDelivery,
 )
-from app.models.project_membership import ProjectExternalDocType, ProjectMembership
+from app.models.project_membership import (
+    ProjectAccess,
+    ProjectExternalDocType,
+    ProjectMembership,
+    project_access_policies,
+)
+from app.models.tags import ArtefactTag, Tag
 from app.models.user import User, UserRole
 from app.models.user_token import UserToken, UserTokenPurpose
+from app.models.workflow import (
+    ArtefactRequest,
+    ArtefactRequestRecipient,
+    ArtefactRevision,
+    ArtefactRevisionFile,
+    ArtefactWorkflow,
+)
 
 __all__ = [
+    "ArtefactWorkflow",
+    "ArtefactRevision",
+    "ArtefactRequest",
+    "ArtefactRequestRecipient",
+    "ArtefactRevisionFile",
+    "AllowedLinkTriple",
+    "ArtefactTag",
+    "Tag",
     "AccessRequest",
     "AuditEvent",
     "AttachmentUploadAttempt",
@@ -82,11 +104,12 @@ __all__ = [
     "ArtefactActivity",
     "Notification",
     "ArtefactLink",
+    "ProjectAccess",
     "ProjectMembership",
+    "project_access_policies",
     "ProjectExternalDocType",
     "Group",
     "GroupMembership",
-    "GroupProjectGrant",
     "Policy",
     "WebhookDelivery",
     "ServiceCredential",

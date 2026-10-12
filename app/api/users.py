@@ -7,20 +7,25 @@ import string
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import get_row_or_404
+from app.api.groups import _selected_policies
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.permissions import as_lists
 from app.core.security import (
+    effective_permissions,
     get_current_user,
     get_password_hash,
     require_project_access,
     require_role,
 )
 from app.models import Project
+from app.models.groups import GroupMembership, user_application_policies
 from app.models.models import (
     ARTEFACT_MODELS,
     Defect,
@@ -31,7 +36,11 @@ from app.models.models import (
     ServiceCredential,
     TestCase,
 )
-from app.models.project_membership import ProjectExternalDocType, ProjectMembership
+from app.models.project_membership import (
+    ProjectAccess,
+    ProjectExternalDocType,
+    ProjectMembership,
+)
 from app.models.user import User, UserRole
 from app.models.user_token import UserToken, UserTokenPurpose
 from app.schemas.auth import (
@@ -54,6 +63,91 @@ from app.services.token_service import create_user_token, invalidate_tokens
 router = APIRouter()
 
 require_admin = require_role(UserRole.admin)
+
+
+class ApplicationPoliciesInput(BaseModel):
+    """The distinct application policies assigned to one account."""
+
+    model_config = ConfigDict(extra="forbid")
+    policy_ids: list[int] = Field(default_factory=list)
+
+    @field_validator("policy_ids")
+    @classmethod
+    def valid_ids(cls, ids):
+        """Require distinct positive policy identifiers."""
+        if any(value <= 0 for value in ids) or len(ids) != len(set(ids)):
+            raise ValueError("Choose distinct positive policy identifiers")
+        return sorted(ids)
+
+
+@router.get("/me/application-permissions")
+async def my_application_permissions(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    """Return the current account's app-resource operations."""
+    return as_lists(await effective_permissions(db, current_user, None))
+
+
+@router.get("/{user_id}/application-policies")
+async def application_policy_ids(
+    user_id: int,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    """List the account's separately selected application policies."""
+    if await db.get(User, user_id) is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    ids = await db.scalars(
+        select(user_application_policies.c.policy_id)
+        .where(user_application_policies.c.user_id == user_id)
+        .order_by(user_application_policies.c.policy_id)
+    )
+    return {"policy_ids": list(ids)}
+
+
+@router.put("/{user_id}/application-policies")
+async def set_application_policies(
+    user_id: int,
+    data: ApplicationPoliciesInput,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    """Set app-only policies for an account without changing its base role."""
+    if await db.get(User, user_id) is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    policies = await _selected_policies(db, data.policy_ids)
+    if any(policy.scope != "app" for policy in policies):
+        raise HTTPException(status_code=400, detail="Choose application policies only")
+    existing = set(
+        await db.scalars(
+            select(user_application_policies.c.policy_id).where(
+                user_application_policies.c.user_id == user_id
+            )
+        )
+    )
+    removed = existing - set(data.policy_ids)
+    if removed:
+        await db.execute(
+            delete(user_application_policies).where(
+                user_application_policies.c.user_id == user_id,
+                user_application_policies.c.policy_id.in_(removed),
+            )
+        )
+    added = set(data.policy_ids) - existing
+    if added:
+        await db.execute(
+            user_application_policies.insert(),
+            [{"user_id": user_id, "policy_id": policy_id} for policy_id in sorted(added)],
+        )
+    await record_audit_event(
+        db,
+        "user.application_policies_updated",
+        target_type="user",
+        target_id=user_id,
+        details={"policy_ids": data.policy_ids},
+    )
+    return {"policy_ids": data.policy_ids}
 
 
 async def _get_user_or_404(db: AsyncSession, user_id: int) -> User:
@@ -137,11 +231,16 @@ async def list_mentionable_users(
 
     await require_project_access(db, current_user, project_id)
 
-    member_ids = select(ProjectMembership.user_id).where(ProjectMembership.project_id == project_id)
+    member_ids = select(ProjectAccess.user_id).where(ProjectAccess.project_id == project_id)
+    grouped_ids = select(GroupMembership.user_id).where(
+        GroupMembership.group_id.in_(
+            select(ProjectAccess.group_id).where(ProjectAccess.project_id == project_id)
+        )
+    )
     result = await db.execute(
         select(User)
         .where(User.is_active.is_(True))
-        .where(or_(User.id.in_(member_ids), User.role == UserRole.admin))
+        .where(or_(User.id.in_(member_ids), User.id.in_(grouped_ids), User.role == UserRole.admin))
         .order_by(User.full_name.asc())
     )
     return [MentionableUserResponse.model_validate(u) for u in result.scalars().all()]
@@ -385,7 +484,7 @@ async def reject_email_change(
 async def update_user(
     user_id: int,
     data: UserUpdate,
-    _admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(select(User).where(User.id == user_id))
@@ -401,7 +500,11 @@ async def update_user(
         if user.role == UserRole.admin and data.role != UserRole.admin:
             raise HTTPException(status_code=400, detail="Admin role cannot be changed")
         if user.role != UserRole.admin and data.role == UserRole.admin:
-            raise HTTPException(status_code=400, detail="Promoting users to admin is not allowed")
+            if admin.email != settings.ADMIN_EMAIL:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only the initial administrator can promote users to admin",
+                )
         user.role = data.role
     if data.is_active is not None:
         user.is_active = data.is_active
@@ -497,6 +600,8 @@ async def delete_user(
             )
         )
         await db.execute(delete(ProjectMembership).where(ProjectMembership.user_id == user_id))
+        await db.execute(delete(ProjectAccess).where(ProjectAccess.user_id == user_id))
+        await db.execute(delete(GroupMembership).where(GroupMembership.user_id == user_id))
         await db.execute(delete(Notification).where(Notification.user_id == user_id))
         await db.execute(delete(ImportAttempt).where(ImportAttempt.user_id == user_id))
 

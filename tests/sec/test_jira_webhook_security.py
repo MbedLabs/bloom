@@ -30,7 +30,7 @@ SECRET = "jira-hook-secret-123"
 
 
 @pytest_asyncio.fixture
-async def env():
+async def env(request):
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -56,7 +56,7 @@ async def env():
                 project_id=project.id,
                 change_id="ALP-CR-001",
                 title="Swap the sensor",
-                status="Submitted",
+                status=getattr(request, "param", "Submitted"),
                 external_tracker="jira",
                 external_repo_full_name="PROJ",
                 external_issue_number=99,
@@ -195,6 +195,29 @@ async def test_valid_signature_closes_the_linked_change_request(env):
     assert response.status_code == 200
     assert response.json()["target"] == "change_request"
     assert await _change_status(maker) == "Closed"
+    repeated = _post(client, body, signature=_sign(body), delivery="d-cr")
+    assert repeated.status_code == 200, repeated.text
+    assert repeated.json()["status"] == "duplicate"
+    async with maker() as session:
+        events = (await session.scalars(select(ChangeRequestSyncEvent))).all()
+        assert len([event for event in events if event.success]) == 1
+
+
+@pytest.mark.parametrize("env", ["Draft", "Review", "Approved"], indirect=True)
+async def test_tracker_closure_cannot_bypass_canonical_change_workflow(env):
+    client, maker = env
+    original = await _change_status(maker)
+    body = _payload("PROJ-99")
+    response = _post(client, body, signature=_sign(body), delivery="canonical-closure")
+    assert response.status_code == 409, response.text
+    assert await _change_status(maker) == original
+
+
+async def test_invalid_tracker_signature_cannot_close_legacy_change(env):
+    client, maker = env
+    response = _post(client, _payload("PROJ-99"), signature="sha256=bad", delivery="legacy-invalid")
+    assert response.status_code == 403, response.text
+    assert await _change_status(maker) == "Submitted"
 
 
 @pytest.mark.asyncio

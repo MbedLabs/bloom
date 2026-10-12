@@ -1,7 +1,7 @@
 """integration_settings: Jira inbound filter, priority map and two-way switch
 
 Revision ID: a4c9e1f27b60
-Revises: 7dbc5eb75da5
+Revises: f3c17b0a55de
 Create Date: 2026-09-24
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "a4c9e1f27b60"
-down_revision = "7dbc5eb75da5"
+down_revision = "f3c17b0a55de"
 branch_labels = None
 depends_on = None
 
@@ -27,9 +27,7 @@ def upgrade() -> None:
         "integration_settings",
         sa.Column("jira_reference_field", sa.String(length=100), nullable=True),
     )
-    op.add_column(
-        "integration_settings", sa.Column("jira_priority_map", sa.JSON(), nullable=True)
-    )
+    op.add_column("integration_settings", sa.Column("jira_priority_map", sa.JSON(), nullable=True))
     op.add_column(
         "integration_settings",
         sa.Column("two_way", sa.Boolean(), nullable=False, server_default=sa.false()),

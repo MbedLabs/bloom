@@ -7,10 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.artefact_utils import (
     apply_update,
     delete_project_row,
+    fully_visible_types,
     get_row_or_404,
     get_visible_row,
+    type_visible,
 )
 from app.core.database import get_db
+from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS
 from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_project_access
 from app.models import (
@@ -29,11 +32,31 @@ from app.services.audit import record_audit_event
 
 router = APIRouter()
 
+SNAPSHOT_SECTION_TYPES = {
+    "requirements": ("REQ",),
+    "test_cases": ("TC",),
+    "documents": CANONICAL_DOCUMENT_KINDS,
+    "designs": ("DES",),
+    "risks": ("RSK",),
+    "changes": ("CHG",),
+}
 
-def _baseline_response(item: Baseline, current_user: User) -> BaselineResponse:
+
+def _baseline_response(
+    item: Baseline, current_user: User, types: frozenset[str] | None
+) -> BaselineResponse:
+    """The baseline as the user sees it: no snapshot for an external user, else the
+    snapshot sections whose document types are all in ``types``, the types of which the
+    user sees every row."""
     response = BaselineResponse.model_validate(item)
     if current_user.role == UserRole.external:
         response.snapshot = None
+    elif types is not None and response.snapshot is not None:
+        response.snapshot = {
+            section: value
+            for section, value in response.snapshot.items()
+            if all(type_visible(types, code) for code in SNAPSHOT_SECTION_TYPES.get(section, ()))
+        }
     return response
 
 
@@ -95,14 +118,15 @@ async def list_baselines(
     current_user: User = Depends(get_current_user),
 ):
     if project_id is not None:
-        await require_project_access(db, current_user, project_id)
+        await require_project_access(db, current_user, project_id, permission=("view", "baseline"))
     query = select(Baseline).order_by(Baseline.created_at.desc())
     if project_id:
         query = query.where(Baseline.project_id == project_id)
     elif current_user.role != UserRole.admin:
         raise HTTPException(status_code=400, detail="project_id is required for non-admin users")
     result = await db.execute(query)
-    return [_baseline_response(item, current_user) for item in result.scalars().all()]
+    types = await fully_visible_types(db, current_user, project_id) if project_id else None
+    return [_baseline_response(item, current_user, types) for item in result.scalars().all()]
 
 
 @router.post("", response_model=BaselineResponse, status_code=201)
@@ -141,7 +165,9 @@ async def create_baseline(
         project_id=item.project_id,
     )
     await db.refresh(item)
-    return _baseline_response(item, current_user)
+    return _baseline_response(
+        item, current_user, await fully_visible_types(db, current_user, item.project_id)
+    )
 
 
 @router.get("/{baseline_id}", response_model=BaselineResponse)
@@ -155,8 +181,10 @@ async def get_baseline(
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Baseline not found")
-    await require_project_access(db, current_user, item.project_id)
-    return _baseline_response(item, current_user)
+    await require_project_access(db, current_user, item.project_id, permission=("view", "baseline"))
+    return _baseline_response(
+        item, current_user, await fully_visible_types(db, current_user, item.project_id)
+    )
 
 
 @router.patch("/{baseline_id}", response_model=BaselineResponse)
@@ -175,7 +203,9 @@ async def update_baseline(
         permission=("edit", "baseline"),
     )
     await apply_update(db, item, data, "baseline")
-    return _baseline_response(item, current_user)
+    return _baseline_response(
+        item, current_user, await fully_visible_types(db, current_user, item.project_id)
+    )
 
 
 @router.delete("/{baseline_id}", status_code=204)

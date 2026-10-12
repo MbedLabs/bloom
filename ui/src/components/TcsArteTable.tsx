@@ -1,3 +1,4 @@
+import UserIdentity from './UserIdentity'
 import { parameterKeyHref } from '../utils/parameters'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
@@ -20,12 +21,13 @@ import {
 } from '../utils/tcs'
 import MentionTextarea from './editor/MentionTextarea'
 import type { MentionSuggestion } from './editor/MentionList'
+import { MenuAction, RowMenu, type MenuPosition } from './RowMenu'
 
 const ROW_TYPE_STYLES: Record<TcsRowType, { marker: string; chip: string; row: string; label: string }> = {
   precondition: {
     marker: 'bg-sky-500',
     chip: 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-300',
-    row: 'bg-sky-500/[0.025]',
+    row: 'bg-sky-500/2.5',
     label: 'Pre-Condition',
   },
   step: {
@@ -37,7 +39,7 @@ const ROW_TYPE_STYLES: Record<TcsRowType, { marker: string; chip: string; row: s
   loop: {
     marker: 'bg-amber-500',
     chip: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300',
-    row: 'bg-amber-500/[0.06]',
+    row: 'bg-amber-500/6',
     label: 'Loop',
   },
 }
@@ -98,7 +100,7 @@ export function TcsArteTable({
       />
     )
   }
-  return <TcsArteTableView rows={rows} parameterHref={parameterHref} parameterValues={parameterValues} />
+  return <TcsArteTableView people={userMentionItems} rows={rows} parameterHref={parameterHref} parameterValues={parameterValues} />
 }
 
 /**
@@ -109,10 +111,27 @@ export function TcsArteTable({
  * step, "{{BOOT_BUDGET_MS}}" says nothing about what the budget actually is,
  * so each reference becomes a link to the screen that owns the value.
  */
-function withParameterLinks(text: string, href?: string, values?: Record<string, string>): ReactNode {
-  if (!text.includes('{{') || (!href && !values)) return text
+function withUserPictures(text: string, people: MentionSuggestion[]): ReactNode {
+  const unique = people.filter(person => person.user?.profile_picture_url && people.filter(other => other.label === person.label).length === 1)
+  const labels = unique.map(person => person.label).sort((a, b) => b.length - a.length)
+  if (!labels.length || !text.includes('@')) return text
+  const pattern = new RegExp(`@(${labels.map(label => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?![\\w])`, 'g')
+  const output: ReactNode[] = []
+  let start = 0
+  for (const match of text.matchAll(pattern)) {
+    output.push(text.slice(start, match.index))
+    const person = unique.find(candidate => candidate.label === match[1])
+    output.push(<UserIdentity key={match.index} user={person!.user!} prefix="@" pictureClassName="w-5 h-5" />)
+    start = match.index! + match[0].length
+  }
+  output.push(text.slice(start))
+  return output
+}
+
+function withParameterLinks(text: string, href?: string, values?: Record<string, string>, people: MentionSuggestion[] = []): ReactNode {
+  if (!text.includes('{{') || (!href && !values)) return withUserPictures(text, people)
   return text.split(/(\{\{[^{}\n]+\}\})/g).map((part, index) => {
-    if (!/^\{\{[^{}\n]+\}\}$/.test(part)) return part
+    if (!/^\{\{[^{}\n]+\}\}$/.test(part)) return withUserPictures(part, people)
     const key = part.slice(2, -2)
     const shown = values?.[key] || part
     const title = values?.[key] ? part : `Open parameter ${key}`
@@ -128,7 +147,7 @@ function withParameterLinks(text: string, href?: string, values?: Record<string,
   })
 }
 
-function TcsArteTableView({ rows, parameterHref, parameterValues }: { rows: TcsRow[]; parameterHref?: string; parameterValues?: Record<string, string> }) {
+function TcsArteTableView({ rows, parameterHref, parameterValues, people }: { rows: TcsRow[]; parameterHref?: string; parameterValues?: Record<string, string>; people: MentionSuggestion[] }) {
   if (!rows || rows.length === 0) return null
   const visibleRows = getVisibleRows(rows)
 
@@ -143,7 +162,7 @@ function TcsArteTableView({ rows, parameterHref, parameterValues }: { rows: TcsR
           </div>
           <div className="divide-y divide-border">
             {visibleRows.map(({ row }) => (
-              <TcsViewRow key={row.id} row={row} parameterHref={parameterHref} parameterValues={parameterValues} hasChildren={hasChildRows(rows, rows.findIndex((candidate) => candidate.id === row.id))} />
+              <TcsViewRow key={row.id} row={row} people={people} parameterHref={parameterHref} parameterValues={parameterValues} hasChildren={hasChildRows(rows, rows.findIndex((candidate) => candidate.id === row.id))} />
             ))}
           </div>
         </div>
@@ -152,12 +171,12 @@ function TcsArteTableView({ rows, parameterHref, parameterValues }: { rows: TcsR
   )
 }
 
-function TcsViewRow({ row, hasChildren, parameterHref, parameterValues }: { row: TcsRow; hasChildren: boolean; parameterHref?: string; parameterValues?: Record<string, string> }) {
+function TcsViewRow({ row, hasChildren, parameterHref, parameterValues, people }: { row: TcsRow; hasChildren: boolean; parameterHref?: string; parameterValues?: Record<string, string>; people: MentionSuggestion[] }) {
   const styles = ROW_TYPE_STYLES[row.row_type]
   const isLoop = row.row_type === 'loop'
 
   return (
-    <div className={`grid grid-cols-[14rem_minmax(18rem,1fr)_minmax(18rem,1fr)] min-h-[4rem] ${styles.row}`}>
+    <div className={`grid grid-cols-[14rem_minmax(18rem,1fr)_minmax(18rem,1fr)] min-h-16 ${styles.row}`}>
       <div className="border-r border-border/70 px-3 py-3">
         <div className="flex items-center gap-2" style={{ paddingLeft: `${row.indent_level * 18}px` }}>
           <span className={`h-6 w-1 rounded-full ${styles.marker}`} />
@@ -175,12 +194,12 @@ function TcsViewRow({ row, hasChildren, parameterHref, parameterValues }: { row:
       </div>
       <div className={`border-r border-border/70 px-4 py-3 text-sm ${isLoop ? 'font-medium text-foreground' : 'text-foreground'} whitespace-pre-wrap`}>
         {row.description
-          ? withParameterLinks(row.description, parameterHref, parameterValues)
+          ? withParameterLinks(row.description, parameterHref, parameterValues, people)
           : <span className="text-muted-foreground">-</span>}
       </div>
       <div className="px-4 py-3 text-sm text-foreground whitespace-pre-wrap">
         {row.expected_result
-          ? withParameterLinks(row.expected_result, parameterHref, parameterValues)
+          ? withParameterLinks(row.expected_result, parameterHref, parameterValues, people)
           : <span className="text-muted-foreground">-</span>}
       </div>
     </div>
@@ -201,19 +220,8 @@ function TcsArteTableEditor({
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [actionMenu, setActionMenu] = useState<{ index: number; top: number; left: number } | null>(null)
-  const [addMenu, setAddMenu] = useState<{ top: number; left: number } | null>(null)
+  const [addMenu, setAddMenu] = useState<MenuPosition | null>(null)
   const visibleRows = getVisibleRows(rows)
-
-  const getMenuPosition = (button: HTMLButtonElement, menuHeight: number) => {
-    const rect = button.getBoundingClientRect()
-    const menuWidth = 176
-    const spaceBelow = window.innerHeight - rect.bottom
-    const top = spaceBelow < menuHeight + 12
-      ? Math.max(8, rect.top - menuHeight - 4)
-      : rect.bottom + 4
-    const left = Math.min(window.innerWidth - menuWidth - 8, Math.max(8, rect.right - menuWidth))
-    return { top, left }
-  }
 
   const updateRow = (index: number, updates: Partial<TcsRow>) => {
     const newRows = [...rows]
@@ -289,12 +297,12 @@ function TcsArteTableEditor({
                 onInsert={() => insertRow(index)}
                 onDuplicate={() => duplicateRow(index)}
                 onRemove={() => removeRow(index)}
-                onToggleMenu={(button) => {
+                onToggleMenu={(position) => {
                   if (actionMenu?.index === index) {
                     setActionMenu(null)
                     return
                   }
-                  setActionMenu({ index, ...getMenuPosition(button, 204) })
+                  setActionMenu({ index, ...position })
                   setAddMenu(null)
                 }}
                 onCloseMenu={() => setActionMenu(null)}
@@ -309,12 +317,12 @@ function TcsArteTableEditor({
             <TcsAddRow
               menuOpen={Boolean(addMenu)}
               menuPosition={addMenu}
-              onToggleMenu={(button) => {
+              onToggleMenu={(position) => {
                 if (addMenu) {
                   setAddMenu(null)
                   return
                 }
-                setAddMenu(getMenuPosition(button, 124))
+                setAddMenu(position)
                 setActionMenu(null)
               }}
               onAdd={addRow}
@@ -333,33 +341,31 @@ function TcsAddRow({
   onAdd,
 }: {
   menuOpen: boolean
-  menuPosition: { top: number; left: number } | null
-  onToggleMenu: (button: HTMLButtonElement) => void
+  menuPosition: MenuPosition | null
+  onToggleMenu: (position: MenuPosition) => void
   onAdd: (type: TcsRowType) => void
 }) {
   return (
-    <div className="grid grid-cols-[15rem_minmax(18rem,1fr)_minmax(18rem,1fr)_4rem] min-h-[2.5rem] bg-muted/20">
+    <div className="grid grid-cols-[15rem_minmax(18rem,1fr)_minmax(18rem,1fr)_4rem] min-h-10 bg-muted/20">
       <div className="border-r border-border/70 px-3 py-1.5">
-        <button
-          type="button"
-          onClick={(event) => onToggleMenu(event.currentTarget)}
-          className="flex h-7 w-7 items-center justify-center border border-border text-muted-foreground hover:border-primary/40 hover:bg-accent hover:text-foreground"
+        <RowMenu
+          icon={<Plus className="h-4 w-4" />}
           title="Add row"
+          buttonClassName="flex h-7 w-7 items-center justify-center border border-border text-muted-foreground hover:border-primary/40 hover:bg-accent hover:text-foreground"
+          menuHeight={124}
+          open={menuOpen}
+          position={menuPosition}
+          onToggle={onToggleMenu}
         >
-          <Plus className="h-4 w-4" />
-        </button>
-        {menuOpen && menuPosition && (
-          <div className="fixed z-[100] w-44 border border-border bg-card shadow-elegant" style={{ top: menuPosition.top, left: menuPosition.left }}>
-            {TCS_ROW_TYPE_OPTIONS.map((option) => (
-              <MenuAction
-                key={option.value}
-                icon={<Plus className="h-3.5 w-3.5" />}
-                label={ROW_TYPE_STYLES[option.value].label}
-                onClick={() => onAdd(option.value)}
-              />
-            ))}
-          </div>
-        )}
+          {TCS_ROW_TYPE_OPTIONS.map((option) => (
+            <MenuAction
+              key={option.value}
+              icon={<Plus className="h-3.5 w-3.5" />}
+              label={ROW_TYPE_STYLES[option.value].label}
+              onClick={() => onAdd(option.value)}
+            />
+          ))}
+        </RowMenu>
       </div>
       <div className="border-r border-border/70" />
       <div className="border-r border-border/70" />
@@ -394,13 +400,13 @@ function TcsEditorRow({
   userMentionItems: MentionSuggestion[]
   isDragTarget: boolean
   menuOpen: boolean
-  menuPosition: { top: number; left: number } | null
+  menuPosition: MenuPosition | null
   onUpdate: (updates: Partial<TcsRow>) => void
   onIndent: (direction: 'increase' | 'decrease') => void
   onInsert: () => void
   onDuplicate: () => void
   onRemove: () => void
-  onToggleMenu: (button: HTMLButtonElement) => void
+  onToggleMenu: (position: MenuPosition) => void
   onCloseMenu: () => void
   onDragStart: () => void
   onDragOver: () => void
@@ -411,7 +417,7 @@ function TcsEditorRow({
 
   return (
     <div
-      className={`group grid grid-cols-[15rem_minmax(18rem,1fr)_minmax(18rem,1fr)_4rem] min-h-[5.25rem] ${styles.row} ${isDragTarget ? 'bg-primary/10' : ''}`}
+      className={`group grid grid-cols-[15rem_minmax(18rem,1fr)_minmax(18rem,1fr)_4rem] min-h-21 ${styles.row} ${isDragTarget ? 'bg-primary/10' : ''}`}
       draggable
       onDragStart={onDragStart}
       onDragOver={(event) => {
@@ -445,7 +451,7 @@ function TcsEditorRow({
                   label: TCS_ROW_TYPE_OPTIONS.find((option) => option.value === rowType)?.label || rowType,
                 })
               }}
-              className={`h-7 min-w-0 flex-1 border px-2 text-xs font-semibold outline-none focus:ring-1 focus:ring-ring ${styles.chip}`}
+              className={`h-7 min-w-0 flex-1 border px-2 text-xs font-semibold outline-hidden focus:ring-1 focus:ring-ring ${styles.chip}`}
             >
               {TCS_ROW_TYPE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -461,7 +467,7 @@ function TcsEditorRow({
           onChange={(description) => onUpdate({ description })}
           mentionItems={mentionItems}
           userMentionItems={userMentionItems}
-          className="min-h-[4rem] w-full resize-y border-0 bg-transparent px-2 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:bg-background focus:ring-1 focus:ring-ring"
+          className="min-h-16 w-full resize-y border-0 bg-transparent px-2 py-1 text-sm text-foreground outline-hidden placeholder:text-muted-foreground/60 focus:bg-background focus:ring-1 focus:ring-ring"
           placeholder={row.row_type === 'loop' ? 'Loop condition or group intent' : 'Action / description'}
         />
       </div>
@@ -472,55 +478,30 @@ function TcsEditorRow({
           onChange={(expected_result) => onUpdate({ expected_result })}
           mentionItems={mentionItems}
           userMentionItems={userMentionItems}
-          className="min-h-[4rem] w-full resize-y border-0 bg-transparent px-2 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:bg-background focus:ring-1 focus:ring-ring"
+          className="min-h-16 w-full resize-y border-0 bg-transparent px-2 py-1 text-sm text-foreground outline-hidden placeholder:text-muted-foreground/60 focus:bg-background focus:ring-1 focus:ring-ring"
           placeholder="Expected result"
         />
       </div>
 
       <div className="px-2 py-3">
         <div className="relative flex justify-end">
-          <button
-            type="button"
-            onClick={(event) => onToggleMenu(event.currentTarget)}
-            className="flex h-8 w-8 items-center justify-center border border-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
+          <RowMenu
+            icon={<MoreHorizontal className="h-4 w-4" />}
             title="Row actions"
+            buttonClassName="flex h-8 w-8 items-center justify-center border border-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
+            menuHeight={204}
+            open={menuOpen}
+            position={menuPosition}
+            onToggle={onToggleMenu}
           >
-            <MoreHorizontal className="h-4 w-4" />
-          </button>
-          {menuOpen && menuPosition && (
-            <div className="fixed z-[100] w-44 border border-border bg-card shadow-elegant" style={{ top: menuPosition.top, left: menuPosition.left }}>
-              <MenuAction icon={<Plus className="h-3.5 w-3.5" />} label="Insert below" onClick={() => { onInsert(); onCloseMenu() }} />
-              <MenuAction icon={<Copy className="h-3.5 w-3.5" />} label="Duplicate" onClick={() => { onDuplicate(); onCloseMenu() }} />
-              <MenuAction icon={<Outdent className="h-3.5 w-3.5" />} label="Outdent" onClick={() => { onIndent('decrease'); onCloseMenu() }} />
-              <MenuAction icon={<Indent className="h-3.5 w-3.5" />} label="Indent" onClick={() => { onIndent('increase'); onCloseMenu() }} />
-              <MenuAction icon={<Trash2 className="h-3.5 w-3.5" />} label="Delete" destructive onClick={() => { onRemove(); onCloseMenu() }} />
-            </div>
-          )}
+            <MenuAction icon={<Plus className="h-3.5 w-3.5" />} label="Insert below" onClick={() => { onInsert(); onCloseMenu() }} />
+            <MenuAction icon={<Copy className="h-3.5 w-3.5" />} label="Duplicate" onClick={() => { onDuplicate(); onCloseMenu() }} />
+            <MenuAction icon={<Outdent className="h-3.5 w-3.5" />} label="Outdent" onClick={() => { onIndent('decrease'); onCloseMenu() }} />
+            <MenuAction icon={<Indent className="h-3.5 w-3.5" />} label="Indent" onClick={() => { onIndent('increase'); onCloseMenu() }} />
+            <MenuAction icon={<Trash2 className="h-3.5 w-3.5" />} label="Delete" destructive onClick={() => { onRemove(); onCloseMenu() }} />
+          </RowMenu>
         </div>
       </div>
     </div>
-  )
-}
-
-function MenuAction({
-  icon,
-  label,
-  destructive = false,
-  onClick,
-}: {
-  icon: ReactNode
-  label: string
-  destructive?: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent ${destructive ? 'text-destructive' : 'text-foreground'}`}
-    >
-      {icon}
-      {label}
-    </button>
   )
 }

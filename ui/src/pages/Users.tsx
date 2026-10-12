@@ -1,21 +1,26 @@
+import ProfilePicture from '../components/ProfilePicture'
+import UserIdentity from '../components/UserIdentity'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { extractApiErrorMessage, InviteUserResponse, User, usersApi } from '../api/client'
+import { extractApiErrorMessage, InviteUserResponse, User, usersApi, policiesApi, type Policy } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
 import { UserPlus, Edit2, Trash2, X, Shield, Wrench, Eye, Copy, Check, Mail } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
+import { ROLE_LABELS } from '../lib/roles'
+import { policyPermissions, policyResourceSummary } from '../lib/policySummary'
 
 const ROLE_CONFIG = {
-  admin: { label: 'Admin', color: 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400', icon: Shield },
-  maintainer: { label: 'Maintainer', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400', icon: Wrench },
-  external: { label: 'Reviewer', color: 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400', icon: Eye },
+  admin: { label: ROLE_LABELS.admin, color: 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400', icon: Shield },
+  maintainer: { label: ROLE_LABELS.maintainer, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400', icon: Wrench },
+  external: { label: ROLE_LABELS.external, color: 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400', icon: Eye },
 }
 
 export default function UsersPage() {
   const { user: currentUser } = useAuth()
   const queryClient = useQueryClient()
   const toast = useToast()
+  const [applicationUser, setApplicationUser] = useState<User | null>(null)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [emailChangeUser, setEmailChangeUser] = useState<User | null>(null)
   const [editingUser, setEditingUser] = useState<number | null>(null)
@@ -116,7 +121,7 @@ export default function UsersPage() {
         </div>
         <button
           onClick={() => setShowInviteModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary to-[#6b7280] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity"
+          className="flex items-center gap-2 px-4 py-2 bg-linear-to-r/srgb from-primary to-[#6b7280] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity"
         >
           <UserPlus className="h-4 w-4" />
           Invite User
@@ -155,9 +160,7 @@ export default function UsersPage() {
                 <tr key={u.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-[#6b7280] flex items-center justify-center text-white text-xs font-bold">
-                        {u.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                      </div>
+                      <ProfilePicture user={u} />
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{u.full_name}</p>
                         <p className="text-xs text-muted-foreground truncate">{u.email}</p>
@@ -183,13 +186,16 @@ export default function UsersPage() {
                     {editingUser === u.id ? (
                       <select
                         defaultValue={u.role}
-                        onChange={(e) => updateMutation.mutate({ id: u.id, data: { role: e.target.value as 'maintainer' | 'external' } })}
+                        onChange={(e) => updateMutation.mutate({ id: u.id, data: { role: e.target.value as 'maintainer' | 'external' | 'admin' } })}
                         className="px-2 py-1 text-xs border border-input rounded bg-background text-foreground"
                         title="Select role"
                         autoFocus
                       >
+                        {currentUser?.is_initial_admin && (
+                          <option value="admin">Admin</option>
+                        )}
                         <option value="maintainer">Maintainer</option>
-                        <option value="external">Reviewer</option>
+                        <option value="external">Viewer</option>
                       </select>
                     ) : (
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold ${roleConf?.color || ''}`}>
@@ -228,6 +234,11 @@ export default function UsersPage() {
                           title={u.email_change_status === 'requested' ? 'Reject email change' : 'Cancel email change'}
                         >
                           <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {u.role !== 'admin' && (
+                        <button onClick={() => setApplicationUser(u)} title="Application policies" className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent">
+                          <Shield className="h-3.5 w-3.5" />
                         </button>
                       )}
                       <button
@@ -286,6 +297,7 @@ export default function UsersPage() {
         </div>
       </div>
 
+      {applicationUser && <ApplicationPoliciesModal user={applicationUser} onClose={() => setApplicationUser(null)} />}
       {showInviteModal && (
         <InviteUserModal
           onClose={() => {
@@ -344,6 +356,7 @@ function EmailChangeModal({
         <p className="text-sm text-muted-foreground mb-4">
           Bloom will send a confirmation link to the new address. The login email remains {user.email} until the recipient confirms it.
         </p>
+        <div className="mb-4"><UserIdentity user={user} /></div>
         {error && <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">{error}</div>}
         <form
           className="space-y-4"
@@ -372,7 +385,7 @@ function EmailChangeModal({
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-2 bg-gradient-to-r from-primary to-[#6b7280] text-white text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50"
+            className="w-full py-2 bg-linear-to-r/srgb from-primary to-[#6b7280] text-white text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50"
           >
             {isLoading ? 'Sending confirmation…' : 'Send confirmation email'}
           </button>
@@ -463,16 +476,53 @@ function InviteUserModal({ onClose, onSubmit, isLoading, error }: {
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Role</label>
             <select value={role} onChange={(e) => setRole(e.target.value)} title="Role" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground">
-              <option value="external">Reviewer</option>
+              <option value="external">Viewer</option>
               <option value="maintainer">Maintainer</option>
               <option value="admin">Admin</option>
             </select>
           </div>
-          <button type="submit" disabled={isLoading} className="w-full py-2 bg-gradient-to-r from-primary to-[#6b7280] text-white text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50">
+          <button type="submit" disabled={isLoading} className="w-full py-2 bg-linear-to-r/srgb from-primary to-[#6b7280] text-white text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50">
             {isLoading ? 'Sending Invite...' : 'Send Invite'}
           </button>
         </form>
       </div>
     </div>
   )
+}
+
+
+function ApplicationPoliciesModal({ user, onClose }: { user: User; onClose: () => void }) {
+  const { data: policies } = useQuery({ queryKey: ['policies'], queryFn: policiesApi.list })
+  const { data: assignment, isError } = useQuery({ queryKey: ['user-application-policies', user.id], queryFn: () => usersApi.applicationPolicies(user.id) })
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-label="Application policies" className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6" onClick={(event) => event.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-semibold text-foreground">Application policies</h2><button title="Close" onClick={onClose}><X className="h-4 w-4" /></button></div>
+        <p className="mb-2 text-sm text-foreground"><UserIdentity user={user} /></p>
+        <p className="mb-4 text-sm text-muted-foreground">Assign app permissions such as Access Management. The account base role stays the same. Project policy groups are assigned separately for each project.</p>
+        {isError ? <p role="alert">Could not load application policies.</p> : policies && assignment ? <ApplicationPolicyForm user={user} policies={policies.filter((policy) => policy.scope === 'app')} initial={assignment.policy_ids} onClose={onClose} /> : <p>Loading policies...</p>}
+      </div>
+    </div>
+  )
+}
+
+function ApplicationPolicyForm({ user, policies, initial, onClose }: { user: User; policies: Policy[]; initial: number[]; onClose: () => void }) {
+  const [selected, setSelected] = useState(initial)
+  const toast = useToast()
+  const queryClient = useQueryClient()
+  const save = useMutation({
+    mutationFn: () => usersApi.setApplicationPolicies(user.id, selected),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['user-application-policies', user.id] }); toast.saved('Application policies'); onClose() },
+    onError: (error) => toast.failed('Saving application policies', error),
+  })
+  return <form onSubmit={(event) => { event.preventDefault(); save.mutate() }} className="space-y-4">
+    <fieldset disabled={save.isPending} className="space-y-3">
+      <legend className="mb-2 text-sm font-medium text-foreground">App policy selection</legend>
+      {policies.map((policy) => <label key={policy.id} className="flex items-start gap-2 text-sm text-foreground">
+        <input type="checkbox" aria-label={`App policy ${policy.name}`} checked={selected.includes(policy.id)} onChange={() => setSelected((current) => current.includes(policy.id) ? current.filter((id) => id !== policy.id) : [...current, policy.id])} />
+        <span>{policy.name}<span className="block text-xs text-muted-foreground">{policyResourceSummary(policy)} · {policyPermissions(policy).join('; ')}</span></span>
+      </label>)}
+    </fieldset>
+    <button disabled={save.isPending} type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">{save.isPending ? 'Saving...' : 'Save application policies'}</button>
+  </form>
 }

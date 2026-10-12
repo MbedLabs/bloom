@@ -1,49 +1,70 @@
-"""Pydantic schemas for the admin-managed entitlement layer: policies and groups.
-
-See app/models/groups.py for the tables and app/core/policy_seed.py for the
-shipped default policies.
-"""
+"""Scoped policy rules, group-owned policy sets and separate memberships."""
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Literal, Optional
 
-from pydantic import BaseModel, Field, field_serializer
-
-_BASE_ROLE_PATTERN = "^(admin|maintainer|external)$"
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 
-class PolicyCreate(BaseModel):
+class NamedInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("name", mode="before", check_fields=False)
+    @classmethod
+    def trim_name(cls, value):
+        """Trim surrounding whitespace before validating a name."""
+        return value.strip() if isinstance(value, str) else value
+
+
+class PolicyRule(BaseModel):
+    """Independent permissions and the document origins covered by one rule."""
+
+    model_config = ConfigDict(extra="forbid")
+    read: bool = False
+    write: bool = False
+    review: bool = False
+    approve: bool = False
+    delete: bool = False
+    all_origins: bool = False
+    visibility: list[Literal["internal", "customer"]] = Field(default_factory=list)
+    tags: list[int] = Field(default_factory=list)
+
+
+class PolicyRuleResponse(PolicyRule):
+    """A rule with the actions it grants."""
+
+    model_config = ConfigDict(extra="ignore")
+    actions: list[str] = Field(default_factory=list)
+
+
+class PolicyCreate(NamedInput):
     name: str = Field(..., min_length=1, max_length=80)
     description: str = Field(default="", max_length=500)
-    base_role: str = Field(default="external", pattern=_BASE_ROLE_PATTERN)
-    permissions: dict = Field(default_factory=dict)
-    doc_tag_scope: Optional[List[str]] = None
+    scope: Literal["document", "project", "app"] = "project"
+    rules: dict[str, PolicyRule] = Field(default_factory=dict)
 
 
-class PolicyUpdate(BaseModel):
+class PolicyUpdate(NamedInput):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=80)
     description: Optional[str] = Field(default=None, max_length=500)
-    base_role: Optional[str] = Field(default=None, pattern=_BASE_ROLE_PATTERN)
-    permissions: Optional[dict] = None
-    doc_tag_scope: Optional[List[str]] = None
+    scope: Optional[Literal["document", "project", "app"]] = None
+    rules: Optional[dict[str, PolicyRule]] = None
 
 
 class PolicyResponse(BaseModel):
     id: int
     name: str
     description: str
-    base_role: str
-    permissions: dict
-    doc_tag_scope: Optional[List[str]] = None
+    scope: Literal["document", "project", "app"]
+    rules: dict[str, PolicyRuleResponse]
     is_default: bool
     created_at: datetime
     updated_at: datetime
 
     @field_serializer("created_at", "updated_at")
     def serialize_dt(self, dt: Optional[datetime], _info):
+        """Serialize stored UTC timestamps with the UTC designator."""
         return f"{dt.isoformat()}Z" if dt else None
-
-    class Config:
-        from_attributes = True
 
 
 class GroupMemberResponse(BaseModel):
@@ -54,39 +75,85 @@ class GroupMemberResponse(BaseModel):
 
 class GroupGrantResponse(BaseModel):
     id: int
-    project_id: Optional[int] = None
+    project_id: int
 
 
-class GroupCreate(BaseModel):
+class GroupCreate(NamedInput):
     name: str = Field(..., min_length=1, max_length=80)
     description: str = Field(default="", max_length=500)
-    policy_id: Optional[int] = None
+    policy_ids: list[int] = Field(default_factory=list)
+
+    @field_validator("policy_ids")
+    @classmethod
+    def distinct_policies(cls, value):
+        """Require distinct positive policy identifiers."""
+        if any(item <= 0 for item in value) or len(set(value)) != len(value):
+            raise ValueError("Choose distinct positive policy identifiers")
+        return sorted(value)
 
 
-class GroupUpdate(BaseModel):
+class GroupUpdate(NamedInput):
     name: Optional[str] = Field(default=None, min_length=1, max_length=80)
     description: Optional[str] = Field(default=None, max_length=500)
-    policy_id: Optional[int] = None
+    policy_ids: Optional[list[int]] = None
+
+    @field_validator("policy_ids")
+    @classmethod
+    def distinct_policies(cls, value):
+        """Require distinct positive policy identifiers when supplied."""
+        if value is not None and (
+            any(item <= 0 for item in value) or len(set(value)) != len(value)
+        ):
+            raise ValueError("Choose distinct positive policy identifiers")
+        return sorted(value) if value is not None else None
 
 
 class GroupResponse(BaseModel):
     id: int
     name: str
     description: str
-    policy_id: Optional[int] = None
+    policy_ids: list[int] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
-    members: List[GroupMemberResponse] = Field(default_factory=list)
-    grants: List[GroupGrantResponse] = Field(default_factory=list)
+    members: list[GroupMemberResponse] = Field(default_factory=list)
+    grants: list[GroupGrantResponse] = Field(default_factory=list)
 
     @field_serializer("created_at", "updated_at")
     def serialize_dt(self, dt: Optional[datetime], _info):
+        """Serialize stored UTC timestamps with the UTC designator."""
         return f"{dt.isoformat()}Z" if dt else None
 
 
 class GroupMemberCreate(BaseModel):
-    user_id: int
+    model_config = ConfigDict(extra="forbid")
+    user_id: int = Field(gt=0)
 
 
-class GroupGrantCreate(BaseModel):
-    project_id: Optional[int] = None
+class GroupMembersCreate(BaseModel):
+    """A nonempty selection of distinct users to add together."""
+
+    model_config = ConfigDict(extra="forbid")
+    user_ids: list[int] = Field(min_length=1)
+
+    @field_validator("user_ids")
+    @classmethod
+    def distinct_users(cls, value):
+        """Require distinct positive user identifiers."""
+        if any(item <= 0 for item in value) or len(set(value)) != len(value):
+            raise ValueError("Choose distinct positive user identifiers")
+        return sorted(value)
+
+
+class GroupGrantUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    inherit_policies: Literal[True] = True
+
+
+class GroupGrantCreate(GroupGrantUpdate):
+    project_id: int = Field(gt=0)
+
+
+class GroupAssignmentCreate(GroupMembersCreate):
+    """Users receiving this bundle on one project."""
+
+    project_id: int = Field(gt=0)

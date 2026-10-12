@@ -7,10 +7,15 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
-from app.core.security import get_current_user, get_password_hash
+from app.core.security import (
+    accessible_project_ids,
+    get_current_user,
+    get_password_hash,
+)
 from app.main import app
 from app.models import Project, ProjectMembership, ProjectVariable, User
 from app.models.user import UserRole
+from tests.access_fixtures import project_access_fixture
 
 
 @dataclass
@@ -64,6 +69,7 @@ def _build_harness():
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Selected test user no longer exists",
                 )
+            await accessible_project_ids(session, user)
             return user
 
     asyncio.run(_create_schema())
@@ -100,15 +106,15 @@ async def _seed_project_variables_data(session_maker: async_sessionmaker[AsyncSe
 
         session.add_all(
             [
-                ProjectMembership(
+                project_access_fixture(
                     user_id=external.id,
                     project_id=project.id,
-                    role=UserRole.external.value,
+                    permissions={"*": ["view", "comment"]},
+                    visibility="customer",
+                    doc_types=[],
                 ),
-                ProjectMembership(
-                    user_id=maintainer.id,
-                    project_id=project.id,
-                    role=UserRole.maintainer.value,
+                project_access_fixture(
+                    user_id=maintainer.id, project_id=project.id, permissions={"*": ["*"]}
                 ),
                 ProjectVariable(
                     project_id=project.id,

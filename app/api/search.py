@@ -7,11 +7,15 @@ from pydantic import BaseModel
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.artefact_utils import type_visible, visible_types
 from app.core.database import get_db
 from app.core.search_registry import SEARCH_TARGETS, rank_match
-from app.core.security import get_current_user
-from app.models import Project, ProjectExternalDocType, ProjectMembership
-from app.models.models import ArtefactVisibility
+from app.core.security import (
+    accessible_project_ids,
+    apply_external_visibility_filter,
+    get_current_user,
+)
+from app.models import Project
 from app.models.user import User, UserRole
 
 router = APIRouter()
@@ -38,46 +42,12 @@ class SearchResponse(BaseModel):
 
 
 async def _accessible_projects(db: AsyncSession, user: User) -> dict[int, Project]:
-    if user.role == UserRole.admin:
-        rows = (await db.execute(select(Project))).scalars().all()
-    else:
-        rows = (
-            (
-                await db.execute(
-                    select(Project)
-                    .join(ProjectMembership, ProjectMembership.project_id == Project.id)
-                    .where(ProjectMembership.user_id == user.id)
-                )
-            )
-            .scalars()
-            .all()
-        )
+    project_ids = await accessible_project_ids(db, user)
+    query = select(Project)
+    if project_ids is not None:
+        query = query.where(Project.id.in_(project_ids))
+    rows = (await db.execute(query)).scalars().all()
     return {p.id: p for p in rows}
-
-
-async def _external_allowed_types(
-    db: AsyncSession, user: User, project_ids: list[int]
-) -> Optional[dict[int, set[str]]]:
-    """For external users: project_id -> allowed doc-type codes. Others: None."""
-    if user.role != UserRole.external or not project_ids:
-        return None if user.role != UserRole.external else {}
-    rows = (
-        await db.execute(
-            select(ProjectMembership.project_id, ProjectExternalDocType.doc_type)
-            .join(
-                ProjectExternalDocType,
-                ProjectExternalDocType.membership_id == ProjectMembership.id,
-            )
-            .where(
-                ProjectMembership.user_id == user.id,
-                ProjectMembership.project_id.in_(project_ids),
-            )
-        )
-    ).all()
-    allowed: dict[int, set[str]] = {}
-    for project_id, doc_type in rows:
-        allowed.setdefault(project_id, set()).add(doc_type)
-    return allowed
 
 
 async def run_global_search(
@@ -95,7 +65,7 @@ async def run_global_search(
         return SearchResponse(query=q, total=0, items=[])
 
     project_ids = list(projects)
-    external_allowed = await _external_allowed_types(db, current_user, project_ids)
+    types_by_project = {pid: await visible_types(db, current_user, pid) for pid in project_ids}
 
     pattern = f"%{q}%"
     query_lower = q.lower()
@@ -110,8 +80,7 @@ async def run_global_search(
             model.project_id.in_(project_ids),
             or_(id_col.ilike(pattern), title_col.ilike(pattern)),
         )
-        if current_user.role == UserRole.external:
-            stmt = stmt.where(model.visibility == ArtefactVisibility.customer.value)
+        stmt = apply_external_visibility_filter(stmt, model, current_user)
         stmt = stmt.limit(PER_TYPE_LIMIT * 3)
 
         rows = (await db.execute(stmt)).scalars().all()
@@ -121,9 +90,8 @@ async def run_global_search(
             type_code = (
                 getattr(row, target.doc_type_attr) if target.doc_type_attr else target.type_code
             ) or target.type_code
-            if external_allowed is not None:
-                if type_code not in external_allowed.get(row.project_id, set()):
-                    continue
+            if not type_visible(types_by_project[row.project_id], type_code):
+                continue
             doc_id = getattr(row, target.id_attr)
             title = getattr(row, target.title_attr)
             project = projects[row.project_id]

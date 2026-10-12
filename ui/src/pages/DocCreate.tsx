@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
+import TagPicker from '../components/TagPicker'
 import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router'
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { ArrowLeft, PanelRightOpen, PanelRightClose, Trash2 } from 'lucide-react'
@@ -22,6 +23,7 @@ import {
   isDocTagHostType,
   isDocTagTargetAllowed,
   normalizeDocTypeParam,
+  isWorkflowControlledDocType,
 } from '../types/doc'
 import { useToast } from '../components/useToast'
 import { docRegistryBackUrl, docRegistryListLabel } from '../lib/docRegistryParams'
@@ -31,13 +33,19 @@ import {
   usesDocumentEditor,
 } from './docCreateIdPolicy'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import { useAuth } from '../contexts/AuthContext'
 import { useParameterValues } from '../hooks/useParameterValues'
 import { useArtefactLabels } from '../hooks/useArtefactLabels'
+import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
 
 function artefactActivityTypeForDocType(docType: DocType): string | null {
   if (docType === 'REQ') return 'requirement'
   if (docType === 'TC') return 'test-case'
   if (docType === 'SPEC' || docType === 'PRT' || docType === 'RPT' || docType === 'STD') return 'document'
+  if (docType === 'DES') return 'design'
+  if (docType === 'CPT') return 'test-concept'
+  if (docType === 'CHG') return 'change'
+  if (docType === 'RSK') return 'risk'
   return null
 }
 
@@ -55,7 +63,6 @@ function sharedDocumentCreatePayload(
   contentJson: Record<string, unknown> | null,
   contentHtml: string,
   metadata: Record<string, string>,
-  statusOptions: string[],
 ) {
   const visibility: ArtefactVisibility =
     metadata.visibility === 'customer' ? 'customer' : 'internal'
@@ -65,7 +72,7 @@ function sharedDocumentCreatePayload(
     description: metadata.description || undefined,
     content_json: contentJson,
     content_html: contentHtml || undefined,
-    status: metadata.status || statusOptions[0],
+    status: 'Draft',
     visibility,
   }
 }
@@ -86,7 +93,7 @@ function sharedDocumentUpdatePayload(
     description: metadata.description || null,
     content_json: contentJson,
     content_html: contentHtml || null,
-    status: metadata.status || statusOptions[0],
+    ...(!isWorkflowControlledDocType(docType) ? { status: metadata.status || statusOptions[0] } : {}),
     visibility,
   }
 }
@@ -164,6 +171,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const [tcRows, setTcRows] = useState<TcsRow[]>(() => requestedDocType === 'TC' && !editMode ? createDefaultTcRows() : [])
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [metadata, setMetadata] = useState<Record<string, string>>({})
+  const [tagIds, setTagIds] = useState<number[]>([])
   const [outlineOpen, setOutlineOpen] = useState(() => editMode)
   const [headingNumbered, setHeadingNumbered] = useState(true)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -187,6 +195,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const docType = ((editMode && editDocFacade?.doc_type) || requestedDocType) as DocType
   const config = DOC_CONFIGS[docType]
   const resolvedDocId = editMode ? editDocFacade?.id : undefined
+  const workflowType = artefactActivityTypeForDocType(docType)
+  const workflow = useDocumentWorkflow(workflowType ?? 'document', editMode ? resolvedDocId : undefined)
   const listBackUrl = prefix ? docRegistryBackUrl(prefix, docType, returnTo ?? null) : '/projects'
   const backNavLabel =
     typeof returnTo === 'string' && returnTo.trim() !== ''
@@ -195,7 +205,24 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const { can } = useProjectPermissions(prefix, projectId)
   const parameterValues = useParameterValues(prefix, projectId)
   const artefactLabels = useArtefactLabels(prefix, contentJson)
-  const canEditDocs = can(editMode ? 'edit' : 'create', docType)
+  const { user } = useAuth()
+  const external = user?.role === 'external'
+  const rowActions = editMode ? editDocFacade?.allowed_actions : undefined
+  const rowAllows = (action: string) => rowActions === undefined || rowActions.includes(action)
+  const canEditDocs = can(editMode ? 'edit' : 'create', docType) && (!editMode || rowAllows('edit'))
+  const sent: Record<string, string> = external
+    ? { ...metadata, visibility: 'customer', ...(docType === 'REQ' ? { req_origin: 'Customer' } : {}) }
+    : metadata
+  const controlled = isWorkflowControlledDocType(docType)
+  const firstStatus = controlled ? 'Draft' : config.statusOptions[0]
+  const displayedStatus = editMode && controlled ? workflow.data?.phase ?? editDocFacade?.status ?? '' : metadata.status || firstStatus
+  const statusChoices: readonly string[] = !editMode && (controlled || isControlledSharedDocument(docType))
+    ? ['Draft']
+    : !external
+      ? config.statusOptions
+      : editMode
+        ? [...new Set([editDocFacade?.status ?? firstStatus, ...(config.statusOptions.includes('Draft') ? ['Draft'] : [])])]
+        : [firstStatus]
   // The server allocates ids with MAX(suffix)+1, so ask it rather than assuming
   // -001, which was almost always already taken.
   const { data: nextDocId } = useQuery({
@@ -242,7 +269,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
     [projectVariables],
   )
   const userMentionItems = useMemo(
-    () => (users ?? []).map((u) => ({ id: u.id, label: u.full_name })),
+    () => (users ?? []).map((u) => ({ id: u.id, label: u.full_name, user: u })),
     [users],
   )
 
@@ -342,22 +369,25 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const createMutation = useMutation({
     mutationFn: async () => {
       const api = apiForType(docType)
+      const tag_ids = tagIds
       if (docType === 'TC') {
         return testCasesApi.create({
           project_id: projectId,
           title,
-          description: metadata.description || undefined,
-          preconditions: metadata.preconditions || undefined,
+          description: sent.description || undefined,
+          preconditions: sent.preconditions || undefined,
           steps: tcRows.length > 0 ? tcRows : undefined,
-          status: metadata.status || config.statusOptions[0],
-          visibility: metadata.visibility === 'customer' ? 'customer' : 'internal',
-          reviewer_id: metadata.reviewer_id ? Number(metadata.reviewer_id) : undefined,
+          status: 'Draft',
+          visibility: sent.visibility === 'customer' ? 'customer' : 'internal',
+          reviewer_id: sent.reviewer_id ? Number(sent.reviewer_id) : undefined,
+          tag_ids,
         })
       }
       if (isControlledSharedDocument(docType)) {
         return documentsApi.create({
           project_id: projectId,
-          ...sharedDocumentCreatePayload(docType, title, contentJson, contentHtml, metadata, config.statusOptions),
+          ...sharedDocumentCreatePayload(docType, title, contentJson, contentHtml, sent),
+          tag_ids,
         })
       }
       const payload: Record<string, unknown> = {
@@ -365,11 +395,14 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
         [config.titleField]: title,
         content_json: contentJson,
         content_html: contentHtml,
-        ...metadata,
+        ...sent,
+        tag_ids,
       }
       if (docType === 'REQ') {
-        payload.visibility = requirementVisibilityFromOrigin(metadata.req_origin)
+        payload.visibility = requirementVisibilityFromOrigin(sent.req_origin)
       }
+      if (controlled) payload.status = 'Draft'
+      if (docType !== 'REQ') delete payload.reviewer_id
       return (api as unknown as { create: (data: Record<string, unknown>) => Promise<Record<string, unknown>> }).create(payload)
     },
     onSuccess: (data) => {
@@ -395,18 +428,16 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       if (docType === 'TC') {
         return testCasesApi.update(resolvedDocId, {
           title,
-          description: metadata.description || null,
-          preconditions: metadata.preconditions || null,
+          description: sent.description || null,
+          preconditions: sent.preconditions || null,
           steps: tcRows.length > 0 ? tcRows : null,
-          status: metadata.status || config.statusOptions[0],
-          visibility: metadata.visibility === 'customer' ? 'customer' : 'internal',
-          reviewer_id: metadata.reviewer_id ? Number(metadata.reviewer_id) : null,
+          visibility: sent.visibility === 'customer' ? 'customer' : 'internal',
         })
       }
       if (isControlledSharedDocument(docType)) {
         return documentsApi.update(
           resolvedDocId,
-          sharedDocumentUpdatePayload(docType, title, contentJson, contentHtml, metadata, config.statusOptions),
+          sharedDocumentUpdatePayload(docType, title, contentJson, contentHtml, sent, config.statusOptions),
         )
       }
       const api = apiForType(docType) as unknown as { update: (id: number, data: Record<string, unknown>) => Promise<Record<string, unknown>> }
@@ -414,11 +445,14 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
         [config.titleField]: title,
         content_json: contentJson,
         content_html: contentHtml,
-        ...metadata,
+        ...sent,
       }
       if (docType === 'REQ') {
-        payload.visibility = requirementVisibilityFromOrigin(metadata.req_origin)
+        payload.visibility = requirementVisibilityFromOrigin(sent.req_origin)
       }
+      if (controlled) delete payload.status
+      delete payload.reviewer_id
+      delete payload.approver_id
       return api.update(resolvedDocId, payload)
     },
     onSuccess: (updated) => {
@@ -442,6 +476,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       const activityType = artefactActivityTypeForDocType(docType)
       if (activityType && resolvedDocId) {
         queryClient.invalidateQueries({ queryKey: ['artefactActivity', activityType, resolvedDocId] })
+        queryClient.invalidateQueries({ queryKey: ['document-workflow', activityType, resolvedDocId] })
       }
       invalidateDocumentQueries(queryClient, projectId, prefix, resolvedDocId, kind, docIdStr)
       setSaveError(null)
@@ -484,6 +519,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
     if (!editMode && !docIdIsValid) return
     if (!projectReady) return
     if (editMode && !resolvedDocId) return
+    if (editMode && !workflow.data?.actions?.edit_current) return
 
     setSaveError(null)
     setSaveSuccess(false)
@@ -499,9 +535,12 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
     && docIdIsValid
     && projectReady
     && (!editMode || !!resolvedDocId)
+    && (!editMode || !!workflow.data?.actions?.edit_current)
   const visibleConfigFields = config.fields.filter((field) =>
+    field.key !== 'req_origin' &&
     field.key !== config.titleField &&
     field.key !== 'description' &&
+    !(field.key === 'priority' && config.priorityOptions) &&
     !(docType === 'TC' && field.key === 'preconditions')
   )
   const showDescriptionMetadata = config.fields.some((field) => field.key === 'description')
@@ -541,6 +580,11 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
     )
   }
 
+  if (editMode && workflow.isPending) return <div className="p-8 text-muted-foreground">Loading document...</div>
+  if (editMode && (workflow.isError || !workflow.data?.actions?.edit_current)) {
+    return <div className="p-8 space-y-4"><p>{workflow.isError ? 'Could not load document.' : 'This document is read-only.'}</p><Link to={prefix && docIdStr ? docUrl(prefix, docType, docIdStr) : listBackUrl}>View document</Link></div>
+  }
+
   return (
     <div className="animate-fade-in -m-6 flex flex-col flex-1 min-h-0">
       {/* Top bar */}
@@ -576,7 +620,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           >
             Discard
           </button>
-          {editMode && resolvedDocId ? (
+          {editMode && resolvedDocId && can('delete', docType) && rowAllows('delete') ? (
             <button
               type="button"
               onClick={() => {
@@ -620,7 +664,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
             {/* Status only: the type and document id are already shown in the top bar. */}
             <div className="flex items-center gap-2 mb-4 flex-wrap">
               <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground">
-                {metadata.status || config.statusOptions[0]}
+                {displayedStatus}
               </span>
             </div>
             {/* Title inside the document frame */}
@@ -630,7 +674,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Untitled"
               autoFocus
-              className="w-full text-3xl font-bold text-foreground placeholder:text-muted-foreground/40 bg-transparent border-none outline-none mb-2"
+              className="w-full text-3xl font-bold text-foreground placeholder:text-muted-foreground/40 bg-transparent border-none outline-hidden mb-2"
             />
 
             {/* Description field inside frame for applicable types */}
@@ -640,7 +684,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                 value={metadata.description || ''}
                 onChange={(e) => setMetadata({ ...metadata, description: e.target.value })}
                 placeholder="Brief description..."
-                className="w-full text-sm text-muted-foreground placeholder:text-muted-foreground/40 bg-transparent border-none outline-none mb-4 pb-4 border-b border-border"
+                className="w-full text-sm text-muted-foreground placeholder:text-muted-foreground/40 bg-transparent border-none outline-hidden mb-4 pb-4 border-b border-border"
               />
             )}
           </div>
@@ -688,46 +732,41 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
 
               {/* Status */}
               <MetaField label="Status">
+                {editMode && controlled ? <span>{displayedStatus}</span> :
                 <select
-                  value={metadata.status || config.statusOptions[0]}
+                  value={metadata.status || firstStatus}
                   onChange={(e) => setMetadata({ ...metadata, status: e.target.value })}
                   title="Select status"
                   className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
                 >
-                  {config.statusOptions.map((opt) => (
+                  {statusChoices.map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
-                </select>
+                </select>}
               </MetaField>
 
-              {docType !== 'REQ' && (
-              <MetaField label="Visibility">
-                <select
-                  value={metadata.visibility || 'internal'}
-                  onChange={(e) => setMetadata({ ...metadata, visibility: e.target.value })}
-                  title="Select visibility"
-                  className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
-                >
-                  <option value="internal">Internal</option>
-                  <option value="customer">Customer</option>
-                </select>
-              </MetaField>
+              {!external && (
+                <MetaField label="Origin">
+                  <select
+                    value={docType === 'REQ' ? metadata.req_origin || 'Internal' : metadata.visibility || 'internal'}
+                    onChange={(event) => setMetadata(docType === 'REQ'
+                      ? { ...metadata, req_origin: event.target.value, visibility: requirementVisibilityFromOrigin(event.target.value) }
+                      : { ...metadata, visibility: event.target.value })}
+                    title="Select origin"
+                    className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
+                  >
+                    {docType === 'REQ'
+                      ? config.fields.find(field => field.key === 'req_origin')?.options?.map(origin => <option key={origin} value={origin}>{origin}</option>)
+                      : <><option value="internal">Internal</option><option value="customer">Customer</option></>}
+                  </select>
+                  {!editMode && projectId > 0 && <TagPicker projectId={projectId} value={tagIds} onChange={setTagIds} showLabel={false} />}
+                </MetaField>
               )}
+              {external && !editMode && projectId > 0 && <TagPicker projectId={projectId} value={tagIds} onChange={setTagIds} />}
 
-              {/* Assigned to */}
-              <MetaField label="Assigned to">
-                <select
-                  value={metadata.reviewer_id || ''}
-                  onChange={(e) => setMetadata({ ...metadata, reviewer_id: e.target.value })}
-                  title="Select reviewer"
-                  className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
-                >
-                  <option value="">Unassigned</option>
-                  {users?.map((u) => (
-                    <option key={u.id} value={u.id}>{u.full_name}</option>
-                  ))}
-                </select>
-              </MetaField>
+              {!editMode && (docType === 'REQ' || docType === 'TC') && <MetaField label="Assigned to">
+                <UserSelect value={metadata.reviewer_id || ''} onChange={value => setMetadata({ ...metadata, reviewer_id: value })} users={users ?? []} label="Select reviewer" />
+              </MetaField>}
 
               {/* Priority (if applicable) */}
               {config.priorityOptions && (
@@ -815,3 +854,4 @@ function MetaField({ label, children }: { label: string; children: React.ReactNo
     </div>
   )
 }
+import UserSelect from '../components/UserSelect'

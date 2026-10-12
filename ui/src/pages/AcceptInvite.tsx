@@ -1,3 +1,4 @@
+import UserIdentity from '../components/UserIdentity'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { useOneTimeToken } from '../hooks/useOneTimeToken'
@@ -102,7 +103,7 @@ export default function AcceptInvite() {
 
       {inviteInfo && !submitMessage && (
         <div className="mb-4 p-3 rounded-lg bg-muted/40 border border-border text-sm text-foreground">
-          <p className="font-medium">{inviteInfo.full_name}</p>
+          <p className="font-medium"><UserIdentity user={inviteInfo} /></p>
           <p className="text-muted-foreground">{inviteInfo.email}</p>
           {!inviteInfo.valid && (
             <p className="mt-2 text-destructive">
@@ -155,7 +156,7 @@ export default function AcceptInvite() {
           <button
             type="submit"
             disabled={!canSubmit}
-            className="w-full py-2.5 px-4 bg-gradient-to-r from-primary to-[#6b7280] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-2.5 px-4 bg-linear-to-r/srgb from-primary to-[#6b7280] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? 'Accepting invitation...' : 'Accept Invitation'}
           </button>

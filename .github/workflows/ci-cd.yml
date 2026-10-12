@@ -74,11 +74,7 @@ jobs:
       - name: Run backend security scans
         run: |
           bandit -r app/ -ll
-          # Blocking: audit the locked closure (constraints.txt), not the ambient
-          # runner tooling. Reviewed ignore: PYSEC-2026-1325 is an ecdsa timing
-          # side-channel with no fix release, transitive via python-jose. Bloom
-          # signs JWTs with HS256 (symmetric), so the affected ES* path is unused.
-          pip-audit -r constraints.txt --ignore-vuln PYSEC-2026-1325
+          pip-audit -r constraints.txt
 
       # The documented fresh-install path (and what production compose actually
       # runs): alembic alone must build the full schema on a truly EMPTY database.

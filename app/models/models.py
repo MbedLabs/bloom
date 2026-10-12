@@ -11,17 +11,20 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     LargeBinary,
     String,
     Text,
     UniqueConstraint,
+    event,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.core.link_rules import allowed_link_triples
 
 
 class ArtefactVisibility(str, Enum):
@@ -245,7 +248,7 @@ class Document(Base):
     status: Mapped[str] = mapped_column(String(20), default="Draft")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
     created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
-    version: Mapped[str] = mapped_column(String(20), default="1.0")
+    version: Mapped[str] = mapped_column(String(20), default="1")
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     content_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -416,11 +419,43 @@ class CampaignSuite(Base):
     suite: Mapped["TestSuite"] = relationship(back_populates="campaign_suites")
 
 
+class AllowedLinkTriple(Base):
+    """Storage triples accepted for typed artefact links."""
+
+    __tablename__ = "allowed_link_triples"
+
+    source_type: Mapped[str] = mapped_column(String(30), primary_key=True)
+    target_type: Mapped[str] = mapped_column(String(30), primary_key=True)
+    role: Mapped[str] = mapped_column(String(50), primary_key=True)
+
+
+@event.listens_for(AllowedLinkTriple.__table__, "after_create")
+def _seed_allowed_link_triples(table, connection, **kwargs) -> None:
+    """Seed allowed triples when ORM metadata creates a new table."""
+    connection.execute(
+        table.insert(),
+        [
+            dict(zip(("source_type", "target_type", "role"), triple))
+            for triple in allowed_link_triples()
+        ],
+    )
+
+
 class ArtefactLink(Base):
     """Generic typed cross-artifact link foundation."""
 
     __tablename__ = "artefact_links"
     __table_args__ = (
+        ForeignKeyConstraint(
+            ["source_type", "target_type", "role"],
+            [
+                "allowed_link_triples.source_type",
+                "allowed_link_triples.target_type",
+                "allowed_link_triples.role",
+            ],
+            name="fk_artefact_links_allowed_triple",
+            postgresql_not_valid=True,
+        ).ddl_if(dialect="postgresql"),
         UniqueConstraint(
             "source_type",
             "source_id",
@@ -533,7 +568,7 @@ class ChangeRequest(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     content_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(String(20), default="Submitted")
+    status: Mapped[str] = mapped_column(String(20), default="Draft")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
     created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     priority: Mapped[str] = mapped_column(String(20), default="Medium")
@@ -772,6 +807,14 @@ class ArtefactComment(Base):
     artefact_type: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
     artefact_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     author_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    author_user_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    revision_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    content_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    review_request_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("artefact_requests.id", ondelete="SET NULL"), nullable=True
+    )
     body: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -784,6 +827,9 @@ class ArtefactActivity(Base):
     artefact_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     event_type: Mapped[str] = mapped_column(String(30), nullable=False)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
+    actor_user_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -794,6 +840,9 @@ class Notification(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    actor_user_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     project_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("projects.id"), nullable=True, index=True
     )

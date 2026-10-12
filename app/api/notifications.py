@@ -21,6 +21,9 @@ class NotificationResponse(BaseModel):
     event_type: str
     title: str
     body: Optional[str] = None
+    actor_user_id: Optional[int] = None
+    actor_name: Optional[str] = None
+    actor_profile_picture_url: Optional[str] = None
     link_path: Optional[str] = None
     project_id: Optional[int] = None
     read_at: Optional[datetime] = None
@@ -32,6 +35,14 @@ class NotificationResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+def notification_response(row: Notification, actor: Optional[User] = None) -> NotificationResponse:
+    """Return the notification with its identified actor's current picture."""
+    result = NotificationResponse.model_validate(row)
+    result.actor_name = actor.full_name if actor else None
+    result.actor_profile_picture_url = actor.profile_picture_url if actor else None
+    return result
 
 
 class NotificationListResponse(BaseModel):
@@ -75,8 +86,14 @@ async def list_notifications(
         .scalars()
         .all()
     )
+    ids = {row.actor_user_id for row in rows if row.actor_user_id is not None}
+    actors = (
+        {user.id: user for user in (await db.scalars(select(User).where(User.id.in_(ids)))).all()}
+        if ids
+        else {}
+    )
     return NotificationListResponse(
-        items=[NotificationResponse.model_validate(n) for n in rows],
+        items=[notification_response(n, actors.get(n.actor_user_id)) for n in rows],
         total=total,
         unread=unread,
     )
@@ -116,7 +133,8 @@ async def mark_read(
     if notification.read_at is None:
         notification.read_at = datetime.utcnow()
         await db.flush()
-    return NotificationResponse.model_validate(notification)
+    actor = await db.get(User, notification.actor_user_id) if notification.actor_user_id else None
+    return notification_response(notification, actor)
 
 
 @router.post("/read-all", response_model=UnreadCountResponse)

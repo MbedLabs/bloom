@@ -11,7 +11,7 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import DocumentAttachment
+from app.models import ArtefactRevisionFile, DocumentAttachment
 from app.services import object_store
 from app.services.attachment_storage import get_attachment_root
 
@@ -53,6 +53,7 @@ async def reconcile_attachments(
             return CleanupReport(leader_acquired=False)
 
     referenced = set((await db.scalars(select(DocumentAttachment.storage_path))).all())
+    referenced.update((await db.scalars(select(ArtefactRevisionFile.storage_path))).all())
     orphan_cutoff = time.time() - orphan_grace_seconds
     orphan_count = 0
     if root is not None:

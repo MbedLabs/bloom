@@ -4,9 +4,10 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, BookOpen, FlaskConical, GitBranch, Map, Pencil } from 'lucide-react'
 
 import { docsApi, projectsApi } from '../api/client'
-import { useAuth } from '../contexts/AuthContext'
+import { useProjectCapabilities } from '../hooks/useProjectCapabilities'
 import { docRegistryListLabel, docRegistryListUrl } from '../lib/docRegistryParams'
 import ProjectDocTopology from '../components/ProjectDocTopology'
+import DocumentRequestsPanel from '../components/DocumentRequestsPanel'
 import AccessDenied from '../components/AccessDenied'
 import { isAccessDenied } from '../lib/accessDenied'
 
@@ -43,7 +44,6 @@ type NavItem = {
 export default function ProjectDetail() {
   const { prefix } = useParams<{ prefix: string }>()
   const navigate = useNavigate()
-  const { user } = useAuth()
   const [searchParams] = useSearchParams()
 
   useEffect(() => {
@@ -61,8 +61,8 @@ export default function ProjectDetail() {
   })
 
   const projectId = project?.id || 0
+  const capabilities = useProjectCapabilities(project?.id)
 
-  // One number, so ask for one number.
   const { data: summary } = useQuery({
     queryKey: ['project-doc-type-summary', prefix],
     queryFn: () => docsApi.typeSummary(prefix!),
@@ -115,7 +115,7 @@ export default function ProjectDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {user?.role === 'admin' && (
+          {capabilities.can_edit && (
             <Link
               to={`/projects/${prefix}/edit`}
               className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent/50 transition-colors"
@@ -162,6 +162,7 @@ export default function ProjectDetail() {
         </nav>
       </div>
 
+      <DocumentRequestsPanel projectId={projectId} projectPrefix={prefix || ''} />
       <ProjectDocTopology projectId={projectId} prefix={prefix || ''} />
     </div>
   )

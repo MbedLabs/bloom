@@ -1,3 +1,5 @@
+import UserSelect from '../components/UserSelect'
+import UserIdentity from '../components/UserIdentity'
 import { useMemo, useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams, useSearchParams, useNavigate } from 'react-router'
@@ -13,7 +15,9 @@ import {
   X,
 } from 'lucide-react'
 
-import { docsApi, type DocShell, usersApi } from '../api/client'
+import { docsApi, type DocShell } from '../api/client'
+import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
+import { useSignOffPeople } from '../hooks/useSignOff'
 import {
   readStoredSort,
   writeStoredSort,
@@ -24,7 +28,7 @@ import {
   type RegistrySortField,
   type RegistrySortDir,
 } from '../lib/docRegistryParams'
-import { docCreateUrl, docUrl, normalizeDocTypeParam, DOC_TYPE_LABELS, type DocType } from '../types/doc'
+import { docCreateUrl, docUrl, documentStatusOptions, normalizeDocTypeParam, DOC_TYPE_LABELS, type DocType } from '../types/doc'
 import { dedicatedListUrl } from './docCreateIdPolicy'
 import { formatDateTime } from '../test/date-utils'
 import { useAuth } from '../contexts/AuthContext'
@@ -80,27 +84,6 @@ const TYPE_PAGE_TITLE: Record<DocType, string> = {
   RPT: 'Reports',
   STD: 'Standards',
 }
-
-const STATUS_OPTIONS = [
-  'Draft',
-  'Review',
-  'Approved',
-  'Rejected',
-  'Obsolete',
-  'Open',
-  'Mitigated',
-  'Submitted',
-  'Implemented',
-  'Active',
-  'Final',
-  'Superseded',
-  'Planned',
-  'Running',
-  'Completed',
-  'Scope',
-  'In Progress',
-  'Aborted',
-]
 
 const PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Critical']
 
@@ -177,7 +160,8 @@ function TypeBadge({ type }: { type: string }) {
   return <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${cfg.color}`}>{cfg.label}</span>
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status }: { status: string | null }) {
+  if (!status) return <span className="text-xs text-muted-foreground">-</span>
   const colors: Record<string, string> = {
     Draft: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
     Review: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
@@ -235,7 +219,6 @@ function ExecutionBadge({ status }: { status: string | null }) {
 export default function Documents() {
   const { user } = useAuth()
   const { prefix } = useParams<{ prefix: string }>()
-  const canListUsers = user?.role === 'admin' || user?.role === 'maintainer'
   const { canAny } = useProjectPermissions(prefix)
   const canEditDocs = canAny('create')
   const [searchParams, setSearchParams] = useSearchParams()
@@ -295,6 +278,10 @@ export default function Documents() {
   const sortParam = searchParams.get('sort')
   const sortField: SortField = isSortField(sortParam) ? sortParam : 'updated_at'
   const pageTitle = typeFilters.length === 1 ? TYPE_PAGE_TITLE[typeFilters[0]] : 'Documents'
+  const statusOptions = [...new Set(
+    (typeFilters.length ? typeFilters : DOC_TYPE_OPTIONS.map(type => type.code))
+      .flatMap(type => [...documentStatusOptions(type)])
+  )]
   const showExecColumn = typeFilters.length === 0 || typeFilters.includes('TC')
 
   const PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100]
@@ -347,11 +334,8 @@ export default function Documents() {
     createdFrom, createdTo, updatedFrom, updatedTo, pageSize, relatedTo,
   ])
 
-  const { data: users } = useQuery({
-    queryKey: ['users'],
-    queryFn: usersApi.list,
-    enabled: canListUsers,
-  })
+  const { data: project } = useProjectByPrefix(prefix)
+  const users = useSignOffPeople(project?.id, user?.role === 'admin')
 
   const userMap = useMemo(() => {
     const m = new Map<number, string>()
@@ -514,13 +498,13 @@ export default function Documents() {
       {priorityFilter && <FilterChip label={`Priority: ${priorityFilter}`} />}
       {reviewerFilter && (
         <FilterChip
-          label={`Reviewer: ${
+          label={<>Reviewer: {
             reviewerFilter === 'assigned'
               ? 'assigned'
               : reviewerFilter === 'unassigned'
                 ? 'unassigned'
-                : userMap.get(Number(reviewerFilter)) || reviewerFilter
-          }`}
+                : <UserIdentity className="ml-1" pictureClassName="w-4 h-4" user={users?.find(person => person.id === Number(reviewerFilter)) ?? { id: Number(reviewerFilter), full_name: userMap.get(Number(reviewerFilter)) || reviewerFilter }} />
+          }</>}
         />
       )}
       {relatedTo && (
@@ -657,7 +641,7 @@ export default function Documents() {
           <div className="space-y-2">
             <div className="text-xs font-medium uppercase text-muted-foreground">Status</div>
             <div className="flex flex-wrap gap-2">
-              {STATUS_OPTIONS.map((status) => (
+              {statusOptions.map((status) => (
                 <button
                   key={status}
                   onClick={() => toggleStatus(status)}
@@ -690,18 +674,7 @@ export default function Documents() {
 
             <label className="space-y-1">
               <span className="text-xs font-medium uppercase text-muted-foreground">Reviewer</span>
-              <select
-                value={reviewerFilter}
-                onChange={(event) => updateRegistryParams({ reviewer: event.target.value })}
-                className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
-              >
-                <option value="">Any reviewer</option>
-                <option value="assigned">Any assigned</option>
-                <option value="unassigned">Unassigned</option>
-                {users?.map((user) => (
-                  <option key={user.id} value={user.id}>{user.full_name}</option>
-                ))}
-              </select>
+              <UserSelect value={reviewerFilter} onChange={value => updateRegistryParams({ reviewer: value })} users={users ?? []} label="Reviewer" emptyLabel="Any reviewer" options={[{ value: 'assigned', label: 'Any assigned' }, { value: 'unassigned', label: 'Unassigned' }]} />
             </label>
 
             <label className="space-y-1">
@@ -854,7 +827,7 @@ export default function Documents() {
                       {doc.priority || '-'}
                     </td>
                     <td className="px-2.5 py-2 whitespace-nowrap text-xs text-muted-foreground">
-                      {doc.reviewer_id ? userMap.get(doc.reviewer_id) || '-' : '-'}
+                      {doc.reviewer_id ? <UserIdentity user={users?.find(person => person.id === doc.reviewer_id) ?? { id: doc.reviewer_id, full_name: userMap.get(doc.reviewer_id) || '-' }} /> : '-'}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">
                       {format(new Date(doc.created_at), 'MMM d, yyyy')}
@@ -879,7 +852,7 @@ export default function Documents() {
                   <select
                     value={pageSize}
                     onChange={(e) => setPageSize(Number(e.target.value))}
-                    className="text-xs border border-border rounded bg-background px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="text-xs border border-border rounded bg-background px-2 py-1 focus:outline-hidden focus:ring-1 focus:ring-primary"
                   >
                     {PAGE_SIZE_OPTIONS.map((s) => (
                       <option key={s} value={s}>{s}</option>

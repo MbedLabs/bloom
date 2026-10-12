@@ -14,8 +14,10 @@ from app.core.database import Base, get_db
 from app.core.security import get_password_hash
 from app.main import app
 from app.models import ArtefactLink, AuditEvent, Project, Requirement, TestCase, User
-from app.models.groups import Group, GroupMembership, GroupProjectGrant, Policy
+from app.models.groups import Group, GroupMembership, Policy
+from app.models.project_membership import ProjectAccess
 from app.models.user import UserRole
+from tests.access_fixtures import scenario_type_tags
 
 PASSWORD = "Correct-Horse-Battery-9"
 
@@ -151,15 +153,15 @@ def _external_exporter(session_maker, project):
         session_maker,
         Policy(
             name="Exporting reader",
-            base_role="external",
             permissions={"REQ": ["view", "export"], "TC": ["view", "export"]},
+            type_tags=scenario_type_tags({"REQ": ["view"], "TC": ["view"]}, "customer"),
         ),
     )
-    [group] = _add(session_maker, Group(name="Readers", policy_id=policy.id))
+    [group] = _add(session_maker, Group(name="Readers"))
     _add(
         session_maker,
         GroupMembership(group_id=group.id, user_id=user.id),
-        GroupProjectGrant(group_id=group.id, project_id=project.id),
+        ProjectAccess(group_id=group.id, project_id=project.id, policies=[policy]),
     )
     return user
 
@@ -213,15 +215,15 @@ def test_the_dossier_needs_test_case_export_too(harness):
         session_maker,
         Policy(
             name="Requirement exporter",
-            base_role="external",
             permissions={"REQ": ["view", "export"]},
+            type_tags=scenario_type_tags({"REQ": ["view"]}, "customer"),
         ),
     )
-    [group] = _add(session_maker, Group(name="Authors", policy_id=policy.id))
+    [group] = _add(session_maker, Group(name="Authors"))
     _add(
         session_maker,
         GroupMembership(group_id=group.id, user_id=user.id),
-        GroupProjectGrant(group_id=group.id, project_id=project.id),
+        ProjectAccess(group_id=group.id, project_id=project.id, policies=[policy]),
     )
     headers = _login(client, "author@example.com")
 

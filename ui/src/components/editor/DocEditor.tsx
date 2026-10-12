@@ -1,9 +1,11 @@
+import UserIdentity from '../UserIdentity'
 import { parameterKeyHref } from '../../utils/parameters'
 import './editor-styles.css'
 import { useRef, useCallback, useEffect } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import type { SuggestionProps } from '@tiptap/suggestion'
 import { BubbleMenu } from '@tiptap/react/menus'
+import { bubbleMenuVisibility } from './bubbleMenuVisibility'
 import { ReactRenderer } from '@tiptap/react'
 import Mention from '@tiptap/extension-mention'
 import StarterKit from '@tiptap/starter-kit'
@@ -121,6 +123,7 @@ export default function DocEditor({
 
   useEffect(() => {
     userMentionItemsRef.current = userMentionItems
+    mentionViewsRef.current.forEach((render) => render())
   }, [userMentionItems])
 
   const mentionSpec = useCallback((node: { attrs: Record<string, unknown> }, editing: boolean | null): MentionSpec => {
@@ -285,11 +288,24 @@ export default function DocEditor({
           return ({ node: initial, editor: host }) => {
             let node = initial
             const dom = document.createElement('span')
+            let identity: ReactRenderer | null = null
             const render = () => {
               const [tag, attrs, text] = mentionSpec(node, host.isEditable)
               const inner = document.createElement(tag)
               Object.entries(attrs).forEach(([name, value]) => inner.setAttribute(name, value))
-              inner.textContent = text
+              identity?.destroy()
+              identity = null
+              if (node.attrs.mentionSuggestionChar === '@') {
+                const person = userMentionItemsRef.current.find((item) => String(item.id) === String(node.attrs.id))?.user
+                if (person?.profile_picture_url) identity = new ReactRenderer(UserIdentity, { editor: host, props: {
+                  user: person ?? { id: Number(node.attrs.id), full_name: String(node.attrs.label ?? node.attrs.id) },
+                  prefix: '@', pictureClassName: 'w-5 h-5',
+                } })
+                if (identity) inner.appendChild(identity.element)
+                else inner.textContent = text
+              } else {
+                inner.textContent = text
+              }
               dom.replaceChildren(inner)
             }
             render()
@@ -304,6 +320,7 @@ export default function DocEditor({
               },
               ignoreMutation: () => true,
               destroy: () => {
+                identity?.destroy()
                 mentionViewsRef.current.delete(render)
               },
             }
@@ -417,7 +434,7 @@ export default function DocEditor({
     },
     editorProps: {
       attributes: {
-        class: `prose prose-sm dark:prose-invert max-w-none focus:outline-none ${minHeight} px-6 pt-4 ${headingNumbered ? 'heading-numbered' : ''}`,
+        class: `prose prose-sm dark:prose-invert max-w-none focus:outline-hidden ${minHeight} px-6 pt-4 ${headingNumbered ? 'heading-numbered' : ''}`,
       },
     },
   })
@@ -485,7 +502,7 @@ export default function DocEditor({
         )}
 
         {editable && editor && (
-          <BubbleMenu editor={editor} className="bg-card border border-border rounded-lg shadow-elegant flex items-center gap-0.5 p-1">
+          <BubbleMenu editor={editor} shouldShow={bubbleMenuVisibility} className="bg-card border border-border rounded-lg shadow-elegant flex items-center gap-0.5 p-1">
             <BubbleButton
               active={editor.isActive('bold')}
               onClick={() => editor.chain().focus().toggleBold().run()}

@@ -2,13 +2,14 @@
 User model and role enum.
 """
 
+import base64
 import enum
 from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import Boolean, DateTime
 from sqlalchemy import Enum as SaEnum
-from sqlalchemy import ForeignKey, Integer, String
+from sqlalchemy import ForeignKey, Integer, LargeBinary, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -26,6 +27,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    profile_picture: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(
         SaEnum(UserRole), default=UserRole.external, nullable=False
@@ -52,3 +54,15 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
+
+    @property
+    def has_profile_picture(self) -> bool:
+        """Whether the account has a stored profile image."""
+        return bool(self.profile_picture)
+
+    @property
+    def profile_picture_url(self) -> str | None:
+        """The normalized account picture as a PNG data URL, or no picture."""
+        if not self.profile_picture:
+            return None
+        return "data:image/png;base64," + base64.b64encode(self.profile_picture).decode("ascii")

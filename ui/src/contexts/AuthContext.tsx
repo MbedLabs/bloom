@@ -25,6 +25,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  const pictureRevision = useRef<string | null | undefined>(undefined)
+
   const applyUser = useCallback(
     (next: User | null) => {
       const previous = getSessionUserId()
@@ -39,6 +41,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (previous === null && next !== null) {
         queryClient.clear()
       }
+      if (previous === next?.id && pictureRevision.current !== next?.profile_picture_url) {
+        void queryClient.invalidateQueries({ predicate: query =>
+          ['users', 'mentionableUsers', 'access-assignment-options', 'project-members', 'project-access', 'access-requests', 'audit', 'artefactComments', 'artefactActivity', 'notifications-list'].includes(String(query.queryKey[0]))
+        })
+      }
+      pictureRevision.current = next?.profile_picture_url
       setSessionUserId(next?.id ?? null)
       setUser(next)
     },

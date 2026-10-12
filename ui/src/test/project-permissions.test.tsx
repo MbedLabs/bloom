@@ -1,11 +1,4 @@
 // @vitest-environment jsdom
-/**
- * Edit controls follow the server's effective permissions.
- *
- * A group policy can give an external user authoring rights on one kind of
- * artefact, or hold a maintainer to read-only. The hook reads the set the server
- * resolved and falls back to what the role alone allows while it has none.
- */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -68,16 +61,22 @@ describe('useProjectPermissions', () => {
     currentUser = { id: 4, role: 'maintainer' }
     vi.mocked(client.projectMembersApi.permissions).mockResolvedValue({ REQ: ['view'] })
     renderProbe({ projectId: 5 })
-    await screen.findByText('requirement create: false')
-    expect(screen.getByText('requirement view: true')).toBeTruthy()
+    await screen.findByText('requirement view: true')
+    expect(screen.getByText('requirement create: false')).toBeTruthy()
     expect(client.projectsApi.getByPrefix).not.toHaveBeenCalled()
   })
 
-  it('falls back to the role while the server set is missing', async () => {
+  it('does not infer project access from a non-administrator role', async () => {
     vi.mocked(client.projectMembersApi.permissions).mockRejectedValue(new Error('offline'))
     renderProbe({ projectId: 5 })
     await vi.waitFor(() => expect(client.projectMembersApi.permissions).toHaveBeenCalled())
-    expect(screen.getByText('requirement view: true')).toBeTruthy()
+    expect(screen.getByText('requirement view: false')).toBeTruthy()
+    expect(screen.getByText('requirement create: false')).toBeTruthy()
+
+    cleanup()
+    currentUser = { id: 4, role: 'maintainer' }
+    renderProbe({ projectId: 5 })
+    expect(screen.getByText('requirement view: false')).toBeTruthy()
     expect(screen.getByText('requirement create: false')).toBeTruthy()
 
     cleanup()

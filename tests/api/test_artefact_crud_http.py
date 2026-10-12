@@ -9,6 +9,7 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characte
 import pytest
 from fastapi.testclient import TestClient
 
+from tests.access_fixtures import add_policy_member
 from tests.conftest import create_project, unique_email
 
 
@@ -262,10 +263,11 @@ class TestChangeRequests:
         patched = api_client.patch(
             f"/api/changes/{created['id']}",
             headers=auth_headers,
-            json={"status": "Approved", "priority": "High"},
+            json={"priority": "High"},
         )
         assert patched.status_code == 200, patched.text
-        assert patched.json()["status"] == "Approved"
+        assert patched.json()["status"] == "Draft"
+        assert patched.json()["priority"] == "High"
 
         assert (
             api_client.delete(f"/api/changes/{created['id']}", headers=auth_headers).status_code
@@ -424,10 +426,12 @@ class TestProjectMembers:
         return created.json()
 
     def test_adds_and_lists_a_member(self, api_client, auth_headers, project, member):
-        added = api_client.post(
-            f"/api/projects/{project['id']}/members",
+        added = add_policy_member(
+            api_client,
             headers=auth_headers,
-            json={"user_id": member["id"], "role": "maintainer"},
+            url=f"/api/projects/{project['id']}/members",
+            user_id=member["id"],
+            permissions={"*": ["*"]},
         )
         assert added.status_code == 201, added.text
 
@@ -436,10 +440,12 @@ class TestProjectMembers:
         assert any(m["user_id"] == member["id"] for m in listed.json())
 
     def test_reads_one_membership(self, api_client, auth_headers, project, member):
-        added = api_client.post(
-            f"/api/projects/{project['id']}/members",
+        added = add_policy_member(
+            api_client,
             headers=auth_headers,
-            json={"user_id": member["id"], "role": "maintainer"},
+            url=f"/api/projects/{project['id']}/members",
+            user_id=member["id"],
+            permissions={"*": ["*"]},
         ).json()
         fetched = api_client.get(
             f"/api/projects/{project['id']}/members/{added['id']}", headers=auth_headers
@@ -447,28 +453,33 @@ class TestProjectMembers:
         assert fetched.status_code == 200, fetched.text
         assert fetched.json()["user_id"] == member["id"]
 
-    def test_changes_a_member_role(self, api_client, auth_headers, project, member):
-        added = api_client.post(
-            f"/api/projects/{project['id']}/members",
+    def test_changes_a_member_to_owner(self, api_client, auth_headers, project, member):
+        added = add_policy_member(
+            api_client,
             headers=auth_headers,
-            json={"user_id": member["id"], "role": "maintainer"},
+            url=f"/api/projects/{project['id']}/members",
+            user_id=member["id"],
+            permissions={"*": ["*"]},
         ).json()
         patched = api_client.patch(
             f"/api/projects/{project['id']}/members/{added['id']}",
             headers=auth_headers,
-            json={"role": "external", "doc_types": ["REQ"]},
+            json={"owner": True, "policy_ids": []},
         )
         assert patched.status_code == 200, patched.text
-        assert patched.json()["role"] == "external"
+        assert patched.json()["owner"] is True
+        assert patched.json()["policy_ids"] == []
 
     def test_rejects_a_membership_role_outside_the_project_roles(
         self, api_client, auth_headers, project, member
     ):
         """Project membership grants maintainer or external; viewer is global."""
-        added = api_client.post(
-            f"/api/projects/{project['id']}/members",
+        added = add_policy_member(
+            api_client,
             headers=auth_headers,
-            json={"user_id": member["id"], "role": "maintainer"},
+            url=f"/api/projects/{project['id']}/members",
+            user_id=member["id"],
+            permissions={"*": ["*"]},
         ).json()
         response = api_client.patch(
             f"/api/projects/{project['id']}/members/{added['id']}",
@@ -478,10 +489,12 @@ class TestProjectMembers:
         assert response.status_code == 422
 
     def test_removes_a_member(self, api_client, auth_headers, project, member):
-        added = api_client.post(
-            f"/api/projects/{project['id']}/members",
+        added = add_policy_member(
+            api_client,
             headers=auth_headers,
-            json={"user_id": member["id"], "role": "maintainer"},
+            url=f"/api/projects/{project['id']}/members",
+            user_id=member["id"],
+            permissions={"*": ["*"]},
         ).json()
         removed = api_client.delete(
             f"/api/projects/{project['id']}/members/{added['id']}", headers=auth_headers
@@ -492,10 +505,12 @@ class TestProjectMembers:
         assert not any(m["id"] == added["id"] for m in listed.json())
 
     def test_adding_an_unknown_user_is_refused(self, api_client, auth_headers, project):
-        response = api_client.post(
-            f"/api/projects/{project['id']}/members",
+        response = add_policy_member(
+            api_client,
             headers=auth_headers,
-            json={"user_id": 999999, "role": "maintainer"},
+            url=f"/api/projects/{project['id']}/members",
+            user_id=999999,
+            permissions={"*": ["*"]},
         )
         assert response.status_code in (400, 404, 422)
 

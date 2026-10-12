@@ -17,7 +17,12 @@ from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.artefact_utils import get_row_or_404, minute_utc
+from app.api.artefact_utils import (
+    get_row_or_404,
+    minute_utc,
+    type_visible,
+    visible_types,
+)
 from app.api.link_read_utils import (
     VERIFY_LINK_ROLE,
     VERIFY_SOURCE_TYPE,
@@ -27,7 +32,6 @@ from app.core.database import get_db
 from app.core.security import (
     apply_external_visibility_filter,
     get_current_user,
-    require_external_doc_type_access,
     require_project_access,
 )
 from app.models import (
@@ -131,7 +135,8 @@ async def _load_requirements(
     db: AsyncSession, project_id: int, current_user: User
 ) -> list[Requirement]:
     """The project's requirements this user may see, ordered by their human id."""
-    await require_external_doc_type_access(db, current_user, project_id, "REQ")
+    if not type_visible(await visible_types(db, current_user, project_id), "REQ"):
+        return []
     query = (
         select(Requirement).where(Requirement.project_id == project_id).order_by(Requirement.req_id)
     )
@@ -143,7 +148,8 @@ async def _verifying_test_cases(
     db: AsyncSession, project_id: int, current_user: User
 ) -> dict[int, list[TestCase]]:
     """The test cases this user may see that verify each requirement, by requirement id."""
-    await require_external_doc_type_access(db, current_user, project_id, "TC")
+    if not type_visible(await visible_types(db, current_user, project_id), "TC"):
+        return {}
     query = (
         select(ArtefactLink.target_id, TestCase)
         .join(TestCase, TestCase.id == ArtefactLink.source_id)
@@ -456,7 +462,8 @@ async def export_traceability(
 
 async def _load_test_cases(db: AsyncSession, project_id: int, current_user: User) -> list[TestCase]:
     """The project's test cases this user may see, ordered by their human id."""
-    await require_external_doc_type_access(db, current_user, project_id, "TC")
+    if not type_visible(await visible_types(db, current_user, project_id), "TC"):
+        return []
     query = select(TestCase).where(TestCase.project_id == project_id).order_by(TestCase.tc_id)
     query = apply_external_visibility_filter(query, TestCase, current_user)
     return (await db.execute(query)).scalars().all()

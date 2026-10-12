@@ -1,7 +1,12 @@
+import ProfilePicture from '../components/ProfilePicture'
+import WorkflowPanel from '../components/WorkflowPanel'
+import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
+import { useSignOffPeople } from '../hooks/useSignOff'
 import { useEffect, useMemo, useState } from 'react'
+import ArtefactTags from '../components/ArtefactTags'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowUpDown, ExternalLink, GitBranch, History, MessageSquare, Pencil, RefreshCw, Trash2 } from 'lucide-react'
+import { ArrowUpDown, ExternalLink, GitBranch, History, Pencil, RefreshCw, Trash2 } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
 import { docUrl, docEditUrl, type DocType, DOC_TYPE_COLORS } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
@@ -27,7 +32,8 @@ import {
   testConceptsApi,
   projectsApi,
 } from '../api/client'
-import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import { useProjectPermissions, useRowActions } from '../hooks/useProjectPermissions'
+import { useAuth } from '../contexts/AuthContext'
 import { useParameterValues } from '../hooks/useParameterValues'
 import { useArtefactLabels } from '../hooks/useArtefactLabels'
 import AccessDenied from '../components/AccessDenied'
@@ -36,7 +42,7 @@ import ConfirmDelete from '../components/ConfirmDelete'
 
 type ArtefactKind = 'design' | 'risk' | 'change' | 'test-concept' | 'defect'
 type ArtefactRecord = DesignItem | RiskItem | ChangeRequest | TestConcept | Defect
-type DetailTab = 'overview' | 'comments' | 'activity' | 'related' | 'sync'
+type DetailTab = 'overview' | 'activity' | 'related' | 'sync'
 
 const SOURCE_TYPE_CODES: Record<ArtefactKind, DocType> = {
   design: 'DES',
@@ -152,9 +158,18 @@ const workflowTransitions: Record<ArtefactKind, Record<string, string[]>> = {
   defect: { Open: ['Triaged', 'Rejected', 'Duplicate'], Triaged: ['In Progress', 'Rejected', 'Duplicate'], 'In Progress': ['Resolved', 'Triaged'], Resolved: ['Verified', 'In Progress'], Verified: ['Closed', 'In Progress'], Closed: ['Open'], Rejected: ['Open'], Duplicate: ['Open'] },
 }
 
-export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKind; resolvedId?: number }) {
+export default function ArtefactDetail({
+  kind,
+  resolvedId,
+  allowedActions,
+}: {
+  kind: ArtefactKind
+  resolvedId?: number
+  allowedActions?: string[]
+}) {
   const { itemId, prefix } = useParams<{ prefix: string; itemId: string }>()
   const recordId = resolvedId || Number(itemId)
+  const workflow = useDocumentWorkflow(kind, recordId)
   const config = configs[kind]
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -162,7 +177,6 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
 
   const [activeTab, setActiveTab] = useState<DetailTab>('overview')
   const [isEditing, setIsEditing] = useState(false)
-  const [commentBody, setCommentBody] = useState('')
   const [form, setForm] = useState<Record<string, string>>({})
 
 
@@ -173,6 +187,8 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
   })
 
   const projectId = artefact ? (artefact as unknown as Record<string, unknown>).project_id as number : undefined
+  const { user } = useAuth()
+  const people = useSignOffPeople(projectId, user?.role === 'admin')
   const { can } = useProjectPermissions(prefix, projectId)
   const parameterValues = useParameterValues(prefix, projectId)
   const artefactLabels = useArtefactLabels(prefix, (artefact as unknown as Record<string, unknown> | undefined)?.content_json)
@@ -183,11 +199,6 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
   })
   const projectPrefix = prefix || projectData?.prefix || ''
 
-  const { data: comments } = useQuery({
-    queryKey: ['artefactComments', kind, recordId],
-    queryFn: () => artefactsApi.listComments(kind, recordId),
-    enabled: !!recordId,
-  })
 
   const { data: activity } = useQuery({
     queryKey: ['artefactActivity', kind, recordId],
@@ -237,6 +248,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
       queryClient.invalidateQueries({ queryKey: [config.listKey, updated.project_id] })
       queryClient.invalidateQueries({ queryKey: ['project', updated.project_id] })
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', kind, recordId] })
+      queryClient.invalidateQueries({ queryKey: ['document-workflow', kind, recordId] })
       setIsEditing(false)
       toast.notify(`${config.singular} saved`, 'success')
     },
@@ -263,18 +275,6 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
     },
   })
 
-  const commentMutation = useMutation({
-    mutationFn: () => artefactsApi.createComment(kind, recordId, commentBody),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['artefactComments', kind, recordId] })
-      queryClient.invalidateQueries({ queryKey: ['artefactActivity', kind, recordId] })
-      setCommentBody('')
-      toast.notify('Comment added', 'success')
-    },
-    onError: (err: unknown) => {
-      toast.failed('Adding the comment', err)
-    },
-  })
 
   const transitionMutation = useMutation({
     mutationFn: (status: string) => artefactsApi.transition(kind, recordId, status),
@@ -318,12 +318,25 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
   })
 
   const artefactRecord = artefact as unknown as Record<string, unknown> | undefined
-  const allowedTransitions = artefact ? workflowTransitions[kind][String(artefact.status)] ?? [] : []
+  const external = user?.role === 'external'
+  const rowAllows = useRowActions(
+    projectPrefix,
+    config.docType,
+    artefactRecord ? String(artefactRecord[config.idField] ?? '') || null : undefined,
+    allowedActions,
+  )
+  const transitions = artefact ? workflowTransitions[kind][String(artefact.status)] ?? [] : []
+  const leavingReview = ['Review', 'Analysis'].includes(String(artefact?.status))
+  const allowedTransitions = external
+    ? transitions.filter((next) => next === 'Draft' && rowAllows(leavingReview ? 'review' : 'edit'))
+    : transitions
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!workflow.data?.actions?.edit_current) return
     const payload: Record<string, unknown> = {}
     for (const field of config.fields) {
+      if (field.key === 'status' && workflow.data.controlled) continue
       const value = form[field.key] ?? ''
       if (field.key === 'coverage') {
         payload[field.key] = Number(value) || 0
@@ -350,6 +363,8 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
   const description = String(artefactRecord[config.descriptionField] ?? '')
   const editUrl = docEditUrl(projectPrefix, config.docType, code)
   const canEditDocs = can('edit', SOURCE_TYPE_CODES[kind])
+  const showEdit = canEditDocs && rowAllows('edit') && workflow.data?.actions?.edit_current === true
+  const showDelete = canEditDocs && can('delete', SOURCE_TYPE_CODES[kind]) && rowAllows('delete')
 
   return (
     <>
@@ -359,8 +374,9 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
       docCode={code}
       title={title}
       status={String(artefact.status)}
-      actions={canEditDocs ? (
+      actions={showEdit || showDelete ? (
         <>
+          {showEdit && (
           <button onClick={() => {
             if (isEditing) {
               setIsEditing(false)
@@ -374,7 +390,8 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
             <Pencil className="h-4 w-4 mr-2" />
             {isEditing ? 'Cancel' : 'Edit'}
           </button>
-          {!deleteConfirm ? (
+          )}
+          {showDelete && (!deleteConfirm ? (
             <button onClick={() => setDeleteConfirm(true)} className="inline-flex items-center px-4 py-2 border border-red-300 text-red-600 rounded-md hover:bg-red-50 text-sm">
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
@@ -385,12 +402,13 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
               onConfirm={() => { setDeleteConfirm(false); deleteMutation.mutate(); }}
               onCancel={() => setDeleteConfirm(false)}
             />
-          )}
+          ))}
         </>
       ) : undefined}
       rightRail={
         <>
-          <SectionCard title="Workflow">
+          <WorkflowPanel artefactType={kind} artefactId={recordId} projectPrefix={projectPrefix} />
+          {workflow.data && !workflow.data.controlled && <SectionCard title="Workflow">
             <div className="space-y-3">
               <div>
                 <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Current Status</div>
@@ -411,7 +429,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
                 )}
               </div>
             </div>
-          </SectionCard>
+          </SectionCard>}
 
           <SectionCard title="Details">
             <div className="space-y-4">
@@ -426,6 +444,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
 
           <SectionCard title="Metadata">
             <div className="space-y-4">
+              <MetaItem label="Origin" value={<ArtefactTags type={kind} id={recordId} projectId={artefact.project_id} canEdit={showEdit} origin={artefact.visibility === 'customer' ? 'Customer' : 'Internal'} />} />
               <MetaItem label="ID" value={code} mono />
               <MetaItem label="Project" value={related?.project ? `${related.project.prefix} · ${related.project.name}` : `#${artefact.project_id}`} />
               <MetaItem label="Created" value={formatDateTime(artefact.created_at) + ' ago'} />
@@ -446,7 +465,6 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
         <nav className="flex gap-6 min-w-max">
           {[
             { key: 'overview' as const, label: 'Overview', icon: Pencil },
-            { key: 'comments' as const, label: 'Comments', icon: MessageSquare },
             { key: 'activity' as const, label: 'Activity', icon: History },
             { key: 'related' as const, label: 'Related', icon: GitBranch },
             ...(kind === 'defect' ? [{ key: 'sync' as const, label: 'Sync Log', icon: ArrowUpDown }] : []),
@@ -460,7 +478,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
       </div>
 
       {activeTab === 'overview' && (
-        isEditing ? (
+        isEditing && workflow.data?.actions?.edit_current ? (
           <form onSubmit={handleSave} className="bg-card rounded-lg shadow-elegant p-6 space-y-5">
             {kind === 'defect' && (
               <>
@@ -487,7 +505,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
                 </div>
               </>
             )}
-            {config.fields.map((field) => (
+            {config.fields.filter((field) => !(field.key === 'status' && workflow.data?.controlled) && !(external && (field.key === 'visibility' || field.key === 'status'))).map((field) => (
               <div key={field.key}>
                 <label className="block text-sm font-medium text-foreground mb-1">{field.label}</label>
                 {'options' in field && field.options ? (
@@ -532,6 +550,7 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
                 <DocEditor
                   content={artefactRecord.content_json as Record<string, unknown>}
                   editable={false}
+                  userMentionItems={people.map(person => ({ id: person.id, label: person.full_name, user: person }))}
                   parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues} artefactLabels={artefactLabels}
             artefactHref={(type, _id, label) => docUrl(prefix, type as DocType, label)}
                   minHeight="min-h-[120px]"
@@ -593,38 +612,6 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
         )
       )}
 
-      {activeTab === 'comments' && (
-        <div className="space-y-4">
-          <SectionCard title="Add Comment">
-            <div className="space-y-3">
-              <textarea value={commentBody} onChange={(e) => setCommentBody(e.target.value)} rows={4} className="w-full px-3 py-2 bg-background border border-input rounded-md" placeholder={`Discuss this ${config.singular.toLowerCase()}...`} />
-              <div className="flex justify-end">
-                <button onClick={() => commentMutation.mutate()} disabled={!commentBody.trim() || commentMutation.isPending} className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm">
-                  {commentMutation.isPending ? 'Posting...' : 'Post Comment'}
-                </button>
-              </div>
-            </div>
-          </SectionCard>
-          <SectionCard title={`Discussion (${comments?.length ?? 0})`}>
-            {!comments || comments.length === 0 ? (
-              <p className="text-muted-foreground">No comments yet.</p>
-            ) : (
-              <div className="space-y-4">
-                {comments.map((comment) => (
-                  <div key={comment.id} className="rounded-lg border border-border p-4 bg-background/60">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="font-medium text-foreground">{comment.author_name}</div>
-                      <div className="text-xs text-muted-foreground">{formatDateTime(comment.created_at)} ago</div>
-                    </div>
-                    <p className="text-foreground mt-3 whitespace-pre-wrap leading-relaxed">{comment.body}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </SectionCard>
-        </div>
-      )}
-
       {activeTab === 'activity' && (
         <SectionCard title={`Activity (${activity?.length ?? 0})`}>
           {!activity || activity.length === 0 ? (
@@ -633,7 +620,9 @@ export default function ArtefactDetail({ kind, resolvedId }: { kind: ArtefactKin
             <div className="space-y-4">
               {activity.map((event) => (
                 <div key={event.id} className="flex gap-4">
-                  <div className="mt-1 h-2.5 w-2.5 rounded-full bg-primary shrink-0" />
+                  {event.actor_user_id && event.actor_name ? (
+                    <ProfilePicture user={{ id: event.actor_user_id, full_name: event.actor_name, profile_picture_url: event.actor_profile_picture_url }} />
+                  ) : <div className="mt-1 h-2.5 w-2.5 rounded-full bg-primary shrink-0" />}
                   <div>
                     <div className="font-medium text-foreground">{event.summary}</div>
                     <div className="text-xs text-muted-foreground mt-1">{event.event_type} · {formatDateTime(event.created_at)} ago</div>

@@ -96,7 +96,7 @@ describe('Settings', () => {
     vi.mocked(companyLogoApi.fetchLogo).mockResolvedValue(new Blob(['x'], { type: 'image/png' }))
     render(<Settings />)
 
-    expect(await within(logoSection()).findByAltText('Company logo')).toBeInTheDocument()
+    expect(await within(logoSection()).findByAltText('Company logo')).toHaveAttribute('src', 'data:image/png;base64,eA==')
     expect(companyLogoApi.fetchLogo).toHaveBeenCalled()
   })
 
@@ -107,19 +107,22 @@ describe('Settings', () => {
     fireEvent.change(section.querySelector('input[type="file"]') as HTMLInputElement, {
       target: { files: [file] },
     })
-    fireEvent.click(within(section).getByRole('button', { name: 'Upload logo' }))
+    fireEvent.click(within(section).getByRole('button', { name: 'Upload' }))
 
     expect(await within(section).findByText('Logo updated.')).toBeInTheDocument()
     expect(companyLogoApi.setLogo).toHaveBeenCalledWith(file)
   })
 
   it('removes the company logo', async () => {
+    vi.mocked(companyLogoApi.fetchLogo).mockResolvedValue(new Blob(['x'], { type: 'image/png' }))
     render(<Settings />)
     const section = logoSection()
-    fireEvent.click(within(section).getByRole('button', { name: 'Remove' }))
+    await within(section).findByAltText('Company logo')
+    fireEvent.click(within(section).getByRole('button', { name: 'Remove company logo' }))
 
     expect(await within(section).findByText('Logo removed.')).toBeInTheDocument()
     expect(companyLogoApi.deleteLogo).toHaveBeenCalled()
+    expect(within(section).queryByAltText('Company logo')).not.toBeInTheDocument()
   })
 
   it('reports an error when the logo upload fails', async () => {
@@ -130,7 +133,7 @@ describe('Settings', () => {
     fireEvent.change(section.querySelector('input[type="file"]') as HTMLInputElement, {
       target: { files: [file] },
     })
-    fireEvent.click(within(section).getByRole('button', { name: 'Upload logo' }))
+    fireEvent.click(within(section).getByRole('button', { name: 'Upload' }))
 
     const status = await within(section).findByRole('status')
     expect(status).not.toHaveTextContent('Logo updated.')
@@ -138,13 +141,16 @@ describe('Settings', () => {
   })
 
   it('reports an error when removing the logo fails', async () => {
+    vi.mocked(companyLogoApi.fetchLogo).mockResolvedValue(new Blob(['x'], { type: 'image/png' }))
     vi.mocked(companyLogoApi.deleteLogo).mockRejectedValue(new Error('nope'))
     render(<Settings />)
     const section = logoSection()
-    fireEvent.click(within(section).getByRole('button', { name: 'Remove' }))
+    await within(section).findByAltText('Company logo')
+    fireEvent.click(within(section).getByRole('button', { name: 'Remove company logo' }))
 
     const status = await within(section).findByRole('status')
     expect(status).not.toHaveTextContent('Logo removed.')
     expect(companyLogoApi.deleteLogo).toHaveBeenCalled()
+    expect(within(section).getByAltText('Company logo')).toBeInTheDocument()
   })
 })

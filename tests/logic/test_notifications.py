@@ -1,21 +1,25 @@
 """Tests for in-app notifications: service, API, and emission hooks."""
 
+import pytest
 import pytest_asyncio
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app.api.artefacts import create_comment
 from app.api.notifications import (
     list_notifications,
     mark_all_read,
     mark_read,
     unread_count,
 )
-from app.api.requirements import create_requirement, update_requirement
+from app.api.requirements import create_requirement, get_requirement, update_requirement
 from app.core.database import Base
-from app.models import Notification, Project, Requirement
+from app.models import Notification, Project, ProjectMembership, Requirement
 from app.models.user import User, UserRole
-from app.schemas import RequirementCreate, RequirementUpdate
+from app.schemas import ArtefactCommentCreate, RequirementCreate, RequirementUpdate
 from app.services.notification_service import notify, notify_assignment
+from tests.access_fixtures import project_access_fixture
 
 
 @pytest_asyncio.fixture
@@ -25,7 +29,14 @@ async def session():
         await conn.run_sync(Base.metadata.create_all)
     maker = async_sessionmaker(engine, expire_on_commit=False)
     async with maker() as db:
-        db.add(Project(name="Alpha", prefix="ALP"))
+        project = Project(name="Alpha", prefix="ALP")
+        reviewer = User(
+            email="rev@test.local",
+            full_name="Rita Reviewer",
+            hashed_password="x",
+            role=UserRole.maintainer,
+        )
+        db.add(project)
         db.add_all(
             [
                 User(
@@ -34,13 +45,14 @@ async def session():
                     hashed_password="x",
                     role=UserRole.admin,
                 ),
-                User(
-                    email="rev@test.local",
-                    full_name="Rita Reviewer",
-                    hashed_password="x",
-                    role=UserRole.maintainer,
-                ),
+                reviewer,
             ]
+        )
+        await db.flush()
+        db.add(
+            project_access_fixture(
+                user_id=reviewer.id, project_id=project.id, permissions={"*": ["*"]}
+            )
         )
         await db.commit()
         yield db
@@ -175,3 +187,91 @@ async def test_users_cannot_read_each_others_notifications(session):
     with pytest.raises(HTTPException) as exc:
         await mark_read(notification_id=created.id, db=session, current_user=admin)
     assert exc.value.status_code == 404
+
+
+async def _external_assignee_requirement(session, origin: str):
+    """A requirement of the given origin whose reviewer is an external user kept from 1.1.0 and
+    whose approver is the project's maintainer."""
+    admin, reviewer = await _users(session)
+    external = User(
+        email="ext@test.local",
+        full_name="Eve External",
+        hashed_password="x",
+        role=UserRole.external,
+    )
+    session.add(external)
+    await session.flush()
+    session.add(
+        project_access_fixture(
+            user_id=external.id,
+            project_id=1,
+            permissions={"*": ["view", "comment"]},
+            visibility="customer",
+            doc_types=["REQ"],
+        )
+    )
+    visibility = "customer" if origin == "Customer" else "internal"
+    requirement = Requirement(
+        project_id=1,
+        req_id="ALP-REQ-009",
+        title="Kept assignment",
+        req_origin=origin,
+        visibility=visibility,
+        reviewer_id=external.id,
+        approver_id=reviewer.id,
+    )
+    session.add(requirement)
+    await session.commit()
+    return admin, reviewer, external, requirement
+
+
+async def test_a_comment_notifies_only_assignees_who_can_see_the_requirement(session):
+    admin, reviewer, external, requirement = await _external_assignee_requirement(
+        session, "Internal"
+    )
+    requirement.reviewer_id = admin.id
+    await session.commit()
+
+    await create_comment(
+        artefact_type="requirement",
+        artefact_id=str(requirement.id),
+        data=ArtefactCommentCreate(body="Please check"),
+        db=session,
+        current_user=admin,
+    )
+
+    rows = (await session.execute(select(Notification))).scalars().all()
+    assert [n.user_id for n in rows] == [reviewer.id]
+
+    requirement.approver_id = external.id
+    await session.commit()
+    await create_comment(
+        artefact_type="requirement",
+        artefact_id=str(requirement.id),
+        data=ArtefactCommentCreate(body="Hidden approver receives nothing"),
+        db=session,
+        current_user=admin,
+    )
+    rows = (await session.execute(select(Notification))).scalars().all()
+    assert [n.user_id for n in rows] == [reviewer.id]
+
+
+async def test_a_change_that_hides_a_requirement_from_its_reviewer_is_refused(session):
+    admin, _, _, requirement = await _external_assignee_requirement(session, "Customer")
+
+    with pytest.raises(HTTPException) as refused:
+        await update_requirement(
+            requirement_id=requirement.id,
+            data=RequirementUpdate(req_origin="Internal"),
+            db=session,
+            current_user=admin,
+        )
+    assert refused.value.status_code == 409
+    assert refused.value.detail == "The reviewer could no longer see ALP-REQ-009."
+
+
+async def test_a_kept_external_reviewer_is_shown_as_unable_to_sign(session):
+    admin, _, _, requirement = await _external_assignee_requirement(session, "Customer")
+
+    shown = await get_requirement(requirement_id=requirement.id, db=session, current_user=admin)
+    assert (shown.reviewer_can_sign, shown.approver_can_sign) == (False, True)

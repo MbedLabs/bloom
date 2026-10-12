@@ -1,34 +1,80 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Edit2, Plus, Trash2, Users, X } from 'lucide-react'
+import { Copy, Edit2, Eye, Plus, Trash2, X } from 'lucide-react'
 import {
-  BaseRole,
   Group,
   GroupInput,
   groupsApi,
   Policy,
+  PolicyVisibility,
   PolicyInput,
+  PolicyRule,
+  PolicyScope,
   policiesApi,
-  projectsApi,
-  usersApi,
+  Tag,
+  tagsApi,
 } from '../api/client'
 import { useToast } from '../components/useToast'
-import { DOC_TYPE_LABELS, type DocType } from '../types/doc'
-
-const EXTERNAL_DOC_TYPES = Object.keys(DOC_TYPE_LABELS) as DocType[]
-
-const BASE_ROLES: BaseRole[] = ['external', 'maintainer', 'admin']
+import { useAuth } from '../contexts/AuthContext'
+import { applicationAllows } from '../lib/applicationAccess'
+import { SortableHeader } from '../components/ListControls'
+import {
+  activeRule, approveIncludesReview, BUILTIN_ORIGINS, emptyRule, isCompleteAppPolicy, isDocType, PERMISSIONS,
+  policyOrigins, policyPermissions, policyResourceSummary, policyScopeLabel,
+  resourceLabel, resourcesFor, SCOPE_LABELS, supportedPermission, type Permission,
+} from '../lib/policySummary'
 
 export default function GroupsPage() {
+  const { user } = useAuth()
+  if (!applicationAllows(user, 'view')) {
+    return <div className="p-6 text-muted-foreground">Access Management permission is required.</div>
+  }
+  return <AccessContent />
+}
+
+function AccessContent() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
   const toast = useToast()
 
   const { data: policies } = useQuery({ queryKey: ['policies'], queryFn: policiesApi.list })
   const { data: groups } = useQuery({ queryKey: ['groups'], queryFn: groupsApi.list })
+  const { data: tags } = useQuery({ queryKey: ['tags'], queryFn: () => tagsApi.list() })
 
+  const [view, setView] = useState<'groups' | 'policies'>('policies')
+  const [viewingPolicy, setViewingPolicy] = useState<Policy | null>(null)
   const [editingPolicy, setEditingPolicy] = useState<Policy | 'new' | null>(null)
   const [editingGroup, setEditingGroup] = useState<Group | 'new' | null>(null)
-  const [managingGroupId, setManagingGroupId] = useState<number | null>(null)
+  const [groupSort, setGroupSort] = useState<'name' | 'policies'>('name')
+  const [groupDir, setGroupDir] = useState<'asc' | 'desc'>('asc')
+  const [policySort, setPolicySort] = useState<'name' | 'scope' | 'permissions' | 'origins'>('name')
+  const [policyDir, setPolicyDir] = useState<'asc' | 'desc'>('asc')
+  const groupPolicyNames = (group: Group) => (group.policy_ids ?? [])
+    .map((id) => policies?.find((policy) => policy.id === id)?.name ?? `Policy ${id}`).join(', ') || 'None'
+  const sortedGroups = [...(groups ?? [])].sort((a, b) => {
+    const value = (group: Group) => groupSort === 'name' ? group.name : groupPolicyNames(group)
+    return value(a).localeCompare(value(b)) * (groupDir === 'asc' ? 1 : -1) || a.id - b.id
+  })
+  const sortedPolicies = [...(policies ?? [])].sort((a, b) => {
+    const scope = (policy: Policy) => {
+      const label = policyScopeLabel(policy)
+      const resources = policyResourceSummary(policy)
+      return policy.scope !== 'document' && !isCompleteAppPolicy(policy) && resources !== label ? `${label} ${resources}` : label
+    }
+    const value = (policy: Policy) => policySort === 'name' ? policy.name
+      : policySort === 'scope' ? scope(policy)
+      : policySort === 'permissions' ? policyPermissions(policy).join(', ')
+      : policyOrigins(policy, tags ?? []).join(', ')
+    return value(a).localeCompare(value(b)) * (policyDir === 'asc' ? 1 : -1) || a.id - b.id
+  })
+  const toggleGroupSort = (field: typeof groupSort) => {
+    setGroupDir(field === groupSort && groupDir === 'asc' ? 'desc' : 'asc')
+    setGroupSort(field)
+  }
+  const togglePolicySort = (field: typeof policySort) => {
+    setPolicyDir(field === policySort && policyDir === 'asc' ? 'desc' : 'asc')
+    setPolicySort(field)
+  }
 
   const invalidatePolicies = () => queryClient.invalidateQueries({ queryKey: ['policies'] })
   const invalidateGroups = () => queryClient.invalidateQueries({ queryKey: ['groups'] })
@@ -42,6 +88,15 @@ export default function GroupsPage() {
     onError: (error) => toast.failed('Deleting the policy', error),
   })
 
+  const duplicatePolicy = useMutation({
+    mutationFn: (id: number) => policiesApi.duplicate(id),
+    onSuccess: (copy) => {
+      invalidatePolicies()
+      setEditingPolicy(copy)
+    },
+    onError: (error) => toast.failed('Duplicating the policy', error),
+  })
+
   const deleteGroup = useMutation({
     mutationFn: (id: number) => groupsApi.delete(id),
     onSuccess: () => {
@@ -51,23 +106,47 @@ export default function GroupsPage() {
     onError: (error) => toast.failed('Deleting the group', error),
   })
 
-  const policyName = (id: number | null) =>
-    (id != null && policies?.find((p) => p.id === id)?.name) || 'None'
-
-  const managingGroup = groups?.find((g) => g.id === managingGroupId) ?? null
 
   return (
-    <div className="p-6 space-y-10">
-      <section>
+    <div className="p-6 space-y-6">
+      <div>
+        <h1 className="text-xl font-semibold text-foreground">Access Management</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Configure groups of policies and permissions by scope and origin.</p>
+      </div>
+      <div role="tablist" aria-label="Access views" className="flex gap-1 border-b border-border">
+        {(['policies', 'groups'] as const).map((tab) => (
+          <button
+            key={tab}
+            id={`access-${tab}-tab`}
+            type="button"
+            role="tab"
+            aria-selected={view === tab}
+            aria-controls={`access-${tab}-panel`}
+            tabIndex={view === tab ? 0 : -1}
+            onClick={() => setView(tab)}
+            onKeyDown={(event) => {
+              const next = event.key === 'Home' ? 'policies' : event.key === 'End' ? 'groups'
+                : event.key === 'ArrowLeft' || event.key === 'ArrowRight' ? (tab === 'groups' ? 'policies' : 'groups') : null
+              if (next) {
+                event.preventDefault()
+                setView(next)
+                document.getElementById(`access-${next}-tab`)?.focus()
+              }
+            }}
+            className={`border-b-2 px-4 py-2 text-sm font-medium ${view === tab ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+          >
+            {tab === 'groups' ? 'Groups' : 'Policies'}
+          </button>
+        ))}
+      </div>
+      {view === 'groups' && <section role="tabpanel" id="access-groups-panel" aria-labelledby="access-groups-tab">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-xl font-semibold text-foreground">Groups</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              A group carries a policy and is granted projects. Its members gain that access.
-            </p>
+            <h2 className="text-xl font-semibold text-foreground">Groups</h2>
           </div>
           <button
             onClick={() => setEditingGroup('new')}
+            disabled={!applicationAllows(user, 'create')}
             className="inline-flex items-center gap-1.5 px-3 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90"
           >
             <Plus className="h-4 w-4" /> New group
@@ -77,35 +156,27 @@ export default function GroupsPage() {
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-muted-foreground">
               <tr>
-                <th className="text-left font-medium px-4 py-2">Name</th>
-                <th className="text-left font-medium px-4 py-2">Policy</th>
-                <th className="text-left font-medium px-4 py-2">Members</th>
-                <th className="text-left font-medium px-4 py-2">Projects</th>
+                {(['name', 'policies'] as const).map((field) => (
+                  <SortableHeader key={field} field={field} sortField={groupSort} sortDir={groupDir} onSort={toggleGroupSort}
+                    className="text-left font-medium px-4 py-2 cursor-pointer select-none hover:text-foreground transition-colors">
+                    {field === 'name' ? 'Name' : 'Policies'}
+                  </SortableHeader>
+                ))}
                 <th className="px-4 py-2" />
               </tr>
             </thead>
             <tbody>
-              {(groups ?? []).map((group) => (
+              {sortedGroups.map((group) => (
                 <tr key={group.id} className="border-t border-border">
                   <td className="px-4 py-2 text-foreground font-medium">{group.name}</td>
-                  <td className="px-4 py-2 text-muted-foreground">{policyName(group.policy_id)}</td>
-                  <td className="px-4 py-2 text-muted-foreground">{group.members.length}</td>
                   <td className="px-4 py-2 text-muted-foreground">
-                    {group.grants.some((g) => g.project_id === null)
-                      ? 'All projects'
-                      : group.grants.length}
+                    {groupPolicyNames(group)}
                   </td>
                   <td className="px-4 py-2">
                     <div className="flex items-center justify-end gap-1">
                       <button
-                        onClick={() => setManagingGroupId(group.id)}
-                        title="Manage members and projects"
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-foreground hover:bg-muted"
-                      >
-                        <Users className="h-3.5 w-3.5" /> Manage
-                      </button>
-                      <button
                         onClick={() => setEditingGroup(group)}
+                        disabled={!applicationAllows(user, 'edit')}
                         title="Edit group"
                         className="p-1 rounded text-muted-foreground hover:text-foreground"
                       >
@@ -113,6 +184,7 @@ export default function GroupsPage() {
                       </button>
                       <button
                         onClick={() => deleteGroup.mutate(group.id)}
+                        disabled={!applicationAllows(user, 'delete')}
                         title="Delete group"
                         className="p-1 rounded text-muted-foreground hover:text-destructive"
                       >
@@ -124,7 +196,7 @@ export default function GroupsPage() {
               ))}
               {groups?.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
+                  <td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">
                     No groups yet.
                   </td>
                 </tr>
@@ -132,18 +204,19 @@ export default function GroupsPage() {
             </tbody>
           </table>
         </div>
-      </section>
+      </section>}
 
-      <section>
+      {view === 'policies' && <section role="tabpanel" id="access-policies-panel" aria-labelledby="access-policies-tab">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-xl font-semibold text-foreground">Policies</h1>
+            <h2 className="text-xl font-semibold text-foreground">Policies</h2>
             <p className="text-sm text-muted-foreground mt-1">
               Named permission sets. The shipped defaults are protected.
             </p>
           </div>
           <button
             onClick={() => setEditingPolicy('new')}
+            disabled={!applicationAllows(user, 'create')}
             className="inline-flex items-center gap-1.5 px-3 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90"
           >
             <Plus className="h-4 w-4" /> New policy
@@ -153,14 +226,17 @@ export default function GroupsPage() {
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-muted-foreground">
               <tr>
-                <th className="text-left font-medium px-4 py-2">Name</th>
-                <th className="text-left font-medium px-4 py-2">Base role</th>
-                <th className="text-left font-medium px-4 py-2">Document types</th>
+                {(['name', 'scope', 'permissions', 'origins'] as const).map((field) => (
+                  <SortableHeader key={field} field={field} sortField={policySort} sortDir={policyDir} onSort={togglePolicySort}
+                    className="text-left font-medium px-4 py-2 cursor-pointer select-none hover:text-foreground transition-colors">
+                    {field.charAt(0).toUpperCase() + field.slice(1)}
+                  </SortableHeader>
+                ))}
                 <th className="px-4 py-2" />
               </tr>
             </thead>
             <tbody>
-              {(policies ?? []).map((policy) => (
+              {sortedPolicies.map((policy) => (
                 <tr key={policy.id} className="border-t border-border">
                   <td className="px-4 py-2 text-foreground font-medium">
                     {policy.name}
@@ -170,31 +246,52 @@ export default function GroupsPage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-2 text-muted-foreground">{policy.base_role}</td>
                   <td className="px-4 py-2 text-muted-foreground">
-                    {policy.base_role !== 'external'
-                      ? 'All'
-                      : policy.doc_tag_scope === null
-                        ? 'All'
-                        : policy.doc_tag_scope.join(', ') || 'None'}
+                    <div>{policyScopeLabel(policy)}</div>
+                    {policy.scope !== 'document' && !isCompleteAppPolicy(policy) && policyResourceSummary(policy) !== policyScopeLabel(policy) && (
+                      <div className="mt-1 max-w-64 text-xs">{policyResourceSummary(policy)}</div>
+                    )}
+                  </td>
+                  <td className="px-4 py-2 text-muted-foreground">
+                    {policyPermissions(policy).map((summary) => <div key={summary}>{summary}</div>)}
+                  </td>
+                  <td className="px-4 py-2 text-muted-foreground">
+                    {policyOrigins(policy, tags ?? []).map((summary) => <div key={summary}>{summary}</div>)}
                   </td>
                   <td className="px-4 py-2">
                     <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => setEditingPolicy(policy)}
-                        title={`Edit ${policy.name}`}
-                        className="p-1 rounded text-muted-foreground hover:text-foreground"
-                      >
-                        <Edit2 className="h-3.5 w-3.5" />
+                      <button onClick={() => setViewingPolicy(policy)} title={`View ${policy.name}`} className="p-1 rounded text-muted-foreground hover:text-foreground">
+                        <Eye className="h-3.5 w-3.5" />
                       </button>
-                      <button
-                        onClick={() => deletePolicy.mutate(policy.id)}
-                        disabled={policy.is_default}
-                        title={policy.is_default ? 'Default policies cannot be deleted' : `Delete ${policy.name}`}
-                        className="p-1 rounded text-muted-foreground hover:text-destructive disabled:opacity-30 disabled:hover:text-muted-foreground"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      {policy.is_default ? (
+                        <button
+                          onClick={() => duplicatePolicy.mutate(policy.id)}
+                          disabled={!applicationAllows(user, 'create')}
+                          title={`Duplicate ${policy.name}`}
+                          className="p-1 rounded text-muted-foreground hover:text-foreground"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => setEditingPolicy(policy)}
+                            disabled={!applicationAllows(user, 'edit')}
+                            title={`Edit ${policy.name}`}
+                            className="p-1 rounded text-muted-foreground hover:text-foreground"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => deletePolicy.mutate(policy.id)}
+                            disabled={!applicationAllows(user, 'delete')}
+                            title={`Delete ${policy.name}`}
+                            className="p-1 rounded text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -202,11 +299,14 @@ export default function GroupsPage() {
             </tbody>
           </table>
         </div>
-      </section>
+      </section>}
 
+
+      {viewingPolicy && <PolicyModal policy={viewingPolicy} tags={tags ?? []} readOnly onClose={() => setViewingPolicy(null)} onSaved={() => setViewingPolicy(null)} />}
       {editingPolicy && (
         <PolicyModal
           policy={editingPolicy === 'new' ? null : editingPolicy}
+          tags={tags ?? []}
           onClose={() => setEditingPolicy(null)}
           onSaved={() => {
             invalidatePolicies()
@@ -225,13 +325,6 @@ export default function GroupsPage() {
           }}
         />
       )}
-      {managingGroup && (
-        <ManageGroupModal
-          group={managingGroup}
-          onClose={() => setManagingGroupId(null)}
-          onChanged={invalidateGroups}
-        />
-      )}
     </div>
   )
 }
@@ -244,7 +337,8 @@ function ModalShell({ title, onClose, children }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
-        className="bg-card border border-border rounded-xl shadow-elegant p-6 w-full max-w-md"
+        role="dialog" aria-modal="true" aria-label={title}
+        className="bg-card border border-border rounded-xl shadow-elegant p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
@@ -262,112 +356,184 @@ function ModalShell({ title, onClose, children }: {
 const inputClass =
   'w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground'
 const submitClass =
-  'w-full py-2 bg-gradient-to-r from-primary to-[#6b7280] text-white text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50'
+  'w-full py-2 bg-linear-to-r/srgb from-primary to-[#6b7280] text-white text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50'
 
-function PolicyModal({ policy, onClose, onSaved }: {
+function PolicyModal({ policy, tags, readOnly = false, onClose, onSaved }: {
   policy: Policy | null
+  tags: Tag[]
+  readOnly?: boolean
   onClose: () => void
   onSaved: () => void
 }) {
   const toast = useToast()
+  const queryClient = useQueryClient()
   const [name, setName] = useState(policy?.name ?? '')
   const [description, setDescription] = useState(policy?.description ?? '')
-  const [baseRole, setBaseRole] = useState<BaseRole>(policy?.base_role ?? 'external')
-  const [docTypes, setDocTypes] = useState<string[]>(policy?.doc_tag_scope ?? [])
-  const isDefault = policy?.is_default ?? false
-
+  const [scope, setScope] = useState<PolicyScope>(policy?.scope ?? 'document')
+  const [rules, setRules] = useState<Record<string, PolicyRule>>(policy?.rules ?? {})
+  const [newOrigin, setNewOrigin] = useState('')
+  const resources = resourcesFor(scope)
+  const rule = (resource: string) => rules[resource] ?? emptyRule()
+  const change = (resource: string, update: (current: PolicyRule) => PolicyRule) =>
+    setRules((prev) => ({ ...prev, [resource]: update(prev[resource] ?? emptyRule()) }))
+  const togglePermission = (resource: string, permission: Permission) =>
+    change(resource, (current) => ({
+      ...current,
+      [permission]: !current[permission],
+      read: permission === 'write' && !current.write ? true : permission === 'read' ? !current.read : current.read,
+      review: permission === 'approve' && !current.approve && approveIncludesReview(resource) ? true : permission === 'review' ? !current.review : current.review ?? false,
+    }))
+  const toggleAllOrigins = (resource: string) =>
+    change(resource, (current) => ({
+      ...current,
+      all_origins: !current.all_origins,
+      visibility: [],
+      tags: [],
+    }))
+  const toggleBuiltinOrigin = (resource: string, key: PolicyVisibility) =>
+    change(resource, (current) => ({
+      ...current,
+      all_origins: false,
+      visibility: current.visibility.includes(key)
+        ? current.visibility.filter((item) => item !== key)
+        : [...current.visibility, key],
+    }))
+  const toggleCustomOrigin = (resource: string, id: number) =>
+    change(resource, (current) => ({
+      ...current,
+      all_origins: false,
+      tags: current.tags.includes(id) ? current.tags.filter((item) => item !== id) : [...current.tags, id],
+    }))
+  const unscoped = resources.filter((resource) => {
+    const current = rule(resource)
+    return isDocType(resource) && activeRule(current) && !current.all_origins
+      && current.visibility.length === 0 && current.tags.length === 0
+  })
   const save = useMutation({
     mutationFn: () => {
-      const payload: PolicyInput = { description, doc_tag_scope: baseRole === 'external' ? docTypes : null }
-      if (!isDefault) {
-        payload.name = name
-        payload.base_role = baseRole
+      const payload: PolicyInput = {
+        name,
+        description,
+        scope,
+        rules: Object.fromEntries(
+          resources.filter((resource) => activeRule(rule(resource))).map((resource) => {
+            const current = rule(resource)
+            const allOrigins = isDocType(resource) && current.all_origins
+            return [resource, {
+              read: current.read || current.write,
+              write: current.write,
+              review: current.review ?? false,
+              approve: current.approve,
+              delete: current.delete,
+              all_origins: allOrigins,
+              visibility: isDocType(resource) && !allOrigins ? current.visibility : [],
+              tags: isDocType(resource) && !allOrigins ? current.tags : [],
+            }]
+          }),
+        ),
       }
-      return policy ? policiesApi.update(policy.id, payload) : policiesApi.create({ ...payload, name, base_role: baseRole })
+      return policy ? policiesApi.update(policy.id, payload) : policiesApi.create(payload)
     },
-    onSuccess: () => {
-      toast.saved('Policy')
-      onSaved()
-    },
+    onSuccess: () => { toast.saved('Policy'); onSaved() },
     onError: (error) => toast.failed('Saving the policy', error),
   })
-
-  const toggleDocType = (dt: string) =>
-    setDocTypes((prev) => (prev.includes(dt) ? prev.filter((x) => x !== dt) : [...prev, dt]))
-
+  const addOrigin = useMutation({
+    mutationFn: () => tagsApi.create(newOrigin.trim()),
+    onSuccess: () => {
+      setNewOrigin('')
+      queryClient.invalidateQueries({ queryKey: ['tags'] })
+      toast.saved('Origin')
+    },
+    onError: (error) => toast.failed('Adding the origin', error),
+  })
   return (
-    <ModalShell title={policy ? 'Edit policy' : 'New policy'} onClose={onClose}>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          save.mutate()
-        }}
-        className="space-y-3"
-      >
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Name</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            disabled={isDefault}
-            title="Policy name"
-            className={inputClass + (isDefault ? ' opacity-60' : '')}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Description</label>
-          <input
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            title="Description"
-            className={inputClass}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Base role</label>
-          <select
-            value={baseRole}
-            onChange={(e) => setBaseRole(e.target.value as BaseRole)}
-            disabled={isDefault}
-            title="Base role"
-            className={inputClass + (isDefault ? ' opacity-60' : '')}
-          >
-            {BASE_ROLES.map((r) => (
-              <option key={r} value={r}>{r}</option>
-            ))}
+    <ModalShell title={readOnly ? 'View policy' : policy ? 'Edit policy' : 'New policy'} onClose={onClose}>
+      <form onSubmit={(event) => { event.preventDefault(); if (!readOnly) save.mutate() }} className="space-y-4">
+        <label className="block text-sm font-medium text-foreground">Name
+          <input value={name} onChange={(event) => setName(event.target.value)} readOnly={readOnly} required title="Policy name" className={inputClass} />
+        </label>
+        <label className="block text-sm font-medium text-foreground">Description
+          <input value={description} onChange={(event) => setDescription(event.target.value)} readOnly={readOnly} title="Description" className={inputClass} />
+        </label>
+        <label className="block text-sm font-medium text-foreground">Assignment scope
+          <select disabled={readOnly} value={scope} title="Assignment scope" className={inputClass} onChange={(event) => {
+            const nextScope = event.target.value as PolicyScope
+            setScope(nextScope)
+            setRules((current) => Object.fromEntries(Object.entries(current).filter(([resource]) => resourcesFor(nextScope).includes(resource))))
+          }}>
+            {Object.entries(SCOPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
-          {isDefault && (
-            <p className="text-xs text-muted-foreground mt-1">A default policy's name and base role are fixed.</p>
-          )}
+        </label>
+        <p className="text-xs text-muted-foreground">Write includes Read. Review, Approve and Delete are separate permissions.</p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-muted-foreground">
+                <th className="text-left font-medium pr-3">Resource</th>
+                {PERMISSIONS.map((permission) => (
+                  <th key={permission} className="font-medium px-2">
+                    {permission.charAt(0).toUpperCase() + permission.slice(1)}
+                  </th>
+                ))}
+                <th className="text-left font-medium px-2">Origins</th>
+              </tr>
+            </thead>
+            <tbody>
+              {resources.map((resource) => {
+                const current = rule(resource)
+                const active = activeRule(current)
+                return (
+                  <tr key={resource} className="border-t border-border">
+                    <th className="text-left font-normal py-2 pr-3 whitespace-nowrap" title={current.actions?.length ? `Grants: ${current.actions.join(', ')}` : undefined}>
+                      {resourceLabel(resource)}
+                    </th>
+                    {PERMISSIONS.map((permission) => (
+                      <td key={permission} className="text-center px-2">
+                        <input
+                          type="checkbox"
+                          aria-label={`${permission.charAt(0).toUpperCase() + permission.slice(1)} ${resource}`}
+                          checked={permission === 'read' ? current.read || current.write : permission === 'review' ? current.review || current.approve && approveIncludesReview(resource) : current[permission]}
+                          disabled={readOnly || !supportedPermission(resource, permission) || permission === 'read' && current.write || permission === 'review' && current.approve && approveIncludesReview(resource)}
+                          onChange={() => togglePermission(resource, permission)}
+                        />
+                      </td>
+                    ))}
+                    <td className="px-2 py-2">
+                      {isDocType(resource) && (
+                        <fieldset aria-label={`Origins for ${resource}`} className="flex flex-wrap gap-x-3 gap-y-1 min-w-56">
+                          <label className="inline-flex items-center gap-1.5">
+                            <input type="checkbox" aria-label={`All origins on ${resource}`} disabled={readOnly || !active} checked={current.all_origins} onChange={() => toggleAllOrigins(resource)} />
+                            All
+                          </label>
+                          {BUILTIN_ORIGINS.map((origin) => (
+                            <label key={origin.key} className="inline-flex items-center gap-1.5">
+                              <input type="checkbox" aria-label={`${origin.label} on ${resource}`} disabled={readOnly || !active} checked={current.visibility.includes(origin.key)} onChange={() => toggleBuiltinOrigin(resource, origin.key)} />
+                              {origin.label}
+                            </label>
+                          ))}
+                          {tags.map((origin) => (
+                            <label key={origin.id} className="inline-flex items-center gap-1.5">
+                              <input type="checkbox" aria-label={`${origin.name} on ${resource}`} disabled={readOnly || !active} checked={current.tags.includes(origin.id)} onChange={() => toggleCustomOrigin(resource, origin.id)} />
+                              {origin.name}
+                            </label>
+                          ))}
+                        </fieldset>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
-        {baseRole === 'external' && (
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">
-              Document types (empty means every type)
-            </label>
-            <div className="flex flex-wrap gap-1.5">
-              {EXTERNAL_DOC_TYPES.map((dt) => (
-                <button
-                  type="button"
-                  key={dt}
-                  onClick={() => toggleDocType(dt)}
-                  className={
-                    'px-2 py-0.5 rounded text-xs border ' +
-                    (docTypes.includes(dt)
-                      ? 'bg-primary text-white border-primary'
-                      : 'bg-background text-muted-foreground border-input')
-                  }
-                >
-                  {dt}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        <button type="submit" disabled={save.isPending} className={submitClass}>
-          {save.isPending ? 'Saving…' : 'Save policy'}
-        </button>
+        {!readOnly && <div className="flex gap-2">
+          <input value={newOrigin} onChange={(event) => setNewOrigin(event.target.value)} placeholder="New origin" title="New origin" className={inputClass + ' max-w-xs'} />
+          <button type="button" disabled={!newOrigin.trim() || addOrigin.isPending} onClick={() => addOrigin.mutate()} className="inline-flex items-center gap-1.5 px-3 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50">
+            <Plus className="h-4 w-4" /> Add origin
+          </button>
+        </div>}
+        {unscoped.length > 0 && <p className="text-xs text-destructive">Choose at least one origin for {unscoped.join(', ')}.</p>}
+        {!readOnly && <button type="submit" disabled={save.isPending || unscoped.length > 0} className={submitClass}>{save.isPending ? 'Saving…' : 'Save policy'}</button>}
       </form>
     </ModalShell>
   )
@@ -382,11 +548,11 @@ function GroupModal({ group, policies, onClose, onSaved }: {
   const toast = useToast()
   const [name, setName] = useState(group?.name ?? '')
   const [description, setDescription] = useState(group?.description ?? '')
-  const [policyId, setPolicyId] = useState<number | null>(group?.policy_id ?? null)
+  const [policyIds, setPolicyIds] = useState<number[]>(group?.policy_ids ?? [])
 
   const save = useMutation({
     mutationFn: () => {
-      const payload: GroupInput = { name, description, policy_id: policyId }
+      const payload: GroupInput = { name, description, policy_ids: policyIds }
       return group ? groupsApi.update(group.id, payload) : groupsApi.create(payload)
     },
     onSuccess: () => {
@@ -413,134 +579,28 @@ function GroupModal({ group, policies, onClose, onSaved }: {
           <label className="block text-sm font-medium text-foreground mb-1">Description</label>
           <input value={description} onChange={(e) => setDescription(e.target.value)} title="Description" className={inputClass} />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Policy</label>
-          <select
-            value={policyId ?? ''}
-            onChange={(e) => setPolicyId(e.target.value ? Number(e.target.value) : null)}
-            title="Policy"
-            className={inputClass}
-          >
-            <option value="">None</option>
-            {policies.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-        </div>
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium text-foreground mb-2">Policies owned by this group</legend>
+          {policies.map((policy) => (
+            <label key={policy.id} className="flex items-center gap-2 text-sm text-foreground">
+              <input
+                type="checkbox"
+                aria-label={`Group policy ${policy.name}`}
+                checked={policyIds.includes(policy.id)}
+                onChange={() => setPolicyIds((current) => current.includes(policy.id)
+                  ? current.filter((id) => id !== policy.id)
+                  : [...current, policy.id].sort((a, b) => a - b))}
+              />
+              {policy.name}
+              <span className="text-muted-foreground">{SCOPE_LABELS[policy.scope]}</span>
+            </label>
+          ))}
+          {policies.length === 0 && <p className="text-sm text-muted-foreground">No policies available.</p>}
+        </fieldset>
         <button type="submit" disabled={save.isPending} className={submitClass}>
           {save.isPending ? 'Saving…' : 'Save group'}
         </button>
       </form>
-    </ModalShell>
-  )
-}
-
-function ManageGroupModal({ group, onClose, onChanged }: {
-  group: Group
-  onClose: () => void
-  onChanged: () => void
-}) {
-  const toast = useToast()
-  const { data: users } = useQuery({ queryKey: ['users'], queryFn: usersApi.list })
-  const { data: projects } = useQuery({ queryKey: ['projects'], queryFn: projectsApi.list })
-  const [userId, setUserId] = useState('')
-  const [projectId, setProjectId] = useState('')
-
-  const run = (fn: () => Promise<unknown>, doing: string) =>
-    fn()
-      .then(() => onChanged())
-      .catch((error) => toast.failed(doing, error))
-
-  const memberIds = new Set(group.members.map((m) => m.user_id))
-  const grantedProjectIds = new Set(group.grants.map((g) => g.project_id))
-
-  return (
-    <ModalShell title={`Manage ${group.name}`} onClose={onClose}>
-      <div className="space-y-5">
-        <div>
-          <h3 className="text-sm font-medium text-foreground mb-2">Members</h3>
-          <ul className="space-y-1 mb-2">
-            {group.members.map((m) => (
-              <li key={m.user_id} className="flex items-center justify-between text-sm">
-                <span className="text-foreground">{m.full_name} <span className="text-muted-foreground">({m.email})</span></span>
-                <button
-                  onClick={() => run(() => groupsApi.removeMember(group.id, m.user_id), 'Removing the member')}
-                  title="Remove member"
-                  className="p-1 rounded text-muted-foreground hover:text-destructive"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </li>
-            ))}
-            {group.members.length === 0 && <li className="text-sm text-muted-foreground">No members yet.</li>}
-          </ul>
-          <div className="flex gap-2">
-            <select value={userId} onChange={(e) => setUserId(e.target.value)} title="Add member" className={inputClass}>
-              <option value="">Add a user…</option>
-              {(users ?? [])
-                .filter((u) => !memberIds.has(u.id))
-                .map((u) => (
-                  <option key={u.id} value={u.id}>{u.full_name} ({u.email})</option>
-                ))}
-            </select>
-            <button
-              disabled={!userId}
-              onClick={() =>
-                run(() => groupsApi.addMember(group.id, Number(userId)), 'Adding the member').then(() => setUserId(''))
-              }
-              className="px-3 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 disabled:opacity-50"
-            >
-              Add
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <h3 className="text-sm font-medium text-foreground mb-2">Project grants</h3>
-          <ul className="space-y-1 mb-2">
-            {group.grants.map((grant) => (
-              <li key={grant.id} className="flex items-center justify-between text-sm">
-                <span className="text-foreground">
-                  {grant.project_id === null
-                    ? 'All projects'
-                    : projects?.find((p) => p.id === grant.project_id)?.name ?? `Project ${grant.project_id}`}
-                </span>
-                <button
-                  onClick={() => run(() => groupsApi.removeGrant(group.id, grant.id), 'Removing the grant')}
-                  title="Remove grant"
-                  className="p-1 rounded text-muted-foreground hover:text-destructive"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </li>
-            ))}
-            {group.grants.length === 0 && <li className="text-sm text-muted-foreground">No projects granted.</li>}
-          </ul>
-          <div className="flex gap-2">
-            <select value={projectId} onChange={(e) => setProjectId(e.target.value)} title="Grant a project" className={inputClass}>
-              <option value="">Grant a project…</option>
-              {!grantedProjectIds.has(null) && <option value="all">All projects</option>}
-              {(projects ?? [])
-                .filter((p) => !grantedProjectIds.has(p.id))
-                .map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-            </select>
-            <button
-              disabled={!projectId}
-              onClick={() =>
-                run(
-                  () => groupsApi.addGrant(group.id, projectId === 'all' ? null : Number(projectId)),
-                  'Granting the project',
-                ).then(() => setProjectId(''))
-              }
-              className="px-3 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 disabled:opacity-50"
-            >
-              Grant
-            </button>
-          </div>
-        </div>
-      </div>
     </ModalShell>
   )
 }

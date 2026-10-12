@@ -19,6 +19,31 @@ def _admin_headers(api_client: TestClient) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def _approve_test_case(api_client, headers, test_case_id) -> None:
+    """Approve the case through assigned, content-bound review and approval."""
+    path = f"/api/artefacts/test-case/{test_case_id}"
+    workflow = api_client.get(path + "/workflow", headers=headers)
+    assert workflow.status_code == 200, workflow.text
+    actor_id = workflow.json()["creator"]["id"]
+    assigned = api_client.put(
+        path + "/workflow/assignees", headers=headers, json={"reviewer_id": actor_id}
+    )
+    assert assigned.status_code == 200, assigned.text
+    review = api_client.post(path + "/requests", headers=headers, json={"kind": "review"})
+    assert review.status_code == 201, review.text
+    comment = api_client.post(
+        path + "/comments", headers=headers, json={"body": "Reviewed the requested test case."}
+    )
+    assert comment.status_code == 201, comment.text
+    assert comment.json()["author_user_id"] == actor_id
+    approval = api_client.post(path + "/requests", headers=headers, json={"kind": "approval"})
+    assert approval.status_code == 201, approval.text
+    signed = api_client.post(path + "/sign-off", headers=headers, json={"step": "approve"})
+    assert signed.status_code == 200, signed.text
+    assert signed.json()["reviewed_by_id"] == actor_id
+    assert signed.json()["approved_by_id"] == actor_id
+
+
 def test_coverage_gap_report_counts_requirements_by_verification_state(api_client: TestClient):
     headers = _admin_headers(api_client)
     suffix = unique_suffix()
@@ -51,7 +76,7 @@ def test_coverage_gap_report_counts_requirements_by_verification_state(api_clien
     approved_tc = api_client.post(
         "/api/test-cases",
         headers=headers,
-        json={"project_id": project_id, "title": f"Approved TC {suffix}", "status": "Approved"},
+        json={"project_id": project_id, "title": f"Approved TC {suffix}", "status": "Draft"},
     )
     assert draft_tc.status_code == 201
     assert approved_tc.status_code == 201
@@ -73,6 +98,8 @@ def test_coverage_gap_report_counts_requirements_by_verification_state(api_clien
             },
         )
         assert link.status_code == 201
+
+    _approve_test_case(api_client, headers, approved_tc.json()["id"])
 
     report = api_client.get(f"/api/traceability/coverage-gaps/{project_id}", headers=headers)
     assert report.status_code == 200

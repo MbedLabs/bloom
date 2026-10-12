@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { accessRequestsApi } from '../api/client'
 import { useToast } from './useToast'
+import UserIdentity from './UserIdentity'
 
 /** Pending access requests for one project, for an administrator to mark granted or refused. */
 export default function AccessRequestsPanel({ projectPrefix }: { projectPrefix: string }) {
@@ -30,7 +31,7 @@ export default function AccessRequestsPanel({ projectPrefix }: { projectPrefix: 
         {requests.map((request) => (
           <li key={request.id} className="py-2 flex items-center justify-between gap-3 text-sm">
             <span className="text-foreground">
-              {request.requester_name} ({request.requester_email}) asks for {request.resource_ref}
+              <UserIdentity user={{ full_name: request.requester_name ?? request.requester_email ?? 'Unknown user', profile_picture_url: request.requester_profile_picture_url }} /> ({request.requester_email}) asks for {request.resource_ref}
             </span>
             <span className="flex gap-2">
               <button

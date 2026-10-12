@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.core.security import require_external_doc_type_access
+from app.core.security import AccessTerm, require_external_doc_type_access
 from app.models.user import UserRole
 
 
@@ -19,6 +19,16 @@ async def test_require_external_doc_type_access_allows_granted_type():
         SimpleNamespace(scalar_one_or_none=lambda: membership),
         _scalar_result(["REQ"]),
     ]
-    external = SimpleNamespace(id=7, role=UserRole.external)
+    external = SimpleNamespace(
+        id=7,
+        role=UserRole.external,
+        access_map={
+            42: (
+                AccessTerm(
+                    {"*": {"view"}}, frozenset(["REQ"]), frozenset(["customer"]), frozenset(), True
+                ),
+            )
+        },
+    )
 
     await require_external_doc_type_access(db, external, 42, "REQ")

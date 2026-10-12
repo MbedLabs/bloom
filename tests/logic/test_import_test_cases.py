@@ -53,7 +53,7 @@ async def test_csv_import_updates_existing_and_creates_new(session):
     admin = await _admin(session)
     content = (
         "tc_id,title,status,visibility,preconditions,steps,description\n"
-        "ALP-TC-001,Updated login,Approved,internal,User exists,1. Open => Form,Round-trip\n"
+        "ALP-TC-001,Updated login,Draft,internal,User exists,1. Open => Form,Round-trip\n"
         ",Brand new case,Draft,internal,,1. Do X => Y,New one\n"
     ).encode()
     result = await import_test_cases_file(
@@ -65,10 +65,28 @@ async def test_csv_import_updates_existing_and_creates_new(session):
         await session.execute(select(TestCase).where(TestCase.tc_id == "ALP-TC-001"))
     ).scalar_one()
     assert tc.title == "Updated login"
+    assert tc.status == "Draft"
     assert [(s["row_type"], s["description"], s["expected_result"]) for s in tc.steps] == [
         ("step", "Open", "Form")
     ]
     assert (await session.execute(select(TestCase))).scalars().all().__len__() == 2
+
+
+async def test_csv_import_cannot_approve_existing_or_new_test_cases(session):
+    admin = await _admin(session)
+    content = (
+        "tc_id,title,status\n"
+        "ALP-TC-001,Unreviewed change,Approved\n"
+        ",Unreviewed new case,Approved\n"
+    ).encode()
+    result = await import_test_cases_file(
+        project_id=1, format="csv", file=_upload(content), db=session, current_user=admin
+    )
+    assert (result.updated, result.created, result.skipped) == (0, 0, 2)
+    cases = (await session.execute(select(TestCase))).scalars().all()
+    assert [(case.tc_id, case.title, case.status) for case in cases] == [
+        ("ALP-TC-001", "Verify login", "Draft")
+    ]
 
 
 async def test_xml_import_creates(session):

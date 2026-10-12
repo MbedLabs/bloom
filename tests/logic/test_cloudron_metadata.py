@@ -18,7 +18,7 @@ def test_cloudron_metadata_uses_canonical_product_positioning():
 
     assert manifest["title"] == "Bloom PLM by EmbedLabs"
     assert manifest["tagline"] == "Requirements, controlled documents and traceability"
-    assert description == (
+    assert description.splitlines()[0] == (
         "Bloom PLM by EmbedLabs covers requirements, controlled documents, "
         "verification, risks, changes, defects, baselines and traceability."
     )
@@ -32,6 +32,13 @@ def test_cloudron_release_metadata_matches_product_version():
     version = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
     assert manifest["version"] == version
     assert manifest["upstreamVersion"] == version
+    catalog = json.loads((ROOT / "cloudron" / "CloudronVersions.json").read_text())
+    current = catalog["versions"][version]
+    assert current["manifest"]["version"] == version
+    assert current["manifest"]["upstreamVersion"] == version
+    assert current["manifest"]["description"] == DESCRIPTION.read_text()
+    assert not current["manifest"]["changelog"].startswith("file://")
+    assert current["publishState"] in {"testing", "published"}
     changelog = (ROOT / "cloudron" / "CHANGELOG").read_text()
     # The changelog may open with a prerelease entry for the next, unreleased
     # version; what must hold is that the shipped version has its own section.

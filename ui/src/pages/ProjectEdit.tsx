@@ -2,20 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import {
-  extractApiErrorMessage,
-  projectMembersApi,
-  projectsApi,
-  type AccessOrigin,
-  type ProjectAccessEntry,
-  type ProjectMember,
-  type ProjectMemberRole,
-  usersApi,
-} from '../api/client'
+import { extractApiErrorMessage, groupsApi, projectsApi } from '../api/client'
+import ProjectPolicyGroups from '../components/ProjectPolicyGroups'
+import { applicationAllows } from '../lib/applicationAccess'
 import { useAuth } from '../contexts/AuthContext'
 import AccessRequestsPanel from '../components/AccessRequestsPanel'
 import { useToast } from '../components/useToast'
-import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
+import { useProjectCapabilities } from '../hooks/useProjectCapabilities'
 import {
   projectDeleteConfirmationMatches,
   projectDeleteConfirmationPhrase,
@@ -26,13 +19,16 @@ const PROJECT_PREFIX_PATTERN = /^[A-Z]{3}$/
 const PROJECT_PREFIX_ERROR = 'Use exactly three uppercase letters, e.g. PRJ.'
 
 const STATUS_OPTIONS = ['Active', 'Archived', 'Draft'] as const
-const EXTERNAL_DOC_TYPES = ['REQ', 'SPEC', 'TC', 'DES', 'RSK', 'CHG', 'CPT', 'DEF', 'CMP', 'TS', 'PRT', 'RPT', 'STD'] as const
 
 export default function ProjectEdit() {
   const { prefix } = useParams<{ prefix: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { data: project, isLoading } = useProjectByPrefix(prefix)
+  const canManageAccess = applicationAllows(user, 'view')
+  const { data: project, isLoading } = useQuery({ queryKey: ['project-by-prefix', prefix], queryFn: () => projectsApi.getByPrefix(prefix!), enabled: !!prefix, retry: false })
+  const assignmentOptions = useQuery({ queryKey: ['access-assignment-options'], queryFn: groupsApi.assignmentOptions, enabled: canManageAccess })
+  const accessProject = assignmentOptions.data?.projects.find((entry) => entry.prefix === prefix)
+  const capabilities = useProjectCapabilities(project?.id)
   const queryClient = useQueryClient()
   const toast = useToast()
 
@@ -70,6 +66,7 @@ export default function ProjectEdit() {
       setFormError('')
       queryClient.setQueryData(['projects'], (old: unknown) => old)
       queryClient.invalidateQueries({ queryKey: ['projects'] })
+      queryClient.invalidateQueries({ queryKey: ['access-assignment-options'] })
       queryClient.setQueryData(['project-by-prefix', updated.prefix], updated)
       queryClient.invalidateQueries({ queryKey: ['project-by-prefix', updated.prefix] })
       toast.saved('Project')
@@ -88,6 +85,7 @@ export default function ProjectEdit() {
     onSuccess: () => {
       setDeleteError('')
       queryClient.invalidateQueries({ queryKey: ['projects'] })
+      queryClient.invalidateQueries({ queryKey: ['access-assignment-options'] })
       toast.deleted(`Project ${project?.name ?? ''}`.trim())
       navigate('/projects', { replace: true })
     },
@@ -105,26 +103,15 @@ export default function ProjectEdit() {
     enabled: isAdmin,
   })
 
-  const { data: projectMembers } = useQuery({
-    queryKey: ['project-members', project?.id],
-    queryFn: () => projectMembersApi.list(project!.id),
-    enabled: isAdmin && !!project?.id,
-  })
-
-  const { data: users } = useQuery({
-    queryKey: ['users'],
-    queryFn: usersApi.list,
-    enabled: isAdmin,
-  })
-
-  const { data: projectAccess } = useQuery({
-    queryKey: ['project-access', project?.id],
-    queryFn: () => projectMembersApi.access(project!.id),
-    enabled: isAdmin && !!project?.id,
-  })
-
-  if (isLoading) {
+  if (isLoading || capabilities.isLoading || (canManageAccess && assignmentOptions.isPending)) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
+  }
+
+  if (canManageAccess && (accessProject || project) && (!project || !capabilities.can_edit)) {
+    return <div className="space-y-6 animate-fade-in max-w-4xl">
+      <div><Link to="/projects" className="text-sm text-muted-foreground hover:text-primary">&larr; Projects</Link><h2 className="mt-2 text-xl font-bold">Edit project: {(accessProject ?? project)!.name}</h2><p className="mt-1 text-sm text-muted-foreground">Manage the people assigned to this project's policy groups.</p></div>
+      <ProjectPolicyGroups key={(accessProject ?? project)!.id} projectId={(accessProject ?? project)!.id} />
+    </div>
   }
 
   if (!project) {
@@ -138,7 +125,7 @@ export default function ProjectEdit() {
     )
   }
 
-  if (!isAdmin) {
+  if (!capabilities.can_edit) {
     return (
       <div className="space-y-4 animate-fade-in">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -149,7 +136,7 @@ export default function ProjectEdit() {
           <span className="text-foreground">Edit project</span>
         </div>
         <div className="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">
-          Only administrators can edit project details. You can still view integration status below if applicable.
+          Project Owner access is required to edit project details. You can still view integration status below if applicable.
         </div>
         <IntegrationSettingsPanel projectId={project.id} />
       </div>
@@ -190,7 +177,7 @@ export default function ProjectEdit() {
   }
 
   return (
-    <div className="space-y-8 animate-fade-in max-w-3xl">
+    <div className="space-y-8 animate-fade-in max-w-4xl">
       <div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
           <Link to={`/projects/${prefix}`} className="hover:text-primary transition-colors">
@@ -200,7 +187,7 @@ export default function ProjectEdit() {
           <span className="text-foreground">Edit project</span>
         </div>
         <h2 className="text-xl font-bold text-foreground">Edit project</h2>
-        <p className="text-sm text-muted-foreground mt-0.5">Update project metadata and external issue tracker.</p>
+        <p className="text-sm text-muted-foreground mt-0.5">Manage project details, integrations and member access.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-card rounded-lg border border-border shadow-elegant p-6 space-y-4">
@@ -286,24 +273,8 @@ export default function ProjectEdit() {
         </div>
       </form>
 
-      <section className="rounded-lg border border-destructive/30 bg-card p-6 shadow-elegant">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-destructive">Danger zone</h3>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Permanently delete this project and its project-scoped data. This action cannot be undone.
-        </p>
-        <div className="mt-4 flex justify-end">
-          <button
-            type="button"
-            onClick={openDeleteModal}
-            className="rounded-md border border-destructive/30 px-4 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10"
-          >
-            Delete project
-          </button>
-        </div>
-      </section>
-
-      {confirmDeleteOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      {isAdmin && confirmDeleteOpen && (
+        <div role="dialog" aria-modal="true" aria-label="Delete project" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs">
           <div className="mx-4 w-full max-w-md rounded-lg bg-card p-6 shadow-elegant">
             <h3 className="text-lg font-semibold text-foreground">Delete project?</h3>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -348,350 +319,25 @@ export default function ProjectEdit() {
         </div>
       )}
 
+      {canManageAccess && <ProjectPolicyGroups key={project.id} projectId={project.id} />}
       <IntegrationSettingsPanel projectId={project.id} />
       {user?.role === 'admin' && <AccessRequestsPanel projectPrefix={project.prefix} />}
-      <ProjectMembersPanel
-        projectId={project.id}
-        members={projectMembers ?? []}
-        users={users ?? []}
-        access={projectAccess ?? []}
-      />
-    </div>
-  )
-}
 
-/** One reason for access, as a reader would say it. */
-function originLabel(origin: AccessOrigin): string {
-  if (origin.kind === 'direct') {
-    return `Direct (${origin.role === 'external' ? 'Reviewer' : 'Maintainer'})`
-  }
-  const policy = origin.policy ? ` (${origin.policy})` : ''
-  return `Via ${origin.group}${policy}${origin.all_projects ? ', all projects' : ''}`
-}
-
-function ProjectMembersPanel({
-  projectId,
-  members,
-  users,
-  access,
-}: {
-  projectId: number
-  members: ProjectMember[]
-  users: Array<{ id: number; email: string; full_name: string; role: 'admin' | 'maintainer' | 'external' }>
-  access: ProjectAccessEntry[]
-}) {
-  const queryClient = useQueryClient()
-  const toast = useToast()
-  const [selectedUserId, setSelectedUserId] = useState('')
-  const [selectedRole, setSelectedRole] = useState<ProjectMemberRole>('external')
-  const [selectedDocTypes, setSelectedDocTypes] = useState<string[]>(['REQ', 'TC', 'CPT', 'CMP'])
-  const [error, setError] = useState('')
-
-  const availableUsers = users.filter(
-    (user) => user.role !== 'admin' && !members.some((member) => member.user_id === user.id)
-  )
-
-  const createMutation = useMutation({
-    mutationFn: () =>
-      projectMembersApi.create(projectId, {
-        user_id: Number(selectedUserId),
-        role: selectedRole,
-        doc_types: selectedRole === 'external' ? selectedDocTypes : undefined,
-      }),
-    onSuccess: () => {
-      setError('')
-      setSelectedUserId('')
-      setSelectedRole('external')
-      setSelectedDocTypes(['REQ', 'TC', 'CPT', 'CMP'])
-      queryClient.invalidateQueries({ queryKey: ['project-members', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['project-access', projectId] })
-      toast.notify('Member added', 'success')
-    },
-    onError: (mutationError) => {
-      setError(extractApiErrorMessage(mutationError, 'Could not add project member'))
-      toast.failed('Adding the member', mutationError)
-    },
-  })
-
-  const updateMutation = useMutation({
-    mutationFn: ({
-      membershipId,
-      role,
-      docTypes,
-    }: {
-      membershipId: number
-      role: ProjectMemberRole
-      docTypes: string[]
-    }) =>
-      projectMembersApi.update(projectId, membershipId, {
-        role,
-        doc_types: role === 'external' ? docTypes : [],
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['project-members', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['project-access', projectId] })
-      toast.saved('Member access')
-    },
-    onError: (error) => toast.failed('Saving the member access', error),
-  })
-
-  const removeMutation = useMutation({
-    mutationFn: (membershipId: number) => projectMembersApi.remove(projectId, membershipId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['project-members', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['project-access', projectId] })
-      toast.notify('Member removed', 'success')
-    },
-    onError: (error) => toast.failed('Removing the member', error),
-  })
-
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    if (!selectedUserId) {
-      setError('Select a user to add to this project.')
-      return
-    }
-    createMutation.mutate()
-  }
-
-  return (
-    <section className="rounded-lg border border-border bg-card p-6 shadow-elegant">
-      <div className="mb-4">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">Project members</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage per-project access for maintainers and external users.
+      {isAdmin && <section className="rounded-lg border border-destructive/30 bg-card p-6 shadow-elegant">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-destructive">Danger zone</h3>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Permanently delete this project and its project-scoped data. This action cannot be undone.
         </p>
-      </div>
-
-      {error && (
-        <div className="mb-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600">
-          {error}
-        </div>
-      )}
-
-      <form onSubmit={handleCreate} className="mb-6 space-y-4 rounded-lg border border-border bg-background/40 p-4">
-        <div className="grid gap-4 md:grid-cols-2">
-          <div>
-            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              User
-            </label>
-            <select
-              value={selectedUserId}
-              onChange={(e) => setSelectedUserId(e.target.value)}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              title="Select user to add"
-            >
-              <option value="">Select a user</option>
-              {availableUsers.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.full_name} ({user.email})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Role
-            </label>
-            <select
-              value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value as ProjectMemberRole)}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              title="Project role"
-            >
-              <option value="external">Reviewer</option>
-              <option value="maintainer">Maintainer</option>
-            </select>
-          </div>
-        </div>
-
-        {selectedRole === 'external' && (
-          <DocTypePicker
-            label="Reviewer document visibility"
-            selected={selectedDocTypes}
-            onToggle={(docType, checked) => {
-              setSelectedDocTypes((current) =>
-                checked ? [...current, docType] : current.filter((value) => value !== docType)
-              )
-            }}
-          />
-        )}
-
-        <div className="flex justify-end">
+        <div className="mt-4 flex justify-end">
           <button
-            type="submit"
-            disabled={createMutation.isPending || !selectedUserId}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            type="button"
+            onClick={openDeleteModal}
+            className="rounded-md border border-destructive/30 px-4 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10"
           >
-            {createMutation.isPending ? 'Adding...' : 'Add member'}
+            Delete project
           </button>
         </div>
-      </form>
-
-      <div className="space-y-3">
-        {members.length === 0 ? (
-          <div className="rounded-md border border-border bg-background/40 px-4 py-3 text-sm text-muted-foreground">
-            No explicit project members yet.
-          </div>
-        ) : (
-          members.map((member) => (
-            <ProjectMemberRow
-              key={member.id}
-              member={member}
-              onSave={(role, docTypes) =>
-                updateMutation.mutate({ membershipId: member.id, role, docTypes })
-              }
-              onRemove={() => removeMutation.mutate(member.id)}
-              isSaving={updateMutation.isPending}
-              isRemoving={removeMutation.isPending}
-            />
-          ))
-        )}
-      </div>
-
-      <div className="mt-6">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-foreground">Who has access</h4>
-        <p className="mt-1 mb-3 text-sm text-muted-foreground">
-          Direct members, and members of groups granted this project or all projects. Group access is
-          changed on the Groups page.
-        </p>
-        {access.length === 0 ? (
-          <div className="rounded-md border border-border bg-background/40 px-4 py-3 text-sm text-muted-foreground">
-            No one has access to this project yet.
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="py-1.5 pr-4 font-medium">Name</th>
-                <th className="py-1.5 pr-4 font-medium">Email</th>
-                <th className="py-1.5 font-medium">Origin</th>
-              </tr>
-            </thead>
-            <tbody>
-              {access.map((entry) => (
-                <tr key={entry.user_id} className="border-t border-border">
-                  <td className="py-1.5 pr-4 text-foreground">{entry.full_name}</td>
-                  <td className="py-1.5 pr-4 text-muted-foreground">{entry.email}</td>
-                  <td className="py-1.5 text-foreground">{entry.origins.map(originLabel).join('; ')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </section>
-  )
-}
-
-function ProjectMemberRow({
-  member,
-  onSave,
-  onRemove,
-  isSaving,
-  isRemoving,
-}: {
-  member: ProjectMember
-  onSave: (role: ProjectMemberRole, docTypes: string[]) => void
-  onRemove: () => void
-  isSaving: boolean
-  isRemoving: boolean
-}) {
-  const [role, setRole] = useState<ProjectMemberRole>(member.role)
-  const [docTypes, setDocTypes] = useState<string[]>(member.doc_types)
-
-  return (
-    <div className="rounded-lg border border-border bg-background/40 p-4">
-      <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-foreground">{member.full_name}</p>
-          <p className="text-xs text-muted-foreground">{member.email}</p>
-        </div>
-        <button
-          type="button"
-          onClick={onRemove}
-          disabled={isRemoving}
-          className="rounded-md border border-red-500/30 px-3 py-1.5 text-sm text-red-600 hover:bg-red-500/10 disabled:opacity-50"
-        >
-          Remove
-        </button>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-[180px_1fr]">
-        <div>
-          <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Role
-          </label>
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as ProjectMemberRole)}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            title={`Project role for ${member.full_name}`}
-          >
-            <option value="external">Reviewer</option>
-            <option value="maintainer">Maintainer</option>
-          </select>
-        </div>
-
-        {role === 'external' ? (
-          <DocTypePicker
-            label="Reviewer document visibility"
-            selected={docTypes}
-            onToggle={(docType, checked) => {
-              setDocTypes((current) =>
-                checked ? [...current, docType] : current.filter((value) => value !== docType)
-              )
-            }}
-          />
-        ) : (
-          <div className="rounded-md border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
-            Maintainers can access the full project surface.
-          </div>
-        )}
-      </div>
-
-      <div className="mt-4 flex justify-end">
-        <button
-          type="button"
-          onClick={() => onSave(role, docTypes)}
-          disabled={isSaving}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-        >
-          Save member settings
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function DocTypePicker({
-  label,
-  selected,
-  onToggle,
-}: {
-  label: string
-  selected: string[]
-  onToggle: (docType: string, checked: boolean) => void
-}) {
-  return (
-    <div>
-      <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-        {label}
-      </p>
-      <div className="grid gap-2 sm:grid-cols-3">
-        {EXTERNAL_DOC_TYPES.map((docType) => (
-          <label key={docType} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
-            <input
-              type="checkbox"
-              checked={selected.includes(docType)}
-              onChange={(e) => onToggle(docType, e.target.checked)}
-            />
-            <span>{docType}</span>
-          </label>
-        ))}
-      </div>
+      </section>}
     </div>
   )
 }

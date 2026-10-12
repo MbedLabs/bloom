@@ -32,7 +32,7 @@ export interface LinkTarget {
   doc_id: string
   doc_type: DocType
   title: string
-  status: string
+  status: string | null
 }
 
 /** The server's ceiling on a single `keys` request, and on the picker's page. */
@@ -238,7 +238,7 @@ function LinkDocumentModal({
   const hiddenCount = Math.max(0, (candidates?.total ?? 0) - (candidates?.items?.length ?? 0))
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50">
       <div className="bg-card rounded-lg shadow-elegant max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col">
         <div className="px-6 py-4 border-b border-border flex justify-between items-center">
           <h3 className="text-lg font-semibold">Link Document</h3>

@@ -7,10 +7,11 @@ import re
 from collections import defaultdict
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.artefact_utils import get_visible_row, type_visible, visible_types
 from app.api.link_read_utils import (
     VERIFY_LINK_ROLE,
     VERIFY_SOURCE_TYPE,
@@ -65,8 +66,11 @@ async def _build_traceability_context(
     project_id: int, req_ids: list[int], db: AsyncSession, current_user: User
 ) -> TraceabilityContext:
     ctx = TraceabilityContext()
+    types = await visible_types(db, current_user, project_id)
 
-    req_query = select(Requirement).where(Requirement.project_id == project_id)
+    req_query = select(Requirement).where(
+        Requirement.project_id == project_id, type_visible(types, "REQ")
+    )
     reqs = (
         (await db.execute(apply_external_visibility_filter(req_query, Requirement, current_user)))
         .scalars()
@@ -87,6 +91,7 @@ async def _build_traceability_context(
             ArtefactLink.target_type == VERIFY_TARGET_TYPE,
             ArtefactLink.target_id.in_(req_ids),
             ArtefactLink.role == VERIFY_LINK_ROLE,
+            type_visible(types, "TC"),
         )
         .order_by(ArtefactLink.created_at.desc(), TestCase.tc_id)
     )
@@ -205,6 +210,7 @@ async def get_traceability_matrix(
 ):
     """The matrix lists every requirement in the project, which runs to thousands."""
     await require_project_access(db, current_user, project_id)
+    types = await visible_types(db, current_user, project_id)
 
     # Verifying links per requirement: how many test cases point at it, and how
     # many of those are past Draft. That pair is what coverage_status decides on.
@@ -221,6 +227,7 @@ async def get_traceability_matrix(
                 ArtefactLink.source_type == VERIFY_SOURCE_TYPE,
                 ArtefactLink.target_type == VERIFY_TARGET_TYPE,
                 ArtefactLink.role == VERIFY_LINK_ROLE,
+                type_visible(types, "TC"),
             ),
             TestCase,
             current_user,
@@ -238,7 +245,7 @@ async def get_traceability_matrix(
     scoped = apply_external_visibility_filter(
         select(Requirement)
         .outerjoin(link_counts, link_counts.c.requirement_id == Requirement.id)
-        .where(Requirement.project_id == project_id),
+        .where(Requirement.project_id == project_id, type_visible(types, "REQ")),
         Requirement,
         current_user,
     )
@@ -306,18 +313,15 @@ async def get_impact_analysis(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(
-        apply_external_visibility_filter(
-            select(Requirement).where(Requirement.id == requirement_id),
-            Requirement,
-            current_user,
-        )
+    root = await get_visible_row(
+        db,
+        Requirement,
+        requirement_id,
+        "Requirement not found",
+        current_user,
+        permission=("view", "REQ"),
     )
-    root = result.scalar_one_or_none()
-    if not root:
-        raise HTTPException(status_code=404, detail="Requirement not found")
     project_id = root.project_id
-    await require_project_access(db, current_user, project_id)
 
     ctx = await _build_traceability_context(
         project_id,
@@ -448,9 +452,12 @@ async def get_coverage_gaps(
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)
+    types = await visible_types(db, current_user, project_id)
     result = await db.execute(
         apply_external_visibility_filter(
-            select(Requirement).where(Requirement.project_id == project_id),
+            select(Requirement).where(
+                Requirement.project_id == project_id, type_visible(types, "REQ")
+            ),
             Requirement,
             current_user,
         )

@@ -2,7 +2,7 @@
 
 Bloom PLM is a product lifecycle management platform for requirements, controlled documents, verification, risks, changes, defects, baselines, and end-to-end traceability.
 
-> **Release:** 1.1.0 public beta
+> **Development:** 1.2.0 · **Published release:** 1.1.0 public beta
 
 ## What Bloom provides
 

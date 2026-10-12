@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import TagPicker from '../components/TagPicker'
 import { useParams, Link, useSearchParams } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignsApi, extractApiErrorMessage, testCasesApi, testSuitesApi } from '../api/client'
@@ -8,6 +9,7 @@ import { useToast } from '../components/useToast'
 import { formatDateTime } from '../test/date-utils'
 import BudRunLink from '../components/BudRunLink'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import { useAuth } from '../contexts/AuthContext'
 
 type CampaignSortField = 'name' | 'status' | 'updated_at'
 type SortDir = 'asc' | 'desc'
@@ -22,6 +24,8 @@ export default function TestCampaigns() {
   const { prefix } = useParams<{ prefix: string }>()
   const { can } = useProjectPermissions(prefix)
   const canEditDocs = can('create', 'CMP')
+  const { user } = useAuth()
+  const external = user?.role === 'external'
   const [searchParams, setSearchParams] = useSearchParams()
   const { data: project } = useProjectByPrefix(prefix)
   const projectId = project?.id || 0
@@ -141,6 +145,9 @@ export default function TestCampaigns() {
     )
   }
 
+  const [campaignTagIds, setCampaignTagIds] = useState<number[]>([])
+  const [suiteTagIds, setSuiteTagIds] = useState<number[]>([])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (selectedSuiteIds.length === 0) {
@@ -151,8 +158,9 @@ export default function TestCampaigns() {
       project_id: projectId,
       name: form.name,
       description: form.description || undefined,
-      visibility: form.visibility === 'customer' ? 'customer' : 'internal',
+      visibility: external || form.visibility === 'customer' ? 'customer' : 'internal',
       suite_ids: selectedSuiteIds,
+      tag_ids: campaignTagIds,
     })
   }
 
@@ -162,8 +170,9 @@ export default function TestCampaigns() {
       project_id: projectId,
       name: suiteForm.name,
       description: suiteForm.description || undefined,
-      visibility: suiteForm.visibility === 'customer' ? 'customer' : 'internal',
+      visibility: external || suiteForm.visibility === 'customer' ? 'customer' : 'internal',
       test_case_ids: selectedTcIds,
+      tag_ids: suiteTagIds,
     })
   }
 
@@ -303,7 +312,7 @@ export default function TestCampaigns() {
 
           {!campaigns || campaigns.length === 0 ? (
             <div className="bg-card rounded-lg shadow-elegant p-12 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-linear-to-br/srgb from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-4">
                 <FlaskConical className="h-8 w-8 text-primary/40" />
               </div>
               <h3 className="text-lg font-medium text-foreground mb-2">No Campaign Scopes</h3>
@@ -335,7 +344,7 @@ export default function TestCampaigns() {
       </div>
 
       {canEditDocs && showCreate && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50">
           <div className="bg-card rounded-lg shadow-elegant max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
             <div className="px-6 py-4 border-b border-border">
               <h3 className="text-lg font-semibold">New Test Campaign</h3>
@@ -363,8 +372,9 @@ export default function TestCampaigns() {
                     placeholder="Optional description..."
                   />
                 </div>
+                {!external && (
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Visibility</label>
+                  <label className="block text-sm font-medium text-foreground mb-1">Origin</label>
                   <select
                     value={form.visibility}
                     onChange={(e) => setForm({ ...form, visibility: e.target.value })}
@@ -373,7 +383,10 @@ export default function TestCampaigns() {
                     <option value="internal">Internal</option>
                     <option value="customer">Customer</option>
                   </select>
+                  <TagPicker projectId={projectId} value={campaignTagIds} onChange={setCampaignTagIds} showLabel={false} />
                 </div>
+                )}
+                {external && <TagPicker projectId={projectId} value={campaignTagIds} onChange={setCampaignTagIds} />}
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">
                     Campaign Suites ({selectedSuiteIds.length} selected)
@@ -440,7 +453,7 @@ export default function TestCampaigns() {
       )}
 
       {can('create', 'TS') && showCreateSuite && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50">
           <div className="bg-card rounded-lg shadow-elegant max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
             <div className="px-6 py-4 border-b border-border">
               <h3 className="text-lg font-semibold">New Test Suite</h3>
@@ -466,8 +479,9 @@ export default function TestCampaigns() {
                     rows={2}
                   />
                 </div>
+                {!external && (
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Visibility</label>
+                  <label className="block text-sm font-medium text-foreground mb-1">Origin</label>
                   <select
                     value={suiteForm.visibility}
                     onChange={(e) => setSuiteForm({ ...suiteForm, visibility: e.target.value })}
@@ -476,7 +490,10 @@ export default function TestCampaigns() {
                     <option value="internal">Internal</option>
                     <option value="customer">Customer</option>
                   </select>
+                  <TagPicker projectId={projectId} value={suiteTagIds} onChange={setSuiteTagIds} showLabel={false} />
                 </div>
+                )}
+                {external && <TagPicker projectId={projectId} value={suiteTagIds} onChange={setSuiteTagIds} />}
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">
                     Select Test Cases ({selectedTcIds.length} selected)
@@ -578,7 +595,7 @@ function CampaignCard({ campaign, prefix }: { campaign: import('../api/client').
               : 'Not executed'}
           </div>
           <div className="w-full bg-border rounded-full h-1.5">
-            <div className="h-1.5 rounded-full bg-gradient-to-r from-primary to-[#6b7280] transition-all duration-500" style={{ width: `${progress}%` }} />
+            <div className="h-1.5 rounded-full bg-linear-to-r/srgb from-primary to-[#6b7280] transition-all duration-500" style={{ width: `${progress}%` }} />
           </div>
         </div>
       )}

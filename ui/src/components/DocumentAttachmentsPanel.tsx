@@ -17,9 +17,11 @@ function formatBytes(bytes: number): string {
 export default function DocumentAttachmentsPanel({
   documentId,
   docType,
+  rowAllowsEdit = true,
 }: {
   documentId: number
   docType: DocType | null
+  rowAllowsEdit?: boolean
 }) {
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -27,7 +29,7 @@ export default function DocumentAttachmentsPanel({
   const [busyId, setBusyId] = useState<number | null>(null)
   const { prefix } = useParams<{ prefix: string }>()
   const { can } = useProjectPermissions(prefix)
-  const canEdit = docType ? can('edit', docType) : false
+  const canEdit = docType ? can('edit', docType) && rowAllowsEdit : false
 
   const { data: attachments, isLoading } = useQuery({
     queryKey: ['attachments', documentId],

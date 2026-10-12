@@ -1,200 +1,265 @@
-"""Tests for the additive group/policy entitlement layer:
-
-the group-aware require_project_access / user_can_access_project /
-get_external_doc_types in app/core/security.py, plus the default-policy specs.
-A user in no group must resolve exactly to their direct membership, so nothing
-regresses; a group grant only ever adds access.
-"""
+"""Project admission, group policies and explicit replacements enforce complete rules."""
 
 import pytest
 import pytest_asyncio
 from fastapi import HTTPException
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core.database import Base
-from app.core.policy_seed import DEFAULT_POLICIES
 from app.core.security import (
-    _group_project_role,
-    get_external_doc_types,
+    access_terms,
+    creation_covered,
+    customer_only,
     require_project_access,
+    row_allows,
     user_can_access_project,
 )
-from app.models import Project, ProjectMembership, User, UserRole
-from app.models.groups import Group, GroupMembership, GroupProjectGrant, Policy
-from app.schemas.memberships import EXTERNAL_DOC_TYPES
-
-_seq = iter(range(1, 100000))
+from app.models import Project, ProjectMembership, Requirement, User, UserRole
+from app.models.groups import Group, GroupMembership, Policy
+from app.models.project_membership import ProjectAccess
+from tests.access_fixtures import scenario_type_tags
 
 
 @pytest_asyncio.fixture
 async def session():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    maker = async_sessionmaker(engine, expire_on_commit=False)
-    async with maker() as db:
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+    async with async_sessionmaker(engine, expire_on_commit=False)() as db:
         yield db
     await engine.dispose()
 
 
-async def _user(db, role=UserRole.external):
-    u = User(email=f"u{next(_seq)}@test.local", full_name="U", hashed_password="x", role=role)
-    db.add(u)
+async def _setup(db, role=UserRole.maintainer):
+    user = User(email="user@example.com", full_name="User", hashed_password="x", role=role)
+    project = Project(name="Project", prefix="PRJ")
+    other = Project(name="Other", prefix="OTH")
+    db.add_all([user, project, other])
     await db.flush()
-    return u
+    return user, project, other
 
 
-async def _project(db):
-    n = next(_seq)
-    p = Project(name=f"P{n}", prefix="PRJ")
-    db.add(p)
-    await db.flush()
-    return p
-
-
-async def _grant_group(
-    db, user, base_role, *, project=None, all_projects=False, doc_tag_scope=None
-):
-    pol = Policy(
-        name=f"pol{next(_seq)}",
-        base_role=base_role,
-        permissions={},
-        doc_tag_scope=doc_tag_scope,
+async def _policy(db, name, permissions, visibility="internal", types=None):
+    policy = Policy(
+        name=name,
+        permissions=permissions,
+        type_tags=scenario_type_tags(permissions, visibility, types),
     )
-    db.add(pol)
+    db.add(policy)
     await db.flush()
-    g = Group(name=f"grp{next(_seq)}", policy_id=pol.id)
-    db.add(g)
+    return policy
+
+
+async def _group(db, user, project, policies):
+    group = Group(name="Team", policies=policies)
+    db.add(group)
     await db.flush()
-    db.add(GroupProjectGrant(group_id=g.id, project_id=None if all_projects else project.id))
-    db.add(GroupMembership(group_id=g.id, user_id=user.id))
+    membership = GroupMembership(group_id=group.id, user_id=user.id)
+    db.add_all(
+        [membership, ProjectAccess(group_id=group.id, project_id=project.id, inherit_policies=True)]
+    )
     await db.flush()
-    return g
+    return membership
 
 
 @pytest.mark.asyncio
-async def test_direct_membership_role_unchanged(session):
-    user = await _user(session, UserRole.maintainer)
-    proj = await _project(session)
-    session.add(ProjectMembership(user_id=user.id, project_id=proj.id, role="maintainer"))
+async def test_group_grant_reaches_only_its_explicit_project(session):
+    user, project, other = await _setup(session)
+    policy = await _policy(session, "Read", {"REQ": ["view"]})
+    await _group(session, user, project, [policy])
+    assert await user_can_access_project(session, user, project.id)
+    assert not await user_can_access_project(session, user, other.id)
+
+
+@pytest.mark.asyncio
+async def test_no_grant_has_no_access(session):
+    user, project, _ = await _setup(session)
+    with pytest.raises(HTTPException) as error:
+        await require_project_access(session, user, project.id)
+    assert error.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_instance_admin_access_is_independent_of_project_entries(session):
+    user, project, _ = await _setup(session, UserRole.admin)
+    assert await user_can_access_project(session, user, project.id)
+
+
+@pytest.mark.asyncio
+async def test_a_membership_row_or_a_group_without_an_entry_grants_no_access(session):
+    user, project, _ = await _setup(session)
+    group = Group(name="Old team")
+    session.add(group)
     await session.flush()
-    assert await user_can_access_project(session, user, proj.id, roles={"maintainer"}) is True
-    assert await _group_project_role(session, user.id, proj.id) is None
-
-
-@pytest.mark.asyncio
-async def test_group_grant_applies(session):
-    user = await _user(session, UserRole.external)
-    proj = await _project(session)
-    await _grant_group(session, user, "maintainer", project=proj)
-    assert await _group_project_role(session, user.id, proj.id) == "maintainer"
-    assert await user_can_access_project(session, user, proj.id, roles={"maintainer"}) is True
-    membership = await require_project_access(session, user, proj.id, roles={"maintainer"})
-    assert membership is None
-
-
-@pytest.mark.asyncio
-async def test_strongest_wins(session):
-    user = await _user(session, UserRole.external)
-    proj = await _project(session)
-    session.add(ProjectMembership(user_id=user.id, project_id=proj.id, role="external"))
+    session.add_all(
+        [
+            ProjectMembership(user_id=user.id, project_id=project.id, role="maintainer"),
+            GroupMembership(group_id=group.id, user_id=user.id),
+        ]
+    )
     await session.flush()
-    await _grant_group(session, user, "maintainer", project=proj)
-    assert await user_can_access_project(session, user, proj.id, roles={"maintainer"}) is True
+    assert not await user_can_access_project(session, user, project.id)
 
 
 @pytest.mark.asyncio
-async def test_all_projects_grant_covers_project(session):
-    user = await _user(session, UserRole.external)
-    proj = await _project(session)
-    await _grant_group(session, user, "maintainer", all_projects=True)
-    assert await _group_project_role(session, user.id, proj.id) == "maintainer"
-
-
-@pytest.mark.asyncio
-async def test_no_grant_no_access(session):
-    user = await _user(session, UserRole.external)
-    proj = await _project(session)
-    assert await _group_project_role(session, user.id, proj.id) is None
-    assert await user_can_access_project(session, user, proj.id) is False
-    with pytest.raises(HTTPException):
-        await require_project_access(session, user, proj.id)
-
-
-@pytest.mark.asyncio
-async def test_admin_accesses_every_project(session):
-    user = await _user(session, UserRole.admin)
-    proj = await _project(session)
-    assert await user_can_access_project(session, user, proj.id) is True
-
-
-@pytest.mark.asyncio
-async def test_removing_from_group_removes_access(session):
-    user = await _user(session, UserRole.external)
-    proj = await _project(session)
-    await _grant_group(session, user, "maintainer", project=proj)
-    assert await _group_project_role(session, user.id, proj.id) == "maintainer"
-    membership = (
-        await session.execute(select(GroupMembership).where(GroupMembership.user_id == user.id))
-    ).scalar_one()
+async def test_removing_group_membership_keeps_independent_direct_grant(session):
+    user, project, _ = await _setup(session)
+    read = await _policy(session, "Read", {"REQ": ["view"]})
+    write = await _policy(session, "Write", {"REQ": ["edit"]})
+    session.add(ProjectAccess(user_id=user.id, project_id=project.id, policies=[read]))
+    membership = await _group(session, user, project, [write])
+    assert all(
+        "edit" not in term.permissions["REQ"]
+        for term in await access_terms(session, user, project.id)
+    )
     await session.delete(membership)
     await session.flush()
-    assert await _group_project_role(session, user.id, proj.id) is None
-
-
-def test_default_policies_are_well_formed():
-    names = [spec["name"] for spec in DEFAULT_POLICIES]
-    assert len(names) == len(set(names)) == 9
-    assert {"Administrator", "External Reader"} <= set(names)
-    for spec in DEFAULT_POLICIES:
-        assert spec["base_role"] in {"admin", "maintainer", "external"}
-        scope = spec.get("doc_tag_scope")
-        assert scope is None or set(scope) <= EXTERNAL_DOC_TYPES
+    del user.access_map
+    terms = await access_terms(session, user, project.id)
+    assert len(terms) == 1 and terms[0].permissions == {"REQ": {"view"}}
 
 
 @pytest.mark.asyncio
-async def test_group_external_doc_scope_enforced(session):
-    user = await _user(session, UserRole.external)
-    proj = await _project(session)
-    await _grant_group(session, user, "external", project=proj, doc_tag_scope=["REQ", "TC"])
-    assert await get_external_doc_types(session, user, proj.id) == {"REQ", "TC"}
+async def test_broad_read_does_not_lend_visibility_to_scoped_write(session):
+    user, project, _ = await _setup(session)
+    read = await _policy(session, "Broad read", {"REQ": ["view"]})
+    write = await _policy(session, "Customer write", {"REQ": ["edit"]}, "customer", ["REQ"])
+    await _group(session, user, project, [read, write])
+    internal = Requirement(
+        project_id=project.id, req_id="PRJ-REQ-001", title="Internal", visibility="internal"
+    )
+    customer = Requirement(
+        project_id=project.id, req_id="PRJ-REQ-002", title="Customer", visibility="customer"
+    )
+    session.add_all([internal, customer])
+    await session.flush()
+    assert await row_allows(session, user, internal, "view", "REQ")
+    assert not await row_allows(session, user, internal, "edit", "REQ")
+    assert await row_allows(session, user, customer, "edit", "REQ")
 
 
 @pytest.mark.asyncio
-async def test_group_external_doc_scope_none_means_all(session):
-    user = await _user(session, UserRole.external)
-    proj = await _project(session)
-    await _grant_group(session, user, "external", project=proj, doc_tag_scope=None)
-    assert await get_external_doc_types(session, user, proj.id) is None
-
-
-@pytest.mark.asyncio
-async def test_group_external_doc_scope_unions_across_groups(session):
-    user = await _user(session, UserRole.external)
-    proj = await _project(session)
-    await _grant_group(session, user, "external", project=proj, doc_tag_scope=["REQ"])
-    await _grant_group(session, user, "external", project=proj, doc_tag_scope=["DEF"])
-    assert await get_external_doc_types(session, user, proj.id) == {"REQ", "DEF"}
-
-
-@pytest.mark.asyncio
-async def test_group_maintainer_sees_every_doc_type(session):
-    user = await _user(session, UserRole.maintainer)
-    proj = await _project(session)
-    await _grant_group(session, user, "maintainer", project=proj, doc_tag_scope=["REQ"])
-    assert await get_external_doc_types(session, user, proj.id) is None
-
-
-@pytest.mark.asyncio
-async def test_no_group_external_still_forbidden(session):
-    user = await _user(session, UserRole.external)
-    proj = await _project(session)
+async def test_document_type_scope_keeps_explicit_link_permission(session):
+    user, project, _ = await _setup(session)
+    policy = await _policy(
+        session, "Requirement links", {"REQ": ["view"], "link": ["create"]}, types=["REQ"]
+    )
+    await _group(session, user, project, [policy])
+    await require_project_access(session, user, project.id, permission=("create", "link"))
     with pytest.raises(HTTPException):
-        await get_external_doc_types(session, user, proj.id)
+        await require_project_access(session, user, project.id, permission=("view", "TC"))
 
 
-def test_default_customer_policy_scopes_doc_types():
-    customer = next(spec for spec in DEFAULT_POLICIES if spec["name"] == "External Reader")
-    assert customer["base_role"] == "external"
-    assert set(customer["doc_tag_scope"]) == {"REQ", "TC", "CPT", "CMP"}
+@pytest.mark.asyncio
+@pytest.mark.parametrize("owner", [False, True])
+async def test_external_project_grants_do_not_expose_parameters(session, owner):
+    user, project, _ = await _setup(session, UserRole.external)
+    policies = []
+    if not owner:
+        policies.append(await _policy(session, "Parameter grant", {"parameter": ["view"]}))
+    session.add(
+        ProjectAccess(user_id=user.id, project_id=project.id, owner=owner, policies=policies)
+    )
+    await session.flush()
+    with pytest.raises(HTTPException) as denied:
+        await require_project_access(session, user, project.id, permission=("view", "parameter"))
+    assert denied.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_owner_is_a_direct_project_entry_and_does_not_change_instance_role(session):
+    user, project, other = await _setup(session)
+    session.add(ProjectAccess(user_id=user.id, project_id=project.id, owner=True))
+    await session.flush()
+    assert await user_can_access_project(session, user, project.id)
+    assert not await user_can_access_project(session, user, other.id)
+    assert user.role == UserRole.maintainer
+    assert any(
+        term.permissions == {"*": {"*"}} for term in await access_terms(session, user, project.id)
+    )
+
+
+@pytest.mark.asyncio
+async def test_customer_scope_does_not_change_account_identity(session):
+    internal, project, _ = await _setup(session)
+    policy = await _policy(session, "Customer scope", {"REQ": ["view"]}, "customer")
+    session.add(ProjectAccess(user_id=internal.id, project_id=project.id, policies=[policy]))
+    await session.flush()
+    await access_terms(session, internal, project.id)
+    assert not customer_only(internal, project.id)
+    external = User(
+        email="external@example.com",
+        full_name="External",
+        hashed_password="x",
+        role=UserRole.external,
+    )
+    session.add(external)
+    await session.flush()
+    session.add(ProjectAccess(user_id=external.id, project_id=project.id, policies=[policy]))
+    await session.flush()
+    assert customer_only(external, project.id)
+
+
+@pytest.mark.asyncio
+async def test_external_identity_preserves_customer_only_reading_with_broad_policy(session):
+    user, project, _ = await _setup(session, UserRole.external)
+    policy = await _policy(session, "Broad read", {"REQ": ["view"]}, "internal")
+    session.add(ProjectAccess(user_id=user.id, project_id=project.id, policies=[policy]))
+    internal = Requirement(
+        project_id=project.id, req_id="PRJ-REQ-001", title="Internal", visibility="internal"
+    )
+    customer = Requirement(
+        project_id=project.id, req_id="PRJ-REQ-002", title="Customer", visibility="customer"
+    )
+    session.add_all([internal, customer])
+    await session.flush()
+    assert not await row_allows(session, user, internal, "view", "REQ")
+    assert await row_allows(session, user, customer, "view", "REQ")
+    from sqlalchemy import select
+
+    from app.core.security import apply_external_visibility_filter
+
+    rows = (
+        (
+            await session.execute(
+                apply_external_visibility_filter(select(Requirement), Requirement, user)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert [row.id for row in rows] == [customer.id]
+
+
+@pytest.mark.asyncio
+async def test_a_kept_matrix_approves_only_rows_its_approving_policy_covers(session):
+    user, project, _ = await _setup(session)
+    author = await _policy(session, "Author", {"REQ": ["view", "create"]})
+    signer = await _policy(session, "Signer", {"REQ": ["view", "approve"]}, "customer")
+    session.add(ProjectAccess(user_id=user.id, project_id=project.id, policies=[author, signer]))
+    await session.flush()
+    for visibility in ("internal", "customer"):
+        assert await creation_covered(session, user, project.id, "REQ", visibility, [])
+    assert not await creation_covered(session, user, project.id, "REQ", "internal", [], "approve")
+    assert await creation_covered(session, user, project.id, "REQ", "customer", [], "approve")
+
+
+@pytest.mark.asyncio
+async def test_write_reading_stays_within_its_resource_and_origin(session):
+    user, project, _ = await _setup(session)
+    write = await _policy(session, "Customer author", {"REQ": ["edit"]}, "customer", ["REQ"])
+    await _group(session, user, project, [write])
+    customer = Requirement(
+        project_id=project.id, req_id="PRJ-REQ-001", title="Customer", visibility="customer"
+    )
+    internal = Requirement(
+        project_id=project.id, req_id="PRJ-REQ-002", title="Internal", visibility="internal"
+    )
+    session.add_all([customer, internal])
+    await session.flush()
+    assert await row_allows(session, user, customer, "view", "REQ")
+    assert await row_allows(session, user, customer, "edit", "REQ")
+    assert not await row_allows(session, user, customer, "approve", "REQ")
+    assert not await row_allows(session, user, customer, "delete", "REQ")
+    assert not await row_allows(session, user, internal, "view", "REQ")
+    assert not await row_allows(session, user, customer, "view", "TC")

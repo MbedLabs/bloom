@@ -66,12 +66,12 @@ export default function OutlineSidebar({ editor, open, onToggle }: OutlineSideba
     const container = scrollParentOf(editor.view.dom)
     const target: HTMLElement | Window = container ?? window
 
-    let queued = false
+    let frame: number | null = null
     const onScroll = () => {
-      if (queued) return
-      queued = true
-      requestAnimationFrame(() => {
-        queued = false
+      if (frame !== null) return
+      frame = requestAnimationFrame(() => {
+        frame = null
+        if (editor.isDestroyed) return
         const viewportTop = container ? container.getBoundingClientRect().top : 0
         setActiveId(activeHeadingAt(editor, headings, viewportTop))
       })
@@ -79,7 +79,10 @@ export default function OutlineSidebar({ editor, open, onToggle }: OutlineSideba
 
     onScroll()
     target.addEventListener('scroll', onScroll, { passive: true })
-    return () => target.removeEventListener('scroll', onScroll)
+    return () => {
+      target.removeEventListener('scroll', onScroll)
+      if (frame !== null) cancelAnimationFrame(frame)
+    }
   }, [editor, headings, open])
 
   // Keep the highlighted entry visible in a long outline.

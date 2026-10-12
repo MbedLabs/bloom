@@ -4,10 +4,10 @@ There is no endpoint that changes or deletes an event.
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import String, case, cast, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -33,6 +33,10 @@ async def list_audit_events(
     until: Optional[datetime] = None,
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    sort: Literal[
+        "occurred_at", "actor", "action", "target", "outcome", "ip", "request_id"
+    ] = "occurred_at",
+    dir: Literal["asc", "desc"] = "desc",
     db: AsyncSession = Depends(get_db, scope="function"),
     _admin: User = Depends(require_admin),
 ):
@@ -58,20 +62,44 @@ async def list_audit_events(
     if until is not None:
         conditions.append(AuditEvent.occurred_at < until)
 
+    sort_columns = {
+        "occurred_at": AuditEvent.occurred_at,
+        "actor": func.coalesce(
+            User.full_name,
+            case(
+                (
+                    AuditEvent.actor_user_id.is_not(None),
+                    literal("User ") + cast(AuditEvent.actor_user_id, String),
+                ),
+                else_=AuditEvent.actor_type,
+            ),
+        ),
+        "action": AuditEvent.action,
+        "target": func.coalesce(AuditEvent.target_type, "")
+        + literal(" ")
+        + func.coalesce(AuditEvent.target_id, ""),
+        "outcome": AuditEvent.outcome,
+        "ip": func.coalesce(AuditEvent.ip, ""),
+        "request_id": func.coalesce(AuditEvent.request_id, ""),
+    }
+    column = sort_columns[sort]
+    ordering = column.asc() if dir == "asc" else column.desc()
+    tie_breaker = AuditEvent.id.asc() if dir == "asc" else AuditEvent.id.desc()
     total = await db.scalar(select(func.count(AuditEvent.id)).where(*conditions))
     rows = (
         await db.execute(
-            select(AuditEvent, User.full_name)
+            select(AuditEvent, User)
             .outerjoin(User, User.id == AuditEvent.actor_user_id)
             .where(*conditions)
-            .order_by(AuditEvent.occurred_at.desc(), AuditEvent.id.desc())
+            .order_by(ordering, tie_breaker)
             .limit(limit)
             .offset(offset)
         )
     ).all()
     items = []
-    for event, actor_name in rows:
+    for event, actor in rows:
         item = AuditEventResponse.model_validate(event)
-        item.actor_name = actor_name
+        item.actor_name = actor.full_name if actor else None
+        item.actor_profile_picture_url = actor.profile_picture_url if actor else None
         items.append(item)
     return AuditEventPage(items=items, total=total or 0)

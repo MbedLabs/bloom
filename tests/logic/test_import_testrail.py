@@ -181,3 +181,15 @@ async def test_the_lookups_do_not_grow_with_the_number_of_cases(session):
 
     assert (twenty.created, twenty.links_created) == (20, 20)
     assert len(statements) == one
+
+
+async def test_testrail_refuses_a_role_removed_from_shared_rules(session, monkeypatch):
+    from app.core import link_rules
+
+    monkeypatch.setattr(link_rules, "LINK_RULE_ROWS", ())
+    with pytest.raises(HTTPException) as failed:
+        await _import(session, SUITE_XML)
+    assert failed.value.status_code == 422
+    assert "C7" in failed.value.detail and "verifies" in failed.value.detail
+    assert (await session.execute(select(TestCaseModel))).scalars().all() == []
+    assert (await session.execute(select(ArtefactLink))).scalars().all() == []

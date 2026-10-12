@@ -10,9 +10,9 @@ import linksPanelSource from '../components/DocumentLinksPanel.tsx?raw'
  * `.dark` class the browser cannot see, so every scrollbar stayed light in dark
  * mode - the main content one worst of all, since it had no styling whatsoever.
  *
- * The `color-scheme` declarations that fix this live in index.css, which Vitest
- * stubs out even through `?raw`; the build asserts those. What is checked here
- * is that no scroll container is left on the unstyled default.
+ * The `color-scheme` declarations that fix this live in index.css; the build
+ * asserts those. What is checked here is that no scroll container is left on
+ * the unstyled default.
  */
 
 const CONTAINERS: [string, string][] = [
