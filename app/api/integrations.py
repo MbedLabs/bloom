@@ -1362,8 +1362,6 @@ async def sync_change_request_to_tracker(
     await _sync_to_tracker(db, "change_request", change_request, changed_fields)
 
 
-
-
 _SYNC_EVENT_TABLES = {
     "defect": (DefectSyncEvent, "defect_id"),
     "change_request": (ChangeRequestSyncEvent, "change_request_id"),
