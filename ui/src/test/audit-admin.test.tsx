@@ -1,9 +1,10 @@
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
  * The admin audit log screen: it lists events newest first and filters them by
  * event group and outcome.
  */
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -33,7 +34,7 @@ const api = await import('../api/client')
 const AuditPage = (await import('../pages/Audit')).default
 
 function renderPage() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const client = createQueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={client}>
       <AuditPage />

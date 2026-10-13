@@ -1,7 +1,8 @@
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -52,7 +53,7 @@ describe('Bloom cross-tab session restoration', () => {
     })
 
     render(
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider client={createQueryClient()}>
         <AuthProvider>
           <AuthState />
         </AuthProvider>
@@ -68,7 +69,7 @@ describe('Bloom cross-tab session restoration', () => {
     refreshMock.mockRejectedValueOnce(new Error('Invalid or expired session'))
 
     render(
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider client={createQueryClient()}>
         <AuthProvider>
           <AuthState />
         </AuthProvider>

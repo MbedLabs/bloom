@@ -1,3 +1,4 @@
+import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Download, Paperclip, Trash2, Upload } from 'lucide-react'
@@ -16,10 +17,12 @@ function formatBytes(bytes: number): string {
 
 export default function DocumentAttachmentsPanel({
   documentId,
+  projectId,
   docType,
   rowAllowsEdit = true,
 }: {
   documentId: number
+  projectId?: number
   docType: DocType | null
   rowAllowsEdit?: boolean
 }) {
@@ -40,6 +43,7 @@ export default function DocumentAttachmentsPanel({
   const uploadMutation = useMutation({
     mutationFn: (file: File) => attachmentsApi.upload(documentId, file),
     onSuccess: () => {
+      refreshProjectViews(queryClient, { prefix, projectId })
       queryClient.invalidateQueries({ queryKey: ['attachments', documentId] })
       toast.notify('File attached', 'success')
     },
@@ -49,6 +53,7 @@ export default function DocumentAttachmentsPanel({
   const deleteMutation = useMutation({
     mutationFn: (id: number) => attachmentsApi.remove(id),
     onSuccess: () => {
+      refreshProjectViews(queryClient, { prefix, projectId })
       queryClient.invalidateQueries({ queryKey: ['attachments', documentId] })
       toast.notify('Attachment removed', 'success')
     },

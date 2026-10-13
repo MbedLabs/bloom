@@ -1,10 +1,11 @@
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
  * A `{{parameter}}` chip shows the name while editing, with the value on hover, and
  * the value while reading. A parameter without a value keeps showing its name. The
  * steps table of a test case follows the same rule when read.
  */
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -138,7 +139,7 @@ describe('the steps table when read', () => {
 
 describe('useParameterValues', () => {
   function wrapper({ children }: { children: ReactNode }) {
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const queryClient = createQueryClient({ defaultOptions: { queries: { retry: false } } })
     return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   }
 

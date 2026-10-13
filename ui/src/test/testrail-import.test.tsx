@@ -1,3 +1,4 @@
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
  * Migrating test cases from a TestRail export.
@@ -6,7 +7,7 @@
  * recognised, lets the user repoint any field, and sends that mapping with the
  * import. The title column is the one field an import cannot do without.
  */
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { AxiosError, AxiosHeaders } from 'axios'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
@@ -34,7 +35,7 @@ const result = {
 }
 
 function renderImport() {
-  const queryClient = new QueryClient({
+  const queryClient = createQueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   })
   return render(

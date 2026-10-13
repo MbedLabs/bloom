@@ -1,3 +1,4 @@
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
  * The two panels that hang off a document: its links and its tracker.
@@ -9,7 +10,7 @@
  * cannot be created without a token; only an administrator may touch either)
  * were unchecked.
  */
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -53,7 +54,7 @@ const { DocumentLinksPanel } = await import('../components/DocumentLinksPanel')
 const IntegrationSettingsPanel = (await import('../components/IntegrationSettingsPanel')).default
 
 function renderPanel(element: React.ReactElement) {
-  const queryClient = new QueryClient({
+  const queryClient = createQueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   })
   return render(

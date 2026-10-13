@@ -1,3 +1,4 @@
+import { refreshProjectViews, finishArtefactDeletion } from '../lib/refreshProjectViews'
 import WorkflowPanel from '../components/WorkflowPanel'
 import { useState, useEffect, useRef } from 'react'
 import ArtefactTags from '../components/ArtefactTags'
@@ -60,6 +61,7 @@ export default function CampaignDetail({
     mutationFn: (data: { name?: string; description?: string; status?: string; visibility?: 'internal' | 'customer' }) =>
       campaignsApi.update(campId, data),
     onSuccess: (updated) => {
+      refreshProjectViews(queryClient, { prefix, projectId: updated.project_id })
       queryClient.setQueryData(['campaign', campId], (old: unknown) => {
         if (old && typeof old === 'object') {
           return { ...(old as object), ...(updated as object) }
@@ -78,10 +80,9 @@ export default function CampaignDetail({
   const deleteMutation = useMutation({
     mutationFn: () => campaignsApi.delete(campId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['campaigns'] })
       toast.notify('Campaign deleted', 'success')
       setTimeout(() => {
-        navigate(docRegistryListUrl(prefix!, 'CMP'))
+        finishArtefactDeletion(queryClient, { prefix, projectId: campaign?.project_id, detailKey: 'campaign', artefactType: 'campaign', recordId: campId, kind: 'campaigns', docId: campaign?.campaign_id }, () => navigate(docRegistryListUrl(prefix!, 'CMP')))
       }, 800)
     },
     onError: (err: unknown) => {
@@ -381,7 +382,7 @@ export default function CampaignDetail({
         </div>
       )}
 
-      <WorkflowPanel artefactType="campaign" artefactId={campId} projectPrefix={prefix} />
+      <WorkflowPanel artefactType="campaign" artefactId={campId} projectPrefix={prefix} projectId={campaign.project_id} />
 
       <div>
         <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Origin</div>

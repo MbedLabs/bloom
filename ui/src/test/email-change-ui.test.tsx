@@ -1,8 +1,9 @@
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 
 import { ToastProvider } from '../components/Toast'
 import '@testing-library/jest-dom/vitest'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -63,7 +64,7 @@ vi.mock('../api/client', async (importOriginal) => {
 })
 
 function renderWithQueryClient(element: React.ReactElement) {
-  const queryClient = new QueryClient({
+  const queryClient = createQueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   return render(

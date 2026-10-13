@@ -1,5 +1,6 @@
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -12,7 +13,7 @@ const api = await import('../api/client')
 const Panel = (await import('../components/AccessRequestsPanel')).default
 
 function renderPanel(projectPrefix?: string, showEmpty = true) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const client = createQueryClient({ defaultOptions: { queries: { retry: false } } })
   const invalidate = vi.spyOn(client, 'invalidateQueries')
   render(<QueryClientProvider client={client}><Panel projectPrefix={projectPrefix} showEmpty={showEmpty} /></QueryClientProvider>)
   return invalidate

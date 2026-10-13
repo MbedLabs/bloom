@@ -1,3 +1,4 @@
+import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { artefactTagsApi, tagsApi, type TaggedArtefactType } from '../api/client'
@@ -32,6 +33,7 @@ export default function ArtefactTags({
   const save = useMutation({
     mutationFn: () => artefactTagsApi.set(type, id, chosen),
     onSuccess: (tags) => {
+      refreshProjectViews(queryClient, { projectId })
       queryClient.setQueryData(key, tags)
       setEditing(false)
       toast.saved('Origin')

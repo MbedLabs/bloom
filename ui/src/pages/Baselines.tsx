@@ -1,3 +1,4 @@
+import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useMemo, useState } from 'react'
 import { useParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -40,7 +41,7 @@ export default function Baselines() {
   const createMutation = useMutation({
     mutationFn: baselinesApi.create,
     onSuccess: (baseline) => {
-      queryClient.invalidateQueries({ queryKey: ['baselines'] })
+      refreshProjectViews(queryClient, { projectId: baseline.project_id })
       toast.saved(`Baseline ${baseline.name}`)
       setShowCreate(false)
       setForm({

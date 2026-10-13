@@ -1,3 +1,4 @@
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -9,7 +10,7 @@ import ProfilePicture from '../components/ProfilePicture'
 import MentionList from '../components/editor/MentionList'
 import DocEditor from '../components/editor/DocEditor'
 import { authApi, artefactsApi } from '../api/client'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
 
 vi.mock('../api/client', async (original) => {
@@ -119,7 +120,7 @@ it('renders the identified activity actor without inferring old free-text actors
     { id: 1, artefact_type: 'requirement', artefact_id: 1, event_type: 'created', summary: 'Ada created PRJ-REQ-001', actor_user_id: ada.id, actor_name: ada.full_name, actor_profile_picture_url: ada.profile_picture_url, created_at: '2026-10-10T12:00:00Z' },
     { id: 2, artefact_type: 'requirement', artefact_id: 1, event_type: 'updated', summary: 'Unknown updated PRJ-REQ-001', created_at: '2026-10-10T12:01:00Z' },
   ])
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const client = createQueryClient({ defaultOptions: { queries: { retry: false } } })
   render(<QueryClientProvider client={client}><DocumentActivityPanel artefactType="requirement" artefactId={1} /></QueryClientProvider>)
   expect(await screen.findByAltText("Ada Lovelace's profile picture")).toHaveAttribute('src', ada.profile_picture_url)
   expect(screen.getByText('Unknown updated PRJ-REQ-001')).toBeInTheDocument()

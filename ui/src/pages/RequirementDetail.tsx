@@ -1,3 +1,4 @@
+import { finishArtefactDeletion } from '../lib/refreshProjectViews'
 import { useState, useMemo } from 'react'
 import ArtefactTags from '../components/ArtefactTags'
 import { useParams, Link, useNavigate } from 'react-router'
@@ -127,13 +128,9 @@ export default function RequirementDetail({
     mutationFn: () => requirementsApi.delete(reqId),
     onSuccess: () => {
       if (!requirement) return
-      queryClient.invalidateQueries({ queryKey: ['requirements', requirement.project_id] })
-      queryClient.invalidateQueries({ queryKey: ['all-docs', prefix] })
-      queryClient.invalidateQueries({ queryKey: ['project', requirement.project_id] })
-      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'requirement', reqId] })
       toast.notify('Requirement deleted', 'success')
       setTimeout(() => {
-        navigate(docRegistryListUrl(prefix!, 'REQ'))
+        finishArtefactDeletion(queryClient, { prefix, projectId: requirement.project_id, detailKey: 'requirement', artefactType: 'requirement', recordId: reqId, kind: 'requirements', docId: requirement.req_id }, () => navigate(docRegistryListUrl(prefix!, 'REQ')))
       }, 800)
     },
     onError: (err: unknown) => {
@@ -221,7 +218,7 @@ export default function RequirementDetail({
             </div>
           </SectionCard>
 
-          <WorkflowPanel artefactType="requirement" artefactId={reqId} projectPrefix={projectPrefix} />
+          <WorkflowPanel artefactType="requirement" artefactId={reqId} projectPrefix={projectPrefix} projectId={requirement.project_id} />
 
           {requirement.linked_test_runs?.length > 0 && (
             <SectionCard title="Test runs">

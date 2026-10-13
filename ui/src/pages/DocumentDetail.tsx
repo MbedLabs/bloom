@@ -1,3 +1,5 @@
+import { DOC_TYPE_SLUGS } from '../types/doc'
+import { finishArtefactDeletion } from '../lib/refreshProjectViews'
 import WorkflowPanel from '../components/WorkflowPanel'
 import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
 import { useAuth } from '../contexts/AuthContext'
@@ -92,18 +94,10 @@ export default function DocumentDetail({
   const deleteDocumentMutation = useMutation({
     mutationFn: () => documentsApi.delete(docId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'document', docId] })
       toast.notify('Document deleted', 'success')
-      if (projectPrefix) {
-        queryClient.invalidateQueries({ queryKey: ['documents', doc?.project_id] })
-        setTimeout(() => {
-          navigate(`/projects/${projectPrefix}/docs`)
-        }, 800)
-      } else {
-        setTimeout(() => {
-          navigate('/projects')
-        }, 800)
-      }
+      setTimeout(() => {
+        finishArtefactDeletion(queryClient, { prefix: projectPrefix, projectId: doc?.project_id, detailKey: 'document', artefactType: 'document', recordId: docId, kind: docType ? DOC_TYPE_SLUGS[docType] : undefined, docId: doc?.doc_id ?? undefined }, () => navigate(projectPrefix ? `/projects/${projectPrefix}/docs` : '/projects'))
+      }, 800)
     },
     onError: (err: unknown) => {
       toast.failed('Deleting the document', err)
@@ -182,7 +176,7 @@ export default function DocumentDetail({
       ) : undefined}
       rightRail={
         <>
-        <WorkflowPanel artefactType="document" artefactId={docId} projectPrefix={projectPrefix} />
+        <WorkflowPanel artefactType="document" artefactId={docId} projectPrefix={projectPrefix} projectId={doc.project_id} />
         <SectionCard title="Metadata">
           <div className="space-y-4">
             <MetaItem label="Origin" value={<ArtefactTags type="document" id={docId} projectId={doc.project_id} canEdit={showEdit} origin={doc.visibility === 'customer' ? 'Customer' : 'Internal'} />} />
@@ -250,7 +244,7 @@ export default function DocumentDetail({
         </div>
       )}
 
-      <DocumentAttachmentsPanel documentId={docId} docType={docType} rowAllowsEdit={showEdit} />
+      <DocumentAttachmentsPanel documentId={docId} docType={docType} rowAllowsEdit={showEdit} projectId={doc.project_id} />
 
       <DocumentActivityPanel artefactType="document" artefactId={docId} />
 

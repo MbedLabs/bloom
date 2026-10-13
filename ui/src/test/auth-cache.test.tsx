@@ -1,8 +1,9 @@
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
 import { StrictMode } from 'react'
 import { AxiosError } from 'axios'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { type QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -77,7 +78,7 @@ afterEach(() => {
 
 describe('query cache and the signed-in user', () => {
   it('is emptied when a user signs in', async () => {
-    const client = new QueryClient()
+    const client = createQueryClient()
     client.setQueryData(['cached', 0], [{ id: 0 }])
     await signedIn(client)
     expect(client.getQueryData(['cached', 0])).toBeUndefined()
@@ -86,7 +87,7 @@ describe('query cache and the signed-in user', () => {
   })
 
   it('is emptied and the login page loaded when the user signs out', async () => {
-    const client = new QueryClient()
+    const client = createQueryClient()
     await signedIn(client)
     fireEvent.click(screen.getByText('Sign out'))
     await waitFor(() => expect(location.href).toBe('/login'))
@@ -95,7 +96,7 @@ describe('query cache and the signed-in user', () => {
   })
 
   it('is emptied and the login page loaded when the server has ended the session', async () => {
-    const client = new QueryClient()
+    const client = createQueryClient()
     await signedIn(client)
     vi.mocked(authApi.getMe).mockRejectedValueOnce(
       Object.assign(new AxiosError('Unauthorized'), { response: { status: 401 } }),
@@ -106,7 +107,7 @@ describe('query cache and the signed-in user', () => {
   })
 
   it('is emptied and the login page loaded when the session check fails', async () => {
-    const client = new QueryClient()
+    const client = createQueryClient()
     await signedIn(client)
     vi.mocked(authApi.getMe).mockRejectedValueOnce(new Error('offline'))
     fireEvent.click(screen.getByText('Check session'))
@@ -115,7 +116,7 @@ describe('query cache and the signed-in user', () => {
   })
 
   it('is kept when the session check confirms the same user', async () => {
-    const client = new QueryClient()
+    const client = createQueryClient()
     await signedIn(client)
     vi.mocked(authApi.getMe).mockResolvedValueOnce(reader as never)
     fireEvent.click(screen.getByText('Check session'))
@@ -125,7 +126,7 @@ describe('query cache and the signed-in user', () => {
   })
 
   it('refreshes person caches after replacing or removing a picture without clearing documents', async () => {
-    const client = new QueryClient()
+    const client = createQueryClient()
     await signedIn(client)
     const keys = ['users', 'mentionableUsers', 'access-assignment-options', 'project-members', 'project-access', 'access-requests', 'audit', 'artefactComments', 'artefactActivity', 'notifications-list']
     const document = { content: 'Draft remains intact' }
@@ -141,7 +142,7 @@ describe('query cache and the signed-in user', () => {
   })
 
   it('is emptied without a reload when someone signs in as another user', async () => {
-    const client = new QueryClient()
+    const client = createQueryClient()
     await signedIn(client)
     vi.mocked(authApi.login).mockResolvedValueOnce({ access_token: 'other-token', user: other } as never)
     fireEvent.click(screen.getByText('Sign in'))
@@ -152,7 +153,7 @@ describe('query cache and the signed-in user', () => {
   })
 
   it('is emptied and the login page loaded when the sign-out request cannot reach the server', async () => {
-    const client = new QueryClient()
+    const client = createQueryClient()
     await signedIn(client)
     vi.mocked(authApi.logout).mockRejectedValueOnce(new Error('network down'))
     fireEvent.click(screen.getByText('Sign out'))
@@ -161,7 +162,7 @@ describe('query cache and the signed-in user', () => {
   })
 
   it('is emptied and the login page loaded when the server says the session is already over', async () => {
-    const client = new QueryClient()
+    const client = createQueryClient()
     await signedIn(client)
     vi.mocked(authApi.logout).mockRejectedValueOnce(Object.assign(new AxiosError('Unauthorized'), { response: { status: 401 } }))
     fireEvent.click(screen.getByText('Sign out'))
@@ -170,7 +171,7 @@ describe('query cache and the signed-in user', () => {
   })
 
   it('is emptied and the login page loaded when the account is deactivated', async () => {
-    const client = new QueryClient()
+    const client = createQueryClient()
     await signedIn(client)
     vi.mocked(authApi.getMe).mockRejectedValueOnce(
       Object.assign(new AxiosError('Forbidden'), { response: { status: 403 } }),
@@ -183,7 +184,7 @@ describe('query cache and the signed-in user', () => {
     setAuthToken('stored-token')
     vi.mocked(authApi.getMe).mockRejectedValueOnce(new Error('offline'))
     render(
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider client={createQueryClient()}>
         <AuthProvider>
           <Controls />
         </AuthProvider>
@@ -200,7 +201,7 @@ describe('query cache and the signed-in user', () => {
     vi.mocked(authApi.getMe).mockReturnValueOnce(new Promise(() => {}) as never)
     vi.mocked(authApi.getMe).mockResolvedValueOnce(reader as never)
     render(
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider client={createQueryClient()}>
         <AuthProvider>
           <Controls />
         </AuthProvider>
@@ -215,7 +216,7 @@ describe('query cache and the signed-in user', () => {
     vi.mocked(authApi.refresh).mockResolvedValue({ access_token: 'cookie-token', user: reader } as never)
     render(
       <StrictMode>
-        <QueryClientProvider client={new QueryClient()}>
+        <QueryClientProvider client={createQueryClient()}>
           <AuthProvider>
             <Controls />
           </AuthProvider>
@@ -228,7 +229,7 @@ describe('query cache and the signed-in user', () => {
   })
 
   it('is emptied and the login page loaded when the session now belongs to another user', async () => {
-    const client = new QueryClient()
+    const client = createQueryClient()
     await signedIn(client)
     clearAuthToken()
     vi.mocked(authApi.refresh).mockResolvedValueOnce({ access_token: 'other-token', user: other } as never)

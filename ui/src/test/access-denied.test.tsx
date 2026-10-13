@@ -1,9 +1,10 @@
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
  * The access-denied page: it names the resource only by its address, asks the
  * administrators once, and says when a request is pending or the mail failed.
  */
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AccessRequestInfo } from '../api/client'
@@ -27,7 +28,7 @@ const AccessDenied = (await import('../components/AccessDenied')).default
 const { isAccessDenied } = await import('../lib/accessDenied')
 
 function renderPage() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const client = createQueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={client}>
       <AccessDenied resourceType="requirement" resourceRef="APO-REQ-001" projectPrefix="APO" />

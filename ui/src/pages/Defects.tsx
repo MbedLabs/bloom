@@ -1,3 +1,4 @@
+import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useMemo, useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -118,7 +119,7 @@ export default function Defects() {
     mutationFn: defectsApi.create,
     onMutate: () => setCreateError(''),
     onSuccess: (defect) => {
-      queryClient.invalidateQueries({ queryKey: ['defects', projectId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
       toast.saved(`Defect ${defect.defect_id}`)
       setShowCreate(false)
       setForm({

@@ -1,3 +1,4 @@
+import { refreshProjectViews, finishArtefactDeletion } from '../lib/refreshProjectViews'
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import TagPicker from '../components/TagPicker'
 import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router'
@@ -126,20 +127,8 @@ function invalidateDocumentQueries(
   kind?: string,
   docIdStr?: string,
 ) {
-  queryClient.invalidateQueries({ queryKey: ['requirements', projectId] })
-  queryClient.invalidateQueries({ queryKey: ['test-cases', projectId] })
-  queryClient.invalidateQueries({ queryKey: ['testCases', projectId] })
-  queryClient.invalidateQueries({ queryKey: ['designs', projectId] })
-  queryClient.invalidateQueries({ queryKey: ['risks', projectId] })
-  queryClient.invalidateQueries({ queryKey: ['changes', projectId] })
-  queryClient.invalidateQueries({ queryKey: ['test-concepts', projectId] })
-  queryClient.invalidateQueries({ queryKey: ['defects', projectId] })
-  queryClient.invalidateQueries({ queryKey: ['documents', projectId] })
-  queryClient.invalidateQueries({ queryKey: ['project-by-prefix', prefix] })
-  queryClient.invalidateQueries({ queryKey: ['project-docs-shell', prefix] })
+  refreshProjectViews(queryClient, { projectId, prefix })
   if (resolvedDocId) {
-    // The lists above are keyed by project; a detail page reads its own record under a
-    // singular key keyed by the record id.
     for (const key of DETAIL_QUERY_KEYS) {
       queryClient.invalidateQueries({ queryKey: [key, resolvedDocId] })
     }
@@ -500,9 +489,10 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       await api.delete(resolvedDocId)
     },
     onSuccess: () => {
-      invalidateDocumentQueries(queryClient, projectId, prefix, resolvedDocId, kind, docIdStr)
+      const artefactType = artefactActivityTypeForDocType(docType) || 'defect'
+      const detailKey = ({ 'test-case': 'testCase', 'test-concept': 'testConcept' } as Record<string, string>)[artefactType] || artefactType
+      finishArtefactDeletion(queryClient, { projectId, prefix, detailKey, artefactType, recordId: resolvedDocId!, kind, docId: docIdStr }, () => navigate(listBackUrl))
       toast.deleted(docIdStr ? `${DOC_TYPE_LABELS[docType]} ${docIdStr}` : DOC_TYPE_LABELS[docType])
-      navigate(listBackUrl)
     },
     onError: (error) => {
       setSaveError(extractApiErrorMessage(error, 'Could not delete document'))

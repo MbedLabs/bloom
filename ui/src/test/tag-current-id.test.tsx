@@ -1,10 +1,11 @@
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
  * A `#` tag shows the current public id of the artefact it points at, looked up once
  * per document. The stored label is the fallback until the lookup answers, and a tag
  * whose target is gone reads as plain text.
  */
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -94,7 +95,7 @@ describe('tagKeys', () => {
 
 describe('useArtefactLabels', () => {
   function wrapper({ children }: { children: ReactNode }) {
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const queryClient = createQueryClient({ defaultOptions: { queries: { retry: false } } })
     return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   }
 

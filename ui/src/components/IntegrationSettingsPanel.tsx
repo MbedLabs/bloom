@@ -1,3 +1,4 @@
+import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { GitBranch } from 'lucide-react'
@@ -231,7 +232,7 @@ export default function IntegrationSettingsPanel({ projectId }: { projectId: num
     mutationFn: (id: number) => integrationsApi.pullJira(id),
     onSuccess: (result) => {
       setPulled(result)
-      queryClient.invalidateQueries({ queryKey: ['defects'] })
+      refreshProjectViews(queryClient, { projectId })
       toast.notify(`Pulled from Jira: ${result.created} defect(s) created`, 'success')
     },
     onError: (err: unknown) => toast.failed('Pulling from Jira', err),

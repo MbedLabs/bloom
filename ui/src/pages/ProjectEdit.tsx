@@ -1,3 +1,4 @@
+import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -68,7 +69,8 @@ export default function ProjectEdit() {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       queryClient.invalidateQueries({ queryKey: ['access-assignment-options'] })
       queryClient.setQueryData(['project-by-prefix', updated.prefix], updated)
-      queryClient.invalidateQueries({ queryKey: ['project-by-prefix', updated.prefix] })
+      refreshProjectViews(queryClient, { prefix: updated.prefix, projectId: updated.id })
+      if (prefix !== updated.prefix) refreshProjectViews(queryClient, { prefix, projectId: updated.id }, 'none')
       toast.saved('Project')
       if (updated.prefix !== prefix) {
         navigate(`/projects/${updated.prefix}/edit`, { replace: true })

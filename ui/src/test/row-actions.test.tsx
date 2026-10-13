@@ -1,5 +1,6 @@
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -16,7 +17,7 @@ function Probe({ docId, given }: { docId?: string | null; given?: string[] }) {
 }
 
 function renderProbe(props: { docId?: string | null; given?: string[] }) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+  const client = createQueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
   render(<QueryClientProvider client={client}><Probe {...props} /></QueryClientProvider>)
   return client
 }

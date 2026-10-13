@@ -1,3 +1,4 @@
+import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -36,7 +37,7 @@ export default function ProjectParameters() {
   const createMutation = useMutation({
     mutationFn: projectVariablesApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projectVariables', projectId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
       setShowCreate(false)
       setCreateForm({ kind: 'variable', key: '', value: '', description: '' })
       toast.saved('Parameter')
@@ -65,7 +66,7 @@ export default function ProjectParameters() {
   const deleteMutation = useMutation({
     mutationFn: projectVariablesApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projectVariables', projectId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
       toast.deleted('Parameter')
     },
     onError: (error) => toast.failed('Deleting the parameter', error),
@@ -76,7 +77,7 @@ export default function ProjectParameters() {
       projectVariablesApi.update(id, data),
     onSuccess: (_updated) => {
       void _updated
-      queryClient.invalidateQueries({ queryKey: ['projectVariables', projectId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
       setEditingId(null)
       toast.saved('Parameter')
     },

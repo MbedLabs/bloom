@@ -1,3 +1,4 @@
+import { finishArtefactDeletion } from '../lib/refreshProjectViews'
 import { useState, useMemo } from 'react'
 import ArtefactTags from '../components/ArtefactTags'
 import { useParams, Link, useNavigate } from 'react-router'
@@ -104,13 +105,9 @@ export default function TestCaseDetail({
     mutationFn: () => testCasesApi.delete(tcId),
     onSuccess: () => {
       if (!testCase) return
-      queryClient.invalidateQueries({ queryKey: ['testCases', testCase.project_id] })
-      queryClient.invalidateQueries({ queryKey: ['all-docs', prefix] })
-      queryClient.invalidateQueries({ queryKey: ['project', testCase.project_id] })
-      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'test-case', tcId] })
       toast.notify('Test case deleted', 'success')
       setTimeout(() => {
-        navigate(docRegistryListUrl(prefix!, 'TC'))
+        finishArtefactDeletion(queryClient, { prefix, projectId: testCase.project_id, detailKey: 'testCase', artefactType: 'test-case', recordId: tcId, kind: 'test-cases', docId: testCase.tc_id }, () => navigate(docRegistryListUrl(prefix!, 'TC')))
       }, 800)
     },
     onError: (err: unknown) => {
@@ -209,7 +206,7 @@ export default function TestCaseDetail({
             )}
           </SectionCard>
 
-          <WorkflowPanel artefactType="test-case" artefactId={tcId} projectPrefix={projectPrefix} />
+          <WorkflowPanel artefactType="test-case" artefactId={tcId} projectPrefix={projectPrefix} projectId={testCase.project_id} />
 
           <SectionCard title="Metadata">
             <div className="space-y-4">

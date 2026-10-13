@@ -27,6 +27,7 @@
 - Times shown to people stop at the minute: dates and times in the web app, the CSV exports of requirements and test cases, the summary of a published Bud report, and the time in access-request emails (in UTC).
 
 ### Fixed
+- Refresh document lists, project counts, link labels, traceability and reports after successful project changes; remove deleted detail caches after navigation without fetching deleted records.
 
 - Signing out, and a session check that fails while a user is signed in, now reload the page, and a tab reloads when it next renews its session and finds it belongs to another user signed in from another tab. Nothing cached for the previous user stays in memory, and signing in empties the cache as well. Before, the next user in the same tab could be shown data cached for the previous one for up to five minutes.
 - A database created before the locked migration baseline gets `integration_settings.account_email` and the `change_request_sync_events` table it lacked; the integration settings no longer answer 500 on such an instance.

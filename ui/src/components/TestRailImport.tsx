@@ -1,3 +1,4 @@
+import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -56,9 +57,7 @@ export default function TestRailImport({
     onSuccess: (data) => {
       setResult(data)
       toast.notify(`TestRail import: ${data.created} created, ${data.updated} updated`, 'success')
-      queryClient.invalidateQueries({ queryKey: ['testCases', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['all-docs', prefix] })
-      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
     },
     onError: (err) => {
       setResult(null)

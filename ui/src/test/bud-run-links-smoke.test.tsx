@@ -1,5 +1,6 @@
+import { createQueryClient } from '../lib/queryClient'
 import { renderWithToasts } from './render'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -94,7 +95,7 @@ vi.mock('../components/DocDetailShell', () => ({
 }))
 
 function renderPage(element: ReactNode) {
-  const queryClient = new QueryClient({
+  const queryClient = createQueryClient({
     defaultOptions: { queries: { retry: false } },
   })
 

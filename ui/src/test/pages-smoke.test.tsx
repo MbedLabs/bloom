@@ -1,5 +1,6 @@
+import { createQueryClient } from '../lib/queryClient'
 import { renderPage } from './render'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -64,7 +65,7 @@ describe('source-available readiness smoke', () => {
   ])('renders %s without crashing', async (path, marker, attributionColor) => {
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { default: App } = await import('../App')
-    const queryClient = new QueryClient({
+    const queryClient = createQueryClient({
       defaultOptions: {
         queries: { retry: false },
       },

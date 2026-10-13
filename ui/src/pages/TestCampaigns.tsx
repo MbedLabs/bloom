@@ -1,3 +1,4 @@
+import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useMemo, useState } from 'react'
 import TagPicker from '../components/TagPicker'
 import { useParams, Link, useSearchParams } from 'react-router'
@@ -112,7 +113,7 @@ export default function TestCampaigns() {
       setCreateError('')
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['campaigns', projectId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
       setShowCreate(false)
       setForm({ name: '', description: '', visibility: 'internal' })
       setSelectedTcIds([])
@@ -128,8 +129,7 @@ export default function TestCampaigns() {
   const createSuiteMutation = useMutation({
     mutationFn: testSuitesApi.create,
     onSuccess: (suite) => {
-      queryClient.invalidateQueries({ queryKey: ['testSuites', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
       setShowCreateSuite(false)
       setSuiteForm({ name: '', description: '', visibility: 'internal' })
       setSelectedTcIds([])

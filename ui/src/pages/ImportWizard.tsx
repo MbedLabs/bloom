@@ -1,3 +1,4 @@
+import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useState } from 'react'
 import TagPicker from '../components/TagPicker'
 import { useParams, Link, useNavigate } from 'react-router'
@@ -99,10 +100,7 @@ export default function ImportWizard() {
     onSuccess: (data) => {
       setResult(data)
       setStep(5)
-      queryClient.invalidateQueries({ queryKey: ['requirements', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['testCases', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['all-docs', prefix] })
-      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
     },
   })
 
@@ -111,9 +109,7 @@ export default function ImportWizard() {
     onSuccess: (data) => {
       setReqifResult(data)
       setReqifError(null)
-      queryClient.invalidateQueries({ queryKey: ['requirements', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['all-docs', prefix] })
-      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
     },
     onError: (error: { response?: { data?: { detail?: string } } }) => {
       setReqifResult(null)
@@ -127,9 +123,7 @@ export default function ImportWizard() {
     onSuccess: (data) => {
       setFileResult(data)
       setFileError(null)
-      queryClient.invalidateQueries({ queryKey: ['testCases', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['all-docs', prefix] })
-      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
     },
     onError: (error: { response?: { data?: { detail?: string } } }) => {
       setFileResult(null)
@@ -144,8 +138,7 @@ export default function ImportWizard() {
       setMdResult(data)
       setMdError(null)
       setMdCollisions(null)
-      queryClient.invalidateQueries({ queryKey: ['projectVariables', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
     },
     onError: (error: {
       response?: { status?: number; data?: { detail?: string | { collisions?: MarkdownCollision[] } } }

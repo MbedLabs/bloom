@@ -1,3 +1,4 @@
+import { refreshProjectViews, finishArtefactDeletion } from '../lib/refreshProjectViews'
 import WorkflowPanel from '../components/WorkflowPanel'
 import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
 import { type ReactNode, useState, useEffect } from 'react'
@@ -76,10 +77,8 @@ export default function SuiteDetail({
   const addItemMutation = useMutation({
     mutationFn: (testCaseId: number) => testSuitesApi.addItem(parsedSuiteId, testCaseId),
     onSuccess: () => {
+      refreshProjectViews(queryClient, { prefix, projectId })
       queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
-      queryClient.invalidateQueries({ queryKey: ['testSuites', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['testCases', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       queryClient.invalidateQueries({ queryKey: ['document-workflow', 'test-suite', parsedSuiteId] })
       setShowAddCase(false)
       toast.notify('Test case added', 'success')
@@ -92,10 +91,8 @@ export default function SuiteDetail({
   const removeItemMutation = useMutation({
     mutationFn: (itemId: number) => testSuitesApi.removeItem(parsedSuiteId, itemId),
     onSuccess: () => {
+      refreshProjectViews(queryClient, { prefix, projectId })
       queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
-      queryClient.invalidateQueries({ queryKey: ['testSuites', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['testCases', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       queryClient.invalidateQueries({ queryKey: ['document-workflow', 'test-suite', parsedSuiteId] })
       toast.notify('Test case removed', 'success')
     },
@@ -114,7 +111,7 @@ export default function SuiteDetail({
       visibility: suite?.visibility === 'customer' ? 'customer' : 'internal',
     }),
     onSuccess: (campaign) => {
-      queryClient.invalidateQueries({ queryKey: ['campaigns', projectId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
       queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
       toast.notify('Campaign scope created', 'success')
       navigate(`/projects/${prefix}/campaigns/${campaign.id}`, {
@@ -130,6 +127,7 @@ export default function SuiteDetail({
     mutationFn: (data: { name?: string; description?: string; status?: string; visibility?: 'internal' | 'customer' }) =>
       testSuitesApi.update(parsedSuiteId, data),
     onSuccess: (updated: unknown) => {
+      refreshProjectViews(queryClient, { prefix, projectId })
       queryClient.setQueryData(['testSuite', parsedSuiteId], (old: unknown) => {
         if (old && typeof old === 'object') {
           return { ...(old as object), ...(updated as object) }
@@ -137,7 +135,6 @@ export default function SuiteDetail({
         return updated
       })
       queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
-      queryClient.invalidateQueries({ queryKey: ['testSuites', projectId] })
       queryClient.invalidateQueries({ queryKey: ['document-workflow', 'test-suite', parsedSuiteId] })
       setEditing(false)
       toast.notify('Suite saved', 'success')
@@ -150,10 +147,9 @@ export default function SuiteDetail({
   const deleteMutation = useMutation({
     mutationFn: () => testSuitesApi.delete(parsedSuiteId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['testSuites', projectId] })
       toast.notify('Suite deleted', 'success')
       setTimeout(() => {
-        navigate(backUrl)
+        finishArtefactDeletion(queryClient, { prefix, projectId, detailKey: 'testSuite', artefactType: 'test-suite', recordId: parsedSuiteId, kind: 'test-suites', docId: suite?.suite_id }, () => navigate(backUrl))
       }, 800)
     },
     onError: (err: unknown) => {
@@ -416,7 +412,7 @@ export default function SuiteDetail({
         </div>
       )}
 
-      <WorkflowPanel artefactType="test-suite" artefactId={parsedSuiteId} projectPrefix={prefix} />
+      <WorkflowPanel artefactType="test-suite" artefactId={parsedSuiteId} projectPrefix={prefix} projectId={suite.project_id} />
 
       {/* Activity */}
       <div className="bg-card rounded-lg shadow-elegant overflow-hidden">

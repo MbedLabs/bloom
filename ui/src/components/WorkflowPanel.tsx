@@ -1,3 +1,4 @@
+import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useState } from 'react'
 import { UserCheck, UserCog } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
@@ -19,7 +20,7 @@ const reviewButtonClass = 'w-full inline-flex items-center justify-center px-3 p
 const approvalButtonClass = 'w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-500 disabled:opacity-50'
 const ENTITY_KEYS: Record<string, string> = { requirement: 'requirement', 'test-case': 'testCase', document: 'document', design: 'design', risk: 'risk', change: 'change', 'test-concept': 'testConcept', defect: 'defect', 'test-suite': 'testSuite', campaign: 'campaign' }
 
-export default function WorkflowPanel({ artefactType, artefactId, projectPrefix }: { artefactType: string; artefactId: number; projectPrefix?: string }) {
+export default function WorkflowPanel({ artefactType, artefactId, projectPrefix, projectId }: { artefactType: string; artefactId: number; projectPrefix?: string; projectId?: number }) {
   const workflow = useDocumentWorkflow(artefactType, artefactId)
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -38,12 +39,13 @@ export default function WorkflowPanel({ artefactType, artefactId, projectPrefix 
       if (operation.kind === 'draft') return workflowApi.startDraft(artefactType, artefactId)
       return artefactsApi.createComment(artefactType, artefactId, comment.trim())
     },
-    onSuccess: async (result, operation) => {
+    onSuccess: (result, operation) => {
       if (operation.kind === 'comment') setComment('')
-      await Promise.all([
+      refreshProjectViews(queryClient, { prefix: projectPrefix, projectId })
+      void Promise.all([
         ['document-workflow', artefactType, artefactId], [ENTITY_KEYS[artefactType], artefactId],
         ['artefactComments', artefactType, artefactId], ['artefactActivity', artefactType, artefactId],
-        ['document-revision', artefactType, artefactId], ['doc-facade'], ['all-docs'], ['project'],
+        ['document-revision', artefactType, artefactId], ['doc-facade', projectPrefix],
       ].map(queryKey => queryClient.invalidateQueries({ queryKey })))
       toast.notify(result?.already_requested ? 'Already requested' : 'Document updated', 'success')
     },

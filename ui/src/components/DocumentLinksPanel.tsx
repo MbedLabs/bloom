@@ -1,3 +1,4 @@
+import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -203,6 +204,7 @@ function LinkDocumentModal({
       })
     },
     onSuccess: () => {
+      refreshProjectViews(queryClient, { prefix: projectPrefix, projectId })
       queryClient.invalidateQueries({ queryKey: ['docLinks', projectId] })
       toast.notify('Relationship added', 'success')
       onClose()
@@ -363,6 +365,7 @@ export function DocumentLinksPanel({
   const deleteMutation = useMutation({
     mutationFn: linksApi.delete,
     onSuccess: () => {
+      refreshProjectViews(queryClient, { prefix: projectPrefix, projectId })
       queryClient.invalidateQueries({ queryKey: ['docLinks', projectId] })
       toast.notify('Relationship removed', 'success')
     },

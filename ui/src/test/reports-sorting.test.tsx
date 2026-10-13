@@ -1,5 +1,6 @@
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
@@ -22,7 +23,7 @@ describe('Reports project summary sorting', () => {
     ['Coverage', ['Bravo', 'Alpha', 'Zulu']],
     ['Health', ['Bravo', 'Zulu', 'Alpha']],
   ])('sorts %s in both directions while preserving metrics and source data', async (column, ascending) => {
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const client = createQueryClient({ defaultOptions: { queries: { retry: false } } })
     render(<QueryClientProvider client={client}><MemoryRouter><Reports /></MemoryRouter></QueryClientProvider>)
     await screen.findByRole('table')
     const names = () => within(screen.getByRole('table')).getAllByRole('row').slice(1).map((row) => within(row).getAllByRole('link')[0].textContent)

@@ -1,3 +1,5 @@
+import { DOC_TYPE_SLUGS } from '../types/doc'
+import { refreshProjectViews, finishArtefactDeletion } from '../lib/refreshProjectViews'
 import ProfilePicture from '../components/ProfilePicture'
 import WorkflowPanel from '../components/WorkflowPanel'
 import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
@@ -245,8 +247,7 @@ export default function ArtefactDetail({
     onSuccess: (updated: ArtefactRecord) => {
       queryClient.setQueryData([config.queryKey, recordId], updated)
       queryClient.invalidateQueries({ queryKey: [config.queryKey, recordId] })
-      queryClient.invalidateQueries({ queryKey: [config.listKey, updated.project_id] })
-      queryClient.invalidateQueries({ queryKey: ['project', updated.project_id] })
+      refreshProjectViews(queryClient, { prefix: projectPrefix, projectId: updated.project_id })
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', kind, recordId] })
       queryClient.invalidateQueries({ queryKey: ['document-workflow', kind, recordId] })
       setIsEditing(false)
@@ -262,11 +263,10 @@ export default function ArtefactDetail({
     mutationFn: () => config.delete(recordId),
     onSuccess: () => {
       if (!artefact) return
-      queryClient.invalidateQueries({ queryKey: [config.listKey, artefact.project_id] })
-      queryClient.invalidateQueries({ queryKey: ['project', artefact.project_id] })
+
       toast.notify(`${config.singular} deleted`, 'success')
       setTimeout(() => {
-        navigate(docRegistryListUrl(projectPrefix, config.docType))
+        finishArtefactDeletion(queryClient, { prefix: projectPrefix, projectId: artefact.project_id, detailKey: config.queryKey, artefactType: kind, recordId, kind: DOC_TYPE_SLUGS[config.docType], docId: String((artefact as unknown as Record<string, unknown>)[config.idField]) }, () => navigate(docRegistryListUrl(projectPrefix, config.docType)))
       }, 800)
     },
     onError: (err: unknown) => {
@@ -288,7 +288,7 @@ export default function ArtefactDetail({
       queryClient.invalidateQueries({ queryKey: [config.queryKey, recordId] })
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', kind, recordId] })
       if (artefact) {
-        queryClient.invalidateQueries({ queryKey: [config.listKey, artefact.project_id] })
+        refreshProjectViews(queryClient, { prefix: projectPrefix, projectId: artefact.project_id })
       }
       toast.notify(`Status changed`, 'success')
     },
@@ -307,6 +307,7 @@ export default function ArtefactDetail({
         return updated
       })
       queryClient.invalidateQueries({ queryKey: [config.queryKey, recordId] })
+      refreshProjectViews(queryClient, { prefix: projectPrefix, projectId })
       queryClient.invalidateQueries({ queryKey: ['syncEvents', recordId] })
       queryClient.invalidateQueries({ queryKey: ['artefactActivity', kind, recordId] })
       const state = (updated as unknown as Defect).external_issue_state
@@ -407,7 +408,7 @@ export default function ArtefactDetail({
       ) : undefined}
       rightRail={
         <>
-          <WorkflowPanel artefactType={kind} artefactId={recordId} projectPrefix={projectPrefix} />
+          <WorkflowPanel artefactType={kind} artefactId={recordId} projectPrefix={projectPrefix} projectId={projectId} />
           {workflow.data && !workflow.data.controlled && <SectionCard title="Workflow">
             <div className="space-y-3">
               <div>
