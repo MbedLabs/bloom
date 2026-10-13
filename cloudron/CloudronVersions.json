@@ -89,7 +89,7 @@
                     "https://embedlabs.net/app-bloom-dashboard-light.png"
                 ],
                 "packageUrl": "https://github.com/MbedLabs/bloom",
-                "dockerImage": "ghcr.io/mbedlabs/bloom:dev"
+                "dockerImage": "ghcr.io/mbedlabs/bloom:v1.2.0"
             },
             "creationDate": "Mon, 12 Oct 2026 23:26:33 GMT",
             "ts": "Mon, 12 Oct 2026 23:26:33 GMT",
