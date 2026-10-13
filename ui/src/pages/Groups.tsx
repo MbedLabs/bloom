@@ -18,6 +18,7 @@ import { useToast } from '../components/useToast'
 import { useAuth } from '../contexts/AuthContext'
 import { applicationAllows } from '../lib/applicationAccess'
 import { SortableHeader } from '../components/ListControls'
+import AccessRequestsPanel from '../components/AccessRequestsPanel'
 import {
   activeRule, approveIncludesReview, BUILTIN_ORIGINS, emptyRule, isCompleteAppPolicy, isDocType, PERMISSIONS,
   policyOrigins, policyPermissions, policyResourceSummary, policyScopeLabel,
@@ -41,7 +42,8 @@ function AccessContent() {
   const { data: groups } = useQuery({ queryKey: ['groups'], queryFn: groupsApi.list })
   const { data: tags } = useQuery({ queryKey: ['tags'], queryFn: () => tagsApi.list() })
 
-  const [view, setView] = useState<'groups' | 'policies'>('policies')
+  const [view, setView] = useState<'groups' | 'policies' | 'requests'>('policies')
+  const views = user?.role === 'admin' ? ['policies', 'groups', 'requests'] as const : ['policies', 'groups'] as const
   const [viewingPolicy, setViewingPolicy] = useState<Policy | null>(null)
   const [editingPolicy, setEditingPolicy] = useState<Policy | 'new' | null>(null)
   const [editingGroup, setEditingGroup] = useState<Group | 'new' | null>(null)
@@ -114,7 +116,7 @@ function AccessContent() {
         <p className="mt-1 text-sm text-muted-foreground">Configure groups of policies and permissions by scope and origin.</p>
       </div>
       <div role="tablist" aria-label="Access views" className="flex gap-1 border-b border-border">
-        {(['policies', 'groups'] as const).map((tab) => (
+        {views.map((tab) => (
           <button
             key={tab}
             id={`access-${tab}-tab`}
@@ -125,8 +127,10 @@ function AccessContent() {
             tabIndex={view === tab ? 0 : -1}
             onClick={() => setView(tab)}
             onKeyDown={(event) => {
-              const next = event.key === 'Home' ? 'policies' : event.key === 'End' ? 'groups'
-                : event.key === 'ArrowLeft' || event.key === 'ArrowRight' ? (tab === 'groups' ? 'policies' : 'groups') : null
+              const index = views.findIndex((item) => item === tab)
+              const next = event.key === 'Home' ? views[0] : event.key === 'End' ? views[views.length - 1]
+                : event.key === 'ArrowRight' ? views[(index + 1) % views.length]
+                : event.key === 'ArrowLeft' ? views[(index + views.length - 1) % views.length] : null
               if (next) {
                 event.preventDefault()
                 setView(next)
@@ -135,10 +139,13 @@ function AccessContent() {
             }}
             className={`border-b-2 px-4 py-2 text-sm font-medium ${view === tab ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
           >
-            {tab === 'groups' ? 'Groups' : 'Policies'}
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>
         ))}
       </div>
+      {view === 'requests' && user?.role === 'admin' && <section role="tabpanel" id="access-requests-panel" aria-labelledby="access-requests-tab">
+        <AccessRequestsPanel showEmpty />
+      </section>}
       {view === 'groups' && <section role="tabpanel" id="access-groups-panel" aria-labelledby="access-groups-tab">
         <div className="flex items-center justify-between mb-4">
           <div>

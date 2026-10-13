@@ -98,7 +98,11 @@ def _login(client, email):
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
-REQUEST = {"resource_type": "requirement", "resource_ref": "APO-REQ-001", "project_prefix": "APO"}
+REQUEST = {
+    "resource_type": "requirement",
+    "resource_ref": "APO-REQ-001",
+    "project_prefix": "APO",
+}
 
 
 @pytest.fixture
@@ -106,7 +110,9 @@ def sent_mail(monkeypatch):
     """Capture the access request emails instead of sending them."""
     sent = []
     monkeypatch.setattr(
-        access_requests_api, "send_access_request_email", lambda **kwargs: sent.append(kwargs)
+        access_requests_api,
+        "send_access_request_email",
+        lambda **kwargs: sent.append(kwargs),
     )
     return sent
 
@@ -230,6 +236,46 @@ def test_nothing_about_the_resource_is_disclosed(harness, sent_mail):
     }
     assert response.json()["requester_email"] is None
     assert response.json()["requester_profile_picture_url"] is None
+
+
+def test_global_request_listing_preserves_admin_guard_and_refusal_lifecycle(harness, sent_mail):
+    client, session_maker = harness
+    admin = _user(session_maker, "boss@example.com", UserRole.admin)
+    member = _user(session_maker, "member@example.com")
+    member_headers = _login(client, "member@example.com")
+    admin_headers = _login(client, "boss@example.com")
+    created = client.post("/api/access-requests", json=REQUEST, headers=member_headers).json()
+    other = client.post(
+        "/api/access-requests",
+        json={**REQUEST, "resource_ref": "OTH-REQ-001", "project_prefix": "OTH"},
+        headers=member_headers,
+    ).json()
+    denied = client.get("/api/access-requests", headers=member_headers)
+    listed = client.get("/api/access-requests", headers=admin_headers)
+    assert denied.status_code == 403
+    assert listed.status_code == 200
+    assert {row["id"] for row in listed.json()} == {created["id"], other["id"]}
+    refused = client.post(
+        f"/api/access-requests/{created['id']}/decision",
+        json={"decision": "refused"},
+        headers=admin_headers,
+    )
+    assert refused.status_code == 200 and refused.json()["status"] == "refused"
+    pending = client.get("/api/access-requests", headers=admin_headers)
+    history = client.get(
+        "/api/access-requests", params={"status": "refused"}, headers=admin_headers
+    )
+    assert [row["id"] for row in pending.json()] == [other["id"]]
+    assert [row["id"] for row in history.json()] == [created["id"]]
+    repeated = client.post(
+        f"/api/access-requests/{created['id']}/decision",
+        json={"decision": "granted"},
+        headers=admin_headers,
+    )
+    assert repeated.status_code == 409
+    [event] = _events(session_maker, "access.refused")
+    assert event.actor_user_id == admin.id
+    assert event.details["requester_user_id"] == member.id
 
 
 def test_an_anonymous_client_cannot_request(harness):

@@ -68,6 +68,7 @@ vi.mock('../api/client', () => ({
     list: vi.fn().mockResolvedValue([{ id: 4, name: 'Field', created_at: '' }]),
     create: vi.fn().mockResolvedValue({ id: 5, name: 'Lab', created_at: '' }),
   },
+  accessRequestsApi: { list: vi.fn().mockResolvedValue([]), decide: vi.fn() },
 }))
 vi.mock('../components/useToast', () => ({
   useToast: () => ({ saved: vi.fn(), deleted: vi.fn(), failed, notify: vi.fn() }),
@@ -94,6 +95,30 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('Groups and policies administration', () => {
+  it('shows the Requests tab for admins with a visible empty state and keyboard navigation', async () => {
+    renderPage('policies')
+    const policiesTab = screen.getByRole('tab', { name: 'Policies' })
+    fireEvent.keyDown(policiesTab, { key: 'End' })
+    expect(await screen.findByText('No pending requests.')).toBeTruthy()
+    expect(api.accessRequestsApi.list).toHaveBeenCalledWith({ status: 'pending' })
+    const requestsTab = screen.getByRole('tab', { name: 'Requests' })
+    expect(requestsTab.getAttribute('aria-selected')).toBe('true')
+    fireEvent.keyDown(requestsTab, { key: 'ArrowRight' })
+    expect(policiesTab.getAttribute('aria-selected')).toBe('true')
+    fireEvent.keyDown(policiesTab, { key: 'ArrowLeft' })
+    expect(requestsTab.getAttribute('aria-selected')).toBe('true')
+    fireEvent.keyDown(requestsTab, { key: 'Home' })
+    expect(policiesTab.getAttribute('aria-selected')).toBe('true')
+  })
+
+  it('keeps request listing restricted to admins even for an Access policy holder', async () => {
+    auth.user.role = 'maintainer'
+    auth.user.application_permissions = { access: ['view'] }
+    renderPage('policies')
+    await screen.findByTitle('View Read')
+    expect(screen.queryByRole('tab', { name: 'Requests' })).toBeNull()
+    expect(api.accessRequestsApi.list).not.toHaveBeenCalled()
+  })
   it('sorts policy names in either direction without changing cached policy data', async () => {
     renderPage('policies')
     await screen.findByTitle('Edit Field Auditor')
@@ -197,6 +222,9 @@ describe('Groups and policies administration', () => {
     fireEvent.keyDown(groupsTab, { key: 'Home' })
     expect(document.activeElement).toBe(policiesTab)
     fireEvent.keyDown(policiesTab, { key: 'End' })
+    const requestsTab = screen.getByRole('tab', { name: 'Requests' })
+    expect(document.activeElement).toBe(requestsTab)
+    fireEvent.keyDown(requestsTab, { key: 'ArrowLeft' })
     expect(document.activeElement).toBe(groupsTab)
     fireEvent.keyDown(groupsTab, { key: 'ArrowLeft' })
     expect(document.activeElement).toBe(policiesTab)

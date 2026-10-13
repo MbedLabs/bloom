@@ -218,7 +218,7 @@ Administrators read the log under Audit log in the sidebar, or with `GET /api/au
 
 The client address is the one the image's own nginx received. Behind another reverse proxy (Cloudron, a load balancer) it is that proxy's address.
 
-Access requests are emailed to every active administrator through the transactional mail settings above; without SMTP the request is still recorded and shown on the project's members page, and the user is told the email could not be sent.
+Access requests are emailed to every active administrator through the transactional mail settings above; without SMTP the request is still recorded and shown under Access, Requests and on the project's members page, and the user is told the email could not be sent.
 
 Retention is the operator's choice. The application never deletes events; to remove old ones, run on a schedule:
 
