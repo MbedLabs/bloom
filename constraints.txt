@@ -6,7 +6,7 @@
 #
 aiofiles==25.1.0
     # via bloom-app (pyproject.toml)
-alembic==1.19.2
+alembic==1.20.0
     # via bloom-app (pyproject.toml)
 annotated-doc==0.0.5
     # via fastapi
@@ -23,9 +23,9 @@ bcrypt==3.2.2
     # via
     #   bloom-app (pyproject.toml)
     #   passlib
-boto3==1.43.101
+boto3==1.43.108
     # via bloom-app (pyproject.toml)
-botocore==1.43.101
+botocore==1.43.108
     # via
     #   boto3
     #   s3transfer
@@ -39,7 +39,7 @@ cffi==2.1.1
     #   cryptography
 click==8.5.0
     # via uvicorn
-cryptography==50.0.1
+cryptography==50.0.2
     # via bloom-app (pyproject.toml)
 defusedxml==0.7.1
     # via
@@ -53,9 +53,9 @@ email-validator==2.3.0
     # via pydantic
 fastapi==0.141.1
     # via bloom-app (pyproject.toml)
-fonttools==4.64.0
+fonttools==4.65.0
     # via fpdf2
-fpdf2==2.8.8
+fpdf2==2.8.9
     # via bloom-app (pyproject.toml)
 greenlet==3.5.6
     # via
@@ -71,7 +71,7 @@ httptools==0.8.0
     # via uvicorn
 httpx==0.28.1
     # via bloom-app (pyproject.toml)
-idna==3.19
+idna==3.20
     # via
     #   anyio
     #   email-validator
@@ -82,9 +82,9 @@ jmespath==1.1.0
     #   botocore
 limits==5.8.0
     # via slowapi
-mako==1.4.1
+mako==1.4.3
     # via alembic
-markupsafe==3.0.3
+markupsafe==3.0.4
     # via mako
 packaging==26.3
     # via limits
@@ -109,7 +109,7 @@ pyjwt==2.15.1
     # via bloom-app (pyproject.toml)
 python-dateutil==2.9.0.post0
     # via botocore
-python-dotenv==1.2.3
+python-dotenv==1.2.4
     # via
     #   pydantic-settings
     #   uvicorn
@@ -123,11 +123,11 @@ six==1.17.0
     # via python-dateutil
 slowapi==0.1.10
     # via bloom-app (pyproject.toml)
-sqlalchemy==2.0.53
+sqlalchemy==2.0.54
     # via
     #   alembic
     #   bloom-app (pyproject.toml)
-starlette==1.6.0
+starlette==1.7.0
     # via fastapi
 typing-extensions==4.16.0
     # via
@@ -147,13 +147,13 @@ typing-inspection==0.4.4
     #   pydantic-settings
 urllib3==2.8.0
     # via botocore
-uvicorn==0.52.4
+uvicorn==0.54.0
     # via bloom-app (pyproject.toml)
 uvloop==0.22.1
     # via uvicorn
-watchfiles==1.2.0
+watchfiles==1.3.0
     # via uvicorn
 websockets==16.1
     # via uvicorn
-wrapt==2.4.1
+wrapt==2.5.0
     # via deprecated
