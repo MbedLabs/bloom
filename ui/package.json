@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.20",
-    "@tanstack/react-query": "^5.104.0",
+    "@tanstack/react-query": "^5.104.1",
     "@tiptap/core": "^3.31.3",
     "@tiptap/extension-code-block-lowlight": "^3.31.3",
     "@tiptap/extension-highlight": "^3.31.3",
@@ -67,7 +67,7 @@
     "tailwindcss": "^4.3.3",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.71.0",
+    "typescript-eslint": "^8.71.1",
     "vite": "^7.3.6",
     "vitest": "^4.1.11"
   },
