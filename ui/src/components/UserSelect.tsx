@@ -57,7 +57,7 @@ export default function UserSelect({ value, onChange, users, label, emptyLabel =
       {selected.user ? <UserIdentity user={selected.user} /> : selected.label}
       <ChevronDown className="h-4 w-4 shrink-0" />
     </button>
-    {open && <div ref={list} id={`${id}-list`} role="listbox" aria-label={label} className="absolute z-50 mt-1 max-h-64 w-full min-w-48 overflow-auto rounded-md border border-border bg-card p-1 shadow-elegant">
+    {open && <div ref={list} id={`${id}-list`} role="listbox" aria-label={label} className="themed-scrollbar absolute z-50 mt-1 max-h-64 w-full min-w-48 overflow-auto rounded-md border border-border bg-card p-1 shadow-elegant">
       {choices.map((choice, index) => <button type="button" role="option" id={`${id}-${index}`} key={choice.value}
         aria-selected={choice.value === value} tabIndex={-1}
         className={`block w-full rounded px-2 py-1.5 text-left text-sm ${index === active ? 'bg-primary/10 text-primary' : 'hover:bg-accent'}`}

@@ -1,3 +1,4 @@
+import DateField from '../components/DateField'
 import SelectField from '../components/SelectField'
 import UserSelect from '../components/UserSelect'
 import UserIdentity from '../components/UserIdentity'
@@ -8,7 +9,6 @@ import { format } from 'date-fns'
 import {
   ArrowLeft,
   BookOpen,
-  Calendar,
   Filter,
   Plus,
   Search,
@@ -881,22 +881,11 @@ function DatePickerField({
   emptyLabel: string
   onChange: (value: string) => void
 }) {
-  const displayValue = value ? format(new Date(`${value}T00:00:00`), 'MMM d, yyyy') : emptyLabel
-
   return (
     <label className="space-y-1">
       <span className="text-xs font-medium uppercase text-muted-foreground">{label}</span>
-      <span className="relative flex w-full items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-accent/40 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring">
-        <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span className={value ? 'text-foreground' : 'text-muted-foreground'}>{displayValue}</span>
-        <input
-          type="date"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-          aria-label={label}
-        />
-      </span>
+      <DateField label={label} value={value} onChange={onChange} placeholder={emptyLabel}
+        className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-accent/40" />
     </label>
   )
 }
