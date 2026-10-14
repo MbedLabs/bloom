@@ -1,3 +1,4 @@
+import SelectField from '../components/SelectField'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Copy, Edit2, Eye, Plus, Trash2, X } from 'lucide-react'
@@ -463,13 +464,13 @@ function PolicyModal({ policy, tags, readOnly = false, onClose, onSaved }: {
           <input value={description} onChange={(event) => setDescription(event.target.value)} readOnly={readOnly} title="Description" className={inputClass} />
         </label>
         <label className="block text-sm font-medium text-foreground">Assignment scope
-          <select disabled={readOnly} value={scope} title="Assignment scope" className={inputClass} onChange={(event) => {
+          <SelectField disabled={readOnly} value={scope} title="Assignment scope" className={inputClass} onChange={(event) => {
             const nextScope = event.target.value as PolicyScope
             setScope(nextScope)
             setRules((current) => Object.fromEntries(Object.entries(current).filter(([resource]) => resourcesFor(nextScope).includes(resource))))
           }}>
             {Object.entries(SCOPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
+          </SelectField>
         </label>
         <p className="text-xs text-muted-foreground">Write includes Read. Review, Approve and Delete are separate permissions.</p>
         <div className="overflow-x-auto">

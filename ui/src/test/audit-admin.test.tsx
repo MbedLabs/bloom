@@ -1,3 +1,4 @@
+import { changeControl } from './change-control'
 import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
@@ -64,8 +65,8 @@ describe('Audit log admin screen', () => {
   it('filters by event group and outcome from the first page', async () => {
     renderPage()
     await screen.findByText('Ada Admin')
-    fireEvent.change(screen.getByLabelText('Events'), { target: { value: 'auth.' } })
-    fireEvent.change(screen.getByLabelText('Outcome'), { target: { value: 'failure' } })
+    changeControl(screen.getByLabelText('Events'), { target: { value: 'auth.' } })
+    changeControl(screen.getByLabelText('Outcome'), { target: { value: 'failure' } })
     await waitFor(() =>
       expect(api.auditApi.list).toHaveBeenLastCalledWith(
         expect.objectContaining({ action: 'auth.', outcome: 'failure', offset: 0 }),
@@ -77,7 +78,7 @@ describe('Audit log admin screen', () => {
     vi.mocked(api.auditApi.list).mockResolvedValue({ ...page, total: 60 })
     renderPage()
     await screen.findByText('Ada Admin')
-    fireEvent.change(screen.getByLabelText('Outcome'), { target: { value: 'failure' } })
+    changeControl(screen.getByLabelText('Outcome'), { target: { value: 'failure' } })
     await waitFor(() => expect((screen.getByRole('button', { name: 'Next' }) as HTMLButtonElement).disabled).toBe(false))
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     await waitFor(() => expect(api.auditApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 50 })))

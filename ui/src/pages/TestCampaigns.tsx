@@ -1,3 +1,4 @@
+import SelectField from '../components/SelectField'
 import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useMemo, useState } from 'react'
 import TagPicker from '../components/TagPicker'
@@ -281,7 +282,7 @@ export default function TestCampaigns() {
                   className="w-full pl-8 pr-3 py-1.5 bg-background border border-input rounded-md text-sm focus:ring-2 focus:ring-ring"
                 />
               </div>
-              <select
+              <SelectField
                 aria-label="Filter by status"
                 value={statusFilter}
                 onChange={(e) => updateParams({ status: e.target.value })}
@@ -289,16 +290,16 @@ export default function TestCampaigns() {
               >
                 <option value="">All statuses</option>
                 {CAMPAIGN_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+              </SelectField>
               <div className="flex items-center gap-1">
-                <select
+                <SelectField
                   aria-label="Sort by"
                   value={sortField}
                   onChange={(e) => updateParams({ sort: e.target.value as CampaignSortField })}
                   className="px-3 py-1.5 bg-background border border-input rounded-md text-sm focus:ring-2 focus:ring-ring"
                 >
                   {SORT_OPTIONS.map((o) => <option key={o.field} value={o.field}>{o.label}</option>)}
-                </select>
+                </SelectField>
                 <button
                   onClick={() => setSortDir((d) => d === 'asc' ? 'desc' : 'asc')}
                   className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
@@ -375,14 +376,14 @@ export default function TestCampaigns() {
                 {!external && (
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">Origin</label>
-                  <select
+                  <SelectField
                     value={form.visibility}
                     onChange={(e) => setForm({ ...form, visibility: e.target.value })}
                     className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
                   >
                     <option value="internal">Internal</option>
                     <option value="customer">Customer</option>
-                  </select>
+                  </SelectField>
                   <TagPicker projectId={projectId} value={campaignTagIds} onChange={setCampaignTagIds} showLabel={false} />
                 </div>
                 )}
@@ -482,14 +483,14 @@ export default function TestCampaigns() {
                 {!external && (
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">Origin</label>
-                  <select
+                  <SelectField
                     value={suiteForm.visibility}
                     onChange={(e) => setSuiteForm({ ...suiteForm, visibility: e.target.value })}
                     className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
                   >
                     <option value="internal">Internal</option>
                     <option value="customer">Customer</option>
-                  </select>
+                  </SelectField>
                   <TagPicker projectId={projectId} value={suiteTagIds} onChange={setSuiteTagIds} showLabel={false} />
                 </div>
                 )}

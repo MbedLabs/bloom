@@ -1,3 +1,4 @@
+import { changeControl } from './change-control'
 import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
@@ -736,7 +737,7 @@ describe('the Jira tracker of a project', () => {
       target: { value: 'customfield_1' },
     })
     fireEvent.change(screen.getByPlaceholderText(/created >=/), { target: { value: 'priority = High' } })
-    fireEvent.change(screen.getByLabelText('Bloom priority for Jira Lowest'), {
+    changeControl(screen.getByLabelText('Bloom priority for Jira Lowest'), {
       target: { value: 'Medium' },
     })
     fireEvent.click(screen.getByLabelText(/create a defect for each new matching issue/i))

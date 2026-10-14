@@ -1,3 +1,4 @@
+import SelectField from './SelectField'
 import UserIdentity from './UserIdentity'
 import { parameterKeyHref } from '../utils/parameters'
 import { useState } from 'react'
@@ -442,7 +443,7 @@ function TcsEditorRow({
                 {row.collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </button>
             )}
-            <select
+            <SelectField
               value={row.row_type}
               onChange={(event) => {
                 const rowType = event.target.value as TcsRowType
@@ -456,7 +457,7 @@ function TcsEditorRow({
               {TCS_ROW_TYPE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
-            </select>
+            </SelectField>
           </div>
         </div>
       </div>

@@ -1,3 +1,4 @@
+import SelectField from '../components/SelectField'
 import UserSelect from '../components/UserSelect'
 import UserIdentity from '../components/UserIdentity'
 import { useMemo, useState, useEffect } from 'react'
@@ -583,7 +584,7 @@ export default function Documents() {
               className="w-full rounded-md border border-input bg-background py-1.5 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring"
             />
           </div>
-          <select
+          <SelectField
             value={sortField}
             onChange={(event) => {
               const nextSort = event.target.value as SortField
@@ -595,7 +596,7 @@ export default function Documents() {
             {visibleSortOptions.map((option) => (
               <option key={option.field} value={option.field}>Sort by {option.label}</option>
             ))}
-          </select>
+          </SelectField>
           <FiltersToggle
             open={filtersOpen}
             active={hasActiveFilters}
@@ -660,7 +661,7 @@ export default function Documents() {
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
             <label className="space-y-1">
               <span className="text-xs font-medium uppercase text-muted-foreground">Priority / Severity</span>
-              <select
+              <SelectField
                 value={priorityFilter}
                 onChange={(event) => updateRegistryParams({ priority: event.target.value })}
                 className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
@@ -669,7 +670,7 @@ export default function Documents() {
                 {PRIORITY_OPTIONS.map((priority) => (
                   <option key={priority} value={priority}>{priority}</option>
                 ))}
-              </select>
+              </SelectField>
             </label>
 
             <label className="space-y-1">
@@ -679,7 +680,7 @@ export default function Documents() {
 
             <label className="space-y-1">
               <span className="text-xs font-medium uppercase text-muted-foreground">Links</span>
-              <select
+              <SelectField
                 value={linkFilter}
                 onChange={(event) => updateRegistryParams({ links: event.target.value as LinkFilter })}
                 className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
@@ -687,7 +688,7 @@ export default function Documents() {
                 {LINK_FILTER_OPTIONS.map((option) => (
                   <option key={option.code} value={option.code}>{option.label}</option>
                 ))}
-              </select>
+              </SelectField>
             </label>
           </div>
 
@@ -849,7 +850,7 @@ export default function Documents() {
                 </span>
                 <div className="flex items-center gap-1.5 text-muted-foreground">
                   <span className="text-xs">Rows:</span>
-                  <select
+                  <SelectField
                     value={pageSize}
                     onChange={(e) => setPageSize(Number(e.target.value))}
                     className="text-xs border border-border rounded bg-background px-2 py-1 focus:outline-hidden focus:ring-1 focus:ring-primary"
@@ -857,7 +858,7 @@ export default function Documents() {
                     {PAGE_SIZE_OPTIONS.map((s) => (
                       <option key={s} value={s}>{s}</option>
                     ))}
-                  </select>
+                  </SelectField>
                 </div>
               </div>
               <Pager page={page} totalPages={totalPages} setPage={setPage} />

@@ -1,3 +1,4 @@
+import SelectField from './SelectField'
 import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
@@ -128,7 +129,7 @@ export default function TestRailImport({
             {MAPPED_FIELDS.map((f) => (
               <label key={f.key} className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                 {f.label}
-                <select
+                <SelectField
                   aria-label={f.label}
                   value={mapping[f.key] ?? ''}
                   onChange={(e) => setMapping((m) => ({ ...m, [f.key]: e.target.value }))}
@@ -138,7 +139,7 @@ export default function TestRailImport({
                   {columns.map((c) => (
                     <option key={c} value={c}>{c}</option>
                   ))}
-                </select>
+                </SelectField>
               </label>
             ))}
           </div>

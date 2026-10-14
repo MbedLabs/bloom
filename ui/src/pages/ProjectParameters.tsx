@@ -1,3 +1,4 @@
+import SelectField from '../components/SelectField'
 import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
@@ -181,7 +182,7 @@ export default function ProjectParameters() {
           <form onSubmit={onCreate} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Kind</label>
-              <select
+              <SelectField
                 value={createForm.kind}
                 onChange={(e) => setCreateForm({ ...createForm, kind: e.target.value as ProjectVariable['kind'] })}
                 title="Select item kind"
@@ -189,7 +190,7 @@ export default function ProjectParameters() {
               >
                 <option value="variable">Variable</option>
                 <option value="parameter">Parameter</option>
-              </select>
+              </SelectField>
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Key</label>
@@ -259,7 +260,7 @@ export default function ProjectParameters() {
                   editingId === item.id ? (
                     <tr key={item.id} className="bg-accent/30">
                       <Td>
-                        <select
+                        <SelectField
                           value={editForm.kind}
                           onChange={(e) => setEditForm({ ...editForm, kind: e.target.value as ProjectVariable['kind'] })}
                           title="Select item kind"
@@ -267,7 +268,7 @@ export default function ProjectParameters() {
                         >
                           <option value="variable">Variable</option>
                           <option value="parameter">Parameter</option>
-                        </select>
+                        </SelectField>
                       </Td>
                       <Td>
                         <input

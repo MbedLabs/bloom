@@ -1,3 +1,4 @@
+import { changeControl, optionValues } from './change-control'
 import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
@@ -184,10 +185,10 @@ describe('the document registry', () => {
     await screen.findAllByText('VCU-REQ-001')
     fireEvent.click(screen.getAllByRole('button', { name: /^Filters/ })[0])
 
-    fireEvent.change(await screen.findByLabelText(/Priority/i), { target: { value: 'Low' } })
+    changeControl(await screen.findByLabelText(/Priority/i), { target: { value: 'Low' } })
     fireEvent.click(screen.getByRole('combobox', { name: 'Reviewer' }))
     fireEvent.click(screen.getByRole('option', { name: 'Any assigned' }))
-    fireEvent.change(screen.getByLabelText(/Links/i), { target: { value: 'suspect' } })
+    changeControl(screen.getByLabelText(/Links/i), { target: { value: 'suspect' } })
 
     await waitFor(() => {
       const [, params] = lastCall(client.docsApi.list) as [
@@ -360,15 +361,15 @@ describe('the traceability matrix', () => {
     renderAt('/projects/:prefix/traceability', '/projects/VCU/traceability', <TraceabilityMatrix />)
     await screen.findAllByText(/VCU-REQ-001/i)
 
-    const filters = screen.getAllByRole('combobox')
-    fireEvent.change(filters[0], { target: { value: 'Uncovered' } })
+    fireEvent.click(screen.getByRole('button', { name: /Filters/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Partial' }))
 
     await waitFor(() => {
       const [, params] = lastCall(client.traceabilityApi.getMatrix) as [
         number,
         { coverage_filter?: string },
       ]
-      expect(params.coverage_filter).toBe('Uncovered')
+      expect(params.coverage_filter).toBe('Partial')
     })
   })
 
@@ -427,7 +428,7 @@ describe('creating a document', () => {
       ['Select priority', 'Priority'].includes(element.getAttribute('title') ?? '')
     )
     expect(priorities).toHaveLength(1)
-    fireEvent.change(priorities[0], { target: { value: 'High' } })
+    changeControl(priorities[0], { target: { value: 'High' } })
     expect((priorities[0] as HTMLSelectElement).value).toBe('High')
   })
 
@@ -442,7 +443,7 @@ describe('creating a document', () => {
   it.each(['SPEC', 'PRT', 'RPT', 'STD'])('offers and submits only Draft when creating a %s', async (type) => {
     renderAt('/projects/:prefix/docs/new', `/projects/VCU/docs/new?type=${type}`, <DocCreate />)
     const status = await screen.findByTitle('Select status') as HTMLSelectElement
-    expect([...status.options].map((option) => option.value)).toEqual(['Draft'])
+    expect(optionValues(status)).toEqual(['Draft'])
     expect(status.value).toBe('Draft')
 
     fireEvent.change(screen.getByPlaceholderText('Untitled'), { target: { value: `New ${type}` } })
@@ -570,7 +571,7 @@ describe('editing an existing document', () => {
 
     await rowAnswered()
     const status = await screen.findByTitle('Select status') as HTMLSelectElement
-    expect([...status.options].map((option) => option.value)).toEqual(choices)
+    expect(optionValues(status)).toEqual(choices)
   })
 
   function renderEdit() {
@@ -956,7 +957,7 @@ describe('project settings', () => {
     vi.mocked(client.groupsApi.assignmentOptions).mockResolvedValue({ projects: [project], users: [{ id: 99, email: 'additional@example.com', full_name: 'Additional Contributor', role: 'maintainer' }] })
     renderProjectEdit()
     const roster = within(await screen.findByRole('region', { name: 'Developers' }))
-    fireEvent.click(roster.getByRole('button', { name: 'Choose people' }))
+    fireEvent.click(roster.getByRole('button', { name: 'Select members' }))
     fireEvent.click(roster.getByRole('checkbox', { name: 'Select Additional Contributor' }))
     fireEvent.click(roster.getByRole('button', { name: 'Save selection' }))
     await waitFor(() => expect(client.groupsApi.assign).toHaveBeenCalledWith(10, project.id, [99]))
@@ -1024,7 +1025,7 @@ describe('a campaign in detail', () => {
     await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
-    fireEvent.change(await screen.findByLabelText(/status/i), { target: { value: 'Completed' } })
+    changeControl(await screen.findByLabelText(/status/i), { target: { value: 'Completed' } })
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
     await waitFor(() => {
@@ -1305,7 +1306,7 @@ describe('the changes one artefact allows', () => {
     expect(screen.queryByTitle('Select visibility')).toBeNull()
     expect(screen.queryByTitle('Origin')).toBeNull()
     const status = screen.getByTitle('Select status') as HTMLSelectElement
-    expect([...status.options].map((option) => option.value)).toEqual(['Draft'])
+    expect(optionValues(status)).toEqual(['Draft'])
 
     fireEvent.change(screen.getByPlaceholderText('Untitled'), { target: { value: 'Boots' } })
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }))

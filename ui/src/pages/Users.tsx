@@ -1,3 +1,4 @@
+import SelectField from '../components/SelectField'
 import ProfilePicture from '../components/ProfilePicture'
 import UserIdentity from '../components/UserIdentity'
 import { useState } from 'react'
@@ -184,7 +185,7 @@ export default function UsersPage() {
                   </td>
                   <td className="px-4 py-3">
                     {editingUser === u.id ? (
-                      <select
+                      <SelectField
                         defaultValue={u.role}
                         onChange={(e) => updateMutation.mutate({ id: u.id, data: { role: e.target.value as 'maintainer' | 'external' | 'admin' } })}
                         className="px-2 py-1 text-xs border border-input rounded bg-background text-foreground"
@@ -196,7 +197,7 @@ export default function UsersPage() {
                         )}
                         <option value="maintainer">Maintainer</option>
                         <option value="external">Viewer</option>
-                      </select>
+                      </SelectField>
                     ) : (
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold ${roleConf?.color || ''}`}>
                         <roleConf.icon className="h-3 w-3" />
@@ -475,11 +476,11 @@ function InviteUserModal({ onClose, onSubmit, isLoading, error }: {
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Role</label>
-            <select value={role} onChange={(e) => setRole(e.target.value)} title="Role" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground">
+            <SelectField value={role} onChange={(e) => setRole(e.target.value)} title="Role" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground">
               <option value="external">Viewer</option>
               <option value="maintainer">Maintainer</option>
               <option value="admin">Admin</option>
-            </select>
+            </SelectField>
           </div>
           <button type="submit" disabled={isLoading} className="w-full py-2 bg-linear-to-r/srgb from-primary to-[#6b7280] text-white text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50">
             {isLoading ? 'Sending Invite...' : 'Send Invite'}

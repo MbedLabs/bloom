@@ -1,3 +1,4 @@
+import SelectField from '../components/SelectField'
 import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useMemo, useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router'
@@ -216,7 +217,7 @@ export default function Defects() {
               className="w-full rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring"
             />
           </div>
-          <select
+          <SelectField
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
             title="Filter by status"
@@ -228,8 +229,8 @@ export default function Defects() {
                 {s}
               </option>
             ))}
-          </select>
-          <select
+          </SelectField>
+          <SelectField
             value={filterSeverity}
             onChange={(e) => setFilterSeverity(e.target.value)}
             title="Filter by severity"
@@ -241,7 +242,7 @@ export default function Defects() {
                 {s}
               </option>
             ))}
-          </select>
+          </SelectField>
         </div>
       </section>
 
@@ -274,7 +275,7 @@ export default function Defects() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Severity</label>
-                <select
+                <SelectField
                   value={form.severity}
                   onChange={(e) => setForm({ ...form, severity: e.target.value })}
                   title="Severity"
@@ -285,11 +286,11 @@ export default function Defects() {
                       {s}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Priority</label>
-                <select
+                <SelectField
                   value={form.priority}
                   onChange={(e) => setForm({ ...form, priority: e.target.value })}
                   title="Priority"
@@ -300,7 +301,7 @@ export default function Defects() {
                       {s}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               </div>
             </div>
 
@@ -309,7 +310,7 @@ export default function Defects() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">Tracker</label>
-                  <select
+                  <SelectField
                     value={form.external_tracker}
                     onChange={(e) => setForm({ ...form, external_tracker: e.target.value })}
                     title="External tracker"
@@ -318,7 +319,7 @@ export default function Defects() {
                     <option value="">None</option>
                     <option value="github">GitHub</option>
                     <option value="gitlab">GitLab</option>
-                  </select>
+                  </SelectField>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">Repository</label>

@@ -1,3 +1,4 @@
+import SelectField from '../components/SelectField'
 import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useMemo, useState } from 'react'
 import { useParams } from 'react-router'
@@ -189,20 +190,21 @@ export default function Baselines() {
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Project</label>
+                <label htmlFor="baseline-project" className="block text-sm font-medium text-foreground mb-1">Project</label>
                 {scopedProjectId ? (
                   <input
+                    id="baseline-project"
                     value={project?.name ?? `Project #${scopedProjectId}`}
                     className="w-full px-3 py-2 bg-muted border border-input rounded-md text-muted-foreground"
                     disabled
                   />
                 ) : (
-                  <select value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md" required>
+                  <SelectField id="baseline-project" value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md" required>
                     <option value="">Select project</option>
                     {(projects ?? []).map((projectOption) => (
                       <option key={projectOption.id} value={projectOption.id}>{projectOption.name}</option>
                     ))}
-                  </select>
+                  </SelectField>
                 )}
               </div>
               <div>
@@ -211,12 +213,12 @@ export default function Baselines() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Type</label>
-                <select value={form.baseline_type} onChange={(e) => setForm({ ...form, baseline_type: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md">
+                <SelectField value={form.baseline_type} onChange={(e) => setForm({ ...form, baseline_type: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md">
                   <option>Milestone</option>
                   <option>Release</option>
                   <option>Audit</option>
                   <option>Review</option>
-                </select>
+                </SelectField>
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Description</label>

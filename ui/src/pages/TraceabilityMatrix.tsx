@@ -1,3 +1,4 @@
+import SelectField from '../components/SelectField'
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
@@ -257,7 +258,7 @@ export default function TraceabilityMatrix() {
         <div className="grid grid-cols-1 gap-2 border-b border-border p-3 md:grid-cols-[minmax(180px,1fr)_auto]">
           <label className="space-y-1">
             <span className="sr-only">Sort traceability rows</span>
-            <select
+            <SelectField
               value={sortBy}
               onChange={(event) => setSortBy(event.target.value)}
               className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
@@ -267,7 +268,7 @@ export default function TraceabilityMatrix() {
                   Sort by {option.label}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </label>
           <FiltersToggle
             open={filtersOpen}
@@ -325,7 +326,7 @@ export default function TraceabilityMatrix() {
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
               <label className="space-y-1">
                 <span className="text-xs font-medium uppercase text-muted-foreground">Priority</span>
-                <select
+                <SelectField
                   value={priorityFilter}
                   onChange={(event) => setPriorityFilter(event.target.value)}
                   className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
@@ -336,7 +337,7 @@ export default function TraceabilityMatrix() {
                       {priority}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               </label>
             </div>
           </div>

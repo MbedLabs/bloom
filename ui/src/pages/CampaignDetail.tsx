@@ -1,3 +1,4 @@
+import SelectField from '../components/SelectField'
 import { refreshProjectViews, finishArtefactDeletion } from '../lib/refreshProjectViews'
 import WorkflowPanel from '../components/WorkflowPanel'
 import { useState, useEffect, useRef } from 'react'
@@ -217,15 +218,15 @@ export default function CampaignDetail({
               {!external && (
               <div>
                 <label htmlFor="edit-status" className="block text-sm font-medium text-foreground mb-1">Status</label>
-                <select id="edit-status" value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring">
+                <SelectField id="edit-status" value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring">
                   {CAMPAIGN_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
+                </SelectField>
               </div>
               )}
               {!external && (
               <div>
                 <label htmlFor="edit-visibility" className="block text-sm font-medium text-foreground mb-1">Visibility</label>
-                <select
+                <SelectField
                   id="edit-visibility"
                   value={editForm.visibility}
                   onChange={(e) => setEditForm({ ...editForm, visibility: e.target.value })}
@@ -233,7 +234,7 @@ export default function CampaignDetail({
                 >
                   <option value="internal">Internal</option>
                   <option value="customer">Customer</option>
-                </select>
+                </SelectField>
               </div>
               )}
               <div className="flex justify-end gap-2 pt-2">

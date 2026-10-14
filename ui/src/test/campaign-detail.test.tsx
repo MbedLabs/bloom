@@ -1,3 +1,4 @@
+import { changeControl } from './change-control'
 import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
@@ -276,7 +277,7 @@ describe('editing a campaign', () => {
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Final sweep' } })
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Sign-off run' } })
-    fireEvent.change(screen.getByLabelText('Visibility'), { target: { value: 'customer' } })
+    changeControl(screen.getByLabelText('Visibility'), { target: { value: 'customer' } })
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
     await waitFor(() =>

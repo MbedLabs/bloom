@@ -1,3 +1,4 @@
+import { changeControl, optionValues } from './change-control'
 import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -177,9 +178,9 @@ describe('controlled creation metadata', () => {
     vi.mocked(client.tagsApi.scope).mockResolvedValue({ limited: true, tags: [{ id: 4, name: 'Field', created_at: '' }] })
     renderAt('/projects/:prefix/docs/new', `/projects/VCU/docs/new?type=${type}`, <DocCreate />)
     const status = await screen.findByTitle('Select status') as HTMLSelectElement
-    expect([...status.options].map(option => option.value)).toEqual(['Draft'])
+    expect(optionValues(status)).toEqual(['Draft'])
     await screen.findByRole('button', { name: 'Field' })
-    fireEvent.change(screen.getByTitle('Select origin'), { target: { value: type === 'REQ' ? 'Customer' : 'customer' } })
+    changeControl(screen.getByTitle('Select origin'), { target: { value: type === 'REQ' ? 'Customer' : 'customer' } })
     expect(screen.queryByTitle('Select visibility')).toBeNull()
     expect(screen.getAllByText('Origin', { exact: true })).toHaveLength(1)
     fireEvent.change(screen.getByPlaceholderText('Untitled'), { target: { value: 'Initial Draft' } })

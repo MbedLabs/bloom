@@ -1,3 +1,4 @@
+import SelectField from '../components/SelectField'
 import { DOC_TYPE_SLUGS } from '../types/doc'
 import { refreshProjectViews, finishArtefactDeletion } from '../lib/refreshProjectViews'
 import ProfilePicture from '../components/ProfilePicture'
@@ -510,9 +511,9 @@ export default function ArtefactDetail({
               <div key={field.key}>
                 <label className="block text-sm font-medium text-foreground mb-1">{field.label}</label>
                 {'options' in field && field.options ? (
-                  <select value={form[field.key] ?? ''} onChange={(e) => setForm({ ...form, [field.key]: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md">
+                  <SelectField value={form[field.key] ?? ''} onChange={(e) => setForm({ ...form, [field.key]: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md">
                     {field.options.map((option: string) => <option key={option}>{option}</option>)}
-                  </select>
+                  </SelectField>
                 ) : (
                   <input value={form[field.key] ?? ''} onChange={(e) => setForm({ ...form, [field.key]: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md" />
                 )}

@@ -1,3 +1,4 @@
+import SelectField from './SelectField'
 import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -501,7 +502,7 @@ function JiraFields(props: {
           {JIRA_PRIORITIES.map((jira) => (
             <label key={jira} className="text-xs text-muted-foreground">
               {jira}
-              <select
+              <SelectField
                 aria-label={`Bloom priority for Jira ${jira}`}
                 value={props.priorityMap[jira]}
                 onChange={(e) => props.onPriorityMap({ ...props.priorityMap, [jira]: e.target.value })}
@@ -512,7 +513,7 @@ function JiraFields(props: {
                     {level}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </label>
           ))}
         </div>

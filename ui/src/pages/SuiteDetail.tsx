@@ -1,3 +1,4 @@
+import SelectField from '../components/SelectField'
 import { refreshProjectViews, finishArtefactDeletion } from '../lib/refreshProjectViews'
 import WorkflowPanel from '../components/WorkflowPanel'
 import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
@@ -277,14 +278,14 @@ export default function SuiteDetail({
             {!external && (
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Visibility</label>
-              <select
+              <SelectField
                 value={editForm.visibility}
                 onChange={(e) => setEditForm({ ...editForm, visibility: e.target.value })}
                 className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring"
               >
                 <option value="internal">Internal</option>
                 <option value="customer">Customer</option>
-              </select>
+              </SelectField>
             </div>
             )}
             <div className="flex justify-end gap-2">

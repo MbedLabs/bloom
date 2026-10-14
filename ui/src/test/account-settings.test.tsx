@@ -1,3 +1,4 @@
+import { changeControl } from './change-control'
 import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
@@ -242,7 +243,7 @@ describe('appearance and region', () => {
     renderSettings()
 
     const picker = screen.getAllByRole('combobox')[0]
-    fireEvent.change(picker, { target: { value: 'Etc/GMT+5' } })
+    changeControl(picker, { target: { value: 'Etc/GMT+5' } })
 
     expect(window.localStorage.getItem('bloom-timezone')).toBe('Etc/GMT+5')
     // Dates are formatted all over the app, so the page reloads rather than

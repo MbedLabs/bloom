@@ -1,3 +1,4 @@
+import SelectField from '../components/SelectField'
 import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
@@ -234,7 +235,7 @@ export default function ProjectEdit() {
         </div>
         <div>
           <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Status</label>
-          <select
+          <SelectField
             value={status}
             onChange={(e) => setStatus(e.target.value)}
             title="Project status"
@@ -245,7 +246,7 @@ export default function ProjectEdit() {
                 {s}
               </option>
             ))}
-          </select>
+          </SelectField>
         </div>
         <div>
           <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Description</label>

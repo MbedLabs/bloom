@@ -1,3 +1,4 @@
+import SelectField from './SelectField'
 import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
@@ -257,7 +258,7 @@ function LinkDocumentModal({
               className="w-full pl-9 pr-3 py-2 bg-background border border-input rounded-md text-sm"
             />
           </div>
-          <select
+          <SelectField
             value={targetType}
             onChange={(event) => setTargetType(event.target.value as DocType)}
             title="Target artefact kind"
@@ -271,8 +272,8 @@ function LinkDocumentModal({
                 <option key={item} value={item}>{DOC_TYPE_LABELS[item]}</option>
               ))
             )}
-          </select>
-          <select
+          </SelectField>
+          <SelectField
             value={selectedOptionKey}
             onChange={(event) => setSelectedOptionKey(event.target.value)}
             title="Link relationship"
@@ -286,7 +287,7 @@ function LinkDocumentModal({
                 <option key={option.key} value={option.key}>{option.label}</option>
               ))
             )}
-          </select>
+          </SelectField>
         </div>
         <div className="overflow-y-auto themed-scrollbar p-3">
           {availableTargetTypes.length === 0 ? (

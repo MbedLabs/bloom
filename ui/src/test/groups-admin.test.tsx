@@ -1,3 +1,4 @@
+import { changeControl } from './change-control'
 import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -188,7 +189,7 @@ describe('Groups and policies administration', () => {
     for (const resource of ['REQ', 'SPEC', 'TC', 'DES', 'RSK', 'CHG', 'CPT', 'DEF', 'CMP', 'TS', 'PRT', 'RPT', 'STD']) {
       expect((screen.getByLabelText(`Review ${resource}`) as HTMLInputElement).disabled).toBe(false)
     }
-    fireEvent.change(screen.getByTitle('Assignment scope'), { target: { value: 'app' } })
+    changeControl(screen.getByTitle('Assignment scope'), { target: { value: 'app' } })
     for (const resource of ['baseline', 'parameter', 'link', 'project', 'users', 'access', 'application']) {
       expect((screen.getByLabelText(`Review ${resource}`) as HTMLInputElement).disabled).toBe(true)
     }
@@ -511,13 +512,13 @@ describe('Groups and policies administration', () => {
       expect((await screen.findByLabelText(`Approve ${resource}`) as HTMLInputElement).disabled).toBe(true)
     }
     expect(screen.queryByLabelText('Read baseline')).toBeNull()
-    fireEvent.change(screen.getByTitle('Assignment scope'), { target: { value: 'project' } })
+    changeControl(screen.getByTitle('Assignment scope'), { target: { value: 'project' } })
     for (const resource of ['baseline', 'parameter', 'link', 'project']) {
       expect(screen.getByLabelText(`Read ${resource}`)).toBeTruthy()
       expect((screen.getByLabelText(`Approve ${resource}`) as HTMLInputElement).disabled).toBe(true)
     }
     expect((screen.getByLabelText('Delete project') as HTMLInputElement).disabled).toBe(true)
-    fireEvent.change(screen.getByTitle('Assignment scope'), { target: { value: 'app' } })
+    changeControl(screen.getByTitle('Assignment scope'), { target: { value: 'app' } })
     for (const resource of ['access', 'users', 'application']) {
       expect(screen.getByLabelText(`Read ${resource}`)).toBeTruthy()
       expect((screen.getByLabelText(`Approve ${resource}`) as HTMLInputElement).disabled).toBe(true)
@@ -528,7 +529,7 @@ describe('Groups and policies administration', () => {
     renderPage('policies')
     fireEvent.click(await screen.findByText('New policy'))
     fireEvent.change(await screen.findByTitle('Policy name'), { target: { value: 'Management' } })
-    fireEvent.change(screen.getByTitle('Assignment scope'), { target: { value: 'app' } })
+    changeControl(screen.getByTitle('Assignment scope'), { target: { value: 'app' } })
     fireEvent.click(screen.getByLabelText('Read access'))
     fireEvent.click(screen.getByLabelText('Write users'))
     fireEvent.click(screen.getByLabelText('Delete application'))
@@ -564,7 +565,7 @@ describe('Groups and policies administration', () => {
   it('does not submit rules outside a changed assignment scope', async () => {
     renderPage('policies')
     fireEvent.click(await screen.findByTitle('Edit Field Auditor'))
-    fireEvent.change(await screen.findByTitle('Assignment scope'), { target: { value: 'document' } })
+    changeControl(await screen.findByTitle('Assignment scope'), { target: { value: 'document' } })
     fireEvent.click(screen.getByText('Save policy'))
     await waitFor(() => expect(api.policiesApi.update).toHaveBeenCalledWith(2, expect.objectContaining({ scope: 'document' })))
     expect(vi.mocked(api.policiesApi.update).mock.calls[0][1].rules).toEqual({

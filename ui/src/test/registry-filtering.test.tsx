@@ -1,3 +1,4 @@
+import { changeControl } from './change-control'
 import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
@@ -417,7 +418,7 @@ describe('narrowing the registry', () => {
     await screen.findByText('Alpha boot timing')
     await openFilters()
 
-    fireEvent.change(screen.getByLabelText(/Priority/i), { target: { value: 'High' } })
+    changeControl(screen.getByLabelText(/Priority/i), { target: { value: 'High' } })
 
     await waitFor(() => expect(rows()).toEqual(['VCU-REQ-001', 'VCU-TC-002']))
   })
@@ -462,7 +463,7 @@ describe('narrowing the registry', () => {
       ['clean', ['VCU-TC-001', 'VCU-REQ-002']],
     ]
     for (const [value, expected] of cases) {
-      fireEvent.change(picker, { target: { value } })
+      changeControl(picker, { target: { value } })
       await waitFor(() => expect(rows()).toEqual(expected))
     }
   })
@@ -500,7 +501,7 @@ describe('narrowing the registry', () => {
     await openFilters()
 
     fireEvent.click(screen.getByRole('button', { name: 'Draft' }))
-    fireEvent.change(screen.getByLabelText(/Priority/i), { target: { value: 'High' } })
+    changeControl(screen.getByLabelText(/Priority/i), { target: { value: 'High' } })
 
     // Draft alone keeps two; High alone keeps two; together only Delta.
     await waitFor(() => expect(rows()).toEqual(['VCU-TC-002']))
@@ -511,7 +512,7 @@ describe('narrowing the registry', () => {
     await screen.findByText('Alpha boot timing')
     await openFilters()
 
-    fireEvent.change(screen.getByLabelText(/Priority/i), { target: { value: 'Critical' } })
+    changeControl(screen.getByLabelText(/Priority/i), { target: { value: 'Critical' } })
 
     expect(await screen.findByText(/no documents found/i)).toBeTruthy()
     expect(screen.getByText(/try a different filter combination/i)).toBeTruthy()
@@ -530,7 +531,7 @@ describe('narrowing the registry', () => {
     await screen.findByText('Alpha boot timing')
     await openFilters()
 
-    fireEvent.change(screen.getByLabelText(/Priority/i), { target: { value: 'High' } })
+    changeControl(screen.getByLabelText(/Priority/i), { target: { value: 'High' } })
     fireEvent.click(screen.getByRole('button', { name: 'Draft' }))
 
     expect(await screen.findByText('Priority: High')).toBeTruthy()
@@ -644,7 +645,7 @@ describe('ordering the registry', () => {
     const picker = screen
       .getAllByRole('combobox')
       .find((box) => /Sort by/.test(box.textContent ?? '')) as HTMLSelectElement
-    fireEvent.change(picker, { target: { value: 'updated_at' } })
+    changeControl(picker, { target: { value: 'updated_at' } })
 
     // Updated descending: Charlie, Alpha, Bravo, Delta.
     await waitFor(() =>
@@ -703,7 +704,7 @@ describe('paging the registry', () => {
     renderRegistry()
     await screen.findByText('Requirement 1')
 
-    fireEvent.change(screen.getByDisplayValue('30'), { target: { value: '10' } })
+    changeControl(screen.getByDisplayValue('30'), { target: { value: '10' } })
 
     await waitFor(() => expect(rows()).toHaveLength(10))
     expect(screen.getByText('1 / 3')).toBeTruthy()
@@ -713,7 +714,7 @@ describe('paging the registry', () => {
   it('asks the server for the next page instead of slicing what it has', async () => {
     renderRegistry()
     await screen.findByText('Requirement 1')
-    fireEvent.change(screen.getByDisplayValue('30'), { target: { value: '10' } })
+    changeControl(screen.getByDisplayValue('30'), { target: { value: '10' } })
     await waitFor(() => expect(rows()).toHaveLength(10))
 
     // The page counter moves at once - the rows follow when the request lands,
@@ -736,7 +737,7 @@ describe('paging the registry', () => {
   it('shows no row twice while walking the pages', async () => {
     renderRegistry()
     await screen.findByText('Requirement 1')
-    fireEvent.change(screen.getByDisplayValue('30'), { target: { value: '10' } })
+    changeControl(screen.getByDisplayValue('30'), { target: { value: '10' } })
     await waitFor(() => expect(rows()).toHaveLength(10))
 
     const seen: string[] = [...rows()]
@@ -754,7 +755,7 @@ describe('paging the registry', () => {
   it('returns to the first page when a filter changes the set', async () => {
     renderRegistry()
     await screen.findByText('Requirement 1')
-    fireEvent.change(screen.getByDisplayValue('30'), { target: { value: '10' } })
+    changeControl(screen.getByDisplayValue('30'), { target: { value: '10' } })
     await waitFor(() => expect(rows()).toHaveLength(10))
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     await waitFor(() => expect(screen.getByText('2 / 3')).toBeTruthy())

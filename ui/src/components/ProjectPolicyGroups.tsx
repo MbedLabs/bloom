@@ -1,3 +1,4 @@
+import SelectField from './SelectField'
 import UserIdentity from './UserIdentity'
 import ProfilePicture from './ProfilePicture'
 import { useState } from 'react'
@@ -85,10 +86,10 @@ export default function ProjectPolicyGroups({ projectId }: { projectId: number }
     </div>
     {canAssign && remaining.length > 0 && <div className="mt-4 flex flex-wrap items-end gap-2">
       <label className="text-sm text-muted-foreground">Additional policy group
-        <select aria-label="Additional policy group" value={additionalId} onChange={(event) => setAdditionalId(event.target.value)} className="mt-1 block rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground">
+        <SelectField aria-label="Additional policy group" value={additionalId} onChange={(event) => setAdditionalId(event.target.value)} className="mt-1 block rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground">
           <option value="">Choose a group</option>
           {remaining.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
-        </select>
+        </SelectField>
       </label>
       <button type="button" disabled={!additionalId} onClick={() => { setAdditionalIds((current) => [...current, Number(additionalId)]); setAdditionalId('') }} className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50">Add group</button>
     </div>}
@@ -145,14 +146,14 @@ function ProjectGroupRoster({ projectId, group, members, people, policies, canAs
   const busy = assign.isPending || remove.isPending
   return <section aria-label={group.name} className="min-w-0 rounded-lg border border-border bg-background/40 p-4">
     <div className="flex items-center justify-between gap-2"><h4 className="font-semibold text-foreground">{group.name}</h4>
-      {canAssign && <button type="button" disabled={busy || group.policy_ids.length === 0} onClick={() => { setSelected(choosing ? [] : assignedIds); setSearch(''); setChoosing((value) => !value); setError('') }} className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-accent disabled:opacity-50">{choosing ? 'Cancel selection' : 'Choose people'}</button>}
+      {canAssign && <button type="button" disabled={busy || group.policy_ids.length === 0} onClick={() => { setSelected(choosing ? [] : assignedIds); setSearch(''); setChoosing((value) => !value); setError('') }} className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-accent disabled:opacity-50">{choosing ? 'Cancel selection' : 'Select members'}</button>}
     </div>
     {!choosing && (assigned.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No people assigned.</p> : <ul className="mt-3 space-y-2">
       {assigned.map((member) => <li key={member.id} className="flex items-center gap-2"><div className="min-w-0"><p className="text-sm text-foreground"><ProjectMemberIdentity member={member} canRemove={canRemove} disabled={busy} onRemove={() => remove.mutate(member.id)} /></p><p className="truncate text-xs text-muted-foreground">{member.email}</p></div></li>)}
     </ul>)}
     {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
     {choosing && <fieldset disabled={busy} className="mt-4 min-w-0 space-y-3">
-      <legend className="text-sm font-medium">Select people</legend>
+      <legend className="text-sm font-medium">Select members</legend>
       <input aria-label={`Search people for ${group.name}`} placeholder="Search people..." value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
       <p className="text-xs text-muted-foreground">Assigning a person replaces their current policy group in this project. Their assignments in other projects stay separate.</p>
       <div className="max-h-56 space-y-2 overflow-y-auto">

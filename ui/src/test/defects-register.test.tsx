@@ -1,3 +1,4 @@
+import { changeControl } from './change-control'
 import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
@@ -135,7 +136,7 @@ describe('finding a defect', () => {
     renderDefects()
     await screen.findByText(flicker.title)
 
-    fireEvent.change(screen.getByTitle('Filter by status'), { target: { value: 'Triaged' } })
+    changeControl(screen.getByTitle('Filter by status'), { target: { value: 'Triaged' } })
 
     // Status is a server-side filter, so the query has to be re-issued.
     await waitFor(() =>
@@ -147,7 +148,7 @@ describe('finding a defect', () => {
     renderDefects()
     await screen.findByText(flicker.title)
 
-    fireEvent.change(screen.getByTitle('Filter by severity'), { target: { value: 'Critical' } })
+    changeControl(screen.getByTitle('Filter by severity'), { target: { value: 'Critical' } })
 
     await waitFor(() =>
       expect(lastCall(client.defectsApi.list)).toEqual([project.id, { severity: 'Critical' }]),
@@ -158,8 +159,8 @@ describe('finding a defect', () => {
     renderDefects()
     await screen.findByText(flicker.title)
 
-    fireEvent.change(screen.getByTitle('Filter by status'), { target: { value: 'Open' } })
-    fireEvent.change(screen.getByTitle('Filter by severity'), { target: { value: 'High' } })
+    changeControl(screen.getByTitle('Filter by status'), { target: { value: 'Open' } })
+    changeControl(screen.getByTitle('Filter by severity'), { target: { value: 'High' } })
 
     await waitFor(() =>
       expect(lastCall(client.defectsApi.list)).toEqual([
@@ -173,13 +174,13 @@ describe('finding a defect', () => {
     renderDefects()
     await screen.findByText(flicker.title)
 
-    fireEvent.change(screen.getByTitle('Filter by status'), { target: { value: 'Open' } })
+    changeControl(screen.getByTitle('Filter by status'), { target: { value: 'Open' } })
     await waitFor(() =>
       expect(lastCall(client.defectsApi.list)).toEqual([project.id, { status: 'Open' }]),
     )
 
     // An empty choice must not be sent as status="" - that would match nothing.
-    fireEvent.change(screen.getByTitle('Filter by status'), { target: { value: '' } })
+    changeControl(screen.getByTitle('Filter by status'), { target: { value: '' } })
     await waitFor(() => expect(lastCall(client.defectsApi.list)).toEqual([project.id, {}]))
   })
 
@@ -306,8 +307,8 @@ describe('raising a defect', () => {
   it('sends the title, severity and priority', async () => {
     const form = await openForm()
     fireEvent.change(form.title, { target: { value: 'Fan stalls above 60C' } })
-    fireEvent.change(screen.getByTitle('Severity'), { target: { value: 'Critical' } })
-    fireEvent.change(screen.getByTitle('Priority'), { target: { value: 'High' } })
+    changeControl(screen.getByTitle('Severity'), { target: { value: 'Critical' } })
+    changeControl(screen.getByTitle('Priority'), { target: { value: 'High' } })
     fireEvent.click(screen.getByRole('button', { name: /^create defect$/i }))
 
     await waitFor(() =>
@@ -339,7 +340,7 @@ describe('raising a defect', () => {
   it('links the defect to an external issue when one is given', async () => {
     const form = await openForm()
     fireEvent.change(form.title, { target: { value: 'Fan stalls above 60C' } })
-    fireEvent.change(screen.getByTitle('External tracker'), { target: { value: 'github' } })
+    changeControl(screen.getByTitle('External tracker'), { target: { value: 'github' } })
     fireEvent.change(screen.getByTitle('Repository'), { target: { value: 'embedlabs/vcu' } })
     fireEvent.change(screen.getByTitle('Issue number'), { target: { value: '99' } })
     fireEvent.change(screen.getByTitle('Issue URL'), {

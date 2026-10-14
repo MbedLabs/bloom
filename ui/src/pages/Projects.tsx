@@ -161,8 +161,8 @@ export default function Projects() {
 
       {accessProjects.length > 0 && <section className="rounded-lg border border-border bg-card p-5">
         <h3 className="font-semibold">Project access</h3>
-        <p className="mt-1 text-sm text-muted-foreground">Choose people for each project's policy groups.</p>
-        <ul className="mt-3 divide-y divide-border">{accessProjects.map((entry) => <li key={entry.id} className="flex items-center justify-between gap-3 py-3"><span className="text-sm">{entry.name} <span className="text-muted-foreground">({entry.prefix})</span></span><button type="button" onClick={() => navigate(`/projects/${entry.prefix}/edit`)} className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent">Choose people</button></li>)}</ul>
+        <p className="mt-1 text-sm text-muted-foreground">Select members for each project's policy groups.</p>
+        <ul className="mt-3 divide-y divide-border">{accessProjects.map((entry) => <li key={entry.id} className="flex items-center justify-between gap-3 py-3"><span className="text-sm">{entry.name} <span className="text-muted-foreground">({entry.prefix})</span></span><button type="button" onClick={() => navigate(`/projects/${entry.prefix}/edit`)} className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent">Select members</button></li>)}</ul>
       </section>}
 
       {showCreateModal && (

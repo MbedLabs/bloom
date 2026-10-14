@@ -1,3 +1,4 @@
+import { changeControl } from './change-control'
 import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
@@ -106,9 +107,9 @@ describe('TestRail import', () => {
     const button = screen.getByRole('button', { name: /Import from TestRail/ }) as HTMLButtonElement
     expect(button.disabled).toBe(true)
 
-    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Name' } })
-    fireEvent.change(screen.getByLabelText('Steps (text template)'), { target: { value: 'Do' } })
-    fireEvent.change(screen.getByLabelText('Expected result (text template)'), { target: { value: 'Expect' } })
+    changeControl(screen.getByLabelText('Title'), { target: { value: 'Name' } })
+    changeControl(screen.getByLabelText('Steps (text template)'), { target: { value: 'Do' } })
+    changeControl(screen.getByLabelText('Expected result (text template)'), { target: { value: 'Expect' } })
     expect(screen.queryByText('Choose the column that holds the title.')).toBeNull()
     fireEvent.click(button)
 

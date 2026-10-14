@@ -1,3 +1,4 @@
+import SelectField from '../components/SelectField'
 import { refreshProjectViews, finishArtefactDeletion } from '../lib/refreshProjectViews'
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import TagPicker from '../components/TagPicker'
@@ -723,7 +724,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
               {/* Status */}
               <MetaField label="Status">
                 {editMode && controlled ? <span>{displayedStatus}</span> :
-                <select
+                <SelectField
                   value={metadata.status || firstStatus}
                   onChange={(e) => setMetadata({ ...metadata, status: e.target.value })}
                   title="Select status"
@@ -732,12 +733,12 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                   {statusChoices.map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
-                </select>}
+                </SelectField>}
               </MetaField>
 
               {!external && (
                 <MetaField label="Origin">
-                  <select
+                  <SelectField
                     value={docType === 'REQ' ? metadata.req_origin || 'Internal' : metadata.visibility || 'internal'}
                     onChange={(event) => setMetadata(docType === 'REQ'
                       ? { ...metadata, req_origin: event.target.value, visibility: requirementVisibilityFromOrigin(event.target.value) }
@@ -748,7 +749,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                     {docType === 'REQ'
                       ? config.fields.find(field => field.key === 'req_origin')?.options?.map(origin => <option key={origin} value={origin}>{origin}</option>)
                       : <><option value="internal">Internal</option><option value="customer">Customer</option></>}
-                  </select>
+                  </SelectField>
                   {!editMode && projectId > 0 && <TagPicker projectId={projectId} value={tagIds} onChange={setTagIds} showLabel={false} />}
                 </MetaField>
               )}
@@ -761,7 +762,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
               {/* Priority (if applicable) */}
               {config.priorityOptions && (
                 <MetaField label="Priority">
-                  <select
+                  <SelectField
                     value={metadata.priority || config.priorityOptions[0]}
                     onChange={(e) => setMetadata({ ...metadata, priority: e.target.value })}
                     title="Select priority"
@@ -770,7 +771,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                     {config.priorityOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
-                  </select>
+                  </SelectField>
                 </MetaField>
               )}
 
@@ -780,7 +781,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                   {visibleConfigFields.filter((field) => field.type !== 'textarea').map((field) => (
                     <MetaField key={field.key} label={field.label}>
                       {field.type === 'select' && field.options ? (
-                        <select
+                        <SelectField
                           value={metadata[field.key] || field.options[0]}
                           onChange={(e) => setMetadata({ ...metadata, [field.key]: e.target.value })}
                           title={field.label}
@@ -789,7 +790,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                           {field.options.map((opt) => (
                             <option key={opt} value={opt}>{opt}</option>
                           ))}
-                        </select>
+                        </SelectField>
                       ) : field.type === 'number' ? (
                         <input
                           type="number"

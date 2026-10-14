@@ -1,3 +1,4 @@
+import { changeControl } from './change-control'
 import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
@@ -259,7 +260,7 @@ describe('changing what a user may do', () => {
     await screen.findByText(maintainer.full_name)
 
     fireEvent.click(within(rowFor(maintainer.full_name)).getByTitle('Edit role'))
-    fireEvent.change(await screen.findByTitle('Select role'), { target: { value: 'external' } })
+    changeControl(await screen.findByTitle('Select role'), { target: { value: 'external' } })
 
     await waitFor(() =>
       expect(lastCall(client.usersApi.update)).toEqual([maintainer.id, { role: 'external' }]),
@@ -308,7 +309,8 @@ describe('changing what a user may do', () => {
 
     fireEvent.click(within(rowFor(maintainer.full_name)).getByTitle('Edit role'))
     const select = (await screen.findByTitle('Select role')) as HTMLSelectElement
-    expect(within(select).queryByRole('option', { name: 'Admin' })).toBeTruthy()
+    fireEvent.click(select)
+    expect(screen.getByRole('option', { name: 'Admin' })).toBeTruthy()
 
     cleanup()
     currentUser = { ...user, is_initial_admin: false }
@@ -317,7 +319,8 @@ describe('changing what a user may do', () => {
 
     fireEvent.click(within(rowFor(maintainer.full_name)).getByTitle('Edit role'))
     const nonAdminSelect = (await screen.findByTitle('Select role')) as HTMLSelectElement
-    expect(within(nonAdminSelect).queryByRole('option', { name: 'Admin' })).toBeNull()
+    fireEvent.click(nonAdminSelect)
+    expect(screen.queryByRole('option', { name: 'Admin' })).toBeNull()
     currentUser = admin
   })
 
@@ -485,7 +488,7 @@ describe('the invitation link', () => {
     fireEvent.change(screen.getByTitle('Email address'), {
       target: { value: 'grace@example.com' },
     })
-    fireEvent.change(screen.getByTitle('Role'), { target: { value: 'maintainer' } })
+    changeControl(screen.getByTitle('Role'), { target: { value: 'maintainer' } })
     fireEvent.click(screen.getByRole('button', { name: /send invite/i }))
   }
 
@@ -633,7 +636,7 @@ describe('the project list', () => {
     renderProjects()
     expect(await screen.findByText(project.name)).toBeTruthy()
     expect(screen.queryByText(/coverage/i)).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Choose people' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Select members' }))
     expect(await screen.findByText('project settings')).toBeTruthy()
     expect(client.projectsApi.get).not.toHaveBeenCalled()
   })
