@@ -3,6 +3,8 @@
 ## 1.2.0 - unreleased
 
 ### Added
+
+- Readers request reports beside linked Bud runs and follow Pending, Delivered or Refused state. Bud publishers receive requests through the existing integration connection; successful report delivery provides a document link subject to existing project visibility.
 - Upload and remove your profile picture in Settings; show it alongside users, comments and activity.
 
 - Admin company logo on PDF reports: an administrator uploads a company logo in Settings; it renders on the report letterhead (top-left) alongside the EmbedLabs tamper-evidence footer, which is always present. The Settings preview loads through the authenticated client so the admin sees exactly what was stored.

@@ -46,6 +46,7 @@ from app.models.project_membership import (
     ProjectMembership,
     project_access_policies,
 )
+from app.models.report_request import ReportRequest
 from app.models.tags import ArtefactTag, Tag
 from app.models.user import User, UserRole
 from app.models.user_token import UserToken, UserTokenPurpose
@@ -58,6 +59,7 @@ from app.models.workflow import (
 )
 
 __all__ = [
+    "ReportRequest",
     "ArtefactWorkflow",
     "ArtefactRevision",
     "ArtefactRequest",

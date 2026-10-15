@@ -169,7 +169,7 @@ def test_the_access_migration_seeds_defaults_and_converts_memberships():
         state = asyncio.run(_state(target))
         policies, entries = state["policies"], state["entries"]
 
-        _alembic(url, "downgrade", "-1")
+        _alembic(url, "downgrade", BEFORE)
         assert not {"policies", "groups", "project_access", "tags"} & asyncio.run(_tables(target))
         _alembic(url, "upgrade", "head")
         assert asyncio.run(_state(target)) == state

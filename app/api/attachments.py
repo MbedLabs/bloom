@@ -20,7 +20,7 @@ from app.core.database import get_db
 from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user
 from app.core.service_auth import require_bud_sync_token
-from app.models import Document, DocumentAttachment
+from app.models import Document, DocumentAttachment, ReportRequest
 from app.models.user import User
 from app.schemas import (
     DocumentAttachmentResponse,
@@ -274,6 +274,28 @@ async def publish_test_report(
     for item in data.files:
         attachment_ids.append(await _replace_report_file(db, document, item, source_ref))
 
+    requests = (
+        await db.scalars(
+            select(ReportRequest)
+            .where(
+                ReportRequest.project_id == project.id,
+                ReportRequest.bud_run_id == data.bud_run_id,
+                ReportRequest.status == "pending",
+            )
+            .with_for_update()
+        )
+    ).all()
+    for request in requests:
+        request.status = "delivered"
+        request.document_id = document.id
+        await record_audit_event(
+            db,
+            "report.published",
+            target_type="report_request",
+            target_id=request.id,
+            project_id=project.id,
+            details={"document_id": document.id},
+        )
     await db.commit()
     await db.refresh(document)
     return TestReportPublishResponse(

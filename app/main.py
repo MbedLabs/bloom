@@ -40,6 +40,7 @@ from app.api import (
     project_memberships,
     project_variables,
     projects,
+    report_requests,
     requirements,
     risks,
     search,
@@ -470,6 +471,7 @@ app.include_router(test_cases.router, prefix="/api/test-cases", tags=["Test Case
 app.include_router(traceability.router, prefix="/api/traceability", tags=["Traceability"])
 app.include_router(documents.router, prefix="/api", tags=["Documents"])
 app.include_router(attachments.router, prefix="/api", tags=["Attachments"])
+app.include_router(report_requests.router, prefix="/api", tags=["Report requests"])
 app.include_router(test_suites.router, prefix="/api/test-suites", tags=["Test Suites"])
 app.include_router(campaigns.router, prefix="/api/campaigns", tags=["Campaigns"])
 app.include_router(designs.router, prefix="/api/designs", tags=["Designs"])

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.link_read_utils import get_test_case_ids_verifying_requirements
@@ -38,6 +38,7 @@ from app.models import (
     Document,
     DocumentSection,
     Project,
+    ReportRequest,
     Requirement,
     RiskItem,
     TestCampaign,
@@ -596,6 +597,12 @@ async def delete_project_row(
         )
     if audit_type:
         await audit_artefact_deleted(db, audit_type, row)
+    if model is Document:
+        await db.execute(
+            update(ReportRequest)
+            .where(ReportRequest.document_id == row.id)
+            .values(document_id=None)
+        )
     await db.delete(row)
 
 

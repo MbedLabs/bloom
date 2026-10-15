@@ -192,7 +192,7 @@ export default function TestCaseDetail({
                 />
                 <MetaItem
                   label="Bud Run"
-                  value={<BudRunLink runId={testCase.last_bud_run_id} />}
+                  value={<BudRunLink runId={testCase.last_bud_run_id} source={{ source_kind: 'test-case', source_id: testCase.id }} />}
                 />
                 {testCase.last_execution_comment && (
                   <div>

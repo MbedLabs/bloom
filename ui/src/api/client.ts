@@ -7,7 +7,7 @@ import packageJson from '../../package.json'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api'
 
-const api = axios.create({
+export const api = axios.create({
   baseURL: API_URL,
   // Send the httpOnly refresh cookie on same-origin auth calls.
   withCredentials: true,

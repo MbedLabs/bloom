@@ -24,7 +24,7 @@ from app.core.security import (
     require_project_access,
     require_role,
 )
-from app.models import Project
+from app.models import Project, ReportRequest
 from app.models.groups import GroupMembership, user_application_policies
 from app.models.models import (
     ARTEFACT_MODELS,
@@ -547,6 +547,7 @@ async def delete_user(
         )
 
     try:
+        await db.execute(delete(ReportRequest).where(ReportRequest.requester_id == user_id))
         await db.execute(delete(UserToken).where(UserToken.user_id == user_id))
         await db.execute(
             update(UserToken)

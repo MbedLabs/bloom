@@ -1,4 +1,5 @@
 [1.2.0]
+* Request the report beside a linked Bud run and follow pending, delivered or refused status.
 * Assign groups of policies per project, with separate application and access management.
 * Control document access by type and origin, with independent review permissions.
 * Review and approve controlled documents with notifications and email requests.

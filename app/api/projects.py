@@ -30,6 +30,7 @@ from app.models import (
     Notification,
     Project,
     ProjectVariable,
+    ReportRequest,
     Requirement,
     RequirementLink,
     RiskItem,
@@ -53,6 +54,7 @@ router = APIRouter()
 
 
 async def _delete_project_scoped_data(db: AsyncSession, project_id: int) -> None:
+    await db.execute(delete(ReportRequest).where(ReportRequest.project_id == project_id))
     requirement_ids = select(Requirement.id).where(Requirement.project_id == project_id)
     defect_ids = select(Defect.id).where(Defect.project_id == project_id)
     document_ids = select(Document.id).where(Document.project_id == project_id)

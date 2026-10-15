@@ -225,7 +225,7 @@ export default function RequirementDetail({
               <ul className="space-y-2">
                 {requirement.linked_test_runs.map((run) => (
                   <li key={run.id} className="text-sm">
-                    <BudRunLink runId={run.test_run_id} label={run.test_run_name || undefined} />
+                    <BudRunLink runId={run.test_run_id} source={{ source_kind: 'requirement', source_id: requirement.id }} label={run.test_run_name || undefined} />
                     <div className="text-xs text-muted-foreground">{run.status || 'Status not recorded'}</div>
                   </li>
                 ))}

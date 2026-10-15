@@ -316,7 +316,7 @@ export default function SuiteDetail({
           value={suite.last_executed_at ? formatDateTime(suite.last_executed_at) : 'Not executed'}
         />
         <SummaryCard label="Last Result" value={suite.last_execution_status || '-'} />
-        <SummaryCard label="Bud Run" value={<BudRunLink runId={suite.last_bud_run_id} />} />
+        <SummaryCard label="Bud Run" value={<BudRunLink runId={suite.last_bud_run_id} source={{ source_kind: 'test-suite', source_id: suite.id }} />} />
       </div>
 
       <div className="bg-card rounded-lg shadow-elegant overflow-hidden">

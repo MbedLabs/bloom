@@ -251,7 +251,7 @@ export default function TestCampaigns() {
                       {suite.last_bud_run_id && (
                         <div className="mt-1">
                           <BudRunLink
-                            runId={suite.last_bud_run_id}
+                            runId={suite.last_bud_run_id} source={{ source_kind: 'test-suite', source_id: suite.id }}
                             className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80"
                           />
                         </div>

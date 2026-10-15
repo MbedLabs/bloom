@@ -123,6 +123,12 @@ Open `http://localhost:8000`.
 - `/api/ready` checks application readiness and PostgreSQL connectivity.
 - `/api/version` reports the running version.
 
+## Report requests
+
+A reader who can see a linked test case, suite, requirement or campaign can select **Request report** beside its Bud run link. Bloom records the request and shows Pending until a Bud publisher delivers the report or refuses with a reason. Repeated pending requests are deduplicated per reader, run and project. Delivered report links keep the existing document visibility rules.
+
+Bud collects requests through its configured Bloom connection; Bloom stores no reader Bud credentials. The existing integration credential carries the reader name/email and the report-request status. Connection failures leave requests pending for a later collection. Report files arrive through the existing Bud publishing path.
+
 ## Connect Bloom to Bud
 
 To receive test-case execution outcomes:

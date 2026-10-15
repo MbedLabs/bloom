@@ -1,3 +1,4 @@
+import ReportRequestAction from '../components/ReportRequestAction'
 import SelectField from '../components/SelectField'
 import { refreshProjectViews, finishArtefactDeletion } from '../lib/refreshProjectViews'
 import WorkflowPanel from '../components/WorkflowPanel'
@@ -362,9 +363,12 @@ export default function CampaignDetail({
           {campaign.bud_run_status && <RunStatusBadge status={campaign.bud_run_status} />}
         </div>
         {campaignBudRunUrl ? (
+          <div className="flex flex-wrap items-center gap-3">
           <a href={campaignBudRunUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-3 py-2 rounded-md bg-primary text-white hover:bg-primary/90 text-sm">
             Open in Bud TMP
           </a>
+          {campaign.bud_run_id && <ReportRequestAction source={{ source_kind: 'campaign', source_id: campaign.id, run_id: campaign.bud_run_id }} />}
+          </div>
         ) : (
           <div className="text-sm text-muted-foreground">No campaign-specific Bud run linked.</div>
         )}
