@@ -133,7 +133,12 @@ def _copied_resource(doc_type: str) -> str:
     return "REQ" if doc_type == "REQ" else "TC"
 
 
-@router.post("/projects/{project_id}/import", response_model=ImportResult, status_code=201)
+@router.post(
+    "/projects/{project_id}/import",
+    response_model=ImportResult,
+    status_code=201,
+    responses={400: {"description": "Bad Request"}},
+)
 async def import_docs(
     project_id: int,
     data: ImportRequest,
@@ -379,7 +384,10 @@ def _requirement_title(obj: ReqIFObject) -> str:
     "/projects/{project_id}/import/reqif",
     response_model=ReqIFImportResult,
     status_code=201,
-    responses={422: {"description": HTTPStatus(422).phrase}},
+    responses={
+        422: {"description": HTTPStatus(422).phrase},
+        504: {"description": "Gateway Timeout"},
+    },
 )
 async def import_reqif(
     project_id: int,

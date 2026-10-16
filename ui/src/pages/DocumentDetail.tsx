@@ -35,7 +35,7 @@ function flattenSections(sections: DocumentSection[]): DocumentSection[] {
   return result
 }
 
-function TocItem({ section, depth }: { section: DocumentSection; depth: number }) {
+function TocItem({ section, depth }: Readonly<{ section: DocumentSection; depth: number }>) {
   return (
     <>
       <div

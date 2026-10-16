@@ -36,8 +36,8 @@ export default function Projects() {
   const createMutation = useMutation({
     mutationFn: projectsApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
-      queryClient.invalidateQueries({ queryKey: ['access-assignment-options'] })
+      void queryClient.invalidateQueries({ queryKey: ['projects'] })
+      void queryClient.invalidateQueries({ queryKey: ['access-assignment-options'] })
       setFormError('')
       setShowCreateModal(false)
       setName('')
@@ -247,11 +247,11 @@ function ProjectCard({
   project,
   canEdit,
   onEdit,
-}: {
+}: Readonly<{
   project: Project
   canEdit: boolean
   onEdit: () => void
-}) {
+}>) {
   const navigate = useNavigate()
   const coverage = Math.round(project.coverage_percent)
 
@@ -335,7 +335,7 @@ function ProjectCard({
   )
 }
 
-function ProjectStatusBadge({ status }: { status: string }) {
+function ProjectStatusBadge({ status }: Readonly<{ status: string }>) {
   const config: Record<string, string> = {
     Active: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
     Archived: 'bg-muted text-muted-foreground',

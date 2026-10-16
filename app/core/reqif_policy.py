@@ -8,6 +8,10 @@ from typing import Protocol
 
 from app.core.config import settings
 
+REQIF_UNCOMPRESSED_MEMBER_EXCEEDS_THE_25_MIB_LIMIT = (
+    "ReqIF uncompressed member exceeds the 25 MiB limit."
+)
+
 
 class ReqIFParseError(ValueError):
     """Raised when supplied bytes violate the ReqIF input policy or syntax."""
@@ -36,7 +40,7 @@ def _validate_member(info: zipfile.ZipInfo) -> None:
     if info.is_dir():
         raise ReqIFParseError("The ReqIF archive member must be a regular file.")
     if info.file_size > settings.REQIF_MAX_MEMBER_BYTES:
-        raise ReqIFParseError("ReqIF uncompressed member exceeds the 25 MiB limit.")
+        raise ReqIFParseError(REQIF_UNCOMPRESSED_MEMBER_EXCEEDS_THE_25_MIB_LIMIT)
     if info.file_size and info.compress_size == 0:
         raise ReqIFParseError("ReqIF archive has an invalid compression ratio.")
     if info.compress_size and (
@@ -50,7 +54,7 @@ def extract_reqif_xml(data: bytes) -> bytes:
 
     if data[:2] != b"PK":
         if len(data) > settings.REQIF_MAX_MEMBER_BYTES:
-            raise ReqIFParseError("ReqIF uncompressed member exceeds the 25 MiB limit.")
+            raise ReqIFParseError(REQIF_UNCOMPRESSED_MEMBER_EXCEEDS_THE_25_MIB_LIMIT)
         return data
 
     try:
@@ -73,7 +77,7 @@ def extract_reqif_xml(data: bytes) -> bytes:
                 while chunk := source.read(settings.REQIF_STREAM_CHUNK_BYTES):
                     actual_size += len(chunk)
                     if actual_size > settings.REQIF_MAX_MEMBER_BYTES:
-                        raise ReqIFParseError("ReqIF uncompressed member exceeds the 25 MiB limit.")
+                        raise ReqIFParseError(REQIF_UNCOMPRESSED_MEMBER_EXCEEDS_THE_25_MIB_LIMIT)
                     output.write(chunk)
             if actual_size != member.file_size:
                 raise ReqIFParseError("ReqIF archive member size metadata is inconsistent.")

@@ -487,10 +487,10 @@ export function getDocLinkRoleLabel(role: string, direction: 'incoming' | 'outgo
   return direction === 'outgoing' ? pair[0] : pair[1]
 }
 
-function getCanonicalDocLinkRoles(sourceType: DocType, targetType: DocType): DocLinkRole[] {
+function getCanonicalDocLinkRoles(fromType: DocType, toType: DocType): DocLinkRole[] {
   const matchedRow = DOC_LINK_RULE_ROWS.find((row) => (
-    row.sourceType === sourceType &&
-    row.targetType === targetType
+    row.sourceType === fromType &&
+    row.targetType === toType
   ))
   return matchedRow ? matchedRow.roles : []
 }

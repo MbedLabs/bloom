@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
 from sqlalchemy import func, select, update
@@ -24,7 +24,7 @@ async def _lock(db: AsyncSession, key: str) -> None:
 
 
 async def begin_import_attempt(db: AsyncSession, *, user_id: int, project_id: int) -> ImportAttempt:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     await _lock(db, f"reqif-user:{user_id}")
     await _lock(db, f"reqif-project:{project_id}")
     await db.execute(
@@ -90,6 +90,6 @@ async def finish_import_attempt(db: AsyncSession, attempt_id: int, status: str) 
     await db.execute(
         update(ImportAttempt)
         .where(ImportAttempt.id == attempt_id)
-        .values(status=status, completed_at=datetime.utcnow())
+        .values(status=status, completed_at=datetime.now(timezone.utc).replace(tzinfo=None))
     )
     await db.commit()

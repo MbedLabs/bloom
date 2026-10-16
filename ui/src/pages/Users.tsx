@@ -37,7 +37,7 @@ export default function UsersPage() {
   const inviteMutation = useMutation({
     mutationFn: usersApi.invite,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] })
+      void queryClient.invalidateQueries({ queryKey: ['users'] })
       toast.notify('Invitation sent', 'success')
     },
     onError: (error) => toast.failed('Sending the invitation', error),
@@ -48,7 +48,7 @@ export default function UsersPage() {
       usersApi.update(id, data),
     onSuccess: (_updated) => {
       void _updated
-      queryClient.invalidateQueries({ queryKey: ['users'] })
+      void queryClient.invalidateQueries({ queryKey: ['users'] })
       setEditingUser(null)
       toast.saved('User')
     },
@@ -62,7 +62,7 @@ export default function UsersPage() {
       setPendingDeleteUserId(id)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] })
+      void queryClient.invalidateQueries({ queryKey: ['users'] })
       toast.deleted('User')
     },
     onError: (error: unknown) => {
@@ -80,7 +80,7 @@ export default function UsersPage() {
     onSuccess: () => {
       setEmailChangeUser(null)
       setEmailActionError(null)
-      queryClient.invalidateQueries({ queryKey: ['users'] })
+      void queryClient.invalidateQueries({ queryKey: ['users'] })
     },
     onError: (error) => {
       setEmailActionError(extractApiErrorMessage(error, 'Failed to start email change'))
@@ -91,7 +91,7 @@ export default function UsersPage() {
     mutationFn: usersApi.approveEmailChange,
     onSuccess: () => {
       setEmailActionError(null)
-      queryClient.invalidateQueries({ queryKey: ['users'] })
+      void queryClient.invalidateQueries({ queryKey: ['users'] })
     },
     onError: (error) => {
       setEmailActionError(extractApiErrorMessage(error, 'Failed to approve email change'))
@@ -102,7 +102,7 @@ export default function UsersPage() {
     mutationFn: usersApi.rejectEmailChange,
     onSuccess: () => {
       setEmailActionError(null)
-      queryClient.invalidateQueries({ queryKey: ['users'] })
+      void queryClient.invalidateQueries({ queryKey: ['users'] })
     },
     onError: (error) => {
       setEmailActionError(extractApiErrorMessage(error, 'Failed to reject email change'))
@@ -338,13 +338,13 @@ function EmailChangeModal({
   onSubmit,
   isLoading,
   error,
-}: {
+}: Readonly<{
   user: User
   onClose: () => void
   onSubmit: (newEmail: string) => Promise<User>
   isLoading: boolean
   error: string | null
-}) {
+}>) {
   const [newEmail, setNewEmail] = useState(user.pending_email ?? '')
 
   return (
@@ -396,12 +396,12 @@ function EmailChangeModal({
   )
 }
 
-function InviteUserModal({ onClose, onSubmit, isLoading, error }: {
+function InviteUserModal({ onClose, onSubmit, isLoading, error }: Readonly<{
   onClose: () => void
   onSubmit: (data: { email: string; full_name: string; role?: string }) => Promise<InviteUserResponse>
   isLoading: boolean
   error: string | null
-}) {
+}>) {
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState('external')
@@ -514,7 +514,7 @@ function ApplicationPolicyForm({ user, policies, initial, onClose }: Readonly<{ 
   const queryClient = useQueryClient()
   const save = useMutation({
     mutationFn: () => usersApi.setApplicationPolicies(user.id, selected),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['user-application-policies', user.id] }); toast.saved('Application policies'); onClose() },
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['user-application-policies', user.id] }); toast.saved('Application policies'); onClose() },
     onError: (error) => toast.failed('Saving application policies', error),
   })
   return <form onSubmit={(event) => { event.preventDefault(); save.mutate() }} className="space-y-4">

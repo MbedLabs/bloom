@@ -10,6 +10,7 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
+from anyio import open_file
 from fastapi import HTTPException, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -106,7 +107,7 @@ async def write_stream(file: UploadFile, final_path: Path, *, max_bytes: int) ->
     ensure_free_space(max_bytes)
 
     try:
-        with open(temp_path, "xb") as output:
+        async with await open_file(temp_path, "xb") as output:
             while chunk := await file.read(CHUNK_BYTES):
                 size += len(chunk)
                 if size > max_bytes:
@@ -115,7 +116,7 @@ async def write_stream(file: UploadFile, final_path: Path, *, max_bytes: int) ->
                         detail=f"File too large. {max_bytes} bytes are available.",
                     )
                 digest.update(chunk)
-                output.write(chunk)
+                await output.write(chunk)
         os.replace(temp_path, final_path)
     except BaseException:
         for path in (temp_path, final_path):

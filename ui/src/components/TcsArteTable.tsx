@@ -90,7 +90,7 @@ export function TcsArteTable({
   userMentionItems = [],
   parameterHref,
   parameterValues,
-}: TcsArteTableProps) {
+}: Readonly<TcsArteTableProps>) {
   if (editable) {
     return (
       <TcsArteTableEditor
@@ -212,12 +212,12 @@ function TcsArteTableEditor({
   onChange,
   mentionItems,
   userMentionItems,
-}: {
+}: Readonly<{
   rows: TcsRow[]
   onChange: (rows: TcsRow[]) => void
   mentionItems: MentionSuggestion[]
   userMentionItems: MentionSuggestion[]
-}) {
+}>) {
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [actionMenu, setActionMenu] = useState<{ index: number; top: number; left: number } | null>(null)
@@ -340,12 +340,12 @@ function TcsAddRow({
   menuPosition,
   onToggleMenu,
   onAdd,
-}: {
+}: Readonly<{
   menuOpen: boolean
   menuPosition: MenuPosition | null
   onToggleMenu: (position: MenuPosition) => void
   onAdd: (type: TcsRowType) => void
-}) {
+}>) {
   return (
     <div className="grid grid-cols-[15rem_minmax(18rem,1fr)_minmax(18rem,1fr)_4rem] min-h-10 bg-muted/20">
       <div className="border-r border-border/70 px-3 py-1.5">
@@ -394,7 +394,7 @@ function TcsEditorRow({
   onDragOver,
   onDragLeave,
   onDrop,
-}: {
+}: Readonly<{
   row: TcsRow
   hasChildren: boolean
   mentionItems: MentionSuggestion[]
@@ -413,7 +413,7 @@ function TcsEditorRow({
   onDragOver: () => void
   onDragLeave: () => void
   onDrop: () => void
-}) {
+}>) {
   const styles = ROW_TYPE_STYLES[row.row_type]
 
   return (

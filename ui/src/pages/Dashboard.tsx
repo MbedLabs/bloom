@@ -254,7 +254,7 @@ export default function Dashboard() {
   )
 }
 
-function MetricCard({ title, value, detail, icon: Icon, tone = 'default', to, anchor }: {
+function MetricCard({ title, value, detail, icon: Icon, tone = 'default', to, anchor }: Readonly<{
   title: string
   value: number | string
   detail: string
@@ -262,7 +262,7 @@ function MetricCard({ title, value, detail, icon: Icon, tone = 'default', to, an
   tone?: 'default' | 'warning'
   to?: string
   anchor?: string
-}) {
+}>) {
   const isWarning = tone === 'warning'
   const interactive = !!(to || anchor)
   const cardClass = [
@@ -309,7 +309,7 @@ function MetricCard({ title, value, detail, icon: Icon, tone = 'default', to, an
   return <div className={cardClass}>{inner}</div>
 }
 
-function DocKindPanel({ kindCounts, total }: { kindCounts: Record<DocType, number>; total: number }) {
+function DocKindPanel({ kindCounts, total }: Readonly<{ kindCounts: Record<DocType, number>; total: number }>) {
   return (
     <div className="rounded-lg border border-border bg-card p-3.5">
       <div className="flex items-center justify-between gap-3">
@@ -337,7 +337,7 @@ function DocKindPanel({ kindCounts, total }: { kindCounts: Record<DocType, numbe
   )
 }
 
-function DistributionPanel({ id, title, icon: Icon, data, total, emptyMessage, colorMap }: {
+function DistributionPanel({ id, title, icon: Icon, data, total, emptyMessage, colorMap }: Readonly<{
   id?: string
   title: string
   icon: React.ComponentType<{ className?: string }>
@@ -345,7 +345,7 @@ function DistributionPanel({ id, title, icon: Icon, data, total, emptyMessage, c
   total: number
   emptyMessage: string
   colorMap: Record<string, string>
-}) {
+}>) {
   const entries = Object.entries(data).filter(([, value]) => value > 0)
 
   return (
@@ -382,7 +382,7 @@ function DistributionPanel({ id, title, icon: Icon, data, total, emptyMessage, c
   )
 }
 
-function TraceabilityTile({ label, value, tone }: { label: string; value: number | string; tone: string }) {
+function TraceabilityTile({ label, value, tone }: Readonly<{ label: string; value: number | string; tone: string }>) {
   return (
     <div className="rounded-md border border-border bg-background/60 p-2.5">
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
@@ -391,7 +391,7 @@ function TraceabilityTile({ label, value, tone }: { label: string; value: number
   )
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status }: Readonly<{ status: string }>) {
   const config: Record<string, string> = {
     Active: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
     Archived: 'border-border bg-muted text-muted-foreground',
@@ -423,11 +423,11 @@ function EmptyState() {
   )
 }
 
-function Th({ children }: { children?: React.ReactNode }) {
+function Th({ children }: Readonly<{ children?: React.ReactNode }>) {
   return <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">{children}</th>
 }
 
-function Td({ children }: { children: React.ReactNode }) {
+function Td({ children }: Readonly<{ children: React.ReactNode }>) {
   return <td className="whitespace-nowrap px-3 py-2.5 text-sm text-muted-foreground">{children}</td>
 }
 

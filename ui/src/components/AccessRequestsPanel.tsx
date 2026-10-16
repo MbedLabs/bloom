@@ -16,7 +16,7 @@ export default function AccessRequestsPanel({ projectPrefix, showEmpty = false }
     mutationFn: ({ id, decision }: { id: number; decision: 'granted' | 'refused' }) =>
       accessRequestsApi.decide(id, decision),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['access-requests'] })
+      void queryClient.invalidateQueries({ queryKey: ['access-requests'] })
       toast.saved('Access request')
     },
     onError: (error) => toast.failed('Answering the access request', error),

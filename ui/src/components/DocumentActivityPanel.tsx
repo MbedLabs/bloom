@@ -9,11 +9,11 @@ export default function DocumentActivityPanel({
   artefactType,
   artefactId,
   title = 'Activity',
-}: {
+}: Readonly<{
   artefactType: string
   artefactId: number
   title?: string
-}) {
+}>) {
   const { data: activity } = useQuery({
     queryKey: ['artefactActivity', artefactType, artefactId],
     queryFn: () => artefactsApi.listActivity(artefactType, artefactId),

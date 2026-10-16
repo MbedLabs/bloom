@@ -437,12 +437,12 @@ export default function TraceabilityMatrix() {
   )
 }
 
-function SummaryCard({ label, value, icon: Icon, color }: {
+function SummaryCard({ label, value, icon: Icon, color }: Readonly<{
   label: string
   value: number | string
   icon: React.ComponentType<{ className?: string }>
   color: string
-}) {
+}>) {
   return (
     <div className="bg-card rounded-lg shadow-elegant p-4">
       <div className="flex items-center justify-between">
@@ -456,7 +456,7 @@ function SummaryCard({ label, value, icon: Icon, color }: {
   )
 }
 
-function CoverageBadge({ status }: { status: string }) {
+function CoverageBadge({ status }: Readonly<{ status: string }>) {
   const config: Record<string, { colors: string; icon: React.ComponentType<{ className?: string }> }> = {
     Covered: { colors: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400', icon: CheckCircle },
     Partial: { colors: 'bg-amber-500/10 text-amber-700 dark:text-amber-400', icon: AlertCircle },
@@ -472,7 +472,7 @@ function CoverageBadge({ status }: { status: string }) {
   )
 }
 
-function GapTypeBadge({ gapType }: { gapType: string }) {
+function GapTypeBadge({ gapType }: Readonly<{ gapType: string }>) {
   const config: Record<string, { colors: string; label: string }> = {
     no_test_cases: { colors: 'bg-red-500/10 text-red-700 dark:text-red-400', label: 'No Test Cases' },
     all_draft: { colors: 'bg-amber-500/10 text-amber-700 dark:text-amber-400', label: 'All Draft' },
@@ -485,7 +485,7 @@ function GapTypeBadge({ gapType }: { gapType: string }) {
   )
 }
 
-function ImpactLink({ prefix, reqId }: { prefix: string; reqId: string }) {
+function ImpactLink({ prefix, reqId }: Readonly<{ prefix: string; reqId: string }>) {
   return (
     <Link
       to={`/projects/${prefix}/impact-analysis/${reqId}`}
@@ -497,7 +497,7 @@ function ImpactLink({ prefix, reqId }: { prefix: string; reqId: string }) {
   )
 }
 
-function RequirementStatusBadge({ status }: { status: string }) {
+function RequirementStatusBadge({ status }: Readonly<{ status: string }>) {
   const colors: Record<string, string> = {
     Draft: 'bg-gray-500/10 text-gray-700 dark:text-gray-400',
     Review: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
@@ -513,7 +513,7 @@ function RequirementStatusBadge({ status }: { status: string }) {
   )
 }
 
-function PriorityBadge({ priority }: { priority: string }) {
+function PriorityBadge({ priority }: Readonly<{ priority: string }>) {
   const colors: Record<string, string> = {
     Low: 'bg-gray-500/10 text-gray-700 dark:text-gray-400',
     Medium: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',

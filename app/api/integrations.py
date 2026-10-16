@@ -277,7 +277,7 @@ async def create_integration_setting(
 @router.patch(
     "/settings/{setting_id}",
     response_model=IntegrationSettingResponse,
-    responses={400: {"description": HTTPStatus(400).phrase}},
+    responses={400: {"description": HTTPStatus(400).phrase}, 404: {"description": "Not Found"}},
 )
 async def update_integration_setting(
     setting_id: int,
@@ -337,7 +337,9 @@ async def update_integration_setting(
     return _setting_response(setting)
 
 
-@router.delete("/settings/{setting_id}", status_code=204)
+@router.delete(
+    "/settings/{setting_id}", status_code=204, responses={404: {"description": "Not Found"}}
+)
 async def delete_integration_setting(
     setting_id: int,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -947,7 +949,9 @@ async def _create_defect_from_jira_issue(
 
 
 @router.post(
-    "/jira/webhook", status_code=200, responses={400: {"description": HTTPStatus(400).phrase}}
+    "/jira/webhook",
+    status_code=200,
+    responses={400: {"description": HTTPStatus(400).phrase}, 403: {"description": "Forbidden"}},
 )
 async def jira_webhook(
     request: Request,

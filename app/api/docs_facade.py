@@ -511,7 +511,11 @@ async def _registry_union(
     return union_all(*arms).subquery("registry")
 
 
-@router.get("/projects/{project_ref}/docs", response_model=PaginatedResponse[DocShellResponse])
+@router.get(
+    "/projects/{project_ref}/docs",
+    response_model=PaginatedResponse[DocShellResponse],
+    responses={404: {"description": "Not Found"}, 422: {"description": "Unprocessable Content"}},
+)
 async def list_all_docs(
     project_ref: str,
     type: Optional[List[str]] = Query(None),

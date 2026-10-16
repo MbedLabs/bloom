@@ -8,6 +8,8 @@ from typing import List, Literal, Optional
 from pydantic import AliasChoices, EmailStr, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+HTTP_LOCALHOST_8000 = "http://localhost:8000"
+
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ENV_FILES = (BACKEND_DIR / ".env",)
 
@@ -84,14 +86,14 @@ class Settings(BaseSettings):
     BLOOM_APP_VERSION: str = "1.2.0"
 
     APP_BASE_URL: str = Field(
-        default="http://localhost:8000",
+        default=HTTP_LOCALHOST_8000,
         validation_alias=AliasChoices("BLOOM_APP_BASE_URL", "APP_BASE_URL"),
     )
     # Legacy name for APP_BASE_URL. Kept for backward compatibility and left out
     # of .env.example and the docs on purpose. No code reads it directly;
     # APP_BASE_URL falls back to it when only this variable is set.
     FRONTEND_BASE_URL: str = Field(
-        default="http://localhost:8000",
+        default=HTTP_LOCALHOST_8000,
         validation_alias=AliasChoices("BLOOM_FRONTEND_BASE_URL", "FRONTEND_BASE_URL"),
     )
 
@@ -106,7 +108,7 @@ class Settings(BaseSettings):
             "http://localhost:3000",
             "http://localhost:5173",
             "http://localhost:5174",
-            "http://localhost:8000",
+            HTTP_LOCALHOST_8000,
             "http://localhost:8001",
         ],
         validation_alias=AliasChoices("BLOOM_CORS_ORIGINS", "CORS_ORIGINS"),

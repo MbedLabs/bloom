@@ -83,7 +83,12 @@ async def list_defects(
     return PaginatedResponse(items=items, total=total, skip=skip, limit=limit)
 
 
-@router.post("", response_model=DefectResponse, status_code=201)
+@router.post(
+    "",
+    response_model=DefectResponse,
+    status_code=201,
+    responses={422: {"description": "Unprocessable Content"}},
+)
 async def create_defect(
     data: DefectCreate,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -164,7 +169,11 @@ async def get_defect(
     return _defect_response(item)
 
 
-@router.patch("/{defect_pk}", response_model=DefectResponse)
+@router.patch(
+    "/{defect_pk}",
+    response_model=DefectResponse,
+    responses={422: {"description": "Unprocessable Content"}},
+)
 async def update_defect(
     defect_pk: int,
     data: DefectUpdate,
@@ -271,7 +280,15 @@ class RefreshTokenPayload(BaseModel):
     token: str | None = None
 
 
-@router.post("/{defect_pk}/refresh-external", response_model=DefectResponse)
+@router.post(
+    "/{defect_pk}/refresh-external",
+    response_model=DefectResponse,
+    responses={
+        422: {"description": "Unprocessable Content"},
+        502: {"description": "Bad Gateway"},
+        504: {"description": "Gateway Timeout"},
+    },
+)
 async def refresh_external_issue(
     defect_pk: int,
     payload: RefreshTokenPayload | None = None,

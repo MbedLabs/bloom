@@ -126,11 +126,11 @@ function ProjectGroupRoster({ projectId, group, members, people, policies, canAs
   const removed = assigned.filter((member) => !selected.includes(member.user_id))
   const changed = addedIds.length > 0 || removed.length > 0
   const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['project-members', projectId] })
-    queryClient.invalidateQueries({ queryKey: ['project-access', projectId] })
-    queryClient.invalidateQueries({ queryKey: ['project-permissions', projectId] })
-    queryClient.invalidateQueries({ queryKey: ['project-capabilities', projectId] })
-    queryClient.invalidateQueries({ queryKey: ['projects'] })
+    void queryClient.invalidateQueries({ queryKey: ['project-members', projectId] })
+    void queryClient.invalidateQueries({ queryKey: ['project-access', projectId] })
+    void queryClient.invalidateQueries({ queryKey: ['project-permissions', projectId] })
+    void queryClient.invalidateQueries({ queryKey: ['project-capabilities', projectId] })
+    void queryClient.invalidateQueries({ queryKey: ['projects'] })
   }
   const assign = useMutation({
     mutationFn: async () => {
@@ -175,7 +175,7 @@ function LegacyMember({ projectId, member, canRemove }: Readonly<{ projectId: nu
   const toast = useToast()
   const remove = useMutation({
     mutationFn: () => projectMembersApi.remove(projectId, member.id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['project-members', projectId] }); queryClient.invalidateQueries({ queryKey: ['project-access', projectId] }); queryClient.invalidateQueries({ queryKey: ['project-permissions', projectId] }); queryClient.invalidateQueries({ queryKey: ['project-capabilities', projectId] }); queryClient.invalidateQueries({ queryKey: ['projects'] }); toast.notify('Project assignment removed', 'success') },
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['project-members', projectId] }); void queryClient.invalidateQueries({ queryKey: ['project-access', projectId] }); void queryClient.invalidateQueries({ queryKey: ['project-permissions', projectId] }); void queryClient.invalidateQueries({ queryKey: ['project-capabilities', projectId] }); void queryClient.invalidateQueries({ queryKey: ['projects'] }); toast.notify('Project assignment removed', 'success') },
     onError: (failure) => toast.failed('Removing project assignment', failure),
   })
   return <div className="mt-3 text-sm"><div className="flex items-center gap-2"><ProjectMemberIdentity member={member} canRemove={canRemove} disabled={remove.isPending} onRemove={() => remove.mutate()} /></div><p className="text-xs text-muted-foreground">{member.owner ? 'Owner' : member.inherit_policies ? 'Inherited group policies' : 'Individually selected policies'}</p></div>

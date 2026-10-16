@@ -147,7 +147,8 @@ async def test_member_sees_only_member_projects(session):
 async def test_member_without_membership_sees_nothing(session):
     member = await _user(session, UserRole.maintainer)
     res = await run_global_search(session, member, q="login")
-    assert res.total == 0 and res.items == []
+    assert res.total == 0
+    assert res.items == []
 
 
 async def test_external_gated_by_doc_type_and_visibility(session):

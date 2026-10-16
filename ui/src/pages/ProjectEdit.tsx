@@ -67,14 +67,14 @@ export default function ProjectEdit() {
     onSuccess: (updated) => {
       setFormError('')
       queryClient.setQueryData(['projects'], (old: unknown) => old)
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
-      queryClient.invalidateQueries({ queryKey: ['access-assignment-options'] })
+      void queryClient.invalidateQueries({ queryKey: ['projects'] })
+      void queryClient.invalidateQueries({ queryKey: ['access-assignment-options'] })
       queryClient.setQueryData(['project-by-prefix', updated.prefix], updated)
       refreshProjectViews(queryClient, { prefix: updated.prefix, projectId: updated.id })
       if (prefix !== updated.prefix) refreshProjectViews(queryClient, { prefix, projectId: updated.id }, 'none')
       toast.saved('Project')
       if (updated.prefix !== prefix) {
-        navigate(`/projects/${updated.prefix}/edit`, { replace: true })
+        void navigate(`/projects/${updated.prefix}/edit`, { replace: true })
       }
     },
     onError: (error) => {
@@ -87,10 +87,10 @@ export default function ProjectEdit() {
     mutationFn: () => projectsApi.delete(project!.id),
     onSuccess: () => {
       setDeleteError('')
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
-      queryClient.invalidateQueries({ queryKey: ['access-assignment-options'] })
+      void queryClient.invalidateQueries({ queryKey: ['projects'] })
+      void queryClient.invalidateQueries({ queryKey: ['access-assignment-options'] })
       toast.deleted(`Project ${project?.name ?? ''}`.trim())
-      navigate('/projects', { replace: true })
+      void navigate('/projects', { replace: true })
     },
     onError: (error) => {
       setDeleteError(extractApiErrorMessage(error, 'Could not delete project'))

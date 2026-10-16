@@ -68,7 +68,7 @@ export default function MentionTextarea({
   onKeyDown,
   onBlur,
   ...textareaProps
-}: MentionTextareaProps) {
+}: Readonly<MentionTextareaProps>) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const listRef = useRef<MentionListRef>(null)
   const [trigger, setTrigger] = useState<ActiveTrigger | null>(null)

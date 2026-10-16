@@ -27,7 +27,7 @@ const LEGACY_TAB_ROUTES: Record<string, string> = {
   'campaigns': 'campaigns',
 }
 
-function Beaker(props: { className?: string }) {
+function Beaker(props: Readonly<{ className?: string }>) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
       <path d="M4.5 3h15" /><path d="M6 3v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V3" /><path d="M6 14h12" />
@@ -50,7 +50,7 @@ export default function ProjectDetail() {
     const tab = searchParams.get('tab')
     if (tab && tab !== 'overview') {
       const route = LEGACY_TAB_ROUTES[tab]
-      if (route) navigate(`/projects/${prefix}/${route}`, { replace: true })
+      if (route) void navigate(`/projects/${prefix}/${route}`, { replace: true })
     }
   }, [searchParams, prefix, navigate])
 
@@ -190,7 +190,7 @@ function SummaryTile({
   return to ? <Link to={to}>{content}</Link> : content
 }
 
-function ProjectStatusBadge({ status }: { status: string }) {
+function ProjectStatusBadge({ status }: Readonly<{ status: string }>) {
   const colors: Record<string, string> = {
     Active: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
     Archived: 'bg-gray-500/10 text-gray-700 dark:text-gray-400',

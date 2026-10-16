@@ -45,7 +45,7 @@ export default function DocumentAttachmentsPanel({
     mutationFn: (file: File) => attachmentsApi.upload(documentId, file),
     onSuccess: () => {
       refreshProjectViews(queryClient, { prefix, projectId })
-      queryClient.invalidateQueries({ queryKey: ['attachments', documentId] })
+      void queryClient.invalidateQueries({ queryKey: ['attachments', documentId] })
       toast.notify('File attached', 'success')
     },
     onError: (error) => toast.failed('Attaching the file', error),
@@ -55,7 +55,7 @@ export default function DocumentAttachmentsPanel({
     mutationFn: (id: number) => attachmentsApi.remove(id),
     onSuccess: () => {
       refreshProjectViews(queryClient, { prefix, projectId })
-      queryClient.invalidateQueries({ queryKey: ['attachments', documentId] })
+      void queryClient.invalidateQueries({ queryKey: ['attachments', documentId] })
       toast.notify('Attachment removed', 'success')
     },
     onError: (error) => toast.failed('Removing the attachment', error),

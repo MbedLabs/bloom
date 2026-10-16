@@ -85,7 +85,7 @@ function AccessContent() {
   const deletePolicy = useMutation({
     mutationFn: (id: number) => policiesApi.delete(id),
     onSuccess: () => {
-      invalidatePolicies()
+      void invalidatePolicies()
       toast.deleted('Policy')
     },
     onError: (error) => toast.failed('Deleting the policy', error),
@@ -94,7 +94,7 @@ function AccessContent() {
   const duplicatePolicy = useMutation({
     mutationFn: (id: number) => policiesApi.duplicate(id),
     onSuccess: (copy) => {
-      invalidatePolicies()
+      void invalidatePolicies()
       setEditingPolicy(copy)
     },
     onError: (error) => toast.failed('Duplicating the policy', error),
@@ -103,7 +103,7 @@ function AccessContent() {
   const deleteGroup = useMutation({
     mutationFn: (id: number) => groupsApi.delete(id),
     onSuccess: () => {
-      invalidateGroups()
+      void invalidateGroups()
       toast.deleted('Group')
     },
     onError: (error) => toast.failed('Deleting the group', error),
@@ -317,7 +317,7 @@ function AccessContent() {
           tags={tags ?? []}
           onClose={() => setEditingPolicy(null)}
           onSaved={() => {
-            invalidatePolicies()
+            void invalidatePolicies()
             setEditingPolicy(null)
           }}
         />
@@ -328,7 +328,7 @@ function AccessContent() {
           policies={policies ?? []}
           onClose={() => setEditingGroup(null)}
           onSaved={() => {
-            invalidateGroups()
+            void invalidateGroups()
             setEditingGroup(null)
           }}
         />
@@ -448,7 +448,7 @@ function PolicyModal({ policy, tags, readOnly = false, onClose, onSaved }: Reado
     mutationFn: () => tagsApi.create(newOrigin.trim()),
     onSuccess: () => {
       setNewOrigin('')
-      queryClient.invalidateQueries({ queryKey: ['tags'] })
+      void queryClient.invalidateQueries({ queryKey: ['tags'] })
       toast.saved('Origin')
     },
     onError: (error) => toast.failed('Adding the origin', error),

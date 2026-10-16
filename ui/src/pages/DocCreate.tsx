@@ -131,11 +131,11 @@ function invalidateDocumentQueries(
   refreshProjectViews(queryClient, { projectId, prefix })
   if (resolvedDocId) {
     for (const key of DETAIL_QUERY_KEYS) {
-      queryClient.invalidateQueries({ queryKey: [key, resolvedDocId] })
+      void queryClient.invalidateQueries({ queryKey: [key, resolvedDocId] })
     }
   }
   if (prefix && kind && docIdStr) {
-    queryClient.invalidateQueries({ queryKey: ['doc-facade', prefix, kind, docIdStr] })
+    void queryClient.invalidateQueries({ queryKey: ['doc-facade', prefix, kind, docIdStr] })
   }
 }
 
@@ -143,7 +143,7 @@ interface DocCreateProps {
   editMode?: boolean
 }
 
-export default function DocCreate({ editMode = false }: DocCreateProps) {
+export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>) {
   const { prefix, kind, docId: docIdStr } = useParams<{ prefix: string; kind?: string; docId: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -227,9 +227,9 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
 
   const handleBack = useCallback(() => {
     if (window.history.length > 1) {
-      navigate(-1)
+      void navigate(-1)
     } else {
-      navigate(listBackUrl)
+      void navigate(listBackUrl)
     }
   }, [navigate, listBackUrl])
 
@@ -297,7 +297,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   useEffect(() => {
     if (!prefix || usesDocumentEditor(docType)) return
     if (editMode) {
-      navigate(
+      void navigate(
         docIdStr
           ? docUrl(prefix, docType, docIdStr)
           : docRegistryBackUrl(prefix, docType, null),
@@ -305,7 +305,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       )
       return
     }
-    navigate(dedicatedListUrl(prefix, docType) ?? docRegistryBackUrl(prefix, docType, null), {
+    void navigate(dedicatedListUrl(prefix, docType) ?? docRegistryBackUrl(prefix, docType, null), {
       replace: true,
     })
   }, [docIdStr, docType, editMode, navigate, prefix])
@@ -313,7 +313,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   useEffect(() => {
     if (editMode || !prefix || !usesDocumentEditor(docType)) return
     if (!isServerAssignedDocIdOnCreate(docType)) {
-      navigate(docRegistryBackUrl(prefix, docType, returnTo ?? null), { replace: true })
+      void navigate(docRegistryBackUrl(prefix, docType, returnTo ?? null), { replace: true })
     }
   }, [docType, editMode, navigate, prefix, returnTo])
 
@@ -405,7 +405,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       }
       const newDocId = record[docIdFieldMap[docType]] || record.id
       const kindSlug = DOC_TYPE_SLUGS[docType]
-      navigate(`/projects/${prefix}/docs/${kindSlug}/${newDocId}/edit`, { replace: true })
+      void navigate(`/projects/${prefix}/docs/${kindSlug}/${newDocId}/edit`, { replace: true })
     },
     onError: (error) => {
       setSaveError(extractApiErrorMessage(error, 'Could not save document'))
@@ -465,8 +465,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       }
       const activityType = artefactActivityTypeForDocType(docType)
       if (activityType && resolvedDocId) {
-        queryClient.invalidateQueries({ queryKey: ['artefactActivity', activityType, resolvedDocId] })
-        queryClient.invalidateQueries({ queryKey: ['document-workflow', activityType, resolvedDocId] })
+        void queryClient.invalidateQueries({ queryKey: ['artefactActivity', activityType, resolvedDocId] })
+        void queryClient.invalidateQueries({ queryKey: ['document-workflow', activityType, resolvedDocId] })
       }
       invalidateDocumentQueries(queryClient, projectId, prefix, resolvedDocId, kind, docIdStr)
       setSaveError(null)
@@ -835,7 +835,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   )
 }
 
-function MetaField({ label, children }: { label: string; children: React.ReactNode }) {
+function MetaField({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
   return (
     <div>
       <label className="block text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-1">

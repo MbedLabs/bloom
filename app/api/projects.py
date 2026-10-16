@@ -52,6 +52,8 @@ from app.services.audit import record_audit_event
 from app.services.coverage import coverage_percent as coverage_percent_of
 from app.services.coverage import covered_requirement_ids
 
+PROJECT_NOT_FOUND = "Project not found"
+
 router = APIRouter()
 
 
@@ -266,7 +268,12 @@ async def list_projects(
     return response
 
 
-@router.post("", response_model=ProjectResponse, status_code=201)
+@router.post(
+    "",
+    response_model=ProjectResponse,
+    status_code=201,
+    responses={400: {"description": "Bad Request"}},
+)
 async def create_project(
     data: ProjectCreate,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -316,7 +323,11 @@ async def create_project(
     )
 
 
-@router.get("/by-prefix/{prefix}", response_model=ProjectResponse)
+@router.get(
+    "/by-prefix/{prefix}",
+    response_model=ProjectResponse,
+    responses={404: {"description": "Not Found"}},
+)
 async def get_project_by_prefix(
     prefix: str,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -329,7 +340,7 @@ async def get_project_by_prefix(
     project = result.scalar_one_or_none()
 
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=PROJECT_NOT_FOUND)
 
     await require_project_access(db, current_user, project.id)
 
@@ -347,7 +358,9 @@ async def get_project_by_prefix(
     )
 
 
-@router.get("/{project_id}", response_model=ProjectResponse)
+@router.get(
+    "/{project_id}", response_model=ProjectResponse, responses={404: {"description": "Not Found"}}
+)
 async def get_project(
     project_id: int,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -358,7 +371,7 @@ async def get_project(
     """
     project = await db.get(Project, project_id)
     if project is None:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=PROJECT_NOT_FOUND)
     await require_project_access(db, current_user, project_id)
 
     counts = await _project_counts(db, project.id, current_user)
@@ -407,7 +420,7 @@ async def get_project_capabilities(
     current_user: User = Depends(get_current_user),
 ):
     """Return the current user's project metadata and administration capabilities."""
-    await get_row_or_404(db, Project, project_id, "Project not found")
+    await get_row_or_404(db, Project, project_id, PROJECT_NOT_FOUND)
     await require_project_access(db, current_user, project_id)
     is_admin = current_user.role == UserRole.admin
     return {
@@ -420,7 +433,7 @@ async def get_project_capabilities(
 @router.patch(
     "/{project_id}",
     response_model=ProjectResponse,
-    responses={403: {"description": HTTPStatus(403).phrase}},
+    responses={403: {"description": HTTPStatus(403).phrase}, 400: {"description": "Bad Request"}},
 )
 async def update_project(
     project_id: int,
@@ -431,7 +444,7 @@ async def update_project(
     """
     Update a project.
     """
-    project = await get_row_or_404(db, Project, project_id, "Project not found")
+    project = await get_row_or_404(db, Project, project_id, PROJECT_NOT_FOUND)
 
     if not await _can_edit_project(db, current_user, project_id):
         raise HTTPException(status_code=403, detail="Project Write permission is required")
@@ -483,7 +496,7 @@ async def delete_project(
     """
     Delete a project.
     """
-    project = await get_row_or_404(db, Project, project_id, "Project not found")
+    project = await get_row_or_404(db, Project, project_id, PROJECT_NOT_FOUND)
 
     await record_audit_event(
         db,

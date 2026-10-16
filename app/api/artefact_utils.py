@@ -59,6 +59,8 @@ from app.schemas import (
 )
 from app.services.audit import audit_actor_var, record_audit_event
 
+IN_PROGRESS = "In Progress"
+
 
 def naive_utc(value: Optional[datetime]) -> Optional[datetime]:
     """The value as a naive UTC datetime; a naive value is returned unchanged."""
@@ -136,10 +138,10 @@ WORKFLOW_TRANSITIONS = {
     },
     "defect": {
         "Open": ["Triaged", "Rejected", "Duplicate"],
-        "Triaged": ["In Progress", "Rejected", "Duplicate"],
-        "In Progress": ["Resolved", "Triaged"],
-        "Resolved": ["Verified", "In Progress"],
-        "Verified": ["Closed", "In Progress"],
+        "Triaged": [IN_PROGRESS, "Rejected", "Duplicate"],
+        IN_PROGRESS: ["Resolved", "Triaged"],
+        "Resolved": ["Verified", IN_PROGRESS],
+        "Verified": ["Closed", IN_PROGRESS],
         "Closed": ["Open"],
         "Rejected": ["Open"],
         "Duplicate": ["Open"],

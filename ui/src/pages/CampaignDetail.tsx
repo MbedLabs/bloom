@@ -70,7 +70,7 @@ export default function CampaignDetail({
         }
         return updated
       })
-      queryClient.invalidateQueries({ queryKey: ['campaign', campId] })
+      void queryClient.invalidateQueries({ queryKey: ['campaign', campId] })
       setEditOpen(false)
       toast.notify('Campaign updated', 'success')
     },
@@ -412,7 +412,7 @@ export default function CampaignDetail({
   )
 }
 
-function CampaignItemRow({ item, prefix }: { item: TestCampaignItem; prefix: string }) {
+function CampaignItemRow({ item, prefix }: Readonly<{ item: TestCampaignItem; prefix: string }>) {
   return (
     <div className="px-10 py-3 flex items-center justify-between gap-4">
       <div className="min-w-0">
@@ -440,7 +440,7 @@ function CampaignItemRow({ item, prefix }: { item: TestCampaignItem; prefix: str
   )
 }
 
-function StatCard({ label, value, color }: { label: string; value: number | string; color: string }) {
+function StatCard({ label, value, color }: Readonly<{ label: string; value: number | string; color: string }>) {
   return (
     <div className="bg-card rounded-lg shadow-elegant p-4">
       <p className="text-sm text-muted-foreground">{label}</p>
@@ -449,7 +449,7 @@ function StatCard({ label, value, color }: { label: string; value: number | stri
   )
 }
 
-function CampaignStatusBadge({ status }: { status: string }) {
+function CampaignStatusBadge({ status }: Readonly<{ status: string }>) {
   const config: Record<string, { colors: string }> = {
     Planned: { colors: 'bg-gray-500/10 text-gray-700 dark:text-gray-400' },
     Scope: { colors: 'bg-blue-500/10 text-blue-700 dark:text-blue-400' },
@@ -460,7 +460,7 @@ function CampaignStatusBadge({ status }: { status: string }) {
   return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cfg.colors}`}>{status}</span>
 }
 
-function RunStatusBadge({ status }: { status: string }) {
+function RunStatusBadge({ status }: Readonly<{ status: string }>) {
   const config: Record<string, string> = {
     Completed: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
     Failed: 'bg-red-500/10 text-red-700 dark:text-red-400',
@@ -475,7 +475,7 @@ function RunStatusBadge({ status }: { status: string }) {
   )
 }
 
-function ResultBadge({ result }: { result: string }) {
+function ResultBadge({ result }: Readonly<{ result: string }>) {
   const config: Record<string, string> = {
     Passed: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
     Failed: 'bg-red-500/10 text-red-700 dark:text-red-400',

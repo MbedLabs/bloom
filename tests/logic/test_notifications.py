@@ -109,7 +109,8 @@ async def test_requirement_create_notifies_reviewer(session):
     assert n.user_id == reviewer.id
     assert n.event_type == "assignment"
     assert "reviewer" in n.title
-    assert n.link_path and "/docs/requirements/ALP-REQ-001" in n.link_path
+    assert n.link_path
+    assert "/docs/requirements/ALP-REQ-001" in n.link_path
 
 
 async def test_requirement_update_notifies_new_approver_once(session):
@@ -151,7 +152,8 @@ async def test_list_unread_and_mark_read_flow(session):
     listed = await list_notifications(
         unread_only=False, limit=20, offset=0, db=session, current_user=reviewer
     )
-    assert listed.total == 3 and listed.unread == 3
+    assert listed.total == 3
+    assert listed.unread == 3
 
     count = await unread_count(db=session, current_user=reviewer)
     assert count.unread == 3
@@ -167,7 +169,8 @@ async def test_list_unread_and_mark_read_flow(session):
     unread_list = await list_notifications(
         unread_only=True, limit=20, offset=0, db=session, current_user=reviewer
     )
-    assert unread_list.items == [] and unread_list.total == 0
+    assert unread_list.items == []
+    assert unread_list.total == 0
 
 
 async def test_users_cannot_read_each_others_notifications(session):

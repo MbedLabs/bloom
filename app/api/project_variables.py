@@ -41,7 +41,12 @@ async def list_project_variables(
     return result.scalars().all()
 
 
-@router.post("", response_model=ProjectVariableResponse, status_code=201)
+@router.post(
+    "",
+    response_model=ProjectVariableResponse,
+    status_code=201,
+    responses={400: {"description": "Bad Request"}},
+)
 async def create_project_variable(
     data: ProjectVariableCreate,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -81,7 +86,11 @@ async def create_project_variable(
     return item
 
 
-@router.patch("/{item_id}", response_model=ProjectVariableResponse)
+@router.patch(
+    "/{item_id}",
+    response_model=ProjectVariableResponse,
+    responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}},
+)
 async def update_project_variable(
     item_id: int,
     data: ProjectVariableUpdate,

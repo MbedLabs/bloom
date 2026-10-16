@@ -258,9 +258,9 @@ export default function Reports() {
   )
 }
 
-function ReportStatCard({ title, value, subtitle, icon: Icon, color }: {
+function ReportStatCard({ title, value, subtitle, icon: Icon, color }: Readonly<{
   title: string; value: number | string; subtitle: string; icon: React.ComponentType<{ className?: string }>; color: string
-}) {
+}>) {
   return (
     <div className="bg-card rounded-lg border border-border shadow-elegant p-5">
       <div className="flex items-start justify-between">
@@ -275,7 +275,7 @@ function ReportStatCard({ title, value, subtitle, icon: Icon, color }: {
   )
 }
 
-function HorizontalBar({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
+function HorizontalBar({ label, value, max, color }: Readonly<{ label: string; value: number; max: number; color: string }>) {
   const pct = max > 0 ? (value / max) * 100 : 0
   return (
     <div>
@@ -290,7 +290,7 @@ function HorizontalBar({ label, value, max, color }: { label: string; value: num
   )
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status }: Readonly<{ status: string }>) {
   const config: Record<string, string> = {
     Active: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
     Archived: 'bg-muted text-muted-foreground',
@@ -299,7 +299,7 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${config[status] || config.Draft}`}>{status}</span>
 }
 
-function HealthBadge({ level }: { level: string }) {
+function HealthBadge({ level }: Readonly<{ level: string }>) {
   const config: Record<string, { colors: string; icon: string }> = {
     good: { colors: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400', icon: 'Good' },
     warning: { colors: 'bg-amber-500/10 text-amber-700 dark:text-amber-400', icon: 'Warning' },

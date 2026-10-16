@@ -113,7 +113,12 @@ async def list_documents(
     return PaginatedResponse(items=response, total=total, skip=skip, limit=limit)
 
 
-@router.post("/projects/{project_id}/documents", response_model=DocumentResponse, status_code=201)
+@router.post(
+    "/projects/{project_id}/documents",
+    response_model=DocumentResponse,
+    status_code=201,
+    responses={400: {"description": "Bad Request"}},
+)
 async def create_document(
     project_id: int,
     data: DocumentCreate,
@@ -422,7 +427,11 @@ async def create_section(
     )
 
 
-@router.patch("/document-sections/{section_id}", response_model=DocumentSectionResponse)
+@router.patch(
+    "/document-sections/{section_id}",
+    response_model=DocumentSectionResponse,
+    responses={404: {"description": "Not Found"}},
+)
 async def update_section(
     section_id: int,
     data: DocumentSectionUpdate,
@@ -497,7 +506,11 @@ async def update_section(
     )
 
 
-@router.delete("/document-sections/{section_id}", status_code=204)
+@router.delete(
+    "/document-sections/{section_id}",
+    status_code=204,
+    responses={404: {"description": "Not Found"}},
+)
 async def delete_section(
     section_id: int,
     db: AsyncSession = Depends(get_db, scope="function"),

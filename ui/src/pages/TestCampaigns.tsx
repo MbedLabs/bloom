@@ -538,7 +538,7 @@ export default function TestCampaigns() {
   )
 }
 
-function CampaignCard({ campaign, prefix }: { campaign: import('../api/client').TestCampaign; prefix: string }) {
+function CampaignCard({ campaign, prefix }: Readonly<{ campaign: import('../api/client').TestCampaign; prefix: string }>) {
   const total = campaign.total_items
   const progress = 0
 
@@ -608,7 +608,7 @@ function CampaignCard({ campaign, prefix }: { campaign: import('../api/client').
   )
 }
 
-function CampaignStatusBadge({ status }: { status: string }) {
+function CampaignStatusBadge({ status }: Readonly<{ status: string }>) {
   const config: Record<string, { colors: string; icon: React.ComponentType<{ className?: string }> }> = {
     Planned: { colors: 'bg-gray-500/10 text-gray-700 dark:text-gray-400', icon: Clock },
     Scope: { colors: 'bg-blue-500/10 text-blue-700 dark:text-blue-400', icon: FlaskConical },

@@ -37,7 +37,7 @@ function normalizeSteps(steps: unknown): TcsRow[] {
   return normalizeTcsRows(steps) as TcsRow[]
 }
 
-function ExecutionBadge({ status }: { status: string }) {
+function ExecutionBadge({ status }: Readonly<{ status: string }>) {
   const colors: Record<string, string> = {
     Passed: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
     Failed: 'bg-red-500/10 text-red-700 dark:text-red-400',

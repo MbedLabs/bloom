@@ -102,7 +102,11 @@ async def create_credential(
     )
 
 
-@router.post("/{credential_id}/rotate", response_model=ServiceCredentialCreated)
+@router.post(
+    "/{credential_id}/rotate",
+    response_model=ServiceCredentialCreated,
+    responses={404: {"description": "Not Found"}},
+)
 async def rotate_credential(
     credential_id: int,
     db: AsyncSession = Depends(get_db, scope="function"),

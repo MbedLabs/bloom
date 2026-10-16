@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException
 from sqlalchemy import select
@@ -50,7 +50,8 @@ async def create_service_credential(
         token_prefix=raw_token[:TOKEN_LOOKUP_LENGTH],
         token_hash=_token_hash(raw_token),
         scope=SERVICE_SCOPE,
-        expires_at=datetime.utcnow() + timedelta(days=expires_in_days),
+        expires_at=datetime.now(timezone.utc).replace(tzinfo=None)
+        + timedelta(days=expires_in_days),
         created_by_user_id=created_by_user_id,
     )
     db.add(credential)
@@ -63,7 +64,7 @@ async def revoke_service_credential(db: AsyncSession, credential_id: int) -> Non
     credential = await db.get(ServiceCredential, credential_id)
     if credential is None:
         raise HTTPException(status_code=404, detail="Service credential not found.")
-    credential.revoked_at = datetime.utcnow()
+    credential.revoked_at = datetime.now(timezone.utc).replace(tzinfo=None)
     await db.commit()
 
 
@@ -83,7 +84,7 @@ async def require_bud_sync_token(
             ServiceCredential.token_prefix == token[:TOKEN_LOOKUP_LENGTH]
         )
     )
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     if (
         credential is None
         or credential.scope != SERVICE_SCOPE

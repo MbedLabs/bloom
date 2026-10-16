@@ -26,6 +26,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 from app.core.link_rules import allowed_link_triples
 
+ALL_DELETE_ORPHAN = "all, delete-orphan"
+PROJECTS_ID = "projects.id"
+REQUIREMENTS_ID = "requirements.id"
+TEST_SUITES_ID = "test_suites.id"
+
 SET_NULL = "SET NULL"
 USERS_ID = "users.id"
 
@@ -80,7 +85,7 @@ class Project(Base):
         back_populates="project", foreign_keys="Defect.project_id"
     )
     variables: Mapped[List["ProjectVariable"]] = relationship(
-        back_populates="project", cascade="all, delete-orphan"
+        back_populates="project", cascade=ALL_DELETE_ORPHAN
     )
 
 
@@ -90,7 +95,7 @@ class ProjectVariable(Base):
     __tablename__ = "project_variables"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[int] = mapped_column(ForeignKey(PROJECTS_ID), nullable=False)
     kind: Mapped[str] = mapped_column(String(20), default="variable")
     key: Mapped[str] = mapped_column(String(100), nullable=False)
     value: Mapped[str] = mapped_column(Text, nullable=False)
@@ -111,9 +116,9 @@ class Requirement(Base):
     __tablename__ = "requirements"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey(PROJECTS_ID), nullable=False, index=True)
     parent_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("requirements.id"), nullable=True, index=True
+        ForeignKey(REQUIREMENTS_ID), nullable=True, index=True
     )
     req_id: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
@@ -133,9 +138,7 @@ class Requirement(Base):
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    source_project_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("projects.id"), nullable=True
-    )
+    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey(PROJECTS_ID), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -165,7 +168,7 @@ class TestCase(Base):
     __tablename__ = "test_cases"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey(PROJECTS_ID), nullable=False, index=True)
     tc_id: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -187,9 +190,7 @@ class TestCase(Base):
     last_execution_comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     last_bud_run_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    source_project_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("projects.id"), nullable=True
-    )
+    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey(PROJECTS_ID), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -211,8 +212,8 @@ class RequirementLink(Base):
     __table_args__ = (UniqueConstraint("source_id", "target_id", "link_type", name="uq_req_link"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    source_id: Mapped[int] = mapped_column(ForeignKey("requirements.id"), nullable=False)
-    target_id: Mapped[int] = mapped_column(ForeignKey("requirements.id"), nullable=False)
+    source_id: Mapped[int] = mapped_column(ForeignKey(REQUIREMENTS_ID), nullable=False)
+    target_id: Mapped[int] = mapped_column(ForeignKey(REQUIREMENTS_ID), nullable=False)
     link_type: Mapped[str] = mapped_column(String(30), default="depends_on")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -230,7 +231,7 @@ class TestRunLink(Base):
     __tablename__ = "test_run_links"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    requirement_id: Mapped[int] = mapped_column(ForeignKey("requirements.id"), nullable=False)
+    requirement_id: Mapped[int] = mapped_column(ForeignKey(REQUIREMENTS_ID), nullable=False)
     test_run_id: Mapped[int] = mapped_column(Integer, nullable=False)
     test_run_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     teststation_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
@@ -244,7 +245,7 @@ class Document(Base):
     __tablename__ = "documents"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey(PROJECTS_ID), nullable=False, index=True)
     doc_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     doc_type: Mapped[str] = mapped_column(String(30), default="SPEC")
@@ -256,9 +257,7 @@ class Document(Base):
     content_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    source_project_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("projects.id"), nullable=True
-    )
+    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey(PROJECTS_ID), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -269,12 +268,12 @@ class Document(Base):
     project: Mapped["Project"] = relationship(back_populates="documents", foreign_keys=[project_id])
     sections: Mapped[List["DocumentSection"]] = relationship(
         back_populates="document",
-        cascade="all, delete-orphan",
+        cascade=ALL_DELETE_ORPHAN,
         order_by="DocumentSection.order",
     )
     attachments: Mapped[List["DocumentAttachment"]] = relationship(
         back_populates="document",
-        cascade="all, delete-orphan",
+        cascade=ALL_DELETE_ORPHAN,
         order_by="DocumentAttachment.created_at",
     )
 
@@ -292,7 +291,7 @@ class DocumentSection(Base):
     content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     section_type: Mapped[str] = mapped_column(String(30), default="text")
     linked_requirement_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("requirements.id"), nullable=True
+        ForeignKey(REQUIREMENTS_ID), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
@@ -315,7 +314,7 @@ class TestSuite(Base):
     __tablename__ = "test_suites"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey(PROJECTS_ID), nullable=False, index=True)
     suite_id: Mapped[str] = mapped_column(String(50), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -331,7 +330,7 @@ class TestSuite(Base):
 
     project: Mapped["Project"] = relationship(back_populates="test_suites")
     items: Mapped[List["TestSuiteItem"]] = relationship(
-        back_populates="suite", cascade="all, delete-orphan"
+        back_populates="suite", cascade=ALL_DELETE_ORPHAN
     )
     campaigns: Mapped[List["TestCampaign"]] = relationship(back_populates="suite")
     campaign_suites: Mapped[List["CampaignSuite"]] = relationship(back_populates="suite")
@@ -344,7 +343,7 @@ class TestSuiteItem(Base):
     __table_args__ = (UniqueConstraint("suite_id", "test_case_id", name="uq_suite_tc"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    suite_id: Mapped[int] = mapped_column(ForeignKey("test_suites.id"), nullable=False)
+    suite_id: Mapped[int] = mapped_column(ForeignKey(TEST_SUITES_ID), nullable=False)
     test_case_id: Mapped[int] = mapped_column(ForeignKey("test_cases.id"), nullable=False)
     order: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -359,9 +358,9 @@ class TestCampaign(Base):
     __tablename__ = "test_campaigns"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey(PROJECTS_ID), nullable=False, index=True)
     campaign_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    suite_id: Mapped[Optional[int]] = mapped_column(ForeignKey("test_suites.id"), nullable=True)
+    suite_id: Mapped[Optional[int]] = mapped_column(ForeignKey(TEST_SUITES_ID), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Planned")
@@ -382,10 +381,10 @@ class TestCampaign(Base):
     project: Mapped["Project"] = relationship(back_populates="test_campaigns")
     suite: Mapped[Optional["TestSuite"]] = relationship(back_populates="campaigns")
     items: Mapped[List["TestCampaignItem"]] = relationship(
-        back_populates="campaign", cascade="all, delete-orphan"
+        back_populates="campaign", cascade=ALL_DELETE_ORPHAN
     )
     campaign_suites: Mapped[List["CampaignSuite"]] = relationship(
-        back_populates="campaign", cascade="all, delete-orphan"
+        back_populates="campaign", cascade=ALL_DELETE_ORPHAN
     )
 
 
@@ -415,7 +414,7 @@ class CampaignSuite(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     campaign_id: Mapped[int] = mapped_column(ForeignKey("test_campaigns.id"), nullable=False)
-    suite_id: Mapped[int] = mapped_column(ForeignKey("test_suites.id"), nullable=False)
+    suite_id: Mapped[int] = mapped_column(ForeignKey(TEST_SUITES_ID), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     campaign: Mapped["TestCampaign"] = relationship(back_populates="campaign_suites")
@@ -470,7 +469,7 @@ class ArtefactLink(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[int] = mapped_column(ForeignKey(PROJECTS_ID), nullable=False)
     source_type: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
     source_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     target_type: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
@@ -484,7 +483,7 @@ class DesignItem(Base):
     __tablename__ = "design_items"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey(PROJECTS_ID), nullable=False, index=True)
     design_id: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -496,12 +495,10 @@ class DesignItem(Base):
     priority: Mapped[str] = mapped_column(String(20), default="Medium")
     design_type: Mapped[str] = mapped_column(String(30), default="Architecture")
     linked_requirement_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("requirements.id"), nullable=True
+        ForeignKey(REQUIREMENTS_ID), nullable=True
     )
     source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    source_project_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("projects.id"), nullable=True
-    )
+    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey(PROJECTS_ID), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -519,7 +516,7 @@ class RiskItem(Base):
     __tablename__ = "risk_items"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey(PROJECTS_ID), nullable=False, index=True)
     risk_id: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -533,12 +530,10 @@ class RiskItem(Base):
     mitigation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     risk_category: Mapped[str] = mapped_column(String(30), default="Technical")
     linked_requirement_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("requirements.id"), nullable=True
+        ForeignKey(REQUIREMENTS_ID), nullable=True
     )
     source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    source_project_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("projects.id"), nullable=True
-    )
+    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey(PROJECTS_ID), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -565,7 +560,7 @@ class ChangeRequest(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey(PROJECTS_ID), nullable=False, index=True)
     change_id: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -587,9 +582,7 @@ class ChangeRequest(Base):
     external_issue_state: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     external_last_event_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    source_project_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("projects.id"), nullable=True
-    )
+    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey(PROJECTS_ID), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -606,7 +599,7 @@ class Baseline(Base):
     __tablename__ = "baselines"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey(PROJECTS_ID), nullable=False, index=True)
     baseline_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -627,7 +620,7 @@ class TestConcept(Base):
     __tablename__ = "test_concepts"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey(PROJECTS_ID), nullable=False, index=True)
     concept_id: Mapped[str] = mapped_column(String(50), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -639,9 +632,7 @@ class TestConcept(Base):
     linked_requirement_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     coverage: Mapped[float] = mapped_column(Float, default=0)
     source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    source_project_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("projects.id"), nullable=True
-    )
+    source_project_id: Mapped[Optional[int]] = mapped_column(ForeignKey(PROJECTS_ID), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -660,7 +651,7 @@ class Defect(Base):
     __tablename__ = "defects"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[int] = mapped_column(ForeignKey(PROJECTS_ID), nullable=False)
     defect_id: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -702,7 +693,7 @@ class IntegrationSetting(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[int] = mapped_column(ForeignKey(PROJECTS_ID), nullable=False)
     tracker: Mapped[str] = mapped_column(String(20), nullable=False)
     base_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     # Jira Cloud authenticates with `email:api_token` Basic auth, so the account the
@@ -847,7 +838,7 @@ class Notification(Base):
         ForeignKey(USERS_ID, ondelete=SET_NULL), nullable=True
     )
     project_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("projects.id"), nullable=True, index=True
+        ForeignKey(PROJECTS_ID), nullable=True, index=True
     )
     event_type: Mapped[str] = mapped_column(String(40), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
@@ -874,7 +865,7 @@ class ImportAttempt(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey(USERS_ID), nullable=False, index=True)
     project_id: Mapped[int] = mapped_column(
-        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey(PROJECTS_ID, ondelete="CASCADE"), nullable=False, index=True
     )
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)

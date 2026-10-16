@@ -250,7 +250,12 @@ async def list_campaigns(
     )
 
 
-@router.post("", response_model=TestCampaignDetailResponse, status_code=201)
+@router.post(
+    "",
+    response_model=TestCampaignDetailResponse,
+    status_code=201,
+    responses={404: {"description": "Not Found"}},
+)
 async def create_campaign(
     data: TestCampaignCreate,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -394,7 +399,11 @@ async def get_campaign(
     return await _build_campaign_detail(campaign, db, current_user)
 
 
-@router.patch("/{campaign_id}", response_model=TestCampaignResponse)
+@router.patch(
+    "/{campaign_id}",
+    response_model=TestCampaignResponse,
+    responses={404: {"description": "Not Found"}},
+)
 async def update_campaign(
     campaign_id: int,
     data: TestCampaignUpdate,
@@ -518,7 +527,12 @@ async def delete_campaign(
     await db.delete(campaign)
 
 
-@router.post("/{campaign_id}/items", response_model=TestCampaignItemResponse, status_code=201)
+@router.post(
+    "/{campaign_id}/items",
+    response_model=TestCampaignItemResponse,
+    status_code=201,
+    responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}},
+)
 async def add_campaign_item(
     campaign_id: int,
     test_case_id: int = Query(...),
@@ -585,7 +599,11 @@ async def remove_campaign_item(
     await db.delete(item)
 
 
-@router.patch("/{campaign_id}/items/{item_id}", response_model=TestCampaignItemResponse)
+@router.patch(
+    "/{campaign_id}/items/{item_id}",
+    response_model=TestCampaignItemResponse,
+    responses={404: {"description": "Not Found"}},
+)
 async def update_campaign_item(
     campaign_id: int,
     item_id: int,

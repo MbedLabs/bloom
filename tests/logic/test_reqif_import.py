@@ -265,7 +265,8 @@ async def test_import_creates_requirements_with_hierarchy_and_links(session):
     assert child.title == "Login"
     assert child.parent_id == parent.id  # hierarchy preserved
     assert child.priority == "High"  # enum resolved
-    assert child.content_html and "<b>shall</b>" in child.content_html
+    assert child.content_html
+    assert "<b>shall</b>" in child.content_html
     assert child.req_origin == "External"
     assert parent.source_ref == "OBJ-1"  # provenance kept for re-import
 
@@ -280,7 +281,8 @@ async def test_reimport_is_idempotent(session):
     first = await import_reqif(
         project_id=1, file=_FakeUpload(SAMPLE_REQIF), db=session, current_user=admin
     )
-    assert first.imported == 2 and first.links_created == 1
+    assert first.imported == 2
+    assert first.links_created == 1
 
     second = await import_reqif(
         project_id=1, file=_FakeUpload(SAMPLE_REQIF), db=session, current_user=admin

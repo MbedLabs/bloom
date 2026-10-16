@@ -18,7 +18,7 @@ interface OutlineSidebarProps {
   onToggle: () => void
 }
 
-export default function OutlineSidebar({ editor, open, onToggle }: OutlineSidebarProps) {
+export default function OutlineSidebar({ editor, open, onToggle }: Readonly<OutlineSidebarProps>) {
   const [headings, setHeadings] = useState<HeadingItem[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
 

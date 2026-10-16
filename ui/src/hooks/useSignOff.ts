@@ -43,8 +43,8 @@ export function useSignOff({ queryKey, activityKey, noun, setReviewed, setApprov
       }
       return updated
     })
-    queryClient.invalidateQueries({ queryKey })
-    queryClient.invalidateQueries({ queryKey: activityKey })
+    void queryClient.invalidateQueries({ queryKey })
+    void queryClient.invalidateQueries({ queryKey: activityKey })
     toast.notify(message, 'success')
   }
   const markReviewed = useMutation({

@@ -156,7 +156,7 @@ function writeListParam(params: URLSearchParams, key: string, values: string[]) 
   values.forEach((value) => params.append(key, value))
 }
 
-function TypeBadge({ type }: { type: string }) {
+function TypeBadge({ type }: Readonly<{ type: string }>) {
   const cfg = isDocType(type) ? TYPE_BADGES[type] : { label: type, color: 'bg-muted text-muted-foreground' }
   return <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${cfg.color}`}>{cfg.label}</span>
 }
@@ -180,7 +180,7 @@ function StatusBadge({ status }: Readonly<{ status: string | null }>) {
   return <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${colors[status] || 'bg-muted text-muted-foreground'}`}>{status}</span>
 }
 
-function ReqTypeBadge({ reqType }: { reqType: string }) {
+function ReqTypeBadge({ reqType }: Readonly<{ reqType: string }>) {
   return (
     <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/10 text-purple-700 dark:text-purple-400">
       {reqType}
@@ -188,7 +188,7 @@ function ReqTypeBadge({ reqType }: { reqType: string }) {
   )
 }
 
-function ReqOriginBadge({ origin }: { origin: string }) {
+function ReqOriginBadge({ origin }: Readonly<{ origin: string }>) {
   const colors: Record<string, string> = {
     Internal: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
     Customer: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
@@ -205,7 +205,7 @@ function ReqOriginBadge({ origin }: { origin: string }) {
   )
 }
 
-function ExecutionBadge({ status }: { status: string | null }) {
+function ExecutionBadge({ status }: Readonly<{ status: string | null }>) {
   if (!status) {
     return <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">Not executed</span>
   }
@@ -534,9 +534,9 @@ export default function Documents() {
           <button
             onClick={() => {
               if (window.history.length > 1) {
-                navigate(-1)
+                void navigate(-1)
               } else {
-                navigate(`/projects/${prefix}`)
+                void navigate(`/projects/${prefix}`)
               }
             }}
             className="p-1 hover:bg-accent/50 rounded-md shrink-0 mt-0.5"
@@ -875,12 +875,12 @@ function DatePickerField({
   value,
   emptyLabel,
   onChange,
-}: {
+}: Readonly<{
   label: string
   value: string
   emptyLabel: string
   onChange: (value: string) => void
-}) {
+}>) {
   return (
     <label className="space-y-1">
       <span className="text-xs font-medium uppercase text-muted-foreground">{label}</span>

@@ -100,7 +100,12 @@ async def list_links(
     "",
     response_model=ArtefactLinkResponse,
     status_code=201,
-    responses={403: {"description": HTTPStatus(403).phrase}},
+    responses={
+        403: {"description": HTTPStatus(403).phrase},
+        400: {"description": "Bad Request"},
+        404: {"description": "Not Found"},
+        422: {"description": "Unprocessable Content"},
+    },
 )
 async def create_link(
     data: ArtefactLinkCreate,
@@ -184,7 +189,9 @@ async def create_link(
 
 
 @router.delete(
-    "/{link_id}", status_code=204, responses={403: {"description": HTTPStatus(403).phrase}}
+    "/{link_id}",
+    status_code=204,
+    responses={403: {"description": HTTPStatus(403).phrase}, 404: {"description": "Not Found"}},
 )
 async def delete_link(
     link_id: int,

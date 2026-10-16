@@ -30,6 +30,8 @@ from app.models.user import User, UserRole
 from app.schemas import BaselineCreate, BaselineResponse, BaselineUpdate
 from app.services.audit import record_audit_event
 
+BASELINE_NOT_FOUND = "Baseline not found"
+
 router = APIRouter()
 
 SNAPSHOT_SECTION_TYPES = {
@@ -111,7 +113,9 @@ async def _build_snapshot(db: AsyncSession, project_id: int) -> dict:
     }
 
 
-@router.get("", response_model=list[BaselineResponse])
+@router.get(
+    "", response_model=list[BaselineResponse], responses={400: {"description": "Bad Request"}}
+)
 async def list_baselines(
     project_id: int | None = Query(None, description="Optional project filter"),
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -170,7 +174,9 @@ async def create_baseline(
     )
 
 
-@router.get("/{baseline_id}", response_model=BaselineResponse)
+@router.get(
+    "/{baseline_id}", response_model=BaselineResponse, responses={404: {"description": "Not Found"}}
+)
 async def get_baseline(
     baseline_id: int,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -180,7 +186,7 @@ async def get_baseline(
         await db.execute(select(Baseline).where(Baseline.id == baseline_id))
     ).scalar_one_or_none()
     if not item:
-        raise HTTPException(status_code=404, detail="Baseline not found")
+        raise HTTPException(status_code=404, detail=BASELINE_NOT_FOUND)
     await require_project_access(db, current_user, item.project_id, permission=("view", "baseline"))
     return _baseline_response(
         item, current_user, await fully_visible_types(db, current_user, item.project_id)
@@ -198,7 +204,7 @@ async def update_baseline(
         db,
         Baseline,
         baseline_id,
-        "Baseline not found",
+        BASELINE_NOT_FOUND,
         current_user,
         permission=("edit", "baseline"),
     )
@@ -219,7 +225,7 @@ async def delete_baseline(
         current_user,
         Baseline,
         baseline_id,
-        "Baseline not found",
+        BASELINE_NOT_FOUND,
         resource="baseline",
         audit_type="baseline",
     )

@@ -82,7 +82,7 @@ export default function DocEditor({
   parameterHref,
   parameterValues,
   artefactLabels,
-}: DocEditorProps) {
+}: Readonly<DocEditorProps>) {
   const mentionItemsRef = useRef(mentionItems)
   const userMentionItemsRef = useRef(userMentionItems)
   // Read through a ref for the same reason the lists are: the extensions are
@@ -548,12 +548,12 @@ function BubbleButton({
   onClick,
   label,
   className = '',
-}: {
+}: Readonly<{
   active: boolean
   onClick: () => void
   label: string
   className?: string
-}) {
+}>) {
   return (
     <button
       type="button"

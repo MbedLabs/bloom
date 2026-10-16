@@ -217,7 +217,7 @@ async def get_related_items(
 
 @router.post(
     "/{artefact_type}/{artefact_id}/transition",
-    responses={409: {"description": HTTPStatus(409).phrase}},
+    responses={409: {"description": HTTPStatus(409).phrase}, 400: {"description": "Bad Request"}},
 )
 async def transition_status(
     artefact_type: str,

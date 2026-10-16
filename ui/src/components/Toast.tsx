@@ -44,7 +44,7 @@ const ICONS: Record<ToastVariant, typeof CheckCircle2> = {
  * nothing at all, or an inline banner that scrolled out of view. Deleting from
  * the editor just navigated away, which is indistinguishable from a misclick.
  */
-export function ToastProvider({ children }: { children: React.ReactNode }) {
+export function ToastProvider({ children }: Readonly<{ children: React.ReactNode }>) {
   const [toasts, setToasts] = useState<ToastMessage[]>([])
   const nextId = useRef(1)
 
@@ -88,10 +88,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 function ToastItem({
   toast,
   onDismiss,
-}: {
+}: Readonly<{
   toast: ToastMessage
   onDismiss: (id: number) => void
-}) {
+}>) {
   const styles = VARIANT_STYLES[toast.variant]
   const Icon = ICONS[toast.variant]
 

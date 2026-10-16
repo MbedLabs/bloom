@@ -19,7 +19,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from PIL import Image, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageOps
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -71,6 +71,8 @@ from app.services.token_service import (
     invalidate_tokens,
     mark_token_used,
 )
+
+USER_NOT_FOUND = "User not found"
 
 AUTH_LOGIN = "auth.login"
 AUTH_REFRESH = "auth.refresh"
@@ -130,7 +132,7 @@ async def set_profile_picture(
             picture.info.clear()
             output = io.BytesIO()
             picture.save(output, format="PNG")
-    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
+    except (OSError, ValueError, Image.DecompressionBombError):
         raise HTTPException(status_code=422, detail="The picture is invalid or too large.")
     current_user.profile_picture = output.getvalue()
     await db.flush()
@@ -337,7 +339,15 @@ async def update_me(
     return UserResponse.model_validate(current_user)
 
 
-@router.post("/me/email", response_model=GenericMessageResponse)
+@router.post(
+    "/me/email",
+    response_model=GenericMessageResponse,
+    responses={
+        400: {"description": "Bad Request"},
+        404: {"description": "Not Found"},
+        503: {"description": "Service Unavailable"},
+    },
+)
 async def request_email_change(
     data: EmailChangeRequest,
     current_user: User = Depends(get_current_user),
@@ -351,7 +361,7 @@ async def request_email_change(
         with_for_update=True,
     )
     if current_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
     if not verify_password(data.current_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
 
@@ -414,7 +424,11 @@ async def request_email_change(
     )
 
 
-@router.delete("/me/email", response_model=GenericMessageResponse)
+@router.delete(
+    "/me/email",
+    response_model=GenericMessageResponse,
+    responses={404: {"description": "Not Found"}},
+)
 async def cancel_email_change(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -428,7 +442,7 @@ async def cancel_email_change(
         with_for_update=True,
     )
     if current_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
     current_user.pending_email = None
     current_user.email_change_status = None
     current_user.email_change_requested_at = None
@@ -439,7 +453,15 @@ async def cancel_email_change(
     return GenericMessageResponse(message="Pending email change cancelled")
 
 
-@router.post("/confirm-email-change", response_model=GenericMessageResponse)
+@router.post(
+    "/confirm-email-change",
+    response_model=GenericMessageResponse,
+    responses={
+        400: {"description": "Bad Request"},
+        404: {"description": "Not Found"},
+        503: {"description": "Service Unavailable"},
+    },
+)
 async def confirm_email_change(
     data: ConfirmEmailChangeRequest,
     response: Response,
@@ -462,7 +484,7 @@ async def confirm_email_change(
         with_for_update=True,
     )
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
     if not user.pending_email or user.email_change_status not in {
         "awaiting_current_confirmation",
         "awaiting_confirmation",
@@ -548,7 +570,9 @@ async def confirm_email_change(
     return GenericMessageResponse(message="Email address updated. Please log in again.")
 
 
-@router.put("/me/password", response_model=UserResponse)
+@router.put(
+    "/me/password", response_model=UserResponse, responses={400: {"description": "Bad Request"}}
+)
 async def change_password(
     data: PasswordChange,
     response: Response,
@@ -578,7 +602,11 @@ async def change_password(
     return UserResponse.model_validate(current_user)
 
 
-@router.post("/invite-info", response_model=InviteInfoResponse)
+@router.post(
+    "/invite-info",
+    response_model=InviteInfoResponse,
+    responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}},
+)
 async def get_invite_info(
     data: InviteInfoRequest, db: AsyncSession = Depends(get_db, scope="function")
 ):
@@ -588,7 +616,7 @@ async def get_invite_info(
 
     user = await db.get(User, user_token.user_id)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
 
     expired = user_token.expires_at < datetime.now(timezone.utc).replace(tzinfo=None)
     used = user_token.used_at is not None
@@ -601,7 +629,11 @@ async def get_invite_info(
     )
 
 
-@router.post("/accept-invite", response_model=AcceptInviteResponse)
+@router.post(
+    "/accept-invite",
+    response_model=AcceptInviteResponse,
+    responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}},
+)
 async def accept_invite(
     data: AcceptInviteRequest, db: AsyncSession = Depends(get_db, scope="function")
 ):
@@ -612,7 +644,7 @@ async def accept_invite(
 
     user = await db.get(User, claimed.user_id)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
     if user.invite_accepted_at is not None:
         raise HTTPException(status_code=400, detail="Invite already accepted")
 
@@ -634,7 +666,11 @@ async def accept_invite(
     )
 
 
-@router.post("/verify-email", response_model=GenericMessageResponse)
+@router.post(
+    "/verify-email",
+    response_model=GenericMessageResponse,
+    responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}},
+)
 async def verify_email(
     data: VerifyEmailRequest, db: AsyncSession = Depends(get_db, scope="function")
 ):
@@ -649,7 +685,7 @@ async def verify_email(
 
     user = await db.get(User, claimed.user_id)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
     if user.email_verified_at is not None:
         raise HTTPException(status_code=400, detail="Email already verified")
 
@@ -660,7 +696,11 @@ async def verify_email(
     return GenericMessageResponse(message="Email verified successfully")
 
 
-@router.post("/resend-verification", response_model=GenericMessageResponse)
+@router.post(
+    "/resend-verification",
+    response_model=GenericMessageResponse,
+    responses={400: {"description": "Bad Request"}, 503: {"description": "Service Unavailable"}},
+)
 @limiter.limit("5/hour")
 async def resend_verification(
     request: Request,
@@ -745,7 +785,11 @@ async def forgot_password(
     return response
 
 
-@router.post("/reset-password", response_model=GenericMessageResponse)
+@router.post(
+    "/reset-password",
+    response_model=GenericMessageResponse,
+    responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}},
+)
 async def reset_password(
     data: ResetPasswordRequest,
     response: Response,
@@ -765,7 +809,7 @@ async def reset_password(
 
     user = await db.get(User, claimed.user_id)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
 
     user.hashed_password = get_password_hash(data.new_password)
     user.password_set_at = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -784,7 +828,7 @@ async def reset_password(
     return GenericMessageResponse(message="Password reset successfully")
 
 
-@router.post("/token/generate", status_code=410)
+@router.post("/token/generate", status_code=410, responses={410: {"description": "Gone"}})
 async def generate_api_token(
     _current_user: User = Depends(get_current_user),
 ):

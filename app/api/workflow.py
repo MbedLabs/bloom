@@ -822,7 +822,7 @@ async def read_revision(
     db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ):
-    row, revision = await _visible_revision(db, slug, identifier, number, user)
+    _, revision = await _visible_revision(db, slug, identifier, number, user)
     snapshot = {
         key: value
         for key, value in revision.content_snapshot.items()

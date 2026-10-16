@@ -1,6 +1,6 @@
 """Endpoints for the current user's in-app notifications."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -114,7 +114,11 @@ async def unread_count(
     return UnreadCountResponse(unread=unread)
 
 
-@router.post("/{notification_id}/read", response_model=NotificationResponse)
+@router.post(
+    "/{notification_id}/read",
+    response_model=NotificationResponse,
+    responses={404: {"description": "Not Found"}},
+)
 async def mark_read(
     notification_id: int,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -131,7 +135,7 @@ async def mark_read(
     if notification is None:
         raise HTTPException(status_code=404, detail="Notification not found")
     if notification.read_at is None:
-        notification.read_at = datetime.utcnow()
+        notification.read_at = datetime.now(timezone.utc).replace(tzinfo=None)
         await db.flush()
     actor = await db.get(User, notification.actor_user_id) if notification.actor_user_id else None
     return notification_response(notification, actor)
@@ -145,7 +149,7 @@ async def mark_all_read(
     await db.execute(
         update(Notification)
         .where(Notification.user_id == current_user.id, Notification.read_at.is_(None))
-        .values(read_at=datetime.utcnow())
+        .values(read_at=datetime.now(timezone.utc).replace(tzinfo=None))
     )
     await db.flush()
     return UnreadCountResponse(unread=0)

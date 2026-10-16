@@ -20,7 +20,7 @@ export default function Login() {
     setupApi
       .getStatus()
       .then((status) => {
-        if (!cancelled && status.setup_required) navigate('/setup', { replace: true })
+        if (!cancelled && status.setup_required) void navigate('/setup', { replace: true })
       })
       .catch(() => undefined)
     return () => {
@@ -34,7 +34,7 @@ export default function Login() {
     setLoading(true)
     try {
       await login(email, password)
-      navigate('/', { replace: true })
+      void navigate('/', { replace: true })
     } catch (err: unknown) {
       const message = extractApiErrorMessage(err, 'Login failed')
       setError(message)

@@ -151,7 +151,7 @@ function countNodes(nodes: ImpactNode[]): number {
   return count
 }
 
-function ImpactTree({ nodes, direction, prefix }: { nodes: ImpactNode[]; direction: string; prefix: string }) {
+function ImpactTree({ nodes, direction, prefix }: Readonly<{ nodes: ImpactNode[]; direction: string; prefix: string }>) {
   return (
     <div className="space-y-1">
       {nodes.map((node) => (
@@ -161,7 +161,7 @@ function ImpactTree({ nodes, direction, prefix }: { nodes: ImpactNode[]; directi
   )
 }
 
-function ImpactTreeNode({ node, direction, depth, prefix }: { node: ImpactNode; direction: string; depth: number; prefix: string }) {
+function ImpactTreeNode({ node, direction, depth, prefix }: Readonly<{ node: ImpactNode; direction: string; depth: number; prefix: string }>) {
   const [expanded, setExpanded] = useState(depth < 1)
   const hasChildren = node.children.length > 0
   const borderColor = direction === 'upstream' ? 'border-l-blue-400' : 'border-l-orange-400'
@@ -214,7 +214,7 @@ function ImpactTreeNode({ node, direction, depth, prefix }: { node: ImpactNode; 
   )
 }
 
-function LinkTypeBadge({ linkType }: { linkType: string }) {
+function LinkTypeBadge({ linkType }: Readonly<{ linkType: string }>) {
   const config: Record<string, { colors: string; label: string }> = {
     verifies: { colors: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400', label: 'verifies' },
     traces_to: { colors: 'bg-blue-500/10 text-blue-700 dark:text-blue-400', label: 'traces to' },

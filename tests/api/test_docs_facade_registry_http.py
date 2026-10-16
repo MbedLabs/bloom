@@ -182,7 +182,8 @@ class TestTheShellItReturns:
         # stored value is what decides whether an external user sees the row -
         # so the listing has to report it rather than assume a default.
         assert alpha["visibility"] == "customer"
-        assert alpha["created_at"] and alpha["updated_at"]
+        assert alpha["created_at"]
+        assert alpha["updated_at"]
 
     def test_never_returns_the_document_body(self, api_client, auth_headers, registry):
         items = fetch(api_client, auth_headers, registry["prefix"]).json()["items"]

@@ -79,8 +79,8 @@ export default function SuiteDetail({
     mutationFn: (testCaseId: number) => testSuitesApi.addItem(parsedSuiteId, testCaseId),
     onSuccess: () => {
       refreshProjectViews(queryClient, { prefix, projectId })
-      queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
-      queryClient.invalidateQueries({ queryKey: ['document-workflow', 'test-suite', parsedSuiteId] })
+      void queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
+      void queryClient.invalidateQueries({ queryKey: ['document-workflow', 'test-suite', parsedSuiteId] })
       setShowAddCase(false)
       toast.notify('Test case added', 'success')
     },
@@ -93,8 +93,8 @@ export default function SuiteDetail({
     mutationFn: (itemId: number) => testSuitesApi.removeItem(parsedSuiteId, itemId),
     onSuccess: () => {
       refreshProjectViews(queryClient, { prefix, projectId })
-      queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
-      queryClient.invalidateQueries({ queryKey: ['document-workflow', 'test-suite', parsedSuiteId] })
+      void queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
+      void queryClient.invalidateQueries({ queryKey: ['document-workflow', 'test-suite', parsedSuiteId] })
       toast.notify('Test case removed', 'success')
     },
     onError: (err: unknown) => {
@@ -113,9 +113,9 @@ export default function SuiteDetail({
     }),
     onSuccess: (campaign) => {
       refreshProjectViews(queryClient, { prefix, projectId })
-      queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
+      void queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
       toast.notify('Campaign scope created', 'success')
-      navigate(`/projects/${prefix}/campaigns/${campaign.id}`, {
+      void navigate(`/projects/${prefix}/campaigns/${campaign.id}`, {
         state: { returnTo: `/projects/${prefix}/suites/${suiteId}` },
       })
     },
@@ -135,8 +135,8 @@ export default function SuiteDetail({
         }
         return updated
       })
-      queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
-      queryClient.invalidateQueries({ queryKey: ['document-workflow', 'test-suite', parsedSuiteId] })
+      void queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
+      void queryClient.invalidateQueries({ queryKey: ['document-workflow', 'test-suite', parsedSuiteId] })
       setEditing(false)
       toast.notify('Suite saved', 'success')
     },
@@ -424,7 +424,7 @@ export default function SuiteDetail({
   )
 }
 
-function SummaryCard({ label, value }: { label: string; value: ReactNode }) {
+function SummaryCard({ label, value }: Readonly<{ label: string; value: ReactNode }>) {
   return (
     <div className="bg-card rounded-lg border border-border shadow-elegant p-4">
       <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>

@@ -247,10 +247,10 @@ export default function ArtefactDetail({
     mutationFn: (payload: Partial<ArtefactRecord>) => config.update(recordId, payload as never) as Promise<ArtefactRecord>,
     onSuccess: (updated: ArtefactRecord) => {
       queryClient.setQueryData([config.queryKey, recordId], updated)
-      queryClient.invalidateQueries({ queryKey: [config.queryKey, recordId] })
+      void queryClient.invalidateQueries({ queryKey: [config.queryKey, recordId] })
       refreshProjectViews(queryClient, { prefix: projectPrefix, projectId: updated.project_id })
-      queryClient.invalidateQueries({ queryKey: ['artefactActivity', kind, recordId] })
-      queryClient.invalidateQueries({ queryKey: ['document-workflow', kind, recordId] })
+      void queryClient.invalidateQueries({ queryKey: ['artefactActivity', kind, recordId] })
+      void queryClient.invalidateQueries({ queryKey: ['document-workflow', kind, recordId] })
       setIsEditing(false)
       toast.notify(`${config.singular} saved`, 'success')
     },
@@ -286,8 +286,8 @@ export default function ArtefactDetail({
         }
         return updated
       })
-      queryClient.invalidateQueries({ queryKey: [config.queryKey, recordId] })
-      queryClient.invalidateQueries({ queryKey: ['artefactActivity', kind, recordId] })
+      void queryClient.invalidateQueries({ queryKey: [config.queryKey, recordId] })
+      void queryClient.invalidateQueries({ queryKey: ['artefactActivity', kind, recordId] })
       if (artefact) {
         refreshProjectViews(queryClient, { prefix: projectPrefix, projectId: artefact.project_id })
       }
@@ -307,10 +307,10 @@ export default function ArtefactDetail({
         }
         return updated
       })
-      queryClient.invalidateQueries({ queryKey: [config.queryKey, recordId] })
+      void queryClient.invalidateQueries({ queryKey: [config.queryKey, recordId] })
       refreshProjectViews(queryClient, { prefix: projectPrefix, projectId })
-      queryClient.invalidateQueries({ queryKey: ['syncEvents', recordId] })
-      queryClient.invalidateQueries({ queryKey: ['artefactActivity', kind, recordId] })
+      void queryClient.invalidateQueries({ queryKey: ['syncEvents', recordId] })
+      void queryClient.invalidateQueries({ queryKey: ['artefactActivity', kind, recordId] })
       const state = (updated as unknown as Defect).external_issue_state
       toast.notify(state ? `External issue is ${state}` : 'External issue refreshed', 'success')
     },
@@ -386,7 +386,7 @@ export default function ArtefactDetail({
               setActiveTab('overview')
               setIsEditing(true)
             } else {
-              navigate(`${editUrl}?type=${config.docType}`)
+              void navigate(`${editUrl}?type=${config.docType}`)
             }
           }} className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 text-sm">
             <Pencil className="h-4 w-4 mr-2" />
@@ -718,14 +718,14 @@ function ExternalIssueCard({
   onRefresh,
   refreshing,
   refreshError,
-}: {
+}: Readonly<{
   defect: Defect
   projectPrefix: string
   hasStoredToken: boolean
   onRefresh: () => void
   refreshing: boolean
   refreshError: string | null
-}) {
+}>) {
   const tracker = defect.external_tracker
   const trackerLabel = tracker === 'github' ? 'GitHub' : tracker === 'gitlab' ? 'GitLab' : tracker === 'jira' ? 'Jira' : null
   const webhookPath = `/api/integrations/${tracker === 'gitlab' || tracker === 'jira' ? tracker : 'github'}/webhook`

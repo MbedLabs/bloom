@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import base64
-import binascii
 import logging
 from http import HTTPStatus
 from urllib.parse import quote
@@ -69,6 +68,7 @@ async def list_attachments(
     "/documents/{document_id}/attachments",
     response_model=DocumentAttachmentResponse,
     status_code=201,
+    responses={413: {"description": "Content Too Large"}},
 )
 async def upload_attachment(
     document_id: int,
@@ -132,7 +132,7 @@ async def upload_attachment(
 
 @router.get(
     "/attachments/{attachment_id}/download",
-    responses={503: {"description": HTTPStatus(503).phrase}},
+    responses={503: {"description": HTTPStatus(503).phrase}, 404: {"description": "Not Found"}},
 )
 async def download_attachment(
     attachment_id: int,
@@ -183,7 +183,9 @@ async def download_attachment(
     return FileResponse(path=str(path), media_type=attachment.content_type, headers=headers)
 
 
-@router.delete("/attachments/{attachment_id}", status_code=204)
+@router.delete(
+    "/attachments/{attachment_id}", status_code=204, responses={404: {"description": "Not Found"}}
+)
 async def delete_attachment(
     attachment_id: int,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -333,7 +335,7 @@ async def _replace_report_file(
     content_type = storage.require_allowed_type(item.content_type)
     try:
         payload = base64.b64decode(item.content_base64, validate=True)
-    except (ValueError, binascii.Error) as exc:
+    except ValueError as exc:
         raise HTTPException(
             status_code=422, detail=f"'{display_name}' is not valid base64"
         ) from exc

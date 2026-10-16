@@ -69,14 +69,14 @@ function DocumentLinkRow({
   sourceDocId,
   direction,
   onDelete,
-}: {
+}: Readonly<{
   link: ArtefactLink
   target: LinkTarget | undefined
   projectPrefix: string
   sourceDocId?: string
   direction: 'incoming' | 'outgoing'
   onDelete?: () => void
-}) {
+}>) {
   const otherType = (direction === 'outgoing' ? link.target_type : link.source_type) as DocType
   const otherId = direction === 'outgoing' ? link.target_id : link.source_id
   const roleLabel = getDocLinkRoleLabel(link.role, direction)
@@ -128,13 +128,13 @@ function LinkDocumentModal({
   sourceType,
   sourceId,
   onClose,
-}: {
+}: Readonly<{
   projectId: number
   projectPrefix: string
   sourceType: string
   sourceId: number
   onClose: () => void
-}) {
+}>) {
   const queryClient = useQueryClient()
   const toast = useToast()
   const normalizedSourceType = normalizeDocTypeParam(sourceType)
@@ -206,7 +206,7 @@ function LinkDocumentModal({
     },
     onSuccess: () => {
       refreshProjectViews(queryClient, { prefix: projectPrefix, projectId })
-      queryClient.invalidateQueries({ queryKey: ['docLinks', projectId] })
+      void queryClient.invalidateQueries({ queryKey: ['docLinks', projectId] })
       toast.notify('Relationship added', 'success')
       onClose()
     },
@@ -338,7 +338,7 @@ export function DocumentLinksPanel({
   sourceId,
   sourceDocId,
   derivedLinks,
-}: {
+}: Readonly<{
   projectId: number
   projectPrefix: string
   sourceType: string
@@ -346,7 +346,7 @@ export function DocumentLinksPanel({
   /** Human-readable id of the document this panel belongs to (e.g. FLT-REQ-001). */
   sourceDocId?: string
   derivedLinks?: ArtefactLink[]
-}) {
+}>) {
   const queryClient = useQueryClient()
   const toast = useToast()
   const [showModal, setShowModal] = useState(false)
@@ -367,7 +367,7 @@ export function DocumentLinksPanel({
     mutationFn: linksApi.delete,
     onSuccess: () => {
       refreshProjectViews(queryClient, { prefix: projectPrefix, projectId })
-      queryClient.invalidateQueries({ queryKey: ['docLinks', projectId] })
+      void queryClient.invalidateQueries({ queryKey: ['docLinks', projectId] })
       toast.notify('Relationship removed', 'success')
     },
     onError: (error) => toast.failed('Removing the relationship', error),

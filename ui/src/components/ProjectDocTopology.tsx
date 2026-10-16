@@ -232,7 +232,7 @@ function formatCount(n: number): string {
   return n.toLocaleString()
 }
 
-function TypeNode({ data }: { data: TypeNodeData }) {
+function TypeNode({ data }: Readonly<{ data: TypeNodeData }>) {
   const style = TYPE_STYLE[data.docType]
   const Icon = style.icon
   return (
@@ -293,7 +293,7 @@ function FitViewOnLayout({ layoutToken }: { layoutToken: number }) {
   useEffect(() => {
     if (layoutToken === 0) return
     const id = requestAnimationFrame(() => {
-      fitView({ padding: 0.25, duration: 0 })
+      void fitView({ padding: 0.25, duration: 0 })
     })
     return () => cancelAnimationFrame(id)
   }, [layoutToken, fitView])
@@ -418,7 +418,7 @@ interface Props {
   prefix: string
 }
 
-export default function ProjectDocTopology({ projectId, prefix }: Props) {
+export default function ProjectDocTopology({ projectId, prefix }: Readonly<Props>) {
   const navigate = useNavigate()
   const isDark = useIsDarkMode()
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
@@ -586,7 +586,7 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
       const data = node.data as unknown as TypeNodeData
-      navigate(docRegistryListUrl(prefix, data.docType))
+      void navigate(docRegistryListUrl(prefix, data.docType))
     },
     [navigate, prefix],
   )

@@ -34,7 +34,7 @@ const inputClass = 'w-full px-3 py-1.5 text-sm bg-background border border-input
 const labelClass = 'block text-xs uppercase tracking-wide text-muted-foreground mb-1'
 
 /** One external tracker per project: None | GitHub | GitLab | Jira. */
-export default function IntegrationSettingsPanel({ projectId }: { projectId: number }) {
+export default function IntegrationSettingsPanel({ projectId }: Readonly<{ projectId: number }>) {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -195,7 +195,7 @@ export default function IntegrationSettingsPanel({ projectId }: { projectId: num
     },
     onSuccess: (_updated) => {
       void _updated
-      queryClient.invalidateQueries({ queryKey: ['integrationSettings', projectId] })
+      void queryClient.invalidateQueries({ queryKey: ['integrationSettings', projectId] })
       setToken('')
       setDirty(false)
       toast.saved('Integration')

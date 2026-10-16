@@ -51,7 +51,7 @@ const projectNav = [
   { name: 'Parameters', icon: SlidersHorizontal, tab: '', href: 'parameters' as const },
 ]
 
-function Beaker(props: { className?: string }) {
+function Beaker(props: Readonly<{ className?: string }>) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
       <path d="M4.5 3h15" /><path d="M6 3v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V3" /><path d="M6 14h12" />
@@ -159,7 +159,7 @@ function LayoutInner() {
     setSearchOpen(false)
     setSearchQuery('')
     searchInputRef.current?.blur()
-    navigate(searchResultUrl(item))
+    void navigate(searchResultUrl(item))
   }
 
   // Notifications: unread badge polls every 60s; list loads when the panel opens.
@@ -177,8 +177,8 @@ function LayoutInner() {
     enabled: notifOpen,
   })
   const invalidateNotifications = () => {
-    queryClient.invalidateQueries({ queryKey: ['notifications-unread'] })
-    queryClient.invalidateQueries({ queryKey: ['notifications-list'] })
+    void queryClient.invalidateQueries({ queryKey: ['notifications-unread'] })
+    void queryClient.invalidateQueries({ queryKey: ['notifications-list'] })
   }
   const markReadMutation = useMutation({
     mutationFn: notificationsApi.markRead,
@@ -202,7 +202,7 @@ function LayoutInner() {
   const openNotification = (id: number, linkPath: string | null, alreadyRead: boolean) => {
     if (!alreadyRead) markReadMutation.mutate(id)
     setNotifOpen(false)
-    if (linkPath) navigate(linkPath)
+    if (linkPath) void navigate(linkPath)
   }
 
   const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

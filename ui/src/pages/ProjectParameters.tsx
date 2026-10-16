@@ -367,10 +367,10 @@ export default function ProjectParameters() {
   )
 }
 
-function Th({ children }: { children: React.ReactNode }) {
+function Th({ children }: Readonly<{ children: React.ReactNode }>) {
   return <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{children}</th>
 }
 
-function Td({ children }: { children: React.ReactNode }) {
+function Td({ children }: Readonly<{ children: React.ReactNode }>) {
   return <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{children}</td>
 }

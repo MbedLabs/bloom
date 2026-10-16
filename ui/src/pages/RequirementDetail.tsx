@@ -27,7 +27,7 @@ import WorkflowPanel from '../components/WorkflowPanel'
 import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
 import { useSignOffPeople } from '../hooks/useSignOff'
 
-function TypeBadge({ reqType }: { reqType: string }) {
+function TypeBadge({ reqType }: Readonly<{ reqType: string }>) {
   return (
     <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-500/10 text-purple-700 dark:text-purple-400">
       {reqType}
@@ -35,7 +35,7 @@ function TypeBadge({ reqType }: { reqType: string }) {
   )
 }
 
-function OriginBadge({ origin }: { origin: string }) {
+function OriginBadge({ origin }: Readonly<{ origin: string }>) {
   const colors: Record<string, string> = {
     Internal: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
     Customer: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
@@ -52,7 +52,7 @@ function OriginBadge({ origin }: { origin: string }) {
   )
 }
 
-function RunStatusBadge({ status }: { status: string }) {
+function RunStatusBadge({ status }: Readonly<{ status: string }>) {
   const colors: Record<string, string> = {
     Passed: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
     Failed: 'bg-red-500/10 text-red-700 dark:text-red-400',

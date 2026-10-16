@@ -61,6 +61,8 @@ from app.services.mail_service import (
 )
 from app.services.token_service import create_user_token, invalidate_tokens
 
+USER_NOT_FOUND = "User not found"
+
 router = APIRouter()
 
 require_admin = require_role(UserRole.admin)
@@ -100,7 +102,7 @@ async def application_policy_ids(
 ):
     """List the account's separately selected application policies."""
     if await db.get(User, user_id) is None:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
     ids = await db.scalars(
         select(user_application_policies.c.policy_id)
         .where(user_application_policies.c.user_id == user_id)
@@ -124,7 +126,7 @@ async def set_application_policies(
 ):
     """Set app-only policies for an account without changing its base role."""
     if await db.get(User, user_id) is None:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
     policies = await _selected_policies(db, data.policy_ids)
     if any(policy.scope != "app" for policy in policies):
         raise HTTPException(status_code=400, detail="Choose application policies only")
@@ -162,7 +164,7 @@ async def set_application_policies(
 async def _get_user_or_404(db: AsyncSession, user_id: int) -> User:
     user = await db.get(User, user_id, populate_existing=True, with_for_update=True)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
     return user
 
 
@@ -257,7 +259,12 @@ async def list_mentionable_users(
     return [MentionableUserResponse.model_validate(u) for u in result.scalars().all()]
 
 
-@router.post("", response_model=UserResponse, status_code=201)
+@router.post(
+    "",
+    response_model=UserResponse,
+    status_code=201,
+    responses={400: {"description": "Bad Request"}},
+)
 async def create_user(
     data: UserCreate,
     _admin: User = Depends(require_admin),
@@ -286,7 +293,12 @@ async def create_user(
     return UserResponse.model_validate(user)
 
 
-@router.post("/invite", response_model=InviteResponse, status_code=201)
+@router.post(
+    "/invite",
+    response_model=InviteResponse,
+    status_code=201,
+    responses={400: {"description": "Bad Request"}, 503: {"description": "Service Unavailable"}},
+)
 async def invite_user(
     data: InviteCreateRequest,
     admin: User = Depends(require_admin),
@@ -355,7 +367,15 @@ async def invite_user(
     )
 
 
-@router.post("/{user_id}/resend-invite", response_model=InviteResponse)
+@router.post(
+    "/{user_id}/resend-invite",
+    response_model=InviteResponse,
+    responses={
+        400: {"description": "Bad Request"},
+        404: {"description": "Not Found"},
+        503: {"description": "Service Unavailable"},
+    },
+)
 async def resend_invite(
     user_id: int,
     admin: User = Depends(require_admin),
@@ -364,7 +384,7 @@ async def resend_invite(
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
     if user.password_set_at is not None:
         raise HTTPException(status_code=400, detail="Invite already accepted")
 
@@ -399,7 +419,11 @@ async def resend_invite(
     )
 
 
-@router.post("/{user_id}/revoke-invite", response_model=InviteResponse)
+@router.post(
+    "/{user_id}/revoke-invite",
+    response_model=InviteResponse,
+    responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}},
+)
 async def revoke_invite(
     user_id: int,
     _admin: User = Depends(require_admin),
@@ -408,7 +432,7 @@ async def revoke_invite(
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
     if user.password_set_at is not None:
         raise HTTPException(status_code=400, detail="Invite already accepted")
 
@@ -418,7 +442,9 @@ async def revoke_invite(
     return InviteResponse(message="Invitation revoked", user=UserResponse.model_validate(user))
 
 
-@router.get("/{user_id}", response_model=UserResponse)
+@router.get(
+    "/{user_id}", response_model=UserResponse, responses={404: {"description": "Not Found"}}
+)
 async def get_user(
     user_id: int,
     _admin: User = Depends(require_admin),
@@ -427,7 +453,7 @@ async def get_user(
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
     return UserResponse.model_validate(user)
 
 
@@ -450,7 +476,11 @@ async def start_email_change(
     )
 
 
-@router.post("/{user_id}/email/approve", response_model=UserResponse)
+@router.post(
+    "/{user_id}/email/approve",
+    response_model=UserResponse,
+    responses={400: {"description": "Bad Request"}},
+)
 async def approve_email_change(
     user_id: int,
     admin: User = Depends(require_admin),
@@ -471,7 +501,9 @@ async def approve_email_change(
     )
 
 
-@router.delete("/{user_id}/email", response_model=UserResponse)
+@router.delete(
+    "/{user_id}/email", response_model=UserResponse, responses={400: {"description": "Bad Request"}}
+)
 async def reject_email_change(
     user_id: int,
     _admin: User = Depends(require_admin),
@@ -494,7 +526,11 @@ async def reject_email_change(
 @router.patch(
     "/{user_id}",
     response_model=UserResponse,
-    responses={403: {"description": HTTPStatus(403).phrase}},
+    responses={
+        403: {"description": HTTPStatus(403).phrase},
+        400: {"description": "Bad Request"},
+        404: {"description": "Not Found"},
+    },
 )
 async def update_user(
     user_id: int,
@@ -505,7 +541,7 @@ async def update_user(
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
 
     previous_role = user.role
     previous_active = user.is_active
@@ -544,7 +580,15 @@ async def update_user(
     return UserResponse.model_validate(user)
 
 
-@router.delete("/{user_id}", status_code=204)
+@router.delete(
+    "/{user_id}",
+    status_code=204,
+    responses={
+        400: {"description": "Bad Request"},
+        404: {"description": "Not Found"},
+        409: {"description": "Conflict"},
+    },
+)
 async def delete_user(
     user_id: int,
     admin: User = Depends(require_admin),
@@ -553,7 +597,7 @@ async def delete_user(
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
 
     if admin.id == user_id:
         raise HTTPException(

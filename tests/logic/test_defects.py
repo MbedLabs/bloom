@@ -110,9 +110,11 @@ def test_parse_gitlab_url_invalid():
 
 def test_parse_issue_url_auto_detects():
     gh = parse_issue_url("https://github.com/owner/repo/issues/10")
-    assert gh is not None and gh.tracker == "github"
+    assert gh is not None
+    assert gh.tracker == "github"
     gl = parse_issue_url("https://gitlab.com/ns/proj/-/issues/3")
-    assert gl is not None and gl.tracker == "gitlab"
+    assert gl is not None
+    assert gl.tracker == "gitlab"
 
 
 # ==================== External field validation ====================
