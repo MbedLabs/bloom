@@ -3,7 +3,8 @@ import UserIdentity from './UserIdentity'
 import ProfilePicture from './ProfilePicture'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { X } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
+import { RowActionsMenu } from './RowMenu'
 import {
   extractApiErrorMessage, groupsApi, policiesApi, projectMembersApi,
   type Group, type Policy, type ProjectMember,
@@ -15,18 +16,19 @@ import { useToast } from './useToast'
 const DEFAULT_GROUPS = ['Administrators', 'Developers', 'Product Owners', 'Testers']
 type Person = { id: number; email: string; full_name: string; role?: string; profile_picture_url?: string | null }
 
+/** A project member's identity and permitted assignment actions. */
 function ProjectMemberIdentity({ member, canRemove, disabled, onRemove }: Readonly<{ member: ProjectMember; canRemove: boolean; disabled: boolean; onRemove: () => void }>) {
-  const label = `Remove ${member.full_name} from project`
-  return <span className="inline-flex min-w-0 items-center gap-2 align-middle">
-    <span className="group/image relative inline-flex shrink-0">
-      <ProfilePicture user={{ ...member, id: member.user_id }} className="w-6 h-6" />
-      {canRemove && <button type="button" aria-label={label} title={label} disabled={disabled} onClick={onRemove}
-        className="absolute -right-1 -top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full border border-border bg-card text-red-500 opacity-0 transition-opacity group-hover/image:opacity-100 group-focus-within/image:opacity-100 [@media(hover:none)]:opacity-100 hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-wait disabled:opacity-50">
-        <X className="h-3 w-3" aria-hidden="true" />
-      </button>}
-    </span>
-    <span className="truncate">{member.full_name}</span>
-  </span>
+  return <>
+    <div className="min-w-0 flex-1">
+      <p className="inline-flex max-w-full items-center gap-2 text-sm text-foreground">
+        <ProfilePicture user={{ ...member, id: member.user_id }} className="w-6 h-6" />
+        <span className="truncate">{member.full_name}</span>
+      </p>
+      <p className="truncate text-xs text-muted-foreground">{member.email}</p>
+    </div>
+    {canRemove && <RowActionsMenu label={`Project member actions for ${member.full_name}`} disabled={disabled}
+      actions={[{ icon: <Trash2 className="h-4 w-4" />, label: 'Remove', destructive: true, onClick: onRemove }]} />}
+  </>
 }
 
 function groupRequiresRole(group: Group, policies: Policy[]): 'admin' | 'maintainer' | 'external' {
@@ -149,7 +151,7 @@ function ProjectGroupRoster({ projectId, group, members, people, policies, canAs
       {canAssign && <button type="button" disabled={busy || group.policy_ids.length === 0} onClick={() => { setSelected(choosing ? [] : assignedIds); setSearch(''); setChoosing((value) => !value); setError('') }} className="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-accent disabled:opacity-50">{choosing ? 'Cancel selection' : 'Select members'}</button>}
     </div>
     {!choosing && (assigned.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No people assigned.</p> : <ul className="mt-3 space-y-2">
-      {assigned.map((member) => <li key={member.id} className="flex items-center gap-2"><div className="min-w-0"><p className="text-sm text-foreground"><ProjectMemberIdentity member={member} canRemove={canRemove} disabled={busy} onRemove={() => remove.mutate(member.id)} /></p><p className="truncate text-xs text-muted-foreground">{member.email}</p></div></li>)}
+      {assigned.map((member) => <li key={member.id} className="flex items-center gap-2"><ProjectMemberIdentity member={member} canRemove={canRemove} disabled={busy} onRemove={() => remove.mutate(member.id)} /></li>)}
     </ul>)}
     {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
     {choosing && <fieldset disabled={busy} className="mt-4 min-w-0 space-y-3">
@@ -176,5 +178,5 @@ function LegacyMember({ projectId, member, canRemove }: Readonly<{ projectId: nu
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['project-members', projectId] }); queryClient.invalidateQueries({ queryKey: ['project-access', projectId] }); queryClient.invalidateQueries({ queryKey: ['project-permissions', projectId] }); queryClient.invalidateQueries({ queryKey: ['project-capabilities', projectId] }); queryClient.invalidateQueries({ queryKey: ['projects'] }); toast.notify('Project assignment removed', 'success') },
     onError: (failure) => toast.failed('Removing project assignment', failure),
   })
-  return <div className="mt-3 flex items-center gap-2 text-sm"><div className="min-w-0"><p><ProjectMemberIdentity member={member} canRemove={canRemove} disabled={remove.isPending} onRemove={() => remove.mutate()} /></p><p className="truncate text-xs text-muted-foreground">{member.email}</p><p className="text-xs text-muted-foreground">{member.owner ? 'Owner' : member.inherit_policies ? 'Inherited group policies' : 'Individually selected policies'}</p></div></div>
+  return <div className="mt-3 text-sm"><div className="flex items-center gap-2"><ProjectMemberIdentity member={member} canRemove={canRemove} disabled={remove.isPending} onRemove={() => remove.mutate()} /></div><p className="text-xs text-muted-foreground">{member.owner ? 'Owner' : member.inherit_policies ? 'Inherited group policies' : 'Individually selected policies'}</p></div>
 }

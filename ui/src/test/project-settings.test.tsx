@@ -476,7 +476,9 @@ describe('project policy group rosters', () => {
     renderEdit()
     const roster = within(await screen.findByRole('region', { name: 'Developers' }))
     expect(roster.getByText(projectMember.full_name)).toBeTruthy()
-    fireEvent.click(roster.getByRole('button', { name: `Remove ${projectMember.full_name} from project` }))
+    fireEvent.click(roster.getByRole('button', { name: `Project member actions for ${projectMember.full_name}` }))
+    expect(client.projectMembersApi.remove).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
     await waitFor(() => expect(client.projectMembersApi.remove).toHaveBeenCalledWith(project.id, projectMember.id))
     expect(client.usersApi.delete).not.toHaveBeenCalled()
   })
@@ -484,9 +486,38 @@ describe('project policy group rosters', () => {
   it('removes an individual project assignment without deleting the account', async () => {
     vi.mocked(client.projectMembersApi.list).mockResolvedValue([{ ...projectMember, owner: true, inherit_policies: false, policy_ids: [] }])
     renderEdit()
-    fireEvent.click(await screen.findByRole('button', { name: `Remove ${projectMember.full_name} from project` }))
+    fireEvent.click(await screen.findByRole('button', { name: `Project member actions for ${projectMember.full_name}` }))
+    expect(client.projectMembersApi.remove).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
     await waitFor(() => expect(client.projectMembersApi.remove).toHaveBeenCalledWith(project.id, projectMember.id))
     expect(client.usersApi.delete).not.toHaveBeenCalled()
+  })
+
+  it('hides member actions without removal authority', async () => {
+    ;(user as { role: string }).role = 'maintainer'
+    ;(user as { application_permissions?: Record<string, string[]> }).application_permissions = { access: ['view', 'edit'] }
+    vi.mocked(client.projectMembersApi.list).mockResolvedValue([{ ...projectMember, inherit_policies: false, policy_group_id: 10, policy_group_name: 'Developers' }])
+    renderEdit()
+    const roster = within(await screen.findByRole('region', { name: 'Developers' }))
+    expect(roster.getByText(projectMember.full_name)).toBeTruthy()
+    expect(roster.queryByRole('button', { name: `Project member actions for ${projectMember.full_name}` })).toBeNull()
+    expect(client.projectMembersApi.remove).not.toHaveBeenCalled()
+  })
+
+  it('disables member actions while removal is pending', async () => {
+    let finish = () => {}
+    vi.mocked(client.projectMembersApi.remove).mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve }))
+    vi.mocked(client.projectMembersApi.list).mockResolvedValue([{ ...projectMember, inherit_policies: false, policy_group_id: 10, policy_group_name: 'Developers' }])
+    renderEdit()
+    const trigger = await screen.findByRole('button', { name: `Project member actions for ${projectMember.full_name}` }) as HTMLButtonElement
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
+    await waitFor(() => expect(trigger.disabled).toBe(true))
+    fireEvent.click(trigger)
+    expect(client.projectMembersApi.remove).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('menu')).toBeNull()
+    finish()
+    await waitFor(() => expect(trigger.disabled).toBe(false))
   })
 
   it('includes assigned people once in the checklist with their boxes checked', async () => {
@@ -498,7 +529,7 @@ describe('project policy group rosters', () => {
     expect((roster.getByRole('checkbox', { name: `Select ${projectMember.full_name}` }) as HTMLInputElement).checked).toBe(true)
     expect(roster.getAllByText(projectMember.full_name)).toHaveLength(1)
     expect((roster.getByRole('checkbox', { name: `Select ${addableMaintainer.full_name}` }) as HTMLInputElement).checked).toBe(false)
-    expect(roster.queryByRole('button', { name: `Remove ${projectMember.full_name} from project` })).toBeNull()
+    expect(roster.queryByRole('button', { name: `Project member actions for ${projectMember.full_name}` })).toBeNull()
     expect((roster.getByRole('button', { name: 'Save selection' }) as HTMLButtonElement).disabled).toBe(true)
     expect(client.groupsApi.assign).not.toHaveBeenCalled()
     expect(client.projectMembersApi.remove).not.toHaveBeenCalled()
@@ -550,7 +581,7 @@ describe('project policy group rosters', () => {
     fireEvent.click(roster.getByRole('button', { name: 'Select members' }))
     fireEvent.click(roster.getByRole('checkbox', { name: `Select ${projectMember.full_name}` }))
     fireEvent.click(roster.getByRole('button', { name: 'Cancel selection' }))
-    expect(roster.getByRole('button', { name: `Remove ${projectMember.full_name} from project` })).toBeTruthy()
+    expect(roster.getByRole('button', { name: `Project member actions for ${projectMember.full_name}` })).toBeTruthy()
     fireEvent.click(roster.getByRole('button', { name: 'Select members' }))
     expect((roster.getByRole('checkbox', { name: `Select ${projectMember.full_name}` }) as HTMLInputElement).checked).toBe(true)
     expect(client.groupsApi.assign).not.toHaveBeenCalled()

@@ -118,7 +118,8 @@ describe('the files attached to a document', () => {
     fireEvent.change(screen.getByLabelText('Attach a file'), { target: { files: [file] } })
     await waitFor(() => expect(client.attachmentsApi.upload).toHaveBeenCalledWith(11, file))
 
-    fireEvent.click(screen.getByTitle('Remove attachment'))
+    fireEvent.click(screen.getByRole('button', { name: `Attachment actions for ${attachment.original_filename}` }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
     await waitFor(() => expect(client.attachmentsApi.remove).toHaveBeenCalledWith(attachment.id))
   })
 
@@ -127,7 +128,8 @@ describe('the files attached to a document', () => {
     await screen.findByText(attachment.original_filename)
 
     expect(screen.queryByLabelText('Attach a file')).toBeNull()
-    expect(screen.queryByTitle('Remove attachment')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: `Attachment actions for ${attachment.original_filename}` }))
+    expect(screen.queryByRole('menuitem', { name: 'Remove' })).toBeNull()
   })
 
   it('downloads using the name returned by the service', async () => {
@@ -138,7 +140,8 @@ describe('the files attached to a document', () => {
     vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL })
 
     attachmentsPanel()
-    fireEvent.click(await screen.findByTitle('Download'))
+    fireEvent.click(await screen.findByRole('button', { name: `Attachment actions for ${attachment.original_filename}` }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Download' }))
 
     await waitFor(() => expect(client.attachmentsApi.download).toHaveBeenCalledWith(
       attachment.id,
@@ -158,8 +161,31 @@ describe('the files attached to a document', () => {
 
     expect(await screen.findByText(attachment.original_filename)).toBeTruthy()
     expect(screen.queryByRole('button', { name: /attach file/i })).toBeNull()
-    expect(screen.queryByTitle('Remove attachment')).toBeNull()
-    expect(screen.getByTitle('Download')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: `Attachment actions for ${attachment.original_filename}` }))
+    expect(screen.queryByRole('menuitem', { name: 'Remove' })).toBeNull()
+    expect(screen.getByRole('menuitem', { name: 'Download' })).toBeTruthy()
+  })
+
+  it('disables download while the existing request is pending', async () => {
+    let finish: (value: { blob: Blob; filename: string }) => void = () => {}
+    vi.mocked(client.attachmentsApi.download).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    const createObjectURL = vi.fn(() => 'blob:pending-report')
+    vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL: vi.fn() })
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    attachmentsPanel()
+    const trigger = await screen.findByRole('button', { name: `Attachment actions for ${attachment.original_filename}` })
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Download' }))
+    await waitFor(() => expect(client.attachmentsApi.download).toHaveBeenCalledTimes(1))
+    fireEvent.click(trigger)
+    const download = screen.getByRole('menuitem', { name: 'Download' }) as HTMLButtonElement
+    expect(download.disabled).toBe(true)
+    fireEvent.click(download)
+    expect(client.attachmentsApi.download).toHaveBeenCalledTimes(1)
+    finish({ blob: new Blob(['report']), filename: 'report.pdf' })
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalled())
+    click.mockRestore()
+    vi.unstubAllGlobals()
   })
 
   it('states plainly when no files are attached', async () => {

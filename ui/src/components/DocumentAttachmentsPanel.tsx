@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Download, Paperclip, Trash2, Upload } from 'lucide-react'
 import { attachmentsApi, extractApiErrorMessage, type DocumentAttachment } from '../api/client'
 import { SectionCard } from './DocDetailShell'
+import { RowActionsMenu } from './RowMenu'
 import { useToast } from './useToast'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
 import { useParams } from 'react-router'
@@ -127,23 +128,10 @@ export default function DocumentAttachmentsPanel({
                   {attachment.source_ref ? ` · from ${attachment.source_ref}` : ''}
                 </p>
               </div>
-              <button
-                onClick={() => download(attachment)}
-                disabled={busyId === attachment.id}
-                title="Download"
-                className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 disabled:opacity-50"
-              >
-                <Download className="h-4 w-4" />
-              </button>
-              {canEdit && (
-                <button
-                  onClick={() => deleteMutation.mutate(attachment.id)}
-                  title="Remove attachment"
-                  className="p-2 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              )}
+              <RowActionsMenu label={`Attachment actions for ${attachment.original_filename}`} actions={[
+                { icon: <Download className="h-4 w-4" />, label: 'Download', disabled: busyId === attachment.id, onClick: () => { void download(attachment) } },
+                ...(canEdit ? [{ icon: <Trash2 className="h-4 w-4" />, label: 'Remove', destructive: true, onClick: () => deleteMutation.mutate(attachment.id) }] : []),
+              ]} />
             </li>
           ))}
         </ul>

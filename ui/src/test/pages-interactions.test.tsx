@@ -967,11 +967,8 @@ describe('project settings', () => {
     renderProjectEdit()
     await screen.findByText(/^Ext Ernal$/)
 
-    const remove = screen
-      .getAllByRole('button')
-      .find((button) => /remove/i.test(button.textContent ?? '') || /remove/i.test(button.getAttribute('title') ?? ''))
-    expect(remove).toBeTruthy()
-    fireEvent.click(remove as HTMLElement)
+    fireEvent.click(screen.getByRole('button', { name: 'Project member actions for Ext Ernal' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
 
     await waitFor(() => expect(client.projectMembersApi.remove).toHaveBeenCalled())
   })
