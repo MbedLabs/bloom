@@ -21,3 +21,4 @@ coverage.xml
 # ATTACHMENT_DIR defaults to ./attachments, so the backend suite writes test
 # uploads into the repo root unless BLOOM_ATTACHMENT_DIR points elsewhere.
 attachments/
+/node_modules/
