@@ -6,20 +6,20 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.artefact_utils import visible_types
 from app.core.cache import dashboard_stats_cache
 from app.core.database import get_db
+from app.core.security import accessible_project_ids as project_ids_for_user
 from app.core.security import apply_external_visibility_filter, get_current_user
 from app.models import (
     ArtefactLink,
     Defect,
     Project,
-    ProjectMembership,
     Requirement,
     TestCampaign,
     TestCampaignItem,
     TestCase,
 )
-from app.models.project_membership import ProjectExternalDocType
 from app.models.user import User, UserRole
 from app.services.coverage import coverage_percent as coverage_percent_of
 from app.services.coverage import covered_requirement_ids
@@ -45,7 +45,7 @@ router = APIRouter()
 
 @router.get("/stats")
 async def get_dashboard_stats(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     user_scope = f"user:{current_user.id}" if current_user.role != UserRole.admin else "admin"
@@ -57,10 +57,7 @@ async def get_dashboard_stats(
     accessible_project_ids = None
     allowed_project_ids_by_doc_type: dict[str, set[int]] = {}
     if current_user.role != UserRole.admin:
-        membership_result = await db.execute(
-            select(ProjectMembership.project_id).where(ProjectMembership.user_id == current_user.id)
-        )
-        accessible_project_ids = membership_result.scalars().all()
+        accessible_project_ids = await project_ids_for_user(db, current_user)
         if not accessible_project_ids:
             payload = {
                 "total_projects": 0,
@@ -82,16 +79,8 @@ async def get_dashboard_stats(
             }
             dashboard_stats_cache.set(cache_key, payload)
             return payload
-        if current_user.role == UserRole.external:
-            allowed_rows = await db.execute(
-                select(ProjectMembership.project_id, ProjectExternalDocType.doc_type)
-                .join(
-                    ProjectExternalDocType,
-                    ProjectExternalDocType.membership_id == ProjectMembership.id,
-                )
-                .where(ProjectMembership.user_id == current_user.id)
-            )
-            for project_id, doc_type in allowed_rows:
+        for project_id in accessible_project_ids:
+            for doc_type in await visible_types(db, current_user, project_id) or ():
                 allowed_project_ids_by_doc_type.setdefault(doc_type, set()).add(project_id)
 
     def _restrict(query, model, *, project_field: str = "project_id"):
@@ -101,7 +90,7 @@ async def get_dashboard_stats(
 
     def _restrict_visible(query, model, doc_type: str, *, project_field: str = "project_id"):
         query = _restrict(query, model, project_field=project_field)
-        if current_user.role == UserRole.external:
+        if accessible_project_ids is not None:
             query = query.where(
                 getattr(model, project_field).in_(
                     allowed_project_ids_by_doc_type.get(doc_type, set())
@@ -154,7 +143,7 @@ async def get_dashboard_stats(
         if accessible_project_ids is not None
         else True
     )
-    if current_user.role == UserRole.external:
+    if accessible_project_ids is not None:
         covered_req_ids = covered_req_ids.where(
             Requirement.project_id.in_(allowed_project_ids_by_doc_type.get("REQ", set()))
         )
@@ -197,7 +186,7 @@ async def get_dashboard_stats(
         campaign_item_query = campaign_item_query.where(
             TestCampaign.project_id.in_(accessible_project_ids)
         )
-    if current_user.role == UserRole.external:
+    if accessible_project_ids is not None:
         campaign_item_query = campaign_item_query.where(
             TestCampaign.project_id.in_(allowed_project_ids_by_doc_type.get("CMP", set()))
         )
@@ -236,15 +225,15 @@ async def get_dashboard_stats(
 
     req_count_query = select(func.count(Requirement.id)).where(Requirement.project_id == Project.id)
     tc_count_query = select(func.count(TestCase.id)).where(TestCase.project_id == Project.id)
-    if current_user.role == UserRole.external:
+    if accessible_project_ids is not None:
         req_count_query = req_count_query.where(
-            Project.id.in_(allowed_project_ids_by_doc_type.get("REQ", set())),
-            Requirement.visibility == "customer",
+            Project.id.in_(allowed_project_ids_by_doc_type.get("REQ", set()))
         )
         tc_count_query = tc_count_query.where(
-            Project.id.in_(allowed_project_ids_by_doc_type.get("TC", set())),
-            TestCase.visibility == "customer",
+            Project.id.in_(allowed_project_ids_by_doc_type.get("TC", set()))
         )
+    req_count_query = apply_external_visibility_filter(req_count_query, Requirement, current_user)
+    tc_count_query = apply_external_visibility_filter(tc_count_query, TestCase, current_user)
     project_query = select(
         Project.id,
         Project.name,

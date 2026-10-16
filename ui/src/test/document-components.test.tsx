@@ -1,3 +1,5 @@
+import { changeControl } from './change-control'
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
  * The two panels that hang off a document: its links and its tracker.
@@ -9,7 +11,7 @@
  * cannot be created without a token; only an administrator may touch either)
  * were unchecked.
  */
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -53,7 +55,7 @@ const { DocumentLinksPanel } = await import('../components/DocumentLinksPanel')
 const IntegrationSettingsPanel = (await import('../components/IntegrationSettingsPanel')).default
 
 function renderPanel(element: React.ReactElement) {
-  const queryClient = new QueryClient({
+  const queryClient = createQueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   })
   return render(
@@ -97,7 +99,7 @@ afterEach(cleanup)
 
 describe('the files attached to a document', () => {
   function attachmentsPanel() {
-    return renderPanel(<DocumentAttachmentsPanel documentId={11} />)
+    return renderPanel(<DocumentAttachmentsPanel documentId={11} docType="SPEC" />)
   }
 
   it('shows the files and their source', async () => {
@@ -116,8 +118,18 @@ describe('the files attached to a document', () => {
     fireEvent.change(screen.getByLabelText('Attach a file'), { target: { files: [file] } })
     await waitFor(() => expect(client.attachmentsApi.upload).toHaveBeenCalledWith(11, file))
 
-    fireEvent.click(screen.getByTitle('Remove attachment'))
+    fireEvent.click(screen.getByRole('button', { name: `Attachment actions for ${attachment.original_filename}` }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
     await waitFor(() => expect(client.attachmentsApi.remove).toHaveBeenCalledWith(attachment.id))
+  })
+
+  it('offers no attach or remove when the row does not allow edit', async () => {
+    renderPanel(<DocumentAttachmentsPanel documentId={11} docType="SPEC" rowAllowsEdit={false} />)
+    await screen.findByText(attachment.original_filename)
+
+    expect(screen.queryByLabelText('Attach a file')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: `Attachment actions for ${attachment.original_filename}` }))
+    expect(screen.queryByRole('menuitem', { name: 'Remove' })).toBeNull()
   })
 
   it('downloads using the name returned by the service', async () => {
@@ -128,7 +140,8 @@ describe('the files attached to a document', () => {
     vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL })
 
     attachmentsPanel()
-    fireEvent.click(await screen.findByTitle('Download'))
+    fireEvent.click(await screen.findByRole('button', { name: `Attachment actions for ${attachment.original_filename}` }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Download' }))
 
     await waitFor(() => expect(client.attachmentsApi.download).toHaveBeenCalledWith(
       attachment.id,
@@ -148,8 +161,31 @@ describe('the files attached to a document', () => {
 
     expect(await screen.findByText(attachment.original_filename)).toBeTruthy()
     expect(screen.queryByRole('button', { name: /attach file/i })).toBeNull()
-    expect(screen.queryByTitle('Remove attachment')).toBeNull()
-    expect(screen.getByTitle('Download')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: `Attachment actions for ${attachment.original_filename}` }))
+    expect(screen.queryByRole('menuitem', { name: 'Remove' })).toBeNull()
+    expect(screen.getByRole('menuitem', { name: 'Download' })).toBeTruthy()
+  })
+
+  it('disables download while the existing request is pending', async () => {
+    let finish: (value: { blob: Blob; filename: string }) => void = () => {}
+    vi.mocked(client.attachmentsApi.download).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    const createObjectURL = vi.fn(() => 'blob:pending-report')
+    vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL: vi.fn() })
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    attachmentsPanel()
+    const trigger = await screen.findByRole('button', { name: `Attachment actions for ${attachment.original_filename}` })
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Download' }))
+    await waitFor(() => expect(client.attachmentsApi.download).toHaveBeenCalledTimes(1))
+    fireEvent.click(trigger)
+    const download = screen.getByRole('menuitem', { name: 'Download' }) as HTMLButtonElement
+    expect(download.disabled).toBe(true)
+    fireEvent.click(download)
+    expect(client.attachmentsApi.download).toHaveBeenCalledTimes(1)
+    finish({ blob: new Blob(['report']), filename: 'report.pdf' })
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalled())
+    click.mockRestore()
+    vi.unstubAllGlobals()
   })
 
   it('states plainly when no files are attached', async () => {
@@ -584,13 +620,20 @@ describe('the external tracker of a project', () => {
       asked = true
       return true
     }
-    vi.mocked(client.integrationsApi.listSettings).mockResolvedValue([
-      { ...integrationSetting, has_token: false, has_webhook_secret: false, base_url: null },
-    ] as never)
+    let resolveSettings!: (settings: Awaited<ReturnType<typeof client.integrationsApi.listSettings>>) => void
+    vi.mocked(client.integrationsApi.listSettings).mockImplementationOnce(() => new Promise((resolve) => {
+      resolveSettings = resolve
+    }))
     trackerPanel()
-    await screen.findByRole('button', { name: /save integration/i })
+    await waitFor(() => expect(client.integrationsApi.listSettings).toHaveBeenCalledWith(1))
+    expect(screen.queryByRole('button', { name: /save integration/i })).toBeNull()
+    resolveSettings([
+      { ...integrationSetting, has_token: false, has_webhook_secret: false, base_url: null },
+    ])
+    await waitFor(() => expect((screen.getByLabelText('GitHub') as HTMLInputElement).checked).toBe(true))
 
     fireEvent.click(screen.getByLabelText('None'))
+    expect((screen.getByLabelText('None') as HTMLInputElement).checked).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: /save integration/i }))
 
     await waitFor(() => expect(client.integrationsApi.deleteSetting).toHaveBeenCalled())
@@ -673,5 +716,133 @@ describe('the external tracker of a project', () => {
     fireEvent.click(screen.getByRole('button', { name: /save integration/i }))
 
     expect((await screen.findAllByText(/rejected by github/i)).length).toBeGreaterThan(0)
+  })
+})
+
+describe('the Jira tracker of a project', () => {
+  const jiraRow = {
+    ...integrationSetting,
+    id: 142,
+    tracker: 'jira',
+    base_url: 'https://acme.atlassian.net',
+    account_email: 'bot@acme.test',
+    jira_project_key: 'PROJ',
+    create_defects_on_inbound: true,
+    jira_issue_types: ['Bug'],
+    jira_label: null,
+    jira_jql: null,
+    jira_reference_field: null,
+    jira_priority_map: null,
+    two_way: false,
+  }
+
+  function jiraPanel() {
+    return renderPanel(<IntegrationSettingsPanel projectId={1} />)
+  }
+
+  it('creates a one-way Jira integration with its filter and priority map', async () => {
+    vi.mocked(client.integrationsApi.listSettings).mockResolvedValue([])
+    jiraPanel()
+    await screen.findByRole('button', { name: /save integration/i })
+
+    fireEvent.click(screen.getByLabelText('Jira'))
+    expect(await screen.findByText(/one-way: jira issues create and update defects/i)).toBeTruthy()
+    fireEvent.change(screen.getByPlaceholderText('https://your-site.atlassian.net'), {
+      target: { value: 'https://acme.atlassian.net' },
+    })
+    fireEvent.change(screen.getByPlaceholderText(/atlassian account/i), {
+      target: { value: 'bot@acme.test' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('Atlassian API token'), { target: { value: 'tok' } })
+    fireEvent.change(screen.getByPlaceholderText('PROJ'), { target: { value: 'PROJ' } })
+    fireEvent.change(screen.getByPlaceholderText('Bug'), { target: { value: 'Bug, Incident' } })
+    fireEvent.change(screen.getByPlaceholderText(/only issues with this label/i), {
+      target: { value: 'bench' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('customfield_10042'), {
+      target: { value: 'customfield_1' },
+    })
+    fireEvent.change(screen.getByPlaceholderText(/created >=/), { target: { value: 'priority = High' } })
+    changeControl(screen.getByLabelText('Bloom priority for Jira Lowest'), {
+      target: { value: 'Medium' },
+    })
+    fireEvent.click(screen.getByLabelText(/create a defect for each new matching issue/i))
+    fireEvent.click(screen.getByRole('button', { name: /save integration/i }))
+
+    await waitFor(() => expect(client.integrationsApi.createSetting).toHaveBeenCalled())
+    expect(lastCall(client.integrationsApi.createSetting)[0]).toMatchObject({
+      tracker: 'jira',
+      base_url: 'https://acme.atlassian.net',
+      account_email: 'bot@acme.test',
+      token: 'tok',
+      jira_project_key: 'PROJ',
+      create_defects_on_inbound: false,
+      jira_issue_types: ['Bug', 'Incident'],
+      jira_label: 'bench',
+      jira_jql: 'priority = High',
+      jira_reference_field: 'customfield_1',
+      jira_priority_map: { Highest: 'Critical', High: 'High', Medium: 'Medium', Low: 'Low', Lowest: 'Medium' },
+      two_way: false,
+    })
+  })
+
+  it('turns on two-way sync and says so', async () => {
+    vi.mocked(client.integrationsApi.listSettings).mockResolvedValue([jiraRow] as never)
+    jiraPanel()
+    await screen.findByText(/one-way/i)
+
+    fireEvent.click(screen.getByLabelText(/two-way sync/i))
+    expect(screen.getByText(/bloom pushes defect title and status changes back to jira/i)).toBeTruthy()
+    expect(screen.getByText(/save first; the pull uses the saved filter/i)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /save integration/i }))
+
+    await waitFor(() => expect(client.integrationsApi.updateSetting).toHaveBeenCalled())
+    const [id, payload] = lastCall(client.integrationsApi.updateSetting) as [number, Record<string, unknown>]
+    expect(id).toBe(142)
+    expect(payload.two_way).toBe(true)
+    expect(payload.base_url).toBe('https://acme.atlassian.net')
+  })
+
+  it('pulls existing issues and reports the outcome', async () => {
+    vi.mocked(client.integrationsApi.listSettings).mockResolvedValue([jiraRow] as never)
+    vi.mocked(client.integrationsApi.pullJira).mockResolvedValue({
+      searched: 4,
+      created: 2,
+      already_linked: 1,
+      skipped: 1,
+      new_ids: ['VCU-DEF-007', 'VCU-DEF-008'],
+    })
+    jiraPanel()
+    fireEvent.click(await screen.findByRole('button', { name: /pull existing issues/i }))
+
+    await waitFor(() => expect(client.integrationsApi.pullJira).toHaveBeenCalledWith(142))
+    expect(
+      await screen.findByText('Found 4: 2 created, 1 already linked, 1 skipped.'),
+    ).toBeTruthy()
+  })
+
+  it('reports a failed pull', async () => {
+    vi.mocked(client.integrationsApi.listSettings).mockResolvedValue([jiraRow] as never)
+    vi.mocked(client.integrationsApi.pullJira).mockRejectedValue(new Error('Jira answered 401'))
+    jiraPanel()
+    fireEvent.click(await screen.findByRole('button', { name: /pull existing issues/i }))
+
+    await waitFor(() => expect(client.integrationsApi.pullJira).toHaveBeenCalled())
+    expect(await screen.findByText(/jira answered 401/i)).toBeTruthy()
+  })
+
+  it('removes the Jira integration when switching to another tracker', async () => {
+    window.confirm = () => true
+    vi.mocked(client.integrationsApi.listSettings).mockResolvedValue([jiraRow] as never)
+    jiraPanel()
+    await screen.findByText(/one-way/i)
+
+    fireEvent.click(screen.getByLabelText('GitHub'))
+    fireEvent.change(await screen.findByPlaceholderText(/ghp_/), { target: { value: 'ghp_x' } })
+    fireEvent.click(screen.getByRole('button', { name: /save integration/i }))
+
+    await waitFor(() => expect(client.integrationsApi.deleteSetting).toHaveBeenCalledWith(142))
+    await waitFor(() => expect(client.integrationsApi.createSetting).toHaveBeenCalled())
+    expect('jira_project_key' in (lastCall(client.integrationsApi.createSetting)[0] as object)).toBe(false)
   })
 })

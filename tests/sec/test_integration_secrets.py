@@ -169,13 +169,17 @@ def test_created_credentials_are_encrypted_at_rest_and_rotate():
         assert resp.status_code == 201, resp.text
         # The response never echoes the raw secrets.
         body = resp.json()
-        assert body["has_token"] is True and body["has_webhook_secret"] is True
-        assert raw_token not in resp.text and raw_secret not in resp.text
+        assert body["has_token"] is True
+        assert body["has_webhook_secret"] is True
+        assert raw_token not in resp.text
+        assert raw_secret not in resp.text
 
         stored_token, stored_secret = _stored_secrets(session_maker, project_id)
         # Raw values never reach the database; both are Fernet envelopes.
-        assert stored_token != raw_token and is_encrypted(stored_token)
-        assert stored_secret != raw_secret and is_encrypted(stored_secret)
+        assert stored_token != raw_token
+        assert is_encrypted(stored_token)
+        assert stored_secret != raw_secret
+        assert is_encrypted(stored_secret)
         assert decrypt_integration_secret(stored_token) == raw_token
         assert decrypt_integration_secret(stored_secret) == raw_secret
 

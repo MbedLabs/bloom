@@ -1,3 +1,5 @@
+import { changeControl } from './change-control'
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
  * The settings screen: the account, the theme, the timezone and the
@@ -10,7 +12,7 @@
  * generated, when a revoke is declined - and those are the paths where an
  * unreported error leaves a user staring at an unchanged screen.
  */
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -44,7 +46,7 @@ const client = await import('../api/client')
 const Settings = (await import('../pages/Settings')).default
 
 function renderSettings() {
-  const queryClient = new QueryClient({
+  const queryClient = createQueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   })
   return render(
@@ -241,7 +243,7 @@ describe('appearance and region', () => {
     renderSettings()
 
     const picker = screen.getAllByRole('combobox')[0]
-    fireEvent.change(picker, { target: { value: 'Etc/GMT+5' } })
+    changeControl(picker, { target: { value: 'Etc/GMT+5' } })
 
     expect(window.localStorage.getItem('bloom-timezone')).toBe('Etc/GMT+5')
     // Dates are formatted all over the app, so the page reloads rather than

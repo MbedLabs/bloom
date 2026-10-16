@@ -42,6 +42,8 @@ export function getBreadcrumbs(
   if (path === '/reports') return [{ label: 'Home', href: '/' }, { label: 'Reports' }]
   if (path === '/baselines') return [{ label: 'Home', href: '/' }, { label: 'Baselines' }]
   if (path === '/settings') return [{ label: 'Home', href: '/' }, { label: 'Settings' }]
+  if (path === '/access') return [{ label: 'Home', href: '/' }, { label: 'Access' }]
+  if (path === '/users') return [{ label: 'Home', href: '/' }, { label: 'Users' }]
 
   if (path.startsWith('/projects')) {
     crumbs.push({ label: 'Projects', href: '/projects' })

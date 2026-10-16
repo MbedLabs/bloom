@@ -3,23 +3,25 @@
 from __future__ import annotations
 
 import base64
-import binascii
+import logging
+from http import HTTPStatus
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.api.artefact_utils import get_visible_row, minute_utc
 from app.api.docs_facade import resolve_project
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_project_access, require_role
+from app.core.security import get_current_user
 from app.core.service_auth import require_bud_sync_token
-from app.models import Document, DocumentAttachment
-from app.models.user import User, UserRole
+from app.models import Document, DocumentAttachment, ReportRequest
+from app.models.user import User
 from app.schemas import (
     DocumentAttachmentResponse,
     TestReportFile,
@@ -27,47 +29,31 @@ from app.schemas import (
     TestReportPublishResponse,
 )
 from app.services import attachment_storage as storage
+from app.services import object_store
 from app.services.attachment_upload_policy import (
     release_attachment_upload,
     reserve_attachment_upload,
 )
+from app.services.audit import record_audit_event
+from app.services.document_workflow import prepare_content_write
+
+ATTACHMENT_NOT_FOUND = "Attachment not found"
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-async def _readable_document(db: AsyncSession, document_id: int, user: User) -> Document:
-    document = (
-        await db.execute(select(Document).where(Document.id == document_id))
-    ).scalar_one_or_none()
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    await require_project_access(db, user, document.project_id)
-    return document
-
-
-async def _writable_document(db: AsyncSession, document_id: int, user: User) -> Document:
-    document = (
-        await db.execute(select(Document).where(Document.id == document_id))
-    ).scalar_one_or_none()
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    await require_project_access(
-        db,
-        user,
-        document.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
-    )
-    return document
 
 
 @router.get("/documents/{document_id}/attachments", response_model=list[DocumentAttachmentResponse])
 async def list_attachments(
     document_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """Everything held against this document, oldest first."""
-    await _readable_document(db, document_id, current_user)
+    await get_visible_row(
+        db, Document, document_id, "Document not found", current_user, permission=("view", None)
+    )
     rows = (
         await db.execute(
             select(DocumentAttachment)
@@ -82,15 +68,19 @@ async def list_attachments(
     "/documents/{document_id}/attachments",
     response_model=DocumentAttachmentResponse,
     status_code=201,
+    responses={413: {"description": "Content Too Large"}},
 )
 async def upload_attachment(
     document_id: int,
     file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
     """Attach a file to a document."""
-    document = await _writable_document(db, document_id, current_user)
+    document = await get_visible_row(
+        db, Document, document_id, "Document not found", current_user, permission=("edit", None)
+    )
+    await prepare_content_write(db, document, current_user)
     display_name = storage.safe_display_name(file.filename)
     content_type = storage.require_allowed_type(file.content_type)
 
@@ -104,6 +94,7 @@ async def upload_attachment(
         root = storage.ensure_attachment_dir()
         stored_name = storage.storage_name(display_name)
         written = await storage.write_stream(file, root / stored_name, max_bytes=budget)
+        await storage.persist(root / stored_name, stored_name, content_type)
 
         attachment = DocumentAttachment(
             document_id=document.id,
@@ -116,6 +107,19 @@ async def upload_attachment(
             uploaded_by_id=current_user.id,
         )
         db.add(attachment)
+        await db.flush()
+        await record_audit_event(
+            db,
+            "attachment.uploaded",
+            target_type="document",
+            target_id=document.doc_id,
+            project_id=document.project_id,
+            details={
+                "attachment_id": attachment.id,
+                "filename": display_name,
+                "size": written.size_bytes,
+            },
+        )
         await db.commit()
         await db.refresh(attachment)
         return attachment
@@ -126,10 +130,13 @@ async def upload_attachment(
         await release_attachment_upload(db, lease.id)
 
 
-@router.get("/attachments/{attachment_id}/download")
+@router.get(
+    "/attachments/{attachment_id}/download",
+    responses={503: {"description": HTTPStatus(503).phrase}, 404: {"description": "Not Found"}},
+)
 async def download_attachment(
     attachment_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """Download one attachment."""
@@ -141,31 +148,48 @@ async def download_attachment(
         )
     ).scalar_one_or_none()
     if attachment is None:
-        raise HTTPException(status_code=404, detail="Attachment not found")
-    await require_project_access(db, current_user, attachment.document.project_id)
-
-    path = storage.resolve_stored_path(attachment.storage_path)
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="File not found on disk")
-
-    name = attachment.original_filename
-    return FileResponse(
-        path=str(path),
-        media_type=attachment.content_type,
-        headers={
-            "Content-Disposition": (
-                f"attachment; filename=\"{name}\"; filename*=UTF-8''{quote(name)}"
-            ),
-            "X-Content-Type-Options": "nosniff",
-        },
+        raise HTTPException(status_code=404, detail=ATTACHMENT_NOT_FOUND)
+    await get_visible_row(
+        db,
+        Document,
+        attachment.document_id,
+        ATTACHMENT_NOT_FOUND,
+        current_user,
+        permission=("view", None),
     )
 
+    path = storage.resolve_stored_path(attachment.storage_path)
+    name = attachment.original_filename
+    headers = {
+        "Content-Disposition": (f"attachment; filename=\"{name}\"; filename*=UTF-8''{quote(name)}"),
+        "X-Content-Type-Options": "nosniff",
+    }
+    if object_store.s3_enabled():
+        try:
+            body = await object_store.fetch(attachment.storage_path)
+            return StreamingResponse(
+                object_store.iter_body(body), media_type=attachment.content_type, headers=headers
+            )
+        except Exception as exc:
+            if not (object_store.keeps_local_copy() and path.exists()):
+                raise HTTPException(status_code=503, detail="The file store is unreachable.")
+            logger.warning(
+                "Object storage read failed for %s; serving the local mirror: %s",
+                object_store.object_key(attachment.storage_path),
+                exc,
+            )
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="File not found on disk")
+    return FileResponse(path=str(path), media_type=attachment.content_type, headers=headers)
 
-@router.delete("/attachments/{attachment_id}", status_code=204)
+
+@router.delete(
+    "/attachments/{attachment_id}", status_code=204, responses={404: {"description": "Not Found"}}
+)
 async def delete_attachment(
     attachment_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
     """Remove an attachment and the file behind it."""
     attachment = (
@@ -176,18 +200,37 @@ async def delete_attachment(
         )
     ).scalar_one_or_none()
     if attachment is None:
-        raise HTTPException(status_code=404, detail="Attachment not found")
-    await require_project_access(
+        raise HTTPException(status_code=404, detail=ATTACHMENT_NOT_FOUND)
+    document = await get_visible_row(
         db,
+        Document,
+        attachment.document_id,
+        ATTACHMENT_NOT_FOUND,
         current_user,
-        attachment.document.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("delete", None),
     )
 
+    await prepare_content_write(db, document, current_user)
+    from app.models import ArtefactRevisionFile
+
+    retained = await db.scalar(
+        select(ArtefactRevisionFile.id)
+        .where(ArtefactRevisionFile.storage_path == attachment.storage_path)
+        .limit(1)
+    )
     storage_path = attachment.storage_path
+    await record_audit_event(
+        db,
+        "attachment.deleted",
+        target_type="document",
+        target_id=attachment.document.doc_id,
+        project_id=attachment.document.project_id,
+        details={"attachment_id": attachment.id, "filename": attachment.original_filename},
+    )
     await db.delete(attachment)
     await db.commit()
-    storage.unlink_quietly(storage_path)
+    if not retained:
+        await storage.remove(storage_path)
     return Response(status_code=204)
 
 
@@ -198,7 +241,7 @@ async def delete_attachment(
 )
 async def publish_test_report(
     data: TestReportPublish,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _service_credential=Depends(require_bud_sync_token),
 ):
     """Receive a Bud run's report as a Report (RPT) document."""
@@ -219,6 +262,7 @@ async def publish_test_report(
     if created:
         document = Document(
             project_id=project.id,
+            created_by_id=_service_credential.created_by_user_id,
             doc_id=await next_doc_id(
                 db, Document, Document.doc_id, project.id, project.prefix, "RPT"
             ),
@@ -238,6 +282,28 @@ async def publish_test_report(
     for item in data.files:
         attachment_ids.append(await _replace_report_file(db, document, item, source_ref))
 
+    requests = (
+        await db.scalars(
+            select(ReportRequest)
+            .where(
+                ReportRequest.project_id == project.id,
+                ReportRequest.bud_run_id == data.bud_run_id,
+                ReportRequest.status == "pending",
+            )
+            .with_for_update()
+        )
+    ).all()
+    for request in requests:
+        request.status = "delivered"
+        request.document_id = document.id
+        await record_audit_event(
+            db,
+            "report.published",
+            target_type="report_request",
+            target_id=request.id,
+            project_id=project.id,
+            details={"document_id": document.id},
+        )
     await db.commit()
     await db.refresh(document)
     return TestReportPublishResponse(
@@ -249,7 +315,7 @@ async def publish_test_report(
 
 
 def _report_summary(data: TestReportPublish) -> str:
-    executed = data.executed_at.isoformat() if data.executed_at else "unknown"
+    executed = minute_utc(data.executed_at) or "unknown"
     lines = [
         f"Bud run {data.bud_run_id} ({data.status or 'Completed'}) executed {executed}.",
         f"{data.passed_tests} passed, {data.failed_tests} failed, of {data.total_tests}.",
@@ -269,7 +335,7 @@ async def _replace_report_file(
     content_type = storage.require_allowed_type(item.content_type)
     try:
         payload = base64.b64decode(item.content_base64, validate=True)
-    except (ValueError, binascii.Error) as exc:
+    except ValueError as exc:
         raise HTTPException(
             status_code=422, detail=f"'{display_name}' is not valid base64"
         ) from exc
@@ -294,12 +360,13 @@ async def _replace_report_file(
     root = storage.ensure_attachment_dir()
     stored_name = storage.storage_name(display_name)
     written = storage.write_bytes(payload, root / stored_name, max_bytes=budget)
+    await storage.persist(root / stored_name, stored_name, content_type)
 
     if previous is not None:
         stale = previous.storage_path
         await db.delete(previous)
         await db.flush()
-        storage.unlink_quietly(stale)
+        await storage.remove(stale)
 
     attachment = DocumentAttachment(
         document_id=document.id,

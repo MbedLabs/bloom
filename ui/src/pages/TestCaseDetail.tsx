@@ -1,19 +1,20 @@
+import { finishArtefactDeletion } from '../lib/refreshProjectViews'
 import { useState, useMemo } from 'react'
+import ArtefactTags from '../components/ArtefactTags'
 import { useParams, Link, useNavigate } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   type TcsRow,
   projectsApi,
   testCasesApi,
-  usersApi,
-} from '../api/client'
+  } from '../api/client'
 import { TcsArteTable } from '../components/TcsArteTable'
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import { normalizeTcsRows } from '../utils/tcs'
-import { Pencil, UserCheck, UserCog, Trash2 } from 'lucide-react'
+import { Pencil, Trash2 } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
-import { docEditUrl } from '../types/doc'
+import { docEditUrl, docUrl, type DocType } from '../types/doc'
 import { DocEditor } from '../components/editor'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocDetailShell, { MetaItem, SectionCard } from '../components/DocDetailShell'
@@ -24,17 +25,19 @@ import {
   membershipLinksForCampaigns,
   membershipLinksForSuites,
 } from '../lib/membershipLinks'
+import { useProjectPermissions, useRowActions } from '../hooks/useProjectPermissions'
+import { useParameterValues } from '../hooks/useParameterValues'
+import { useArtefactLabels } from '../hooks/useArtefactLabels'
+import ConfirmDelete from '../components/ConfirmDelete'
+import WorkflowPanel from '../components/WorkflowPanel'
+import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
+import { useSignOffPeople } from '../hooks/useSignOff'
 
 function normalizeSteps(steps: unknown): TcsRow[] {
   return normalizeTcsRows(steps) as TcsRow[]
 }
 
-function resolveUserName(users: Array<{ id: number; full_name: string }> | undefined, userId: number | null) {
-  if (!userId) return 'Unassigned'
-  return users?.find((u) => u.id === userId)?.full_name || `User #${userId}`
-}
-
-function ExecutionBadge({ status }: { status: string }) {
+function ExecutionBadge({ status }: Readonly<{ status: string }>) {
   const colors: Record<string, string> = {
     Passed: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
     Failed: 'bg-red-500/10 text-red-700 dark:text-red-400',
@@ -47,10 +50,16 @@ function ExecutionBadge({ status }: { status: string }) {
   )
 }
 
-export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } = {}) {
+export default function TestCaseDetail({
+  resolvedId,
+  allowedActions,
+}: { resolvedId?: number; allowedActions?: string[] } = {}) {
   const { user } = useAuth()
   const { prefix, itemId } = useParams<{ prefix: string; itemId: string }>()
+  const { can } = useProjectPermissions(prefix)
+  const parameterValues = useParameterValues(prefix)
   const tcId = resolvedId || parseInt(itemId || '0')
+  const workflow = useDocumentWorkflow('test-case', tcId)
   const queryClient = useQueryClient()
   const toast = useToast()
   const navigate = useNavigate()
@@ -63,32 +72,14 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
     enabled: !!tcId,
   })
 
+  const artefactLabels = useArtefactLabels(prefix, testCase?.content_json)
   const { data: project } = useQuery({
     queryKey: ['project', testCase?.project_id],
     queryFn: () => projectsApi.get(testCase!.project_id),
     enabled: !!testCase?.project_id,
   })
 
-  // Reviewer and approver are shown by name, so this page has to turn ids into names.
-  const { data: projectPeople } = useQuery({
-    queryKey: ['mentionableUsers', testCase?.project_id],
-    queryFn: () => usersApi.listMentionable(testCase!.project_id),
-    enabled: !!testCase?.project_id,
-  })
-
-  // Admins keep reading the directory too: reviewed_by and approved_by are
-  // historical, and whoever signed off may since have left the project or been
-  // deactivated, so they are no longer in the project's own list.
-  const { data: directory } = useQuery({
-    queryKey: ['users'],
-    queryFn: usersApi.list,
-    enabled: user?.role === 'admin',
-  })
-
-  const users = useMemo<Array<{ id: number; full_name: string }>>(
-    () => [...(projectPeople ?? []), ...(directory ?? [])],
-    [projectPeople, directory],
-  )
+  const users = useSignOffPeople(testCase?.project_id, user?.role === 'admin')
 
   const derivedMembershipLinks = useMemo(() => {
     if (!testCase) return []
@@ -108,54 +99,15 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
     ]
   }, [testCase])
 
-  const markReviewedMutation = useMutation({
-    mutationFn: (reviewedById: number) => testCasesApi.setReviewed(tcId, reviewedById),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(['testCase', tcId], (old: unknown) => {
-        if (old && typeof old === 'object') {
-          return { ...(old as object), ...(updated as object) }
-        }
-        return updated
-      })
-      queryClient.invalidateQueries({ queryKey: ['testCase', tcId] })
-      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'test-case', tcId] })
-      toast.notify('Test case marked as reviewed', 'success')
-    },
-    onError: (err: unknown) => {
-      toast.failed('Marking the test case reviewed', err)
-    },
-  })
-
-  const markApprovedMutation = useMutation({
-    mutationFn: (approvedById: number) => testCasesApi.setApproved(tcId, approvedById),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(['testCase', tcId], (old: unknown) => {
-        if (old && typeof old === 'object') {
-          return { ...(old as object), ...(updated as object) }
-        }
-        return updated
-      })
-      queryClient.invalidateQueries({ queryKey: ['testCase', tcId] })
-      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'test-case', tcId] })
-      toast.notify('Test case approved', 'success')
-    },
-    onError: (err: unknown) => {
-      toast.failed('Approving the test case', err)
-    },
-  })
 
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const deleteMutation = useMutation({
     mutationFn: () => testCasesApi.delete(tcId),
     onSuccess: () => {
       if (!testCase) return
-      queryClient.invalidateQueries({ queryKey: ['testCases', testCase.project_id] })
-      queryClient.invalidateQueries({ queryKey: ['all-docs', prefix] })
-      queryClient.invalidateQueries({ queryKey: ['project', testCase.project_id] })
-      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'test-case', tcId] })
       toast.notify('Test case deleted', 'success')
       setTimeout(() => {
-        navigate(docRegistryListUrl(prefix!, 'TC'))
+        finishArtefactDeletion(queryClient, { prefix, projectId: testCase.project_id, detailKey: 'testCase', artefactType: 'test-case', recordId: tcId, kind: 'test-cases', docId: testCase.tc_id }, () => navigate(docRegistryListUrl(prefix!, 'TC')))
       }, 800)
     },
     onError: (err: unknown) => {
@@ -163,6 +115,8 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
       setDeleteConfirm(false)
     },
   })
+
+  const rowAllows = useRowActions(prefix, 'TC', testCase?.tc_id, allowedActions)
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
@@ -182,7 +136,9 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
   const projectPrefix = project?.prefix || ''
   const tcsRows = normalizeSteps(testCase.steps)
   const editUrl = docEditUrl(projectPrefix, 'TC', testCase.tc_id)
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const canEditDocs = can('edit', 'TC')
+  const showEdit = canEditDocs && rowAllows('edit') && workflow.data?.actions?.edit_current === true
+  const showDelete = canEditDocs && can('delete', 'TC') && rowAllows('delete')
 
   return (
     <>
@@ -192,8 +148,9 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
       docCode={testCase.tc_id}
       title={testCase.title}
       status={testCase.status}
-      actions={canEditDocs ? (
+      actions={showEdit || showDelete ? (
         <div className="flex items-center gap-2">
+          {showEdit && (
           <button
             onClick={() => navigate(`${editUrl}?type=TC`)}
             className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
@@ -201,7 +158,8 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
             <Pencil className="h-4 w-4 mr-2" />
             Edit
           </button>
-          {!deleteConfirm ? (
+          )}
+          {showDelete && (!deleteConfirm ? (
             <button
               type="button"
               onClick={() => setDeleteConfirm(true)}
@@ -211,20 +169,12 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
               Delete
             </button>
           ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Are you sure?</span>
-              <button
-                onClick={() => { setDeleteConfirm(false); deleteMutation.mutate(); }}
-                disabled={deleteMutation.isPending}
-                className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm disabled:opacity-50"
-              >
-                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
-              </button>
-              <button onClick={() => setDeleteConfirm(false)} className="px-3 py-1.5 border border-input rounded-md text-sm hover:bg-accent/40">
-                Cancel
-              </button>
-            </div>
-          )}
+            <ConfirmDelete
+              pending={deleteMutation.isPending}
+              onConfirm={() => { setDeleteConfirm(false); deleteMutation.mutate(); }}
+              onCancel={() => setDeleteConfirm(false)}
+            />
+          ))}
         </div>
       ) : undefined}
       rightRail={
@@ -242,7 +192,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
                 />
                 <MetaItem
                   label="Bud Run"
-                  value={<BudRunLink runId={testCase.last_bud_run_id} />}
+                  value={<BudRunLink runId={testCase.last_bud_run_id} source={{ source_kind: 'test-case', source_id: testCase.id }} />}
                 />
                 {testCase.last_execution_comment && (
                   <div>
@@ -256,52 +206,11 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
             )}
           </SectionCard>
 
-          <SectionCard title="Review">
-            <div className="space-y-3">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Reviewer</div>
-                <div className="text-sm text-foreground">{resolveUserName(users, testCase.reviewer_id)}</div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Reviewed by</div>
-                <div className="text-sm text-foreground">{resolveUserName(users, testCase.reviewed_by_id)}</div>
-                {testCase.reviewed_at && <div className="text-xs text-muted-foreground mt-0.5">{formatDateTime(testCase.reviewed_at)}</div>}
-              </div>
-              <button
-                disabled={!canEditDocs || !testCase.reviewer_id || markReviewedMutation.isPending}
-                onClick={() => testCase.reviewer_id && markReviewedMutation.mutate(testCase.reviewer_id)}
-                className="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-amber-500/90 text-white text-xs font-medium hover:bg-amber-500 disabled:opacity-50"
-              >
-                <UserCheck className="h-3.5 w-3.5 mr-1" />
-                Mark Reviewed
-              </button>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Approval">
-            <div className="space-y-3">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Approver</div>
-                <div className="text-sm text-foreground">{resolveUserName(users, testCase.approver_id)}</div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Approved by</div>
-                <div className="text-sm text-foreground">{resolveUserName(users, testCase.approved_by_id)}</div>
-                {testCase.approved_at && <div className="text-xs text-muted-foreground mt-0.5">{formatDateTime(testCase.approved_at)}</div>}
-              </div>
-              <button
-                disabled={!canEditDocs || !testCase.approver_id || markApprovedMutation.isPending}
-                onClick={() => testCase.approver_id && markApprovedMutation.mutate(testCase.approver_id)}
-                className="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-500 disabled:opacity-50"
-              >
-                <UserCog className="h-3.5 w-3.5 mr-1" />
-                Mark Approved
-              </button>
-            </div>
-          </SectionCard>
+          <WorkflowPanel artefactType="test-case" artefactId={tcId} projectPrefix={projectPrefix} projectId={testCase.project_id} />
 
           <SectionCard title="Metadata">
             <div className="space-y-4">
+              <MetaItem label="Origin" value={<ArtefactTags type="test-case" id={tcId} projectId={testCase.project_id} canEdit={showEdit} origin={testCase.visibility === 'customer' ? 'Customer' : 'Internal'} />} />
               <MetaItem label="Created" value={formatDateTime(testCase.created_at) + ' ago'} />
               <MetaItem label="Updated" value={formatDateTime(testCase.updated_at) + ' ago'} />
             </div>
@@ -314,7 +223,9 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
           <DocEditor
             content={testCase.content_json as Record<string, unknown>}
             editable={false}
-            parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined}
+            userMentionItems={users.map(person => ({ id: person.id, label: person.full_name, user: person }))}
+            parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues} artefactLabels={artefactLabels}
+            artefactHref={(type, _id, label) => docUrl(prefix, type as DocType, label)}
             minHeight="min-h-[120px]"
             className="border-0"
           />
@@ -326,7 +237,7 @@ export default function TestCaseDetail({ resolvedId }: { resolvedId?: number } =
       ) : null}
 
       {tcsRows.length > 0 && (
-        <TcsArteTable rows={tcsRows} onChange={() => {}} editable={false} parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} />
+        <TcsArteTable userMentionItems={users.map(person => ({ id: person.id, label: person.full_name, user: person }))} rows={tcsRows} onChange={() => {}} editable={false} parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues} />
       )}
 
       <DocumentActivityPanel artefactType="test-case" artefactId={tcId} />

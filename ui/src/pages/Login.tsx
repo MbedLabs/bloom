@@ -20,7 +20,7 @@ export default function Login() {
     setupApi
       .getStatus()
       .then((status) => {
-        if (!cancelled && status.setup_required) navigate('/setup', { replace: true })
+        if (!cancelled && status.setup_required) void navigate('/setup', { replace: true })
       })
       .catch(() => undefined)
     return () => {
@@ -34,7 +34,7 @@ export default function Login() {
     setLoading(true)
     try {
       await login(email, password)
-      navigate('/', { replace: true })
+      void navigate('/', { replace: true })
     } catch (err: unknown) {
       const message = extractApiErrorMessage(err, 'Login failed')
       setError(message)
@@ -44,7 +44,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1a1028] via-[#3b1d6e] to-[#6b7280]">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br/srgb from-[#1a1028] via-[#3b1d6e] to-[#6b7280]">
       <div className="w-full max-w-md px-4">
         <div className="bg-card rounded-2xl shadow-2xl p-8 border border-border">
           <div className="flex flex-col items-center mb-8">
@@ -103,7 +103,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 px-4 bg-gradient-to-r from-primary to-[#6b7280] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-2.5 px-4 bg-linear-to-r/srgb from-primary to-[#6b7280] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Signing in...' : 'Sign in'}
             </button>

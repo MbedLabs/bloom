@@ -19,6 +19,7 @@ from app.models import (
 )
 from app.models.models import ArtefactVisibility
 from app.models.user import User, UserRole
+from tests.access_fixtures import allow_doc_types, project_access_fixture
 
 
 @pytest_asyncio.fixture
@@ -133,7 +134,9 @@ async def test_member_sees_only_member_projects(session):
     alpha_id = (
         await session.execute(select(Project.id).where(Project.prefix == "ALP"))
     ).scalar_one()
-    session.add(ProjectMembership(user_id=member.id, project_id=alpha_id, role="maintainer"))
+    session.add(
+        project_access_fixture(user_id=member.id, project_id=alpha_id, permissions={"*": ["*"]})
+    )
     await session.commit()
 
     res = await run_global_search(session, member, q="login")
@@ -144,7 +147,8 @@ async def test_member_sees_only_member_projects(session):
 async def test_member_without_membership_sees_nothing(session):
     member = await _user(session, UserRole.maintainer)
     res = await run_global_search(session, member, q="login")
-    assert res.total == 0 and res.items == []
+    assert res.total == 0
+    assert res.items == []
 
 
 async def test_external_gated_by_doc_type_and_visibility(session):
@@ -152,10 +156,16 @@ async def test_external_gated_by_doc_type_and_visibility(session):
     alpha_id = (
         await session.execute(select(Project.id).where(Project.prefix == "ALP"))
     ).scalar_one()
-    membership = ProjectMembership(user_id=ext.id, project_id=alpha_id, role="external")
+    membership = project_access_fixture(
+        user_id=ext.id,
+        project_id=alpha_id,
+        permissions={"*": ["view", "comment"]},
+        visibility="customer",
+        doc_types=[],
+    )
     session.add(membership)
     await session.flush()
-    session.add(ProjectExternalDocType(membership_id=membership.id, doc_type="REQ"))
+    allow_doc_types(membership.policies[0], ["REQ"])
     await session.commit()
 
     res = await run_global_search(session, ext, q="login")
@@ -171,7 +181,15 @@ async def test_external_with_no_allowlist_sees_nothing(session):
     alpha_id = (
         await session.execute(select(Project.id).where(Project.prefix == "ALP"))
     ).scalar_one()
-    session.add(ProjectMembership(user_id=ext.id, project_id=alpha_id, role="external"))
+    session.add(
+        project_access_fixture(
+            user_id=ext.id,
+            project_id=alpha_id,
+            permissions={"*": ["view", "comment"]},
+            visibility="customer",
+            doc_types=[],
+        )
+    )
     await session.commit()
 
     res = await run_global_search(session, ext, q="login")

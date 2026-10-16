@@ -1,4 +1,17 @@
 export type DocType = 'REQ' | 'SPEC' | 'TC' | 'DES' | 'RSK' | 'CHG' | 'CPT' | 'DEF' | 'CMP' | 'TS' | 'PRT' | 'RPT' | 'STD'
+
+export function isWorkflowControlledDocType(type: DocType): boolean {
+  return ['REQ', 'SPEC', 'TC', 'DES', 'CPT', 'PRT', 'TS', 'CHG'].includes(type)
+}
+
+export function documentStatusOptions(type: DocType): readonly string[] {
+  if (type === 'CHG') return ['Draft', 'Review', 'Approval', 'Approved', 'Submitted', 'Closed']
+  if (type === 'RSK') return ['Open', 'Monitoring', 'Mitigated', 'Accepted', 'Closed']
+  if (type === 'CMP') return ['Planned', 'Scope', 'In Progress', 'Running', 'Completed', 'Aborted']
+  return isWorkflowControlledDocType(type)
+    ? ['Draft', 'Review', 'Approval', 'Approved']
+    : DOC_CONFIGS[type].statusOptions
+}
 export type DocLinkRole =
   | 'derives_from'
   | 'refines'
@@ -191,12 +204,9 @@ export const DOC_CONFIGS: Record<DocType, DocConfig> = {
     titleField: 'title',
     descriptionField: 'description',
     statusOptions: ['Draft', 'Review', 'Approved', 'Rejected', 'Obsolete'],
-    priorityOptions: ['Low', 'Medium', 'High', 'Critical'],
     fields: [
       { key: 'title', label: 'Title', type: 'text', required: true },
       { key: 'description', label: 'Description', type: 'textarea' },
-      { key: 'priority', label: 'Priority', type: 'select', options: ['Low', 'Medium', 'High', 'Critical'] },
-      { key: 'spec_type', label: 'Specification Type', type: 'select', options: ['Product Specification', 'System Specification', 'Subsystem Specification', 'Interface Specification', 'Compliance Specification', 'Customer Specification', 'Supplier Specification'] },
     ],
   },
   PRT: {
@@ -375,6 +385,7 @@ const DOC_LINK_RULE_ROWS: DocLinkRuleRow[] = [
   { sourceType: 'CHG', targetType: 'TC', roles: ['impacts', 'blocks', 'references'] },
   { sourceType: 'CHG', targetType: 'CPT', roles: ['impacts', 'blocks', 'references'] },
   { sourceType: 'CHG', targetType: 'PRT', roles: ['impacts', 'blocks', 'references'] },
+  { sourceType: 'CHG', targetType: 'TS', roles: ['impacts', 'blocks', 'references'] },
   { sourceType: 'CHG', targetType: 'RSK', roles: ['mitigates', 'impacts', 'references'] },
   { sourceType: 'CHG', targetType: 'CHG', roles: ['depends_on', 'duplicates', 'blocks', 'relates_to'] },
   { sourceType: 'CHG', targetType: 'STD', roles: ['references'] },
@@ -476,10 +487,10 @@ export function getDocLinkRoleLabel(role: string, direction: 'incoming' | 'outgo
   return direction === 'outgoing' ? pair[0] : pair[1]
 }
 
-function getCanonicalDocLinkRoles(sourceType: DocType, targetType: DocType): DocLinkRole[] {
+function getCanonicalDocLinkRoles(fromType: DocType, toType: DocType): DocLinkRole[] {
   const matchedRow = DOC_LINK_RULE_ROWS.find((row) => (
-    row.sourceType === sourceType &&
-    row.targetType === targetType
+    row.sourceType === fromType &&
+    row.targetType === toType
   ))
   return matchedRow ? matchedRow.roles : []
 }

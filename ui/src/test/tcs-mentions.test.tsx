@@ -204,11 +204,9 @@ describe('reading a parameter back out of a step', () => {
   it('links each reference to the screen that owns the value', () => {
     render(<TcsArteTable rows={[STEP]} onChange={() => {}} parameterHref="/projects/FLT/parameters" />)
 
-    // A step is plain text, so a reference is only characters - "{{BOOT_BUDGET_MS}}"
-    // says nothing about what the budget is unless you can go and look.
     const links = Array.from(document.querySelectorAll('a')) as HTMLAnchorElement[]
     expect(links.map((a) => a.textContent)).toEqual(['{{BOOT_BUDGET_MS}}', '{{BOOT_BUDGET_MS}}'])
-    expect(links[0].getAttribute('href')).toBe('/projects/FLT/parameters')
+    expect(links[0].getAttribute('href')).toBe('/projects/FLT/parameters?key=BOOT_BUDGET_MS')
   })
 
   it('keeps the surrounding words intact', () => {

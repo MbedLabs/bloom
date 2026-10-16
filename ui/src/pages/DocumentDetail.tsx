@@ -1,4 +1,11 @@
+import { DOC_TYPE_SLUGS } from '../types/doc'
+import { finishArtefactDeletion } from '../lib/refreshProjectViews'
+import WorkflowPanel from '../components/WorkflowPanel'
+import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
+import { useAuth } from '../contexts/AuthContext'
+import { useSignOffPeople } from '../hooks/useSignOff'
 import { useMemo, useState } from 'react'
+import ArtefactTags from '../components/ArtefactTags'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, Link, useNavigate } from 'react-router'
 import { documentsApi, projectsApi, DocumentSection } from '../api/client'
@@ -8,10 +15,13 @@ import DocDetailShell, { MetaItem, SectionCard } from '../components/DocDetailSh
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import DocumentAttachmentsPanel from '../components/DocumentAttachmentsPanel'
-import { docEditUrl, kindSlugToType } from '../types/doc'
+import { docEditUrl, docUrl, kindSlugToType, type DocType } from '../types/doc'
 import { formatDateTime } from '../test/date-utils'
-import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
+import { useProjectPermissions, useRowActions } from '../hooks/useProjectPermissions'
+import { useParameterValues } from '../hooks/useParameterValues'
+import { useArtefactLabels } from '../hooks/useArtefactLabels'
+import ConfirmDelete from '../components/ConfirmDelete'
 
 function flattenSections(sections: DocumentSection[]): DocumentSection[] {
   const result: DocumentSection[] = []
@@ -25,7 +35,7 @@ function flattenSections(sections: DocumentSection[]): DocumentSection[] {
   return result
 }
 
-function TocItem({ section, depth }: { section: DocumentSection; depth: number }) {
+function TocItem({ section, depth }: Readonly<{ section: DocumentSection; depth: number }>) {
   return (
     <>
       <div
@@ -42,10 +52,13 @@ function TocItem({ section, depth }: { section: DocumentSection; depth: number }
   )
 }
 
-export default function DocumentDetail({ resolvedId }: { resolvedId?: number } = {}) {
-  const { user } = useAuth()
+export default function DocumentDetail({
+  resolvedId,
+  allowedActions,
+}: { resolvedId?: number; allowedActions?: string[] } = {}) {
   const { prefix, docId: docIdParam, kind } = useParams<{ prefix: string; docId: string; kind: string }>()
   const docId = resolvedId || Number(docIdParam)
+  const workflow = useDocumentWorkflow('document', docId)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -53,14 +66,22 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
 
 
   const resolvedDocType = kindSlugToType(kind || '')
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
-
+  const { can } = useProjectPermissions(prefix)
+  const parameterValues = useParameterValues(prefix)
   const { data: doc, isLoading } = useQuery({
     queryKey: ['document', docId],
     queryFn: () => documentsApi.get(docId),
     enabled: !!docId,
   })
+  const { user } = useAuth()
+  const people = useSignOffPeople(doc?.project_id, user?.role === 'admin')
+  const docType = (doc?.doc_type as DocType | undefined) ?? resolvedDocType
+  const rowAllows = useRowActions(prefix, docType ?? 'SPEC', doc?.doc_id, allowedActions)
+  const canEditDocs = docType ? can('edit', docType) : false
+  const showEdit = canEditDocs && rowAllows('edit') && workflow.data?.actions?.edit_current === true
+  const showDelete = canEditDocs && !!docType && can('delete', docType) && rowAllows('delete')
 
+  const artefactLabels = useArtefactLabels(prefix, doc?.content_json)
   const { data: project } = useQuery({
     queryKey: ['project', doc?.project_id],
     queryFn: () => projectsApi.get(doc!.project_id),
@@ -73,18 +94,10 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
   const deleteDocumentMutation = useMutation({
     mutationFn: () => documentsApi.delete(docId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'document', docId] })
       toast.notify('Document deleted', 'success')
-      if (projectPrefix) {
-        queryClient.invalidateQueries({ queryKey: ['documents', doc?.project_id] })
-        setTimeout(() => {
-          navigate(`/projects/${projectPrefix}/docs`)
-        }, 800)
-      } else {
-        setTimeout(() => {
-          navigate('/projects')
-        }, 800)
-      }
+      setTimeout(() => {
+        finishArtefactDeletion(queryClient, { prefix: projectPrefix, projectId: doc?.project_id, detailKey: 'document', artefactType: 'document', recordId: docId, kind: docType ? DOC_TYPE_SLUGS[docType] : undefined, docId: doc?.doc_id ?? undefined }, () => navigate(projectPrefix ? `/projects/${projectPrefix}/docs` : '/projects'))
+      }, 800)
     },
     onError: (err: unknown) => {
       toast.failed('Deleting the document', err)
@@ -132,8 +145,9 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
       docCode={doc.doc_id || String(docId)}
       title={doc.title}
       status={doc.status}
-      actions={canEditDocs ? (
+      actions={showEdit || showDelete ? (
         <>
+          {showEdit && (
           <button
             onClick={() => navigate(`${editUrl}?type=${resolvedDocType}`)}
             className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm font-medium"
@@ -141,7 +155,8 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
             <FileEdit className="h-4 w-4 mr-2" />
             Edit
           </button>
-          {!deleteConfirm ? (
+          )}
+          {showDelete && (!deleteConfirm ? (
             <button
               onClick={() => setDeleteConfirm(true)}
               disabled={deleteDocumentMutation.isPending}
@@ -151,31 +166,27 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
               Delete
             </button>
           ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Are you sure?</span>
-              <button
-                onClick={() => { setDeleteConfirm(false); deleteDocumentMutation.mutate(); }}
-                disabled={deleteDocumentMutation.isPending}
-                className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm disabled:opacity-50"
-              >
-                {deleteDocumentMutation.isPending ? 'Deleting...' : 'Delete'}
-              </button>
-              <button onClick={() => setDeleteConfirm(false)} className="px-3 py-1.5 border border-input rounded-md text-sm hover:bg-accent/40">
-                Cancel
-              </button>
-            </div>
-          )}
+            <ConfirmDelete
+              pending={deleteDocumentMutation.isPending}
+              onConfirm={() => { setDeleteConfirm(false); deleteDocumentMutation.mutate(); }}
+              onCancel={() => setDeleteConfirm(false)}
+            />
+          ))}
         </>
       ) : undefined}
       rightRail={
+        <>
+        <WorkflowPanel artefactType="document" artefactId={docId} projectPrefix={projectPrefix} projectId={doc.project_id} />
         <SectionCard title="Metadata">
           <div className="space-y-4">
+            <MetaItem label="Origin" value={<ArtefactTags type="document" id={docId} projectId={doc.project_id} canEdit={showEdit} origin={doc.visibility === 'customer' ? 'Customer' : 'Internal'} />} />
             <MetaItem label="ID" value={doc.doc_id || String(docId)} mono />
             <MetaItem label="Version" value={`v${doc.version}`} />
             <MetaItem label="Created" value={formatDateTime(doc.created_at) + ' ago'} />
             <MetaItem label="Updated" value={formatDateTime(doc.updated_at) + ' ago'} />
           </div>
         </SectionCard>
+        </>
       }
     >
       {hasRichContent && (
@@ -184,7 +195,9 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
             <DocEditor
               content={doc.content_json as Record<string, unknown>}
               editable={false}
-              parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined}
+              userMentionItems={people.map(person => ({ id: person.id, label: person.full_name, user: person }))}
+              parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues} artefactLabels={artefactLabels}
+            artefactHref={(type, _id, label) => docUrl(prefix, type as DocType, label)}
               minHeight="min-h-[40vh]"
             />
           </div>
@@ -214,12 +227,12 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
 
       {!hasRichContent && !hasLegacySections && (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-16 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 rounded-2xl bg-linear-to-br/srgb from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-4">
             <FileText className="h-8 w-8 text-primary/40" />
           </div>
           <h3 className="text-lg font-semibold text-foreground mb-2">Empty Document</h3>
           <p className="text-sm text-muted-foreground max-w-md mx-auto mb-4">This document has no content yet. Open the editor to start writing.</p>
-          {canEditDocs && (
+          {showEdit && (
             <button
               onClick={() => navigate(`${editUrl}?type=${resolvedDocType}`)}
               className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm font-medium"
@@ -231,7 +244,7 @@ export default function DocumentDetail({ resolvedId }: { resolvedId?: number } =
         </div>
       )}
 
-      <DocumentAttachmentsPanel documentId={docId} />
+      <DocumentAttachmentsPanel documentId={docId} docType={docType} rowAllowsEdit={showEdit} projectId={doc.project_id} />
 
       <DocumentActivityPanel artefactType="document" artefactId={docId} />
 

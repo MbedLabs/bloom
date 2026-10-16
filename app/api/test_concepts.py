@@ -1,35 +1,40 @@
 """Test concepts API endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.artefact_utils import (
-    log_artefact_activity,
-    log_document_workflow_activity_from_patch,
-    should_log_generic_document_update,
-    updated_summary,
+from app.api.artefact_crud import (
+    ArtefactKind,
+    create_item,
+    get_item,
+    list_items,
+    update_item,
 )
+from app.api.artefact_utils import delete_project_row
 from app.api.link_read_utils import merged_linked_requirement_ids_for_test_concept
 from app.core.database import get_db
-from app.core.id_generator import next_doc_id
-from app.core.security import (
-    apply_external_visibility_filter,
-    get_current_user,
-    require_project_access,
-    require_role,
-)
-from app.models import Project, TestConcept
-from app.models.user import User, UserRole
+from app.core.security import get_current_user
+from app.models import TestConcept
+from app.models.user import User
 from app.schemas import (
     PaginatedResponse,
     TestConceptCreate,
     TestConceptResponse,
     TestConceptUpdate,
 )
-from app.services.tag_links import sync_tag_links
 
 router = APIRouter()
+
+KIND = ArtefactKind(
+    model=TestConcept,
+    type_code="CPT",
+    id_attr="concept_id",
+    activity_type="test-concept",
+    created_label="test concept",
+    updated_label="test concept",
+    not_found="Test concept not found",
+    exists="Test concept with this ID already exists",
+)
 
 
 async def _response(db: AsyncSession, item: TestConcept) -> TestConceptResponse:
@@ -56,81 +61,37 @@ async def list_test_concepts(
     project_id: int = Query(..., description="Filter by project ID"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    await require_project_access(db, current_user, project_id)
-
-    base = select(TestConcept).where(TestConcept.project_id == project_id)
-    base = apply_external_visibility_filter(base, TestConcept, current_user)
-    total_q = select(func.count()).select_from(base.subquery())
-    total = (await db.execute(total_q)).scalar() or 0
-    query = base.order_by(TestConcept.created_at.desc()).offset(skip).limit(limit)
-    result = await db.execute(query)
-    items = [await _response(db, item) for item in result.scalars().all()]
-    return PaginatedResponse(items=items, total=total, skip=skip, limit=limit)
+    return await list_items(
+        db, KIND, project_id, skip, limit, current_user, lambda item: _response(db, item)
+    )
 
 
 @router.post("", response_model=TestConceptResponse, status_code=201)
 async def create_test_concept(
     data: TestConceptCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    project = (
-        await db.execute(select(Project).where(Project.id == data.project_id))
-    ).scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    await require_project_access(
+    item = await create_item(
         db,
-        current_user,
+        KIND,
         data.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
-    )
-
-    concept_id = await next_doc_id(
-        db, TestConcept, TestConcept.concept_id, data.project_id, project.prefix, "CPT"
-    )
-
-    existing = await db.execute(
-        select(TestConcept).where(
-            TestConcept.project_id == data.project_id,
-            TestConcept.concept_id == concept_id,
-        )
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Test concept with this ID already exists")
-
-    item = TestConcept(
-        project_id=data.project_id,
-        concept_id=concept_id,
-        name=data.name,
-        description=data.description,
-        status=data.status,
-        visibility=data.visibility,
-        linked_requirement_ids=None,
-        coverage=data.coverage,
-        content_json=data.content_json,
-        content_html=data.content_html,
-    )
-    db.add(item)
-    await db.flush()
-    await db.refresh(item)
-    await sync_tag_links(
-        db,
-        project_id=item.project_id,
-        source_type="CPT",
-        source_id=item.id,
-        content_json=item.content_json,
-    )
-    await log_artefact_activity(
-        db,
-        "test-concept",
-        item.id,
-        "created",
-        f"{current_user.full_name} created test concept {item.concept_id}",
+        {
+            "name": data.name,
+            "description": data.description,
+            "status": data.status,
+            "visibility": data.visibility,
+            "linked_requirement_ids": None,
+            "coverage": data.coverage,
+            "content_json": data.content_json,
+            "content_html": data.content_html,
+        },
+        current_user,
+        named=data.model_dump(exclude_unset=True),
+        tag_ids=data.tag_ids,
     )
     return await _response(db, item)
 
@@ -138,103 +99,36 @@ async def create_test_concept(
 @router.get("/{concept_id}", response_model=TestConceptResponse)
 async def get_test_concept(
     concept_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    item = (
-        await db.execute(
-            apply_external_visibility_filter(
-                select(TestConcept).where(TestConcept.id == concept_id),
-                TestConcept,
-                current_user,
-            )
-        )
-    ).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Test concept not found")
-    await require_project_access(db, current_user, item.project_id)
-    return await _response(db, item)
+    return await _response(db, await get_item(db, KIND, concept_id, current_user))
 
 
 @router.patch("/{concept_id}", response_model=TestConceptResponse)
 async def update_test_concept(
     concept_id: int,
     data: TestConceptUpdate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    item = (
-        await db.execute(select(TestConcept).where(TestConcept.id == concept_id))
-    ).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Test concept not found")
-
-    await require_project_access(
-        db,
-        current_user,
-        item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
-    )
-
-    fields_set = data.model_fields_set
-    previous_status = item.status if "status" in fields_set else None
-
-    for field, value in data.model_dump(exclude_unset=True).items():
-        setattr(item, field, value)
-    if item.content_json is not None and "content_json" in fields_set:
-        await sync_tag_links(
-            db,
-            project_id=item.project_id,
-            source_type="CPT",
-            source_id=item.id,
-            content_json=item.content_json,
-        )
-
-    await db.flush()
-    await db.refresh(item)
-    await log_document_workflow_activity_from_patch(
-        db,
-        artefact_type="test-concept",
-        artefact_id=item.id,
-        public_id=item.concept_id,
-        actor=current_user,
-        fields_set=fields_set,
-        previous_status=previous_status,
-        next_status=item.status,
-    )
-    if should_log_generic_document_update(fields_set):
-        await log_artefact_activity(
-            db,
-            "test-concept",
-            item.id,
-            "updated",
-            updated_summary(current_user.full_name, "test concept", item.concept_id, fields_set),
-        )
+    item = await update_item(db, KIND, concept_id, data, current_user)
     return await _response(db, item)
 
 
 @router.delete("/{concept_id}", status_code=204)
 async def delete_test_concept(
     concept_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    item = (
-        await db.execute(select(TestConcept).where(TestConcept.id == concept_id))
-    ).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Test concept not found")
-    await require_project_access(
+    await delete_project_row(
         db,
         current_user,
-        item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        TestConcept,
+        concept_id,
+        "Test concept not found",
+        resource="CPT",
+        audit_type="test-concept",
+        activity=("test concept", "concept_id"),
     )
-    await log_artefact_activity(
-        db,
-        "test-concept",
-        item.id,
-        "deleted",
-        f"{current_user.full_name} deleted test concept {item.concept_id}",
-    )
-    await db.delete(item)

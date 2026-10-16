@@ -110,9 +110,11 @@ def test_parse_gitlab_url_invalid():
 
 def test_parse_issue_url_auto_detects():
     gh = parse_issue_url("https://github.com/owner/repo/issues/10")
-    assert gh is not None and gh.tracker == "github"
+    assert gh is not None
+    assert gh.tracker == "github"
     gl = parse_issue_url("https://gitlab.com/ns/proj/-/issues/3")
-    assert gl is not None and gl.tracker == "gitlab"
+    assert gl is not None
+    assert gl.tracker == "gitlab"
 
 
 # ==================== External field validation ====================
@@ -183,13 +185,13 @@ def test_validate_external_fields_none_fields():
 
 
 def test_github_hmac_signature():
-    from app.api.integrations import _verify_github_signature
+    from app.api.integrations import _verify_sha256_signature
 
     secret = "my-webhook-secret"
     body = b'{"action":"opened"}'
     sig = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-    assert _verify_github_signature(body, secret, sig) is True
-    assert _verify_github_signature(body, secret, "sha256=wrong") is False
+    assert _verify_sha256_signature(body, secret, sig) is True
+    assert _verify_sha256_signature(body, secret, "sha256=wrong") is False
 
 
 def test_gitlab_token_verification():

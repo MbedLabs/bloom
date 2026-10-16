@@ -1,9 +1,11 @@
+import SelectField from '../components/SelectField'
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
-import { traceabilityApi, projectsApi, exportApi } from '../api/client'
+import { traceabilityApi, projectsApi, exportApi, extractApiErrorMessage } from '../api/client'
 import { docUrl } from '../types/doc'
 import { ArrowLeft, CheckCircle, AlertCircle, XCircle, Shield, Filter, GitBranch, AlertTriangle, X, Download } from 'lucide-react'
+import { FilterChip, FiltersToggle } from '../components/ListControls'
 
 const COVERAGE_OPTIONS = ['Covered', 'Partial', 'Uncovered'] as const
 const PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Critical']
@@ -134,33 +136,7 @@ export default function TraceabilityMatrix() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => projId && exportApi.download(projId, 'traceability')}
-            disabled={!projId}
-            title="Export the requirement-to-test-case matrix as CSV"
-            className="inline-flex items-center gap-1.5 px-3 py-2 border border-input text-foreground rounded-md text-sm font-medium hover:bg-accent/50 disabled:opacity-50"
-          >
-            <Download className="h-4 w-4" />
-            Matrix CSV
-          </button>
-          <button
-            onClick={() => projId && exportApi.download(projId, 'requirements', 'csv')}
-            disabled={!projId}
-            title="Export all requirements as CSV"
-            className="inline-flex items-center gap-1.5 px-3 py-2 border border-input text-foreground rounded-md text-sm font-medium hover:bg-accent/50 disabled:opacity-50"
-          >
-            <Download className="h-4 w-4" />
-            Reqs CSV
-          </button>
-          <button
-            onClick={() => projId && exportApi.download(projId, 'requirements', 'pdf')}
-            disabled={!projId}
-            title="Export the requirements specification as PDF"
-            className="inline-flex items-center gap-1.5 px-3 py-2 border border-input text-foreground rounded-md text-sm font-medium hover:bg-accent/50 disabled:opacity-50"
-          >
-            <Download className="h-4 w-4" />
-            Spec PDF
-          </button>
+          <ExportMenu projectId={projId} />
         <button
           onClick={() => setShowGaps(!showGaps)}
           className={`inline-flex items-center px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
@@ -282,7 +258,7 @@ export default function TraceabilityMatrix() {
         <div className="grid grid-cols-1 gap-2 border-b border-border p-3 md:grid-cols-[minmax(180px,1fr)_auto]">
           <label className="space-y-1">
             <span className="sr-only">Sort traceability rows</span>
-            <select
+            <SelectField
               value={sortBy}
               onChange={(event) => setSortBy(event.target.value)}
               className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
@@ -292,25 +268,14 @@ export default function TraceabilityMatrix() {
                   Sort by {option.label}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </label>
-          <button
-            type="button"
-            onClick={() => setFiltersOpen((open) => !open)}
-            className={`inline-flex items-center justify-center gap-2 rounded-md border px-2.5 py-1.5 text-sm font-medium transition-colors ${
-              filtersOpen || hasActiveFilters
-                ? 'border-primary bg-primary/10 text-primary'
-                : 'border-input bg-background text-foreground hover:bg-accent'
-            }`}
-            aria-expanded={filtersOpen}
-            aria-controls="traceability-filter-panel"
-          >
-            <Filter className="h-4 w-4" />
-            Filters
-            {hasActiveFilters && (
-              <span className="rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">On</span>
-            )}
-          </button>
+          <FiltersToggle
+            open={filtersOpen}
+            active={hasActiveFilters}
+            onToggle={() => setFiltersOpen((open) => !open)}
+            controls="traceability-filter-panel"
+          />
         </div>
 
         {showFilterSummary && (
@@ -361,7 +326,7 @@ export default function TraceabilityMatrix() {
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
               <label className="space-y-1">
                 <span className="text-xs font-medium uppercase text-muted-foreground">Priority</span>
-                <select
+                <SelectField
                   value={priorityFilter}
                   onChange={(event) => setPriorityFilter(event.target.value)}
                   className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
@@ -372,7 +337,7 @@ export default function TraceabilityMatrix() {
                       {priority}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               </label>
             </div>
           </div>
@@ -472,20 +437,12 @@ export default function TraceabilityMatrix() {
   )
 }
 
-function FilterChip({ label, muted = false }: { label: string; muted?: boolean }) {
-  return (
-    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs ${muted ? 'border-border text-muted-foreground' : 'border-primary/20 bg-primary/10 text-primary'}`}>
-      {label}
-    </span>
-  )
-}
-
-function SummaryCard({ label, value, icon: Icon, color }: {
+function SummaryCard({ label, value, icon: Icon, color }: Readonly<{
   label: string
   value: number | string
   icon: React.ComponentType<{ className?: string }>
   color: string
-}) {
+}>) {
   return (
     <div className="bg-card rounded-lg shadow-elegant p-4">
       <div className="flex items-center justify-between">
@@ -499,7 +456,7 @@ function SummaryCard({ label, value, icon: Icon, color }: {
   )
 }
 
-function CoverageBadge({ status }: { status: string }) {
+function CoverageBadge({ status }: Readonly<{ status: string }>) {
   const config: Record<string, { colors: string; icon: React.ComponentType<{ className?: string }> }> = {
     Covered: { colors: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400', icon: CheckCircle },
     Partial: { colors: 'bg-amber-500/10 text-amber-700 dark:text-amber-400', icon: AlertCircle },
@@ -515,7 +472,7 @@ function CoverageBadge({ status }: { status: string }) {
   )
 }
 
-function GapTypeBadge({ gapType }: { gapType: string }) {
+function GapTypeBadge({ gapType }: Readonly<{ gapType: string }>) {
   const config: Record<string, { colors: string; label: string }> = {
     no_test_cases: { colors: 'bg-red-500/10 text-red-700 dark:text-red-400', label: 'No Test Cases' },
     all_draft: { colors: 'bg-amber-500/10 text-amber-700 dark:text-amber-400', label: 'All Draft' },
@@ -528,7 +485,7 @@ function GapTypeBadge({ gapType }: { gapType: string }) {
   )
 }
 
-function ImpactLink({ prefix, reqId }: { prefix: string; reqId: string }) {
+function ImpactLink({ prefix, reqId }: Readonly<{ prefix: string; reqId: string }>) {
   return (
     <Link
       to={`/projects/${prefix}/impact-analysis/${reqId}`}
@@ -540,7 +497,7 @@ function ImpactLink({ prefix, reqId }: { prefix: string; reqId: string }) {
   )
 }
 
-function RequirementStatusBadge({ status }: { status: string }) {
+function RequirementStatusBadge({ status }: Readonly<{ status: string }>) {
   const colors: Record<string, string> = {
     Draft: 'bg-gray-500/10 text-gray-700 dark:text-gray-400',
     Review: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
@@ -556,7 +513,7 @@ function RequirementStatusBadge({ status }: { status: string }) {
   )
 }
 
-function PriorityBadge({ priority }: { priority: string }) {
+function PriorityBadge({ priority }: Readonly<{ priority: string }>) {
   const colors: Record<string, string> = {
     Low: 'bg-gray-500/10 text-gray-700 dark:text-gray-400',
     Medium: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
@@ -567,5 +524,68 @@ function PriorityBadge({ priority }: { priority: string }) {
     <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[priority] || 'bg-gray-500/10 text-gray-700 dark:text-gray-400'}`}>
       {priority}
     </span>
+  )
+}
+
+const EXPORTS: {
+  label: string
+  kind: 'requirements' | 'traceability' | 'test-cases' | 'verification-dossier'
+  format: 'csv' | 'pdf' | 'md' | 'xml'
+}[] = [
+  { label: 'Traceability matrix (PDF)', kind: 'traceability', format: 'pdf' },
+  { label: 'Traceability matrix (CSV)', kind: 'traceability', format: 'csv' },
+  { label: 'Verification dossier (PDF)', kind: 'verification-dossier', format: 'pdf' },
+  { label: 'Requirements specification (PDF)', kind: 'requirements', format: 'pdf' },
+  { label: 'Requirements (CSV)', kind: 'requirements', format: 'csv' },
+  { label: 'Test cases (PDF)', kind: 'test-cases', format: 'pdf' },
+  { label: 'Test cases (CSV)', kind: 'test-cases', format: 'csv' },
+  { label: 'Test cases (Markdown)', kind: 'test-cases', format: 'md' },
+  { label: 'Test cases (XML)', kind: 'test-cases', format: 'xml' },
+]
+
+/** One Export button listing every project report and export this page offers. */
+function ExportMenu({ projectId }: Readonly<{ projectId: number | undefined }>) {
+  const [open, setOpen] = useState(false)
+  const [failed, setFailed] = useState<string | null>(null)
+
+  const download = async (entry: (typeof EXPORTS)[number]) => {
+    setOpen(false)
+    setFailed(null)
+    if (!projectId) return
+    try {
+      await exportApi.download(projectId, entry.kind, entry.format)
+    } catch (error) {
+      setFailed(`${entry.label}: ${extractApiErrorMessage(error, 'the export failed')}`)
+    }
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        disabled={!projectId}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="inline-flex items-center gap-1.5 px-3 py-2 border border-input text-foreground rounded-md text-sm font-medium hover:bg-accent/50 disabled:opacity-50"
+      >
+        <Download className="h-4 w-4" />
+        Export
+      </button>
+      {open && (
+        <div role="menu" className="absolute right-0 mt-1 w-64 bg-card border border-border rounded-md shadow-lg z-20 py-1">
+          {EXPORTS.map((entry) => (
+            <button
+              key={entry.label}
+              role="menuitem"
+              onClick={() => download(entry)}
+              className="w-full text-left px-3 py-1.5 text-sm text-foreground hover:bg-accent/50"
+            >
+              {entry.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {failed && <p className="absolute right-0 mt-1 w-64 text-xs text-destructive">{failed}</p>}
+    </div>
   )
 }

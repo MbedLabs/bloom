@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
 from sqlalchemy import delete, func, select
@@ -30,7 +30,7 @@ async def _lock_user(db: AsyncSession, user_id: int) -> None:
 async def reserve_attachment_upload(db: AsyncSession, *, user_id: int) -> AttachmentUploadLease:
     """Record an upload start and reserve the user's only active upload slot."""
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     window_start = now - timedelta(minutes=15)
     await _lock_user(db, user_id)
     await db.execute(delete(AttachmentUploadLease).where(AttachmentUploadLease.expires_at <= now))

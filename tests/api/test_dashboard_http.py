@@ -13,7 +13,11 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.cache import dashboard_stats_cache
 from app.core.database import Base, get_db
-from app.core.security import get_current_user, get_password_hash
+from app.core.security import (
+    accessible_project_ids,
+    get_current_user,
+    get_password_hash,
+)
 from app.main import app
 from app.models import (
     Project,
@@ -25,6 +29,7 @@ from app.models import (
     User,
 )
 from app.models.user import UserRole
+from tests.access_fixtures import allow_doc_types, project_access_fixture
 
 
 def test_dashboard_stats_shape(api_client: TestClient):
@@ -107,6 +112,7 @@ def _build_dashboard_harness():
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Selected test user no longer exists",
                 )
+            await accessible_project_ids(session, user)
             return user
 
     asyncio.run(_create_schema())
@@ -140,19 +146,16 @@ async def _seed_dashboard_visibility_data(
         session.add(project)
         await session.flush()
 
-        membership = ProjectMembership(
+        membership = project_access_fixture(
             user_id=external.id,
             project_id=project.id,
-            role=UserRole.external.value,
+            permissions={"*": ["view", "comment"]},
+            visibility="customer",
+            doc_types=[],
         )
         session.add(membership)
         await session.flush()
-        session.add_all(
-            [
-                ProjectExternalDocType(membership_id=membership.id, doc_type=doc_type)
-                for doc_type in allowed_doc_types
-            ]
-        )
+        allow_doc_types(membership.policies[0], list(allowed_doc_types))
 
         session.add_all(
             [

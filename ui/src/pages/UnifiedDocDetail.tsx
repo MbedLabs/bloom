@@ -8,16 +8,22 @@ import DocumentDetail from './DocumentDetail'
 import ArtefactDetail from './ArtefactDetail'
 import CampaignDetail from './CampaignDetail'
 import SuiteDetail from './SuiteDetail'
+import AccessDenied from '../components/AccessDenied'
+import { docResourceType, isAccessDenied } from '../lib/accessDenied'
 
 export default function UnifiedDocDetail() {
   const { prefix, kind, docId } = useParams<{ prefix: string; kind: string; docId: string }>()
-  const { data: project } = useProjectByPrefix(prefix)
+  const { data: project, error: projectError } = useProjectByPrefix(prefix)
 
-  const { data: doc, isLoading } = useQuery({
+  const { data: doc, isLoading, error: docError } = useQuery({
     queryKey: ['doc-facade', prefix, kind, docId],
     queryFn: () => docsApi.get(prefix!, kind!, docId!),
     enabled: !!prefix && !!kind && !!docId,
   })
+
+  if (isAccessDenied(docError) || isAccessDenied(projectError)) {
+    return <AccessDenied resourceType={docResourceType(kind)} resourceRef={docId ?? ''} projectPrefix={prefix} />
+  }
 
   if (isLoading || !project) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
@@ -39,28 +45,28 @@ export default function UnifiedDocDetail() {
 
   switch (doc.doc_type) {
     case 'REQ':
-      return <RequirementDetail resolvedId={doc.id} />
+      return <RequirementDetail resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     case 'TC':
-      return <TestCaseDetail resolvedId={doc.id} />
+      return <TestCaseDetail resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     case 'SPEC':
     case 'PRT':
     case 'RPT':
     case 'STD':
-      return <DocumentDetail resolvedId={doc.id} />
+      return <DocumentDetail resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     case 'DES':
-      return <ArtefactDetail kind="design" resolvedId={doc.id} />
+      return <ArtefactDetail kind="design" resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     case 'RSK':
-      return <ArtefactDetail kind="risk" resolvedId={doc.id} />
+      return <ArtefactDetail kind="risk" resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     case 'CHG':
-      return <ArtefactDetail kind="change" resolvedId={doc.id} />
+      return <ArtefactDetail kind="change" resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     case 'CPT':
-      return <ArtefactDetail kind="test-concept" resolvedId={doc.id} />
+      return <ArtefactDetail kind="test-concept" resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     case 'DEF':
-      return <ArtefactDetail kind="defect" resolvedId={doc.id} />
+      return <ArtefactDetail kind="defect" resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     case 'CMP':
-      return <CampaignDetail resolvedId={doc.id} />
+      return <CampaignDetail resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     case 'TS':
-      return <SuiteDetail resolvedId={doc.id} />
+      return <SuiteDetail resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     default:
       return <div className="text-center py-16 text-muted-foreground">Unknown document type: {doc.doc_type}</div>
   }

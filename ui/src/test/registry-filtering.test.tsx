@@ -1,3 +1,5 @@
+import { changeControl } from './change-control'
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
  * The document registry's filtering, sorting and paging.
@@ -14,7 +16,7 @@
  * Whether the *real* server reads those parameters correctly is a different
  * question, asked against real SQL in tests/test_docs_facade_registry_http.py.
  */
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -23,6 +25,8 @@ import { ToastProvider } from '../components/Toast'
 import { clearRegistrySortSession } from '../lib/docRegistryParams'
 import { docShell, resetApiMocks, user } from './apiFixtures'
 
+let currentUser: Record<string, unknown> = user
+
 vi.mock('../api/client', async (importOriginal) => {
   const { mockApiModule: build } = await import('./apiFixtures')
   return build(await importOriginal<Record<string, unknown>>(), vi)
@@ -30,7 +34,7 @@ vi.mock('../api/client', async (importOriginal) => {
 
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({
-    user,
+    user: currentUser,
     isLoading: false,
     isAuthenticated: true,
     login: vi.fn(),
@@ -145,7 +149,7 @@ function fakeRegistry(rows: Shell[]) {
     let result = [...rows]
 
     if (params.type?.length) result = result.filter((d) => params.type!.includes(d.doc_type))
-    if (params.status?.length) result = result.filter((d) => params.status!.includes(d.status))
+    if (params.status?.length) result = result.filter((d) => d.status !== null && params.status!.includes(d.status))
     if (params.priority) result = result.filter((d) => (d.priority ?? '') === params.priority)
 
     if (params.reviewer === 'assigned') result = result.filter((d) => d.reviewer_id !== null)
@@ -220,7 +224,7 @@ function fakeRegistry(rows: Shell[]) {
 }
 
 function renderRegistry(url = '/projects/VCU/docs') {
-  const queryClient = new QueryClient({
+  const queryClient = createQueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   })
   return render(
@@ -258,6 +262,7 @@ function lastQuery(): DocListParams {
 }
 
 beforeEach(() => {
+  currentUser = user
   vi.clearAllMocks()
   resetApiMocks(client as unknown as Record<string, unknown>, vi)
   vi.mocked(client.docsApi.list).mockImplementation(fakeRegistry(ALL) as never)
@@ -271,6 +276,66 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('narrowing the registry', () => {
+  it('offers approval phases for Requirements without operational states', async () => {
+    renderRegistry('/projects/VCU/docs?type=requirements')
+    await screen.findByText('Alpha boot timing')
+    await openFilters()
+    for (const phase of ['Draft', 'Review', 'Approval', 'Approved']) {
+      expect(screen.getByRole('button', { name: phase })).toBeTruthy()
+    }
+    for (const status of ['Implemented', 'Verified', 'Accepted', 'Mitigated', 'Closed']) {
+      expect(screen.queryByRole('button', { name: status })).toBeNull()
+    }
+  })
+
+  it('offers and applies Accepted and Mitigated Risk filters', async () => {
+    vi.mocked(client.docsApi.list).mockImplementation(fakeRegistry([
+      { ...alpha, doc_type: 'RSK', doc_id: 'VCU-RSK-001', title: 'Accepted risk', status: 'Accepted' },
+      { ...bravo, doc_type: 'RSK', doc_id: 'VCU-RSK-002', title: 'Mitigated risk', status: 'Mitigated' },
+    ]) as never)
+    renderRegistry('/projects/VCU/docs?type=risks')
+    await screen.findByText('Accepted risk')
+    await openFilters()
+    for (const status of ['Open', 'Monitoring', 'Mitigated', 'Accepted', 'Closed']) {
+      expect(screen.getByRole('button', { name: status })).toBeTruthy()
+    }
+    expect(screen.queryByRole('button', { name: 'Draft' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Accepted' }))
+    await waitFor(() => expect(rows()).toEqual(['VCU-RSK-001']))
+    expect(lastQuery().type).toEqual(['RSK'])
+    expect(lastQuery().status).toEqual(['Accepted'])
+    fireEvent.click(screen.getByRole('button', { name: 'Mitigated' }))
+    await waitFor(() => expect(rows()).toHaveLength(2))
+    expect(lastQuery().status).toEqual(['Accepted', 'Mitigated'])
+  })
+
+  it('preserves existing Campaign operational filters', async () => {
+    vi.mocked(client.docsApi.list).mockImplementation(fakeRegistry([
+      { ...alpha, doc_type: 'CMP', doc_id: 'VCU-CMP-001', title: 'Aborted campaign', status: 'Aborted' },
+      { ...bravo, doc_type: 'CMP', doc_id: 'VCU-CMP-002', title: 'Scoped campaign', status: 'Scope' },
+    ]) as never)
+    renderRegistry('/projects/VCU/docs?type=campaigns')
+    await screen.findByText('Aborted campaign')
+    await openFilters()
+    for (const status of ['Planned', 'Scope', 'In Progress', 'Running', 'Completed', 'Aborted']) {
+      expect(screen.getByRole('button', { name: status })).toBeTruthy()
+    }
+    expect(screen.queryByRole('button', { name: 'Approved' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Aborted' }))
+    await waitFor(() => expect(rows()).toEqual(['VCU-CMP-001']))
+    expect(lastQuery().type).toEqual(['CMP'])
+    expect(lastQuery().status).toEqual(['Aborted'])
+  })
+
+  it('does not label an unrecorded approval phase as Draft', async () => {
+    vi.mocked(client.docsApi.list).mockImplementation(fakeRegistry([{ ...alpha, status: null }]) as never)
+    renderRegistry('/projects/VCU/docs?type=requirements')
+    await screen.findByText('Alpha boot timing')
+    const row = screen.getByText('Alpha boot timing').closest('tr')!
+    expect(within(row).queryByText('Draft')).toBeNull()
+    expect(within(row).getByText('-')).toBeTruthy()
+  })
+
   it('shows every document to begin with', async () => {
     renderRegistry()
     await screen.findByText('Alpha boot timing')
@@ -353,7 +418,7 @@ describe('narrowing the registry', () => {
     await screen.findByText('Alpha boot timing')
     await openFilters()
 
-    fireEvent.change(screen.getByLabelText(/Priority/i), { target: { value: 'High' } })
+    changeControl(screen.getByLabelText(/Priority/i), { target: { value: 'High' } })
 
     await waitFor(() => expect(rows()).toEqual(['VCU-REQ-001', 'VCU-TC-002']))
   })
@@ -364,18 +429,22 @@ describe('narrowing the registry', () => {
     await openFilters()
     const picker = screen.getByLabelText(/Reviewer/i)
 
-    fireEvent.change(picker, { target: { value: 'unassigned' } })
+    fireEvent.click(picker)
+    fireEvent.click(screen.getByRole('option', { name: 'Unassigned' }))
     await waitFor(() => expect(rows()).toEqual(['VCU-TC-001', 'VCU-REQ-002']))
 
-    fireEvent.change(picker, { target: { value: 'assigned' } })
+    fireEvent.click(picker)
+    fireEvent.click(screen.getByRole('option', { name: 'Any assigned' }))
     await waitFor(() => expect(rows()).toEqual(['VCU-REQ-001', 'VCU-TC-002']))
 
-    fireEvent.change(picker, { target: { value: String(reviewer.id) } })
+    fireEvent.click(picker)
+    fireEvent.click(screen.getByRole('option', { name: reviewer.full_name }))
     await waitFor(() => expect(rows()).toEqual(['VCU-REQ-001', 'VCU-TC-002']))
 
     // A reviewer with nothing assigned empties the table rather than being
     // ignored.
-    fireEvent.change(picker, { target: { value: String(user.id) } })
+    fireEvent.click(picker)
+    fireEvent.click(screen.getByRole('option', { name: user.full_name }))
     await waitFor(() => expect(rows()).toHaveLength(0))
   })
 
@@ -394,7 +463,7 @@ describe('narrowing the registry', () => {
       ['clean', ['VCU-TC-001', 'VCU-REQ-002']],
     ]
     for (const [value, expected] of cases) {
-      fireEvent.change(picker, { target: { value } })
+      changeControl(picker, { target: { value } })
       await waitFor(() => expect(rows()).toEqual(expected))
     }
   })
@@ -432,7 +501,7 @@ describe('narrowing the registry', () => {
     await openFilters()
 
     fireEvent.click(screen.getByRole('button', { name: 'Draft' }))
-    fireEvent.change(screen.getByLabelText(/Priority/i), { target: { value: 'High' } })
+    changeControl(screen.getByLabelText(/Priority/i), { target: { value: 'High' } })
 
     // Draft alone keeps two; High alone keeps two; together only Delta.
     await waitFor(() => expect(rows()).toEqual(['VCU-TC-002']))
@@ -443,7 +512,7 @@ describe('narrowing the registry', () => {
     await screen.findByText('Alpha boot timing')
     await openFilters()
 
-    fireEvent.change(screen.getByLabelText(/Priority/i), { target: { value: 'Critical' } })
+    changeControl(screen.getByLabelText(/Priority/i), { target: { value: 'Critical' } })
 
     expect(await screen.findByText(/no documents found/i)).toBeTruthy()
     expect(screen.getByText(/try a different filter combination/i)).toBeTruthy()
@@ -462,7 +531,7 @@ describe('narrowing the registry', () => {
     await screen.findByText('Alpha boot timing')
     await openFilters()
 
-    fireEvent.change(screen.getByLabelText(/Priority/i), { target: { value: 'High' } })
+    changeControl(screen.getByLabelText(/Priority/i), { target: { value: 'High' } })
     fireEvent.click(screen.getByRole('button', { name: 'Draft' }))
 
     expect(await screen.findByText('Priority: High')).toBeTruthy()
@@ -478,9 +547,27 @@ describe('narrowing the registry', () => {
     await screen.findByText('Alpha boot timing')
     await openFilters()
 
-    fireEvent.change(screen.getByLabelText(/Reviewer/i), { target: { value: String(reviewer.id) } })
+    fireEvent.click(screen.getByRole('combobox', { name: 'Reviewer' }))
+    fireEvent.click(screen.getByRole('option', { name: reviewer.full_name }))
 
-    expect(await screen.findByText(`Reviewer: ${reviewer.full_name}`)).toBeTruthy()
+    const chip = await screen.findByText('Reviewer:')
+    expect(chip.textContent).toContain(reviewer.full_name)
+  })
+
+  it.each(['maintainer', 'external'])('resolves reviewer pictures from project people for %s accounts', async (role) => {
+    currentUser = { ...user, role }
+    const picture = 'data:image/png;base64,cHJvamVjdC1wZXJzb24='
+    vi.mocked(client.usersApi.list).mockRejectedValue(new Error('Admin directory denied'))
+    vi.mocked(client.usersApi.listMentionable).mockResolvedValue([{ ...reviewer, profile_picture_url: picture }] as never)
+    renderRegistry()
+    const images = await screen.findAllByAltText(`${reviewer.full_name}'s profile picture`)
+    expect(images.every(image => image.getAttribute('src') === picture)).toBe(true)
+    expect(client.usersApi.list).not.toHaveBeenCalled()
+    expect(client.usersApi.listMentionable).toHaveBeenCalledWith(1)
+    await openFilters()
+    fireEvent.click(screen.getByRole('combobox', { name: 'Reviewer' }))
+    fireEvent.click(screen.getByRole('option', { name: reviewer.full_name }))
+    expect(lastQuery().reviewer).toBe(String(reviewer.id))
   })
 })
 
@@ -558,7 +645,7 @@ describe('ordering the registry', () => {
     const picker = screen
       .getAllByRole('combobox')
       .find((box) => /Sort by/.test(box.textContent ?? '')) as HTMLSelectElement
-    fireEvent.change(picker, { target: { value: 'updated_at' } })
+    changeControl(picker, { target: { value: 'updated_at' } })
 
     // Updated descending: Charlie, Alpha, Bravo, Delta.
     await waitFor(() =>
@@ -617,7 +704,7 @@ describe('paging the registry', () => {
     renderRegistry()
     await screen.findByText('Requirement 1')
 
-    fireEvent.change(screen.getByDisplayValue('30'), { target: { value: '10' } })
+    changeControl(screen.getByDisplayValue('30'), { target: { value: '10' } })
 
     await waitFor(() => expect(rows()).toHaveLength(10))
     expect(screen.getByText('1 / 3')).toBeTruthy()
@@ -627,7 +714,7 @@ describe('paging the registry', () => {
   it('asks the server for the next page instead of slicing what it has', async () => {
     renderRegistry()
     await screen.findByText('Requirement 1')
-    fireEvent.change(screen.getByDisplayValue('30'), { target: { value: '10' } })
+    changeControl(screen.getByDisplayValue('30'), { target: { value: '10' } })
     await waitFor(() => expect(rows()).toHaveLength(10))
 
     // The page counter moves at once - the rows follow when the request lands,
@@ -650,7 +737,7 @@ describe('paging the registry', () => {
   it('shows no row twice while walking the pages', async () => {
     renderRegistry()
     await screen.findByText('Requirement 1')
-    fireEvent.change(screen.getByDisplayValue('30'), { target: { value: '10' } })
+    changeControl(screen.getByDisplayValue('30'), { target: { value: '10' } })
     await waitFor(() => expect(rows()).toHaveLength(10))
 
     const seen: string[] = [...rows()]
@@ -668,7 +755,7 @@ describe('paging the registry', () => {
   it('returns to the first page when a filter changes the set', async () => {
     renderRegistry()
     await screen.findByText('Requirement 1')
-    fireEvent.change(screen.getByDisplayValue('30'), { target: { value: '10' } })
+    changeControl(screen.getByDisplayValue('30'), { target: { value: '10' } })
     await waitFor(() => expect(rows()).toHaveLength(10))
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     await waitFor(() => expect(screen.getByText('2 / 3')).toBeTruthy())

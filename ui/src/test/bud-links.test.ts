@@ -12,13 +12,13 @@ describe('Bud link helpers', () => {
   })
 
   it('normalizes app URLs for browser navigation', () => {
-    expect(normalizeBudAppBaseUrl('https://bud.embedlabs.net/api')).toBe('https://bud.embedlabs.net')
-    expect(normalizeBudAppBaseUrl('https://bud.embedlabs.net/api/')).toBe('https://bud.embedlabs.net')
-    expect(normalizeBudAppBaseUrl('https://bud.embedlabs.net/')).toBe('https://bud.embedlabs.net')
+    expect(normalizeBudAppBaseUrl('https://bud.example.com/api')).toBe('https://bud.example.com')
+    expect(normalizeBudAppBaseUrl('https://bud.example.com/api/')).toBe('https://bud.example.com')
+    expect(normalizeBudAppBaseUrl('https://bud.example.com/')).toBe('https://bud.example.com')
   })
 
   it('builds a direct Bud run detail URL', () => {
-    expect(buildBudRunUrl(42, 'https://bud.embedlabs.net/api')).toBe('https://bud.embedlabs.net/runs/42')
+    expect(buildBudRunUrl(42, 'https://bud.example.com/api')).toBe('https://bud.example.com/runs/42')
   })
 
   it('uses runtime config before build-time fallback', () => {

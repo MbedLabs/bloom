@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.2.0 - unreleased
+
+### Added
+
+- Readers request reports beside linked Bud runs and follow Pending, Delivered or Refused state. Bud publishers receive requests through the existing integration connection; successful report delivery provides a document link subject to existing project visibility.
+- Upload and remove your profile picture in Settings; show it alongside users, comments and activity.
+
+- Admin company logo on PDF reports: an administrator uploads a company logo in Settings; it renders on the report letterhead (top-left) alongside the EmbedLabs tamper-evidence footer, which is always present. The Settings preview loads through the authenticated client so the admin sees exactly what was stored.
+- Markdown document import: classifies a Markdown document into artefacts (by heading tag, front matter, or an at-import marker); a parameter is written inside a sentence as `{{parameter: NAME, value: VALUE}}`, created on import and replaced with `{{NAME}}`, and a name that already exists is never overwritten: the import stops and, for each such name, you keep the project's value or import the file's value under a new name; classified sections are persisted as artefacts; an unlinked imported artefact raises a notification to link it; documented per template. A Markdown mode is added to the Import Wizard.
+- Test-case import from CSV and XML, round-tripping with the export, on the `POST /projects/{id}/import` convention; every step row (preconditions, loops, nesting, multi-line text, expected results) is kept; a CSV/XML mode in the Import Wizard.
+- Export test cases as Markdown, CSV, XML and PDF, with every step row; the Markdown export re-imports as the same test cases.
+- More PDF reports on the report letterhead: the traceability matrix, the test cases, and a verification dossier (each requirement with the test cases that verify it, their last results and the linked runs). Every project export and report is offered from one Export menu on the traceability page. A requirement lists the Bud runs linked to it; each opens in Bud, where the user signs in with their own Bud account and downloads the run report. An export holds only what the user may see: artefacts hidden from external users and document types outside their allowlist are left out.
+- A `{{` parameter chip shows the parameter's name while a body is edited, with its value on hover, and its value when the body is read; a parameter without a value keeps showing its name. Test-case steps show values the same way when read. The stored document keeps `{{NAME}}`.
+- S3-compatible object storage: `STORAGE_BACKEND=s3` keeps attachments in a bucket (AWS S3, MinIO, Hetzner, Ceph) under a per-instance prefix, with the local directory as a mirror that reads fall back to when the bucket does not answer (`STORAGE_LOCAL_MIRROR`, default on). `python -m app.storage migrate --to s3` copies existing files and checks their sizes; cleanup reconciles the bucket; `/api/ready` reports the storage. Local storage stays the default and is unchanged. Adds boto3 to the locked dependencies.
+- Access management: a group is a set of policies. Assign people to a policy group separately in each project. Administrators, Developers, Product Owners and Testers are available in every project; Customers is optional. Policies control actions by resource and document origin; Write includes Read, while Review remains independent. Read Internal covers all origins; Read Customer and Review Customer cover customer content. Application Administration and Access Management are assigned separately from project access. Default policies are protected and can be duplicated; groups remain editable.
+- Controlled documents start in Draft. Their creator requests review, the assigned reviewer comments and requests approval, and an eligible approver records approval. Requests produce notifications and email. Approved content is preserved when edited; a new linked approved CHG advances Version and Revision on Save. A correction without a new CHG returns to Draft at the same numbers. Approved CHGs cannot be edited. Risks, defects, campaigns, reports and standards retain their operational lifecycles.
+- Migrate test cases from TestRail: `POST /projects/{id}/import/testrail?format=xml|csv` reads a TestRail XML suite or CSV export (separated steps, text steps, preconditions, nested sections, one CSV row per step). CSV columns are detected from the header and can be remapped in the Import Wizard (`POST /projects/{id}/import/testrail/columns`). Each top-level section becomes a test suite, references that match a requirement id become `verifies` links, the rest are kept in the case body with type, priority and estimate, and cases import as Draft. A case keeps `source_ref = testrail:C<id>`, so importing the same export again updates it instead of duplicating it. A From TestRail mode is added to the Import Wizard.
+- Resolve artefact detail references by public id; existing database identifiers continue to resolve.
+- Jira to Bloom defects: a Jira issue of a mapped project creates a defect when it matches the project's issue types (default Bug) and optional label, with its description, priority and severity (through a configurable priority map), link and state, reported by the Bloom user behind the integration's account email. The defect then follows the issue (title, description, priority, state; a resolution closes it); a deleted issue leaves the defect marked `Removed in Jira`; a Bloom test-case id in the issue becomes the defect's source. Pull existing issues creates defects for the issues still open, from a one-time JQL search. The account email and API token are checked with Jira first, and a classic API token or an API token with scopes (read:jira-work, read:jira-user, and write:jira-work for two-way sync) works; a token with scopes is used through Atlassian's API gateway for the site. A credential Jira does not accept is reported instead of an empty search. The push to Jira is behind a per-project two-way switch, off by default. Jira is configured in the project's External issue tracker panel; setup is in docs/OPERATIONS.md.
+- Open a mentioned artefact, and the exact parameter, from a document body; mention links resolve by public id.
+- Audit log: security-relevant events (authentication, accounts, project members, external document types, groups, policies and artefact visibility, configuration, deletions, exports, imports, attachments) are recorded with the acting user, the request id, the client address, the outcome and details without secrets; a failed sign-in is recorded although the request fails. Administrators read it under Audit log (`GET /api/audit`, filtered by actor, action, target, project, outcome and time). No endpoint changes or deletes an event; `python -m app.audit prune --older-than-days N` removes old events on the operator's schedule. Event times are shown in the viewer's time zone.
+- Access-denied page: a signed-in user who opens a project, document, artefact, suite or campaign they may not see gets one page that names it only by the address (public id and project), with a Request access button. The administrators are emailed with the requester, the resource, the time, the request id and a link to the project's members; one request per user and resource per 24 hours, and the page says when one is pending. Administrators mark a request granted or refused under Access, Requests across projects or on the project's members page; project access is managed separately. The request and the decision are recorded in the audit log. A mail failure is reported to the user and the request is kept.
+
+### Changed
+
+- Project members and document attachments use vertical three-dot action menus. Member removal and attachment download/removal retain their existing permissions.
+- A read by id of an artefact in a project the user is not in answers 404, as for an artefact the user may not see (was 403).
+- Times shown to people stop at the minute: dates and times in the web app, the CSV exports of requirements and test cases, the summary of a published Bud report, and the time in access-request emails (in UTC).
+
+### Fixed
+- Refresh document lists, project counts, link labels, traceability and reports after successful project changes; remove deleted detail caches after navigation without fetching deleted records.
+
+- Signing out, and a session check that fails while a user is signed in, now reload the page, and a tab reloads when it next renews its session and finds it belongs to another user signed in from another tab. Nothing cached for the previous user stays in memory, and signing in empties the cache as well. Before, the next user in the same tab could be shown data cached for the previous one for up to five minutes.
+- A database created before the locked migration baseline gets `integration_settings.account_email` and the `change_request_sync_events` table it lacked; the integration settings no longer answer 500 on such an instance.
+- A database error while committing a request, such as a constraint violation, is answered with 409 or 500 and the request id; the commit now runs before the response is built instead of after it had started.
+- Requirements and test cases return their editor body.
+- A `#` tag shows the current id of the artefact it points at, looked up once per document, instead of the text captured when it was typed; a tag whose target is gone reads as plain text.
+- Test execution times reported by a results sync were stored in the server's time zone instead of UTC, so a server not running in UTC stored and showed them shifted by its offset.
+- User, project member, document, integration setting, sync event, notification and service credential timestamps in API responses carry the UTC marker (`Z`); without it the Users page showed the time of an email change request shifted by the viewer's UTC offset.
+- Creating a specification, protocol, report or standard from the web app answered 422 and created nothing, because the create page sends the first status and the API refused the field. A document create now accepts `status` when it is `Draft`, the status a new document starts in; any other first status is refused with 422.
+
 ## 1.1.0 - 2026-09-16
 
 ### Added
@@ -60,7 +101,7 @@
 
 ## 1.0.0 - 2026-07-24
 
-Initial public beta release of Bloom PLM by EmbedLabs — a self-hosted product
+Initial public beta release of Bloom PLM by EmbedLabs, a product
 lifecycle management platform. Published as a multi-architecture container image
 with PostgreSQL-backed deployment, Alembic migrations, liveness/readiness health
 checks, and persistent project data.

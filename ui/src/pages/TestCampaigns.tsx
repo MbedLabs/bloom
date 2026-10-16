@@ -1,13 +1,17 @@
+import SelectField from '../components/SelectField'
+import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useMemo, useState } from 'react'
+import TagPicker from '../components/TagPicker'
 import { useParams, Link, useSearchParams } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { campaignsApi, extractApiErrorMessage, testCasesApi, testSuitesApi } from '../api/client'
 import { ArrowLeft, Plus, Clock, FlaskConical, Layers3, Search, ChevronUp, ChevronDown } from 'lucide-react'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
-import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
 import { formatDateTime } from '../test/date-utils'
 import BudRunLink from '../components/BudRunLink'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import { useAuth } from '../contexts/AuthContext'
 
 type CampaignSortField = 'name' | 'status' | 'updated_at'
 type SortDir = 'asc' | 'desc'
@@ -19,9 +23,11 @@ const SORT_OPTIONS: { field: CampaignSortField; label: string }[] = [
 ]
 
 export default function TestCampaigns() {
-  const { user } = useAuth()
   const { prefix } = useParams<{ prefix: string }>()
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const { can } = useProjectPermissions(prefix)
+  const canEditDocs = can('create', 'CMP')
+  const { user } = useAuth()
+  const external = user?.role === 'external'
   const [searchParams, setSearchParams] = useSearchParams()
   const { data: project } = useProjectByPrefix(prefix)
   const projectId = project?.id || 0
@@ -108,7 +114,7 @@ export default function TestCampaigns() {
       setCreateError('')
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['campaigns', projectId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
       setShowCreate(false)
       setForm({ name: '', description: '', visibility: 'internal' })
       setSelectedTcIds([])
@@ -124,8 +130,7 @@ export default function TestCampaigns() {
   const createSuiteMutation = useMutation({
     mutationFn: testSuitesApi.create,
     onSuccess: (suite) => {
-      queryClient.invalidateQueries({ queryKey: ['testSuites', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
       setShowCreateSuite(false)
       setSuiteForm({ name: '', description: '', visibility: 'internal' })
       setSelectedTcIds([])
@@ -141,6 +146,9 @@ export default function TestCampaigns() {
     )
   }
 
+  const [campaignTagIds, setCampaignTagIds] = useState<number[]>([])
+  const [suiteTagIds, setSuiteTagIds] = useState<number[]>([])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (selectedSuiteIds.length === 0) {
@@ -151,8 +159,9 @@ export default function TestCampaigns() {
       project_id: projectId,
       name: form.name,
       description: form.description || undefined,
-      visibility: form.visibility === 'customer' ? 'customer' : 'internal',
+      visibility: external || form.visibility === 'customer' ? 'customer' : 'internal',
       suite_ids: selectedSuiteIds,
+      tag_ids: campaignTagIds,
     })
   }
 
@@ -162,8 +171,9 @@ export default function TestCampaigns() {
       project_id: projectId,
       name: suiteForm.name,
       description: suiteForm.description || undefined,
-      visibility: suiteForm.visibility === 'customer' ? 'customer' : 'internal',
+      visibility: external || suiteForm.visibility === 'customer' ? 'customer' : 'internal',
       test_case_ids: selectedTcIds,
+      tag_ids: suiteTagIds,
     })
   }
 
@@ -241,7 +251,7 @@ export default function TestCampaigns() {
                       {suite.last_bud_run_id && (
                         <div className="mt-1">
                           <BudRunLink
-                            runId={suite.last_bud_run_id}
+                            runId={suite.last_bud_run_id} source={{ source_kind: 'test-suite', source_id: suite.id }}
                             className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80"
                           />
                         </div>
@@ -272,7 +282,7 @@ export default function TestCampaigns() {
                   className="w-full pl-8 pr-3 py-1.5 bg-background border border-input rounded-md text-sm focus:ring-2 focus:ring-ring"
                 />
               </div>
-              <select
+              <SelectField
                 aria-label="Filter by status"
                 value={statusFilter}
                 onChange={(e) => updateParams({ status: e.target.value })}
@@ -280,16 +290,16 @@ export default function TestCampaigns() {
               >
                 <option value="">All statuses</option>
                 {CAMPAIGN_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+              </SelectField>
               <div className="flex items-center gap-1">
-                <select
+                <SelectField
                   aria-label="Sort by"
                   value={sortField}
                   onChange={(e) => updateParams({ sort: e.target.value as CampaignSortField })}
                   className="px-3 py-1.5 bg-background border border-input rounded-md text-sm focus:ring-2 focus:ring-ring"
                 >
                   {SORT_OPTIONS.map((o) => <option key={o.field} value={o.field}>{o.label}</option>)}
-                </select>
+                </SelectField>
                 <button
                   onClick={() => setSortDir((d) => d === 'asc' ? 'desc' : 'asc')}
                   className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
@@ -303,7 +313,7 @@ export default function TestCampaigns() {
 
           {!campaigns || campaigns.length === 0 ? (
             <div className="bg-card rounded-lg shadow-elegant p-12 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-linear-to-br/srgb from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-4">
                 <FlaskConical className="h-8 w-8 text-primary/40" />
               </div>
               <h3 className="text-lg font-medium text-foreground mb-2">No Campaign Scopes</h3>
@@ -335,7 +345,7 @@ export default function TestCampaigns() {
       </div>
 
       {canEditDocs && showCreate && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50">
           <div className="bg-card rounded-lg shadow-elegant max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
             <div className="px-6 py-4 border-b border-border">
               <h3 className="text-lg font-semibold">New Test Campaign</h3>
@@ -363,17 +373,21 @@ export default function TestCampaigns() {
                     placeholder="Optional description..."
                   />
                 </div>
+                {!external && (
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Visibility</label>
-                  <select
+                  <label htmlFor="campaign-visibility" className="block text-sm font-medium text-foreground mb-1">Origin</label>
+                  <SelectField id="campaign-visibility"
                     value={form.visibility}
                     onChange={(e) => setForm({ ...form, visibility: e.target.value })}
                     className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
                   >
                     <option value="internal">Internal</option>
                     <option value="customer">Customer</option>
-                  </select>
+                  </SelectField>
+                  <TagPicker projectId={projectId} value={campaignTagIds} onChange={setCampaignTagIds} showLabel={false} />
                 </div>
+                )}
+                {external && <TagPicker projectId={projectId} value={campaignTagIds} onChange={setCampaignTagIds} />}
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">
                     Campaign Suites ({selectedSuiteIds.length} selected)
@@ -439,8 +453,8 @@ export default function TestCampaigns() {
         </div>
       )}
 
-      {canEditDocs && showCreateSuite && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+      {can('create', 'TS') && showCreateSuite && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50">
           <div className="bg-card rounded-lg shadow-elegant max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
             <div className="px-6 py-4 border-b border-border">
               <h3 className="text-lg font-semibold">New Test Suite</h3>
@@ -466,17 +480,21 @@ export default function TestCampaigns() {
                     rows={2}
                   />
                 </div>
+                {!external && (
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Visibility</label>
-                  <select
+                  <label htmlFor="suite-visibility" className="block text-sm font-medium text-foreground mb-1">Origin</label>
+                  <SelectField id="suite-visibility"
                     value={suiteForm.visibility}
                     onChange={(e) => setSuiteForm({ ...suiteForm, visibility: e.target.value })}
                     className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
                   >
                     <option value="internal">Internal</option>
                     <option value="customer">Customer</option>
-                  </select>
+                  </SelectField>
+                  <TagPicker projectId={projectId} value={suiteTagIds} onChange={setSuiteTagIds} showLabel={false} />
                 </div>
+                )}
+                {external && <TagPicker projectId={projectId} value={suiteTagIds} onChange={setSuiteTagIds} />}
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">
                     Select Test Cases ({selectedTcIds.length} selected)
@@ -520,7 +538,7 @@ export default function TestCampaigns() {
   )
 }
 
-function CampaignCard({ campaign, prefix }: { campaign: import('../api/client').TestCampaign; prefix: string }) {
+function CampaignCard({ campaign, prefix }: Readonly<{ campaign: import('../api/client').TestCampaign; prefix: string }>) {
   const total = campaign.total_items
   const progress = 0
 
@@ -578,7 +596,7 @@ function CampaignCard({ campaign, prefix }: { campaign: import('../api/client').
               : 'Not executed'}
           </div>
           <div className="w-full bg-border rounded-full h-1.5">
-            <div className="h-1.5 rounded-full bg-gradient-to-r from-primary to-[#6b7280] transition-all duration-500" style={{ width: `${progress}%` }} />
+            <div className="h-1.5 rounded-full bg-linear-to-r/srgb from-primary to-[#6b7280] transition-all duration-500" style={{ width: `${progress}%` }} />
           </div>
         </div>
       )}
@@ -590,7 +608,7 @@ function CampaignCard({ campaign, prefix }: { campaign: import('../api/client').
   )
 }
 
-function CampaignStatusBadge({ status }: { status: string }) {
+function CampaignStatusBadge({ status }: Readonly<{ status: string }>) {
   const config: Record<string, { colors: string; icon: React.ComponentType<{ className?: string }> }> = {
     Planned: { colors: 'bg-gray-500/10 text-gray-700 dark:text-gray-400', icon: Clock },
     Scope: { colors: 'bg-blue-500/10 text-blue-700 dark:text-blue-400', icon: FlaskConical },

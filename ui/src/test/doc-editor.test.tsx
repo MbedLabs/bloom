@@ -8,7 +8,8 @@
  * does run in jsdom, so these mount the real thing and act on it: type, format,
  * add headings, and navigate by the outline.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { BubbleMenuView } from '@tiptap/extension-bubble-menu'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const DocEditor = (await import('../components/editor/DocEditor')).default
@@ -95,6 +96,48 @@ describe('showing a document', () => {
 })
 
 describe('editing', () => {
+  it('cancels pending outline work when the editor unmounts', async () => {
+    const frame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 271)
+    const cancel = vi.spyOn(window, 'cancelAnimationFrame')
+    try {
+      const { container, unmount } = render(
+        <DocEditor content={doc(heading(1, 'Scope'))} showOutline />,
+      )
+      await editorSurface(container)
+      expect(frame).toHaveBeenCalled()
+      unmount()
+      expect(cancel).toHaveBeenCalledWith(271)
+    } finally {
+      frame.mockRestore()
+      cancel.mockRestore()
+    }
+  })
+
+  it('does not read document focus after an editor with pending menu work is destroyed', async () => {
+    const { container, unmount } = render(<DocEditor content={doc(paragraph('Before'))} />)
+    const surface = await editorSurface(container)
+    const menuVisibility = vi.spyOn(BubbleMenuView.prototype, 'getShouldShow')
+    vi.useFakeTimers()
+    let documentFocus: ReturnType<typeof vi.spyOn> | undefined
+    try {
+      fireEvent.keyDown(surface, { key: 'a', ctrlKey: true })
+      fireEvent.click(screen.getByTitle('Bold (Ctrl+B)'))
+      unmount()
+      await act(async () => { await vi.advanceTimersByTimeAsync(5) })
+      const before = menuVisibility.mock.calls.length
+      documentFocus = vi.spyOn(document, 'activeElement', 'get').mockImplementation(() => {
+        throw new Error('Document focus was read after editor teardown')
+      })
+      await act(async () => { await vi.advanceTimersByTimeAsync(500) })
+      expect(menuVisibility.mock.calls.length).toBeGreaterThan(before)
+      expect(documentFocus).not.toHaveBeenCalled()
+    } finally {
+      documentFocus?.mockRestore()
+      menuVisibility.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+
   it('reports every change as both JSON and HTML', async () => {
     const onChange = vi.fn()
     const { container } = render(

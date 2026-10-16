@@ -1,12 +1,15 @@
+import SelectField from '../components/SelectField'
+import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useMemo, useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { defectsApi, Defect, extractApiErrorMessage } from '../api/client'
-import { ArrowLeft, ArrowUpDown, ChevronDown, ChevronUp, Plus, Bug, ExternalLink, Search } from 'lucide-react'
+import { ArrowLeft, Plus, Bug, ExternalLink, Search } from 'lucide-react'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
-import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
 import { formatDateTime } from '../test/date-utils'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import { Pager, SortableHeader } from '../components/ListControls'
 
 const SEVERITY_COLORS: Record<string, string> = {
   Critical: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
@@ -36,7 +39,6 @@ export default function Defects() {
   const { prefix } = useParams<{ prefix: string }>()
   const { data: project } = useProjectByPrefix(prefix)
   const projectId = project?.id || 0
-  const { user } = useAuth()
   const queryClient = useQueryClient()
   const toast = useToast()
   const navigate = useNavigate()
@@ -118,7 +120,7 @@ export default function Defects() {
     mutationFn: defectsApi.create,
     onMutate: () => setCreateError(''),
     onSuccess: (defect) => {
-      queryClient.invalidateQueries({ queryKey: ['defects', projectId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
       toast.saved(`Defect ${defect.defect_id}`)
       setShowCreate(false)
       setForm({
@@ -138,7 +140,8 @@ export default function Defects() {
     },
   })
 
-  const canEdit = user?.role === 'admin' || user?.role === 'maintainer'
+  const { can } = useProjectPermissions(prefix, project?.id)
+  const canEdit = can('create', 'DEF')
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault()
@@ -156,19 +159,15 @@ export default function Defects() {
   }
 
   const SortHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
-    <th
+    <SortableHeader
+      field={field}
+      sortField={sortField}
+      sortDir={sortDir}
+      onSort={toggleSort}
       className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer select-none hover:text-foreground transition-colors"
-      onClick={() => toggleSort(field)}
     >
-      <div className="flex items-center gap-1">
-        {children}
-        {sortField === field ? (
-          sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
-        ) : (
-          <ArrowUpDown className="h-3 w-3 opacity-30" />
-        )}
-      </div>
-    </th>
+      {children}
+    </SortableHeader>
   )
 
   if (!project) {
@@ -218,7 +217,7 @@ export default function Defects() {
               className="w-full rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring"
             />
           </div>
-          <select
+          <SelectField
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
             title="Filter by status"
@@ -230,8 +229,8 @@ export default function Defects() {
                 {s}
               </option>
             ))}
-          </select>
-          <select
+          </SelectField>
+          <SelectField
             value={filterSeverity}
             onChange={(e) => setFilterSeverity(e.target.value)}
             title="Filter by severity"
@@ -243,7 +242,7 @@ export default function Defects() {
                 {s}
               </option>
             ))}
-          </select>
+          </SelectField>
         </div>
       </section>
 
@@ -276,7 +275,7 @@ export default function Defects() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Severity</label>
-                <select
+                <SelectField
                   value={form.severity}
                   onChange={(e) => setForm({ ...form, severity: e.target.value })}
                   title="Severity"
@@ -287,11 +286,11 @@ export default function Defects() {
                       {s}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Priority</label>
-                <select
+                <SelectField
                   value={form.priority}
                   onChange={(e) => setForm({ ...form, priority: e.target.value })}
                   title="Priority"
@@ -302,7 +301,7 @@ export default function Defects() {
                       {s}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               </div>
             </div>
 
@@ -311,7 +310,7 @@ export default function Defects() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">Tracker</label>
-                  <select
+                  <SelectField
                     value={form.external_tracker}
                     onChange={(e) => setForm({ ...form, external_tracker: e.target.value })}
                     title="External tracker"
@@ -320,7 +319,7 @@ export default function Defects() {
                     <option value="">None</option>
                     <option value="github">GitHub</option>
                     <option value="gitlab">GitLab</option>
-                  </select>
+                  </SelectField>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">Repository</label>
@@ -432,7 +431,10 @@ export default function Defects() {
                           onClick={(e) => e.stopPropagation()}
                           className="inline-flex items-center gap-1 text-primary hover:text-primary/80 text-xs"
                         >
-                          <ExternalLink className="h-3 w-3" />#{defect.external_issue_number}
+                          <ExternalLink className="h-3 w-3" />
+                          {defect.external_tracker === 'jira'
+                            ? `Jira ${defect.external_repo_full_name}-${defect.external_issue_number}`
+                            : `#${defect.external_issue_number}`}
                         </a>
                       ) : (
                         <span className="text-muted-foreground text-xs">—</span>
@@ -449,25 +451,7 @@ export default function Defects() {
               <span className="text-muted-foreground">
                 Showing {page * PAGE_SIZE + 1}&ndash;{Math.min((page + 1) * PAGE_SIZE, sortedFiltered.length)} of {sortedFiltered.length}
               </span>
-              <div className="flex items-center gap-2">
-                <button
-                  disabled={page === 0}
-                  onClick={() => setPage((p) => p - 1)}
-                  className="px-3 py-1 border border-border rounded hover:bg-accent/50 disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  Prev
-                </button>
-                <span className="px-2 text-muted-foreground">
-                  {page + 1} / {totalPages || 1}
-                </span>
-                <button
-                  disabled={page >= totalPages - 1}
-                  onClick={() => setPage((p) => p + 1)}
-                  className="px-3 py-1 border border-border rounded hover:bg-accent/50 disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              </div>
+              <Pager page={page} totalPages={totalPages} setPage={setPage} />
             </div>
           )}
         </div>

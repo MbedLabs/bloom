@@ -10,10 +10,15 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
-from app.core.security import get_current_user, get_password_hash
+from app.core.security import (
+    accessible_project_ids,
+    get_current_user,
+    get_password_hash,
+)
 from app.main import app
 from app.models import Project, ProjectMembership, User
 from app.models.user import UserRole
+from tests.access_fixtures import project_access_fixture
 
 
 @dataclass
@@ -67,6 +72,7 @@ def mention_harness():
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Selected test user no longer exists",
                 )
+            await accessible_project_ids(session, user)
             return user
 
     asyncio.run(_create_schema())
@@ -114,20 +120,24 @@ async def _seed(session_maker: async_sessionmaker[AsyncSession]) -> dict[str, in
 
         session.add_all(
             [
-                ProjectMembership(
-                    user_id=grace.id, project_id=project.id, role=UserRole.maintainer.value
+                project_access_fixture(
+                    user_id=grace.id, project_id=project.id, permissions={"*": ["*"]}
                 ),
-                ProjectMembership(
-                    user_id=alan.id, project_id=project.id, role=UserRole.maintainer.value
+                project_access_fixture(
+                    user_id=alan.id, project_id=project.id, permissions={"*": ["*"]}
                 ),
-                ProjectMembership(
-                    user_id=retired.id, project_id=project.id, role=UserRole.maintainer.value
+                project_access_fixture(
+                    user_id=retired.id, project_id=project.id, permissions={"*": ["*"]}
                 ),
-                ProjectMembership(
-                    user_id=customer.id, project_id=project.id, role=UserRole.external.value
+                project_access_fixture(
+                    user_id=customer.id,
+                    project_id=project.id,
+                    permissions={"*": ["view", "comment"]},
+                    visibility="customer",
+                    doc_types=[],
                 ),
-                ProjectMembership(
-                    user_id=elsewhere.id, project_id=other.id, role=UserRole.maintainer.value
+                project_access_fixture(
+                    user_id=elsewhere.id, project_id=other.id, permissions={"*": ["*"]}
                 ),
             ]
         )
@@ -204,7 +214,7 @@ def test_a_deactivated_member_is_not_offered(mention_harness):
     assert "Retired Member" not in _names(response.json())
 
 
-def test_it_discloses_a_name_and_nothing_else(mention_harness):
+def test_it_discloses_only_project_identity_and_picture(mention_harness):
     ids = mention_harness.run(_seed(mention_harness.session_maker))
     mention_harness.act_as(ids["grace"])
 
@@ -214,7 +224,8 @@ def test_it_discloses_a_name_and_nothing_else(mention_harness):
 
     # Addressing a colleague must not hand out the user directory.
     for entry in response.json():
-        assert set(entry) == {"id", "full_name"}
+        assert set(entry) == {"id", "full_name", "profile_picture_url"}
+        assert entry["profile_picture_url"] is None
 
 
 def test_a_non_member_is_refused(mention_harness):

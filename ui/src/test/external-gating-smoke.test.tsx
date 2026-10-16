@@ -1,5 +1,6 @@
+import { createQueryClient } from '../lib/queryClient'
 import { renderWithToasts } from './render'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 
@@ -49,6 +50,7 @@ vi.mock('react-router', async () => {
     useParams: () => mockParams,
     useNavigate: () => vi.fn(),
     useLocation: () => ({ state: mockLocationState }),
+    useSearchParams: () => [new URLSearchParams(), vi.fn()],
     Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
   }
 })
@@ -101,7 +103,7 @@ vi.mock('../components/DocDetailShell', () => ({
 }))
 
 function renderPage(element: ReactNode) {
-  const queryClient = new QueryClient({
+  const queryClient = createQueryClient({
     defaultOptions: {
       queries: { retry: false },
     },

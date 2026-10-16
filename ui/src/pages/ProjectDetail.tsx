@@ -4,9 +4,12 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, BookOpen, FlaskConical, GitBranch, Map, Pencil } from 'lucide-react'
 
 import { docsApi, projectsApi } from '../api/client'
-import { useAuth } from '../contexts/AuthContext'
+import { useProjectCapabilities } from '../hooks/useProjectCapabilities'
 import { docRegistryListLabel, docRegistryListUrl } from '../lib/docRegistryParams'
 import ProjectDocTopology from '../components/ProjectDocTopology'
+import DocumentRequestsPanel from '../components/DocumentRequestsPanel'
+import AccessDenied from '../components/AccessDenied'
+import { isAccessDenied } from '../lib/accessDenied'
 
 const LEGACY_TAB_ROUTES: Record<string, string> = {
   'requirements': 'docs?type=REQ',
@@ -24,7 +27,7 @@ const LEGACY_TAB_ROUTES: Record<string, string> = {
   'campaigns': 'campaigns',
 }
 
-function Beaker(props: { className?: string }) {
+function Beaker(props: Readonly<{ className?: string }>) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
       <path d="M4.5 3h15" /><path d="M6 3v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V3" /><path d="M6 14h12" />
@@ -41,26 +44,25 @@ type NavItem = {
 export default function ProjectDetail() {
   const { prefix } = useParams<{ prefix: string }>()
   const navigate = useNavigate()
-  const { user } = useAuth()
   const [searchParams] = useSearchParams()
 
   useEffect(() => {
     const tab = searchParams.get('tab')
     if (tab && tab !== 'overview') {
       const route = LEGACY_TAB_ROUTES[tab]
-      if (route) navigate(`/projects/${prefix}/${route}`, { replace: true })
+      if (route) void navigate(`/projects/${prefix}/${route}`, { replace: true })
     }
   }, [searchParams, prefix, navigate])
 
-  const { data: project, isLoading: projectLoading } = useQuery({
+  const { data: project, isLoading: projectLoading, error: projectError } = useQuery({
     queryKey: ['project-by-prefix', prefix],
     queryFn: () => projectsApi.getByPrefix(prefix!),
     enabled: !!prefix,
   })
 
   const projectId = project?.id || 0
+  const capabilities = useProjectCapabilities(project?.id)
 
-  // One number, so ask for one number.
   const { data: summary } = useQuery({
     queryKey: ['project-doc-type-summary', prefix],
     queryFn: () => docsApi.typeSummary(prefix!),
@@ -74,6 +76,10 @@ export default function ProjectDetail() {
 
   if (projectLoading) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
+  }
+
+  if (isAccessDenied(projectError)) {
+    return <AccessDenied resourceType="project" resourceRef={prefix ?? ''} projectPrefix={prefix} />
   }
 
   if (!project) {
@@ -109,7 +115,7 @@ export default function ProjectDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {user?.role === 'admin' && (
+          {capabilities.can_edit && (
             <Link
               to={`/projects/${prefix}/edit`}
               className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent/50 transition-colors"
@@ -156,6 +162,7 @@ export default function ProjectDetail() {
         </nav>
       </div>
 
+      <DocumentRequestsPanel projectId={projectId} projectPrefix={prefix || ''} />
       <ProjectDocTopology projectId={projectId} prefix={prefix || ''} />
     </div>
   )
@@ -183,7 +190,7 @@ function SummaryTile({
   return to ? <Link to={to}>{content}</Link> : content
 }
 
-function ProjectStatusBadge({ status }: { status: string }) {
+function ProjectStatusBadge({ status }: Readonly<{ status: string }>) {
   const colors: Record<string, string> = {
     Active: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
     Archived: 'bg-gray-500/10 text-gray-700 dark:text-gray-400',

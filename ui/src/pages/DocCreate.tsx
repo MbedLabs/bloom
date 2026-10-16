@@ -1,4 +1,7 @@
+import SelectField from '../components/SelectField'
+import { refreshProjectViews, finishArtefactDeletion } from '../lib/refreshProjectViews'
 import { useState, useCallback, useEffect, useMemo } from 'react'
+import TagPicker from '../components/TagPicker'
 import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router'
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { ArrowLeft, PanelRightOpen, PanelRightClose, Trash2 } from 'lucide-react'
@@ -22,8 +25,8 @@ import {
   isDocTagHostType,
   isDocTagTargetAllowed,
   normalizeDocTypeParam,
+  isWorkflowControlledDocType,
 } from '../types/doc'
-import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
 import { docRegistryBackUrl, docRegistryListLabel } from '../lib/docRegistryParams'
 import {
@@ -31,11 +34,20 @@ import {
   isServerAssignedDocIdOnCreate,
   usesDocumentEditor,
 } from './docCreateIdPolicy'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import { useAuth } from '../contexts/AuthContext'
+import { useParameterValues } from '../hooks/useParameterValues'
+import { useArtefactLabels } from '../hooks/useArtefactLabels'
+import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
 
 function artefactActivityTypeForDocType(docType: DocType): string | null {
   if (docType === 'REQ') return 'requirement'
   if (docType === 'TC') return 'test-case'
   if (docType === 'SPEC' || docType === 'PRT' || docType === 'RPT' || docType === 'STD') return 'document'
+  if (docType === 'DES') return 'design'
+  if (docType === 'CPT') return 'test-concept'
+  if (docType === 'CHG') return 'change'
+  if (docType === 'RSK') return 'risk'
   return null
 }
 
@@ -53,7 +65,6 @@ function sharedDocumentCreatePayload(
   contentJson: Record<string, unknown> | null,
   contentHtml: string,
   metadata: Record<string, string>,
-  statusOptions: string[],
 ) {
   const visibility: ArtefactVisibility =
     metadata.visibility === 'customer' ? 'customer' : 'internal'
@@ -63,7 +74,7 @@ function sharedDocumentCreatePayload(
     description: metadata.description || undefined,
     content_json: contentJson,
     content_html: contentHtml || undefined,
-    status: metadata.status || statusOptions[0],
+    status: 'Draft',
     visibility,
   }
 }
@@ -84,7 +95,7 @@ function sharedDocumentUpdatePayload(
     description: metadata.description || null,
     content_json: contentJson,
     content_html: contentHtml || null,
-    status: metadata.status || statusOptions[0],
+    ...(!isWorkflowControlledDocType(docType) ? { status: metadata.status || statusOptions[0] } : {}),
     visibility,
   }
 }
@@ -117,26 +128,14 @@ function invalidateDocumentQueries(
   kind?: string,
   docIdStr?: string,
 ) {
-  queryClient.invalidateQueries({ queryKey: ['requirements', projectId] })
-  queryClient.invalidateQueries({ queryKey: ['test-cases', projectId] })
-  queryClient.invalidateQueries({ queryKey: ['testCases', projectId] })
-  queryClient.invalidateQueries({ queryKey: ['designs', projectId] })
-  queryClient.invalidateQueries({ queryKey: ['risks', projectId] })
-  queryClient.invalidateQueries({ queryKey: ['changes', projectId] })
-  queryClient.invalidateQueries({ queryKey: ['test-concepts', projectId] })
-  queryClient.invalidateQueries({ queryKey: ['defects', projectId] })
-  queryClient.invalidateQueries({ queryKey: ['documents', projectId] })
-  queryClient.invalidateQueries({ queryKey: ['project-by-prefix', prefix] })
-  queryClient.invalidateQueries({ queryKey: ['project-docs-shell', prefix] })
+  refreshProjectViews(queryClient, { projectId, prefix })
   if (resolvedDocId) {
-    // The lists above are keyed by project; a detail page reads its own record under a
-    // singular key keyed by the record id.
     for (const key of DETAIL_QUERY_KEYS) {
-      queryClient.invalidateQueries({ queryKey: [key, resolvedDocId] })
+      void queryClient.invalidateQueries({ queryKey: [key, resolvedDocId] })
     }
   }
   if (prefix && kind && docIdStr) {
-    queryClient.invalidateQueries({ queryKey: ['doc-facade', prefix, kind, docIdStr] })
+    void queryClient.invalidateQueries({ queryKey: ['doc-facade', prefix, kind, docIdStr] })
   }
 }
 
@@ -144,8 +143,7 @@ interface DocCreateProps {
   editMode?: boolean
 }
 
-export default function DocCreate({ editMode = false }: DocCreateProps) {
-  const { user } = useAuth()
+export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>) {
   const { prefix, kind, docId: docIdStr } = useParams<{ prefix: string; kind?: string; docId: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -163,6 +161,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const [tcRows, setTcRows] = useState<TcsRow[]>(() => requestedDocType === 'TC' && !editMode ? createDefaultTcRows() : [])
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [metadata, setMetadata] = useState<Record<string, string>>({})
+  const [tagIds, setTagIds] = useState<number[]>([])
   const [outlineOpen, setOutlineOpen] = useState(() => editMode)
   const [headingNumbered, setHeadingNumbered] = useState(true)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -186,12 +185,34 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const docType = ((editMode && editDocFacade?.doc_type) || requestedDocType) as DocType
   const config = DOC_CONFIGS[docType]
   const resolvedDocId = editMode ? editDocFacade?.id : undefined
+  const workflowType = artefactActivityTypeForDocType(docType)
+  const workflow = useDocumentWorkflow(workflowType ?? 'document', editMode ? resolvedDocId : undefined)
   const listBackUrl = prefix ? docRegistryBackUrl(prefix, docType, returnTo ?? null) : '/projects'
   const backNavLabel =
     typeof returnTo === 'string' && returnTo.trim() !== ''
       ? 'Back'
       : `Back to ${docRegistryListLabel(docType)}`
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const { can } = useProjectPermissions(prefix, projectId)
+  const parameterValues = useParameterValues(prefix, projectId)
+  const artefactLabels = useArtefactLabels(prefix, contentJson)
+  const { user } = useAuth()
+  const external = user?.role === 'external'
+  const rowActions = editMode ? editDocFacade?.allowed_actions : undefined
+  const rowAllows = (action: string) => rowActions === undefined || rowActions.includes(action)
+  const canEditDocs = can(editMode ? 'edit' : 'create', docType) && (!editMode || rowAllows('edit'))
+  const sent: Record<string, string> = external
+    ? { ...metadata, visibility: 'customer', ...(docType === 'REQ' ? { req_origin: 'Customer' } : {}) }
+    : metadata
+  const controlled = isWorkflowControlledDocType(docType)
+  const firstStatus = controlled ? 'Draft' : config.statusOptions[0]
+  const displayedStatus = editMode && controlled ? workflow.data?.phase ?? editDocFacade?.status ?? '' : metadata.status || firstStatus
+  const statusChoices: readonly string[] = !editMode && (controlled || isControlledSharedDocument(docType))
+    ? ['Draft']
+    : !external
+      ? config.statusOptions
+      : editMode
+        ? [...new Set([editDocFacade?.status ?? firstStatus, ...(config.statusOptions.includes('Draft') ? ['Draft'] : [])])]
+        : [firstStatus]
   // The server allocates ids with MAX(suffix)+1, so ask it rather than assuming
   // -001, which was almost always already taken.
   const { data: nextDocId } = useQuery({
@@ -206,9 +227,9 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
 
   const handleBack = useCallback(() => {
     if (window.history.length > 1) {
-      navigate(-1)
+      void navigate(-1)
     } else {
-      navigate(listBackUrl)
+      void navigate(listBackUrl)
     }
   }, [navigate, listBackUrl])
 
@@ -224,7 +245,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const { data: projectVariables } = useQuery({
     queryKey: ['projectVariables', projectId],
     queryFn: () => projectVariablesApi.list(projectId),
-    enabled: canEditDocs && !!projectId,
+    enabled: can('view', 'parameter') && !!projectId,
   })
 
   // `{{` inserts a project parameter *or* a project variable - both kinds live on the
@@ -238,7 +259,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
     [projectVariables],
   )
   const userMentionItems = useMemo(
-    () => (users ?? []).map((u) => ({ id: u.id, label: u.full_name })),
+    () => (users ?? []).map((u) => ({ id: u.id, label: u.full_name, user: u })),
     [users],
   )
 
@@ -276,7 +297,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   useEffect(() => {
     if (!prefix || usesDocumentEditor(docType)) return
     if (editMode) {
-      navigate(
+      void navigate(
         docIdStr
           ? docUrl(prefix, docType, docIdStr)
           : docRegistryBackUrl(prefix, docType, null),
@@ -284,7 +305,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       )
       return
     }
-    navigate(dedicatedListUrl(prefix, docType) ?? docRegistryBackUrl(prefix, docType, null), {
+    void navigate(dedicatedListUrl(prefix, docType) ?? docRegistryBackUrl(prefix, docType, null), {
       replace: true,
     })
   }, [docIdStr, docType, editMode, navigate, prefix])
@@ -292,7 +313,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   useEffect(() => {
     if (editMode || !prefix || !usesDocumentEditor(docType)) return
     if (!isServerAssignedDocIdOnCreate(docType)) {
-      navigate(docRegistryBackUrl(prefix, docType, returnTo ?? null), { replace: true })
+      void navigate(docRegistryBackUrl(prefix, docType, returnTo ?? null), { replace: true })
     }
   }, [docType, editMode, navigate, prefix, returnTo])
 
@@ -338,22 +359,25 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   const createMutation = useMutation({
     mutationFn: async () => {
       const api = apiForType(docType)
+      const tag_ids = tagIds
       if (docType === 'TC') {
         return testCasesApi.create({
           project_id: projectId,
           title,
-          description: metadata.description || undefined,
-          preconditions: metadata.preconditions || undefined,
+          description: sent.description || undefined,
+          preconditions: sent.preconditions || undefined,
           steps: tcRows.length > 0 ? tcRows : undefined,
-          status: metadata.status || config.statusOptions[0],
-          visibility: metadata.visibility === 'customer' ? 'customer' : 'internal',
-          reviewer_id: metadata.reviewer_id ? Number(metadata.reviewer_id) : undefined,
+          status: 'Draft',
+          visibility: sent.visibility === 'customer' ? 'customer' : 'internal',
+          reviewer_id: sent.reviewer_id ? Number(sent.reviewer_id) : undefined,
+          tag_ids,
         })
       }
       if (isControlledSharedDocument(docType)) {
         return documentsApi.create({
           project_id: projectId,
-          ...sharedDocumentCreatePayload(docType, title, contentJson, contentHtml, metadata, config.statusOptions),
+          ...sharedDocumentCreatePayload(docType, title, contentJson, contentHtml, sent),
+          tag_ids,
         })
       }
       const payload: Record<string, unknown> = {
@@ -361,11 +385,14 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
         [config.titleField]: title,
         content_json: contentJson,
         content_html: contentHtml,
-        ...metadata,
+        ...sent,
+        tag_ids,
       }
       if (docType === 'REQ') {
-        payload.visibility = requirementVisibilityFromOrigin(metadata.req_origin)
+        payload.visibility = requirementVisibilityFromOrigin(sent.req_origin)
       }
+      if (controlled) payload.status = 'Draft'
+      if (docType !== 'REQ') delete payload.reviewer_id
       return (api as unknown as { create: (data: Record<string, unknown>) => Promise<Record<string, unknown>> }).create(payload)
     },
     onSuccess: (data) => {
@@ -378,7 +405,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       }
       const newDocId = record[docIdFieldMap[docType]] || record.id
       const kindSlug = DOC_TYPE_SLUGS[docType]
-      navigate(`/projects/${prefix}/docs/${kindSlug}/${newDocId}/edit`, { replace: true })
+      void navigate(`/projects/${prefix}/docs/${kindSlug}/${newDocId}/edit`, { replace: true })
     },
     onError: (error) => {
       setSaveError(extractApiErrorMessage(error, 'Could not save document'))
@@ -391,18 +418,16 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       if (docType === 'TC') {
         return testCasesApi.update(resolvedDocId, {
           title,
-          description: metadata.description || null,
-          preconditions: metadata.preconditions || null,
+          description: sent.description || null,
+          preconditions: sent.preconditions || null,
           steps: tcRows.length > 0 ? tcRows : null,
-          status: metadata.status || config.statusOptions[0],
-          visibility: metadata.visibility === 'customer' ? 'customer' : 'internal',
-          reviewer_id: metadata.reviewer_id ? Number(metadata.reviewer_id) : null,
+          visibility: sent.visibility === 'customer' ? 'customer' : 'internal',
         })
       }
       if (isControlledSharedDocument(docType)) {
         return documentsApi.update(
           resolvedDocId,
-          sharedDocumentUpdatePayload(docType, title, contentJson, contentHtml, metadata, config.statusOptions),
+          sharedDocumentUpdatePayload(docType, title, contentJson, contentHtml, sent, config.statusOptions),
         )
       }
       const api = apiForType(docType) as unknown as { update: (id: number, data: Record<string, unknown>) => Promise<Record<string, unknown>> }
@@ -410,11 +435,14 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
         [config.titleField]: title,
         content_json: contentJson,
         content_html: contentHtml,
-        ...metadata,
+        ...sent,
       }
       if (docType === 'REQ') {
-        payload.visibility = requirementVisibilityFromOrigin(metadata.req_origin)
+        payload.visibility = requirementVisibilityFromOrigin(sent.req_origin)
       }
+      if (controlled) delete payload.status
+      delete payload.reviewer_id
+      delete payload.approver_id
       return api.update(resolvedDocId, payload)
     },
     onSuccess: (updated) => {
@@ -437,7 +465,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       }
       const activityType = artefactActivityTypeForDocType(docType)
       if (activityType && resolvedDocId) {
-        queryClient.invalidateQueries({ queryKey: ['artefactActivity', activityType, resolvedDocId] })
+        void queryClient.invalidateQueries({ queryKey: ['artefactActivity', activityType, resolvedDocId] })
+        void queryClient.invalidateQueries({ queryKey: ['document-workflow', activityType, resolvedDocId] })
       }
       invalidateDocumentQueries(queryClient, projectId, prefix, resolvedDocId, kind, docIdStr)
       setSaveError(null)
@@ -461,9 +490,10 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
       await api.delete(resolvedDocId)
     },
     onSuccess: () => {
-      invalidateDocumentQueries(queryClient, projectId, prefix, resolvedDocId, kind, docIdStr)
+      const artefactType = artefactActivityTypeForDocType(docType) || 'defect'
+      const detailKey = ({ 'test-case': 'testCase', 'test-concept': 'testConcept' } as Record<string, string>)[artefactType] || artefactType
+      finishArtefactDeletion(queryClient, { projectId, prefix, detailKey, artefactType, recordId: resolvedDocId!, kind, docId: docIdStr }, () => navigate(listBackUrl))
       toast.deleted(docIdStr ? `${DOC_TYPE_LABELS[docType]} ${docIdStr}` : DOC_TYPE_LABELS[docType])
-      navigate(listBackUrl)
     },
     onError: (error) => {
       setSaveError(extractApiErrorMessage(error, 'Could not delete document'))
@@ -480,6 +510,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
     if (!editMode && !docIdIsValid) return
     if (!projectReady) return
     if (editMode && !resolvedDocId) return
+    if (editMode && !workflow.data?.actions?.edit_current) return
 
     setSaveError(null)
     setSaveSuccess(false)
@@ -495,9 +526,12 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
     && docIdIsValid
     && projectReady
     && (!editMode || !!resolvedDocId)
+    && (!editMode || !!workflow.data?.actions?.edit_current)
   const visibleConfigFields = config.fields.filter((field) =>
+    field.key !== 'req_origin' &&
     field.key !== config.titleField &&
     field.key !== 'description' &&
+    !(field.key === 'priority' && config.priorityOptions) &&
     !(docType === 'TC' && field.key === 'preconditions')
   )
   const showDescriptionMetadata = config.fields.some((field) => field.key === 'description')
@@ -537,6 +571,11 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
     )
   }
 
+  if (editMode && workflow.isPending) return <div className="p-8 text-muted-foreground">Loading document...</div>
+  if (editMode && (workflow.isError || !workflow.data?.actions?.edit_current)) {
+    return <div className="p-8 space-y-4"><p>{workflow.isError ? 'Could not load document.' : 'This document is read-only.'}</p><Link to={prefix && docIdStr ? docUrl(prefix, docType, docIdStr) : listBackUrl}>View document</Link></div>
+  }
+
   return (
     <div className="animate-fade-in -m-6 flex flex-col flex-1 min-h-0">
       {/* Top bar */}
@@ -572,7 +611,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
           >
             Discard
           </button>
-          {editMode && resolvedDocId ? (
+          {editMode && resolvedDocId && can('delete', docType) && rowAllows('delete') ? (
             <button
               type="button"
               onClick={() => {
@@ -616,7 +655,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
             {/* Status only: the type and document id are already shown in the top bar. */}
             <div className="flex items-center gap-2 mb-4 flex-wrap">
               <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground">
-                {metadata.status || config.statusOptions[0]}
+                {displayedStatus}
               </span>
             </div>
             {/* Title inside the document frame */}
@@ -626,7 +665,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Untitled"
               autoFocus
-              className="w-full text-3xl font-bold text-foreground placeholder:text-muted-foreground/40 bg-transparent border-none outline-none mb-2"
+              className="w-full text-3xl font-bold text-foreground placeholder:text-muted-foreground/40 bg-transparent border-none outline-hidden mb-2"
             />
 
             {/* Description field inside frame for applicable types */}
@@ -636,7 +675,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                 value={metadata.description || ''}
                 onChange={(e) => setMetadata({ ...metadata, description: e.target.value })}
                 placeholder="Brief description..."
-                className="w-full text-sm text-muted-foreground placeholder:text-muted-foreground/40 bg-transparent border-none outline-none mb-4 pb-4 border-b border-border"
+                className="w-full text-sm text-muted-foreground placeholder:text-muted-foreground/40 bg-transparent border-none outline-hidden mb-4 pb-4 border-b border-border"
               />
             )}
           </div>
@@ -651,7 +690,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                   editable
                   mentionItems={parameterMentionItems}
                   userMentionItems={userMentionItems}
-                  parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined}
+                  parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues}
                 />
               ) : (
                 <DocEditor
@@ -668,6 +707,8 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                   userMentionItems={userMentionItems}
                   artefactSearch={artefactSearch}
                   artefactHref={artefactHref}
+                  parameterValues={parameterValues}
+                  artefactLabels={artefactLabels}
                 />
               )}
             </div>
@@ -682,51 +723,46 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
 
               {/* Status */}
               <MetaField label="Status">
-                <select
-                  value={metadata.status || config.statusOptions[0]}
+                {editMode && controlled ? <span>{displayedStatus}</span> :
+                <SelectField
+                  value={metadata.status || firstStatus}
                   onChange={(e) => setMetadata({ ...metadata, status: e.target.value })}
                   title="Select status"
                   className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
                 >
-                  {config.statusOptions.map((opt) => (
+                  {statusChoices.map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
-                </select>
+                </SelectField>}
               </MetaField>
 
-              {docType !== 'REQ' && (
-              <MetaField label="Visibility">
-                <select
-                  value={metadata.visibility || 'internal'}
-                  onChange={(e) => setMetadata({ ...metadata, visibility: e.target.value })}
-                  title="Select visibility"
-                  className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
-                >
-                  <option value="internal">Internal</option>
-                  <option value="customer">Customer</option>
-                </select>
-              </MetaField>
+              {!external && (
+                <MetaField label="Origin">
+                  <SelectField
+                    value={docType === 'REQ' ? metadata.req_origin || 'Internal' : metadata.visibility || 'internal'}
+                    onChange={(event) => setMetadata(docType === 'REQ'
+                      ? { ...metadata, req_origin: event.target.value, visibility: requirementVisibilityFromOrigin(event.target.value) }
+                      : { ...metadata, visibility: event.target.value })}
+                    title="Select origin"
+                    className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
+                  >
+                    {docType === 'REQ'
+                      ? config.fields.find(field => field.key === 'req_origin')?.options?.map(origin => <option key={origin} value={origin}>{origin}</option>)
+                      : <><option value="internal">Internal</option><option value="customer">Customer</option></>}
+                  </SelectField>
+                  {!editMode && projectId > 0 && <TagPicker projectId={projectId} value={tagIds} onChange={setTagIds} showLabel={false} />}
+                </MetaField>
               )}
+              {external && !editMode && projectId > 0 && <TagPicker projectId={projectId} value={tagIds} onChange={setTagIds} />}
 
-              {/* Assigned to */}
-              <MetaField label="Assigned to">
-                <select
-                  value={metadata.reviewer_id || ''}
-                  onChange={(e) => setMetadata({ ...metadata, reviewer_id: e.target.value })}
-                  title="Select reviewer"
-                  className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
-                >
-                  <option value="">Unassigned</option>
-                  {users?.map((u) => (
-                    <option key={u.id} value={u.id}>{u.full_name}</option>
-                  ))}
-                </select>
-              </MetaField>
+              {!editMode && (docType === 'REQ' || docType === 'TC') && <MetaField label="Assigned to">
+                <UserSelect value={metadata.reviewer_id || ''} onChange={value => setMetadata({ ...metadata, reviewer_id: value })} users={users ?? []} label="Select reviewer" />
+              </MetaField>}
 
               {/* Priority (if applicable) */}
               {config.priorityOptions && (
                 <MetaField label="Priority">
-                  <select
+                  <SelectField
                     value={metadata.priority || config.priorityOptions[0]}
                     onChange={(e) => setMetadata({ ...metadata, priority: e.target.value })}
                     title="Select priority"
@@ -735,7 +771,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                     {config.priorityOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
-                  </select>
+                  </SelectField>
                 </MetaField>
               )}
 
@@ -745,7 +781,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                   {visibleConfigFields.filter((field) => field.type !== 'textarea').map((field) => (
                     <MetaField key={field.key} label={field.label}>
                       {field.type === 'select' && field.options ? (
-                        <select
+                        <SelectField
                           value={metadata[field.key] || field.options[0]}
                           onChange={(e) => setMetadata({ ...metadata, [field.key]: e.target.value })}
                           title={field.label}
@@ -754,7 +790,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
                           {field.options.map((opt) => (
                             <option key={opt} value={opt}>{opt}</option>
                           ))}
-                        </select>
+                        </SelectField>
                       ) : field.type === 'number' ? (
                         <input
                           type="number"
@@ -799,7 +835,7 @@ export default function DocCreate({ editMode = false }: DocCreateProps) {
   )
 }
 
-function MetaField({ label, children }: { label: string; children: React.ReactNode }) {
+function MetaField({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
   return (
     <div>
       <label className="block text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
@@ -809,3 +845,4 @@ function MetaField({ label, children }: { label: string; children: React.ReactNo
     </div>
   )
 }
+import UserSelect from '../components/UserSelect'

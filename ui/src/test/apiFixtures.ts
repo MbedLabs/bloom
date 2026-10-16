@@ -45,6 +45,14 @@ export const user = {
   ...timestamps(),
 }
 
+export const workflowFixture = {
+  controlled: true, revision_number: 1, phase: 'Draft', status: 'Draft', creator: user,
+  reviewer: user, approver: user, reviewed_by: null, reviewed_at: null, approved_by: null, approved_at: null,
+  authorizing_change: null, options: { reviewers: [user], approvers: [user], changes: [] },
+  actions: { request_review: false, request_approval: false, approve: false, decline: false, assign_reviewer: false, assign_approver: false, comment: true, start_revision: false, start_draft: false, edit_current: true, plan_current: true },
+  pending_request: null, last_request: null, revisions: [],
+}
+
 export const requirement = {
   id: 11,
   project_id: 1,
@@ -144,6 +152,7 @@ export const docDetail = {
   description: 'Cold start to ready state.',
   content_json: null,
   content_html: '<p>Cold start to ready state.</p>',
+  allowed_actions: ['edit', 'delete', 'plan', 'review', 'approve'],
 }
 
 /**
@@ -321,13 +330,18 @@ export const baseline = {
   ...timestamps(),
 }
 
+export const policyFixtures = [
+  { id: 1, name: 'Read', description: '', rules: { REQ: { read: true, write: false, review: false, delete: false, visibility: ['internal' as const, 'customer' as const], tags: [] } }, is_default: true, ...timestamps() },
+  { id: 2, name: 'Write', description: '', rules: { TC: { read: true, write: true, review: false, delete: false, visibility: ['internal' as const, 'customer' as const], tags: [] } }, is_default: true, ...timestamps() },
+]
+
 export const projectMember = {
   id: 111,
   user_id: 2,
   email: 'external@example.com',
   full_name: 'Ext Ernal',
-  role: 'external' as const,
-  doc_types: ['REQ'],
+  owner: false,
+  policy_ids: [1],
   ...timestamps(),
 }
 
@@ -536,10 +550,25 @@ export const RESPONSES: Record<string, unknown> = {
   'projectsApi.list': [project],
   'projectsApi.get': project,
   'projectsApi.getByPrefix': project,
+  'projectsApi.capabilities': { can_edit: true, can_delete: true, can_manage_access: true },
   'projectsApi.create': project,
   'projectsApi.update': project,
   'projectsApi.delete': undefined,
 
+  'policiesApi.list': policyFixtures,
+  'groupsApi.list': [
+    { id: 12, name: 'Administrators', description: '', policy_ids: [1, 2], members: [], grants: [], created_at: '', updated_at: '' },
+    { id: 13, name: 'Product Owners', description: '', policy_ids: [1, 2], members: [], grants: [], created_at: '', updated_at: '' },
+    { id: 14, name: 'Testers', description: '', policy_ids: [1, 2], members: [], grants: [], created_at: '', updated_at: '' },
+    { id: 10, name: 'Developers', description: '', policy_ids: [1, 2], members: [], grants: [], created_at: '', updated_at: '' },
+    { id: 11, name: 'Customers', description: '', policy_ids: [1], members: [], grants: [], created_at: '', updated_at: '' },
+  ],
+  'usersApi.applicationPolicies': { policy_ids: [] },
+  'usersApi.setApplicationPolicies': { policy_ids: [] },
+  'groupsApi.assignmentOptions': { projects: [project], users: [user] },
+  'groupsApi.assign': [],
+  'tagsApi.list': [],
+  'projectMembersApi.access': [],
   'projectMembersApi.list': [projectMember],
   'projectMembersApi.create': projectMember,
   'projectMembersApi.update': projectMember,
@@ -672,6 +701,24 @@ export const RESPONSES: Record<string, unknown> = {
     new_ids: ['VCU-REQ-004'],
     errors: [],
   },
+  'importApi.importTestCases': {
+    created: 1,
+    updated: 0,
+    skipped: 0,
+    new_ids: ['VCU-TC-004'],
+    errors: [],
+  },
+  'importApi.importMarkdown': {
+    doc_type: 'REQ',
+    parameters_created: 1,
+    parameter_collisions: [],
+    artefacts_created: 2,
+    artefacts_skipped: 0,
+    sections: [],
+  },
+  'companyLogoApi.setLogo': { content_type: 'image/png', size: 4 },
+  'companyLogoApi.fetchLogo': undefined,
+  'companyLogoApi.deleteLogo': undefined,
 
   'exportApi.download': undefined,
 
@@ -681,6 +728,17 @@ export const RESPONSES: Record<string, unknown> = {
   'notificationsApi.markAllRead': undefined,
 
   'searchApi.global': { query: 'boot', total: 1, items: [] },
+
+  'workflowApi.get': workflowFixture,
+  'workflowApi.listProjectRequests': [],
+  'workflowApi.assign': {},
+  'workflowApi.request': {},
+  'workflowApi.decline': {},
+  'workflowApi.approve': {},
+  'workflowApi.startRevision': {},
+  'workflowApi.startDraft': {},
+  'workflowApi.getRevision': { revision_number: 1, approved_by: user, approved_at: NOW, authorizing_change: null, snapshot: { fields: {}, sections: [], attachments: [], suite_items: [] } },
+  'workflowApi.downloadRevisionAttachment': new Blob(),
 
   'artefactsApi.listComments': [artefactComment],
   'artefactsApi.createComment': artefactComment,
@@ -718,6 +776,7 @@ export function mockApiModule(
 }
 
 function defaultImplementation(key: string) {
+  if (key === 'workflowApi.get') return async (type: string) => ({ ...workflowFixture, controlled: !['risk', 'defect', 'campaign'].includes(type) })
   return async () => {
     if (!(key in RESPONSES)) throw new Error(`no fixture for ${key}`)
     return RESPONSES[key]

@@ -13,7 +13,7 @@ const PageMetaContext = createContext<PageMetaContextType>({
   setCrumbLabel: () => {},
 })
 
-export function PageMetaProvider({ children }: { children: ReactNode }) {
+export function PageMetaProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [crumbLabel, setCrumbLabelRaw] = useState<string | undefined>()
   const setCrumbLabel = useCallback((label: string | undefined) => setCrumbLabelRaw(label), [])
 

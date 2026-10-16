@@ -204,7 +204,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # no
 
 from app.api.import_service import import_reqif  # noqa: E402
 from app.core.database import Base  # noqa: E402
-from app.models import Project, Requirement, RequirementLink  # noqa: E402
+from app.models import ArtefactLink, Project, Requirement, RequirementLink  # noqa: E402
 from app.models.user import User, UserRole  # noqa: E402
 
 
@@ -265,13 +265,15 @@ async def test_import_creates_requirements_with_hierarchy_and_links(session):
     assert child.title == "Login"
     assert child.parent_id == parent.id  # hierarchy preserved
     assert child.priority == "High"  # enum resolved
-    assert child.content_html and "<b>shall</b>" in child.content_html
+    assert child.content_html
+    assert "<b>shall</b>" in child.content_html
     assert child.req_origin == "External"
     assert parent.source_ref == "OBJ-1"  # provenance kept for re-import
 
-    link = (await session.execute(select(RequirementLink))).scalars().one()
+    link = (await session.execute(select(ArtefactLink))).scalars().one()
     assert (link.source_id, link.target_id) == (child.id, parent.id)
-    assert link.link_type == "refines"
+    assert (link.source_type, link.target_type, link.role) == ("REQ", "REQ", "refines")
+    assert (await session.execute(select(RequirementLink))).scalars().all() == []
 
 
 async def test_reimport_is_idempotent(session):
@@ -279,7 +281,8 @@ async def test_reimport_is_idempotent(session):
     first = await import_reqif(
         project_id=1, file=_FakeUpload(SAMPLE_REQIF), db=session, current_user=admin
     )
-    assert first.imported == 2 and first.links_created == 1
+    assert first.imported == 2
+    assert first.links_created == 1
 
     second = await import_reqif(
         project_id=1, file=_FakeUpload(SAMPLE_REQIF), db=session, current_user=admin
@@ -312,3 +315,92 @@ async def test_unparseable_upload_returns_422(session):
             project_id=1, file=_FakeUpload(b"not reqif"), db=session, current_user=admin
         )
     assert exc.value.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("type_name", "role"),
+    [
+        ("Refines", "refines"),
+        ("Derives", "derives_from"),
+        ("Depends", "depends_on"),
+        ("Satisfies", "relates_to"),
+        ("Copies", "duplicates"),
+    ],
+)
+async def test_reqif_relations_are_visible_as_normalized_links(session, type_name, role):
+    from app.api.link_read_utils import iter_req_req_outgoing_neighbors
+
+    result = await import_reqif(
+        project_id=1,
+        file=_FakeUpload(
+            SAMPLE_REQIF.replace(b'LONG-NAME="Refines"', f'LONG-NAME="{type_name}"'.encode())
+        ),
+        db=session,
+        current_user=await _admin(session),
+    )
+    assert result.links_created == 1
+    link = (await session.execute(select(ArtefactLink))).scalar_one()
+    assert link.role == role
+    assert [edge async for edge in iter_req_req_outgoing_neighbors(link.source_id, 1, session)] == [
+        (link.target_id, role)
+    ]
+
+
+async def test_reqif_unknown_relation_fails_with_identifier_and_type(session):
+    from fastapi import HTTPException
+
+    with pytest.raises(HTTPException) as failed:
+        await import_reqif(
+            project_id=1,
+            file=_FakeUpload(
+                SAMPLE_REQIF.replace(b'LONG-NAME="Refines"', b'LONG-NAME="Unknown Relation"')
+            ),
+            db=session,
+            current_user=await _admin(session),
+        )
+    assert failed.value.status_code == 422
+    assert "REL-1" in failed.value.detail
+    assert "Unknown Relation" in failed.value.detail
+    assert (await session.execute(select(Requirement))).scalars().all() == []
+    assert (await session.execute(select(ArtefactLink))).scalars().all() == []
+
+
+async def test_reqif_disallowed_mapped_role_fails_with_relation(session, monkeypatch):
+    from fastapi import HTTPException
+
+    from app.core import link_rules
+
+    monkeypatch.setattr(link_rules, "LINK_RULE_ROWS", ())
+    with pytest.raises(HTTPException) as failed:
+        await import_reqif(
+            project_id=1,
+            file=_FakeUpload(SAMPLE_REQIF),
+            db=session,
+            current_user=await _admin(session),
+        )
+    assert failed.value.status_code == 422
+    assert "REL-1" in failed.value.detail
+    assert "Refines" in failed.value.detail
+    assert (await session.execute(select(ArtefactLink))).scalars().all() == []
+
+
+async def test_reqif_preserves_and_deduplicates_legacy_equivalents(session):
+    session.add_all(
+        [
+            Requirement(project_id=1, req_id="SYS-REQ-001", title="Parent", source_ref="OBJ-1"),
+            Requirement(project_id=1, req_id="SYS-REQ-002", title="Child", source_ref="OBJ-2"),
+        ]
+    )
+    await session.flush()
+    legacy = RequirementLink(source_id=2, target_id=1, link_type="derived_from")
+    session.add(legacy)
+    await session.flush()
+    result = await import_reqif(
+        project_id=1,
+        file=_FakeUpload(SAMPLE_REQIF.replace(b'LONG-NAME="Refines"', b'LONG-NAME="Derives"')),
+        db=session,
+        current_user=await _admin(session),
+    )
+    assert result.links_created == 0
+    assert (await session.execute(select(RequirementLink))).scalar_one().id == legacy.id
+    assert (await session.execute(select(ArtefactLink))).scalars().all() == []

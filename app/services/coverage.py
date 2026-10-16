@@ -4,6 +4,7 @@ from typing import Iterable, Optional
 
 from sqlalchemy import Select, select
 
+from app.core.link_rules import VERIFY_LINK_ROLE, VERIFY_SOURCE_TYPE, VERIFY_TARGET_TYPE
 from app.models import ArtefactLink, Requirement, TestCase
 
 DRAFT_STATUS = "Draft"
@@ -11,10 +12,6 @@ DRAFT_STATUS = "Draft"
 COVERED = "Covered"
 PARTIAL = "Partial"
 UNCOVERED = "Uncovered"
-
-VERIFY_SOURCE_TYPE = "TC"
-VERIFY_TARGET_TYPE = "REQ"
-VERIFY_LINK_ROLE = "verifies"
 
 
 def verifies(test_case_status: Optional[str]) -> bool:

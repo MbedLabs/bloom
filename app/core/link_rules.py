@@ -2,6 +2,10 @@
 
 from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS, normalize_document_kind
 
+VERIFY_SOURCE_TYPE = "TC"
+VERIFY_TARGET_TYPE = "REQ"
+VERIFY_LINK_ROLE = "verifies"
+
 LINKABLE_ARTEFACT_KINDS = ("REQ", "TC", "DES", "RSK", "CHG", "CPT", "DEF", "CMP", "TS")
 LINKABLE_DOC_KINDS = LINKABLE_ARTEFACT_KINDS + tuple(CANONICAL_DOCUMENT_KINDS)
 
@@ -85,6 +89,7 @@ LINK_RULE_ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("CHG", "TC", ("impacts", "blocks", "references")),
     ("CHG", "CPT", ("impacts", "blocks", "references")),
     ("CHG", "PRT", ("impacts", "blocks", "references")),
+    ("CHG", "TS", ("impacts", "blocks", "references")),
     ("CHG", "RSK", ("mitigates", "impacts", "references")),
     ("CHG", "CHG", ("depends_on", "duplicates", "blocks", "relates_to")),
     ("CHG", "STD", ("references",)),
@@ -170,4 +175,27 @@ def is_allowed_tag_pair(source_type: str | None, target_type: str | None) -> boo
 
     return (
         is_tag_host_type(source_type) and normalize_linkable_type(target_type) in LINKABLE_DOC_KINDS
+    )
+
+
+def allowed_link_triples() -> tuple[tuple[str, str, str], ...]:
+    """Return allowed manual and tag triples with every legacy storage alias."""
+    canonical = {
+        (source, target, role) for source, target, roles in LINK_RULE_ROWS for role in roles
+    }
+    canonical.update(
+        (source, target, TAG_ROLE)
+        for source in TAG_HOST_KINDS
+        for target in LINKABLE_DOC_KINDS
+        if is_allowed_tag_pair(source, target)
+    )
+    return tuple(
+        sorted(
+            {
+                (stored_source, stored_target, role)
+                for source, target, role in canonical
+                for stored_source in get_linkable_type_storage_values(source)
+                for stored_target in get_linkable_type_storage_values(target)
+            }
+        )
     )

@@ -61,8 +61,8 @@ export default function TopologyLinkEdge({
           <span
             className={`
               inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold
-              tabular-nums select-none shadow-sm
-              bg-card/90 backdrop-blur-sm border border-border/50
+              tabular-nums select-none shadow-xs
+              bg-card/90 backdrop-blur-xs border border-border/50
               ${d.totalSuspect > 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'}
             `}
           >

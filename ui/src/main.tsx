@@ -1,10 +1,11 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router'
 import { AuthProvider } from './contexts/AuthContext'
 import { ToastProvider } from './components/Toast'
 import App from './App'
+import { createQueryClient } from './lib/queryClient'
 import './index.css'
 
 // Apply theme before first paint so auth pages (outside Layout) respect dark mode.
@@ -16,14 +17,7 @@ import './index.css'
   document.documentElement.classList.toggle('dark', dark)
 })()
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000,
-      retry: 1,
-    },
-  },
-})
+const queryClient = createQueryClient()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

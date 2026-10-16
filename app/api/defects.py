@@ -1,19 +1,33 @@
 """Defect API endpoints."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
+    audit_visibility_change,
+    check_assignee,
+    check_assignees_keep_sight,
+    check_create_status_right,
+    check_external_change,
+    check_status_right,
+    check_visibility_right,
+    delete_project_row,
+    external_create_values,
+    get_row_or_404,
+    get_visible_row,
     log_artefact_activity,
     log_document_workflow_activity_from_patch,
+    page_of,
     should_log_generic_document_update,
+    type_visible,
     updated_summary,
+    visible_types,
 )
 from app.core.database import get_db
 from app.core.external_issue import validate_external_fields
@@ -22,12 +36,14 @@ from app.core.security import (
     apply_external_visibility_filter,
     get_current_user,
     require_project_access,
-    require_role,
 )
 from app.models import Defect, IntegrationSetting, Project
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas import DefectCreate, DefectResponse, DefectUpdate, PaginatedResponse
+from app.services.artefact_tags import attach_tags, creation_tags
 from app.services.integration_secrets import decrypt_integration_secret
+
+DEFECT_NOT_FOUND = "Defect not found"
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +63,12 @@ async def list_defects(
     severity: str | None = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)
+    if not type_visible(await visible_types(db, current_user, project_id), "DEF"):
+        return PaginatedResponse(items=[], total=0, skip=skip, limit=limit)
 
     base = select(Defect).where(Defect.project_id == project_id)
     base = apply_external_visibility_filter(base, Defect, current_user)
@@ -59,34 +77,34 @@ async def list_defects(
     if severity:
         base = base.where(Defect.severity == severity)
 
-    total_q = select(func.count()).select_from(base.subquery())
-    total = (await db.execute(total_q)).scalar() or 0
-
-    query = base.order_by(Defect.created_at.desc()).offset(skip).limit(limit)
-    result = await db.execute(query)
-    items = [_defect_response(item) for item in result.scalars().all()]
+    rows, total = await page_of(db, base, Defect, skip, limit)
+    items = [_defect_response(item) for item in rows]
 
     return PaginatedResponse(items=items, total=total, skip=skip, limit=limit)
 
 
-@router.post("", response_model=DefectResponse, status_code=201)
+@router.post(
+    "",
+    response_model=DefectResponse,
+    status_code=201,
+    responses={422: {"description": "Unprocessable Content"}},
+)
 async def create_defect(
     data: DefectCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    project = (
-        await db.execute(select(Project).where(Project.id == data.project_id))
-    ).scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = await get_row_or_404(db, Project, data.project_id, "Project not found")
 
     await require_project_access(
         db,
         current_user,
         data.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("create", "DEF"),
     )
+    named = data.model_dump(exclude_unset=True)
+    forced = external_create_values(current_user, "DEF", named)
+    await check_create_status_right(db, current_user, data.project_id, "DEF", named)
 
     defect_id = await next_doc_id(db, Defect, Defect.defect_id, project.id, project.prefix, "DEF")
 
@@ -99,12 +117,14 @@ async def create_defect(
     if ext_error:
         raise HTTPException(status_code=422, detail=ext_error)
 
+    tag_ids = await creation_tags(db, current_user, data.project_id, data.tag_ids)
     item = Defect(
         project_id=data.project_id,
+        created_by_id=current_user.id,
         defect_id=defect_id,
         title=data.title,
         description=data.description,
-        status=data.status,
+        status=forced.get("status", data.status),
         severity=data.severity,
         priority=data.priority,
         source_type=data.source_type,
@@ -118,10 +138,14 @@ async def create_defect(
         external_issue_number=data.external_issue_number,
         external_issue_url=data.external_issue_url,
         external_issue_state=data.external_issue_state,
-        visibility=data.visibility,
+        visibility=forced.get("visibility", data.visibility),
     )
     db.add(item)
     await db.flush()
+    await attach_tags(db, "defect", item, tag_ids, current_user)
+    await check_assignee(
+        db, data.project_id, "DEF", defect_id, "review", data.reviewer_id, row=item
+    )
     await db.refresh(item)
     await log_artefact_activity(
         db,
@@ -136,39 +160,45 @@ async def create_defect(
 @router.get("/{defect_pk}", response_model=DefectResponse)
 async def get_defect(
     defect_pk: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    item = (
-        await db.execute(
-            apply_external_visibility_filter(
-                select(Defect).where(Defect.id == defect_pk), Defect, current_user
-            )
-        )
-    ).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Defect not found")
-    await require_project_access(db, current_user, item.project_id)
+    item = await get_visible_row(
+        db, Defect, defect_pk, DEFECT_NOT_FOUND, current_user, permission=("view", "DEF")
+    )
     return _defect_response(item)
 
 
-@router.patch("/{defect_pk}", response_model=DefectResponse)
+@router.patch(
+    "/{defect_pk}",
+    response_model=DefectResponse,
+    responses={422: {"description": "Unprocessable Content"}},
+)
 async def update_defect(
     defect_pk: int,
     data: DefectUpdate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    item = (await db.execute(select(Defect).where(Defect.id == defect_pk))).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Defect not found")
-
-    await require_project_access(
-        db,
-        current_user,
-        item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+    item = await get_visible_row(
+        db, Defect, defect_pk, DEFECT_NOT_FOUND, current_user, permission=("edit", "DEF")
     )
+    changes = data.model_dump(exclude_unset=True)
+    check_external_change(current_user, "DEF", item, changes)
+    await check_status_right(db, current_user, "DEF", item, changes)
+    await check_visibility_right(db, current_user, "DEF", item, changes)
+    if changes.get("reviewer_id") not in (None, item.reviewer_id):
+        await check_assignee(
+            db,
+            item.project_id,
+            "DEF",
+            item.defect_id,
+            "review",
+            changes["reviewer_id"],
+            row=item,
+            visibility=changes.get("visibility"),
+        )
+    await check_assignees_keep_sight(db, item, item.defect_id, changes.get("visibility"))
 
     fields_set = data.model_fields_set
     previous_status = item.status if "status" in fields_set else None
@@ -184,11 +214,13 @@ async def update_defect(
 
     new_status = updates.get("status")
 
+    previous_visibility = getattr(item, "visibility", None)
     for field, value in updates.items():
         setattr(item, field, value)
+    await audit_visibility_change(db, "defect", item, previous_visibility)
 
     if new_status and new_status in TERMINAL_STATUSES and item.closed_at is None:
-        item.closed_at = datetime.utcnow()
+        item.closed_at = datetime.now(timezone.utc).replace(tzinfo=None)
     elif new_status and new_status not in TERMINAL_STATUSES:
         item.closed_at = None
 
@@ -226,26 +258,19 @@ async def update_defect(
 @router.delete("/{defect_pk}", status_code=204)
 async def delete_defect(
     defect_pk: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    item = (await db.execute(select(Defect).where(Defect.id == defect_pk))).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Defect not found")
-    await require_project_access(
+    await delete_project_row(
         db,
         current_user,
-        item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        Defect,
+        defect_pk,
+        DEFECT_NOT_FOUND,
+        resource="DEF",
+        audit_type="defect",
+        activity=("defect", "defect_id"),
     )
-    await log_artefact_activity(
-        db,
-        "defect",
-        item.id,
-        "deleted",
-        f"{current_user.full_name} deleted defect {item.defect_id}",
-    )
-    await db.delete(item)
 
 
 # ==================== External issue refresh ====================
@@ -255,22 +280,24 @@ class RefreshTokenPayload(BaseModel):
     token: str | None = None
 
 
-@router.post("/{defect_pk}/refresh-external", response_model=DefectResponse)
+@router.post(
+    "/{defect_pk}/refresh-external",
+    response_model=DefectResponse,
+    responses={
+        422: {"description": "Unprocessable Content"},
+        502: {"description": "Bad Gateway"},
+        504: {"description": "Gateway Timeout"},
+    },
+)
 async def refresh_external_issue(
     defect_pk: int,
     payload: RefreshTokenPayload | None = None,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
     """Fetch current state from GitHub/GitLab and update cached fields."""
-    item = (await db.execute(select(Defect).where(Defect.id == defect_pk))).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Defect not found")
-    await require_project_access(
-        db,
-        current_user,
-        item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+    item = await get_visible_row(
+        db, Defect, defect_pk, DEFECT_NOT_FOUND, current_user, permission=("edit", "DEF")
     )
     if (
         not item.external_tracker
@@ -334,7 +361,7 @@ async def refresh_external_issue(
         ) from exc
 
     item.external_issue_state = result["state"]
-    item.external_last_event_at = datetime.utcnow()
+    item.external_last_event_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     await db.flush()
     await db.refresh(item)

@@ -17,6 +17,15 @@ from app.schemas.auth import ForgotPasswordRequest, ResetPasswordRequest
 from app.services.token_service import TokenValidationError
 
 
+@pytest.fixture(autouse=True)
+def _no_audit_rows(monkeypatch):
+    """These handlers run on a fake session; audit rows are covered in tests/sec."""
+    for module in (auth_api, users_api):
+        for name in ("record_audit_event", "record_audit_failure"):
+            if hasattr(module, name):
+                monkeypatch.setattr(module, name, AsyncMock())
+
+
 class _ScalarResult:
     def __init__(self, value):
         self._value = value
@@ -268,3 +277,128 @@ async def test_reset_password_rejects_invalid_expired_or_used_tokens(detail, mon
     assert exc.value.detail == detail
     assert db.get.await_count == 0
     assert db.flush.await_count == 0
+
+
+@pytest.mark.asyncio
+async def test_update_user_seed_admin_promotes_to_admin():
+    from datetime import datetime, timezone
+
+    from app.core.config import settings
+    from app.schemas.auth import UserUpdate
+
+    now = datetime.now(timezone.utc)
+    user = User(
+        id=42,
+        email="dev@example.com",
+        full_name="Dev User",
+        role=UserRole.maintainer,
+        is_active=True,
+        created_at=now,
+        updated_at=now,
+    )
+    admin = User(
+        id=1,
+        email=settings.ADMIN_EMAIL,
+        full_name="Seed Admin",
+        role=UserRole.admin,
+        is_active=True,
+        created_at=now,
+        updated_at=now,
+    )
+    db = SimpleNamespace(
+        execute=AsyncMock(return_value=_ScalarResult(user)),
+        flush=AsyncMock(),
+        refresh=AsyncMock(),
+    )
+
+    response = await users_api.update_user(
+        user_id=42,
+        data=UserUpdate(role=UserRole.admin),
+        admin=admin,
+        db=db,
+    )
+    assert response.role == UserRole.admin
+    assert user.role == UserRole.admin
+
+
+@pytest.mark.asyncio
+async def test_update_user_non_seed_admin_cannot_promote_to_admin():
+    from datetime import datetime, timezone
+
+    from app.schemas.auth import UserUpdate
+
+    now = datetime.now(timezone.utc)
+    user = User(
+        id=42,
+        email="dev@example.com",
+        full_name="Dev User",
+        role=UserRole.maintainer,
+        is_active=True,
+        created_at=now,
+        updated_at=now,
+    )
+    admin = User(
+        id=2,
+        email="other-admin@example.com",
+        full_name="Other Admin",
+        role=UserRole.admin,
+        is_active=True,
+        created_at=now,
+        updated_at=now,
+    )
+    db = SimpleNamespace(
+        execute=AsyncMock(return_value=_ScalarResult(user)),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        await users_api.update_user(
+            user_id=42,
+            data=UserUpdate(role=UserRole.admin),
+            admin=admin,
+            db=db,
+        )
+    assert exc.value.status_code == 403
+    assert exc.value.detail == "Only the initial administrator can promote users to admin"
+    assert user.role == UserRole.maintainer
+
+
+@pytest.mark.asyncio
+async def test_update_user_cannot_demote_admin():
+    from datetime import datetime, timezone
+
+    from app.core.config import settings
+    from app.schemas.auth import UserUpdate
+
+    now = datetime.now(timezone.utc)
+    user = User(
+        id=42,
+        email="admin2@example.com",
+        full_name="Admin Two",
+        role=UserRole.admin,
+        is_active=True,
+        created_at=now,
+        updated_at=now,
+    )
+    admin = User(
+        id=1,
+        email=settings.ADMIN_EMAIL,
+        full_name="Seed Admin",
+        role=UserRole.admin,
+        is_active=True,
+        created_at=now,
+        updated_at=now,
+    )
+    db = SimpleNamespace(
+        execute=AsyncMock(return_value=_ScalarResult(user)),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        await users_api.update_user(
+            user_id=42,
+            data=UserUpdate(role=UserRole.maintainer),
+            admin=admin,
+            db=db,
+        )
+    assert exc.value.status_code == 400
+    assert exc.value.detail == "Admin role cannot be changed"
+    assert user.role == UserRole.admin

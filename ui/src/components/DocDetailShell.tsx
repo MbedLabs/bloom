@@ -26,7 +26,7 @@ const STATUS_COLORS: Record<string, string> = {
   Verified: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
 }
 
-export function StatusBadge({ status }: { status: string }) {
+export function StatusBadge({ status }: Readonly<{ status: string }>) {
   return (
     <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[status] || 'bg-muted text-muted-foreground'}`}>
       {status}
@@ -34,7 +34,7 @@ export function StatusBadge({ status }: { status: string }) {
   )
 }
 
-export function MetaItem({ label, value, mono = false }: { label: string; value: ReactNode; mono?: boolean }) {
+export function MetaItem({ label, value, mono = false }: Readonly<{ label: string; value: ReactNode; mono?: boolean }>) {
   return (
     <div>
       <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{label}</div>
@@ -43,7 +43,7 @@ export function MetaItem({ label, value, mono = false }: { label: string; value:
   )
 }
 
-export function SectionCard({ title, children, actions }: { title: string; children: ReactNode; actions?: ReactNode }) {
+export function SectionCard({ title, children, actions }: Readonly<{ title: string; children: ReactNode; actions?: ReactNode }>) {
   return (
     <div className="bg-card rounded-lg shadow-elegant p-6">
       <div className="flex items-center justify-between mb-4">
@@ -77,7 +77,7 @@ export default function DocDetailShell({
   rightRail,
   children,
   backTo,
-}: DocDetailShellProps) {
+}: Readonly<DocDetailShellProps>) {
   const location = useLocation()
   const navigate = useNavigate()
   const returnTo = backTo
@@ -86,9 +86,9 @@ export default function DocDetailShell({
 
   const handleBack = () => {
     if (window.history.length > 1) {
-      navigate(-1)
+      void navigate(-1)
     } else {
-      navigate(returnTo)
+      void navigate(returnTo)
     }
   }
 

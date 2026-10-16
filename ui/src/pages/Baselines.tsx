@@ -1,3 +1,5 @@
+import SelectField from '../components/SelectField'
+import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useMemo, useState } from 'react'
 import { useParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -8,6 +10,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { formatDateTime } from '../test/date-utils'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
 
 export default function Baselines() {
   const { user } = useAuth()
@@ -19,7 +22,8 @@ export default function Baselines() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [form, setForm] = useState({ project_id: '', name: '', description: '', baseline_type: 'Milestone' })
   const isAdmin = user?.role === 'admin'
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const { can } = useProjectPermissions(prefix, project?.id)
+  const canEditDocs = can('create', 'baseline')
   const scopedProjectId = project?.id ?? null
   const canListBaselines = isAdmin || scopedProjectId !== null
 
@@ -38,7 +42,7 @@ export default function Baselines() {
   const createMutation = useMutation({
     mutationFn: baselinesApi.create,
     onSuccess: (baseline) => {
-      queryClient.invalidateQueries({ queryKey: ['baselines'] })
+      refreshProjectViews(queryClient, { projectId: baseline.project_id })
       toast.saved(`Baseline ${baseline.name}`)
       setShowCreate(false)
       setForm({
@@ -111,7 +115,7 @@ export default function Baselines() {
         <div className="bg-card rounded-lg shadow-elegant p-8 text-center text-muted-foreground">Loading...</div>
       ) : !baselines || baselines.length === 0 ? (
         <div className="bg-card rounded-lg shadow-elegant p-12 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 rounded-2xl bg-linear-to-br/srgb from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-4">
             <Layers className="h-8 w-8 text-primary/40" />
           </div>
           <h3 className="text-lg font-medium text-foreground mb-2">No Baselines Yet</h3>
@@ -161,7 +165,7 @@ export default function Baselines() {
                         <div className="text-sm font-medium text-foreground capitalize">{key.replace('_', ' ')}</div>
                         <div className="text-lg font-bold text-foreground">{value?.count ?? 0}</div>
                       </div>
-                      <div className="text-xs text-muted-foreground break-words">
+                      <div className="text-xs text-muted-foreground wrap-break-word">
                         {value?.ids?.slice(0, 6).join(', ') || value?.titles?.slice(0, 6).join(', ') || 'No items'}
                       </div>
                     </div>
@@ -179,27 +183,28 @@ export default function Baselines() {
       )}
 
       {canEditDocs && showCreate && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-card border border-border rounded-xl shadow-glow max-w-md w-full">
             <div className="px-6 py-4 border-b border-border">
               <h3 className="text-lg font-semibold text-foreground">Create Baseline</h3>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Project</label>
+                <label htmlFor="baseline-project" className="block text-sm font-medium text-foreground mb-1">Project</label>
                 {scopedProjectId ? (
                   <input
+                    id="baseline-project"
                     value={project?.name ?? `Project #${scopedProjectId}`}
                     className="w-full px-3 py-2 bg-muted border border-input rounded-md text-muted-foreground"
                     disabled
                   />
                 ) : (
-                  <select value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md" required>
+                  <SelectField id="baseline-project" value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md" required>
                     <option value="">Select project</option>
                     {(projects ?? []).map((projectOption) => (
                       <option key={projectOption.id} value={projectOption.id}>{projectOption.name}</option>
                     ))}
-                  </select>
+                  </SelectField>
                 )}
               </div>
               <div>
@@ -208,12 +213,12 @@ export default function Baselines() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Type</label>
-                <select value={form.baseline_type} onChange={(e) => setForm({ ...form, baseline_type: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md">
+                <SelectField value={form.baseline_type} onChange={(e) => setForm({ ...form, baseline_type: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md">
                   <option>Milestone</option>
                   <option>Release</option>
                   <option>Audit</option>
                   <option>Review</option>
-                </select>
+                </SelectField>
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Description</label>

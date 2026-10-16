@@ -21,6 +21,7 @@ interface Recorded {
   url: string
   data: unknown
   params: unknown
+  responseType: unknown
 }
 
 const requests: Recorded[] = []
@@ -39,6 +40,7 @@ axios.defaults.adapter = async (config: InternalAxiosRequestConfig) => {
     url: config.url ?? '',
     data: config.data,
     params: config.params,
+    responseType: config.responseType,
   })
   return {
     data: nextResponse.data,
@@ -71,11 +73,24 @@ const BODY = {
  * builds them into the path itself.
  */
 const CALLS: Array<[string, unknown[], string, string]> = [
+  ['workflowApi.listProjectRequests', [1], 'get', '/projects/1/artefact-requests'],
+  ['workflowApi.get', ['requirement', 11], 'get', '/artefacts/requirement/11/workflow'],
+  ['workflowApi.assign', ['requirement', 11, { reviewer_id: 2 }], 'put', '/artefacts/requirement/11/workflow/assignees'],
+  ['workflowApi.request', ['requirement', 11, 'review'], 'post', '/artefacts/requirement/11/requests'],
+  ['workflowApi.decline', [72], 'post', '/artefact-requests/72/decline'],
+  ['workflowApi.approve', ['requirement', 11], 'post', '/artefacts/requirement/11/sign-off'],
+  ['workflowApi.startRevision', ['requirement', 11, 81], 'post', '/artefacts/requirement/11/revisions'],
+  ['workflowApi.startDraft', ['requirement', 11], 'post', '/artefacts/requirement/11/draft'],
+  ['workflowApi.getRevision', ['requirement', 11, 1], 'get', '/artefacts/requirement/11/revisions/1'],
+  ['workflowApi.downloadRevisionAttachment', ['requirement', 11, 1, 501], 'get', '/artefacts/requirement/11/revisions/1/attachments/501'],
   ['authApi.login', ['u@example.com', 'pw'], 'post', '/auth/login'],
   ['authApi.refresh', [], 'post', '/auth/refresh'],
   ['authApi.logout', [], 'post', '/auth/logout'],
   ['authApi.getMe', [], 'get', '/auth/me'],
   ['authApi.updateMe', [{ full_name: 'New Name' }], 'put', '/auth/me'],
+  ['authApi.setProfilePicture', [new File(['picture'], 'profile.png', { type: 'image/png' })], 'put', '/auth/me/picture'],
+  ['authApi.fetchProfilePicture', [], 'get', '/auth/me/picture'],
+  ['authApi.deleteProfilePicture', [], 'delete', '/auth/me/picture'],
   ['authApi.requestEmailChange', ['pw', 'new@example.com'], 'post', '/auth/me/email'],
   ['authApi.cancelEmailChange', [], 'delete', '/auth/me/email'],
   ['authApi.confirmEmailChange', ['tok'], 'post', '/auth/confirm-email-change'],
@@ -97,6 +112,8 @@ const CALLS: Array<[string, unknown[], string, string]> = [
   ['usersApi.list', [], 'get', '/users'],
   ['usersApi.listMentionable', [5], 'get', '/users/mentionable'],
   ['usersApi.get', [3], 'get', '/users/3'],
+  ['usersApi.applicationPolicies', [3], 'get', '/users/3/application-policies'],
+  ['usersApi.setApplicationPolicies', [3, [1, 2]], 'put', '/users/3/application-policies'],
   [
     'usersApi.create',
     [{ email: 'u@example.com', full_name: 'U', password: 'pw' }],
@@ -120,13 +137,16 @@ const CALLS: Array<[string, unknown[], string, string]> = [
   ['projectsApi.delete', [5], 'delete', '/projects/5'],
 
   ['projectMembersApi.list', [5], 'get', '/projects/5/members'],
+  ['projectMembersApi.access', [5], 'get', '/projects/5/access'],
+  ['projectMembersApi.permissions', [5], 'get', '/projects/5/permissions'],
+  ['projectsApi.capabilities', [5], 'get', '/projects/5/capabilities'],
   [
     'projectMembersApi.create',
-    [5, { user_id: 3, role: 'maintainer' }],
+    [5, { user_id: 3, owner: false, policy_ids: [1, 2] }],
     'post',
     '/projects/5/members',
   ],
-  ['projectMembersApi.update', [5, 9, { role: 'external' }], 'patch', '/projects/5/members/9'],
+  ['projectMembersApi.update', [5, 9, { owner: true, policy_ids: [] }], 'patch', '/projects/5/members/9'],
   ['projectMembersApi.remove', [5, 9], 'delete', '/projects/5/members/9'],
 
   ['attachmentsApi.list', [7], 'get', '/documents/7/attachments'],
@@ -143,8 +163,8 @@ const CALLS: Array<[string, unknown[], string, string]> = [
   ['requirementsApi.get', [11], 'get', '/requirements/11'],
   ['requirementsApi.create', [{ project_id: 5, title: 'R' }], 'post', '/requirements'],
   ['requirementsApi.update', [11, { title: 'R2' }], 'patch', '/requirements/11'],
-  ['requirementsApi.setReviewed', [11, 3], 'patch', '/requirements/11'],
-  ['requirementsApi.setApproved', [11, 3], 'patch', '/requirements/11'],
+  ['requirementsApi.setReviewed', [11], 'post', '/artefacts/requirement/11/sign-off'],
+  ['requirementsApi.setApproved', [11], 'post', '/artefacts/requirement/11/sign-off'],
   ['requirementsApi.delete', [11], 'delete', '/requirements/11'],
   ['requirementsApi.linkTestRun', [11, 42], 'post', '/requirements/11/link-testrun'],
   ['requirementsApi.getTestRuns', [11], 'get', '/requirements/11/test-runs'],
@@ -153,8 +173,8 @@ const CALLS: Array<[string, unknown[], string, string]> = [
   ['testCasesApi.get', [12], 'get', '/test-cases/12'],
   ['testCasesApi.create', [{ project_id: 5, title: 'TC' }], 'post', '/test-cases'],
   ['testCasesApi.update', [12, { title: 'TC2' }], 'patch', '/test-cases/12'],
-  ['testCasesApi.setReviewed', [12, 3], 'patch', '/test-cases/12'],
-  ['testCasesApi.setApproved', [12, 3], 'patch', '/test-cases/12'],
+  ['testCasesApi.setReviewed', [12], 'post', '/artefacts/test-case/12/sign-off'],
+  ['testCasesApi.setApproved', [12], 'post', '/artefacts/test-case/12/sign-off'],
   ['testCasesApi.delete', [12], 'delete', '/test-cases/12'],
 
   ['traceabilityApi.getMatrix', [5], 'get', '/traceability?project_id=5'],
@@ -247,6 +267,7 @@ const CALLS: Array<[string, unknown[], string, string]> = [
   ],
   ['integrationsApi.updateSetting', [131, { base_url: 'x' }], 'patch', '/integrations/settings/131'],
   ['integrationsApi.deleteSetting', [131], 'delete', '/integrations/settings/131'],
+  ['integrationsApi.pullJira', [131], 'post', '/integrations/settings/131/jira/pull'],
   ['integrationsApi.listSyncEvents', [121], 'get', '/integrations/sync-events'],
   ['integrationsApi.refreshExternal', [121], 'post', '/defects/121/refresh-external'],
 
@@ -269,6 +290,33 @@ const CALLS: Array<[string, unknown[], string, string]> = [
     'post',
     '/projects/5/import/reqif',
   ],
+  [
+    'importApi.importTestCases',
+    [5, new File(['tc_id,title\n,New'], 'tcs.csv'), 'csv'],
+    'post',
+    '/projects/5/import/test-cases?format=csv',
+  ],
+  [
+    'importApi.importMarkdown',
+    [5, new File(['# Doc'], 'doc.md')],
+    'post',
+    '/projects/5/import/markdown',
+  ],
+  [
+    'importApi.testRailColumns',
+    [5, new File(['ID,Title'], 'cases.csv')],
+    'post',
+    '/projects/5/import/testrail/columns',
+  ],
+  [
+    'importApi.importTestRail',
+    [5, new File(['<suite/>'], 'suite.xml'), 'xml'],
+    'post',
+    '/projects/5/import/testrail?format=xml',
+  ],
+  ['companyLogoApi.setLogo', [new File(['x'], 'logo.png')], 'put', '/company-logo/logo'],
+  ['companyLogoApi.fetchLogo', [], 'get', '/company-logo/logo'],
+  ['companyLogoApi.deleteLogo', [], 'delete', '/company-logo/logo'],
 
   ['exportApi.download', [5, 'requirements'], 'get', '/projects/5/export/requirements'],
 
@@ -284,6 +332,36 @@ const CALLS: Array<[string, unknown[], string, string]> = [
   ['artefactsApi.listActivity', ['requirement', 11], 'get', '/artefacts/requirement/11/activity'],
   ['artefactsApi.getRelated', ['requirement', 11], 'get', '/artefacts/requirement/11/related'],
   ['artefactsApi.transition', ['requirement', 11, 'Approved'], 'post', '/artefacts/requirement/11/transition'],
+
+  ['policiesApi.list', [], 'get', '/policies'],
+  ['policiesApi.create', [{ name: 'P', rules: {} }], 'post', '/policies'],
+  ['policiesApi.update', [2, { description: 'x' }], 'patch', '/policies/2'],
+  ['policiesApi.delete', [2], 'delete', '/policies/2'],
+  ['policiesApi.duplicate', [2], 'post', '/policies/2/duplicate'],
+  ['tagsApi.list', [7], 'get', '/tags'],
+  ['tagsApi.create', ['Field'], 'post', '/tags'],
+  ['tagsApi.rename', [4, 'Lab'], 'patch', '/tags/4'],
+  ['tagsApi.scope', [7], 'get', '/tags/scope'],
+  ['artefactTagsApi.get', ['requirement', 9], 'get', '/artefacts/requirement/9/tags'],
+  ['artefactTagsApi.set', ['requirement', 9, [4]], 'put', '/artefacts/requirement/9/tags'],
+
+  ['auditApi.list', [{ action: 'auth.' }], 'get', '/audit'],
+  ['accessRequestsApi.create', [{ resource_type: 'requirement', resource_ref: 'APO-REQ-001' }], 'post', '/access-requests'],
+  ['accessRequestsApi.mine', [{ resource_type: 'requirement', resource_ref: 'APO-REQ-001' }], 'get', '/access-requests/mine'],
+  ['accessRequestsApi.list', [], 'get', '/access-requests'],
+  ['accessRequestsApi.decide', [3, 'granted'], 'post', '/access-requests/3/decision'],
+  ['groupsApi.list', [], 'get', '/groups'],
+  ['groupsApi.assignmentOptions', [], 'get', '/groups/assignment-options'],
+  ['groupsApi.assign', [10, 7, [5, 6]], 'post', '/groups/10/assignments'],
+  ['groupsApi.create', [{ name: 'G' }], 'post', '/groups'],
+  ['groupsApi.update', [10, { name: 'G2' }], 'patch', '/groups/10'],
+  ['groupsApi.delete', [10], 'delete', '/groups/10'],
+  ['groupsApi.addMember', [10, 5], 'post', '/groups/10/members'],
+  ['groupsApi.addMembers', [10, [5, 6]], 'post', '/groups/10/members'],
+  ['groupsApi.removeMember', [10, 5], 'delete', '/groups/10/members/5'],
+  ['groupsApi.addGrant', [10, 7], 'post', '/groups/10/grants'],
+  ['groupsApi.updateGrant', [10, 3], 'patch', '/groups/10/grants/3'],
+  ['groupsApi.removeGrant', [10, 3], 'delete', '/groups/10/grants/3'],
 ]
 
 type ApiGroup = Record<string, (...args: unknown[]) => Promise<unknown>>
@@ -352,6 +430,33 @@ describe('responses are unwrapped', () => {
   it('unreadCount returns the count itself', async () => {
     nextResponse = { status: 200, data: { unread: 4 }, headers: {} }
     await expect(client.notificationsApi.unreadCount()).resolves.toBe(4)
+  })
+})
+
+describe('group project admissions', () => {
+  it('admits a group with its owned policies without a project policy selection', async () => {
+    await client.groupsApi.addGrant(10, 7)
+    expect(JSON.parse(requests[0].data as string)).toEqual({ project_id: 7, inherit_policies: true })
+  })
+
+  it('updates a group admission only to inherit its owned policies', async () => {
+    await client.groupsApi.updateGrant(10, 3)
+    expect(JSON.parse(requests[0].data as string)).toEqual({ inherit_policies: true })
+  })
+})
+
+describe('group membership payloads', () => {
+  it('sends all selected users in one membership request', async () => {
+    await client.groupsApi.addMembers(10, [5, 6])
+    expect(requests).toHaveLength(1)
+    expect(requests[0].method).toBe('post')
+    expect(requests[0].url).toBe('/groups/10/members')
+    expect(JSON.parse(requests[0].data as string)).toEqual({ user_ids: [5, 6] })
+  })
+
+  it('retains the existing single-user membership payload', async () => {
+    await client.groupsApi.addMember(10, 5)
+    expect(JSON.parse(requests[0].data as string)).toEqual({ user_id: 5 })
   })
 })
 
@@ -450,17 +555,55 @@ describe('query parameters', () => {
     expect(requests[0].params).toEqual({ q: 'boot', project_id: 5, limit: 10 })
   })
 
-  it('sends the reviewer and approver as the fields the backend expects', async () => {
-    await client.requirementsApi.setReviewed(11, 3)
-    const reviewed = JSON.parse(requests[0].data as string)
-    expect(reviewed.reviewed_by_id).toBe(3)
-    expect(Date.parse(reviewed.reviewed_at)).not.toBeNaN()
+  it('sends only the sign-off step; the server records who signs and when', async () => {
+    await client.requirementsApi.setReviewed(11)
+    expect(JSON.parse(requests[0].data as string)).toEqual({ step: 'review' })
 
     requests.length = 0
-    await client.testCasesApi.setApproved(12, 4)
-    const approved = JSON.parse(requests[0].data as string)
-    expect(approved.approved_by_id).toBe(4)
-    expect(Date.parse(approved.approved_at)).not.toBeNaN()
+    await client.testCasesApi.setApproved(12)
+    expect(JSON.parse(requests[0].data as string)).toEqual({ step: 'approve' })
+  })
+})
+
+describe('workflow command payloads', () => {
+  it('sends independent Review without manufacturing other policy permissions', async () => {
+    const rule = { read: false, write: false, review: true, approve: false, delete: false, all_origins: false, visibility: ['customer' as const], tags: [] }
+    await client.policiesApi.create({ name: 'Customer reviewer', scope: 'project', rules: { REQ: rule } })
+    expect(JSON.parse(requests[0].data as string)).toEqual({ name: 'Customer reviewer', scope: 'project', rules: { REQ: rule } })
+  })
+
+  it('sends only the selected assignments', async () => {
+    await client.workflowApi.assign('requirement', 11, { reviewer_id: 2, approver_id: null })
+    expect(JSON.parse(requests[0].data as string)).toEqual({ reviewer_id: 2, approver_id: null })
+  })
+
+  it.each(['review', 'approval'] as const)('requests the %s handoff', async kind => {
+    await client.workflowApi.request('test-case', 12, kind)
+    expect(JSON.parse(requests[0].data as string)).toEqual({ kind })
+  })
+
+  it('sends the approval step without actor or timestamp fields', async () => {
+    await client.workflowApi.approve('requirement', 11)
+    expect(JSON.parse(requests[0].data as string)).toEqual({ step: 'approve' })
+  })
+
+  it('uses the authorizing change id to start a revision', async () => {
+    await client.workflowApi.startRevision('document', 13, 81)
+    expect(JSON.parse(requests[0].data as string)).toEqual({ change_request_id: 81 })
+  })
+
+  it('declines and starts Draft with empty command bodies', async () => {
+    await client.workflowApi.decline(72)
+    expect(JSON.parse(requests[0].data as string)).toEqual({})
+    await client.workflowApi.startDraft('design', 14)
+    expect(JSON.parse(requests[1].data as string)).toEqual({})
+  })
+
+  it('downloads the immutable revision file as a blob', async () => {
+    const blob = new Blob(['approved file'])
+    nextResponse = { status: 200, data: blob, headers: {} }
+    expect(await client.workflowApi.downloadRevisionAttachment('document', 13, 1, 501)).toBe(blob)
+    expect(requests[0]).toMatchObject({ url: '/artefacts/document/13/revisions/1/attachments/501', responseType: 'blob' })
   })
 })
 

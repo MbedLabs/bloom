@@ -1,6 +1,10 @@
 """Models package initialization."""
 
+from app.models.access_request import AccessRequest
+from app.models.audit import AuditEvent
+from app.models.groups import Group, GroupMembership, Policy
 from app.models.models import (
+    AllowedLinkTriple,
     ArtefactActivity,
     ArtefactComment,
     ArtefactLink,
@@ -11,6 +15,7 @@ from app.models.models import (
     CampaignSuite,
     ChangeRequest,
     ChangeRequestSyncEvent,
+    CompanyLogo,
     Defect,
     DefectSyncEvent,
     DesignItem,
@@ -35,11 +40,36 @@ from app.models.models import (
     TestSuiteItem,
     WebhookDelivery,
 )
-from app.models.project_membership import ProjectExternalDocType, ProjectMembership
+from app.models.project_membership import (
+    ProjectAccess,
+    ProjectExternalDocType,
+    ProjectMembership,
+    project_access_policies,
+)
+from app.models.report_request import ReportRequest
+from app.models.tags import ArtefactTag, Tag
 from app.models.user import User, UserRole
 from app.models.user_token import UserToken, UserTokenPurpose
+from app.models.workflow import (
+    ArtefactRequest,
+    ArtefactRequestRecipient,
+    ArtefactRevision,
+    ArtefactRevisionFile,
+    ArtefactWorkflow,
+)
 
 __all__ = [
+    "ReportRequest",
+    "ArtefactWorkflow",
+    "ArtefactRevision",
+    "ArtefactRequest",
+    "ArtefactRequestRecipient",
+    "ArtefactRevisionFile",
+    "AllowedLinkTriple",
+    "ArtefactTag",
+    "Tag",
+    "AccessRequest",
+    "AuditEvent",
     "AttachmentUploadAttempt",
     "AttachmentUploadLease",
     "Project",
@@ -57,6 +87,7 @@ __all__ = [
     "TestCampaignItem",
     "CampaignSuite",
     "ProjectVariable",
+    "CompanyLogo",
     "User",
     "UserRole",
     "UserToken",
@@ -75,8 +106,13 @@ __all__ = [
     "ArtefactActivity",
     "Notification",
     "ArtefactLink",
+    "ProjectAccess",
     "ProjectMembership",
+    "project_access_policies",
     "ProjectExternalDocType",
+    "Group",
+    "GroupMembership",
+    "Policy",
     "WebhookDelivery",
     "ServiceCredential",
 ]

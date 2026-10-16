@@ -1,5 +1,6 @@
+import { createQueryClient } from '../lib/queryClient'
 import { renderPage } from './render'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
 
@@ -48,7 +49,7 @@ const stats: DashboardStats = {
 
 describe('Dashboard document totals', () => {
   it('counts campaigns as controlled documents', async () => {
-    const queryClient = new QueryClient({
+    const queryClient = createQueryClient({
       defaultOptions: { queries: { retry: false } },
     })
     queryClient.setQueryData(['dashboard-stats'], stats)

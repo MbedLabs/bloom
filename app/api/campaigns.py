@@ -1,21 +1,36 @@
 """Test campaign API: traceability scopes and Bud execution linkage."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.artefact_utils import (
+    audit_artefact_deleted,
+    audit_visibility_change,
+    check_external_change,
+    check_status_right,
+    check_visibility_right,
+    external_create_values,
+    get_row_or_404,
+    get_visible_row,
+    naive_utc,
+    page_of,
+    requirement_summary,
+    type_visible,
+    visible_types,
+)
 from app.api.link_read_utils import get_verified_requirement_links_for_test_case
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
 from app.core.security import (
     apply_external_visibility_filter,
+    doc_type_visible,
     get_current_user,
     require_project_access,
-    require_role,
 )
 from app.core.service_auth import require_bud_sync_token
 from app.models import (
@@ -30,7 +45,7 @@ from app.models import (
     TestSuite,
     TestSuiteItem,
 )
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas import (
     PaginatedResponse,
     RequirementSummary,
@@ -49,6 +64,9 @@ from app.schemas import (
     TestConceptSummary,
     TestSuiteSummary,
 )
+from app.services.artefact_tags import attach_tags, creation_tags
+
+CAMPAIGN_NOT_FOUND = "Campaign not found"
 
 router = APIRouter()
 
@@ -56,34 +74,26 @@ router = APIRouter()
 def campaign_frontend_url(project_prefix: str, campaign_id: int) -> str | None:
     """Bloom's own address for a campaign, or None when it does not know it."""
 
-    base = (settings.FRONTEND_BASE_URL or "").rstrip("/")
+    base = (settings.APP_BASE_URL or "").rstrip("/")
     return f"{base}/projects/{project_prefix}/campaigns/{campaign_id}" if base else None
 
 
 def suite_frontend_url(project_prefix: str, suite_id: int) -> str | None:
     """Bloom's own address for a test suite, or None when it does not know it."""
 
-    base = (settings.FRONTEND_BASE_URL or "").rstrip("/")
+    base = (settings.APP_BASE_URL or "").rstrip("/")
     return f"{base}/projects/{project_prefix}/suites/{suite_id}" if base else None
 
 
-def _normalize_datetime(value: Optional[datetime]) -> Optional[datetime]:
-    if value is None:
-        return None
-    if value.tzinfo is not None:
-        return value.astimezone().replace(tzinfo=None)
-    return value
-
-
 def _resolved_execution_time(value: Optional[datetime]) -> datetime:
-    resolved = value or datetime.utcnow()
-    return _normalize_datetime(resolved) or datetime.utcnow()
+    resolved = value or datetime.now(timezone.utc).replace(tzinfo=None)
+    return naive_utc(resolved) or datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _apply_result_to_test_case(tc: TestCase, res) -> bool:
     executed_at = _resolved_execution_time(res.executed_at)
-    current = _normalize_datetime(tc.last_executed_at)
-    incoming = _normalize_datetime(executed_at)
+    current = naive_utc(tc.last_executed_at)
+    incoming = naive_utc(executed_at)
 
     if current and incoming and incoming < current:
         return False
@@ -106,7 +116,7 @@ def _apply_result_to_campaign_item(item: TestCampaignItem, res) -> None:
 @router.post("/sync-results", response_model=SyncResultsResponse)
 async def sync_results_global(
     data: SyncResultsRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _service_credential=Depends(require_bud_sync_token),
 ):
     """
@@ -218,22 +228,19 @@ async def list_campaigns(
     status: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)
+    if not type_visible(await visible_types(db, current_user, project_id), "CMP"):
+        return PaginatedResponse(items=[], total=0, skip=skip, limit=limit)
 
     base = select(TestCampaign).where(TestCampaign.project_id == project_id)
     base = apply_external_visibility_filter(base, TestCampaign, current_user)
     if status:
         base = base.where(TestCampaign.status == status)
 
-    total_q = select(func.count()).select_from(base.subquery())
-    total = (await db.execute(total_q)).scalar() or 0
-
-    query = base.order_by(TestCampaign.created_at.desc()).offset(skip).limit(limit)
-    result = await db.execute(query)
-    campaigns = result.scalars().all()
+    campaigns, total = await page_of(db, base, TestCampaign, skip, limit)
 
     return PaginatedResponse(
         items=await _build_campaign_responses_batch(campaigns, db, current_user),
@@ -243,22 +250,25 @@ async def list_campaigns(
     )
 
 
-@router.post("", response_model=TestCampaignDetailResponse, status_code=201)
+@router.post(
+    "",
+    response_model=TestCampaignDetailResponse,
+    status_code=201,
+    responses={404: {"description": "Not Found"}},
+)
 async def create_campaign(
     data: TestCampaignCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    proj_row = await db.execute(select(Project).where(Project.id == data.project_id))
-    project = proj_row.scalar_one_or_none()
-    if not project:
-        raise HTTPException(404, "Project not found")
+    project = await get_row_or_404(db, Project, data.project_id, "Project not found")
     await require_project_access(
         db,
         current_user,
         data.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("create", "CMP"),
     )
+    forced = external_create_values(current_user, "CMP", data.model_dump(exclude_unset=True))
 
     # Resolve suite_ids: prefer new field, fall back to legacy suite_id
     resolved_suite_ids = list(data.suite_ids) if data.suite_ids else []
@@ -270,12 +280,20 @@ async def create_campaign(
         {
             suite.id: suite
             for suite in (
-                (await db.execute(select(TestSuite).where(TestSuite.id.in_(resolved_suite_ids))))
+                (
+                    await db.execute(
+                        apply_external_visibility_filter(
+                            select(TestSuite).where(TestSuite.id.in_(resolved_suite_ids)),
+                            TestSuite,
+                            current_user,
+                        )
+                    )
+                )
                 .scalars()
                 .all()
             )
         }
-        if resolved_suite_ids
+        if resolved_suite_ids and await doc_type_visible(db, current_user, data.project_id, "TS")
         else {}
     )
     validated_suites: list[TestSuite] = []
@@ -294,12 +312,14 @@ async def create_campaign(
         "CMP",
     )
 
+    tag_ids = await creation_tags(db, current_user, data.project_id, data.tag_ids)
     campaign = TestCampaign(
         project_id=data.project_id,
+        created_by_id=current_user.id,
         campaign_id=campaign_public_id,
         name=data.name,
         description=data.description,
-        visibility=data.visibility,
+        visibility=forced.get("visibility", data.visibility),
         suite_id=resolved_suite_ids[0] if resolved_suite_ids else None,
         bud_run_id=data.bud_run_id,
         bud_run_url=data.bud_run_url,
@@ -308,6 +328,7 @@ async def create_campaign(
     )
     db.add(campaign)
     await db.flush()
+    await attach_tags(db, "campaign", campaign, tag_ids, current_user)
     await db.refresh(campaign)
 
     # Create CampaignSuite rows for multi-suite support
@@ -330,13 +351,17 @@ async def create_campaign(
         )
         selected_test_case_ids.update(suite_item_rows)
 
-    if selected_test_case_ids:
+    if selected_test_case_ids and await doc_type_visible(db, current_user, data.project_id, "TC"):
         tc_rows = (
             (
                 await db.execute(
-                    select(TestCase).where(
-                        TestCase.id.in_(selected_test_case_ids),
-                        TestCase.project_id == data.project_id,
+                    apply_external_visibility_filter(
+                        select(TestCase).where(
+                            TestCase.id.in_(selected_test_case_ids),
+                            TestCase.project_id == data.project_id,
+                        ),
+                        TestCase,
+                        current_user,
                     )
                 )
             )
@@ -360,88 +385,117 @@ async def create_campaign(
 @router.get("/{campaign_id}", response_model=TestCampaignDetailResponse)
 async def get_campaign(
     campaign_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(
-        apply_external_visibility_filter(
-            select(TestCampaign).where(TestCampaign.id == campaign_id),
-            TestCampaign,
-            current_user,
-        )
+    campaign = await get_visible_row(
+        db,
+        TestCampaign,
+        campaign_id,
+        CAMPAIGN_NOT_FOUND,
+        current_user,
+        permission=("view", "CMP"),
     )
-    campaign = result.scalar_one_or_none()
-    if not campaign:
-        raise HTTPException(404, "Campaign not found")
-    await require_project_access(db, current_user, campaign.project_id)
     return await _build_campaign_detail(campaign, db, current_user)
 
 
-@router.patch("/{campaign_id}", response_model=TestCampaignResponse)
+@router.patch(
+    "/{campaign_id}",
+    response_model=TestCampaignResponse,
+    responses={404: {"description": "Not Found"}},
+)
 async def update_campaign(
     campaign_id: int,
     data: TestCampaignUpdate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
-    campaign = result.scalar_one_or_none()
-    if not campaign:
-        raise HTTPException(404, "Campaign not found")
-    await require_project_access(
+    campaign = await get_visible_row(
         db,
+        TestCampaign,
+        campaign_id,
+        CAMPAIGN_NOT_FOUND,
         current_user,
-        campaign.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "CMP"),
     )
+    changes = data.model_dump(exclude_unset=True)
+    check_external_change(current_user, "CMP", campaign, changes)
+    await check_status_right(db, current_user, "CMP", campaign, changes)
+    await check_visibility_right(db, current_user, "CMP", campaign, changes)
 
     if data.name is not None:
         campaign.name = data.name
     if data.description is not None:
         campaign.description = data.description
     if data.visibility is not None:
+        previous_visibility = campaign.visibility
         campaign.visibility = data.visibility
+        await audit_visibility_change(db, "campaign", campaign, previous_visibility)
     # Handle suite_ids (multi-suite) or legacy suite_id
     resolved_suite_ids = data.suite_ids
     if resolved_suite_ids is None and data.suite_id is not None:
         resolved_suite_ids = [data.suite_id]
     if resolved_suite_ids is not None:
+        suites_visible = await doc_type_visible(db, current_user, campaign.project_id, "TS")
         existing_suites = (
             {
                 suite.id: suite
                 for suite in (
                     (
                         await db.execute(
-                            select(TestSuite).where(TestSuite.id.in_(resolved_suite_ids))
+                            apply_external_visibility_filter(
+                                select(TestSuite).where(TestSuite.id.in_(resolved_suite_ids)),
+                                TestSuite,
+                                current_user,
+                            )
                         )
                     )
                     .scalars()
                     .all()
                 )
             }
-            if resolved_suite_ids
+            if resolved_suite_ids and suites_visible
             else {}
         )
         for sid in resolved_suite_ids:
             suite = existing_suites.get(sid)
             if not suite or suite.project_id != campaign.project_id:
                 raise HTTPException(404, f"Suite {sid} not found")
-        # Delete existing CampaignSuite rows
-        existing_cs = (
+        visible_links = (
             (
                 await db.execute(
-                    select(CampaignSuite).where(CampaignSuite.campaign_id == campaign.id)
+                    apply_external_visibility_filter(
+                        select(CampaignSuite)
+                        .join(TestSuite, TestSuite.id == CampaignSuite.suite_id)
+                        .where(CampaignSuite.campaign_id == campaign.id),
+                        TestSuite,
+                        current_user,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+            if suites_visible
+            else []
+        )
+        for cs in visible_links:
+            await db.delete(cs)
+        kept_suite_ids = (
+            (
+                await db.execute(
+                    select(CampaignSuite.suite_id).where(
+                        CampaignSuite.campaign_id == campaign.id,
+                        CampaignSuite.id.not_in([cs.id for cs in visible_links]),
+                    )
                 )
             )
             .scalars()
             .all()
         )
-        for cs in existing_cs:
-            await db.delete(cs)
-        # Insert new CampaignSuite rows
         for sid in resolved_suite_ids:
             db.add(CampaignSuite(campaign_id=campaign.id, suite_id=sid))
-        campaign.suite_id = resolved_suite_ids[0] if resolved_suite_ids else None
+        linked = list(resolved_suite_ids) + list(kept_suite_ids)
+        campaign.suite_id = linked[0] if linked else None
     if data.bud_run_id is not None:
         campaign.bud_run_id = data.bud_run_id
     if data.bud_run_url is not None:
@@ -458,44 +512,45 @@ async def update_campaign(
 @router.delete("/{campaign_id}", status_code=204)
 async def delete_campaign(
     campaign_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
-    campaign = result.scalar_one_or_none()
-    if not campaign:
-        raise HTTPException(404, "Campaign not found")
-    await require_project_access(
+    campaign = await get_visible_row(
         db,
+        TestCampaign,
+        campaign_id,
+        CAMPAIGN_NOT_FOUND,
         current_user,
-        campaign.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("delete", "CMP"),
     )
+    await audit_artefact_deleted(db, "campaign", campaign)
     await db.delete(campaign)
 
 
-@router.post("/{campaign_id}/items", response_model=TestCampaignItemResponse, status_code=201)
+@router.post(
+    "/{campaign_id}/items",
+    response_model=TestCampaignItemResponse,
+    status_code=201,
+    responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}},
+)
 async def add_campaign_item(
     campaign_id: int,
     test_case_id: int = Query(...),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
-    campaign = result.scalar_one_or_none()
-    if not campaign:
-        raise HTTPException(404, "Campaign not found")
-    await require_project_access(
+    campaign = await get_visible_row(
         db,
+        TestCampaign,
+        campaign_id,
+        CAMPAIGN_NOT_FOUND,
         current_user,
-        campaign.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("plan", "CMP"),
     )
 
-    tc_result = await db.execute(select(TestCase).where(TestCase.id == test_case_id))
-    test_case = tc_result.scalar_one_or_none()
-    if not test_case:
-        raise HTTPException(404, "Test case not found")
+    test_case = await get_visible_row(
+        db, TestCase, test_case_id, "Test case not found", current_user, permission=("view", "TC")
+    )
     if test_case.project_id != campaign.project_id:
         raise HTTPException(404, "Test case not found")
 
@@ -516,57 +571,53 @@ async def add_campaign_item(
     db.add(item)
     await db.flush()
     await db.refresh(item)
-    return item
+    return await _campaign_item_response(item, test_case, db, current_user)
 
 
 @router.delete("/{campaign_id}/items/{item_id}", status_code=204)
 async def remove_campaign_item(
     campaign_id: int,
     item_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    campaign = (
-        await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
-    ).scalar_one_or_none()
-    if not campaign:
-        raise HTTPException(404, "Campaign not found")
-    await require_project_access(
+    await get_visible_row(
         db,
+        TestCampaign,
+        campaign_id,
+        CAMPAIGN_NOT_FOUND,
         current_user,
-        campaign.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("plan", "CMP"),
     )
-    result = await db.execute(
-        select(TestCampaignItem).where(
-            TestCampaignItem.id == item_id,
-            TestCampaignItem.campaign_id == campaign_id,
-        )
+    item = await get_row_or_404(
+        db,
+        TestCampaignItem,
+        item_id,
+        "Campaign item not found",
+        TestCampaignItem.campaign_id == campaign_id,
     )
-    item = result.scalar_one_or_none()
-    if not item:
-        raise HTTPException(404, "Campaign item not found")
     await db.delete(item)
 
 
-@router.patch("/{campaign_id}/items/{item_id}", response_model=TestCampaignItemResponse)
+@router.patch(
+    "/{campaign_id}/items/{item_id}",
+    response_model=TestCampaignItemResponse,
+    responses={404: {"description": "Not Found"}},
+)
 async def update_campaign_item(
     campaign_id: int,
     item_id: int,
     data: TestCampaignItemUpdate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    campaign = (
-        await db.execute(select(TestCampaign).where(TestCampaign.id == campaign_id))
-    ).scalar_one_or_none()
-    if not campaign:
-        raise HTTPException(404, "Campaign not found")
-    await require_project_access(
+    await get_visible_row(
         db,
+        TestCampaign,
+        campaign_id,
+        CAMPAIGN_NOT_FOUND,
         current_user,
-        campaign.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("plan", "CMP"),
     )
     item = (
         await db.execute(
@@ -588,6 +639,13 @@ async def update_campaign_item(
     tc = (
         await db.execute(select(TestCase).where(TestCase.id == item.test_case_id))
     ).scalar_one_or_none()
+    return await _campaign_item_response(item, tc, db, current_user)
+
+
+async def _campaign_item_response(
+    item: TestCampaignItem, tc: TestCase | None, db: AsyncSession, current_user: User
+) -> TestCampaignItemResponse:
+    """The campaign item as the API reports it, with its test case."""
     tc_resp = await _build_test_case_response(tc, db, current_user) if tc else None
     return TestCampaignItemResponse(
         id=item.id,
@@ -612,10 +670,11 @@ async def _build_campaign_responses_batch(
         return []
 
     campaign_ids = [c.id for c in campaigns]
+    types = await visible_types(db, current_user, campaigns[0].project_id) if current_user else None
     totals_query = (
         select(TestCampaignItem.campaign_id, func.count(TestCampaignItem.id))
         .join(TestCase, TestCase.id == TestCampaignItem.test_case_id)
-        .where(TestCampaignItem.campaign_id.in_(campaign_ids))
+        .where(TestCampaignItem.campaign_id.in_(campaign_ids), type_visible(types, "TC"))
         .group_by(TestCampaignItem.campaign_id)
     )
     if current_user is not None:
@@ -633,6 +692,7 @@ async def _build_campaign_responses_batch(
         .where(
             TestCampaignItem.campaign_id.in_(campaign_ids),
             TestCampaignItem.executed_at.is_not(None),
+            type_visible(types, "TC"),
         )
         .order_by(
             TestCampaignItem.campaign_id,
@@ -652,7 +712,7 @@ async def _build_campaign_responses_batch(
             apply_external_visibility_filter(
                 select(CampaignSuite, TestSuite)
                 .join(TestSuite, TestSuite.id == CampaignSuite.suite_id)
-                .where(CampaignSuite.campaign_id.in_(campaign_ids))
+                .where(CampaignSuite.campaign_id.in_(campaign_ids), type_visible(types, "TS"))
                 .order_by(CampaignSuite.campaign_id, CampaignSuite.id),
                 TestSuite,
                 current_user,
@@ -715,10 +775,11 @@ async def _build_campaign_responses_batch(
 async def _build_campaign_response(
     campaign: TestCampaign, db: AsyncSession, current_user: User | None = None
 ) -> TestCampaignResponse:
+    types = await visible_types(db, current_user, campaign.project_id) if current_user else None
     total_query = (
         select(func.count(TestCampaignItem.id))
         .join(TestCase, TestCase.id == TestCampaignItem.test_case_id)
-        .where(TestCampaignItem.campaign_id == campaign.id)
+        .where(TestCampaignItem.campaign_id == campaign.id, type_visible(types, "TC"))
     )
     if current_user is not None:
         total_query = apply_external_visibility_filter(total_query, TestCase, current_user)
@@ -729,6 +790,7 @@ async def _build_campaign_response(
         .where(
             TestCampaignItem.campaign_id == campaign.id,
             TestCampaignItem.executed_at.is_not(None),
+            type_visible(types, "TC"),
         )
         .order_by(TestCampaignItem.executed_at.desc(), TestCampaignItem.id.desc())
         .limit(1)
@@ -743,7 +805,7 @@ async def _build_campaign_response(
             apply_external_visibility_filter(
                 select(CampaignSuite, TestSuite)
                 .join(TestSuite, TestSuite.id == CampaignSuite.suite_id)
-                .where(CampaignSuite.campaign_id == campaign.id)
+                .where(CampaignSuite.campaign_id == campaign.id, type_visible(types, "TS"))
                 .order_by(CampaignSuite.id),
                 TestSuite,
                 current_user,
@@ -799,6 +861,7 @@ async def _build_campaign_detail(
     campaign: TestCampaign, db: AsyncSession, current_user: User | None = None
 ) -> TestCampaignDetailResponse:
     base = await _build_campaign_response(campaign, db, current_user)
+    types = await visible_types(db, current_user, campaign.project_id) if current_user else None
 
     items_result = await db.execute(
         select(TestCampaignItem).where(TestCampaignItem.campaign_id == campaign.id)
@@ -811,7 +874,7 @@ async def _build_campaign_detail(
     if tc_ids:
         tc_result = await db.execute(
             apply_external_visibility_filter(
-                select(TestCase).where(TestCase.id.in_(tc_ids)),
+                select(TestCase).where(TestCase.id.in_(tc_ids), type_visible(types, "TC")),
                 TestCase,
                 current_user,
             )
@@ -830,6 +893,7 @@ async def _build_campaign_detail(
                 ArtefactLink.target_type == "REQ",
                 ArtefactLink.source_id.in_(tc_ids),
                 ArtefactLink.role == "verifies",
+                type_visible(types, "REQ"),
             )
             .order_by(ArtefactLink.created_at.desc(), Requirement.req_id)
         )
@@ -839,9 +903,7 @@ async def _build_campaign_detail(
             )
         links_result = await db.execute(requirement_links_query)
         for link, req in links_result.all():
-            summary = RequirementSummary(
-                id=req.id, req_id=req.req_id, title=req.title, status=req.status
-            )
+            summary = requirement_summary(req)
             linked_reqs_by_tc.setdefault(link.source_id, []).append(summary)
             requirement_ids.add(req.id)
 
@@ -890,7 +952,7 @@ async def _build_campaign_detail(
                 await db.execute(
                     apply_external_visibility_filter(
                         select(Requirement)
-                        .where(Requirement.id.in_(requirement_ids))
+                        .where(Requirement.id.in_(requirement_ids), type_visible(types, "REQ"))
                         .order_by(Requirement.req_id),
                         Requirement,
                         current_user,
@@ -900,10 +962,7 @@ async def _build_campaign_detail(
             .scalars()
             .all()
         )
-        related_requirements = [
-            RequirementSummary(id=req.id, req_id=req.req_id, title=req.title, status=req.status)
-            for req in reqs
-        ]
+        related_requirements = [requirement_summary(req) for req in reqs]
 
     # Related concepts: find CPTs linked to any TC in the campaign via ArtefactLink
     tc_ids = [item.test_case_id for item in items]
@@ -924,7 +983,7 @@ async def _build_campaign_detail(
             .scalars()
             .all()
         )
-        if concept_links:
+        if concept_links and type_visible(types, "CPT"):
             concepts = (
                 (
                     await db.execute(
@@ -955,7 +1014,7 @@ async def _build_campaign_detail(
             apply_external_visibility_filter(
                 select(CampaignSuite, TestSuite)
                 .join(TestSuite, TestSuite.id == CampaignSuite.suite_id)
-                .where(CampaignSuite.campaign_id == campaign.id)
+                .where(CampaignSuite.campaign_id == campaign.id, type_visible(types, "TS"))
                 .order_by(CampaignSuite.id),
                 TestSuite,
                 current_user,
@@ -968,7 +1027,7 @@ async def _build_campaign_detail(
             select(TestSuiteItem, TestSuite)
             .join(TestSuite, TestSuite.id == TestSuiteItem.suite_id)
             .join(CampaignSuite, CampaignSuite.suite_id == TestSuite.id)
-            .where(CampaignSuite.campaign_id == campaign.id),
+            .where(CampaignSuite.campaign_id == campaign.id, type_visible(types, "TS")),
             TestSuite,
             current_user,
         )
@@ -1017,10 +1076,12 @@ async def _build_test_case_response(
     current_user: User | None = None,
 ) -> TestCaseResponse:
     linked_requirements = []
-    for _link, req in await get_verified_requirement_links_for_test_case(tc.id, db, current_user):
-        linked_requirements.append(
-            RequirementSummary(id=req.id, req_id=req.req_id, title=req.title, status=req.status)
-        )
+    types = await visible_types(db, current_user, tc.project_id) if current_user else None
+    if type_visible(types, "REQ"):
+        for _link, req in await get_verified_requirement_links_for_test_case(
+            tc.id, db, current_user
+        ):
+            linked_requirements.append(requirement_summary(req))
     return TestCaseResponse(
         id=tc.id,
         project_id=tc.project_id,

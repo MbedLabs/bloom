@@ -56,7 +56,7 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
   REQ: {
     icon: FileText,
     borderTop: 'border-t-amber-500',
-    surface: 'bg-gradient-to-br from-amber-500/10 to-card ring-1 ring-amber-500/10',
+    surface: 'bg-linear-to-br/srgb from-amber-500/10 to-card ring-1 ring-amber-500/10',
     iconChip: 'bg-amber-500/15 text-amber-800 dark:text-amber-200',
     countText: 'text-amber-800 dark:text-amber-200',
     accent: '#d97706',
@@ -64,7 +64,7 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
   SPEC: {
     icon: FileText,
     borderTop: 'border-t-indigo-600',
-    surface: 'bg-gradient-to-br from-indigo-500/10 to-card ring-1 ring-indigo-500/10',
+    surface: 'bg-linear-to-br/srgb from-indigo-500/10 to-card ring-1 ring-indigo-500/10',
     iconChip: 'bg-indigo-500/15 text-indigo-800 dark:text-indigo-200',
     countText: 'text-indigo-800 dark:text-indigo-200',
     accent: '#4f46e5',
@@ -72,7 +72,7 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
   TC: {
     icon: CheckSquare,
     borderTop: 'border-t-sky-600',
-    surface: 'bg-gradient-to-br from-sky-500/10 to-card ring-1 ring-sky-500/10',
+    surface: 'bg-linear-to-br/srgb from-sky-500/10 to-card ring-1 ring-sky-500/10',
     iconChip: 'bg-sky-500/15 text-sky-900 dark:text-sky-200',
     countText: 'text-sky-900 dark:text-sky-200',
     accent: '#0284c7',
@@ -80,7 +80,7 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
   CPT: {
     icon: Beaker,
     borderTop: 'border-t-emerald-600',
-    surface: 'bg-gradient-to-br from-emerald-500/10 to-card ring-1 ring-emerald-500/10',
+    surface: 'bg-linear-to-br/srgb from-emerald-500/10 to-card ring-1 ring-emerald-500/10',
     iconChip: 'bg-emerald-500/15 text-emerald-900 dark:text-emerald-200',
     countText: 'text-emerald-900 dark:text-emerald-200',
     accent: '#059669',
@@ -88,7 +88,7 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
   PRT: {
     icon: BookOpen,
     borderTop: 'border-t-violet-600',
-    surface: 'bg-gradient-to-br from-violet-500/10 to-card ring-1 ring-violet-500/10',
+    surface: 'bg-linear-to-br/srgb from-violet-500/10 to-card ring-1 ring-violet-500/10',
     iconChip: 'bg-violet-500/15 text-violet-900 dark:text-violet-200',
     countText: 'text-violet-900 dark:text-violet-200',
     accent: '#7c3aed',
@@ -96,7 +96,7 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
   DES: {
     icon: PenTool,
     borderTop: 'border-t-violet-600',
-    surface: 'bg-gradient-to-br from-violet-500/10 to-card ring-1 ring-violet-500/10',
+    surface: 'bg-linear-to-br/srgb from-violet-500/10 to-card ring-1 ring-violet-500/10',
     iconChip: 'bg-violet-500/15 text-violet-900 dark:text-violet-200',
     countText: 'text-violet-900 dark:text-violet-200',
     accent: '#7c3aed',
@@ -104,7 +104,7 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
   RSK: {
     icon: AlertTriangle,
     borderTop: 'border-t-red-600',
-    surface: 'bg-gradient-to-br from-red-500/10 to-card ring-1 ring-red-500/10',
+    surface: 'bg-linear-to-br/srgb from-red-500/10 to-card ring-1 ring-red-500/10',
     iconChip: 'bg-red-500/15 text-red-800 dark:text-red-200',
     countText: 'text-red-800 dark:text-red-200',
     accent: '#dc2626',
@@ -112,7 +112,7 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
   CHG: {
     icon: GitPullRequest,
     borderTop: 'border-t-purple-600',
-    surface: 'bg-gradient-to-br from-purple-500/10 to-card ring-1 ring-purple-500/10',
+    surface: 'bg-linear-to-br/srgb from-purple-500/10 to-card ring-1 ring-purple-500/10',
     iconChip: 'bg-purple-500/15 text-purple-900 dark:text-purple-200',
     countText: 'text-purple-900 dark:text-purple-200',
     accent: '#9333ea',
@@ -120,7 +120,7 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
   RPT: {
     icon: Layers,
     borderTop: 'border-t-slate-600',
-    surface: 'bg-gradient-to-br from-slate-500/10 to-card ring-1 ring-slate-500/10',
+    surface: 'bg-linear-to-br/srgb from-slate-500/10 to-card ring-1 ring-slate-500/10',
     iconChip: 'bg-slate-500/15 text-slate-800 dark:text-slate-200',
     countText: 'text-slate-800 dark:text-slate-200',
     accent: '#64748b',
@@ -128,7 +128,7 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
   STD: {
     icon: BookOpen,
     borderTop: 'border-t-orange-600',
-    surface: 'bg-gradient-to-br from-orange-500/10 to-card ring-1 ring-orange-500/10',
+    surface: 'bg-linear-to-br/srgb from-orange-500/10 to-card ring-1 ring-orange-500/10',
     iconChip: 'bg-orange-500/15 text-orange-900 dark:text-orange-200',
     countText: 'text-orange-900 dark:text-orange-200',
     accent: '#ea580c',
@@ -136,7 +136,7 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
   DEF: {
     icon: AlertTriangle,
     borderTop: 'border-t-rose-600',
-    surface: 'bg-gradient-to-br from-rose-500/10 to-card ring-1 ring-rose-500/10',
+    surface: 'bg-linear-to-br/srgb from-rose-500/10 to-card ring-1 ring-rose-500/10',
     iconChip: 'bg-rose-500/15 text-rose-900 dark:text-rose-200',
     countText: 'text-rose-900 dark:text-rose-200',
     accent: '#e11d48',
@@ -144,7 +144,7 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
   CMP: {
     icon: GitBranch,
     borderTop: 'border-t-sky-600',
-    surface: 'bg-gradient-to-br from-sky-500/10 to-card ring-1 ring-sky-500/10',
+    surface: 'bg-linear-to-br/srgb from-sky-500/10 to-card ring-1 ring-sky-500/10',
     iconChip: 'bg-sky-500/15 text-sky-900 dark:text-sky-200',
     countText: 'text-sky-900 dark:text-sky-200',
     accent: '#0284c7',
@@ -152,7 +152,7 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
   TS: {
     icon: CheckSquare,
     borderTop: 'border-t-lime-600',
-    surface: 'bg-gradient-to-br from-lime-500/10 to-card ring-1 ring-lime-500/10',
+    surface: 'bg-linear-to-br/srgb from-lime-500/10 to-card ring-1 ring-lime-500/10',
     iconChip: 'bg-lime-500/15 text-lime-900 dark:text-lime-200',
     countText: 'text-lime-900 dark:text-lime-200',
     accent: '#65a30d',
@@ -232,7 +232,7 @@ function formatCount(n: number): string {
   return n.toLocaleString()
 }
 
-function TypeNode({ data }: { data: TypeNodeData }) {
+function TypeNode({ data }: Readonly<{ data: TypeNodeData }>) {
   const style = TYPE_STYLE[data.docType]
   const Icon = style.icon
   return (
@@ -293,7 +293,7 @@ function FitViewOnLayout({ layoutToken }: { layoutToken: number }) {
   useEffect(() => {
     if (layoutToken === 0) return
     const id = requestAnimationFrame(() => {
-      fitView({ padding: 0.25, duration: 0 })
+      void fitView({ padding: 0.25, duration: 0 })
     })
     return () => cancelAnimationFrame(id)
   }, [layoutToken, fitView])
@@ -418,7 +418,7 @@ interface Props {
   prefix: string
 }
 
-export default function ProjectDocTopology({ projectId, prefix }: Props) {
+export default function ProjectDocTopology({ projectId, prefix }: Readonly<Props>) {
   const navigate = useNavigate()
   const isDark = useIsDarkMode()
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
@@ -586,7 +586,7 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
       const data = node.data as unknown as TypeNodeData
-      navigate(docRegistryListUrl(prefix, data.docType))
+      void navigate(docRegistryListUrl(prefix, data.docType))
     },
     [navigate, prefix],
   )
@@ -645,12 +645,12 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
         <Controls
           showInteractive={false}
           position="bottom-right"
-          className="!m-3 !overflow-hidden !rounded-lg !border !border-border !bg-card !shadow-sm [&>button]:!h-8 [&>button]:!w-8 [&>button]:!border-border [&>button]:!bg-card [&>button]:!fill-muted-foreground [&>button]:!text-muted-foreground hover:[&>button]:!bg-accent hover:[&>button]:!fill-foreground"
+          className="m-3! overflow-hidden! rounded-lg! border! border-border! bg-card! shadow-xs! [&>button]:h-8! [&>button]:w-8! [&>button]:border-border! [&>button]:bg-card! [&>button]:fill-muted-foreground! [&>button]:text-muted-foreground! [&>button]:hover:bg-accent! [&>button]:hover:fill-foreground!"
         />
 
         {/* Top-left header / stats */}
         <Panel position="top-left" className="m-3">
-          <div className="rounded-lg border border-border bg-card/95 backdrop-blur-sm shadow-sm px-3 py-2.5">
+          <div className="rounded-lg border border-border bg-card/95 backdrop-blur-xs shadow-xs px-3 py-2.5">
             <div className="flex items-center gap-2 text-foreground">
               <GitBranch className="h-4 w-4 text-purple-500" />
               <span className="text-sm font-semibold">Topology</span>
@@ -675,7 +675,7 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
         <Panel position="top-right" className="m-3">
           <button
             onClick={rebuild}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/95 backdrop-blur-sm px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm hover:bg-accent transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/95 backdrop-blur-xs px-2.5 py-1.5 text-xs font-medium text-foreground shadow-xs hover:bg-accent transition-colors"
             title="Reset layout"
           >
             <RotateCcw className="h-3.5 w-3.5" />
@@ -686,7 +686,7 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
         {/* Hovered edge detail */}
         {hoveredEdge && (
           <Panel position="bottom-left" className="m-3">
-            <div className="rounded-lg border border-border bg-card/95 backdrop-blur-sm shadow-md px-3 py-2 max-w-sm">
+            <div className="rounded-lg border border-border bg-card/95 backdrop-blur-xs shadow-md px-3 py-2 max-w-sm">
               <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
                 <span style={{ color: TYPE_STYLE[hoveredEdge.source].accent }}>
                   {DOC_TYPE_LABELS[hoveredEdge.source]}
@@ -719,7 +719,7 @@ export default function ProjectDocTopology({ projectId, prefix }: Props) {
         {/* Empty-links hint */}
         {edges.length === 0 && (
           <Panel position="bottom-center" className="m-3">
-            <div className="rounded-lg border border-border bg-card/95 backdrop-blur-sm shadow-sm px-3 py-2 text-xs text-muted-foreground">
+            <div className="rounded-lg border border-border bg-card/95 backdrop-blur-xs shadow-xs px-3 py-2 text-xs text-muted-foreground">
               No relationships between document types yet — link documents to see them here.
             </div>
           </Panel>

@@ -149,6 +149,25 @@ def _activity_event_types(
     return [event["event_type"] for event in activity.json()]
 
 
+def _review_document(api_client, auth_headers, artefact_type, artefact_id):
+    """Record the assigned reviewer's proof for the creator's requested revision."""
+    actor_id = _current_user_id(api_client, auth_headers)
+    base = f"/api/artefacts/{artefact_type}/{artefact_id}"
+    assigned = api_client.put(
+        base + "/workflow/assignees",
+        headers=auth_headers,
+        json={"reviewer_id": actor_id, "approver_id": actor_id},
+    )
+    assert assigned.status_code == 200, assigned.text
+    requested = api_client.post(base + "/requests", headers=auth_headers, json={"kind": "review"})
+    assert requested.status_code == 201, requested.text
+    comment = api_client.post(
+        base + "/comments", headers=auth_headers, json={"body": "Reviewed this revision"}
+    )
+    assert comment.status_code == 201, comment.text
+    return api_client.post(base + "/sign-off", headers=auth_headers, json={"step": "review"})
+
+
 def test_requirement_workflow_activity_events(
     api_client: TestClient,
     auth_headers: dict[str, str],
@@ -163,20 +182,24 @@ def test_requirement_workflow_activity_events(
     assert created.status_code == 201, created.text
     requirement_id = created.json()["id"]
 
-    reviewed = api_client.patch(
+    refused = api_client.patch(
         f"/api/requirements/{requirement_id}",
         headers=auth_headers,
         json={"reviewed_by_id": admin_id, "reviewed_at": "2026-05-12T10:00:00Z"},
     )
+    assert refused.status_code == 422, refused.text
+    reviewed = _review_document(api_client, auth_headers, "requirement", requirement_id)
     assert reviewed.status_code == 200, reviewed.text
+    assert reviewed.json()["reviewed_by_id"] == admin_id
+    assert reviewed.json()["reviewed_at"].endswith("Z")
     reviewed_events = _activity_event_types(api_client, auth_headers, "requirement", requirement_id)
     assert "reviewed" in reviewed_events
     assert reviewed_events.count("updated") == 0
 
-    approved = api_client.patch(
-        f"/api/requirements/{requirement_id}",
+    approved = api_client.post(
+        f"/api/artefacts/requirement/{requirement_id}/sign-off",
         headers=auth_headers,
-        json={"approved_by_id": admin_id, "approved_at": "2026-05-12T11:00:00Z"},
+        json={"step": "approve"},
     )
     assert approved.status_code == 200, approved.text
     approved_events = _activity_event_types(api_client, auth_headers, "requirement", requirement_id)
@@ -196,10 +219,45 @@ def test_requirement_workflow_activity_events(
         headers=auth_headers,
         json={"title": "Workflow requirement renamed", "status": "Draft"},
     )
-    assert mixed.status_code == 200, mixed.text
+    assert mixed.status_code == 409, mixed.text
+    change = api_client.post(
+        "/api/changes",
+        headers=auth_headers,
+        json={"project_id": project_id, "title": "Authorize a revised requirement"},
+    )
+    assert change.status_code == 201, change.text
+    change_id = change.json()["id"]
+    reviewed_change = _review_document(api_client, auth_headers, "change", change_id)
+    assert reviewed_change.status_code == 200, reviewed_change.text
+    approved_change = api_client.post(
+        f"/api/artefacts/change/{change_id}/sign-off",
+        headers=auth_headers,
+        json={"step": "approve"},
+    )
+    assert approved_change.status_code == 200, approved_change.text
+    linked = api_client.post(
+        "/api/links",
+        headers=auth_headers,
+        json={
+            "project_id": project_id,
+            "source_type": "CHG",
+            "source_id": change_id,
+            "target_type": "REQ",
+            "target_id": requirement_id,
+            "role": "impacts",
+        },
+    )
+    assert linked.status_code == 201, linked.text
+    edited = api_client.patch(
+        f"/api/requirements/{requirement_id}",
+        headers=auth_headers,
+        json={"title": "Workflow requirement renamed"},
+    )
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["status"] == "Draft"
     mixed_events = _activity_event_types(api_client, auth_headers, "requirement", requirement_id)
     assert "updated" in mixed_events
-    assert "status_changed" in mixed_events
+    assert "revision_started" in mixed_events
 
 
 def test_test_case_workflow_activity_events(
@@ -216,20 +274,24 @@ def test_test_case_workflow_activity_events(
     assert created.status_code == 201, created.text
     test_case_id = created.json()["id"]
 
-    reviewed = api_client.patch(
+    refused = api_client.patch(
         f"/api/test-cases/{test_case_id}",
         headers=auth_headers,
         json={"reviewed_by_id": admin_id, "reviewed_at": "2026-05-12T10:00:00Z"},
     )
+    assert refused.status_code == 422, refused.text
+    reviewed = _review_document(api_client, auth_headers, "test-case", test_case_id)
     assert reviewed.status_code == 200, reviewed.text
+    assert reviewed.json()["reviewed_by_id"] == admin_id
+    assert reviewed.json()["reviewed_at"].endswith("Z")
     reviewed_events = _activity_event_types(api_client, auth_headers, "test-case", test_case_id)
     assert "reviewed" in reviewed_events
     assert reviewed_events.count("updated") == 0
 
-    approved = api_client.patch(
-        f"/api/test-cases/{test_case_id}",
+    approved = api_client.post(
+        f"/api/artefacts/test-case/{test_case_id}/sign-off",
         headers=auth_headers,
-        json={"approved_by_id": admin_id, "approved_at": "2026-05-12T11:00:00Z"},
+        json={"step": "approve"},
     )
     assert approved.status_code == 200, approved.text
     approved_events = _activity_event_types(api_client, auth_headers, "test-case", test_case_id)
@@ -258,20 +320,16 @@ def test_document_workflow_activity_events(
     assert created.status_code == 201, created.text
     document_id = created.json()["id"]
 
-    reviewed = api_client.patch(
-        f"/api/documents/{document_id}",
-        headers=auth_headers,
-        json={"status": "Review"},
-    )
+    reviewed = _review_document(api_client, auth_headers, "document", document_id)
     assert reviewed.status_code == 200, reviewed.text
     reviewed_events = _activity_event_types(api_client, auth_headers, "document", document_id)
     assert "reviewed" in reviewed_events
     assert reviewed_events.count("updated") == 0
 
-    approved = api_client.patch(
-        f"/api/documents/{document_id}",
+    approved = api_client.post(
+        f"/api/artefacts/document/{document_id}/sign-off",
         headers=auth_headers,
-        json={"status": "Approved"},
+        json={"step": "approve"},
     )
     assert approved.status_code == 200, approved.text
     approved_events = _activity_event_types(api_client, auth_headers, "document", document_id)
@@ -291,19 +349,15 @@ def test_design_transition_logs_review_and_approval_activity(
     assert created.status_code == 201, created.text
     design_id = created.json()["id"]
 
-    review = api_client.post(
-        f"/api/artefacts/design/{design_id}/transition",
-        headers=auth_headers,
-        json={"status": "Review"},
-    )
+    review = _review_document(api_client, auth_headers, "design", design_id)
     assert review.status_code == 200, review.text
     review_events = _activity_event_types(api_client, auth_headers, "design", design_id)
     assert "reviewed" in review_events
 
     approved = api_client.post(
-        f"/api/artefacts/design/{design_id}/transition",
+        f"/api/artefacts/design/{design_id}/sign-off",
         headers=auth_headers,
-        json={"status": "Approved"},
+        json={"step": "approve"},
     )
     assert approved.status_code == 200, approved.text
     approved_events = _activity_event_types(api_client, auth_headers, "design", design_id)

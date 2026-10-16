@@ -1,5 +1,5 @@
 import { lazy } from 'react'
-import { Routes, Route, Link } from 'react-router'
+import { Routes, Route, Link, Navigate } from 'react-router'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
@@ -38,12 +38,14 @@ const TestCampaigns = lazy(() => import('./pages/TestCampaigns'))
 const TraceabilityMatrix = lazy(() => import('./pages/TraceabilityMatrix'))
 const UnifiedDocDetail = lazy(() => import('./pages/UnifiedDocDetail'))
 const Users = lazy(() => import('./pages/Users'))
+const Groups = lazy(() => import('./pages/Groups'))
+const Audit = lazy(() => import('./pages/Audit'))
 /* v8 ignore stop */
 
 function NotFound() {
   return (
     <div className="flex flex-col items-center justify-center h-64 animate-fade-in">
-      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/10 to-violet-500/10 flex items-center justify-center mb-5">
+      <div className="w-20 h-20 rounded-2xl bg-linear-to-br/srgb from-primary/10 to-violet-500/10 flex items-center justify-center mb-5">
         <span className="text-3xl font-bold text-primary/40">404</span>
       </div>
       <h2 className="text-xl font-bold text-foreground mb-2">Page Not Found</h2>
@@ -88,6 +90,9 @@ function App() {
         <Route path="reports" element={<Reports />} />
         <Route path="baselines" element={<Baselines />} />
         <Route path="users" element={<Users />} />
+        <Route path="access" element={<Groups />} />
+        <Route path="groups" element={<Navigate to="/access" replace />} />
+        <Route path="audit" element={<Audit />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<NotFound />} />
       </Route>

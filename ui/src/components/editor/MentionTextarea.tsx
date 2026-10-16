@@ -68,7 +68,7 @@ export default function MentionTextarea({
   onKeyDown,
   onBlur,
   ...textareaProps
-}: MentionTextareaProps) {
+}: Readonly<MentionTextareaProps>) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const listRef = useRef<MentionListRef>(null)
   const [trigger, setTrigger] = useState<ActiveTrigger | null>(null)
@@ -163,7 +163,7 @@ export default function MentionTextarea({
       />
       {trigger && anchor && (
         <div
-          className="mention-suggestion-popover fixed z-[120]"
+          className="mention-suggestion-popover fixed z-120"
           style={{ left: anchor.left, top: anchor.top }}
         >
           <MentionList

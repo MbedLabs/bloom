@@ -28,6 +28,7 @@ async def notify(
     try:
         notification = Notification(
             user_id=user_id,
+            actor_user_id=actor.id if actor else None,
             project_id=project_id,
             event_type=event_type,
             title=title[:500],

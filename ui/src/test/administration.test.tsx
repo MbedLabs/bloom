@@ -1,3 +1,5 @@
+import { changeControl } from './change-control'
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
  * The administrator's screens: people, projects, and project parameters.
@@ -9,7 +11,7 @@
  * where the page must *not* call the server: a role it may not change, a
  * prefix it may not save, a deletion the user backed out of.
  */
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -89,7 +91,7 @@ const awaitingMailbox = {
 }
 
 function renderAt(routePath: string, url: string, element: React.ReactElement) {
-  const queryClient = new QueryClient({
+  const queryClient = createQueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   })
   return render(
@@ -163,8 +165,27 @@ describe('the user table', () => {
 
     expect(within(rowFor(admin.full_name)).getByText('Admin')).toBeTruthy()
     expect(within(rowFor(maintainer.full_name)).getByText('Maintainer')).toBeTruthy()
-    // The stored value stays 'external'; the label shown to users is Reviewer.
-    expect(within(rowFor(external.full_name)).getByText('Reviewer')).toBeTruthy()
+    expect(within(rowFor(external.full_name)).getByText('Viewer')).toBeTruthy()
+  })
+
+  it('assigns app policies without changing the account role or project group', async () => {
+    vi.mocked(client.policiesApi.list).mockResolvedValue([
+      { id: 80, name: 'Access Management', scope: 'app', rules: { access: { read: true, write: true, delete: true, all_origins: true, visibility: [], tags: [] } } },
+      { id: 81, name: 'Requirements', scope: 'document', rules: { REQ: { read: true, write: true, all_origins: true, visibility: [], tags: [] } } },
+    ] as never)
+    vi.mocked(client.usersApi.applicationPolicies).mockResolvedValue({ policy_ids: [] })
+    renderAt('/users', '/users', <Users />)
+    await screen.findByText(maintainer.full_name)
+    fireEvent.click(within(rowFor(maintainer.full_name)).getByTitle('Application policies'))
+    const choice = await screen.findByLabelText('App policy Access Management')
+    expect(screen.queryByLabelText('App policy Requirements')).toBeNull()
+    fireEvent.click(choice)
+    fireEvent.click(screen.getByRole('button', { name: 'Save application policies' }))
+    await waitFor(() => expect(client.usersApi.setApplicationPolicies).toHaveBeenCalledWith(maintainer.id, [80]))
+    expect(client.usersApi.update).not.toHaveBeenCalled()
+    expect(client.projectMembersApi.update).not.toHaveBeenCalled()
+    expect(client.usersApi.invite).not.toHaveBeenCalled()
+    expect(within(rowFor(maintainer.full_name)).getByText('Maintainer')).toBeTruthy()
   })
 
   it('distinguishes an email change waiting on an admin from one waiting on a mailbox', async () => {
@@ -239,7 +260,7 @@ describe('changing what a user may do', () => {
     await screen.findByText(maintainer.full_name)
 
     fireEvent.click(within(rowFor(maintainer.full_name)).getByTitle('Edit role'))
-    fireEvent.change(await screen.findByTitle('Select role'), { target: { value: 'external' } })
+    changeControl(await screen.findByTitle('Select role'), { target: { value: 'external' } })
 
     await waitFor(() =>
       expect(lastCall(client.usersApi.update)).toEqual([maintainer.id, { role: 'external' }]),
@@ -268,6 +289,39 @@ describe('changing what a user may do', () => {
     expect(row.queryByTitle('Edit role')).toBeNull()
     // The other destructive actions are still offered - only the role is fixed.
     expect(row.getByTitle('Delete user')).toBeTruthy()
+  })
+
+  it('hides application policies for admin users', async () => {
+    renderAt('/users', '/users', <Users />)
+    await screen.findByText(otherAdmin.full_name)
+
+    const adminRow = within(rowFor(otherAdmin.full_name))
+    expect(adminRow.queryByTitle('Application policies')).toBeNull()
+
+    const maintainerRow = within(rowFor(maintainer.full_name))
+    expect(maintainerRow.getByTitle('Application policies')).toBeTruthy()
+  })
+
+  it('allows only the initial admin to promote a user to admin', async () => {
+    currentUser = { ...user, is_initial_admin: true }
+    renderAt('/users', '/users', <Users />)
+    await screen.findByText(maintainer.full_name)
+
+    fireEvent.click(within(rowFor(maintainer.full_name)).getByTitle('Edit role'))
+    const select = (await screen.findByTitle('Select role')) as HTMLSelectElement
+    fireEvent.click(select)
+    expect(screen.getByRole('option', { name: 'Admin' })).toBeTruthy()
+
+    cleanup()
+    currentUser = { ...user, is_initial_admin: false }
+    renderAt('/users', '/users', <Users />)
+    await screen.findByText(maintainer.full_name)
+
+    fireEvent.click(within(rowFor(maintainer.full_name)).getByTitle('Edit role'))
+    const nonAdminSelect = (await screen.findByTitle('Select role')) as HTMLSelectElement
+    fireEvent.click(nonAdminSelect)
+    expect(screen.queryByRole('option', { name: 'Admin' })).toBeNull()
+    currentUser = admin
   })
 
   it('closes the role editor when the button is pressed again', async () => {
@@ -434,7 +488,7 @@ describe('the invitation link', () => {
     fireEvent.change(screen.getByTitle('Email address'), {
       target: { value: 'grace@example.com' },
     })
-    fireEvent.change(screen.getByTitle('Role'), { target: { value: 'maintainer' } })
+    changeControl(screen.getByTitle('Role'), { target: { value: 'maintainer' } })
     fireEvent.click(screen.getByRole('button', { name: /send invite/i }))
   }
 
@@ -575,6 +629,18 @@ describe('the project list', () => {
     expect(await screen.findByText('project settings')).toBeTruthy()
   })
 
+  it('lets an Access Manager choose people on a project without document admission', async () => {
+    currentUser = { ...user, role: 'maintainer', application_permissions: { access: ['view', 'edit'] } }
+    vi.mocked(client.projectsApi.list).mockResolvedValue([])
+    vi.mocked(client.groupsApi.assignmentOptions).mockResolvedValue({ projects: [project], users: [] })
+    renderProjects()
+    expect(await screen.findByText(project.name)).toBeTruthy()
+    expect(screen.queryByText(/coverage/i)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Select members' }))
+    expect(await screen.findByText('project settings')).toBeTruthy()
+    expect(client.projectsApi.get).not.toHaveBeenCalled()
+  })
+
   it('does not offer settings to a maintainer', async () => {
     currentUser = { ...user, role: 'maintainer' }
     renderProjects()
@@ -696,6 +762,39 @@ describe('project parameters', () => {
     )
   }
 
+  /** Open the actions menu of the only parameter row. */
+  function openRowMenu() {
+    fireEvent.click(screen.getByTitle('Row actions'))
+  }
+
+  it('shows one actions menu per row with Edit and Delete for someone who may delete', async () => {
+    renderParameters()
+    await screen.findAllByText(projectVariable.key)
+
+    expect(screen.getAllByTitle('Row actions')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: /^edit$/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^delete$/i })).toBeNull()
+
+    openRowMenu()
+
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^delete$/i })).toBeTruthy()
+  })
+
+  it('lists only Edit to someone who may edit parameters but not delete them', async () => {
+    vi.mocked(client.projectMembersApi.permissions).mockResolvedValue({ parameter: ['edit'] } as never)
+    currentUser = { ...user, role: 'maintainer' }
+    renderParameters()
+    await screen.findAllByText(projectVariable.key)
+    await waitFor(() => expect(client.projectMembersApi.permissions).toHaveBeenCalled())
+    await settle()
+
+    openRowMenu()
+
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^delete$/i })).toBeNull()
+  })
+
   it('shows an unknown project as missing instead of an empty table', async () => {
     vi.mocked(client.projectsApi.getByPrefix).mockRejectedValueOnce(apiError('Not found'))
     renderParameters('ZZZ')
@@ -797,6 +896,7 @@ describe('project parameters', () => {
     renderParameters()
     await screen.findAllByText(projectVariable.key)
 
+    openRowMenu()
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
 
     const key = (await screen.findByPlaceholderText('Enter a key')) as HTMLInputElement
@@ -809,6 +909,7 @@ describe('project parameters', () => {
     renderParameters()
     await screen.findAllByText(projectVariable.key)
 
+    openRowMenu()
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
     fireEvent.change(await screen.findByPlaceholderText('Enter a value'), {
       target: { value: '3000' },
@@ -832,6 +933,7 @@ describe('project parameters', () => {
     renderParameters()
     await screen.findAllByText(projectVariable.key)
 
+    openRowMenu()
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
     fireEvent.change(await screen.findByPlaceholderText('Enter a key'), { target: { value: '   ' } })
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
@@ -844,6 +946,7 @@ describe('project parameters', () => {
     renderParameters()
     await screen.findAllByText(projectVariable.key)
 
+    openRowMenu()
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
     fireEvent.change(await screen.findByPlaceholderText('Enter a value'), {
       target: { value: '3000' },
@@ -859,6 +962,7 @@ describe('project parameters', () => {
     renderParameters()
     await screen.findAllByText(projectVariable.key)
 
+    openRowMenu()
     fireEvent.click(screen.getByRole('button', { name: /delete/i }))
 
     await waitFor(() =>

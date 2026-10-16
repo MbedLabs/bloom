@@ -1,3 +1,5 @@
+import { changeControl } from './change-control'
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
  * Project settings: renaming, re-prefixing, per-member access, and deletion.
@@ -10,7 +12,7 @@
  * single click. Both were largely uncovered, as was the member editor that
  * decides which document types an external user may see at all.
  */
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -40,8 +42,13 @@ vi.mock('../components/IntegrationSettingsPanel', () => ({
   default: () => <div data-testid="tracker-panel" />,
 }))
 
+vi.mock('../components/ProjectDocTopology', () => ({
+  default: () => <div data-testid="project-topology" />,
+}))
+
 const client = await import('../api/client')
 const ProjectEdit = (await import('../pages/ProjectEdit')).default
+const ProjectDetail = (await import('../pages/ProjectDetail')).default
 
 const otherProject = { ...project, id: 2, name: 'Battery Management', prefix: 'BMS' }
 /** A maintainer and an external, neither of them already a member. */
@@ -59,17 +66,25 @@ const addableExternal = {
   email: 'vic@supplier.example',
   role: 'external' as const,
 }
+const addableAdmin = {
+  ...user,
+  id: 7,
+  full_name: 'Charles Babbage',
+  email: 'charles@example.com',
+  role: 'admin' as const,
+}
 
-function renderEdit(prefix = 'VCU') {
-  const queryClient = new QueryClient({
+function renderEdit(prefix = 'VCU', overview = false) {
+  const queryClient = createQueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   })
   return render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <MemoryRouter initialEntries={[`/projects/${prefix}/edit`]}>
+        <MemoryRouter initialEntries={[`/projects/${prefix}${overview ? '' : '/edit'}`]}>
           <Routes>
             <Route path="/projects/:prefix/edit" element={<ProjectEdit />} />
+            <Route path="/projects/:prefix" element={<ProjectDetail />} />
             <Route path="/projects" element={<div>project list</div>} />
           </Routes>
         </MemoryRouter>
@@ -107,9 +122,113 @@ beforeEach(() => {
     addableMaintainer,
     addableExternal,
   ] as never)
+  vi.mocked(client.groupsApi.assignmentOptions).mockResolvedValue({ projects: [project, otherProject], users: [user, addableAdmin, addableMaintainer, addableExternal] })
 })
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  ;(user as { role: string }).role = 'admin'
+  delete (user as { application_permissions?: Record<string, string[]> }).application_permissions
+})
+
+describe('project ownership capabilities', () => {
+  it('lets an Owner save metadata without administrative catalogues or controls', async () => {
+    ;(user as { role: string }).role = 'maintainer'
+    vi.mocked(client.projectsApi.capabilities).mockResolvedValue({
+      can_edit: true, can_delete: false, can_manage_access: false,
+    })
+    renderEdit()
+    fireEvent.change(await screen.findByTitle('Project name'), { target: { value: 'Updated project' } })
+    fireEvent.click(saveButton())
+    await waitFor(() => expect(client.projectsApi.update).toHaveBeenCalledWith(project.id, expect.objectContaining({ name: 'Updated project' })))
+    expect(client.usersApi.list).not.toHaveBeenCalled()
+    expect(client.policiesApi.list).not.toHaveBeenCalled()
+    expect(client.tagsApi.list).not.toHaveBeenCalled()
+    expect(client.projectsApi.list).not.toHaveBeenCalled()
+    expect(client.projectMembersApi.list).not.toHaveBeenCalled()
+    expect(client.projectMembersApi.access).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: /delete project/i })).toBeNull()
+    expect(screen.queryByText('Project members')).toBeNull()
+    expect(screen.queryByText('Access requests')).toBeNull()
+  })
+
+  it('keeps the metadata form unavailable without ownership', async () => {
+    ;(user as { role: string }).role = 'maintainer'
+    vi.mocked(client.projectsApi.capabilities).mockResolvedValue({
+      can_edit: false, can_delete: false, can_manage_access: false,
+    })
+    renderEdit()
+    expect(await screen.findByText(/Project Owner access is required/)).toBeTruthy()
+    expect(screen.queryByTitle('Project name')).toBeNull()
+  })
+
+  it('keeps the metadata form unavailable after a failed capability read', async () => {
+    ;(user as { role: string }).role = 'maintainer'
+    vi.mocked(client.projectsApi.capabilities).mockRejectedValue(apiError('Forbidden'))
+    renderEdit()
+    expect(await screen.findByText(/Project Owner access is required/)).toBeTruthy()
+    expect(screen.queryByTitle('Project name')).toBeNull()
+  })
+
+  it('does not expose a metadata form while the capability read is pending', async () => {
+    ;(user as { role: string }).role = 'maintainer'
+    vi.mocked(client.projectsApi.capabilities).mockReturnValue(new Promise(() => {}))
+    renderEdit()
+    await waitFor(() => expect(client.projectsApi.capabilities).toHaveBeenCalledWith(project.id))
+    expect(screen.queryByTitle('Project name')).toBeNull()
+  })
+
+  it('shows the Owner edit link on the project overview', async () => {
+    ;(user as { role: string }).role = 'maintainer'
+    vi.mocked(client.projectsApi.capabilities).mockResolvedValue({
+      can_edit: true, can_delete: false, can_manage_access: false,
+    })
+    renderEdit('VCU', true)
+    expect(await screen.findByRole('link', { name: 'Edit project' })).toBeTruthy()
+  })
+
+  it('hides the overview edit link when ownership is absent', async () => {
+    ;(user as { role: string }).role = 'maintainer'
+    vi.mocked(client.projectsApi.capabilities).mockResolvedValue({
+      can_edit: false, can_delete: false, can_manage_access: false,
+    })
+    renderEdit('VCU', true)
+    await waitFor(() => expect(client.projectsApi.capabilities).toHaveBeenCalledWith(project.id))
+    await settle()
+    expect(screen.queryByRole('link', { name: 'Edit project' })).toBeNull()
+  })
+})
+
+describe('pending document requests on the project', () => {
+  it('shows the server-filtered review and approval requests with document links', async () => {
+    vi.mocked(client.workflowApi.listProjectRequests).mockResolvedValue([
+      { id: 71, kind: 'review', status: 'pending', created_at: '2026-10-11T10:00:00Z',
+        artefact_type: 'document', artefact_id: 11, doc_type: 'SPEC', public_id: 'VCU-SPEC-001', revision_number: 2 },
+      { id: 72, kind: 'approval', status: 'pending', created_at: '2026-10-11T11:00:00Z',
+        artefact_type: 'test-suite', artefact_id: 12, doc_type: 'TS', public_id: 'VCU-TS-001', revision_number: 1 },
+    ])
+    renderEdit('VCU', true)
+    expect((await screen.findByRole('link', { name: 'VCU-SPEC-001' })).getAttribute('href')).toBe('/projects/VCU/docs/specifications/VCU-SPEC-001')
+    expect(screen.getByRole('link', { name: 'VCU-TS-001' }).getAttribute('href')).toBe('/projects/VCU/docs/test-suites/VCU-TS-001')
+    expect(screen.getByText('Review')).toBeTruthy()
+    expect(screen.getByText('Approval')).toBeTruthy()
+    expect(screen.getByText('Revision 2')).toBeTruthy()
+    expect(client.workflowApi.listProjectRequests).toHaveBeenCalledWith(project.id)
+    expect(screen.queryByRole('button', { name: /accept review/i })).toBeNull()
+  })
+
+  it('shows an explicit empty state for no pending requests', async () => {
+    renderEdit('VCU', true)
+    expect(await screen.findByText('No pending document requests.')).toBeTruthy()
+  })
+
+  it('shows a read failure instead of claiming there are no pending requests', async () => {
+    vi.mocked(client.workflowApi.listProjectRequests).mockRejectedValue(apiError('Unavailable'))
+    renderEdit('VCU', true)
+    expect(await screen.findByText('Could not load document requests.')).toBeTruthy()
+    expect(screen.queryByText('No pending document requests.')).toBeNull()
+  })
+})
 
 describe('changing a project’s prefix', () => {
   it('upper-cases it and caps it at three characters', async () => {
@@ -172,7 +291,7 @@ describe('editing the project details', () => {
     renderEdit()
     await screen.findByTitle('Project name')
 
-    fireEvent.change(screen.getByTitle('Project status'), { target: { value: 'Archived' } })
+    changeControl(screen.getByTitle('Project status'), { target: { value: 'Archived' } })
     fireEvent.change(screen.getByTitle('Project description'), {
       target: { value: 'Retired after the B-sample' },
     })
@@ -207,11 +326,9 @@ describe('deleting a project', () => {
     await screen.findByTitle('Project name')
     const buttons = screen.getAllByRole('button', { name: /delete project/i })
     fireEvent.click(buttons[0])
-    // Two buttons read "Delete project": the one that opens the dialog and the
-    // one inside it.
-    const all = await screen.findAllByRole('button', { name: /delete project/i })
+    const dialog = await screen.findByRole('dialog', { name: 'Delete project' })
     return {
-      confirm: all[all.length - 1] as HTMLButtonElement,
+      confirm: within(dialog).getByRole('button', { name: 'Delete project' }) as HTMLButtonElement,
       field: screen.getByPlaceholderText(`Delete ${project.prefix}`),
     }
   }
@@ -288,134 +405,294 @@ describe('deleting a project', () => {
   })
 })
 
-describe('project members', () => {
-  beforeEach(() => {
-    vi.mocked(client.projectMembersApi.list).mockResolvedValue([projectMember] as never)
+describe('project policy group rosters', () => {
+  it('shows four default sections on every project, including empty rosters', async () => {
+    vi.mocked(client.projectMembersApi.list).mockResolvedValue([])
+    renderEdit()
+    for (const name of ['Administrators', 'Developers', 'Product Owners', 'Testers']) {
+      expect(await screen.findByRole('region', { name })).toBeTruthy()
+    }
+    expect(screen.queryByRole('region', { name: 'Customers' })).toBeNull()
+    expect(screen.queryByTitle('Select user to add')).toBeNull()
+    expect(client.groupsApi.assign).not.toHaveBeenCalled()
+    expect(client.projectMembersApi.create).not.toHaveBeenCalled()
+    expect(client.usersApi.list).not.toHaveBeenCalled()
   })
 
-  it('offers only users who are not already members, and never an admin', async () => {
+  it('assigns multiple selected people including an account admin on this project', async () => {
     renderEdit()
-    await screen.findByText(projectMember.full_name)
-
-    const picker = screen.getByTitle('Select user to add') as HTMLSelectElement
-    const offered = Array.from(picker.options).map((option) => option.textContent)
-    // An admin already reaches every project, and the external is a member.
-    expect(offered).toEqual([
-      'Select a user',
-      `${addableMaintainer.full_name} (${addableMaintainer.email})`,
-      `${addableExternal.full_name} (${addableExternal.email})`,
-    ])
+    const roster = within(await screen.findByRole('region', { name: 'Administrators' }))
+    fireEvent.click(roster.getByRole('button', { name: 'Select members' }))
+    fireEvent.click(roster.getByRole('checkbox', { name: `Select ${user.full_name}` }))
+    fireEvent.click(roster.getByRole('checkbox', { name: `Select ${addableAdmin.full_name}` }))
+    fireEvent.click(roster.getByRole('button', { name: 'Save selection' }))
+    await waitFor(() => expect(client.groupsApi.assign).toHaveBeenCalledWith(12, project.id, [user.id, addableAdmin.id].sort((a, b) => a - b)))
+    expect(client.groupsApi.addMembers).not.toHaveBeenCalled()
   })
 
-  it('adds an external member with the document types that were ticked', async () => {
-    renderEdit()
-    await screen.findByText(projectMember.full_name)
-
-    fireEvent.change(screen.getByTitle('Select user to add'), {
-      target: { value: String(addableExternal.id) },
-    })
-    // The form starts with four types ticked; drop one.
-    const addForm = screen.getByTitle('Project role').closest('form') as HTMLElement
-    fireEvent.click(within(addForm).getByLabelText('CMP'))
-    fireEvent.click(screen.getByRole('button', { name: /add member/i }))
-
-    await waitFor(() =>
-      expect(lastCall(client.projectMembersApi.create)).toEqual([
-        project.id,
-        { user_id: addableExternal.id, role: 'external', doc_types: ['REQ', 'TC', 'CPT'] },
-      ]),
-    )
+  it('uses the same Administrators bundle on a different project', async () => {
+    vi.mocked(client.projectsApi.getByPrefix).mockResolvedValue(otherProject as never)
+    renderEdit('BMS')
+    const roster = within(await screen.findByRole('region', { name: 'Administrators' }))
+    fireEvent.click(roster.getByRole('button', { name: 'Select members' }))
+    fireEvent.click(roster.getByRole('checkbox', { name: `Select ${addableAdmin.full_name}` }))
+    fireEvent.click(roster.getByRole('button', { name: 'Save selection' }))
+    await waitFor(() => expect(client.groupsApi.assign).toHaveBeenCalledWith(12, otherProject.id, [addableAdmin.id]))
   })
 
-  it('sends no document types for a maintainer, who sees everything', async () => {
+  it('assigns a Maintainer to the Administrators roster for this project', async () => {
     renderEdit()
-    await screen.findByText(projectMember.full_name)
+    const roster = within(await screen.findByRole('region', { name: 'Administrators' }))
+    fireEvent.click(roster.getByRole('button', { name: 'Select members' }))
+    fireEvent.click(roster.getByRole('checkbox', { name: `Select ${addableMaintainer.full_name}` }))
+    fireEvent.click(roster.getByRole('button', { name: 'Save selection' }))
 
-    fireEvent.change(screen.getByTitle('Select user to add'), {
-      target: { value: String(addableMaintainer.id) },
-    })
-    fireEvent.change(screen.getByTitle('Project role'), { target: { value: 'maintainer' } })
-    fireEvent.click(screen.getByRole('button', { name: /add member/i }))
-
-    await waitFor(() =>
-      expect(lastCall(client.projectMembersApi.create)[1]).toEqual({
-        user_id: addableMaintainer.id,
-        role: 'maintainer',
-        doc_types: undefined,
-      }),
-    )
+    await waitFor(() => expect(client.groupsApi.assign).toHaveBeenCalledWith(12, project.id, [addableMaintainer.id]))
+    expect(client.groupsApi.addMembers).not.toHaveBeenCalled()
+    expect(client.usersApi.update).not.toHaveBeenCalled()
   })
 
-  it('reports why a member could not be added', async () => {
-    vi.mocked(client.projectMembersApi.create).mockRejectedValueOnce(
-      apiError('That user is already a member of this project'),
-    )
+  it('keeps legacy entries until an explicit roster assignment replaces them', async () => {
+    vi.mocked(client.projectMembersApi.list).mockResolvedValue([{ ...projectMember, owner: true, inherit_policies: false, policy_ids: [] }])
     renderEdit()
-    await screen.findByText(projectMember.full_name)
-
-    fireEvent.change(screen.getByTitle('Select user to add'), {
-      target: { value: String(addableExternal.id) },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /add member/i }))
-
-    expect((await screen.findAllByText(/already a member/i)).length).toBeGreaterThan(0)
+    expect(await screen.findByText('Owner')).toBeTruthy()
+    expect(screen.queryByLabelText(`Policy group for ${projectMember.full_name}`)).toBeNull()
+    expect(client.groupsApi.assign).not.toHaveBeenCalled()
+    expect(client.projectMembersApi.update).not.toHaveBeenCalled()
+    expect(client.projectMembersApi.remove).not.toHaveBeenCalled()
   })
 
-  it('saves a change to an existing member’s visibility', async () => {
+  it('adds Customers as an optional section without saving an assignment', async () => {
     renderEdit()
-    await screen.findByText(projectMember.full_name)
-
-    const row = screen
-      .getByTitle(`Project role for ${projectMember.full_name}`)
-      .closest('div.rounded-lg') as HTMLElement
-    fireEvent.click(within(row).getByLabelText('TC'))
-    fireEvent.click(within(row).getByRole('button', { name: /save member settings/i }))
-
-    // The fixture member can see REQ only; ticking TC adds it.
-    await waitFor(() =>
-      expect(lastCall(client.projectMembersApi.update)).toEqual([
-        project.id,
-        projectMember.id,
-        { role: 'external', doc_types: ['REQ', 'TC'] },
-      ]),
-    )
+    await screen.findByRole('region', { name: 'Administrators' })
+    changeControl(screen.getByLabelText('Additional policy group'), { target: { value: '11' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add group' }))
+    expect(await screen.findByRole('region', { name: 'Customers' })).toBeTruthy()
+    expect(client.groupsApi.assign).not.toHaveBeenCalled()
   })
 
-  it('clears the document types when a member is promoted to maintainer', async () => {
+  it('shows persisted people under their project group', async () => {
+    vi.mocked(client.projectMembersApi.list).mockResolvedValue([{ ...projectMember, inherit_policies: false, policy_group_id: 10, policy_group_name: 'Developers' }])
     renderEdit()
-    await screen.findByText(projectMember.full_name)
-
-    const roleField = screen.getByTitle(`Project role for ${projectMember.full_name}`)
-    fireEvent.change(roleField, { target: { value: 'maintainer' } })
-
-    const row = roleField.closest('div.rounded-lg') as HTMLElement
-    expect(within(row).getByText(/maintainers can access the full project surface/i)).toBeTruthy()
-    fireEvent.click(within(row).getByRole('button', { name: /save member settings/i }))
-
-    // Leaving the old types behind would keep a stale restriction on record.
-    await waitFor(() =>
-      expect(lastCall(client.projectMembersApi.update)[2]).toEqual({
-        role: 'maintainer',
-        doc_types: [],
-      }),
-    )
+    const roster = within(await screen.findByRole('region', { name: 'Developers' }))
+    expect(roster.getByText(projectMember.full_name)).toBeTruthy()
+    fireEvent.click(roster.getByRole('button', { name: `Project member actions for ${projectMember.full_name}` }))
+    expect(client.projectMembersApi.remove).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
+    await waitFor(() => expect(client.projectMembersApi.remove).toHaveBeenCalledWith(project.id, projectMember.id))
+    expect(client.usersApi.delete).not.toHaveBeenCalled()
   })
 
-  it('removes a member', async () => {
+  it('removes an individual project assignment without deleting the account', async () => {
+    vi.mocked(client.projectMembersApi.list).mockResolvedValue([{ ...projectMember, owner: true, inherit_policies: false, policy_ids: [] }])
     renderEdit()
-    await screen.findByText(projectMember.full_name)
-
-    fireEvent.click(screen.getByRole('button', { name: /^remove$/i }))
-
-    await waitFor(() =>
-      expect(lastCall(client.projectMembersApi.remove)).toEqual([project.id, projectMember.id]),
-    )
+    fireEvent.click(await screen.findByRole('button', { name: `Project member actions for ${projectMember.full_name}` }))
+    expect(client.projectMembersApi.remove).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
+    await waitFor(() => expect(client.projectMembersApi.remove).toHaveBeenCalledWith(project.id, projectMember.id))
+    expect(client.usersApi.delete).not.toHaveBeenCalled()
   })
 
-  it('says plainly when a project has no explicit members', async () => {
-    vi.mocked(client.projectMembersApi.list).mockResolvedValue([] as never)
+  it('hides member actions without removal authority', async () => {
+    ;(user as { role: string }).role = 'maintainer'
+    ;(user as { application_permissions?: Record<string, string[]> }).application_permissions = { access: ['view', 'edit'] }
+    vi.mocked(client.projectMembersApi.list).mockResolvedValue([{ ...projectMember, inherit_policies: false, policy_group_id: 10, policy_group_name: 'Developers' }])
     renderEdit()
+    const roster = within(await screen.findByRole('region', { name: 'Developers' }))
+    expect(roster.getByText(projectMember.full_name)).toBeTruthy()
+    expect(roster.queryByRole('button', { name: `Project member actions for ${projectMember.full_name}` })).toBeNull()
+    expect(client.projectMembersApi.remove).not.toHaveBeenCalled()
+  })
 
-    expect(await screen.findByText(/no explicit project members yet/i)).toBeTruthy()
+  it('disables member actions while removal is pending', async () => {
+    let finish = () => {}
+    vi.mocked(client.projectMembersApi.remove).mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve }))
+    vi.mocked(client.projectMembersApi.list).mockResolvedValue([{ ...projectMember, inherit_policies: false, policy_group_id: 10, policy_group_name: 'Developers' }])
+    renderEdit()
+    const trigger = await screen.findByRole('button', { name: `Project member actions for ${projectMember.full_name}` }) as HTMLButtonElement
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
+    await waitFor(() => expect(trigger.disabled).toBe(true))
+    fireEvent.click(trigger)
+    expect(client.projectMembersApi.remove).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('menu')).toBeNull()
+    finish()
+    await waitFor(() => expect(trigger.disabled).toBe(false))
+  })
+
+  it('includes assigned people once in the checklist with their boxes checked', async () => {
+    vi.mocked(client.groupsApi.assignmentOptions).mockResolvedValue({ projects: [project], users: [user, addableMaintainer, { ...projectMember, id: projectMember.user_id, role: 'external' }] })
+    vi.mocked(client.projectMembersApi.list).mockResolvedValue([{ ...projectMember, inherit_policies: false, policy_group_id: 10, policy_group_name: 'Developers' }])
+    renderEdit()
+    const roster = within(await screen.findByRole('region', { name: 'Developers' }))
+    fireEvent.click(roster.getByRole('button', { name: 'Select members' }))
+    expect((roster.getByRole('checkbox', { name: `Select ${projectMember.full_name}` }) as HTMLInputElement).checked).toBe(true)
+    expect(roster.getAllByText(projectMember.full_name)).toHaveLength(1)
+    expect((roster.getByRole('checkbox', { name: `Select ${addableMaintainer.full_name}` }) as HTMLInputElement).checked).toBe(false)
+    expect(roster.queryByRole('button', { name: `Project member actions for ${projectMember.full_name}` })).toBeNull()
+    expect((roster.getByRole('button', { name: 'Save selection' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(client.groupsApi.assign).not.toHaveBeenCalled()
+    expect(client.projectMembersApi.remove).not.toHaveBeenCalled()
+  })
+
+  it('saves only new people while retaining the existing project assignments', async () => {
+    vi.mocked(client.projectMembersApi.list).mockResolvedValue([{ ...projectMember, inherit_policies: false, policy_group_id: 10, policy_group_name: 'Developers' }])
+    renderEdit()
+    const roster = within(await screen.findByRole('region', { name: 'Developers' }))
+    fireEvent.click(roster.getByRole('button', { name: 'Select members' }))
+    fireEvent.click(roster.getByRole('checkbox', { name: `Select ${addableMaintainer.full_name}` }))
+    fireEvent.click(roster.getByRole('button', { name: 'Save selection' }))
+    await waitFor(() => expect(client.groupsApi.assign).toHaveBeenCalledWith(10, project.id, [addableMaintainer.id]))
+    expect(client.projectMembersApi.remove).not.toHaveBeenCalled()
+    expect(client.usersApi.update).not.toHaveBeenCalled()
+  })
+
+  it('unchecks an assigned person without removing them until Save', async () => {
+    const retained = { ...projectMember, id: 92, user_id: addableMaintainer.id, full_name: addableMaintainer.full_name, email: addableMaintainer.email, inherit_policies: false, policy_group_id: 10, policy_group_name: 'Developers' }
+    vi.mocked(client.projectMembersApi.list).mockResolvedValue([{ ...projectMember, inherit_policies: false, policy_group_id: 10, policy_group_name: 'Developers' }, retained])
+    renderEdit()
+    const roster = within(await screen.findByRole('region', { name: 'Developers' }))
+    fireEvent.click(roster.getByRole('button', { name: 'Select members' }))
+    fireEvent.click(roster.getByRole('checkbox', { name: `Select ${projectMember.full_name}` }))
+    expect(client.projectMembersApi.remove).not.toHaveBeenCalled()
+    fireEvent.click(roster.getByRole('button', { name: 'Save selection' }))
+    await waitFor(() => expect(client.projectMembersApi.remove).toHaveBeenCalledWith(project.id, projectMember.id))
+    expect(client.projectMembersApi.remove).toHaveBeenCalledTimes(1)
+    expect(client.groupsApi.assign).not.toHaveBeenCalled()
+    expect(client.usersApi.delete).not.toHaveBeenCalled()
+  })
+
+  it('can save an empty roster after unchecking its last assigned person', async () => {
+    vi.mocked(client.projectMembersApi.list).mockResolvedValue([{ ...projectMember, inherit_policies: false, policy_group_id: 10, policy_group_name: 'Developers' }])
+    renderEdit()
+    const roster = within(await screen.findByRole('region', { name: 'Developers' }))
+    fireEvent.click(roster.getByRole('button', { name: 'Select members' }))
+    fireEvent.click(roster.getByRole('checkbox', { name: `Select ${projectMember.full_name}` }))
+    expect((roster.getByRole('button', { name: 'Save selection' }) as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.click(roster.getByRole('button', { name: 'Save selection' }))
+    await waitFor(() => expect(client.projectMembersApi.remove).toHaveBeenCalledWith(project.id, projectMember.id))
+    expect(client.groupsApi.assign).not.toHaveBeenCalled()
+  })
+
+  it('restores assigned checkboxes after cancelling an unsaved removal', async () => {
+    vi.mocked(client.projectMembersApi.list).mockResolvedValue([{ ...projectMember, inherit_policies: false, policy_group_id: 10, policy_group_name: 'Developers' }])
+    renderEdit()
+    const roster = within(await screen.findByRole('region', { name: 'Developers' }))
+    fireEvent.click(roster.getByRole('button', { name: 'Select members' }))
+    fireEvent.click(roster.getByRole('checkbox', { name: `Select ${projectMember.full_name}` }))
+    fireEvent.click(roster.getByRole('button', { name: 'Cancel selection' }))
+    expect(roster.getByRole('button', { name: `Project member actions for ${projectMember.full_name}` })).toBeTruthy()
+    fireEvent.click(roster.getByRole('button', { name: 'Select members' }))
+    expect((roster.getByRole('checkbox', { name: `Select ${projectMember.full_name}` }) as HTMLInputElement).checked).toBe(true)
+    expect(client.groupsApi.assign).not.toHaveBeenCalled()
+    expect(client.projectMembersApi.remove).not.toHaveBeenCalled()
+  })
+
+  it('keeps assigned accounts visible when absent from active assignment choices', async () => {
+    vi.mocked(client.projectMembersApi.list).mockResolvedValue([{ ...projectMember, inherit_policies: false, policy_group_id: 10, policy_group_name: 'Developers' }])
+    renderEdit()
+    const roster = within(await screen.findByRole('region', { name: 'Developers' }))
+    fireEvent.click(roster.getByRole('button', { name: 'Select members' }))
+    fireEvent.change(roster.getByRole('textbox', { name: 'Search people for Developers' }), { target: { value: projectMember.full_name } })
+    expect((roster.getByRole('checkbox', { name: `Select ${projectMember.full_name}` }) as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('requires deletion authority to uncheck an existing assignment', async () => {
+    ;(user as { role: string }).role = 'maintainer'
+    ;(user as { application_permissions?: Record<string, string[]> }).application_permissions = { access: ['view', 'edit'] }
+    vi.mocked(client.projectMembersApi.list).mockResolvedValue([{ ...projectMember, inherit_policies: false, policy_group_id: 10, policy_group_name: 'Developers' }])
+    renderEdit()
+    const roster = within(await screen.findByRole('region', { name: 'Developers' }))
+    fireEvent.click(roster.getByRole('button', { name: 'Select members' }))
+    const assignedBox = roster.getByRole('checkbox', { name: `Select ${projectMember.full_name}` }) as HTMLInputElement
+    expect(assignedBox.checked).toBe(true)
+    expect(assignedBox.disabled).toBe(true)
+    expect((roster.getByRole('checkbox', { name: `Select ${addableMaintainer.full_name}` }) as HTMLInputElement).disabled).toBe(false)
+    expect(client.projectMembersApi.remove).not.toHaveBeenCalled()
+  })
+
+  it('retains checked people after a failed assignment and shows the error', async () => {
+    vi.mocked(client.groupsApi.assign).mockRejectedValueOnce(apiError('Assignment rejected'))
+    renderEdit()
+    const roster = within(await screen.findByRole('region', { name: 'Testers' }))
+    fireEvent.click(roster.getByRole('button', { name: 'Select members' }))
+    const person = roster.getByRole('checkbox', { name: `Select ${addableMaintainer.full_name}` }) as HTMLInputElement
+    fireEvent.click(person)
+    fireEvent.click(roster.getByRole('button', { name: 'Save selection' }))
+    expect((await screen.findAllByText('Assignment rejected')).length).toBeGreaterThan(0)
+    expect(person.checked).toBe(true)
+  })
+
+  it('blocks duplicate submissions while the selected people are saving', async () => {
+    let finish: (value: never[]) => void = () => {}
+    vi.mocked(client.groupsApi.assign).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    renderEdit()
+    const roster = within(await screen.findByRole('region', { name: 'Developers' }))
+    fireEvent.click(roster.getByRole('button', { name: 'Select members' }))
+    fireEvent.click(roster.getByRole('checkbox', { name: `Select ${addableMaintainer.full_name}` }))
+    fireEvent.click(roster.getByRole('button', { name: 'Save selection' }))
+    await waitFor(() => expect((roster.getByRole('button', { name: 'Saving...' }) as HTMLButtonElement).disabled).toBe(true))
+    expect((roster.getByRole('checkbox', { name: `Select ${addableMaintainer.full_name}` }) as HTMLInputElement).disabled).toBe(true)
+    expect(client.groupsApi.assign).toHaveBeenCalledTimes(1)
+    finish([])
+    await settle()
+  })
+
+  it('discards an unsaved selection when it is cancelled', async () => {
+    renderEdit()
+    const roster = within(await screen.findByRole('region', { name: 'Developers' }))
+    fireEvent.click(roster.getByRole('button', { name: 'Select members' }))
+    fireEvent.click(roster.getByRole('checkbox', { name: `Select ${addableMaintainer.full_name}` }))
+    fireEvent.click(roster.getByRole('button', { name: 'Cancel selection' }))
+    fireEvent.click(roster.getByRole('button', { name: 'Select members' }))
+    expect((roster.getByRole('checkbox', { name: `Select ${addableMaintainer.full_name}` }) as HTMLInputElement).checked).toBe(false)
+    expect(client.groupsApi.assign).not.toHaveBeenCalled()
+  })
+
+  it('lets an Access Manager reach the roster without document admission or metadata editing', async () => {
+    ;(user as { role: string }).role = 'maintainer'
+    ;(user as { application_permissions?: Record<string, string[]> }).application_permissions = { access: ['view', 'create', 'edit', 'delete'] }
+    vi.mocked(client.projectsApi.getByPrefix).mockRejectedValueOnce(apiError('No project access'))
+    renderEdit()
+    const roster = within(await screen.findByRole('region', { name: 'Developers' }))
+    fireEvent.click(roster.getByRole('button', { name: 'Select members' }))
+    fireEvent.click(roster.getByRole('checkbox', { name: `Select ${addableMaintainer.full_name}` }))
+    fireEvent.click(roster.getByRole('button', { name: 'Save selection' }))
+    await waitFor(() => expect(client.groupsApi.assign).toHaveBeenCalledWith(10, project.id, [addableMaintainer.id]))
+    expect(screen.queryByTitle('Project name')).toBeNull()
+    expect(screen.queryByTestId('tracker-panel')).toBeNull()
+    expect(screen.queryByText('Danger zone')).toBeNull()
+    expect(client.usersApi.list).not.toHaveBeenCalled()
+  })
+
+  it('filters roster candidates transitively by base role', async () => {
+    renderEdit()
+    const adminsRoster = within(await screen.findByRole('region', { name: 'Administrators' }))
+    fireEvent.click(adminsRoster.getByRole('button', { name: 'Select members' }))
+    expect(adminsRoster.queryByRole('checkbox', { name: `Select ${addableAdmin.full_name}` })).toBeTruthy()
+    expect(adminsRoster.queryByRole('checkbox', { name: `Select ${addableMaintainer.full_name}` })).toBeTruthy()
+    expect(adminsRoster.queryByRole('checkbox', { name: `Select ${addableExternal.full_name}` })).toBeNull()
+
+    const devsRoster = within(await screen.findByRole('region', { name: 'Developers' }))
+    fireEvent.click(devsRoster.getByRole('button', { name: 'Select members' }))
+    expect(devsRoster.queryByRole('checkbox', { name: `Select ${addableAdmin.full_name}` })).toBeTruthy()
+    expect(devsRoster.queryByRole('checkbox', { name: `Select ${addableMaintainer.full_name}` })).toBeTruthy()
+    expect(devsRoster.queryByRole('checkbox', { name: `Select ${addableExternal.full_name}` })).toBeNull()
+
+    changeControl(screen.getByLabelText('Additional policy group'), { target: { value: '11' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add group' }))
+    const customersRoster = within(await screen.findByRole('region', { name: 'Customers' }))
+    fireEvent.click(customersRoster.getByRole('button', { name: 'Select members' }))
+    expect(customersRoster.queryByRole('checkbox', { name: `Select ${addableAdmin.full_name}` })).toBeTruthy()
+    expect(customersRoster.queryByRole('checkbox', { name: `Select ${addableMaintainer.full_name}` })).toBeTruthy()
+    expect(customersRoster.queryByRole('checkbox', { name: `Select ${addableExternal.full_name}` })).toBeTruthy()
+  })
+})
+
+describe('who has access', () => {
+  it('does not render who has access section', async () => {
+    renderEdit()
+    await screen.findByRole('region', { name: 'Administrators' })
+    expect(screen.queryByText('Who has access')).toBeNull()
   })
 })

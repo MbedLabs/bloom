@@ -4,9 +4,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.artefact_utils import (
+    apply_update,
+    delete_project_row,
+    fully_visible_types,
+    get_row_or_404,
+    get_visible_row,
+    type_visible,
+)
 from app.core.database import get_db
+from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS
 from app.core.id_generator import next_doc_id
-from app.core.security import get_current_user, require_project_access, require_role
+from app.core.security import get_current_user, require_project_access
 from app.models import (
     Baseline,
     ChangeRequest,
@@ -19,14 +28,37 @@ from app.models import (
 )
 from app.models.user import User, UserRole
 from app.schemas import BaselineCreate, BaselineResponse, BaselineUpdate
+from app.services.audit import record_audit_event
+
+BASELINE_NOT_FOUND = "Baseline not found"
 
 router = APIRouter()
 
+SNAPSHOT_SECTION_TYPES = {
+    "requirements": ("REQ",),
+    "test_cases": ("TC",),
+    "documents": CANONICAL_DOCUMENT_KINDS,
+    "designs": ("DES",),
+    "risks": ("RSK",),
+    "changes": ("CHG",),
+}
 
-def _baseline_response(item: Baseline, current_user: User) -> BaselineResponse:
+
+def _baseline_response(
+    item: Baseline, current_user: User, types: frozenset[str] | None
+) -> BaselineResponse:
+    """The baseline as the user sees it: no snapshot for an external user, else the
+    snapshot sections whose document types are all in ``types``, the types of which the
+    user sees every row."""
     response = BaselineResponse.model_validate(item)
     if current_user.role == UserRole.external:
         response.snapshot = None
+    elif types is not None and response.snapshot is not None:
+        response.snapshot = {
+            section: value
+            for section, value in response.snapshot.items()
+            if all(type_visible(types, code) for code in SNAPSHOT_SECTION_TYPES.get(section, ()))
+        }
     return response
 
 
@@ -81,40 +113,39 @@ async def _build_snapshot(db: AsyncSession, project_id: int) -> dict:
     }
 
 
-@router.get("", response_model=list[BaselineResponse])
+@router.get(
+    "", response_model=list[BaselineResponse], responses={400: {"description": "Bad Request"}}
+)
 async def list_baselines(
     project_id: int | None = Query(None, description="Optional project filter"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     if project_id is not None:
-        await require_project_access(db, current_user, project_id)
+        await require_project_access(db, current_user, project_id, permission=("view", "baseline"))
     query = select(Baseline).order_by(Baseline.created_at.desc())
     if project_id:
         query = query.where(Baseline.project_id == project_id)
     elif current_user.role != UserRole.admin:
         raise HTTPException(status_code=400, detail="project_id is required for non-admin users")
     result = await db.execute(query)
-    return [_baseline_response(item, current_user) for item in result.scalars().all()]
+    types = await fully_visible_types(db, current_user, project_id) if project_id else None
+    return [_baseline_response(item, current_user, types) for item in result.scalars().all()]
 
 
 @router.post("", response_model=BaselineResponse, status_code=201)
 async def create_baseline(
     data: BaselineCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    project = (
-        await db.execute(select(Project).where(Project.id == data.project_id))
-    ).scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = await get_row_or_404(db, Project, data.project_id, "Project not found")
 
     await require_project_access(
         db,
         current_user,
         data.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("create", "baseline"),
     )
 
     baseline_id = await next_doc_id(
@@ -130,68 +161,71 @@ async def create_baseline(
     )
     db.add(item)
     await db.flush()
+    await record_audit_event(
+        db,
+        "baseline.created",
+        target_type="baseline",
+        target_id=item.baseline_id,
+        project_id=item.project_id,
+    )
     await db.refresh(item)
-    return _baseline_response(item, current_user)
+    return _baseline_response(
+        item, current_user, await fully_visible_types(db, current_user, item.project_id)
+    )
 
 
-@router.get("/{baseline_id}", response_model=BaselineResponse)
+@router.get(
+    "/{baseline_id}", response_model=BaselineResponse, responses={404: {"description": "Not Found"}}
+)
 async def get_baseline(
     baseline_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     item = (
         await db.execute(select(Baseline).where(Baseline.id == baseline_id))
     ).scalar_one_or_none()
     if not item:
-        raise HTTPException(status_code=404, detail="Baseline not found")
-    await require_project_access(db, current_user, item.project_id)
-    return _baseline_response(item, current_user)
+        raise HTTPException(status_code=404, detail=BASELINE_NOT_FOUND)
+    await require_project_access(db, current_user, item.project_id, permission=("view", "baseline"))
+    return _baseline_response(
+        item, current_user, await fully_visible_types(db, current_user, item.project_id)
+    )
 
 
 @router.patch("/{baseline_id}", response_model=BaselineResponse)
 async def update_baseline(
     baseline_id: int,
     data: BaselineUpdate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    item = (
-        await db.execute(select(Baseline).where(Baseline.id == baseline_id))
-    ).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Baseline not found")
-
-    await require_project_access(
+    item = await get_visible_row(
         db,
+        Baseline,
+        baseline_id,
+        BASELINE_NOT_FOUND,
         current_user,
-        item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("edit", "baseline"),
     )
-
-    for field, value in data.model_dump(exclude_unset=True).items():
-        setattr(item, field, value)
-
-    await db.flush()
-    await db.refresh(item)
-    return _baseline_response(item, current_user)
+    await apply_update(db, item, data, "baseline")
+    return _baseline_response(
+        item, current_user, await fully_visible_types(db, current_user, item.project_id)
+    )
 
 
 @router.delete("/{baseline_id}", status_code=204)
 async def delete_baseline(
     baseline_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    item = (
-        await db.execute(select(Baseline).where(Baseline.id == baseline_id))
-    ).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Baseline not found")
-    await require_project_access(
+    await delete_project_row(
         db,
         current_user,
-        item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        Baseline,
+        baseline_id,
+        BASELINE_NOT_FOUND,
+        resource="baseline",
+        audit_type="baseline",
     )
-    await db.delete(item)

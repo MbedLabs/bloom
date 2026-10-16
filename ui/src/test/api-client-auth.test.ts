@@ -51,11 +51,19 @@ axios.defaults.adapter = async (config: InternalAxiosRequestConfig) => {
 }
 
 const client = await import('../api/client')
-const { clearAuthToken, getAuthToken, setAuthToken } = await import('../lib/tokenStorage')
+const { clearAuthToken, getAuthToken, setAuthToken, setSessionUserId } = await import(
+  '../lib/tokenStorage'
+)
 
 /** jsdom refuses assignment to `location.href`; this records it instead. */
 function stubLocation(pathname: string): { href: string } {
-  const location = { pathname, href: '' }
+  const location = {
+    pathname,
+    href: '',
+    replace(url: string) {
+      location.href = url
+    },
+  }
   Object.defineProperty(window, 'location', {
     configurable: true,
     writable: true,
@@ -68,6 +76,7 @@ beforeEach(() => {
   requests.length = 0
   script = {}
   sessionStorage.clear()
+  setSessionUserId(null)
   stubLocation('/projects')
 })
 
@@ -144,6 +153,48 @@ describe('a 401 refreshes once and retries', () => {
     await expect(client.projectsApi.list()).rejects.toBeDefined()
     expect(getAuthToken()).toBeNull()
     expect(location.href).toBe('/login')
+  })
+
+  it('loads the login page instead of replaying when the refresh answers for another user', async () => {
+    setAuthToken('expired-token')
+    setSessionUserId(1)
+    const location = stubLocation('/projects')
+    script = {
+      '/projects': [{ status: 401 }],
+      '/api/auth/refresh': [{ status: 200, data: { access_token: 'other-token', user: { id: 2 } } }],
+    }
+
+    await expect(client.projectsApi.list()).rejects.toBeDefined()
+    expect(requests.map((r) => r.url)).toEqual(['/projects', '/api/auth/refresh'])
+    expect(getAuthToken()).toBeNull()
+    expect(location.href).toBe('/login')
+  })
+
+  it('treats a refresh that names no user as another user', async () => {
+    setAuthToken('expired-token')
+    setSessionUserId(1)
+    const location = stubLocation('/projects')
+    script = {
+      '/projects': [{ status: 401 }],
+      '/api/auth/refresh': [{ status: 200, data: { access_token: 'other-token' } }],
+    }
+
+    await expect(client.projectsApi.list()).rejects.toBeDefined()
+    expect(requests.map((r) => r.url)).toEqual(['/projects', '/api/auth/refresh'])
+    expect(location.href).toBe('/login')
+  })
+
+  it('replays when the refresh answers for the same user', async () => {
+    setAuthToken('expired-token')
+    setSessionUserId(1)
+    script = {
+      '/projects': [{ status: 401 }, { status: 200, data: [] }],
+      '/api/auth/refresh': [{ status: 200, data: { access_token: 'fresh-token', user: { id: 1 } } }],
+    }
+
+    await client.projectsApi.list()
+    expect(requests.map((r) => r.url)).toEqual(['/projects', '/api/auth/refresh', '/projects'])
+    expect(getAuthToken()).toBe('fresh-token')
   })
 
   it('stays put when the 401 arrives on a public screen', async () => {

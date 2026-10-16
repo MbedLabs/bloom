@@ -1,4 +1,5 @@
 import json
+import re
 import tomllib
 from pathlib import Path
 
@@ -7,13 +8,17 @@ MANIFEST = ROOT / "cloudron" / "CloudronManifest.json"
 DESCRIPTION = ROOT / "cloudron" / "DESCRIPTION.md"
 
 
+def _version_tuple(value):
+    return tuple(int(part) for part in value.split("."))
+
+
 def test_cloudron_metadata_uses_canonical_product_positioning():
     manifest = json.loads(MANIFEST.read_text())
     description = DESCRIPTION.read_text().strip()
 
     assert manifest["title"] == "Bloom PLM by EmbedLabs"
     assert manifest["tagline"] == "Requirements, controlled documents and traceability"
-    assert description == (
+    assert description.splitlines()[0] == (
         "Bloom PLM by EmbedLabs covers requirements, controlled documents, "
         "verification, risks, changes, defects, baselines and traceability."
     )
@@ -27,5 +32,18 @@ def test_cloudron_release_metadata_matches_product_version():
     version = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
     assert manifest["version"] == version
     assert manifest["upstreamVersion"] == version
+    catalog = json.loads((ROOT / "cloudron" / "CloudronVersions.json").read_text())
+    current = catalog["versions"][version]
+    assert current["manifest"]["version"] == version
+    assert current["manifest"]["upstreamVersion"] == version
+    assert current["manifest"]["description"] == DESCRIPTION.read_text()
+    assert not current["manifest"]["changelog"].startswith("file://")
+    assert current["publishState"] in {"testing", "published"}
     changelog = (ROOT / "cloudron" / "CHANGELOG").read_text()
-    assert changelog.startswith(f"[{version}]\n")
+    # The changelog may open with a prerelease entry for the next, unreleased
+    # version; what must hold is that the shipped version has its own section.
+    assert f"[{version}]\n" in changelog
+    top = changelog.splitlines()[0]
+    match = re.fullmatch(r"\[(\d+(?:\.\d+){0,2})[^\]]*\]", top)
+    assert match, f"changelog must open with a version header, got {top!r}"
+    assert _version_tuple(match.group(1)) >= _version_tuple(version)

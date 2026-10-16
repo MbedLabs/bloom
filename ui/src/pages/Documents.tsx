@@ -1,14 +1,14 @@
+import DateField from '../components/DateField'
+import SelectField from '../components/SelectField'
+import UserSelect from '../components/UserSelect'
+import UserIdentity from '../components/UserIdentity'
 import { useMemo, useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams, useSearchParams, useNavigate } from 'react-router'
 import { format } from 'date-fns'
 import {
   ArrowLeft,
-  ArrowUpDown,
   BookOpen,
-  Calendar,
-  ChevronDown,
-  ChevronUp,
   Filter,
   Plus,
   Search,
@@ -16,7 +16,9 @@ import {
   X,
 } from 'lucide-react'
 
-import { docsApi, type DocShell, usersApi } from '../api/client'
+import { docsApi, type DocShell } from '../api/client'
+import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
+import { useSignOffPeople } from '../hooks/useSignOff'
 import {
   readStoredSort,
   writeStoredSort,
@@ -27,12 +29,14 @@ import {
   type RegistrySortField,
   type RegistrySortDir,
 } from '../lib/docRegistryParams'
-import { docCreateUrl, docUrl, normalizeDocTypeParam, DOC_TYPE_LABELS, type DocType } from '../types/doc'
+import { docCreateUrl, docUrl, documentStatusOptions, normalizeDocTypeParam, DOC_TYPE_LABELS, type DocType } from '../types/doc'
 import { dedicatedListUrl } from './docCreateIdPolicy'
 import { formatDateTime } from '../test/date-utils'
 import { useAuth } from '../contexts/AuthContext'
 import { useDebounced } from '../hooks/useDebounced'
 import BudRunLink from '../components/BudRunLink'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import { FilterChip, FiltersToggle, Pager, SortableHeader } from '../components/ListControls'
 
 const TYPE_BADGES: Record<DocType, { label: string; color: string }> = {
   REQ: { label: 'Requirement', color: 'bg-amber-500/10 text-amber-700 dark:text-amber-400' },
@@ -81,27 +85,6 @@ const TYPE_PAGE_TITLE: Record<DocType, string> = {
   RPT: 'Reports',
   STD: 'Standards',
 }
-
-const STATUS_OPTIONS = [
-  'Draft',
-  'Review',
-  'Approved',
-  'Rejected',
-  'Obsolete',
-  'Open',
-  'Mitigated',
-  'Submitted',
-  'Implemented',
-  'Active',
-  'Final',
-  'Superseded',
-  'Planned',
-  'Running',
-  'Completed',
-  'Scope',
-  'In Progress',
-  'Aborted',
-]
 
 const PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Critical']
 
@@ -173,12 +156,13 @@ function writeListParam(params: URLSearchParams, key: string, values: string[]) 
   values.forEach((value) => params.append(key, value))
 }
 
-function TypeBadge({ type }: { type: string }) {
+function TypeBadge({ type }: Readonly<{ type: string }>) {
   const cfg = isDocType(type) ? TYPE_BADGES[type] : { label: type, color: 'bg-muted text-muted-foreground' }
   return <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${cfg.color}`}>{cfg.label}</span>
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status }: Readonly<{ status: string | null }>) {
+  if (!status) return <span className="text-xs text-muted-foreground">-</span>
   const colors: Record<string, string> = {
     Draft: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
     Review: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
@@ -196,7 +180,7 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${colors[status] || 'bg-muted text-muted-foreground'}`}>{status}</span>
 }
 
-function ReqTypeBadge({ reqType }: { reqType: string }) {
+function ReqTypeBadge({ reqType }: Readonly<{ reqType: string }>) {
   return (
     <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/10 text-purple-700 dark:text-purple-400">
       {reqType}
@@ -204,7 +188,7 @@ function ReqTypeBadge({ reqType }: { reqType: string }) {
   )
 }
 
-function ReqOriginBadge({ origin }: { origin: string }) {
+function ReqOriginBadge({ origin }: Readonly<{ origin: string }>) {
   const colors: Record<string, string> = {
     Internal: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
     Customer: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
@@ -221,7 +205,7 @@ function ReqOriginBadge({ origin }: { origin: string }) {
   )
 }
 
-function ExecutionBadge({ status }: { status: string | null }) {
+function ExecutionBadge({ status }: Readonly<{ status: string | null }>) {
   if (!status) {
     return <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">Not executed</span>
   }
@@ -236,7 +220,8 @@ function ExecutionBadge({ status }: { status: string | null }) {
 export default function Documents() {
   const { user } = useAuth()
   const { prefix } = useParams<{ prefix: string }>()
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const { canAny } = useProjectPermissions(prefix)
+  const canEditDocs = canAny('create')
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -294,6 +279,10 @@ export default function Documents() {
   const sortParam = searchParams.get('sort')
   const sortField: SortField = isSortField(sortParam) ? sortParam : 'updated_at'
   const pageTitle = typeFilters.length === 1 ? TYPE_PAGE_TITLE[typeFilters[0]] : 'Documents'
+  const statusOptions = [...new Set(
+    (typeFilters.length ? typeFilters : DOC_TYPE_OPTIONS.map(type => type.code))
+      .flatMap(type => [...documentStatusOptions(type)])
+  )]
   const showExecColumn = typeFilters.length === 0 || typeFilters.includes('TC')
 
   const PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100]
@@ -346,11 +335,8 @@ export default function Documents() {
     createdFrom, createdTo, updatedFrom, updatedTo, pageSize, relatedTo,
   ])
 
-  const { data: users } = useQuery({
-    queryKey: ['users'],
-    queryFn: usersApi.list,
-    enabled: canEditDocs,
-  })
+  const { data: project } = useProjectByPrefix(prefix)
+  const users = useSignOffPeople(project?.id, user?.role === 'admin')
 
   const userMap = useMemo(() => {
     const m = new Map<number, string>()
@@ -493,19 +479,15 @@ export default function Documents() {
     'inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors'
 
   const SortHeader = ({ field, children, compact = false }: { field: SortField; children: React.ReactNode; compact?: boolean }) => (
-    <th
+    <SortableHeader
+      field={field}
+      sortField={sortField}
+      sortDir={sortDir}
+      onSort={toggleSort}
       className={`${compact ? 'px-3' : 'px-5'} py-2.5 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer select-none hover:text-foreground transition-colors`}
-      onClick={() => toggleSort(field)}
     >
-      <div className="flex items-center gap-1">
-        {children}
-        {sortField === field ? (
-          sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
-        ) : (
-          <ArrowUpDown className="h-3 w-3 opacity-30" />
-        )}
-      </div>
-    </th>
+      {children}
+    </SortableHeader>
   )
 
   const filterSummaryChips = (
@@ -517,13 +499,13 @@ export default function Documents() {
       {priorityFilter && <FilterChip label={`Priority: ${priorityFilter}`} />}
       {reviewerFilter && (
         <FilterChip
-          label={`Reviewer: ${
+          label={<>Reviewer: {
             reviewerFilter === 'assigned'
               ? 'assigned'
               : reviewerFilter === 'unassigned'
                 ? 'unassigned'
-                : userMap.get(Number(reviewerFilter)) || reviewerFilter
-          }`}
+                : <UserIdentity className="ml-1" pictureClassName="w-4 h-4" user={users?.find(person => person.id === Number(reviewerFilter)) ?? { id: Number(reviewerFilter), full_name: userMap.get(Number(reviewerFilter)) || reviewerFilter }} />
+          }</>}
         />
       )}
       {relatedTo && (
@@ -552,9 +534,9 @@ export default function Documents() {
           <button
             onClick={() => {
               if (window.history.length > 1) {
-                navigate(-1)
+                void navigate(-1)
               } else {
-                navigate(`/projects/${prefix}`)
+                void navigate(`/projects/${prefix}`)
               }
             }}
             className="p-1 hover:bg-accent/50 rounded-md shrink-0 mt-0.5"
@@ -602,7 +584,7 @@ export default function Documents() {
               className="w-full rounded-md border border-input bg-background py-1.5 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring"
             />
           </div>
-          <select
+          <SelectField
             value={sortField}
             onChange={(event) => {
               const nextSort = event.target.value as SortField
@@ -614,24 +596,13 @@ export default function Documents() {
             {visibleSortOptions.map((option) => (
               <option key={option.field} value={option.field}>Sort by {option.label}</option>
             ))}
-          </select>
-          <button
-            type="button"
-            onClick={() => setFiltersOpen((open) => !open)}
-            className={`inline-flex items-center justify-center gap-2 rounded-md border px-2.5 py-1.5 text-sm font-medium transition-colors ${
-              filtersOpen || hasActiveFilters
-                ? 'border-primary bg-primary/10 text-primary'
-                : 'border-input bg-background text-foreground hover:bg-accent'
-            }`}
-            aria-expanded={filtersOpen}
-            aria-controls="documents-filter-panel"
-          >
-            <Filter className="h-4 w-4" />
-            Filters
-            {hasActiveFilters && (
-              <span className="rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">On</span>
-            )}
-          </button>
+          </SelectField>
+          <FiltersToggle
+            open={filtersOpen}
+            active={hasActiveFilters}
+            onToggle={() => setFiltersOpen((open) => !open)}
+            controls="documents-filter-panel"
+          />
         </div>
 
         {showFilterSummary && (
@@ -671,7 +642,7 @@ export default function Documents() {
           <div className="space-y-2">
             <div className="text-xs font-medium uppercase text-muted-foreground">Status</div>
             <div className="flex flex-wrap gap-2">
-              {STATUS_OPTIONS.map((status) => (
+              {statusOptions.map((status) => (
                 <button
                   key={status}
                   onClick={() => toggleStatus(status)}
@@ -690,7 +661,7 @@ export default function Documents() {
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
             <label className="space-y-1">
               <span className="text-xs font-medium uppercase text-muted-foreground">Priority / Severity</span>
-              <select
+              <SelectField
                 value={priorityFilter}
                 onChange={(event) => updateRegistryParams({ priority: event.target.value })}
                 className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
@@ -699,28 +670,17 @@ export default function Documents() {
                 {PRIORITY_OPTIONS.map((priority) => (
                   <option key={priority} value={priority}>{priority}</option>
                 ))}
-              </select>
+              </SelectField>
             </label>
 
             <label className="space-y-1">
               <span className="text-xs font-medium uppercase text-muted-foreground">Reviewer</span>
-              <select
-                value={reviewerFilter}
-                onChange={(event) => updateRegistryParams({ reviewer: event.target.value })}
-                className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
-              >
-                <option value="">Any reviewer</option>
-                <option value="assigned">Any assigned</option>
-                <option value="unassigned">Unassigned</option>
-                {users?.map((user) => (
-                  <option key={user.id} value={user.id}>{user.full_name}</option>
-                ))}
-              </select>
+              <UserSelect value={reviewerFilter} onChange={value => updateRegistryParams({ reviewer: value })} users={users ?? []} label="Reviewer" emptyLabel="Any reviewer" options={[{ value: 'assigned', label: 'Any assigned' }, { value: 'unassigned', label: 'Unassigned' }]} />
             </label>
 
             <label className="space-y-1">
               <span className="text-xs font-medium uppercase text-muted-foreground">Links</span>
-              <select
+              <SelectField
                 value={linkFilter}
                 onChange={(event) => updateRegistryParams({ links: event.target.value as LinkFilter })}
                 className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
@@ -728,7 +688,7 @@ export default function Documents() {
                 {LINK_FILTER_OPTIONS.map((option) => (
                   <option key={option.code} value={option.code}>{option.label}</option>
                 ))}
-              </select>
+              </SelectField>
             </label>
           </div>
 
@@ -868,7 +828,7 @@ export default function Documents() {
                       {doc.priority || '-'}
                     </td>
                     <td className="px-2.5 py-2 whitespace-nowrap text-xs text-muted-foreground">
-                      {doc.reviewer_id ? userMap.get(doc.reviewer_id) || '-' : '-'}
+                      {doc.reviewer_id ? <UserIdentity user={users?.find(person => person.id === doc.reviewer_id) ?? { id: doc.reviewer_id, full_name: userMap.get(doc.reviewer_id) || '-' }} /> : '-'}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">
                       {format(new Date(doc.created_at), 'MMM d, yyyy')}
@@ -890,36 +850,18 @@ export default function Documents() {
                 </span>
                 <div className="flex items-center gap-1.5 text-muted-foreground">
                   <span className="text-xs">Rows:</span>
-                  <select
+                  <SelectField
                     value={pageSize}
                     onChange={(e) => setPageSize(Number(e.target.value))}
-                    className="text-xs border border-border rounded bg-background px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="text-xs border border-border rounded bg-background px-2 py-1 focus:outline-hidden focus:ring-1 focus:ring-primary"
                   >
                     {PAGE_SIZE_OPTIONS.map((s) => (
                       <option key={s} value={s}>{s}</option>
                     ))}
-                  </select>
+                  </SelectField>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  disabled={page === 0}
-                  onClick={() => setPage((p) => p - 1)}
-                  className="px-3 py-1 border border-border rounded hover:bg-accent/50 disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  Prev
-                </button>
-                <span className="px-2 text-muted-foreground">
-                  {page + 1} / {totalPages || 1}
-                </span>
-                <button
-                  disabled={page >= totalPages - 1}
-                  onClick={() => setPage((p) => p + 1)}
-                  className="px-3 py-1 border border-border rounded hover:bg-accent/50 disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              </div>
+              <Pager page={page} totalPages={totalPages} setPage={setPage} />
             </div>
           )}
         </div>
@@ -928,41 +870,22 @@ export default function Documents() {
   )
 }
 
-function FilterChip({ label, muted = false }: { label: string; muted?: boolean }) {
-  return (
-    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs ${muted ? 'border-border text-muted-foreground' : 'border-primary/20 bg-primary/10 text-primary'}`}>
-      {label}
-    </span>
-  )
-}
-
 function DatePickerField({
   label,
   value,
   emptyLabel,
   onChange,
-}: {
+}: Readonly<{
   label: string
   value: string
   emptyLabel: string
   onChange: (value: string) => void
-}) {
-  const displayValue = value ? format(new Date(`${value}T00:00:00`), 'MMM d, yyyy') : emptyLabel
-
+}>) {
   return (
     <label className="space-y-1">
       <span className="text-xs font-medium uppercase text-muted-foreground">{label}</span>
-      <span className="relative flex w-full items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-accent/40 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring">
-        <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span className={value ? 'text-foreground' : 'text-muted-foreground'}>{displayValue}</span>
-        <input
-          type="date"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-          aria-label={label}
-        />
-      </span>
+      <DateField label={label} value={value} onChange={onChange} placeholder={emptyLabel}
+        className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-accent/40" />
     </label>
   )
 }

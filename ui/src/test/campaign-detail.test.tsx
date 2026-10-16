@@ -1,3 +1,5 @@
+import { changeControl } from './change-control'
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
  * One campaign in detail: its scope, its Bud run, and editing it.
@@ -8,7 +10,7 @@
  * scopes at all. These drive the real thing: expanding a suite, reading a
  * result off an item, and the edit and delete paths that change or destroy it.
  */
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -46,6 +48,12 @@ vi.mock('../contexts/AuthContext', () => ({
 }))
 
 const client = await import('../api/client')
+
+/** Wait until the page has the server's answer for which changes the row allows. */
+async function rowAnswered() {
+  await waitFor(() => expect(client.docsApi.get).toHaveBeenCalled())
+  await settle()
+}
 const CampaignDetail = (await import('../pages/CampaignDetail')).default
 
 const passed = {
@@ -86,7 +94,7 @@ const withScopes = {
 }
 
 function renderCampaign() {
-  const queryClient = new QueryClient({
+  const queryClient = createQueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   })
   return render(
@@ -246,6 +254,7 @@ describe('editing a campaign', () => {
   it('opens the form filled from the campaign', async () => {
     renderCampaign()
     await screen.findByText(campaignDetail.name)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
 
@@ -263,11 +272,12 @@ describe('editing a campaign', () => {
   it('saves the name, description and visibility together', async () => {
     renderCampaign()
     await screen.findByText(campaignDetail.name)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Final sweep' } })
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Sign-off run' } })
-    fireEvent.change(screen.getByLabelText('Visibility'), { target: { value: 'customer' } })
+    changeControl(screen.getByLabelText('Visibility'), { target: { value: 'customer' } })
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
     await waitFor(() =>
@@ -286,6 +296,7 @@ describe('editing a campaign', () => {
   it('sends no description rather than an empty one', async () => {
     renderCampaign()
     await screen.findByText(campaignDetail.name)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
     fireEvent.change(await screen.findByLabelText('Description'), { target: { value: '' } })
@@ -301,6 +312,7 @@ describe('editing a campaign', () => {
   it('closes on Escape without saving', async () => {
     renderCampaign()
     await screen.findByText(campaignDetail.name)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
     const name = await screen.findByLabelText('Name')
@@ -315,6 +327,7 @@ describe('editing a campaign', () => {
   it('closes on the X without saving', async () => {
     renderCampaign()
     await screen.findByText(campaignDetail.name)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
     await screen.findByLabelText('Name')
@@ -328,6 +341,7 @@ describe('editing a campaign', () => {
   it('re-fills the form from the campaign when it is reopened', async () => {
     renderCampaign()
     await screen.findByText(campaignDetail.name)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Abandoned' } })
@@ -345,6 +359,7 @@ describe('deleting a campaign', () => {
   it('backs out of the confirmation', async () => {
     renderCampaign()
     await screen.findByText(campaignDetail.name)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
     expect(await screen.findByText('Delete Campaign?')).toBeTruthy()
@@ -358,6 +373,7 @@ describe('deleting a campaign', () => {
   it('warns that the scope goes with it', async () => {
     renderCampaign()
     await screen.findByText(campaignDetail.name)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
 
@@ -374,6 +390,7 @@ describe('deleting a campaign', () => {
     )
     renderCampaign()
     await screen.findByText(campaignDetail.name)
+    await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
     const confirms = await screen.findAllByRole('button', { name: /^delete$/i })

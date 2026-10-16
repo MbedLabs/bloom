@@ -1,3 +1,5 @@
+import { changeControl } from './change-control'
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
  * Test campaigns and the suites they are scoped from.
@@ -8,7 +10,7 @@
  * a search, a status filter and a sort with its own direction toggle - most of
  * which had no coverage, including the rule that stops an empty campaign.
  */
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -82,7 +84,7 @@ function envelope(items: unknown[]) {
 }
 
 function renderCampaigns() {
-  const queryClient = new QueryClient({
+  const queryClient = createQueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   })
   return render(
@@ -154,7 +156,7 @@ describe('the campaign list', () => {
     renderCampaigns()
     await screen.findByText('Alpha regression')
 
-    fireEvent.change(screen.getByLabelText('Filter by status'), { target: { value: 'Planned' } })
+    changeControl(screen.getByLabelText('Filter by status'), { target: { value: 'Planned' } })
 
     await waitFor(() => expect(cardNames()).toEqual(['Bravo smoke']))
   })
@@ -183,7 +185,7 @@ describe('the campaign list', () => {
     renderCampaigns()
     await screen.findByText('Alpha regression')
 
-    fireEvent.change(screen.getByLabelText('Sort by'), { target: { value: 'name' } })
+    changeControl(screen.getByLabelText('Sort by'), { target: { value: 'name' } })
     await waitFor(() =>
       expect(cardNames()).toEqual(['Charlie soak', 'Bravo smoke', 'Alpha regression']),
     )
@@ -198,7 +200,7 @@ describe('the campaign list', () => {
     renderCampaigns()
     await screen.findByText('Alpha regression')
 
-    fireEvent.change(screen.getByLabelText('Sort by'), { target: { value: 'status' } })
+    changeControl(screen.getByLabelText('Sort by'), { target: { value: 'status' } })
 
     // Descending: Planned, In Progress, Completed.
     await waitFor(() =>
@@ -373,7 +375,7 @@ describe('creating a campaign', () => {
     const form = await openForm()
     fireEvent.change(form.name, { target: { value: 'Customer sweep' } })
     fireEvent.change(form.description, { target: { value: 'Shared with the customer' } })
-    fireEvent.change(screen.getAllByRole('combobox').slice(-1)[0], {
+    changeControl(screen.getAllByRole('combobox').slice(-1)[0], {
       target: { value: 'customer' },
     })
     fireEvent.click(screen.getAllByRole('checkbox')[0])

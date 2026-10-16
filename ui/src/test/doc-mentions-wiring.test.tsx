@@ -1,3 +1,4 @@
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
  * Which list each mention trigger is fed.
@@ -8,7 +9,7 @@
  * wrongly there is invisible from inside the editor - the trigger simply says
  * "No results" for anything it was not given. That is what these pin.
  */
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -60,7 +61,7 @@ const variable = { ...projectVariable, id: 302, kind: 'variable' as const, key: 
 const person = { ...user, id: 7, full_name: 'Grace Hopper', role: 'maintainer' as const }
 
 function renderCreate(type = 'requirements') {
-  const queryClient = new QueryClient({
+  const queryClient = createQueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   })
   return render(

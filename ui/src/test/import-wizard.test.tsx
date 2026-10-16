@@ -1,3 +1,4 @@
+import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 /**
  * Copying documents from one project into another.
@@ -10,7 +11,7 @@
  * under the old one, and the review step is the last place the identifiers
  * about to be minted are shown before anything is written.
  */
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -56,7 +57,7 @@ function envelope(items: unknown[]) {
 }
 
 function renderWizard() {
-  const queryClient = new QueryClient({
+  const queryClient = createQueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   })
   return render(
@@ -324,6 +325,7 @@ describe('reviewing and running the import', () => {
           doc_type: 'REQ',
           doc_ids: [first.id],
           include_links: true,
+          tag_ids: [],
         },
       ]),
     )

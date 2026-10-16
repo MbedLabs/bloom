@@ -1,10 +1,14 @@
+import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Download, Paperclip, Trash2, Upload } from 'lucide-react'
 import { attachmentsApi, extractApiErrorMessage, type DocumentAttachment } from '../api/client'
-import { useAuth } from '../contexts/AuthContext'
 import { SectionCard } from './DocDetailShell'
+import { RowActionsMenu } from './RowMenu'
 import { useToast } from './useToast'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import { useParams } from 'react-router'
+import type { DocType } from '../types/doc'
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -12,13 +16,24 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export default function DocumentAttachmentsPanel({ documentId }: { documentId: number }) {
-  const { user } = useAuth()
+export default function DocumentAttachmentsPanel({
+  documentId,
+  projectId,
+  docType,
+  rowAllowsEdit = true,
+}: Readonly<{
+  documentId: number
+  projectId?: number
+  docType: DocType | null
+  rowAllowsEdit?: boolean
+}>) {
   const queryClient = useQueryClient()
   const toast = useToast()
   const fileInput = useRef<HTMLInputElement>(null)
   const [busyId, setBusyId] = useState<number | null>(null)
-  const canEdit = user?.role === 'admin' || user?.role === 'maintainer'
+  const { prefix } = useParams<{ prefix: string }>()
+  const { can } = useProjectPermissions(prefix)
+  const canEdit = docType ? can('edit', docType) && rowAllowsEdit : false
 
   const { data: attachments, isLoading } = useQuery({
     queryKey: ['attachments', documentId],
@@ -29,7 +44,8 @@ export default function DocumentAttachmentsPanel({ documentId }: { documentId: n
   const uploadMutation = useMutation({
     mutationFn: (file: File) => attachmentsApi.upload(documentId, file),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['attachments', documentId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
+      void queryClient.invalidateQueries({ queryKey: ['attachments', documentId] })
       toast.notify('File attached', 'success')
     },
     onError: (error) => toast.failed('Attaching the file', error),
@@ -38,7 +54,8 @@ export default function DocumentAttachmentsPanel({ documentId }: { documentId: n
   const deleteMutation = useMutation({
     mutationFn: (id: number) => attachmentsApi.remove(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['attachments', documentId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
+      void queryClient.invalidateQueries({ queryKey: ['attachments', documentId] })
       toast.notify('Attachment removed', 'success')
     },
     onError: (error) => toast.failed('Removing the attachment', error),
@@ -111,23 +128,10 @@ export default function DocumentAttachmentsPanel({ documentId }: { documentId: n
                   {attachment.source_ref ? ` · from ${attachment.source_ref}` : ''}
                 </p>
               </div>
-              <button
-                onClick={() => download(attachment)}
-                disabled={busyId === attachment.id}
-                title="Download"
-                className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 disabled:opacity-50"
-              >
-                <Download className="h-4 w-4" />
-              </button>
-              {canEdit && (
-                <button
-                  onClick={() => deleteMutation.mutate(attachment.id)}
-                  title="Remove attachment"
-                  className="p-2 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              )}
+              <RowActionsMenu label={`Attachment actions for ${attachment.original_filename}`} actions={[
+                { icon: <Download className="h-4 w-4" />, label: 'Download', disabled: busyId === attachment.id, onClick: () => { void download(attachment) } },
+                ...(canEdit ? [{ icon: <Trash2 className="h-4 w-4" />, label: 'Remove', destructive: true, onClick: () => deleteMutation.mutate(attachment.id) }] : []),
+              ]} />
             </li>
           ))}
         </ul>

@@ -120,6 +120,112 @@ same file, document, MIME, and disk-capacity checks.
 
 These controls limit resource exhaustion; they are not a malware scanner.
 
+## Markdown import
+
+The document format, one example per artefact type and how to write such a document
+with an AI assistant are in `docs/md-import-format.md`.
+
+## Jira defects
+
+A Jira project can feed a Bloom project: a matching Jira issue creates a defect, and
+the defect then follows the issue. The direction is Jira to Bloom unless the project
+turns on two-way sync, which also pushes defect title and status changes to Jira.
+
+Each project has its own Jira integration. The instance needs
+`INTEGRATION_ENCRYPTION_KEY` set first; without it Bloom refuses to store the
+integration.
+
+In Bloom, as an administrator, open the project settings, choose Jira under External
+issue tracker and fill in:
+
+- Site URL (`https://your-site.atlassian.net`).
+- Optionally, the account email and API token of a Jira account (created under
+  id.atlassian.com, Security, API tokens). They are needed only to migrate the issues
+  that are already open (Pull existing issues) and for two-way sync, and the email
+  also makes that Bloom user the reporter of the defects. Webhook deliveries need
+  neither. They are stored for this project only, encrypted. Both kinds of token work:
+  a classic API token acts with the account's own Jira permissions; an API token with
+  scopes needs `read:jira-work` and `read:jira-user`, plus `write:jira-work` for
+  two-way sync, and Bloom calls Jira for it through Atlassian's API gateway for the
+  site. Bloom checks the credential before each pull or push and reports a token Jira
+  does not accept.
+- Webhook secret: any long random string; the same value goes into Jira.
+- Jira project key, issue types (default `Bug`), and optionally a label, a custom field
+  that holds Bloom test-case ids, and extra JQL used by the pull.
+- The Jira priority to Bloom priority map.
+
+In Jira, as a site administrator, open Settings, System, WebHooks and create a webhook:
+
+- URL: `https://<bloom-host>/api/integrations/jira/webhook`
+- Secret: the webhook secret entered in Bloom. Jira signs each delivery with it and
+  Bloom rejects unsigned or wrongly signed deliveries.
+- Events: Issue created, updated and deleted. A JQL filter such as `project = PROJ`
+  keeps the events of other projects away.
+
+What Bloom does with an event:
+
+- Created or updated, for an issue with no defect yet: a defect is created when the
+  issue matches the project's issue types and label. It takes the summary, the
+  description as text, the priority (also as severity) through the map, the issue URL
+  and state. A Bloom test-case id of the project in the summary, the description or
+  the reference field becomes the defect's source.
+  The defect's reporter is the Bloom user whose email is the integration's account
+  email; with no such user it has no reporter.
+- Updated, for a linked issue: title, description, priority and state follow Jira; a
+  resolution closes the defect.
+- Deleted: the defect stays and its issue state reads `Removed in Jira`.
+- A delivery Jira retries with the same identifier is processed once.
+
+Pull existing issues, on the same panel, migrates the issues that were open before the
+webhook existed: it searches Jira once with the saved filter, skips the issues already
+in a Done status, and creates the defects that do not exist yet (at most 1000 issues per pull). It signs in with the account
+email and API token above, so it needs a Jira login that can browse the project, and
+it only reads from Jira.
+
+## Object storage (S3)
+
+Attachments are kept in `BLOOM_ATTACHMENT_DIR` by default. To keep them in an
+S3-compatible bucket (AWS S3, MinIO, Hetzner, Ceph) instead:
+
+- `BLOOM_STORAGE_BACKEND=s3` and `BLOOM_S3_BUCKET`. The bucket must exist.
+- `BLOOM_S3_ENDPOINT_URL` for anything that is not AWS (for MinIO, for example
+  `http://minio:9000`); `BLOOM_S3_REGION` where the store needs one.
+- `BLOOM_S3_PREFIX` (default `bloom`) keeps several instances apart in one bucket.
+- `BLOOM_S3_ACCESS_KEY_ID` and `BLOOM_S3_SECRET_ACCESS_KEY`, or neither, in which
+  case the ambient AWS credentials (an instance role) are used.
+- `BLOOM_STORAGE_LOCAL_MIRROR` (default `true`) also keeps every file in
+  `BLOOM_ATTACHMENT_DIR`. Reads come from the bucket and fall back to the mirror when the
+  bucket does not answer; the log then names the key as a warning. The free-space
+  reserve applies to this directory; quotas in the bucket are the operator's.
+
+Existing files are copied with `python -m app.storage migrate --to s3`. Each file
+keeps its storage name under the prefix, sizes are checked after the copy, and files
+already in the bucket are skipped, so the command can be run again. The local files
+stay where they are.
+
+`GET /api/ready` reports `storage`: `local`, `s3`, or `s3-unreachable` when the bucket
+did not answer. It stays `200` in that case, because the database decides readiness
+and reads can still come from the mirror. Orphan cleanup lists the bucket; a file is
+counted missing when the bucket lacks it. On Cloudron the variables are set with
+`cloudron env set`; keep the mirror, as it lives under `/app/data` and is part of
+Cloudron's backup.
+
+## Audit log
+
+Security-relevant events are written to the `audit_events` table in the same transaction as the action: sign-in, sign-out, session refresh, password change and reset, email verification and email change; user creation, invitation, role change, activation, deletion; project members, external document types, groups, policies and artefact visibility; configuration changes; deletions, exports, imports and attachments. A failed sign-in or password reset is recorded even though the request itself fails. Each event carries the acting user or `anonymous`/`service`/`runner`, the action, the target, the request id (the `x-request-id` response header), the client address and user agent, the outcome and details without secrets.
+
+Administrators read the log under Audit log in the sidebar, or with `GET /api/audit` (filters: `actor_user_id`, `action` or an action prefix ending in `.`, `target_type`, `target_id`, `project_id`, `outcome`, `since`, `until`, `limit`, `offset`). No endpoint changes or deletes an event.
+
+The client address is the one the image's own nginx received. Behind another reverse proxy (Cloudron, a load balancer) it is that proxy's address.
+
+Access requests are emailed to every active administrator through the transactional mail settings above; without SMTP the request is still recorded and shown under Access, Requests and on the project's members page, and the user is told the email could not be sent.
+
+Retention is the operator's choice. The application never deletes events; to remove old ones, run on a schedule:
+
+```
+python -m app.audit prune --older-than-days 365
+```
+
 ## Upgrades
 
 1. Back up first (see above).

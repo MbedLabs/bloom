@@ -1,10 +1,12 @@
+import { finishArtefactDeletion } from '../lib/refreshProjectViews'
 import { useState, useMemo } from 'react'
+import ArtefactTags from '../components/ArtefactTags'
 import { useParams, Link, useNavigate } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { requirementsApi, usersApi, projectsApi } from '../api/client'
-import { ExternalLink, ChevronRight, UserCheck, UserCog, Trash2 } from 'lucide-react'
+import { requirementsApi, projectsApi } from '../api/client'
+import { ExternalLink, ChevronRight, Trash2 } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
-import { docEditUrl, docUrl } from '../types/doc'
+import { docEditUrl, docUrl, type DocType } from '../types/doc'
 import { DocEditor } from '../components/editor'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
@@ -16,8 +18,16 @@ import {
   membershipLinksForCampaigns,
   membershipLinksForSuites,
 } from '../lib/membershipLinks'
+import { useProjectPermissions, useRowActions } from '../hooks/useProjectPermissions'
+import { useParameterValues } from '../hooks/useParameterValues'
+import { useArtefactLabels } from '../hooks/useArtefactLabels'
+import BudRunLink from '../components/BudRunLink'
+import ConfirmDelete from '../components/ConfirmDelete'
+import WorkflowPanel from '../components/WorkflowPanel'
+import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
+import { useSignOffPeople } from '../hooks/useSignOff'
 
-function TypeBadge({ reqType }: { reqType: string }) {
+function TypeBadge({ reqType }: Readonly<{ reqType: string }>) {
   return (
     <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-500/10 text-purple-700 dark:text-purple-400">
       {reqType}
@@ -25,7 +35,7 @@ function TypeBadge({ reqType }: { reqType: string }) {
   )
 }
 
-function OriginBadge({ origin }: { origin: string }) {
+function OriginBadge({ origin }: Readonly<{ origin: string }>) {
   const colors: Record<string, string> = {
     Internal: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
     Customer: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
@@ -42,7 +52,7 @@ function OriginBadge({ origin }: { origin: string }) {
   )
 }
 
-function RunStatusBadge({ status }: { status: string }) {
+function RunStatusBadge({ status }: Readonly<{ status: string }>) {
   const colors: Record<string, string> = {
     Passed: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
     Failed: 'bg-red-500/10 text-red-700 dark:text-red-400',
@@ -56,15 +66,16 @@ function RunStatusBadge({ status }: { status: string }) {
   )
 }
 
-function resolveUserName(users: Array<{ id: number; full_name: string }> | undefined, userId: number | null) {
-  if (!userId) return 'Unassigned'
-  return users?.find((u) => u.id === userId)?.full_name || `User #${userId}`
-}
-
-export default function RequirementDetail({ resolvedId }: { resolvedId?: number } = {}) {
+export default function RequirementDetail({
+  resolvedId,
+  allowedActions,
+}: { resolvedId?: number; allowedActions?: string[] } = {}) {
   const { user } = useAuth()
   const { prefix, itemId } = useParams<{ prefix: string; itemId: string }>()
+  const { can } = useProjectPermissions(prefix)
+  const parameterValues = useParameterValues(prefix)
   const reqId = resolvedId || parseInt(itemId || '0')
+  const workflow = useDocumentWorkflow('requirement', reqId)
   const queryClient = useQueryClient()
   const toast = useToast()
   const navigate = useNavigate()
@@ -75,6 +86,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
     enabled: !!reqId,
   })
 
+  const artefactLabels = useArtefactLabels(prefix, requirement?.content_json)
   const { data: project } = useQuery({
     queryKey: ['project', requirement?.project_id],
     queryFn: () => projectsApi.get(requirement!.project_id),
@@ -109,39 +121,16 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
 
 
 
-  // Reviewer and approver are shown by name, so this page has to turn ids into names.
-  const { data: projectPeople } = useQuery({
-    queryKey: ['mentionableUsers', requirement?.project_id],
-    queryFn: () => usersApi.listMentionable(requirement!.project_id),
-    enabled: !!requirement?.project_id,
-  })
-
-  // Admins keep reading the directory too: reviewed_by and approved_by are
-  // historical, and whoever signed off may since have left the project or been
-  // deactivated, so they are no longer in the project's own list.
-  const { data: directory } = useQuery({
-    queryKey: ['users'],
-    queryFn: usersApi.list,
-    enabled: user?.role === 'admin',
-  })
-
-  const users = useMemo<Array<{ id: number; full_name: string }>>(
-    () => [...(projectPeople ?? []), ...(directory ?? [])],
-    [projectPeople, directory],
-  )
+  const users = useSignOffPeople(requirement?.project_id, user?.role === 'admin')
 
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const deleteMutation = useMutation({
     mutationFn: () => requirementsApi.delete(reqId),
     onSuccess: () => {
       if (!requirement) return
-      queryClient.invalidateQueries({ queryKey: ['requirements', requirement.project_id] })
-      queryClient.invalidateQueries({ queryKey: ['all-docs', prefix] })
-      queryClient.invalidateQueries({ queryKey: ['project', requirement.project_id] })
-      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'requirement', reqId] })
       toast.notify('Requirement deleted', 'success')
       setTimeout(() => {
-        navigate(docRegistryListUrl(prefix!, 'REQ'))
+        finishArtefactDeletion(queryClient, { prefix, projectId: requirement.project_id, detailKey: 'requirement', artefactType: 'requirement', recordId: reqId, kind: 'requirements', docId: requirement.req_id }, () => navigate(docRegistryListUrl(prefix!, 'REQ')))
       }, 800)
     },
     onError: (err: unknown) => {
@@ -150,41 +139,8 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
     },
   })
 
-  const markReviewedMutation = useMutation({
-    mutationFn: (reviewedById: number) => requirementsApi.setReviewed(reqId, reviewedById),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(['requirement', reqId], (old: unknown) => {
-        if (old && typeof old === 'object') {
-          return { ...(old as object), ...(updated as object) }
-        }
-        return updated
-      })
-      queryClient.invalidateQueries({ queryKey: ['requirement', reqId] })
-      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'requirement', reqId] })
-      toast.notify('Requirement marked as reviewed', 'success')
-    },
-    onError: (err: unknown) => {
-      toast.failed('Marking the requirement reviewed', err)
-    },
-  })
 
-  const markApprovedMutation = useMutation({
-    mutationFn: (approvedById: number) => requirementsApi.setApproved(reqId, approvedById),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(['requirement', reqId], (old: unknown) => {
-        if (old && typeof old === 'object') {
-          return { ...(old as object), ...(updated as object) }
-        }
-        return updated
-      })
-      queryClient.invalidateQueries({ queryKey: ['requirement', reqId] })
-      queryClient.invalidateQueries({ queryKey: ['artefactActivity', 'requirement', reqId] })
-      toast.notify('Requirement approved', 'success')
-    },
-    onError: (err: unknown) => {
-      toast.failed('Approving the requirement', err)
-    },
-  })
+  const rowAllows = useRowActions(prefix, 'REQ', requirement?.req_id, allowedActions)
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
@@ -201,7 +157,9 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
     )
   }
 
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const canEditDocs = can('edit', 'REQ')
+  const showEdit = canEditDocs && rowAllows('edit') && workflow.data?.actions?.edit_current === true
+  const showDelete = canEditDocs && can('delete', 'REQ') && rowAllows('delete')
 
   return (
     <>
@@ -212,15 +170,17 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
       title={requirement.title}
       status={requirement.status}
       priority={requirement.priority}
-      actions={canEditDocs ? (
+      actions={showEdit || showDelete ? (
         <div className="flex items-center gap-2">
+          {showEdit && (
           <button
             onClick={() => navigate(docEditUrl(projectPrefix, 'REQ', requirement.req_id))}
             className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
           >
             Edit
           </button>
-          {!deleteConfirm ? (
+          )}
+          {showDelete && (!deleteConfirm ? (
             <button
               type="button"
               onClick={() => setDeleteConfirm(true)}
@@ -230,20 +190,12 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
               Delete
             </button>
           ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Are you sure?</span>
-              <button
-                onClick={() => { setDeleteConfirm(false); deleteMutation.mutate(); }}
-                disabled={deleteMutation.isPending}
-                className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm disabled:opacity-50"
-              >
-                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
-              </button>
-              <button onClick={() => setDeleteConfirm(false)} className="px-3 py-1.5 border border-input rounded-md text-sm hover:bg-accent/40">
-                Cancel
-              </button>
-            </div>
-          )}
+            <ConfirmDelete
+              pending={deleteMutation.isPending}
+              onConfirm={() => { setDeleteConfirm(false); deleteMutation.mutate(); }}
+              onCancel={() => setDeleteConfirm(false)}
+            />
+          ))}
         </div>
       ) : undefined}
       rightRail={
@@ -256,56 +208,33 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
               </div>
               <div>
                 <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Origin</div>
-                <OriginBadge origin={requirement.req_origin} />
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <OriginBadge origin={requirement.req_origin} />
+                  <ArtefactTags type="requirement" id={reqId} projectId={requirement.project_id} canEdit={showEdit} />
+                </div>
               </div>
               <MetaItem label="Created" value={formatDateTime(requirement.created_at) + ' ago'} />
               <MetaItem label="Updated" value={formatDateTime(requirement.updated_at) + ' ago'} />
             </div>
           </SectionCard>
 
-          <SectionCard title="Review">
-            <div className="space-y-3">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Reviewer</div>
-                <div className="text-sm text-foreground">{resolveUserName(users, requirement.reviewer_id)}</div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Reviewed by</div>
-                <div className="text-sm text-foreground">{resolveUserName(users, requirement.reviewed_by_id)}</div>
-                {requirement.reviewed_at && <div className="text-xs text-muted-foreground mt-0.5">{formatDateTime(requirement.reviewed_at)}</div>}
-              </div>
-              <button
-                disabled={!canEditDocs || !requirement.reviewer_id || markReviewedMutation.isPending}
-                onClick={() => requirement.reviewer_id && markReviewedMutation.mutate(requirement.reviewer_id)}
-                className="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-amber-500/90 text-white text-xs font-medium hover:bg-amber-500 disabled:opacity-50"
-              >
-                <UserCheck className="h-3.5 w-3.5 mr-1" />
-                Mark Reviewed
-              </button>
-            </div>
-          </SectionCard>
+          <WorkflowPanel artefactType="requirement" artefactId={reqId} projectPrefix={projectPrefix} projectId={requirement.project_id} />
 
-          <SectionCard title="Approval">
-            <div className="space-y-3">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Approver</div>
-                <div className="text-sm text-foreground">{resolveUserName(users, requirement.approver_id)}</div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Approved by</div>
-                <div className="text-sm text-foreground">{resolveUserName(users, requirement.approved_by_id)}</div>
-                {requirement.approved_at && <div className="text-xs text-muted-foreground mt-0.5">{formatDateTime(requirement.approved_at)}</div>}
-              </div>
-              <button
-                disabled={!canEditDocs || !requirement.approver_id || markApprovedMutation.isPending}
-                onClick={() => requirement.approver_id && markApprovedMutation.mutate(requirement.approver_id)}
-                className="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-500 disabled:opacity-50"
-              >
-                <UserCog className="h-3.5 w-3.5 mr-1" />
-                Mark Approved
-              </button>
-            </div>
-          </SectionCard>
+          {requirement.linked_test_runs?.length > 0 && (
+            <SectionCard title="Test runs">
+              <ul className="space-y-2">
+                {requirement.linked_test_runs.map((run) => (
+                  <li key={run.id} className="text-sm">
+                    <BudRunLink runId={run.test_run_id} source={{ source_kind: 'requirement', source_id: requirement.id }} label={run.test_run_name || undefined} />
+                    <div className="text-xs text-muted-foreground">{run.status || 'Status not recorded'}</div>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-muted-foreground mt-3">
+                A run opens in Bud, where its report can be downloaded.
+              </p>
+            </SectionCard>
+          )}
         </>
       }
     >
@@ -323,7 +252,9 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
           <DocEditor
             content={requirement.content_json as Record<string, unknown>}
             editable={false}
-            parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined}
+            userMentionItems={users.map(person => ({ id: person.id, label: person.full_name, user: person }))}
+            parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues} artefactLabels={artefactLabels}
+            artefactHref={(type, _id, label) => docUrl(prefix, type as DocType, label)}
             minHeight="min-h-[120px]"
             className="border-0"
           />
@@ -405,6 +336,7 @@ export default function RequirementDetail({ resolvedId }: { resolvedId?: number 
           </div>
         </SectionCard>
       )}
+
 
       <DocumentActivityPanel artefactType="requirement" artefactId={reqId} />
 

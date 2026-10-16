@@ -4,6 +4,7 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characte
 
 from fastapi.testclient import TestClient
 
+from tests.access_fixtures import add_policy_member
 from tests.conftest import create_project, unique_email, unique_suffix
 
 """Deleting a user must actually delete the user."""
@@ -63,10 +64,14 @@ def test_deleting_a_project_member_removes_it(api_client: TestClient):
     project_id = create_project(api_client, headers, f"Member Del {suffix}")["id"]
     user_id = _create_user(api_client, headers)
 
-    added = api_client.post(
-        f"/api/projects/{project_id}/members",
+    added = add_policy_member(
+        api_client,
         headers=headers,
-        json={"user_id": user_id, "role": "external"},
+        url=f"/api/projects/{project_id}/members",
+        user_id=user_id,
+        permissions={"*": ["view", "comment"]},
+        visibility="customer",
+        doc_types=["REQ", "TC", "CPT", "CMP"],
     )
     assert added.status_code in (200, 201), added.text
 

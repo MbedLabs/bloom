@@ -74,6 +74,7 @@ vi.mock('../components/DocumentLinksPanel', () => ({
 vi.mock('../components/DocumentActivityPanel', () => ({
   default: () => null,
 }))
+vi.mock('../components/ArtefactTags', () => ({ default: () => null }))
 
 describe('requirement origin presentation', () => {
   beforeAll(() => {

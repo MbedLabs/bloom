@@ -1,8 +1,11 @@
+import UserIdentity from '../UserIdentity'
+import { parameterKeyHref } from '../../utils/parameters'
 import './editor-styles.css'
 import { useRef, useCallback, useEffect } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import type { SuggestionProps } from '@tiptap/suggestion'
 import { BubbleMenu } from '@tiptap/react/menus'
+import { bubbleMenuVisibility } from './bubbleMenuVisibility'
 import { ReactRenderer } from '@tiptap/react'
 import Mention from '@tiptap/extension-mention'
 import StarterKit from '@tiptap/starter-kit'
@@ -44,10 +47,22 @@ interface DocEditorProps {
   mentionItems?: MentionSuggestion[]
   userMentionItems?: MentionSuggestion[]
   artefactSearch?: (query: string) => Promise<MentionSuggestion[]>
-  artefactHref?: (docType: string, id: number) => string
+  artefactHref?: (docType: string, id: number, label: string) => string
   /** Where a `{{parameter}}` links to. Omitted, the chip is not a link. */
   parameterHref?: string
+  /**
+   * Parameter and variable values by key. While editing, a `{{KEY}}` chip shows the
+   * key and its value on hover; while reading, it shows the value.
+   */
+  parameterValues?: Record<string, string>
+  /**
+   * The current public id of each tagged artefact by `TYPE:id`; null when the target
+   * is gone. A tag shows the current id and reads as plain text once its target is gone.
+   */
+  artefactLabels?: Record<string, string | null>
 }
+
+type MentionSpec = [string, Record<string, string>, string]
 
 export default function DocEditor({
   content,
@@ -65,7 +80,9 @@ export default function DocEditor({
   artefactSearch,
   artefactHref,
   parameterHref,
-}: DocEditorProps) {
+  parameterValues,
+  artefactLabels,
+}: Readonly<DocEditorProps>) {
   const mentionItemsRef = useRef(mentionItems)
   const userMentionItemsRef = useRef(userMentionItems)
   // Read through a ref for the same reason the lists are: the extensions are
@@ -73,6 +90,9 @@ export default function DocEditor({
   // the render that created the editor.
   const parameterHrefRef = useRef(parameterHref)
   const artefactSearchRef = useRef(artefactSearch)
+  const parameterValuesRef = useRef(parameterValues)
+  const artefactLabelsRef = useRef(artefactLabels)
+  const mentionViewsRef = useRef(new Set<() => void>())
   const artefactHrefRef = useRef(artefactHref)
 
   useEffect(() => {
@@ -84,6 +104,16 @@ export default function DocEditor({
   }, [artefactSearch])
 
   useEffect(() => {
+    parameterValuesRef.current = parameterValues
+    mentionViewsRef.current.forEach((render) => render())
+  }, [parameterValues])
+
+  useEffect(() => {
+    artefactLabelsRef.current = artefactLabels
+    mentionViewsRef.current.forEach((render) => render())
+  }, [artefactLabels])
+
+  useEffect(() => {
     artefactHrefRef.current = artefactHref
   }, [artefactHref])
 
@@ -93,7 +123,47 @@ export default function DocEditor({
 
   useEffect(() => {
     userMentionItemsRef.current = userMentionItems
+    mentionViewsRef.current.forEach((render) => render())
   }, [userMentionItems])
+
+  const mentionSpec = useCallback((node: { attrs: Record<string, unknown> }, editing: boolean | null): MentionSpec => {
+    const label = String(node.attrs.label ?? node.attrs.id)
+    if (node.attrs.mentionSuggestionChar === '#') {
+      const [docType, rawId] = String(node.attrs.id).split(':')
+      const resolved = editing === null ? undefined : artefactLabelsRef.current?.[String(node.attrs.id)]
+      if (resolved === null) {
+        return ['span', { 'data-type': 'mention', class: 'mention-artefact-gone' }, label]
+      }
+      const shown = resolved ?? label
+      const build = artefactHrefRef.current
+      const target = build && docType && rawId ? build(docType, Number(rawId), shown) : undefined
+      const attrs: Record<string, string> = {
+        'data-type': 'mention',
+        class: 'mention-artefact text-primary font-medium',
+      }
+      if (target) {
+        attrs.href = target
+        attrs.title = shown
+      }
+      return [target ? 'a' : 'span', attrs, shown]
+    }
+    if (node.attrs.mentionSuggestionChar === '@') {
+      return ['span', { 'data-type': 'mention', class: 'mention-user text-blue-500 font-medium' }, `@${label}`]
+    }
+    const href = parameterHrefRef.current
+    const attrs: Record<string, string> = { 'data-type': 'mention', class: 'mention' }
+    if (href) {
+      attrs.href = parameterKeyHref(href, label)
+      attrs.title = `Open parameter ${label}`
+    }
+    const value = parameterValuesRef.current?.[label]
+    if (editing !== null && value) {
+      attrs['data-parameter'] = label
+      attrs.title = editing ? value : `{{${label}}}`
+      if (!editing) return [href ? 'a' : 'span', attrs, value]
+    }
+    return [href ? 'a' : 'span', attrs, `{{${label}}}`]
+  }, [])
 
   const renderParameterMentionList = useCallback(() => {
     let component: ReactRenderer<MentionListRef> | null = null
@@ -213,7 +283,50 @@ export default function DocEditor({
         codeBlock: false,
         heading: { levels: [1, 2, 3, 4, 5, 6] },
       }),
-      Mention.configure({
+      Mention.extend({
+        addNodeView() {
+          return ({ node: initial, editor: host }) => {
+            let node = initial
+            const dom = document.createElement('span')
+            let identity: ReactRenderer | null = null
+            const render = () => {
+              const [tag, attrs, text] = mentionSpec(node, host.isEditable)
+              const inner = document.createElement(tag)
+              Object.entries(attrs).forEach(([name, value]) => inner.setAttribute(name, value))
+              identity?.destroy()
+              identity = null
+              if (node.attrs.mentionSuggestionChar === '@') {
+                const person = userMentionItemsRef.current.find((item) => String(item.id) === String(node.attrs.id))?.user
+                if (person?.profile_picture_url) identity = new ReactRenderer(UserIdentity, { editor: host, props: {
+                  user: person ?? { id: Number(node.attrs.id), full_name: String(node.attrs.label ?? node.attrs.id) },
+                  prefix: '@', pictureClassName: 'w-5 h-5',
+                } })
+                if (identity) inner.appendChild(identity.element)
+                else inner.textContent = text
+              } else {
+                inner.textContent = text
+              }
+              dom.replaceChildren(inner)
+            }
+            render()
+            mentionViewsRef.current.add(render)
+            return {
+              dom,
+              update: (next) => {
+                if (next.type !== node.type) return false
+                node = next
+                render()
+                return true
+              },
+              ignoreMutation: () => true,
+              destroy: () => {
+                identity?.destroy()
+                mentionViewsRef.current.delete(render)
+              },
+            }
+          }
+        },
+      }).configure({
         HTMLAttributes: { class: 'mention' },
         renderText: ({ node }) => {
           const label = String(node.attrs.label ?? node.attrs.id)
@@ -221,39 +334,7 @@ export default function DocEditor({
           if (node.attrs.mentionSuggestionChar === '#') return label
           return `{{${label}}}`
         },
-        renderHTML: ({ node }) => {
-          const label = String(node.attrs.label ?? node.attrs.id)
-          if (node.attrs.mentionSuggestionChar === '#') {
-            const [docType, rawId] = String(node.attrs.id).split(':')
-            const build = artefactHrefRef.current
-            const target = build && docType && rawId ? build(docType, Number(rawId)) : undefined
-            const attrs: Record<string, string> = {
-              'data-type': 'mention',
-              class: 'mention-artefact text-primary font-medium',
-            }
-            if (target) {
-              attrs.href = target
-              attrs.title = label
-            }
-            return [target ? 'a' : 'span', attrs, label]
-          }
-          if (node.attrs.mentionSuggestionChar === '@') {
-            return [
-              'span',
-              { 'data-type': 'mention', class: 'mention-user text-blue-500 font-medium' },
-              `@${label}`,
-            ]
-          }
-          // A parameter is written as a key, so on its own it does not say what it
-          // stands for.
-          const href = parameterHrefRef.current
-          const attrs: Record<string, string> = { 'data-type': 'mention', class: 'mention' }
-          if (href) {
-            attrs.href = href
-            attrs.title = 'Open Parameters & Variables'
-          }
-          return [href ? 'a' : 'span', attrs, `{{${label}}}`]
-        },
+        renderHTML: ({ node }) => mentionSpec(node, null),
         suggestions: [
           {
             char: PARAMETER_MENTION_TRIGGER,
@@ -353,7 +434,7 @@ export default function DocEditor({
     },
     editorProps: {
       attributes: {
-        class: `prose prose-sm dark:prose-invert max-w-none focus:outline-none ${minHeight} px-6 pt-4 ${headingNumbered ? 'heading-numbered' : ''}`,
+        class: `prose prose-sm dark:prose-invert max-w-none focus:outline-hidden ${minHeight} px-6 pt-4 ${headingNumbered ? 'heading-numbered' : ''}`,
       },
     },
   })
@@ -370,6 +451,7 @@ export default function DocEditor({
 
   useEffect(() => {
     editor?.setEditable(editable)
+    mentionViewsRef.current.forEach((render) => render())
   }, [editable, editor])
 
   const addLink = useCallback(() => {
@@ -420,7 +502,7 @@ export default function DocEditor({
         )}
 
         {editable && editor && (
-          <BubbleMenu editor={editor} className="bg-card border border-border rounded-lg shadow-elegant flex items-center gap-0.5 p-1">
+          <BubbleMenu editor={editor} shouldShow={bubbleMenuVisibility} className="bg-card border border-border rounded-lg shadow-elegant flex items-center gap-0.5 p-1">
             <BubbleButton
               active={editor.isActive('bold')}
               onClick={() => editor.chain().focus().toggleBold().run()}
@@ -466,12 +548,12 @@ function BubbleButton({
   onClick,
   label,
   className = '',
-}: {
+}: Readonly<{
   active: boolean
   onClick: () => void
   label: string
   className?: string
-}) {
+}>) {
   return (
     <button
       type="button"

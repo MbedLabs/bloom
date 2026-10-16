@@ -15,37 +15,42 @@ from slowapi.errors import RateLimitExceeded
 from sqlalchemy import or_, select, text
 from sqlalchemy.exc import IntegrityError
 
+from app.api import access_requests as access_requests_api
 from app.api import artefacts, attachments
+from app.api import audit as audit_api
 from app.api import auth as auth_api
 from app.api import (
     baselines,
     campaigns,
     changes,
+    company_logo,
     dashboard,
     defects,
     designs,
     docs_facade,
     documents,
     export,
+    groups,
     health,
     import_service,
     integrations,
     links,
     notifications,
+    policies,
     project_memberships,
     project_variables,
     projects,
+    report_requests,
     requirements,
     risks,
     search,
     service_credentials,
     setup,
-    test_cases,
-    test_concepts,
-    test_suites,
-    traceability,
 )
+from app.api import tags as tags_api
+from app.api import test_cases, test_concepts, test_suites, traceability
 from app.api import users as users_api
+from app.api import workflow
 from app.core.config import settings
 from app.core.database import async_session_maker, create_tables, engine
 from app.core.deps import limiter
@@ -441,6 +446,13 @@ app.include_router(
     tags=["Service Credentials"],
 )
 app.include_router(users_api.router, prefix="/api/users", tags=["Users"])
+app.include_router(audit_api.router, prefix="/api/audit", tags=["Audit"])
+app.include_router(
+    access_requests_api.router, prefix="/api/access-requests", tags=["Access requests"]
+)
+app.include_router(groups.router, prefix="/api/groups", tags=["Groups"])
+app.include_router(policies.router, prefix="/api/policies", tags=["Policies"])
+app.include_router(tags_api.router, prefix="/api", tags=["Tags"])
 app.include_router(setup.router, prefix="/api", tags=["Setup"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
@@ -459,6 +471,7 @@ app.include_router(test_cases.router, prefix="/api/test-cases", tags=["Test Case
 app.include_router(traceability.router, prefix="/api/traceability", tags=["Traceability"])
 app.include_router(documents.router, prefix="/api", tags=["Documents"])
 app.include_router(attachments.router, prefix="/api", tags=["Attachments"])
+app.include_router(report_requests.router, prefix="/api", tags=["Report requests"])
 app.include_router(test_suites.router, prefix="/api/test-suites", tags=["Test Suites"])
 app.include_router(campaigns.router, prefix="/api/campaigns", tags=["Campaigns"])
 app.include_router(designs.router, prefix="/api/designs", tags=["Designs"])
@@ -469,10 +482,12 @@ app.include_router(integrations.router, prefix="/api/integrations", tags=["Integ
 app.include_router(baselines.router, prefix="/api/baselines", tags=["Baselines"])
 app.include_router(test_concepts.router, prefix="/api/test-concepts", tags=["Test Concepts"])
 app.include_router(artefacts.router, prefix="/api/artefacts", tags=["Artefacts"])
+app.include_router(workflow.router, prefix="/api", tags=["Document workflow"])
 app.include_router(links.router, prefix="/api/links", tags=["Links"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
 app.include_router(import_service.router, prefix="/api", tags=["Import"])
 app.include_router(export.router, prefix="/api", tags=["Export"])
+app.include_router(company_logo.router, prefix="/api/company-logo", tags=["Company logo"])
 app.include_router(search.router, prefix="/api/search", tags=["Search"])
 app.include_router(docs_facade.router, prefix="/api", tags=["Docs Facade"])
 

@@ -1,17 +1,23 @@
+import SelectField from '../components/SelectField'
+import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useParams, useSearchParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Edit2, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Edit2, MoreVertical, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react'
 
 import { projectVariablesApi, ProjectVariable } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
-import { useAuth } from '../contexts/AuthContext'
+import { MenuAction, RowMenu, type MenuPosition } from '../components/RowMenu'
 import { useToast } from '../components/useToast'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
 
 export default function ProjectParameters() {
-  const { user } = useAuth()
+  const [searchParams] = useSearchParams()
+  const focusedKey = searchParams.get('key')
   const { prefix } = useParams<{ prefix: string }>()
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const { can } = useProjectPermissions(prefix)
+  const canEditDocs = can('edit', 'parameter')
+  const canDelete = can('delete', 'parameter')
   const { data: project, isLoading: projectLoading } = useProjectByPrefix(prefix)
   const projectId = project?.id || 0
   const queryClient = useQueryClient()
@@ -20,6 +26,7 @@ export default function ProjectParameters() {
   const [showCreate, setShowCreate] = useState(false)
   const [createForm, setCreateForm] = useState({ kind: 'variable' as ProjectVariable['kind'], key: '', value: '', description: '' })
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [menu, setMenu] = useState<({ id: number } & MenuPosition) | null>(null)
   const [editForm, setEditForm] = useState({ kind: 'variable' as ProjectVariable['kind'], key: '', value: '', description: '' })
 
   const { data: variables, isLoading: variablesLoading } = useQuery({
@@ -31,13 +38,19 @@ export default function ProjectParameters() {
   const createMutation = useMutation({
     mutationFn: projectVariablesApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projectVariables', projectId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
       setShowCreate(false)
       setCreateForm({ kind: 'variable', key: '', value: '', description: '' })
       toast.saved('Parameter')
     },
     onError: (error) => toast.failed('Creating the parameter', error),
   })
+
+  useEffect(() => {
+    if (!focusedKey) return
+    const row = document.getElementById(`parameter-${focusedKey}`)
+    if (row) row.scrollIntoView({ block: 'center' })
+  }, [focusedKey])
 
   useEffect(() => {
     if (!editingId || !variables) return
@@ -54,7 +67,7 @@ export default function ProjectParameters() {
   const deleteMutation = useMutation({
     mutationFn: projectVariablesApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projectVariables', projectId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
       toast.deleted('Parameter')
     },
     onError: (error) => toast.failed('Deleting the parameter', error),
@@ -65,7 +78,7 @@ export default function ProjectParameters() {
       projectVariablesApi.update(id, data),
     onSuccess: (_updated) => {
       void _updated
-      queryClient.invalidateQueries({ queryKey: ['projectVariables', projectId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
       setEditingId(null)
       toast.saved('Parameter')
     },
@@ -169,7 +182,7 @@ export default function ProjectParameters() {
           <form onSubmit={onCreate} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Kind</label>
-              <select
+              <SelectField
                 value={createForm.kind}
                 onChange={(e) => setCreateForm({ ...createForm, kind: e.target.value as ProjectVariable['kind'] })}
                 title="Select item kind"
@@ -177,7 +190,7 @@ export default function ProjectParameters() {
               >
                 <option value="variable">Variable</option>
                 <option value="parameter">Parameter</option>
-              </select>
+              </SelectField>
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Key</label>
@@ -247,7 +260,7 @@ export default function ProjectParameters() {
                   editingId === item.id ? (
                     <tr key={item.id} className="bg-accent/30">
                       <Td>
-                        <select
+                        <SelectField
                           value={editForm.kind}
                           onChange={(e) => setEditForm({ ...editForm, kind: e.target.value as ProjectVariable['kind'] })}
                           title="Select item kind"
@@ -255,7 +268,7 @@ export default function ProjectParameters() {
                         >
                           <option value="variable">Variable</option>
                           <option value="parameter">Parameter</option>
-                        </select>
+                        </SelectField>
                       </Td>
                       <Td>
                         <input
@@ -310,29 +323,36 @@ export default function ProjectParameters() {
                       </Td>
                     </tr>
                   ) : (
-                    <tr key={item.id} className="hover:bg-accent/50">
+                    <tr key={item.id} id={`parameter-${item.key}`} className={item.key === focusedKey ? 'bg-primary/10 ring-1 ring-primary/40' : 'hover:bg-accent/50'}>
                       <Td><span className="font-mono text-sm text-foreground">{item.kind}</span></Td>
                       <Td><span className="font-mono text-sm text-foreground">{item.key}</span></Td>
                       <Td><span className="font-mono text-xs text-muted-foreground">{item.value}</span></Td>
                       <Td>{item.description || '-'}</Td>
                       <Td>
                         {canEditDocs && (
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => setEditingId(item.id)}
-                              className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-input text-foreground hover:bg-accent/50"
-                            >
-                              <Edit2 className="h-3.5 w-3.5" />
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => deleteMutation.mutate(item.id)}
-                              className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-red-500/50 text-red-600 hover:bg-red-500/10"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              Delete
-                            </button>
-                          </div>
+                          <RowMenu
+                            icon={<MoreVertical className="h-4 w-4" />}
+                            title="Row actions"
+                            buttonClassName="flex h-8 w-8 items-center justify-center rounded border border-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
+                            menuHeight={canDelete ? 84 : 44}
+                            open={menu?.id === item.id}
+                            position={menu?.id === item.id ? menu : null}
+                            onToggle={(position) => setMenu(menu?.id === item.id ? null : { id: item.id, ...position })}
+                          >
+                            <MenuAction
+                              icon={<Edit2 className="h-3.5 w-3.5" />}
+                              label="Edit"
+                              onClick={() => { setEditingId(item.id); setMenu(null) }}
+                            />
+                            {canDelete && (
+                              <MenuAction
+                                icon={<Trash2 className="h-3.5 w-3.5" />}
+                                label="Delete"
+                                destructive
+                                onClick={() => { deleteMutation.mutate(item.id); setMenu(null) }}
+                              />
+                            )}
+                          </RowMenu>
                         )}
                       </Td>
                     </tr>
@@ -347,10 +367,10 @@ export default function ProjectParameters() {
   )
 }
 
-function Th({ children }: { children: React.ReactNode }) {
+function Th({ children }: Readonly<{ children: React.ReactNode }>) {
   return <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{children}</th>
 }
 
-function Td({ children }: { children: React.ReactNode }) {
+function Td({ children }: Readonly<{ children: React.ReactNode }>) {
   return <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{children}</td>
 }

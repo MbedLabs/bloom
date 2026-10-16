@@ -1,17 +1,34 @@
 """Reusable test suite API endpoints."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.artefact_utils import (
+    apply_update,
+    check_create_status_right,
+    check_external_change,
+    check_status_right,
+    check_visibility_right,
+    delete_project_row,
+    external_create_values,
+    get_row_or_404,
+    get_visible_row,
+    page_of,
+    prepare_workflow_update,
+    requirement_summary,
+    test_case_summary,
+    type_visible,
+    visible_types,
+)
 from app.api.link_read_utils import get_requirement_ids_verified_by_test_cases
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
 from app.core.security import (
     apply_external_visibility_filter,
+    doc_type_visible,
     get_current_user,
     require_project_access,
-    require_role,
 )
 from app.models import (
     ArtefactLink,
@@ -24,12 +41,10 @@ from app.models import (
     TestSuite,
     TestSuiteItem,
 )
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas import (
     PaginatedResponse,
-    RequirementSummary,
     TestCampaignSummary,
-    TestCaseSummary,
     TestConceptSummary,
     TestSuiteCreate,
     TestSuiteDetailResponse,
@@ -37,20 +52,17 @@ from app.schemas import (
     TestSuiteResponse,
     TestSuiteUpdate,
 )
+from app.services.artefact_tags import attach_tags, creation_tags
+from app.services.document_workflow import prepare_content_write
 
 router = APIRouter()
 
 
-def _test_case_summary(tc: TestCase) -> TestCaseSummary:
-    return TestCaseSummary(id=tc.id, tc_id=tc.tc_id, title=tc.title, status=tc.status)
-
-
-def _requirement_summary(req: Requirement) -> RequirementSummary:
-    return RequirementSummary(id=req.id, req_id=req.req_id, title=req.title, status=req.status)
-
-
 async def _build_suite_response(
-    suite: TestSuite, db: AsyncSession, current_user: User | None = None
+    suite: TestSuite,
+    db: AsyncSession,
+    current_user: User | None = None,
+    tc_visible: bool = True,
 ) -> TestSuiteResponse:
     total_items_query = (
         select(func.count(TestSuiteItem.id))
@@ -61,6 +73,8 @@ async def _build_suite_response(
         total_items_query = apply_external_visibility_filter(
             total_items_query, TestCase, current_user
         )
+    if not tc_visible:
+        total_items_query = total_items_query.where(false())
     total_items = (await db.execute(total_items_query)).scalar() or 0
     latest_execution_query = (
         select(
@@ -77,6 +91,8 @@ async def _build_suite_response(
         latest_execution_query = apply_external_visibility_filter(
             latest_execution_query, TestCase, current_user
         )
+    if not tc_visible:
+        latest_execution_query = latest_execution_query.where(false())
     latest_execution = (await db.execute(latest_execution_query)).one_or_none()
     return TestSuiteResponse(
         id=suite.id,
@@ -98,7 +114,10 @@ async def _build_suite_response(
 async def _build_suite_detail(
     suite: TestSuite, db: AsyncSession, current_user: User | None = None
 ) -> TestSuiteDetailResponse:
-    base = await _build_suite_response(suite, db, current_user)
+    types = await visible_types(db, current_user, suite.project_id) if current_user else None
+    base = await _build_suite_response(
+        suite, db, current_user, tc_visible=type_visible(types, "TC")
+    )
     items_query = (
         select(TestSuiteItem, TestCase)
         .join(TestCase, TestCase.id == TestSuiteItem.test_case_id)
@@ -107,6 +126,8 @@ async def _build_suite_detail(
     )
     if current_user is not None:
         items_query = apply_external_visibility_filter(items_query, TestCase, current_user)
+    if not type_visible(types, "TC"):
+        items_query = items_query.where(false())
     items_result = await db.execute(items_query)
 
     item_responses = []
@@ -119,7 +140,7 @@ async def _build_suite_detail(
                 test_case_id=item.test_case_id,
                 order=item.order,
                 created_at=item.created_at,
-                test_case=_test_case_summary(tc),
+                test_case=test_case_summary(tc),
             )
         )
         tc_ids.append(tc.id)
@@ -129,7 +150,7 @@ async def _build_suite_detail(
         requirement_ids.update(await get_requirement_ids_verified_by_test_cases(tc_ids, db))
 
     requirements = []
-    if requirement_ids:
+    if requirement_ids and type_visible(types, "REQ"):
         reqs = (
             (
                 await db.execute(
@@ -145,7 +166,7 @@ async def _build_suite_detail(
             .scalars()
             .all()
         )
-        requirements = [_requirement_summary(req) for req in reqs]
+        requirements = [requirement_summary(req) for req in reqs]
 
     campaigns = (
         (
@@ -153,7 +174,7 @@ async def _build_suite_detail(
                 apply_external_visibility_filter(
                     select(TestCampaign)
                     .join(CampaignSuite, CampaignSuite.campaign_id == TestCampaign.id)
-                    .where(CampaignSuite.suite_id == suite.id)
+                    .where(CampaignSuite.suite_id == suite.id, type_visible(types, "CMP"))
                     .order_by(TestCampaign.created_at.desc()),
                     TestCampaign,
                     current_user,
@@ -175,7 +196,7 @@ async def _build_suite_detail(
 
     # Related concepts: find CPTs linked to any TC in this suite via ArtefactLink
     related_concepts: list[TestConceptSummary] = []
-    if tc_ids:
+    if tc_ids and type_visible(types, "CPT"):
         concept_links = (
             (
                 await db.execute(
@@ -224,21 +245,24 @@ async def list_suites(
     project_id: int = Query(...),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id)
+    types = await visible_types(db, current_user, project_id)
+    if not type_visible(types, "TS"):
+        return PaginatedResponse(items=[], total=0, skip=skip, limit=limit)
 
     base = select(TestSuite).where(TestSuite.project_id == project_id)
     base = apply_external_visibility_filter(base, TestSuite, current_user)
-    total_q = select(func.count()).select_from(base.subquery())
-    total = (await db.execute(total_q)).scalar() or 0
-
-    query = base.order_by(TestSuite.created_at.desc()).offset(skip).limit(limit)
-    suites = (await db.execute(query)).scalars().all()
+    suites, total = await page_of(db, base, TestSuite, skip, limit)
+    tc_visible = type_visible(types, "TC")
 
     return PaginatedResponse(
-        items=[await _build_suite_response(item, db, current_user) for item in suites],
+        items=[
+            await _build_suite_response(item, db, current_user, tc_visible=tc_visible)
+            for item in suites
+        ],
         total=total,
         skip=skip,
         limit=limit,
@@ -248,46 +272,52 @@ async def list_suites(
 @router.post("", response_model=TestSuiteDetailResponse, status_code=201)
 async def create_suite(
     data: TestSuiteCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    project = (
-        await db.execute(select(Project).where(Project.id == data.project_id))
-    ).scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = await get_row_or_404(db, Project, data.project_id, "Project not found")
 
     await require_project_access(
         db,
         current_user,
         data.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        permission=("create", "TS"),
     )
+    named = data.model_dump(exclude_unset=True)
+    forced = external_create_values(current_user, "TS", named)
+    await check_create_status_right(db, current_user, data.project_id, "TS", named)
 
     suite_id = await next_doc_id(
         db, TestSuite, TestSuite.suite_id, data.project_id, project.prefix, "TS"
     )
+    tag_ids = await creation_tags(db, current_user, data.project_id, data.tag_ids)
     suite = TestSuite(
         project_id=data.project_id,
+        created_by_id=current_user.id,
         suite_id=suite_id,
         name=data.name,
         description=data.description,
-        status=data.status,
-        visibility=data.visibility,
+        status=forced.get("status", data.status),
+        visibility=forced.get("visibility", data.visibility),
     )
     db.add(suite)
     await db.flush()
+    await attach_tags(db, "test-suite", suite, tag_ids, current_user)
     await db.refresh(suite)
 
     # One statement for the whole selection. Ids that do not exist, or belong to
     # another project, are still skipped silently rather than rejected.
-    if data.test_case_ids:
+    if data.test_case_ids and await doc_type_visible(db, current_user, data.project_id, "TC"):
         valid_test_case_ids = set(
             (
                 await db.execute(
-                    select(TestCase.id).where(
-                        TestCase.id.in_(data.test_case_ids),
-                        TestCase.project_id == data.project_id,
+                    apply_external_visibility_filter(
+                        select(TestCase.id).where(
+                            TestCase.id.in_(data.test_case_ids),
+                            TestCase.project_id == data.project_id,
+                        ),
+                        TestCase,
+                        current_user,
                     )
                 )
             )
@@ -305,21 +335,12 @@ async def create_suite(
 @router.get("/{suite_id}", response_model=TestSuiteDetailResponse)
 async def get_suite(
     suite_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    suite = (
-        await db.execute(
-            apply_external_visibility_filter(
-                select(TestSuite).where(TestSuite.id == suite_id),
-                TestSuite,
-                current_user,
-            )
-        )
-    ).scalar_one_or_none()
-    if not suite:
-        raise HTTPException(status_code=404, detail="Test suite not found")
-    await require_project_access(db, current_user, suite.project_id)
+    suite = await get_visible_row(
+        db, TestSuite, suite_id, "Test suite not found", current_user, permission=("view", "TS")
+    )
     return await _build_suite_detail(suite, db, current_user)
 
 
@@ -327,72 +348,58 @@ async def get_suite(
 async def update_suite(
     suite_id: int,
     data: TestSuiteUpdate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    suite = (
-        await db.execute(select(TestSuite).where(TestSuite.id == suite_id))
-    ).scalar_one_or_none()
-    if not suite:
-        raise HTTPException(status_code=404, detail="Test suite not found")
-
-    await require_project_access(
-        db,
-        current_user,
-        suite.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+    suite = await get_visible_row(
+        db, TestSuite, suite_id, "Test suite not found", current_user, permission=("edit", "TS")
     )
+    changes = data.model_dump(exclude_unset=True)
+    check_external_change(current_user, "TS", suite, changes)
+    await check_status_right(db, current_user, "TS", suite, changes)
+    await check_visibility_right(db, current_user, "TS", suite, changes)
+    await prepare_workflow_update(db, suite, data, current_user)
 
-    for field, value in data.model_dump(exclude_unset=True).items():
-        setattr(suite, field, value)
-
-    await db.flush()
-    await db.refresh(suite)
+    await apply_update(db, suite, data, "test-suite")
     return await _build_suite_detail(suite, db, current_user)
 
 
 @router.delete("/{suite_id}", status_code=204)
 async def delete_suite(
     suite_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    suite = (
-        await db.execute(select(TestSuite).where(TestSuite.id == suite_id))
-    ).scalar_one_or_none()
-    if not suite:
-        raise HTTPException(status_code=404, detail="Test suite not found")
-    await require_project_access(
+    await delete_project_row(
         db,
         current_user,
-        suite.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        TestSuite,
+        suite_id,
+        "Test suite not found",
+        resource="TS",
+        audit_type="test-suite",
     )
-    await db.delete(suite)
 
 
 @router.post("/{suite_id}/items", response_model=TestSuiteItemResponse, status_code=201)
 async def add_suite_item(
     suite_id: int,
     test_case_id: int = Query(...),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    suite = (
-        await db.execute(select(TestSuite).where(TestSuite.id == suite_id))
-    ).scalar_one_or_none()
-    if not suite:
-        raise HTTPException(status_code=404, detail="Test suite not found")
-    await require_project_access(
-        db,
-        current_user,
-        suite.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+    suite = await get_visible_row(
+        db, TestSuite, suite_id, "Test suite not found", current_user, permission=("plan", "TS")
     )
-    tc = (
-        await db.execute(select(TestCase).where(TestCase.id == test_case_id))
-    ).scalar_one_or_none()
-    if not tc or tc.project_id != suite.project_id:
+    tc = await get_visible_row(
+        db,
+        TestCase,
+        test_case_id,
+        "Test case not found in suite project",
+        current_user,
+        permission=("view", "TC"),
+    )
+    if tc.project_id != suite.project_id:
         raise HTTPException(status_code=404, detail="Test case not found in suite project")
     existing = (
         await db.execute(
@@ -410,6 +417,7 @@ async def add_suite_item(
             select(func.count(TestSuiteItem.id)).where(TestSuiteItem.suite_id == suite_id)
         )
     ).scalar() or 0
+    await prepare_content_write(db, suite, current_user)
     item = TestSuiteItem(suite_id=suite_id, test_case_id=test_case_id, order=current_count)
     db.add(item)
     await db.flush()
@@ -420,7 +428,7 @@ async def add_suite_item(
         test_case_id=item.test_case_id,
         order=item.order,
         created_at=item.created_at,
-        test_case=_test_case_summary(tc),
+        test_case=test_case_summary(tc),
     )
 
 
@@ -428,27 +436,14 @@ async def add_suite_item(
 async def remove_suite_item(
     suite_id: int,
     item_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    suite = (
-        await db.execute(select(TestSuite).where(TestSuite.id == suite_id))
-    ).scalar_one_or_none()
-    if not suite:
-        raise HTTPException(status_code=404, detail="Test suite not found")
-    await require_project_access(
-        db,
-        current_user,
-        suite.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+    suite = await get_visible_row(
+        db, TestSuite, suite_id, "Test suite not found", current_user, permission=("plan", "TS")
     )
-    item = (
-        await db.execute(
-            select(TestSuiteItem).where(
-                TestSuiteItem.id == item_id, TestSuiteItem.suite_id == suite_id
-            )
-        )
-    ).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Suite item not found")
+    item = await get_row_or_404(
+        db, TestSuiteItem, item_id, "Suite item not found", TestSuiteItem.suite_id == suite_id
+    )
+    await prepare_content_write(db, suite, current_user)
     await db.delete(item)

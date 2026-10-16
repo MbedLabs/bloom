@@ -1,34 +1,39 @@
 """Risk items API endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.artefact_utils import (
-    log_artefact_activity,
-    log_document_workflow_activity_from_patch,
-    should_log_generic_document_update,
-    updated_summary,
+from app.api.artefact_crud import (
+    ArtefactKind,
+    create_item,
+    get_item,
+    list_items,
+    update_item,
 )
+from app.api.artefact_utils import delete_project_row
 from app.core.database import get_db
-from app.core.id_generator import next_doc_id
-from app.core.security import (
-    apply_external_visibility_filter,
-    get_current_user,
-    require_project_access,
-    require_role,
-)
-from app.models import Project, RiskItem
-from app.models.user import User, UserRole
+from app.core.security import get_current_user
+from app.models import RiskItem
+from app.models.user import User
 from app.schemas import (
     PaginatedResponse,
     RiskItemCreate,
     RiskItemResponse,
     RiskItemUpdate,
 )
-from app.services.tag_links import sync_tag_links
 
 router = APIRouter()
+
+KIND = ArtefactKind(
+    model=RiskItem,
+    type_code="RSK",
+    id_attr="risk_id",
+    activity_type="risk",
+    created_label="risk",
+    updated_label="risk item",
+    not_found="Risk item not found",
+    exists="Risk item with this ID already exists",
+)
 
 
 def _risk_response(item: RiskItem) -> RiskItemResponse:
@@ -40,84 +45,38 @@ async def list_risk_items(
     project_id: int = Query(..., description="Filter by project ID"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    await require_project_access(db, current_user, project_id)
-
-    base = select(RiskItem).where(RiskItem.project_id == project_id)
-    base = apply_external_visibility_filter(base, RiskItem, current_user)
-    total_q = select(func.count()).select_from(base.subquery())
-    total = (await db.execute(total_q)).scalar() or 0
-    query = base.order_by(RiskItem.created_at.desc()).offset(skip).limit(limit)
-    result = await db.execute(query)
-    items = [_risk_response(item) for item in result.scalars().all()]
-    return PaginatedResponse(items=items, total=total, skip=skip, limit=limit)
+    return await list_items(db, KIND, project_id, skip, limit, current_user, _risk_response)
 
 
 @router.post("", response_model=RiskItemResponse, status_code=201)
 async def create_risk_item(
     data: RiskItemCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    project = (
-        await db.execute(select(Project).where(Project.id == data.project_id))
-    ).scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    await require_project_access(
+    item = await create_item(
         db,
-        current_user,
+        KIND,
         data.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
-    )
-
-    risk_id = await next_doc_id(
-        db, RiskItem, RiskItem.risk_id, data.project_id, project.prefix, "RSK"
-    )
-
-    existing = await db.execute(
-        select(RiskItem).where(
-            RiskItem.project_id == data.project_id,
-            RiskItem.risk_id == risk_id,
-        )
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Risk item with this ID already exists")
-
-    item = RiskItem(
-        project_id=data.project_id,
-        risk_id=risk_id,
-        title=data.title,
-        description=data.description,
-        status=data.status,
-        severity=data.severity,
-        probability=data.probability,
-        mitigation=data.mitigation,
-        risk_category=data.risk_category,
-        visibility=data.visibility,
-        linked_requirement_id=None,
-        content_json=data.content_json,
-        content_html=data.content_html,
-    )
-    db.add(item)
-    await db.flush()
-    await db.refresh(item)
-    await sync_tag_links(
-        db,
-        project_id=item.project_id,
-        source_type="RSK",
-        source_id=item.id,
-        content_json=item.content_json,
-    )
-    await log_artefact_activity(
-        db,
-        "risk",
-        item.id,
-        "created",
-        f"{current_user.full_name} created risk {item.risk_id}",
+        {
+            "title": data.title,
+            "description": data.description,
+            "status": data.status,
+            "severity": data.severity,
+            "probability": data.probability,
+            "mitigation": data.mitigation,
+            "risk_category": data.risk_category,
+            "visibility": data.visibility,
+            "linked_requirement_id": None,
+            "content_json": data.content_json,
+            "content_html": data.content_html,
+        },
+        current_user,
+        named=data.model_dump(exclude_unset=True),
+        tag_ids=data.tag_ids,
     )
     return _risk_response(item)
 
@@ -125,97 +84,36 @@ async def create_risk_item(
 @router.get("/{risk_id}", response_model=RiskItemResponse)
 async def get_risk_item(
     risk_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    item = (
-        await db.execute(
-            apply_external_visibility_filter(
-                select(RiskItem).where(RiskItem.id == risk_id), RiskItem, current_user
-            )
-        )
-    ).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Risk item not found")
-    await require_project_access(db, current_user, item.project_id)
-    return _risk_response(item)
+    return _risk_response(await get_item(db, KIND, risk_id, current_user))
 
 
 @router.patch("/{risk_id}", response_model=RiskItemResponse)
 async def update_risk_item(
     risk_id: int,
     data: RiskItemUpdate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    item = (await db.execute(select(RiskItem).where(RiskItem.id == risk_id))).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Risk item not found")
-
-    await require_project_access(
-        db,
-        current_user,
-        item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
-    )
-
-    fields_set = data.model_fields_set
-    previous_status = item.status if "status" in fields_set else None
-
-    for field, value in data.model_dump(exclude_unset=True).items():
-        setattr(item, field, value)
-    if item.content_json is not None and "content_json" in fields_set:
-        await sync_tag_links(
-            db,
-            project_id=item.project_id,
-            source_type="RSK",
-            source_id=item.id,
-            content_json=item.content_json,
-        )
-
-    await db.flush()
-    await db.refresh(item)
-    await log_document_workflow_activity_from_patch(
-        db,
-        artefact_type="risk",
-        artefact_id=item.id,
-        public_id=item.risk_id,
-        actor=current_user,
-        fields_set=fields_set,
-        previous_status=previous_status,
-        next_status=item.status,
-    )
-    if should_log_generic_document_update(fields_set):
-        await log_artefact_activity(
-            db,
-            "risk",
-            item.id,
-            "updated",
-            updated_summary(current_user.full_name, "risk item", item.risk_id, fields_set),
-        )
+    item = await update_item(db, KIND, risk_id, data, current_user)
     return _risk_response(item)
 
 
 @router.delete("/{risk_id}", status_code=204)
 async def delete_risk_item(
     risk_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.admin, UserRole.maintainer)),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
 ):
-    item = (await db.execute(select(RiskItem).where(RiskItem.id == risk_id))).scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Risk item not found")
-    await require_project_access(
+    await delete_project_row(
         db,
         current_user,
-        item.project_id,
-        roles={UserRole.admin.value, UserRole.maintainer.value},
+        RiskItem,
+        risk_id,
+        "Risk item not found",
+        resource="RSK",
+        audit_type="risk",
+        activity=("risk", "risk_id"),
     )
-    await log_artefact_activity(
-        db,
-        "risk",
-        item.id,
-        "deleted",
-        f"{current_user.full_name} deleted risk {item.risk_id}",
-    )
-    await db.delete(item)

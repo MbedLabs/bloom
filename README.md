@@ -1,8 +1,8 @@
 # Bloom PLM by EmbedLabs
 
-Bloom PLM is a self-hosted product lifecycle management platform for requirements, controlled documents, verification, risks, changes, defects, baselines, and end-to-end traceability.
+Bloom PLM is a product lifecycle management platform for requirements, controlled documents, verification, risks, changes, defects, baselines, and end-to-end traceability.
 
-> **Release:** 1.1.0 public beta
+> **Development:** 1.2.0 · **Published release:** 1.1.0 public beta
 
 ## What Bloom provides
 
@@ -10,10 +10,12 @@ Bloom PLM is a self-hosted product lifecycle management platform for requirement
 - Test cases, suites, campaigns, concepts, and verification planning
 - Risks, changes, defects, parameters, and baselines
 - Traceability links, relationship views, and coverage analysis
+- Notifications, and project-wide search across artefacts
 - Inline `#` tags that turn a mention in a document body into a link a reader can follow
 - Stable human-readable identifiers for controlled project records
 - Administrator, maintainer, and external-user access controls
-- ReqIF import plus CSV and PDF exports
+- ReqIF and Markdown document import; test cases import from CSV and XML and export as CSV, XML, and Markdown
+- PDF and CSV exports, with an optional administrator company logo on PDF reports
 - GitHub, GitLab, and Jira synchronization for defects and change requests
 - Optional test-case execution outcomes from Bud TMP
 - Readiness, health, metrics, structured logging, and backup workflows
@@ -72,7 +74,6 @@ Open `.env` and set at least:
 - `ADMIN_PASSWORD`
 - `ADMIN_FULL_NAME`
 - `APP_BASE_URL`
-- `FRONTEND_BASE_URL`
 - `BLOOM_APP_URL`
 
 For a new database, set `AUTO_SEED_ADMIN=true` for the first startup. In production, Bloom rejects a missing or weak signing key and requires an administrator password of at least 16 characters.
@@ -121,6 +122,12 @@ Open `http://localhost:8000`.
 - `/api/health` checks process liveness.
 - `/api/ready` checks application readiness and PostgreSQL connectivity.
 - `/api/version` reports the running version.
+
+## Report requests
+
+A reader who can see a linked test case, suite, requirement or campaign can select **Request report** beside its Bud run link. Bloom records the request and shows Pending until a Bud publisher delivers the report or refuses with a reason. Repeated pending requests are deduplicated per reader, run and project. Delivered report links keep the existing document visibility rules.
+
+Bud collects requests through its configured Bloom connection; Bloom stores no reader Bud credentials. The existing integration credential carries the reader name/email and the report-request status. Connection failures leave requests pending for a later collection. Report files arrive through the existing Bud publishing path.
 
 ## Connect Bloom to Bud
 

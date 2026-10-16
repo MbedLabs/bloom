@@ -151,7 +151,7 @@ function countNodes(nodes: ImpactNode[]): number {
   return count
 }
 
-function ImpactTree({ nodes, direction, prefix }: { nodes: ImpactNode[]; direction: string; prefix: string }) {
+function ImpactTree({ nodes, direction, prefix }: Readonly<{ nodes: ImpactNode[]; direction: string; prefix: string }>) {
   return (
     <div className="space-y-1">
       {nodes.map((node) => (
@@ -161,7 +161,7 @@ function ImpactTree({ nodes, direction, prefix }: { nodes: ImpactNode[]; directi
   )
 }
 
-function ImpactTreeNode({ node, direction, depth, prefix }: { node: ImpactNode; direction: string; depth: number; prefix: string }) {
+function ImpactTreeNode({ node, direction, depth, prefix }: Readonly<{ node: ImpactNode; direction: string; depth: number; prefix: string }>) {
   const [expanded, setExpanded] = useState(depth < 1)
   const hasChildren = node.children.length > 0
   const borderColor = direction === 'upstream' ? 'border-l-blue-400' : 'border-l-orange-400'
@@ -173,15 +173,15 @@ function ImpactTreeNode({ node, direction, depth, prefix }: { node: ImpactNode; 
       >
         <div className="flex items-center space-x-2 min-w-0">
           {hasChildren ? (
-            <button onClick={() => setExpanded(!expanded)} className="flex-shrink-0 p-0.5 hover:bg-accent/50 rounded">
+            <button onClick={() => setExpanded(!expanded)} className="shrink-0 p-0.5 hover:bg-accent/50 rounded">
               {expanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
             </button>
           ) : (
-            <div className="w-5 flex-shrink-0" />
+            <div className="w-5 shrink-0" />
           )}
           <Link
             to={docUrl(prefix, 'REQ', node.requirement.req_id)}
-            className="font-mono text-xs text-primary hover:text-primary/80 font-medium flex-shrink-0"
+            className="font-mono text-xs text-primary hover:text-primary/80 font-medium shrink-0"
           >
             {node.requirement.req_id}
           </Link>
@@ -192,7 +192,7 @@ function ImpactTreeNode({ node, direction, depth, prefix }: { node: ImpactNode; 
             {node.requirement.title}
           </Link>
         </div>
-        <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
+        <div className="flex items-center space-x-2 shrink-0 ml-2">
           <LinkTypeBadge linkType={node.link_type} />
           <span className="text-xs text-muted-foreground">depth {node.depth}</span>
         </div>
@@ -214,7 +214,7 @@ function ImpactTreeNode({ node, direction, depth, prefix }: { node: ImpactNode; 
   )
 }
 
-function LinkTypeBadge({ linkType }: { linkType: string }) {
+function LinkTypeBadge({ linkType }: Readonly<{ linkType: string }>) {
   const config: Record<string, { colors: string; label: string }> = {
     verifies: { colors: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400', label: 'verifies' },
     traces_to: { colors: 'bg-blue-500/10 text-blue-700 dark:text-blue-400', label: 'traces to' },

@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
-import { extractApiErrorMessage, projectsApi, type Project } from '../api/client'
+import { extractApiErrorMessage, groupsApi, projectsApi, type Project } from '../api/client'
 import { Plus, FolderKanban, Search, FileText, CheckCircle, ArrowRight, Pencil } from 'lucide-react'
+import { applicationAllows } from '../lib/applicationAccess'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
 
@@ -11,7 +12,8 @@ const PROJECT_PREFIX_ERROR = 'Use exactly three uppercase letters, e.g. PRJ.'
 
 export default function Projects() {
   const { user } = useAuth()
-  const canManageProjects = user?.role === 'admin'
+  const canManageAccess = applicationAllows(user, 'view')
+  const canManageProjects = user?.role === 'admin' || canManageAccess
   const canCreateProjects = user?.role === 'admin' || user?.role === 'maintainer'
   const navigate = useNavigate()
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -28,10 +30,14 @@ export default function Projects() {
     queryFn: projectsApi.list,
   })
 
+  const { data: assignmentOptions } = useQuery({ queryKey: ['access-assignment-options'], queryFn: groupsApi.assignmentOptions, enabled: canManageAccess && user?.role !== 'admin' })
+  const accessProjects = (assignmentOptions?.projects ?? []).filter((entry) => !projects?.some((project) => project.id === entry.id) && (!search || `${entry.name} ${entry.prefix}`.toLowerCase().includes(search.toLowerCase())))
+
   const createMutation = useMutation({
     mutationFn: projectsApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      void queryClient.invalidateQueries({ queryKey: ['projects'] })
+      void queryClient.invalidateQueries({ queryKey: ['access-assignment-options'] })
       setFormError('')
       setShowCreateModal(false)
       setName('')
@@ -119,9 +125,9 @@ export default function Projects() {
         <div className="bg-card rounded-lg border border-border shadow-elegant p-8 text-center text-muted-foreground">
           Loading...
         </div>
-      ) : !filteredProjects || filteredProjects.length === 0 ? (
+      ) : (!filteredProjects || filteredProjects.length === 0) && accessProjects.length > 0 ? null : !filteredProjects || filteredProjects.length === 0 ? (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-16 text-center">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-5">
+          <div className="w-20 h-20 rounded-2xl bg-linear-to-br/srgb from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-5">
             <FolderKanban className="h-10 w-10 text-primary/40" />
           </div>
           <h3 className="text-lg font-semibold text-foreground mb-2">
@@ -153,9 +159,14 @@ export default function Projects() {
         </div>
       )}
 
-      {/* Create Modal */}
+      {accessProjects.length > 0 && <section className="rounded-lg border border-border bg-card p-5">
+        <h3 className="font-semibold">Project access</h3>
+        <p className="mt-1 text-sm text-muted-foreground">Select members for each project's policy groups.</p>
+        <ul className="mt-3 divide-y divide-border">{accessProjects.map((entry) => <li key={entry.id} className="flex items-center justify-between gap-3 py-3"><span className="text-sm">{entry.name} <span className="text-muted-foreground">({entry.prefix})</span></span><button type="button" onClick={() => navigate(`/projects/${entry.prefix}/edit`)} className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent">Select members</button></li>)}</ul>
+      </section>}
+
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50">
           <div className="bg-card border border-border rounded-xl shadow-glow max-w-md w-full mx-4 animate-fade-in">
             <div className="px-6 py-4 border-b border-border">
               <h3 className="text-lg font-semibold text-foreground">New Project</h3>
@@ -236,11 +247,11 @@ function ProjectCard({
   project,
   canEdit,
   onEdit,
-}: {
+}: Readonly<{
   project: Project
   canEdit: boolean
   onEdit: () => void
-}) {
+}>) {
   const navigate = useNavigate()
   const coverage = Math.round(project.coverage_percent)
 
@@ -250,7 +261,7 @@ function ProjectCard({
       onClick={() => navigate(`/projects/${project.prefix}`)}
     >
       <div className={`h-1 ${
-        project.status === 'Active' ? 'bg-gradient-to-r from-primary via-[#7c3aed] to-[#6b7280]' : 'bg-muted'
+        project.status === 'Active' ? 'bg-linear-to-r/srgb from-primary via-[#7c3aed] to-[#6b7280]' : 'bg-muted'
       }`} />
 
       <div className="p-5">
@@ -300,7 +311,7 @@ function ProjectCard({
           <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${
-                coverage >= 80 ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' : coverage >= 50 ? 'bg-gradient-to-r from-amber-500 to-amber-400' : 'bg-gradient-to-r from-red-400 to-red-300'
+                coverage >= 80 ? 'bg-linear-to-r/srgb from-emerald-500 to-emerald-400' : coverage >= 50 ? 'bg-linear-to-r/srgb from-amber-500 to-amber-400' : 'bg-linear-to-r/srgb from-red-400 to-red-300'
               }`}
               style={{ width: `${Math.max(coverage, 3)}%` }}
             />
@@ -324,7 +335,7 @@ function ProjectCard({
   )
 }
 
-function ProjectStatusBadge({ status }: { status: string }) {
+function ProjectStatusBadge({ status }: Readonly<{ status: string }>) {
   const config: Record<string, string> = {
     Active: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
     Archived: 'bg-muted text-muted-foreground',

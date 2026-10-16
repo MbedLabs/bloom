@@ -24,7 +24,7 @@ export default function DocEditorToolbar({
   editor, onAddLink, onAddImage, onAddTable,
   headingNumbered = true, onHeadingNumberedChange,
   outlineOpen = false, onOutlineToggle,
-}: DocEditorToolbarProps) {
+}: Readonly<DocEditorToolbarProps>) {
   const [headingOpen, setHeadingOpen] = useState(false)
   const [colorOpen, setColorOpen] = useState(false)
   const [lineHeightOpen, setLineHeightOpen] = useState(false)
@@ -358,13 +358,13 @@ function ToolbarButton({
   disabled = false,
   icon,
   title,
-}: {
+}: Readonly<{
   onClick: () => void
   active?: boolean
   disabled?: boolean
   icon: React.ReactNode
   title: string
-}) {
+}>) {
   return (
     <button
       type="button"
@@ -384,7 +384,7 @@ function ToolbarButton({
   )
 }
 
-function SmallButton({ onClick, label, className = '' }: { onClick: () => void; label: string; className?: string }) {
+function SmallButton({ onClick, label, className = '' }: Readonly<{ onClick: () => void; label: string; className?: string }>) {
   return (
     <button
       type="button"
@@ -405,12 +405,12 @@ function HeadingOption({
   active,
   onClick,
   className = '',
-}: {
+}: Readonly<{
   label: string
   active: boolean
   onClick: () => void
   className?: string
-}) {
+}>) {
   return (
     <button
       onClick={onClick}

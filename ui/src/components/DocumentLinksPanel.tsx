@@ -1,3 +1,5 @@
+import SelectField from './SelectField'
+import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -24,15 +26,15 @@ import {
   type DocType,
 } from '../types/doc'
 import { SectionCard } from './DocDetailShell'
-import { useAuth } from '../contexts/AuthContext'
 import { useDebounced } from '../hooks/useDebounced'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
 
 export interface LinkTarget {
   id: number
   doc_id: string
   doc_type: DocType
   title: string
-  status: string
+  status: string | null
 }
 
 /** The server's ceiling on a single `keys` request, and on the picker's page. */
@@ -67,14 +69,14 @@ function DocumentLinkRow({
   sourceDocId,
   direction,
   onDelete,
-}: {
+}: Readonly<{
   link: ArtefactLink
   target: LinkTarget | undefined
   projectPrefix: string
   sourceDocId?: string
   direction: 'incoming' | 'outgoing'
   onDelete?: () => void
-}) {
+}>) {
   const otherType = (direction === 'outgoing' ? link.target_type : link.source_type) as DocType
   const otherId = direction === 'outgoing' ? link.target_id : link.source_id
   const roleLabel = getDocLinkRoleLabel(link.role, direction)
@@ -126,13 +128,13 @@ function LinkDocumentModal({
   sourceType,
   sourceId,
   onClose,
-}: {
+}: Readonly<{
   projectId: number
   projectPrefix: string
   sourceType: string
   sourceId: number
   onClose: () => void
-}) {
+}>) {
   const queryClient = useQueryClient()
   const toast = useToast()
   const normalizedSourceType = normalizeDocTypeParam(sourceType)
@@ -203,7 +205,8 @@ function LinkDocumentModal({
       })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['docLinks', projectId] })
+      refreshProjectViews(queryClient, { prefix: projectPrefix, projectId })
+      void queryClient.invalidateQueries({ queryKey: ['docLinks', projectId] })
       toast.notify('Relationship added', 'success')
       onClose()
     },
@@ -238,7 +241,7 @@ function LinkDocumentModal({
   const hiddenCount = Math.max(0, (candidates?.total ?? 0) - (candidates?.items?.length ?? 0))
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50">
       <div className="bg-card rounded-lg shadow-elegant max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col">
         <div className="px-6 py-4 border-b border-border flex justify-between items-center">
           <h3 className="text-lg font-semibold">Link Document</h3>
@@ -255,7 +258,7 @@ function LinkDocumentModal({
               className="w-full pl-9 pr-3 py-2 bg-background border border-input rounded-md text-sm"
             />
           </div>
-          <select
+          <SelectField
             value={targetType}
             onChange={(event) => setTargetType(event.target.value as DocType)}
             title="Target artefact kind"
@@ -269,8 +272,8 @@ function LinkDocumentModal({
                 <option key={item} value={item}>{DOC_TYPE_LABELS[item]}</option>
               ))
             )}
-          </select>
-          <select
+          </SelectField>
+          <SelectField
             value={selectedOptionKey}
             onChange={(event) => setSelectedOptionKey(event.target.value)}
             title="Link relationship"
@@ -284,7 +287,7 @@ function LinkDocumentModal({
                 <option key={option.key} value={option.key}>{option.label}</option>
               ))
             )}
-          </select>
+          </SelectField>
         </div>
         <div className="overflow-y-auto themed-scrollbar p-3">
           {availableTargetTypes.length === 0 ? (
@@ -335,7 +338,7 @@ export function DocumentLinksPanel({
   sourceId,
   sourceDocId,
   derivedLinks,
-}: {
+}: Readonly<{
   projectId: number
   projectPrefix: string
   sourceType: string
@@ -343,12 +346,12 @@ export function DocumentLinksPanel({
   /** Human-readable id of the document this panel belongs to (e.g. FLT-REQ-001). */
   sourceDocId?: string
   derivedLinks?: ArtefactLink[]
-}) {
-  const { user } = useAuth()
+}>) {
   const queryClient = useQueryClient()
   const toast = useToast()
   const [showModal, setShowModal] = useState(false)
-  const canEditDocs = user?.role === 'admin' || user?.role === 'maintainer'
+  const { can } = useProjectPermissions(undefined, projectId)
+  const canEditDocs = can('create', 'link')
 
   const { data: outgoingLinks } = useQuery({
     queryKey: ['docLinks', projectId, sourceType, sourceId, 'outgoing'],
@@ -363,7 +366,8 @@ export function DocumentLinksPanel({
   const deleteMutation = useMutation({
     mutationFn: linksApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['docLinks', projectId] })
+      refreshProjectViews(queryClient, { prefix: projectPrefix, projectId })
+      void queryClient.invalidateQueries({ queryKey: ['docLinks', projectId] })
       toast.notify('Relationship removed', 'success')
     },
     onError: (error) => toast.failed('Removing the relationship', error),
@@ -519,7 +523,7 @@ export function DocumentLinksPanel({
                 projectPrefix={projectPrefix}
                 sourceDocId={sourceDocId}
                 direction={direction}
-                onDelete={canEditDocs && !isDerived ? () => deleteMutation.mutate(link.id) : undefined}
+                onDelete={can('delete', 'link') && !isDerived ? () => deleteMutation.mutate(link.id) : undefined}
               />
             )
           })}

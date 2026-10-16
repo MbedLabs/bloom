@@ -7,40 +7,26 @@ import { docRegistryListUrl, syncRegistryProjectContext } from '../lib/docRegist
 import { searchResultUrl } from '../lib/searchLinks'
 import { getBudAppBaseUrl } from '../lib/budLinks'
 import { getBreadcrumbs } from '../lib/breadcrumbs'
+import { roleLabel } from '../lib/roles'
+import { applicationAllows } from '../lib/applicationAccess'
 import { useAuth } from '../contexts/AuthContext'
+import ProfilePicture from './ProfilePicture'
 import { PageMetaProvider, usePageMeta } from '../contexts/PageMetaContext'
 import PoweredByEmbedLabs from './PoweredByEmbedLabs'
 import {
   LayoutDashboard, FolderKanban, FileText, CheckSquare,
   GitBranch, BarChart3, Sun, Moon, Bell,
   ExternalLink, ChevronDown, ChevronLeft, ChevronRight, Search,
-  BookOpen, Bug, Layers, FlaskConical, LogOut, Users, PenTool, AlertTriangle, GitPullRequest, Settings, SlidersHorizontal,
+  BookOpen, Bug, Layers, FlaskConical, LogOut, Users, PenTool, AlertTriangle, GitPullRequest, Settings, SlidersHorizontal, ShieldCheck, ScrollText,
 } from 'lucide-react'
+import { useProjectPermissions } from '../hooks/useProjectPermissions'
+import { useDarkMode } from '../hooks/useDarkMode'
+import { formatDateTime } from '../test/date-utils'
 
 /** Must match Tailwind `w-60` / `w-14` and main `ml-*` — also positions the seam toggle. */
 const SIDEBAR_EDGE = { expanded: '15rem', collapsed: '3.5rem' } as const
 
 const BUD_APP_URL = getBudAppBaseUrl()
-
-function useDarkMode() {
-  const [dark, setDark] = useState(() => {
-    const stored = localStorage.getItem('bloom-theme')
-    if (stored) return stored === 'dark'
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
-  })
-
-  useEffect(() => {
-    const root = document.documentElement
-    if (dark) {
-      root.classList.add('dark')
-    } else {
-      root.classList.remove('dark')
-    }
-    localStorage.setItem('bloom-theme', dark ? 'dark' : 'light')
-  }, [dark])
-
-  return [dark, setDark] as const
-}
 
 const mainNav = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -65,7 +51,7 @@ const projectNav = [
   { name: 'Parameters', icon: SlidersHorizontal, tab: '', href: 'parameters' as const },
 ]
 
-function Beaker(props: { className?: string }) {
+function Beaker(props: Readonly<{ className?: string }>) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
       <path d="M4.5 3h15" /><path d="M6 3v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V3" /><path d="M6 14h12" />
@@ -173,7 +159,7 @@ function LayoutInner() {
     setSearchOpen(false)
     setSearchQuery('')
     searchInputRef.current?.blur()
-    navigate(searchResultUrl(item))
+    void navigate(searchResultUrl(item))
   }
 
   // Notifications: unread badge polls every 60s; list loads when the panel opens.
@@ -191,8 +177,8 @@ function LayoutInner() {
     enabled: notifOpen,
   })
   const invalidateNotifications = () => {
-    queryClient.invalidateQueries({ queryKey: ['notifications-unread'] })
-    queryClient.invalidateQueries({ queryKey: ['notifications-list'] })
+    void queryClient.invalidateQueries({ queryKey: ['notifications-unread'] })
+    void queryClient.invalidateQueries({ queryKey: ['notifications-list'] })
   }
   const markReadMutation = useMutation({
     mutationFn: notificationsApi.markRead,
@@ -216,7 +202,7 @@ function LayoutInner() {
   const openNotification = (id: number, linkPath: string | null, alreadyRead: boolean) => {
     if (!alreadyRead) markReadMutation.mutate(id)
     setNotifOpen(false)
-    if (linkPath) navigate(linkPath)
+    if (linkPath) void navigate(linkPath)
   }
 
   const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -259,16 +245,20 @@ function LayoutInner() {
     : user?.role === 'maintainer'
     ? 'bg-blue-500/10 text-violet-400'
     : 'bg-green-500/10 text-green-400'
-  const canEditProjectParameters = user?.role === 'admin' || user?.role === 'maintainer'
+  const currentProjectId = projects?.find(
+    (p) => p.prefix === currentProjectSlug || String(p.id) === currentProjectSlug,
+  )?.id
+  const { can } = useProjectPermissions(undefined, currentProjectId)
+  const canEditProjectParameters = can('edit', 'parameter')
+
+  const [signingOut, setSigningOut] = useState(false)
 
   const handleLogout = () => {
-    logout()
-    navigate('/login')
+    if (signingOut) return
+    setSigningOut(true)
+    logout().catch(() => setSigningOut(false))
   }
 
-  const userInitials = user?.full_name
-    ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-    : 'U'
 
   return (
     <div className="h-screen flex overflow-hidden">
@@ -300,7 +290,7 @@ function LayoutInner() {
                 to={item.href}
                 className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-2 rounded-lg text-sm font-medium transition-all duration-200 group ${
                   isActive && !isInProject
-                    ? 'bg-sidebar-active text-white shadow-sm'
+                    ? 'bg-sidebar-active text-white shadow-xs'
                     : 'text-violet-100/70 hover:bg-sidebar-hover hover:text-white'
                 }`}
                 title={sidebarCollapsed ? item.name : undefined}
@@ -333,6 +323,36 @@ function LayoutInner() {
             >
               <Users className="h-[18px] w-[18px] shrink-0 text-violet-400/50 group-hover:text-violet-300" />
               {!sidebarCollapsed && 'Users'}
+            </Link>
+          )}
+          {applicationAllows(user, 'view') && (
+            <Link
+              to="/access"
+              className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-2 rounded-lg text-sm font-medium text-violet-100/70 hover:bg-sidebar-hover hover:text-white transition-all duration-200 group`}
+              title={sidebarCollapsed ? 'Access' : undefined}
+              onClick={() => {
+                if (sidebarCollapsed && location.pathname !== '/access') {
+                  setSidebarCollapsed(false)
+                }
+              }}
+            >
+              <ShieldCheck className="h-[18px] w-[18px] shrink-0 text-violet-400/50 group-hover:text-violet-300" />
+              {!sidebarCollapsed && 'Access'}
+            </Link>
+          )}
+          {user?.role === 'admin' && (
+            <Link
+              to="/audit"
+              className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-2.5 px-3'} py-2 rounded-lg text-sm font-medium text-violet-100/70 hover:bg-sidebar-hover hover:text-white transition-all duration-200 group`}
+              title={sidebarCollapsed ? 'Audit log' : undefined}
+              onClick={() => {
+                if (sidebarCollapsed && location.pathname !== '/audit') {
+                  setSidebarCollapsed(false)
+                }
+              }}
+            >
+              <ScrollText className="h-[18px] w-[18px] shrink-0 text-violet-400/50 group-hover:text-violet-300" />
+              {!sidebarCollapsed && 'Audit log'}
             </Link>
           )}
         </nav>
@@ -478,7 +498,7 @@ function LayoutInner() {
       <button
         type="button"
         onClick={() => setSidebarCollapsed((c) => !c)}
-        className="fixed z-[35] top-4 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-md transition-[left,background-color,color,box-shadow] duration-200 hover:bg-accent hover:text-foreground dark:bg-card dark:hover:bg-accent"
+        className="fixed z-35 top-4 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-md transition-[left,background-color,color,box-shadow] duration-200 hover:bg-accent hover:text-foreground dark:bg-card dark:hover:bg-accent"
         style={{ left: sidebarCollapsed ? SIDEBAR_EDGE.collapsed : SIDEBAR_EDGE.expanded }}
         aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -528,10 +548,10 @@ function LayoutInner() {
                   role="combobox"
                   aria-expanded={searchOpen && searchItems.length > 0}
                   aria-controls="global-search-results"
-                  className="w-full rounded-md border border-input bg-background py-1.5 pl-9 pr-[5.25rem] text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full rounded-md border border-input bg-background py-1.5 pl-9 pr-21 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-hidden focus:ring-2 focus:ring-ring"
                 />
                 <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 select-none text-[10px] font-medium text-muted-foreground" aria-hidden>
-                  <kbd className="inline-flex h-5 min-w-[2.75rem] items-center justify-center rounded border border-border bg-muted px-1.5 font-sans shadow-sm">
+                  <kbd className="inline-flex h-5 min-w-11 items-center justify-center rounded border border-border bg-muted px-1.5 font-sans shadow-xs">
                     {searchShortcutLabel}
                   </kbd>
                 </span>
@@ -557,7 +577,7 @@ function LayoutInner() {
                           index === searchActiveIndex ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent/50'
                         }`}
                       >
-                        <span className="inline-flex h-5 min-w-[2.5rem] shrink-0 items-center justify-center rounded border border-border bg-muted px-1 text-[10px] font-semibold uppercase text-muted-foreground">
+                        <span className="inline-flex h-5 min-w-10 shrink-0 items-center justify-center rounded border border-border bg-muted px-1 text-[10px] font-semibold uppercase text-muted-foreground">
                           {item.type}
                         </span>
                         <span className="shrink-0 font-mono text-xs text-primary">{item.doc_id}</span>
@@ -581,7 +601,7 @@ function LayoutInner() {
                 >
                   <Bell className="h-4 w-4" />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">
+                    <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">
                       {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                   )}
@@ -615,6 +635,7 @@ function LayoutInner() {
                           }`}
                         >
                           <div className="flex items-start gap-2">
+                            {n.actor_user_id && n.actor_name && <span aria-hidden="true"><ProfilePicture user={{ id: n.actor_user_id, full_name: n.actor_name, profile_picture_url: n.actor_profile_picture_url }} className="w-7 h-7" /></span>}
                             {n.read_at === null && (
                               <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
                             )}
@@ -624,7 +645,7 @@ function LayoutInner() {
                                 <div className="truncate text-xs text-muted-foreground">{n.body}</div>
                               )}
                               <div className="mt-0.5 text-[10px] uppercase text-muted-foreground">
-                                {new Date(n.created_at + 'Z').toLocaleString()}
+                                {formatDateTime(n.created_at)}
                               </div>
                             </div>
                           </div>
@@ -649,9 +670,7 @@ function LayoutInner() {
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="flex items-center gap-2 p-1 rounded-lg hover:bg-accent transition-colors"
                 >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-violet-700 flex items-center justify-center text-white text-xs font-bold">
-                    {userInitials}
-                  </div>
+                  <ProfilePicture own user={user} />
                   <span className="text-sm text-foreground font-medium hidden sm:block max-w-[120px] truncate">
                     {user?.full_name}
                   </span>
@@ -660,20 +679,24 @@ function LayoutInner() {
 
                 {userMenuOpen && (
                   <div className="absolute right-0 top-full mt-2 w-64 bg-card border border-border rounded-lg shadow-elegant overflow-hidden z-50">
-                    <div className="px-4 py-3 border-b border-border">
+                    <div className="flex items-start gap-3 px-4 py-3 border-b border-border">
+                      <ProfilePicture own user={user} />
+                      <div className="min-w-0">
                       <p className="text-sm font-medium text-foreground">{user?.full_name}</p>
                       <p className="text-xs text-muted-foreground">{user?.email}</p>
                       <span className={`inline-block mt-1.5 px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${roleBadgeColor}`}>
-                        {user?.role}
+                        {roleLabel(user?.role)}
                       </span>
+                      </div>
                     </div>
                     <div className="py-1">
                       <button
                         onClick={handleLogout}
+                        disabled={signingOut}
                         className="w-full flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                       >
                         <LogOut className="h-4 w-4" />
-                        Sign out
+                        {signingOut ? 'Signing out...' : 'Sign out'}
                       </button>
                     </div>
                   </div>

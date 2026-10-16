@@ -8,7 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
-from app.core.security import get_current_user, get_password_hash
+from app.core.security import (
+    accessible_project_ids,
+    get_current_user,
+    get_password_hash,
+)
 from app.main import app
 from app.models import (
     Document,
@@ -19,6 +23,7 @@ from app.models import (
     User,
 )
 from app.models.user import UserRole
+from tests.access_fixtures import allow_doc_types, project_access_fixture
 
 
 @dataclass
@@ -74,6 +79,7 @@ def visibility_harness():
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Selected test user no longer exists",
                 )
+            await accessible_project_ids(session, user)
             return user
 
     asyncio.run(_create_schema())
@@ -114,19 +120,16 @@ async def _seed_docs_visibility_data(session_maker: async_sessionmaker[AsyncSess
         session.add(project)
         await session.flush()
 
-        membership = ProjectMembership(
+        membership = project_access_fixture(
             user_id=external.id,
             project_id=project.id,
-            role=UserRole.external.value,
+            permissions={"*": ["view", "comment"]},
+            visibility="customer",
+            doc_types=[],
         )
         session.add(membership)
         await session.flush()
-        session.add_all(
-            [
-                ProjectExternalDocType(membership_id=membership.id, doc_type="REQ"),
-                ProjectExternalDocType(membership_id=membership.id, doc_type="SPEC"),
-            ]
-        )
+        allow_doc_types(membership.policies[0], ["REQ", "SPEC"])
 
         customer_requirement = Requirement(
             project_id=project.id,

@@ -9,7 +9,7 @@ from app.services.token_service import hash_token
 
 def test_token_hash_is_deterministic():
     token = "abc123"
-    assert hash_token(token) == hash_token(token)
+    assert hash_token(token) == "6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090"
     assert hash_token(token) != hash_token("different")
 
 

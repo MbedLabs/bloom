@@ -13,6 +13,7 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characte
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
+from tests.access_fixtures import add_policy_member
 from tests.conftest import create_project, unique_email  # noqa: E402
 
 PDF = b"%PDF-1.4 fake report"
@@ -88,10 +89,12 @@ def _maintainer_headers(api_client, admin_headers, project):
         },
     )
     assert created.status_code == 201, created.text
-    assigned = api_client.post(
-        f"/api/projects/{project['id']}/members",
+    assigned = add_policy_member(
+        api_client,
         headers=admin_headers,
-        json={"user_id": created.json()["id"], "role": "maintainer"},
+        url=f"/api/projects/{project['id']}/members",
+        user_id=created.json()["id"],
+        permissions={"*": ["*"]},
     )
     assert assigned.status_code == 201, assigned.text
     login = api_client.post("/api/auth/login", json={"email": email, "password": password})
@@ -100,6 +103,35 @@ def _maintainer_headers(api_client, admin_headers, project):
 
 
 class TestHoldingFilesAgainstADocument:
+    def test_write_cannot_remove_a_file_without_delete(
+        self, api_client, auth_headers, project, document
+    ):
+        from tests.api.test_groups_http import _create_user, _headers_for
+
+        user = _create_user(api_client, auth_headers, role="maintainer")
+        headers = _headers_for(api_client, user["email"])
+        assigned = add_policy_member(
+            api_client,
+            headers=auth_headers,
+            url=f"/api/projects/{project['id']}/members",
+            user_id=user["id"],
+            permissions={"RPT": ["view", "create", "edit"]},
+        )
+        assert assigned.status_code == 201, assigned.text
+        uploaded = _upload(
+            api_client, headers, document["id"], "report.pdf", PDF, "application/pdf"
+        )
+        assert uploaded.status_code == 201, uploaded.text
+        attachment_id = uploaded.json()["id"]
+        denied = api_client.delete(f"/api/attachments/{attachment_id}", headers=headers)
+        assert denied.status_code == 403, denied.text
+        assert any(
+            attachment["id"] == attachment_id
+            for attachment in api_client.get(
+                f"/api/documents/{document['id']}/attachments", headers=headers
+            ).json()
+        )
+
     def test_rate_limits_upload_starts_per_maintainer(
         self, api_client, auth_headers, project, document, monkeypatch
     ):
@@ -422,3 +454,28 @@ class TestPublishingABudReport:
             },
         )
         assert response.status_code == 401
+
+
+def test_an_external_user_reaches_no_attachment_of_a_hidden_document(
+    api_client: TestClient, auth_headers, project, document
+):
+    from tests.api.test_group_permissions_http import _grant
+    from tests.api.test_groups_http import _create_user, _headers_for
+
+    created = _upload(api_client, auth_headers, document["id"], "r.pdf", PDF, "application/pdf")
+    assert created.status_code == 201, created.text
+    user = _create_user(api_client, auth_headers, role="external")
+    headers = _headers_for(api_client, user["email"])
+    _grant(api_client, auth_headers, "Requirements Author", user["id"], project["id"])
+
+    attempts = [
+        ("get", f"/api/documents/{document['id']}/attachments"),
+        ("get", f"/api/attachments/{created.json()['id']}/download"),
+        ("delete", f"/api/attachments/{created.json()['id']}"),
+    ]
+    for method, path in attempts:
+        response = getattr(api_client, method)(path, headers=headers)
+        assert response.status_code == 404, (method, path, response.text)
+        assert response.json()["detail"] != "Not Found", (method, path)
+    listed = api_client.get(f"/api/documents/{document['id']}/attachments", headers=auth_headers)
+    assert [a["id"] for a in listed.json()] == [created.json()["id"]]

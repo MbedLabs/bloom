@@ -1,194 +1,396 @@
-"""Project membership management (admin only)."""
+"""Administrator-managed direct user entries and project access provenance."""
+
+from http import HTTPStatus
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import delete, select
+from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.groups import _selected_policies
 from app.core.database import get_db
-from app.core.security import require_project_role
-from app.models.project_membership import ProjectExternalDocType, ProjectMembership
+from app.core.permissions import as_lists
+from app.core.security import (
+    effective_permissions,
+    get_current_user,
+    require_app_permission,
+)
+from app.models import Project
+from app.models.groups import Group, GroupMembership
+from app.models.project_membership import ProjectAccess
 from app.models.user import User, UserRole
 from app.schemas.memberships import (
-    DEFAULT_EXTERNAL_DOC_TYPES,
-    EXTERNAL_DOC_TYPES,
     ProjectMemberResponse,
     ProjectMembershipCreate,
     ProjectMembershipUpdate,
+    validate_entry,
 )
+from app.services.audit import record_audit_event
 
 router = APIRouter()
+require_admin = require_app_permission("view")
 
 
-async def _build_member_response(
-    db: AsyncSession, membership: ProjectMembership
-) -> ProjectMemberResponse:
-    user_row = await db.execute(select(User).where(User.id == membership.user_id))
-    user = user_row.scalar_one_or_none()
+async def _project(db: AsyncSession, project_id: int) -> None:
+    """Require an existing project before returning its administrative entries."""
+    if await db.get(Project, project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found")
 
-    doc_types: list[str] = []
-    if membership.role == "external":
-        result = await db.execute(
-            select(ProjectExternalDocType.doc_type).where(
-                ProjectExternalDocType.membership_id == membership.id
-            )
+
+async def _entry(db: AsyncSession, project_id: int, entry_id: int) -> ProjectAccess:
+    """Find a direct user entry within the addressed project."""
+    row = await db.scalar(
+        select(ProjectAccess).where(
+            ProjectAccess.id == entry_id,
+            ProjectAccess.project_id == project_id,
+            ProjectAccess.user_id.is_not(None),
         )
-        doc_types = sorted(result.scalars().all())
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Membership not found")
+    return row
 
+
+async def _response(db: AsyncSession, entry: ProjectAccess) -> ProjectMemberResponse:
+    """Describe the direct entry and its user without a role baseline."""
+    user = await db.get(User, entry.user_id)
+    group = await db.get(Group, entry.policy_group_id) if entry.policy_group_id else None
     return ProjectMemberResponse(
-        id=membership.id,
-        user_id=membership.user_id,
-        email=user.email if user else "",
-        full_name=user.full_name if user else "",
-        role=membership.role,
-        doc_types=doc_types,
-        created_at=membership.created_at,
-        updated_at=membership.updated_at,
+        id=entry.id,
+        user_id=entry.user_id,
+        email=user.email,
+        full_name=user.full_name,
+        profile_picture_url=user.profile_picture_url,
+        owner=entry.owner,
+        inherit_policies=entry.inherit_policies,
+        policy_ids=sorted(policy.id for policy in (group.policies if group else entry.policies)),
+        policy_group_id=entry.policy_group_id,
+        policy_group_name=group.name if group else None,
+        created_at=entry.created_at,
     )
 
 
-@router.get("/{project_id}/members", response_model=list[ProjectMemberResponse])
+async def _selected_group(db: AsyncSession, group_id: int) -> Group:
+    """Resolve a nonempty project policy bundle."""
+    group = await db.get(Group, group_id)
+    if group is None:
+        raise HTTPException(status_code=404, detail="Group not found")
+    if not group.policies:
+        raise HTTPException(status_code=400, detail="Choose a group with policies")
+    return group
+
+
+@router.get(
+    "/{project_id}/members",
+    response_model=list[ProjectMemberResponse],
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
 async def list_project_members(
     project_id: int,
-    _admin: User = Depends(require_project_role("admin")),
-    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
-    result = await db.execute(
-        select(ProjectMembership).where(ProjectMembership.project_id == project_id)
+    """List the project's direct user entries."""
+    await _project(db, project_id)
+    rows = (
+        (
+            await db.execute(
+                select(ProjectAccess)
+                .where(ProjectAccess.project_id == project_id, ProjectAccess.user_id.is_not(None))
+                .order_by(ProjectAccess.id)
+            )
+        )
+        .scalars()
+        .all()
     )
-    memberships = result.scalars().all()
-    return [await _build_member_response(db, m) for m in memberships]
+    return [await _response(db, row) for row in rows]
 
 
-@router.post("/{project_id}/members", response_model=ProjectMemberResponse, status_code=201)
+@router.post(
+    "/{project_id}/members",
+    response_model=ProjectMemberResponse,
+    status_code=201,
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+        409: {"description": HTTPStatus(409).phrase},
+    },
+)
 async def add_project_member(
     project_id: int,
     data: ProjectMembershipCreate,
-    _admin: User = Depends(require_project_role("admin")),
-    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_app_permission("create")),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
-    user_row = await db.execute(select(User).where(User.id == data.user_id))
-    user = user_row.scalar_one_or_none()
+    """Assign Owner or explicitly selected policies to a user on this project."""
+    await _project(db, project_id)
+    user = await db.get(User, data.user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-
     if user.role == UserRole.admin:
         raise HTTPException(status_code=400, detail="Admin users do not need project memberships")
-
-    existing = await db.execute(
-        select(ProjectMembership).where(
-            ProjectMembership.user_id == data.user_id,
-            ProjectMembership.project_id == project_id,
+    existing = await db.scalar(
+        select(ProjectAccess.id).where(
+            ProjectAccess.project_id == project_id, ProjectAccess.user_id == data.user_id
         )
     )
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="User is already a member of this project")
-
-    doc_types = data.doc_types
-    if data.role == "external":
-        if doc_types is None:
-            doc_types = list(DEFAULT_EXTERNAL_DOC_TYPES)
-        invalid = set(doc_types) - EXTERNAL_DOC_TYPES
-        if invalid:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Invalid doc types: {sorted(invalid)}. "
-                f"Allowed: {sorted(EXTERNAL_DOC_TYPES)}",
-            )
-
-    membership = ProjectMembership(
-        user_id=data.user_id,
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="User already has a direct project entry")
+    if data.policy_group_id is not None:
+        await _selected_group(db, data.policy_group_id)
+    policies = await _selected_policies(db, data.policy_ids)
+    if any(policy.scope == "app" for policy in policies):
+        raise HTTPException(
+            status_code=400, detail="Application policies cannot be assigned on a project"
+        )
+    entry = ProjectAccess(
         project_id=project_id,
-        role=data.role,
+        user_id=data.user_id,
+        owner=data.owner,
+        inherit_policies=data.inherit_policies,
+        policies=policies,
+        policy_group_id=data.policy_group_id,
     )
-    db.add(membership)
+    db.add(entry)
     await db.flush()
-
-    if data.role == "external" and doc_types:
-        for dt in sorted(doc_types):
-            db.add(ProjectExternalDocType(membership_id=membership.id, doc_type=dt))
-        await db.flush()
-
-    await db.refresh(membership)
-    return await _build_member_response(db, membership)
+    await record_audit_event(
+        db,
+        "project_member.added",
+        target_type="user",
+        target_id=user.id,
+        project_id=project_id,
+        details={"owner": entry.owner, "policy_ids": sorted(data.policy_ids)},
+    )
+    return await _response(db, entry)
 
 
 @router.get("/{project_id}/members/{membership_id}", response_model=ProjectMemberResponse)
 async def get_project_member(
     project_id: int,
     membership_id: int,
-    _admin: User = Depends(require_project_role("admin")),
-    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
-    result = await db.execute(
-        select(ProjectMembership).where(
-            ProjectMembership.id == membership_id,
-            ProjectMembership.project_id == project_id,
-        )
-    )
-    membership = result.scalar_one_or_none()
-    if membership is None:
-        raise HTTPException(status_code=404, detail="Membership not found")
-    return await _build_member_response(db, membership)
+    """Read a direct user entry of this project."""
+    return await _response(db, await _entry(db, project_id, membership_id))
 
 
-@router.patch("/{project_id}/members/{membership_id}", response_model=ProjectMemberResponse)
+@router.patch(
+    "/{project_id}/members/{membership_id}",
+    response_model=ProjectMemberResponse,
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+        422: {"description": HTTPStatus(422).phrase},
+    },
+)
 async def update_project_member(
     project_id: int,
     membership_id: int,
     data: ProjectMembershipUpdate,
-    _admin: User = Depends(require_project_role("admin")),
-    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_app_permission("edit")),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
-    result = await db.execute(
-        select(ProjectMembership).where(
-            ProjectMembership.id == membership_id,
-            ProjectMembership.project_id == project_id,
-        )
+    """Update a direct entry without inheriting a role baseline."""
+    entry = await _entry(db, project_id, membership_id)
+    owner = data.owner if data.owner is not None else entry.owner
+    inherit_policies = (
+        data.inherit_policies if data.inherit_policies is not None else entry.inherit_policies
     )
-    membership = result.scalar_one_or_none()
-    if membership is None:
-        raise HTTPException(status_code=404, detail="Membership not found")
-
-    if data.role is not None:
-        membership.role = data.role
-        await db.flush()
-
-    if data.doc_types is not None:
-        await db.execute(
-            delete(ProjectExternalDocType).where(
-                ProjectExternalDocType.membership_id == membership.id
-            )
+    policy_ids = (
+        data.policy_ids if data.policy_ids is not None else [policy.id for policy in entry.policies]
+    )
+    policy_group_id = (
+        data.policy_group_id
+        if "policy_group_id" in data.model_fields_set
+        else entry.policy_group_id
+    )
+    if data.policy_group_id is not None:
+        if data.owner or data.inherit_policies or data.policy_ids:
+            raise HTTPException(status_code=422, detail="Choose only a project policy group")
+        await _selected_group(db, data.policy_group_id)
+        owner, inherit_policies, policy_ids = False, False, []
+    elif any(key in data.model_fields_set for key in ("owner", "inherit_policies", "policy_ids")):
+        policy_group_id = None
+    try:
+        validate_entry(owner, policy_ids, inherit_policies, policy_group_id)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    policies = await _selected_policies(db, policy_ids)
+    if any(policy.scope == "app" for policy in policies):
+        raise HTTPException(
+            status_code=400, detail="Application policies cannot be assigned on a project"
         )
-        if membership.role == "external":
-            invalid = set(data.doc_types) - EXTERNAL_DOC_TYPES
-            if invalid:
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"Invalid doc types: {sorted(invalid)}. "
-                    f"Allowed: {sorted(EXTERNAL_DOC_TYPES)}",
-                )
-            for dt in sorted(data.doc_types):
-                db.add(ProjectExternalDocType(membership_id=membership.id, doc_type=dt))
-        await db.flush()
-
-    await db.refresh(membership)
-    return await _build_member_response(db, membership)
+    entry.policy_group_id = policy_group_id
+    entry.owner = owner
+    entry.inherit_policies = inherit_policies
+    entry.policies = policies
+    await db.flush()
+    await record_audit_event(
+        db,
+        "project_member.updated",
+        target_type="user",
+        target_id=entry.user_id,
+        project_id=project_id,
+        details={"owner": owner, "policy_ids": sorted(policy_ids)},
+    )
+    return await _response(db, entry)
 
 
 @router.delete("/{project_id}/members/{membership_id}", status_code=204)
 async def remove_project_member(
     project_id: int,
     membership_id: int,
-    _admin: User = Depends(require_project_role("admin")),
-    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_app_permission("delete")),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
-    result = await db.execute(
-        select(ProjectMembership).where(
-            ProjectMembership.id == membership_id,
-            ProjectMembership.project_id == project_id,
-        )
+    """Revoke the project's direct user entry."""
+    entry = await _entry(db, project_id, membership_id)
+    await record_audit_event(
+        db,
+        "project_member.removed",
+        target_type="user",
+        target_id=entry.user_id,
+        project_id=project_id,
+        details={
+            "owner": entry.owner,
+            "policy_ids": sorted(policy.id for policy in entry.policies),
+        },
     )
-    membership = result.scalar_one_or_none()
-    if membership is None:
-        raise HTTPException(status_code=404, detail="Membership not found")
-    await db.delete(membership)
+    await db.delete(entry)
+
+
+@router.get("/{project_id}/permissions", response_model=dict[str, list[str]])
+async def get_my_project_permissions(
+    project_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    """Return the current user's effective permission operations for the project."""
+    return as_lists(await effective_permissions(db, current_user, project_id))
+
+
+class AccessOrigin(BaseModel):
+    kind: str
+    owner: bool = False
+    inherit_policies: bool = False
+    group: str | None = None
+    policies: list[str]
+
+
+class ProjectAccessEntry(BaseModel):
+    user_id: int
+    email: str
+    full_name: str
+    profile_picture_url: str | None = None
+    origins: list[AccessOrigin]
+
+
+@router.get(
+    "/{project_id}/access",
+    response_model=list[ProjectAccessEntry],
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
+async def list_project_access(
+    project_id: int,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    """Report direct and group entries from the same storage authorization reads."""
+    await _project(db, project_id)
+    entries = {}
+    rows = (
+        (
+            await db.execute(
+                select(ProjectAccess)
+                .where(ProjectAccess.project_id == project_id)
+                .order_by(ProjectAccess.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for row in rows:
+        if row.user_id is not None:
+            users = [await db.get(User, row.user_id)]
+            group = None
+        else:
+            group = await db.get(Group, row.group_id)
+            users = (
+                (
+                    await db.execute(
+                        select(User)
+                        .join(GroupMembership, GroupMembership.user_id == User.id)
+                        .where(GroupMembership.group_id == row.group_id)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        for user in users:
+            direct = next((candidate for candidate in rows if candidate.user_id == user.id), None)
+            if direct is not None and not direct.inherit_policies and row is not direct:
+                continue
+            entry = entries.setdefault(
+                user.id,
+                ProjectAccessEntry(
+                    user_id=user.id,
+                    email=user.email,
+                    full_name=user.full_name,
+                    profile_picture_url=user.profile_picture_url,
+                    origins=[],
+                ),
+            )
+            if row.inherit_policies and row.policy_group_id is None:
+                inherited_groups = (
+                    (
+                        await db.execute(
+                            select(Group)
+                            .join(GroupMembership, GroupMembership.group_id == Group.id)
+                            .where(GroupMembership.user_id == user.id)
+                            .order_by(Group.name)
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+                for source_group in inherited_groups:
+                    source = AccessOrigin(
+                        kind="group",
+                        owner=False,
+                        inherit_policies=True,
+                        group=source_group.name,
+                        policies=[
+                            policy.name
+                            for policy in sorted(
+                                source_group.policies, key=lambda policy: policy.id
+                            )
+                        ],
+                    )
+                    if source not in entry.origins:
+                        entry.origins.append(source)
+                if not inherited_groups:
+                    source = AccessOrigin(kind="direct", inherit_policies=True, policies=[])
+                    if source not in entry.origins:
+                        entry.origins.append(source)
+                continue
+            entry.origins.append(
+                AccessOrigin(
+                    kind="direct" if row.user_id is not None else "group",
+                    owner=row.owner,
+                    inherit_policies=False,
+                    group=(
+                        row.policy_group.name
+                        if row.policy_group_id
+                        else group.name if group else None
+                    ),
+                    policies=[
+                        policy.name
+                        for policy in sorted(
+                            row.policy_group.policies if row.policy_group_id else row.policies,
+                            key=lambda policy: policy.id,
+                        )
+                    ],
+                )
+            )
+    return sorted(entries.values(), key=lambda entry: entry.full_name.lower())

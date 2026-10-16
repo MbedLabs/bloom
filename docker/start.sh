@@ -64,7 +64,6 @@ if [ -n "${CLOUDRON_APP_ORIGIN:-}" ]; then
 
   export BLOOM_ENV=production
   export APP_BASE_URL="$CLOUDRON_APP_ORIGIN"
-  export FRONTEND_BASE_URL="$CLOUDRON_APP_ORIGIN"
   export BLOOM_APP_URL="$CLOUDRON_APP_ORIGIN"
   export BLOOM_ATTACHMENT_DIR=/app/data/attachments
   export ENABLE_DOCS=false

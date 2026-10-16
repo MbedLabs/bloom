@@ -1,14 +1,26 @@
+import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useState } from 'react'
+import TagPicker from '../components/TagPicker'
 import { useParams, Link, useNavigate } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Check, ChevronRight, Download, AlertCircle, FileUp } from 'lucide-react'
 import { docsApi, projectsApi, importApi } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { useDebounced } from '../hooks/useDebounced'
-import type { ImportResult, ReqIFImportResult } from '../api/client'
+import TestRailImport from '../components/TestRailImport'
+import type {
+  ImportResult,
+  MarkdownCollision,
+  MarkdownCollisionAction,
+  MarkdownImportResult,
+  ReqIFImportResult,
+  TestCaseImportResult,
+} from '../api/client'
+import ParameterCollisions from '../components/ParameterCollisions'
+import { collisionsResolved } from '../utils/parameters'
 
 type WizardStep = 1 | 2 | 3 | 4 | 5
-type ImportMode = 'project' | 'reqif'
+type ImportMode = 'project' | 'reqif' | 'file' | 'md' | 'testrail'
 
 /** How many source documents the picker shows at once. */
 const IMPORT_PAGE = 100
@@ -30,6 +42,15 @@ export default function ImportWizard() {
   const [reqifFile, setReqifFile] = useState<File | null>(null)
   const [reqifResult, setReqifResult] = useState<ReqIFImportResult | null>(null)
   const [reqifError, setReqifError] = useState<string | null>(null)
+  const [fileUpload, setFileUpload] = useState<File | null>(null)
+  const [fileFormat, setFileFormat] = useState<'csv' | 'xml'>('csv')
+  const [fileResult, setFileResult] = useState<TestCaseImportResult | null>(null)
+  const [fileError, setFileError] = useState<string | null>(null)
+  const [mdFile, setMdFile] = useState<File | null>(null)
+  const [mdResult, setMdResult] = useState<MarkdownImportResult | null>(null)
+  const [mdError, setMdError] = useState<string | null>(null)
+  const [mdCollisions, setMdCollisions] = useState<MarkdownCollision[] | null>(null)
+  const [mdChoices, setMdChoices] = useState<Record<string, MarkdownCollisionAction>>({})
 
   const { data: projects } = useQuery({
     queryKey: ['projects'],
@@ -65,6 +86,8 @@ export default function ImportWizard() {
   const sourceDocs = sourceDocsData?.items
   const unlistedDocs = Math.max(0, (sourceDocsData?.total ?? 0) - (sourceDocs?.length ?? 0))
 
+  const [importTagIds, setImportTagIds] = useState<number[]>([])
+
   const importMutation = useMutation({
     mutationFn: () =>
       importApi.import(projectId, {
@@ -72,29 +95,62 @@ export default function ImportWizard() {
         doc_type: docType,
         doc_ids: selectedIds,
         include_links: includeLinks,
+        tag_ids: importTagIds,
       }),
     onSuccess: (data) => {
       setResult(data)
       setStep(5)
-      queryClient.invalidateQueries({ queryKey: ['requirements', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['testCases', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['all-docs', prefix] })
-      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
     },
   })
 
   const reqifMutation = useMutation({
-    mutationFn: (file: File) => importApi.importReqif(projectId, file),
+    mutationFn: (file: File) => importApi.importReqif(projectId, file, importTagIds),
     onSuccess: (data) => {
       setReqifResult(data)
       setReqifError(null)
-      queryClient.invalidateQueries({ queryKey: ['requirements', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['all-docs', prefix] })
-      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      refreshProjectViews(queryClient, { prefix, projectId })
     },
     onError: (error: { response?: { data?: { detail?: string } } }) => {
       setReqifResult(null)
       setReqifError(error.response?.data?.detail || 'Import failed. Check the file and try again.')
+    },
+  })
+
+  const fileMutation = useMutation({
+    mutationFn: (args: { file: File; format: 'csv' | 'xml' }) =>
+      importApi.importTestCases(projectId, args.file, args.format, importTagIds),
+    onSuccess: (data) => {
+      setFileResult(data)
+      setFileError(null)
+      refreshProjectViews(queryClient, { prefix, projectId })
+    },
+    onError: (error: { response?: { data?: { detail?: string } } }) => {
+      setFileResult(null)
+      setFileError(error.response?.data?.detail || 'Import failed. Check the file and try again.')
+    },
+  })
+
+  const mdMutation = useMutation({
+    mutationFn: ({ file, actions }: { file: File; actions?: Record<string, MarkdownCollisionAction> }) =>
+      importApi.importMarkdown(projectId, file, undefined, actions, importTagIds),
+    onSuccess: (data) => {
+      setMdResult(data)
+      setMdError(null)
+      setMdCollisions(null)
+      refreshProjectViews(queryClient, { prefix, projectId })
+    },
+    onError: (error: {
+      response?: { status?: number; data?: { detail?: string | { collisions?: MarkdownCollision[] } } }
+    }) => {
+      setMdResult(null)
+      const detail = error.response?.data?.detail
+      if (error.response?.status === 409 && typeof detail === 'object' && detail?.collisions) {
+        setMdCollisions(detail.collisions)
+        setMdError(null)
+        return
+      }
+      setMdError(typeof detail === 'string' && detail ? detail : 'Import failed. Check the file and try again.')
     },
   })
 
@@ -118,11 +174,18 @@ export default function ImportWizard() {
         </div>
       </div>
 
+      {projectId > 0 && (
+        <TagPicker projectId={projectId} value={importTagIds} onChange={setImportTagIds} />
+      )}
+
       {/* Import source mode */}
       <div className="flex gap-2">
         {([
           { key: 'project', label: 'From another project' },
           { key: 'reqif', label: 'From ReqIF file' },
+          { key: 'file', label: 'From CSV/XML file' },
+          { key: 'md', label: 'From Markdown file' },
+          { key: 'testrail', label: 'From TestRail' },
         ] as const).map((m) => (
           <button
             key={m.key}
@@ -233,6 +296,182 @@ export default function ImportWizard() {
             >
               View imported requirements
             </button>
+          </div>
+        )}
+      </div>
+      )}
+
+      {mode === 'file' && (
+      <div className="bg-card rounded-lg border border-border shadow-elegant p-6 space-y-4">
+        <h3 className="text-lg font-semibold text-foreground">Import test cases from a file</h3>
+        <p className="text-sm text-muted-foreground">
+          Upload a <span className="font-mono">.csv</span> or <span className="font-mono">.xml</span> file in
+          Bloom&apos;s export format. A row whose ID already exists updates that test case; new rows are created.
+        </p>
+
+        <div className="flex gap-2">
+          {(['csv', 'xml'] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFileFormat(f)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                fileFormat === f ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {f.toUpperCase()}
+            </button>
+          ))}
+        </div>
+
+        <label className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border p-8 cursor-pointer hover:border-primary/40 hover:bg-accent/30 transition-colors">
+          <FileUp className="h-6 w-6 text-muted-foreground" />
+          <span className="text-sm text-foreground font-medium">
+            {fileUpload ? fileUpload.name : `Choose a ${fileFormat.toUpperCase()} file`}
+          </span>
+          <span className="text-xs text-muted-foreground">.csv or .xml, up to 5 MB</span>
+          <input
+            type="file"
+            accept=".csv,.xml,text/csv,application/xml"
+            className="hidden"
+            onChange={(e) => {
+              setFileUpload(e.target.files?.[0] ?? null)
+              setFileResult(null)
+              setFileError(null)
+            }}
+          />
+        </label>
+
+        <div className="flex justify-end">
+          <button
+            onClick={() => fileUpload && fileMutation.mutate({ file: fileUpload, format: fileFormat })}
+            disabled={!fileUpload || fileMutation.isPending}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50 inline-flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            {fileMutation.isPending ? 'Importing...' : `Import ${fileFormat.toUpperCase()}`}
+          </button>
+        </div>
+
+        {fileError && (
+          <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-4 flex items-center gap-2 text-sm text-red-700 dark:text-red-400">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {fileError}
+          </div>
+        )}
+
+        {fileResult && (
+          <div className="space-y-3">
+            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-4 space-y-2">
+              <div className="text-emerald-700 dark:text-emerald-400 font-medium">
+                {fileResult.created} created &middot; {fileResult.updated} updated
+                {fileResult.skipped > 0 && ` · ${fileResult.skipped} skipped`}
+              </div>
+              {fileResult.new_ids.length > 0 && (
+                <div className="text-sm text-muted-foreground">New IDs: {fileResult.new_ids.join(', ')}</div>
+              )}
+            </div>
+            {fileResult.errors.length > 0 && (
+              <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-4 space-y-1">
+                <div className="flex items-center gap-2 text-red-700 dark:text-red-400 font-medium">
+                  <AlertCircle className="h-4 w-4" />
+                  Warnings
+                </div>
+                {fileResult.errors.map((err, i) => (
+                  <div key={i} className="text-sm text-red-600 dark:text-red-400">{err}</div>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={() => navigate(`/projects/${prefix}/docs`)}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90"
+            >
+              View test cases
+            </button>
+          </div>
+        )}
+      </div>
+      )}
+
+      {mode === 'testrail' && <TestRailImport projectId={projectId} prefix={prefix} tagIds={importTagIds} />}
+
+      {mode === 'md' && (
+      <div className="bg-card rounded-lg border border-border shadow-elegant p-6 space-y-4">
+        <h3 className="text-lg font-semibold text-foreground">Import from Markdown</h3>
+        <p className="text-sm text-muted-foreground">
+          Upload a <span className="font-mono">.md</span> file. Its parameters become project
+          variables and each classified section becomes an artefact. A parameter whose name already
+          exists is never overwritten: you choose, per name, to keep the project&apos;s value or to
+          import the file&apos;s value under a new name.
+        </p>
+
+        <label className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border p-8 cursor-pointer hover:border-primary/40 hover:bg-accent/30 transition-colors">
+          <FileUp className="h-6 w-6 text-muted-foreground" />
+          <span className="text-sm text-foreground font-medium">
+            {mdFile ? mdFile.name : 'Choose a Markdown file'}
+          </span>
+          <span className="text-xs text-muted-foreground">.md, up to 5 MB</span>
+          <input
+            type="file"
+            accept=".md,.markdown,text/markdown"
+            className="hidden"
+            onChange={(e) => {
+              setMdFile(e.target.files?.[0] ?? null)
+              setMdResult(null)
+              setMdError(null)
+              setMdCollisions(null)
+              setMdChoices({})
+            }}
+          />
+        </label>
+
+        <div className="flex justify-end">
+          <button
+            onClick={() =>
+              mdFile && mdMutation.mutate({ file: mdFile, actions: mdCollisions ? mdChoices : undefined })
+            }
+            disabled={
+              !mdFile || mdMutation.isPending || (!!mdCollisions && !collisionsResolved(mdCollisions, mdChoices))
+            }
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50 inline-flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            {mdMutation.isPending ? 'Importing...' : mdCollisions ? 'Import with these choices' : 'Import Markdown'}
+          </button>
+        </div>
+
+        {mdCollisions && (
+          <ParameterCollisions collisions={mdCollisions} choices={mdChoices} onChange={setMdChoices} />
+        )}
+
+        {mdError && (
+          <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-4 flex items-center gap-2 text-sm text-red-700 dark:text-red-400">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {mdError}
+          </div>
+        )}
+
+        {mdResult && (
+          <div className="space-y-3">
+            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-4 space-y-2">
+              <div className="text-emerald-700 dark:text-emerald-400 font-medium">
+                {mdResult.parameters_created} parameter{mdResult.parameters_created !== 1 ? 's' : ''} imported
+                &middot; {mdResult.artefacts_created} artefact{mdResult.artefacts_created !== 1 ? 's' : ''} created
+                &middot; {mdResult.sections.length} section{mdResult.sections.length !== 1 ? 's' : ''} classified
+              </div>
+            </div>
+            {mdResult.parameter_collisions.length > 0 && (
+              <div className="text-sm text-muted-foreground">
+                Kept the project&apos;s value: {mdResult.parameter_collisions.join(', ')}
+              </div>
+            )}
+            {Object.keys(mdResult.parameters_renamed ?? {}).length > 0 && (
+              <div className="text-sm text-muted-foreground">
+                Imported under a new name:{' '}
+                {Object.entries(mdResult.parameters_renamed ?? {})
+                  .map(([from, to]) => `${from} as ${to}`)
+                  .join(', ')}
+              </div>
+            )}
           </div>
         )}
       </div>

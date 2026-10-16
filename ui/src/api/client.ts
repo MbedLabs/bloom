@@ -2,12 +2,12 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { type DocType, DOC_TYPE_SLUGS } from '../types/doc'
 import type { TcsRow } from '../utils/tcs'
 export type { TcsRow } from '../utils/tcs'
-import { clearAuthToken, getAuthToken, setAuthToken } from '../lib/tokenStorage'
+import { clearAuthToken, getAuthToken, getSessionUserId, setAuthToken } from '../lib/tokenStorage'
 import packageJson from '../../package.json'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api'
 
-const api = axios.create({
+export const api = axios.create({
   baseURL: API_URL,
   // Send the httpOnly refresh cookie on same-origin auth calls.
   withCredentials: true,
@@ -40,11 +40,17 @@ let refreshPromise: Promise<string | null> | null = null
 async function refreshAccessToken(): Promise<string | null> {
   try {
     // Bare axios (no interceptors) so a 401 here cannot recurse into itself.
-    const resp = await axios.post<{ access_token: string }>(
+    const resp = await axios.post<{ access_token: string; user?: { id: number } }>(
       `${API_URL}/auth/refresh`,
       {},
       { withCredentials: true },
     )
+    const signedIn = getSessionUserId()
+    if (signedIn !== null && resp.data.user?.id !== signedIn) {
+      clearAuthToken()
+      window.location.replace('/login')
+      return null
+    }
     setAuthToken(resp.data.access_token)
     return resp.data.access_token
   } catch {
@@ -89,12 +95,23 @@ export interface PaginatedResponse<T> {
 
 export type ArtefactVisibility = 'internal' | 'customer'
 
-export interface User {
+export interface ProfilePerson {
+  id?: number
+  full_name: string
+  profile_picture_url?: string | null
+  has_profile_picture?: boolean
+  updated_at?: string
+}
+
+export interface User extends ProfilePerson {
   id: number
   email: string
   full_name: string
   role: 'admin' | 'maintainer' | 'external'
+  application_permissions?: Record<string, string[]>
   is_active: boolean
+  has_profile_picture?: boolean
+  is_initial_admin?: boolean
   pending_email?: string | null
   email_change_status?: 'requested' | 'awaiting_current_confirmation' | 'awaiting_confirmation' | null
   email_change_requested_at?: string | null
@@ -116,7 +133,7 @@ export interface LoginResponse {
   user: User
 }
 
-export interface InviteInfoResponse {
+export interface InviteInfoResponse extends ProfilePerson {
   email: string
   full_name: string
   valid: boolean
@@ -204,7 +221,7 @@ export const authApi = {
   },
   logout: async (): Promise<void> => {
     try {
-      await api.post('/auth/logout')
+      await api.post('/auth/logout', undefined, { timeout: 10000 })
     } finally {
       clearAuthToken()
     }
@@ -215,6 +232,27 @@ export const authApi = {
   },
   updateMe: async (data: { full_name?: string }): Promise<User> => {
     const response = await api.put<User>('/auth/me', data)
+    return response.data
+  },
+  setProfilePicture: async (file: File): Promise<User> => {
+    const form = new FormData()
+    form.append('file', file)
+    const response = await api.put<User>('/auth/me/picture', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return response.data
+  },
+  fetchProfilePicture: async (): Promise<Blob | null> => {
+    try {
+      const response = await api.get('/auth/me/picture', { responseType: 'blob' })
+      return response.data as Blob
+    } catch (error) {
+      if ((error as { response?: { status?: number } }).response?.status === 404) return null
+      throw error
+    }
+  },
+  deleteProfilePicture: async (): Promise<User> => {
+    const response = await api.delete<User>('/auth/me/picture')
     return response.data
   },
   requestEmailChange: async (
@@ -298,12 +336,16 @@ export const serviceCredentialsApi = {
   },
 }
 
-export interface MentionableUser {
+export interface MentionableUser extends ProfilePerson {
   id: number
   full_name: string
 }
 
 export const usersApi = {
+  applicationPolicies: async (id: number): Promise<{ policy_ids: number[] }> =>
+    (await api.get<{ policy_ids: number[] }>(`/users/${id}/application-policies`)).data,
+  setApplicationPolicies: async (id: number, policyIds: number[]): Promise<{ policy_ids: number[] }> =>
+    (await api.put<{ policy_ids: number[] }>(`/users/${id}/application-policies`, { policy_ids: policyIds })).data,
   list: async (): Promise<User[]> => {
     const response = await api.get<User[]>('/users')
     return response.data
@@ -347,6 +389,228 @@ export const usersApi = {
   delete: async (id: number): Promise<void> => {
     await api.delete(`/users/${id}`)
   },
+}
+
+export type PolicyVisibility = 'internal' | 'customer'
+export type PolicyScope = 'document' | 'project' | 'app'
+
+export interface PolicyRule {
+  read: boolean
+  write: boolean
+  review: boolean
+  approve: boolean
+  delete: boolean
+  all_origins: boolean
+  visibility: PolicyVisibility[]
+  tags: number[]
+  actions?: string[]
+}
+
+export interface Policy {
+  id: number
+  name: string
+  description: string
+  scope: PolicyScope
+  rules: Record<string, PolicyRule>
+  is_default: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface PolicyInput {
+  name?: string
+  description?: string
+  scope?: PolicyScope
+  rules?: Record<string, PolicyRule>
+}
+
+export interface GroupMember {
+  user_id: number
+  email: string
+  full_name: string
+}
+
+export interface GroupGrant {
+  id: number
+  project_id: number
+}
+
+export interface Group {
+  id: number
+  name: string
+  description: string
+  policy_ids: number[]
+  created_at: string
+  updated_at: string
+  members: GroupMember[]
+  grants: GroupGrant[]
+}
+
+export interface GroupInput {
+  name?: string
+  description?: string
+  policy_ids?: number[]
+}
+
+export const policiesApi = {
+  list: async () => (await api.get<Policy[]>('/policies')).data,
+  create: async (data: PolicyInput) => (await api.post<Policy>('/policies', data)).data,
+  update: async (id: number, data: PolicyInput) =>
+    (await api.patch<Policy>(`/policies/${id}`, data)).data,
+  delete: async (id: number) => {
+    await api.delete(`/policies/${id}`)
+  },
+  duplicate: async (id: number) => (await api.post<Policy>(`/policies/${id}/duplicate`)).data,
+}
+
+export interface Tag {
+  id: number
+  name: string
+  created_at: string
+}
+
+export type TaggedArtefactType =
+  | 'requirement'
+  | 'test-case'
+  | 'document'
+  | 'design'
+  | 'risk'
+  | 'change'
+  | 'test-concept'
+  | 'defect'
+  | 'test-suite'
+  | 'campaign'
+
+export const tagsApi = {
+  list: async (projectId?: number) =>
+    (await api.get<Tag[]>('/tags', { params: projectId ? { project_id: projectId } : {} })).data,
+  create: async (name: string) => (await api.post<Tag>('/tags', { name })).data,
+  rename: async (id: number, name: string) => (await api.patch<Tag>(`/tags/${id}`, { name })).data,
+  scope: async (projectId: number) =>
+    (await api.get<{ limited: boolean; tags: Tag[] }>('/tags/scope', { params: { project_id: projectId } })).data,
+}
+
+export const artefactTagsApi = {
+  get: async (type: TaggedArtefactType, id: number) =>
+    (await api.get<Tag[]>(`/artefacts/${type}/${id}/tags`)).data,
+  set: async (type: TaggedArtefactType, id: number, tagIds: number[]) =>
+    (await api.put<Tag[]>(`/artefacts/${type}/${id}/tags`, { tag_ids: tagIds })).data,
+}
+
+export const groupsApi = {
+  assignmentOptions: async (): Promise<{ projects: Array<{ id: number; name: string; prefix: string }>; users: Array<{ id: number; email: string; full_name: string; role?: string; profile_picture_url?: string | null }> }> =>
+    (await api.get('/groups/assignment-options')).data,
+  assign: async (id: number, projectId: number, userIds: number[]): Promise<ProjectMember[]> =>
+    (await api.post<ProjectMember[]>(`/groups/${id}/assignments`, { project_id: projectId, user_ids: userIds })).data,
+  list: async () => (await api.get<Group[]>('/groups')).data,
+  create: async (data: GroupInput) => (await api.post<Group>('/groups', data)).data,
+  update: async (id: number, data: GroupInput) =>
+    (await api.patch<Group>(`/groups/${id}`, data)).data,
+  delete: async (id: number) => {
+    await api.delete(`/groups/${id}`)
+  },
+  addMember: async (id: number, userId: number) =>
+    (await api.post<Group>(`/groups/${id}/members`, { user_id: userId })).data,
+  addMembers: async (id: number, userIds: number[]) =>
+    (await api.post<Group>(`/groups/${id}/members`, { user_ids: userIds })).data,
+  removeMember: async (id: number, userId: number) => {
+    await api.delete(`/groups/${id}/members/${userId}`)
+  },
+  addGrant: async (id: number, projectId: number) =>
+    (await api.post<Group>(`/groups/${id}/grants`, { project_id: projectId, inherit_policies: true })).data,
+  updateGrant: async (id: number, grantId: number) =>
+    (await api.patch<Group>(`/groups/${id}/grants/${grantId}`, { inherit_policies: true })).data,
+  removeGrant: async (id: number, grantId: number) => {
+    await api.delete(`/groups/${id}/grants/${grantId}`)
+  },
+}
+
+export type AccessResourceType =
+  | 'project'
+  | 'requirement'
+  | 'test-case'
+  | 'design'
+  | 'risk'
+  | 'change'
+  | 'test-concept'
+  | 'defect'
+  | 'document'
+  | 'test-suite'
+  | 'campaign'
+
+export interface AccessRequestInfo {
+  id: number
+  resource_type: string
+  resource_ref: string
+  project_prefix: string | null
+  status: 'pending' | 'granted' | 'refused'
+  created_at: string
+  decided_at: string | null
+  requester_name: string | null
+  requester_email: string | null
+  requester_profile_picture_url?: string | null
+  already_requested: boolean
+  mail_sent: boolean | null
+}
+
+export interface AccessRequestParams {
+  resource_type: AccessResourceType
+  resource_ref: string
+  project_prefix?: string
+}
+
+export const accessRequestsApi = {
+  create: async (data: AccessRequestParams) =>
+    (await api.post<AccessRequestInfo>('/access-requests', data)).data,
+  mine: async (params: AccessRequestParams) =>
+    (await api.get<AccessRequestInfo | null>('/access-requests/mine', { params })).data,
+  list: async (params: { status?: string; project_prefix?: string } = {}) =>
+    (await api.get<AccessRequestInfo[]>('/access-requests', { params })).data,
+  decide: async (id: number, decision: 'granted' | 'refused') =>
+    (await api.post<AccessRequestInfo>(`/access-requests/${id}/decision`, { decision })).data,
+}
+
+export interface AuditEvent {
+  id: number
+  occurred_at: string
+  actor_user_id: number | null
+  actor_name: string | null
+  actor_profile_picture_url?: string | null
+  actor_type: string
+  action: string
+  target_type: string | null
+  target_id: string | null
+  project_id: number | null
+  request_id: string | null
+  ip: string | null
+  user_agent: string | null
+  outcome: string
+  details: Record<string, unknown> | null
+}
+
+export interface AuditEventPage {
+  items: AuditEvent[]
+  total: number
+}
+
+export interface AuditFilters {
+  sort?: 'occurred_at' | 'actor' | 'action' | 'target' | 'outcome' | 'ip' | 'request_id'
+  dir?: 'asc' | 'desc'
+  actor_user_id?: number
+  action?: string
+  target_type?: string
+  target_id?: string
+  project_id?: number
+  outcome?: string
+  since?: string
+  until?: string
+  limit?: number
+  offset?: number
+}
+
+export const auditApi = {
+  list: async (filters: AuditFilters = {}) =>
+    (await api.get<AuditEventPage>('/audit', { params: filters })).data,
 }
 
 export interface DashboardStats {
@@ -404,15 +668,17 @@ export interface Project {
   updated_at: string
 }
 
-export type ProjectMemberRole = 'maintainer' | 'external'
-
 export interface ProjectMember {
+  profile_picture_url?: string | null
   id: number
   user_id: number
   email: string
   full_name: string
-  role: ProjectMemberRole
-  doc_types: string[]
+  owner: boolean
+  inherit_policies: boolean
+  policy_ids: number[]
+  policy_group_id?: number | null
+  policy_group_name?: string | null
   created_at: string
   updated_at: string
 }
@@ -494,6 +760,10 @@ export interface Requirement {
   approved_by_id: number | null
   reviewed_at: string | null
   approved_at: string | null
+  /** Whether the assigned reviewer could sign; sent with the detail read only. */
+  reviewer_can_sign?: boolean | null
+  /** Whether the assigned approver could sign; sent with the detail read only. */
+  approver_can_sign?: boolean | null
   source_ref?: string | null
   source_project_id?: number | null
   test_case_count: number
@@ -525,6 +795,10 @@ export interface TestCase {
   approved_by_id: number | null
   reviewed_at: string | null
   approved_at: string | null
+  /** Whether the assigned reviewer could sign; sent with the detail read only. */
+  reviewer_can_sign?: boolean | null
+  /** Whether the assigned approver could sign; sent with the detail read only. */
+  approver_can_sign?: boolean | null
   last_execution_status?: string | null
   last_executed_at?: string | null
   last_execution_comment: string | null
@@ -715,6 +989,8 @@ export interface ArtefactComment {
   artefact_type: string
   artefact_id: number
   author_name: string
+  author_user_id?: number | null
+  author_profile_picture_url?: string | null
   body: string
   created_at: string
 }
@@ -725,6 +1001,9 @@ export interface ArtefactActivity {
   artefact_id: number
   event_type: string
   summary: string
+  actor_user_id?: number | null
+  actor_name?: string | null
+  actor_profile_picture_url?: string | null
   created_at: string
 }
 
@@ -758,6 +1037,12 @@ export interface ArtefactRelated {
   related_documents: RelatedDocumentSummary[]
 }
 
+export interface ProjectCapabilities {
+  can_edit: boolean
+  can_delete: boolean
+  can_manage_access: boolean
+}
+
 export const projectsApi = {
   list: async () => {
     const response = await api.get<Project[]>('/projects')
@@ -771,6 +1056,11 @@ export const projectsApi = {
 
   getByPrefix: async (prefix: string) => {
     const response = await api.get<Project>(`/projects/by-prefix/${prefix}`)
+    return response.data
+  },
+
+  capabilities: async (id: number): Promise<ProjectCapabilities> => {
+    const response = await api.get<ProjectCapabilities>(`/projects/${id}/capabilities`)
     return response.data
   },
 
@@ -789,14 +1079,42 @@ export const projectsApi = {
   },
 }
 
+/** Effective permissions on a project: resource (or `*`) to actions (or `*`). */
+export type ProjectPermissions = Record<string, string[]>
+
+/** Why a person has access to a project: a direct membership, or a group granted it. */
+export interface AccessOrigin {
+  kind: 'direct' | 'group'
+  owner: boolean
+  inherit_policies: boolean
+  group: string | null
+  policies: string[]
+}
+
+/** A person with access to a project, with every reason they have it. */
+export interface ProjectAccessEntry {
+  user_id: number
+  email: string
+  full_name: string
+  origins: AccessOrigin[]
+}
+
 export const projectMembersApi = {
+  access: async (projectId: number): Promise<ProjectAccessEntry[]> => {
+    const response = await api.get<ProjectAccessEntry[]>(`/projects/${projectId}/access`)
+    return response.data
+  },
+  permissions: async (projectId: number): Promise<ProjectPermissions> => {
+    const response = await api.get<ProjectPermissions>(`/projects/${projectId}/permissions`)
+    return response.data
+  },
   list: async (projectId: number): Promise<ProjectMember[]> => {
     const response = await api.get<ProjectMember[]>(`/projects/${projectId}/members`)
     return response.data
   },
   create: async (
     projectId: number,
-    data: { user_id: number; role: ProjectMemberRole; doc_types?: string[] }
+    data: { user_id: number; owner?: boolean; inherit_policies?: boolean; policy_ids?: number[]; policy_group_id?: number }
   ): Promise<ProjectMember> => {
     const response = await api.post<ProjectMember>(`/projects/${projectId}/members`, data)
     return response.data
@@ -804,7 +1122,7 @@ export const projectMembersApi = {
   update: async (
     projectId: number,
     membershipId: number,
-    data: { role?: ProjectMemberRole; doc_types?: string[] }
+    data: { owner?: boolean; inherit_policies?: boolean; policy_ids?: number[]; policy_group_id?: number }
   ): Promise<ProjectMember> => {
     const response = await api.patch<ProjectMember>(
       `/projects/${projectId}/members/${membershipId}`,
@@ -822,7 +1140,7 @@ export interface DocShell {
   doc_id: string
   doc_type: string
   title: string
-  status: string
+  status: string | null
   visibility: ArtefactVisibility
   priority: string | null
   req_type: string | null
@@ -843,6 +1161,8 @@ export interface DocDetailFacade extends DocShell {
   description: string | null
   content_json: Record<string, unknown> | null
   content_html: string | null
+  /** The changes the signed-in user may make to this artefact. */
+  allowed_actions?: string[]
 }
 
 /** How the registry is narrowed. Every one of these is applied by the server. */
@@ -966,18 +1286,16 @@ export const requirementsApi = {
     return response.data
   },
 
-  setReviewed: async (id: number, reviewedById: number) => {
-    const response = await api.patch<Requirement>(`/requirements/${id}`, {
-      reviewed_by_id: reviewedById,
-      reviewed_at: new Date().toISOString(),
+  setReviewed: async (id: number) => {
+    const response = await api.post<Partial<Requirement>>(`/artefacts/requirement/${id}/sign-off`, {
+      step: 'review',
     })
     return response.data
   },
 
-  setApproved: async (id: number, approvedById: number) => {
-    const response = await api.patch<Requirement>(`/requirements/${id}`, {
-      approved_by_id: approvedById,
-      approved_at: new Date().toISOString(),
+  setApproved: async (id: number) => {
+    const response = await api.post<Partial<Requirement>>(`/artefacts/requirement/${id}/sign-off`, {
+      step: 'approve',
     })
     return response.data
   },
@@ -1018,6 +1336,7 @@ export const testCasesApi = {
     visibility?: ArtefactVisibility
     reviewer_id?: number
     approver_id?: number
+    tag_ids?: number[]
   }) => {
     const response = await api.post<TestCase>('/test-cases', data)
     return response.data
@@ -1028,18 +1347,16 @@ export const testCasesApi = {
     return response.data
   },
 
-  setReviewed: async (id: number, reviewedById: number) => {
-    const response = await api.patch<TestCase>(`/test-cases/${id}`, {
-      reviewed_by_id: reviewedById,
-      reviewed_at: new Date().toISOString(),
+  setReviewed: async (id: number) => {
+    const response = await api.post<Partial<TestCase>>(`/artefacts/test-case/${id}/sign-off`, {
+      step: 'review',
     })
     return response.data
   },
 
-  setApproved: async (id: number, approvedById: number) => {
-    const response = await api.patch<TestCase>(`/test-cases/${id}`, {
-      approved_by_id: approvedById,
-      approved_at: new Date().toISOString(),
+  setApproved: async (id: number) => {
+    const response = await api.post<Partial<TestCase>>(`/artefacts/test-case/${id}/sign-off`, {
+      step: 'approve',
     })
     return response.data
   },
@@ -1130,7 +1447,7 @@ export const documentsApi = {
     const response = await api.get<DocumentDetail>(`/documents/${documentId}`)
     return response.data
   },
-  create: async (data: { project_id: number; title: string; doc_type?: string; description?: string; content_json?: Record<string, unknown> | null; content_html?: string | null; visibility?: ArtefactVisibility }) => {
+  create: async (data: { project_id: number; title: string; doc_type?: string; description?: string; content_json?: Record<string, unknown> | null; content_html?: string | null; visibility?: ArtefactVisibility; tag_ids?: number[] }) => {
     const response = await api.post<Document>('/projects/' + data.project_id + '/documents', data)
     return response.data
   },
@@ -1307,7 +1624,7 @@ export const campaignsApi = {
     return response.data
   },
 
-  create: async (data: { project_id: number; name: string; description?: string; configuration_id?: number; suite_id?: number; suite_ids?: number[]; status?: string; visibility?: ArtefactVisibility; bud_run_id?: number; bud_run_url?: string; bud_run_status?: string; test_case_ids?: number[] }) => {
+  create: async (data: { project_id: number; name: string; description?: string; configuration_id?: number; suite_id?: number; suite_ids?: number[]; status?: string; visibility?: ArtefactVisibility; bud_run_id?: number; bud_run_url?: string; bud_run_status?: string; test_case_ids?: number[]; tag_ids?: number[] }) => {
     const response = await api.post<TestCampaignDetail>('/campaigns', data)
     return response.data
   },
@@ -1355,7 +1672,7 @@ export const testSuitesApi = {
     const response = await api.get<TestSuiteDetail>(`/test-suites/${suiteId}`)
     return response.data
   },
-  create: async (data: { project_id: number; name: string; description?: string; status?: string; visibility?: ArtefactVisibility; test_case_ids?: number[] }) => {
+  create: async (data: { project_id: number; name: string; description?: string; status?: string; visibility?: ArtefactVisibility; test_case_ids?: number[]; tag_ids?: number[] }) => {
     const response = await api.post<TestSuiteDetail>('/test-suites', data)
     return response.data
   },
@@ -1522,8 +1839,39 @@ export interface IntegrationSetting {
   has_token: boolean
   has_webhook_secret: boolean
   enabled: boolean
+  account_email?: string | null
+  jira_project_key?: string | null
+  create_defects_on_inbound?: boolean
+  jira_issue_types?: string[]
+  jira_label?: string | null
+  jira_jql?: string | null
+  jira_reference_field?: string | null
+  jira_priority_map?: Record<string, string> | null
+  two_way?: boolean
   created_at: string
   updated_at: string
+}
+
+/** Outcome of pulling existing Jira issues into defects. */
+export interface JiraPullResult {
+  searched: number
+  created: number
+  already_linked: number
+  skipped: number
+  new_ids: string[]
+}
+
+/** Jira settings a create or update may carry. */
+export interface JiraSettingFields {
+  account_email?: string
+  jira_project_key?: string
+  create_defects_on_inbound?: boolean
+  jira_issue_types?: string[]
+  jira_label?: string
+  jira_jql?: string
+  jira_reference_field?: string
+  jira_priority_map?: Record<string, string>
+  two_way?: boolean
 }
 
 export interface SyncEvent {
@@ -1543,16 +1891,20 @@ export const integrationsApi = {
     const response = await api.get<IntegrationSetting[]>('/integrations/settings', { params: { project_id: projectId } })
     return response.data
   },
-  createSetting: async (data: { project_id: number; tracker: string; base_url?: string; token?: string; webhook_secret?: string; enabled?: boolean }) => {
+  createSetting: async (data: { project_id: number; tracker: string; base_url?: string; token?: string; webhook_secret?: string; enabled?: boolean } & JiraSettingFields) => {
     const response = await api.post<IntegrationSetting>('/integrations/settings', data)
     return response.data
   },
-  updateSetting: async (id: number, data: { base_url?: string; token?: string; webhook_secret?: string; enabled?: boolean }) => {
+  updateSetting: async (id: number, data: { base_url?: string; token?: string; webhook_secret?: string; enabled?: boolean } & JiraSettingFields) => {
     const response = await api.patch<IntegrationSetting>(`/integrations/settings/${id}`, data)
     return response.data
   },
   deleteSetting: async (id: number) => {
     await api.delete(`/integrations/settings/${id}`)
+  },
+  pullJira: async (id: number) => {
+    const response = await api.post<JiraPullResult>(`/integrations/settings/${id}/jira/pull`)
+    return response.data
   },
   listSyncEvents: async (defectId: number) => {
     const response = await api.get<SyncEvent[]>('/integrations/sync-events', { params: { defect_id: defectId } })
@@ -1616,6 +1968,7 @@ export interface ImportRequest {
   doc_type: string
   doc_ids: number[]
   include_links: boolean
+  tag_ids?: number[]
 }
 
 export interface ImportResult {
@@ -1634,20 +1987,170 @@ export interface ReqIFImportResult {
   errors: string[]
 }
 
+export interface TestCaseImportResult {
+  created: number
+  updated: number
+  skipped: number
+  new_ids: string[]
+  errors: string[]
+}
+
+/** A parameter name of an import that already exists in the project. */
+export interface MarkdownCollision {
+  name: string
+  existing_value: string
+  imported_value: string
+}
+
+/** Keep the project's value, or import the file's value under a new name. */
+export type MarkdownCollisionAction = { action: 'existing' } | { action: 'rename'; to: string }
+
+export interface MarkdownImportResult {
+  doc_type: string | null
+  parameters_created: number
+  parameter_collisions: string[]
+  parameters_renamed?: Record<string, string>
+  artefacts_created: number
+  artefacts_skipped: number
+  sections: { type_code: string | null; title: string }[]
+}
+
+export type TestRailField =
+  | 'id'
+  | 'title'
+  | 'section'
+  | 'section_hierarchy'
+  | 'type'
+  | 'priority'
+  | 'estimate'
+  | 'references'
+  | 'preconditions'
+  | 'steps'
+  | 'expected'
+  | 'step'
+  | 'step_expected'
+
+export interface TestRailColumns {
+  columns: string[]
+  detected: Partial<Record<TestRailField, string>>
+}
+
+export interface TestRailImportResult {
+  created: number
+  updated: number
+  skipped: number
+  suites_created: string[]
+  links_created: number
+  new_ids: string[]
+  errors: string[]
+}
+
+function tagQuery(tagIds?: number[], join = '?'): string {
+  return tagIds && tagIds.length ? join + tagIds.map((id) => `tag_ids=${id}`).join('&') : ''
+}
+
 export const importApi = {
   import: async (projectId: number, data: ImportRequest): Promise<ImportResult> => {
     const response = await api.post<ImportResult>(`/projects/${projectId}/import`, data)
     return response.data
   },
-  importReqif: async (projectId: number, file: File): Promise<ReqIFImportResult> => {
+  importReqif: async (projectId: number, file: File, tagIds?: number[]): Promise<ReqIFImportResult> => {
     const form = new FormData()
     form.append('file', file)
     const response = await api.post<ReqIFImportResult>(
-      `/projects/${projectId}/import/reqif`,
+      `/projects/${projectId}/import/reqif${tagQuery(tagIds)}`,
       form,
       { headers: { 'Content-Type': 'multipart/form-data' } }
     )
     return response.data
+  },
+  importTestCases: async (
+    projectId: number,
+    file: File,
+    format: 'csv' | 'xml',
+    tagIds?: number[],
+  ): Promise<TestCaseImportResult> => {
+    const form = new FormData()
+    form.append('file', file)
+    const response = await api.post<TestCaseImportResult>(
+      `/projects/${projectId}/import/test-cases?format=${format}${tagQuery(tagIds, '&')}`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    return response.data
+  },
+  importMarkdown: async (
+    projectId: number,
+    file: File,
+    defaultType?: string,
+    collisionActions?: Record<string, MarkdownCollisionAction>,
+    tagIds?: number[],
+  ): Promise<MarkdownImportResult> => {
+    const form = new FormData()
+    form.append('file', file)
+    if (collisionActions) form.append('collision_actions', JSON.stringify(collisionActions))
+    const qs = (defaultType ? `?default_type=${defaultType}` : '') + tagQuery(tagIds, defaultType ? '&' : '?')
+    const response = await api.post<MarkdownImportResult>(
+      `/projects/${projectId}/import/markdown${qs}`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    return response.data
+  },
+  testRailColumns: async (projectId: number, file: File): Promise<TestRailColumns> => {
+    const form = new FormData()
+    form.append('file', file)
+    const response = await api.post<TestRailColumns>(
+      `/projects/${projectId}/import/testrail/columns`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    return response.data
+  },
+  importTestRail: async (
+    projectId: number,
+    file: File,
+    format: 'xml' | 'csv',
+    mapping?: Partial<Record<TestRailField, string>>,
+    tagIds?: number[],
+  ): Promise<TestRailImportResult> => {
+    const form = new FormData()
+    form.append('file', file)
+    if (mapping) form.append('mapping', JSON.stringify(mapping))
+    const response = await api.post<TestRailImportResult>(
+      `/projects/${projectId}/import/testrail?format=${format}${tagQuery(tagIds, '&')}`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    return response.data
+  },
+}
+
+export const companyLogoApi = {
+  setLogo: async (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    const response = await api.put<{ content_type: string; size: number }>(
+      '/company-logo/logo',
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    return response.data
+  },
+  // Fetched through the authenticated client (not a bare <img src>) so the
+  // admin actually sees the stored logo; 404 means none is set yet.
+  fetchLogo: async (): Promise<Blob | null> => {
+    try {
+      const response = await api.get('/company-logo/logo', { responseType: 'blob' })
+      return response.data as Blob
+    } catch (err) {
+      const status = (err as { response?: { status?: number } }).response?.status
+      if (status === 404) return null
+      throw err
+    }
+  },
+  deleteLogo: async () => {
+    await api.delete('/company-logo/logo')
   },
 }
 
@@ -1672,8 +2175,8 @@ export const exportApi = {
   /** Download a server-side export, preserving the backend's filename. */
   download: async (
     projectId: number,
-    kind: 'requirements' | 'traceability',
-    format?: 'csv' | 'pdf'
+    kind: 'requirements' | 'traceability' | 'test-cases' | 'verification-dossier',
+    format?: 'csv' | 'pdf' | 'md' | 'xml'
   ): Promise<void> => {
     const response = await api.get<Blob>(`/projects/${projectId}/export/${kind}`, {
       params: format ? { format } : {},
@@ -1691,6 +2194,9 @@ export const exportApi = {
 }
 
 export interface Notification {
+  actor_user_id?: number | null
+  actor_name?: string | null
+  actor_profile_picture_url?: string | null
   id: number
   event_type: string
   title: string
@@ -1801,6 +2307,67 @@ export const artefactsApi = {
     const response = await api.post<{ status: string; allowed_transitions: string[] }>(`/artefacts/${artefactType}/${artefactId}/transition`, { status })
     return response.data
   },
+}
+
+export type WorkflowPerson = ProfilePerson & { id: number }
+export interface WorkflowChange { id: number; change_id: string; title: string }
+export interface WorkflowRequest { id: number; kind: 'review' | 'approval'; status: string; created_at: string }
+export interface ProjectDocumentRequest extends WorkflowRequest {
+  artefact_type: string
+  artefact_id: number
+  doc_type: DocType
+  public_id: string
+  revision_number: number
+}
+export interface DocumentWorkflow {
+  controlled: boolean
+  revision_number: number | null
+  phase: string | null
+  status: string
+  creator: WorkflowPerson | null
+  reviewer: WorkflowPerson | null
+  approver: WorkflowPerson | null
+  reviewed_by: WorkflowPerson | null
+  reviewed_at: string | null
+  approved_by: WorkflowPerson | null
+  approved_at: string | null
+  authorizing_change: WorkflowChange | null
+  options: { reviewers: WorkflowPerson[]; approvers: WorkflowPerson[]; changes: WorkflowChange[] }
+  actions: Record<'request_review' | 'request_approval' | 'approve' | 'decline' | 'assign_reviewer' | 'assign_approver' | 'comment' | 'start_revision' | 'start_draft' | 'edit_current' | 'plan_current', boolean>
+  pending_request: WorkflowRequest | null
+  last_request: { id: number; kind: 'review' | 'approval'; status: string; retry_at: string | null } | null
+  revisions: { revision_number: number; captured_at: string; approved_by: WorkflowPerson | null; approved_at: string | null; authorizing_change_id: number | null }[]
+}
+export interface ApprovedDocumentRevision {
+  revision_number: number
+  approved_by: WorkflowPerson | null
+  approved_at: string | null
+  authorizing_change: WorkflowChange | null
+  snapshot: {
+    fields: Record<string, unknown>
+    sections: DocumentSection[]
+    attachments: { id: number; original_filename: string; content_type: string | null; file_size: number | null }[]
+    suite_items: { id: number; test_case_id: number; test_case?: { tc_id: string; title: string } | null }[]
+  }
+}
+export const workflowApi = {
+  listProjectRequests: async (projectId: number): Promise<ProjectDocumentRequest[]> =>
+    (await api.get<ProjectDocumentRequest[]>(`/projects/${projectId}/artefact-requests`)).data,
+  get: async (type: string, id: number): Promise<DocumentWorkflow> =>
+    (await api.get<DocumentWorkflow>(`/artefacts/${type}/${id}/workflow`)).data,
+  assign: async (type: string, id: number, data: { reviewer_id?: number | null; approver_id?: number | null }) =>
+    (await api.put(`/artefacts/${type}/${id}/workflow/assignees`, data)).data,
+  request: async (type: string, id: number, kind: 'review' | 'approval') =>
+    (await api.post(`/artefacts/${type}/${id}/requests`, { kind })).data,
+  decline: async (requestId: number) => (await api.post(`/artefact-requests/${requestId}/decline`, {})).data,
+  approve: async (type: string, id: number) => (await api.post(`/artefacts/${type}/${id}/sign-off`, { step: 'approve' })).data,
+  startRevision: async (type: string, id: number, changeRequestId: number) =>
+    (await api.post(`/artefacts/${type}/${id}/revisions`, { change_request_id: changeRequestId })).data,
+  startDraft: async (type: string, id: number) => (await api.post(`/artefacts/${type}/${id}/draft`, {})).data,
+  getRevision: async (type: string, id: number, number: number): Promise<ApprovedDocumentRevision> =>
+    (await api.get<ApprovedDocumentRevision>(`/artefacts/${type}/${id}/revisions/${number}`)).data,
+  downloadRevisionAttachment: async (type: string, id: number, number: number, fileId: number): Promise<Blob> =>
+    (await api.get<Blob>(`/artefacts/${type}/${id}/revisions/${number}/attachments/${fileId}`, { responseType: 'blob' })).data,
 }
 
 export interface SetupStatusResponse {

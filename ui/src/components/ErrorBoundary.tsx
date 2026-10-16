@@ -18,7 +18,7 @@ export default class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.error) {
       return (
-        <div className="flex flex-col items-center justify-center min-h-[16rem] p-8">
+        <div className="flex flex-col items-center justify-center min-h-64 p-8">
           <h2 className="text-lg font-semibold text-foreground mb-2">Something went wrong</h2>
           <p className="text-sm text-muted-foreground mb-4 max-w-md text-center">
             {this.state.error.message || 'An unexpected error occurred while loading this page.'}

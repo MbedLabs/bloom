@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-const sources = import.meta.glob('../{pages,components}/*.tsx', {
+const sources = import.meta.glob(['../{pages,components}/*.tsx', '../hooks/*.ts'], {
   eager: true,
   query: '?raw',
   import: 'default',

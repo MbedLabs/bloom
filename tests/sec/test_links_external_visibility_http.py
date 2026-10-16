@@ -7,17 +7,24 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
-from app.core.security import get_current_user, get_password_hash
+from app.core.security import (
+    accessible_project_ids,
+    get_current_user,
+    get_password_hash,
+)
 from app.main import app
 from app.models import (
     ArtefactLink,
     Project,
+    ProjectExternalDocType,
     ProjectMembership,
     Requirement,
     TestCase,
     User,
 )
 from app.models.user import UserRole
+from app.schemas.memberships import DEFAULT_EXTERNAL_DOC_TYPES
+from tests.access_fixtures import allow_doc_types, project_access_fixture
 
 
 @dataclass
@@ -71,6 +78,7 @@ def _build_harness():
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Selected test user no longer exists",
                 )
+            await accessible_project_ids(session, user)
             return user
 
     asyncio.run(_create_schema())
@@ -98,13 +106,17 @@ async def _seed_links_visibility_data(session_maker: async_sessionmaker[AsyncSes
         session.add(project)
         await session.flush()
 
-        session.add(
-            ProjectMembership(
-                user_id=external.id,
-                project_id=project.id,
-                role=UserRole.external.value,
-            )
+        membership = project_access_fixture(
+            user_id=external.id,
+            project_id=project.id,
+            permissions={"*": ["view", "comment"]},
+            visibility="customer",
+            doc_types=[],
         )
+        session.add(membership)
+        await session.flush()
+        for doc_type in sorted(DEFAULT_EXTERNAL_DOC_TYPES):
+            allow_doc_types(membership.policies[0], [doc_type])
 
         customer_requirement = Requirement(
             project_id=project.id,

@@ -33,7 +33,8 @@ def test_response_carries_generated_request_id():
     response = client.get("/api/ping")
     assert response.status_code == 200
     request_id = response.headers.get("x-request-id")
-    assert request_id and len(request_id) >= 16
+    assert request_id
+    assert len(request_id) >= 16
 
 
 def test_incoming_request_id_is_propagated():

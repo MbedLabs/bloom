@@ -1,9 +1,10 @@
 """Admin lifecycle endpoints for scoped machine credentials."""
 
 from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +17,7 @@ from app.core.service_auth import (
 )
 from app.models import ServiceCredential
 from app.models.user import User, UserRole
+from app.services.audit import record_audit_event
 
 router = APIRouter()
 
@@ -38,9 +40,17 @@ class ServiceCredentialSummary(BaseModel):
 
     model_config = {"from_attributes": True}
 
+    @field_serializer("expires_at", "revoked_at", "last_used_at", "created_at")
+    def serialize_dt(self, dt: Optional[datetime], _info):
+        return f"{dt.isoformat()}Z" if dt else None
+
 
 class ServiceCredentialCreated(ServiceCredentialSummary):
     token: str
+
+    @field_serializer("expires_at", "revoked_at", "last_used_at", "created_at")
+    def serialize_dt(self, dt: Optional[datetime], _info):
+        return f"{dt.isoformat()}Z" if dt else None
 
 
 def _validate_scope(scope: str) -> None:
@@ -53,7 +63,7 @@ def _validate_scope(scope: str) -> None:
 
 @router.get("", response_model=list[ServiceCredentialSummary])
 async def list_service_credentials(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _admin: User = Depends(require_role(UserRole.admin)),
 ):
     return list(
@@ -68,7 +78,7 @@ async def list_service_credentials(
 @router.post("", response_model=ServiceCredentialCreated, status_code=201)
 async def create_credential(
     data: ServiceCredentialCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     admin: User = Depends(require_role(UserRole.admin)),
 ):
     _validate_scope(data.scope)
@@ -78,6 +88,13 @@ async def create_credential(
         name=data.name,
         expires_in_days=data.expires_in_days,
     )
+    await record_audit_event(
+        db,
+        "service_credential.issued",
+        target_type="service_credential",
+        target_id=credential.id,
+        details={"name": credential.name, "prefix": credential.token_prefix},
+    )
     summary = ServiceCredentialSummary.model_validate(credential)
     return ServiceCredentialCreated(
         **summary.model_dump(),
@@ -85,10 +102,14 @@ async def create_credential(
     )
 
 
-@router.post("/{credential_id}/rotate", response_model=ServiceCredentialCreated)
+@router.post(
+    "/{credential_id}/rotate",
+    response_model=ServiceCredentialCreated,
+    responses={404: {"description": "Not Found"}},
+)
 async def rotate_credential(
     credential_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     admin: User = Depends(require_role(UserRole.admin)),
 ):
     existing = await db.get(ServiceCredential, credential_id)
@@ -97,6 +118,13 @@ async def rotate_credential(
     name = existing.name
     await revoke_service_credential(db, credential_id)
     credential, token = await create_service_credential(db, created_by_user_id=admin.id, name=name)
+    await record_audit_event(
+        db,
+        "service_credential.rotated",
+        target_type="service_credential",
+        target_id=credential.id,
+        details={"name": name, "replaced_id": credential_id, "prefix": credential.token_prefix},
+    )
     summary = ServiceCredentialSummary.model_validate(credential)
     return ServiceCredentialCreated(
         **summary.model_dump(),
@@ -107,7 +135,10 @@ async def rotate_credential(
 @router.delete("/{credential_id}", status_code=204)
 async def revoke_credential(
     credential_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _admin: User = Depends(require_role(UserRole.admin)),
 ):
     await revoke_service_credential(db, credential_id)
+    await record_audit_event(
+        db, "service_credential.revoked", target_type="service_credential", target_id=credential_id
+    )

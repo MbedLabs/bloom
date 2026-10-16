@@ -108,7 +108,7 @@ async def test_requirements_pdf_is_valid_pdf(session):
 
 async def test_traceability_csv_marks_coverage(session):
     admin = await _admin(session)
-    response = await export_traceability(project_id=1, db=session, current_user=admin)
+    response = await export_traceability(project_id=1, format="csv", db=session, current_user=admin)
     rows = _parse_csv(response)
     assert rows[0] == [
         "req_id",
