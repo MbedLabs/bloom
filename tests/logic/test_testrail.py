@@ -135,7 +135,8 @@ def test_csv_text_template():
     data = b"Title,Steps,Expected Result\nWarm boot,Reset the board,Banner\n"
     (case,) = parse_testrail_csv(data)
     assert _rows(case) == [("step", "Reset the board", "Banner")]
-    assert case.case_id == "" and case.sections == []
+    assert case.case_id == ""
+    assert case.sections == []
 
 
 def test_csv_column_mapping_and_errors():

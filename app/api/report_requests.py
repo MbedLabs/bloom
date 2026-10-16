@@ -1,6 +1,7 @@
 """Reader report requests and the authenticated Bud publishing mailbox."""
 
-from datetime import datetime
+from datetime import datetime, timezone
+from http import HTTPStatus
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -106,7 +107,7 @@ async def reader_response(db: AsyncSession, user: User, row: ReportRequest | Non
     }
 
 
-@router.get("/report-requests")
+@router.get("/report-requests", responses={404: {"description": HTTPStatus(404).phrase}})
 async def request_state(
     source_kind: SourceKind,
     source_id: int = Query(gt=0),
@@ -131,7 +132,9 @@ async def request_state(
     return await reader_response(db, user, row)
 
 
-@router.post("/report-requests", status_code=201)
+@router.post(
+    "/report-requests", status_code=201, responses={404: {"description": HTTPStatus(404).phrase}}
+)
 async def request_report(
     data: ReaderRequest,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -204,7 +207,14 @@ async def publishing_mailbox(
     ]
 
 
-@router.post("/bud/report-requests/{request_id}/refuse")
+@router.post(
+    "/bud/report-requests/{request_id}/refuse",
+    responses={
+        404: {"description": HTTPStatus(404).phrase},
+        409: {"description": HTTPStatus(409).phrase},
+        422: {"description": HTTPStatus(422).phrase},
+    },
+)
 async def refuse_report(
     request_id: int,
     data: Refusal,
@@ -226,7 +236,7 @@ async def refuse_report(
         row.status = "refused"
         row.reason = reason
         row.publisher = data.publisher
-        row.updated_at = datetime.utcnow()
+        row.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         await record_audit_event(
             db,
             "report.refused",

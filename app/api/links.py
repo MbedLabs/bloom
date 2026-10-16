@@ -1,5 +1,7 @@
 """Generic typed artefact link endpoints."""
 
+from http import HTTPStatus
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -94,7 +96,12 @@ async def list_links(
     return [_link_response(row) for row in rows]
 
 
-@router.post("", response_model=ArtefactLinkResponse, status_code=201)
+@router.post(
+    "",
+    response_model=ArtefactLinkResponse,
+    status_code=201,
+    responses={403: {"description": HTTPStatus(403).phrase}},
+)
 async def create_link(
     data: ArtefactLinkCreate,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -176,7 +183,9 @@ async def create_link(
     return _link_response(link)
 
 
-@router.delete("/{link_id}", status_code=204)
+@router.delete(
+    "/{link_id}", status_code=204, responses={403: {"description": HTTPStatus(403).phrase}}
+)
 async def delete_link(
     link_id: int,
     db: AsyncSession = Depends(get_db, scope="function"),

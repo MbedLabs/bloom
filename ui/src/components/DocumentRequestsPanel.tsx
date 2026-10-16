@@ -4,7 +4,7 @@ import { workflowApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import { docUrl } from '../types/doc'
 
-export default function DocumentRequestsPanel({ projectId, projectPrefix }: { projectId: number; projectPrefix: string }) {
+export default function DocumentRequestsPanel({ projectId, projectPrefix }: Readonly<{ projectId: number; projectPrefix: string }>) {
   const { user } = useAuth()
   const { data: requests, isPending, isError } = useQuery({
     queryKey: ['document-requests', projectId, user?.id],

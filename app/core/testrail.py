@@ -109,7 +109,7 @@ def _check_size(data: bytes) -> None:
 def _text(node, tag: str) -> str:
     """The stripped text of a child element, or an empty string."""
     child = node.find(tag) if node is not None else None
-    return (child.text or "").strip() if child is not None and child.text else ""
+    return child.text.strip() if child is not None and child.text else ""
 
 
 def _xml_case(node, sections: list) -> TestRailCase:

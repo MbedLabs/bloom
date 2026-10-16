@@ -45,6 +45,8 @@ from app.models import (
 from app.models.user import User
 from app.services.audit import record_audit_event
 
+EXPORT_GENERATED = "export.generated"
+
 router = APIRouter()
 
 CSV_MEDIA_TYPE = "text/csv; charset=utf-8"
@@ -360,7 +362,7 @@ async def export_requirements(
     project = await _load_project(db, project_id, current_user, "REQ")
     await record_audit_event(
         db,
-        "export.generated",
+        EXPORT_GENERATED,
         target_type="project",
         target_id=project.id,
         project_id=project.id,
@@ -416,7 +418,7 @@ async def export_traceability(
     project = await _load_project(db, project_id, current_user, "REQ")
     await record_audit_event(
         db,
-        "export.generated",
+        EXPORT_GENERATED,
         target_type="project",
         target_id=project.id,
         project_id=project.id,
@@ -525,7 +527,7 @@ async def export_test_cases(
     project = await _load_project(db, project_id, current_user, "TC")
     await record_audit_event(
         db,
-        "export.generated",
+        EXPORT_GENERATED,
         target_type="project",
         target_id=project.id,
         project_id=project.id,
@@ -594,7 +596,7 @@ async def export_verification_dossier(
     await require_project_access(db, current_user, project_id, permission=("export", "TC"))
     await record_audit_event(
         db,
-        "export.generated",
+        EXPORT_GENERATED,
         target_type="project",
         target_id=project.id,
         project_id=project.id,

@@ -73,7 +73,8 @@ def test_the_tag_base_is_managed_by_administrators(api_client: TestClient):
     renamed = api_client.patch(
         f"/api/tags/{tag['id']}", headers=admin, json={"name": tag["name"] + "-x"}
     )
-    assert renamed.status_code == 200 and renamed.json()["name"] == tag["name"] + "-x"
+    assert renamed.status_code == 200
+    assert renamed.json()["name"] == tag["name"] + "-x"
     clash = api_client.post("/api/tags", headers=admin, json={"name": tag["name"] + "-x"})
     assert clash.status_code == 409
     user = _create_user(api_client, admin, role="maintainer")

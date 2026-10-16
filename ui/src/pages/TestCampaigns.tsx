@@ -375,8 +375,8 @@ export default function TestCampaigns() {
                 </div>
                 {!external && (
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Origin</label>
-                  <SelectField
+                  <label htmlFor="campaign-visibility" className="block text-sm font-medium text-foreground mb-1">Origin</label>
+                  <SelectField id="campaign-visibility"
                     value={form.visibility}
                     onChange={(e) => setForm({ ...form, visibility: e.target.value })}
                     className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
@@ -482,8 +482,8 @@ export default function TestCampaigns() {
                 </div>
                 {!external && (
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Origin</label>
-                  <SelectField
+                  <label htmlFor="suite-visibility" className="block text-sm font-medium text-foreground mb-1">Origin</label>
+                  <SelectField id="suite-visibility"
                     value={suiteForm.visibility}
                     onChange={(e) => setSuiteForm({ ...suiteForm, visibility: e.target.value })}
                     className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"

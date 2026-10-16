@@ -74,7 +74,8 @@ async def test_xml_import_creates_cases_suite_and_links(session):
     ).scalar_one()
     assert cold.source_ref == "testrail:C7"
     assert cold.status == "Draft"
-    assert cold.reviewer_id is None and cold.approver_id is None
+    assert cold.reviewer_id is None
+    assert cold.approver_id is None
     assert cold.preconditions == "Relay open\n\nSerial console attached"
     assert [r["row_type"] for r in cold.steps] == ["precondition", "precondition", "step", "step"]
     assert cold.description == (
@@ -89,7 +90,8 @@ async def test_xml_import_creates_cases_suite_and_links(session):
         "verifies",
     )
     suite = (await session.execute(select(TestSuite))).scalar_one()
-    assert suite.name == "Boot" and suite.suite_id == result.suites_created[0]
+    assert suite.name == "Boot"
+    assert suite.suite_id == result.suites_created[0]
     items = (await session.execute(select(TestSuiteItem))).scalars().all()
     assert len(items) == 2
 
@@ -99,7 +101,8 @@ async def test_reimport_updates_instead_of_duplicating(session):
     again = await _import(session, SUITE_XML)
 
     assert (again.created, again.updated) == (0, 2)
-    assert again.suites_created == [] and again.links_created == 0
+    assert again.suites_created == []
+    assert again.links_created == 0
     assert len((await session.execute(select(TestCaseModel))).scalars().all()) == 2
     assert len((await session.execute(select(TestSuiteItem))).scalars().all()) == 2
     assert len((await session.execute(select(ArtefactLink))).scalars().all()) == 1
@@ -190,6 +193,7 @@ async def test_testrail_refuses_a_role_removed_from_shared_rules(session, monkey
     with pytest.raises(HTTPException) as failed:
         await _import(session, SUITE_XML)
     assert failed.value.status_code == 422
-    assert "C7" in failed.value.detail and "verifies" in failed.value.detail
+    assert "C7" in failed.value.detail
+    assert "verifies" in failed.value.detail
     assert (await session.execute(select(TestCaseModel))).scalars().all() == []
     assert (await session.execute(select(ArtefactLink))).scalars().all() == []

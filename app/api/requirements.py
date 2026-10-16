@@ -75,6 +75,8 @@ from app.services.artefact_tags import attach_tags, creation_tags
 from app.services.notification_service import notify_assignment
 from app.services.tag_links import sync_tag_links
 
+REQUIREMENT_NOT_FOUND = "Requirement not found"
+
 router = APIRouter()
 
 
@@ -521,7 +523,7 @@ async def get_requirement(
         db,
         Requirement,
         requirement_id,
-        "Requirement not found",
+        REQUIREMENT_NOT_FOUND,
         current_user,
         permission=("view", "REQ"),
     )
@@ -552,7 +554,7 @@ async def update_requirement(
         db,
         Requirement,
         requirement_id,
-        "Requirement not found",
+        REQUIREMENT_NOT_FOUND,
         current_user,
         permission=("edit", "REQ"),
     )
@@ -725,7 +727,7 @@ async def delete_requirement(
         current_user,
         Requirement,
         requirement_id,
-        "Requirement not found",
+        REQUIREMENT_NOT_FOUND,
         resource="REQ",
         audit_type="requirement",
         activity=("requirement", "req_id"),
@@ -750,7 +752,7 @@ async def link_test_run(
         db,
         Requirement,
         requirement_id,
-        "Requirement not found",
+        REQUIREMENT_NOT_FOUND,
         _current_user,
         permission=("edit", "REQ"),
     )
@@ -786,7 +788,7 @@ async def get_linked_test_runs(
         db,
         Requirement,
         requirement_id,
-        "Requirement not found",
+        REQUIREMENT_NOT_FOUND,
         current_user,
         permission=("view", "REQ"),
     )

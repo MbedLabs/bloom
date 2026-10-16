@@ -15,7 +15,7 @@ import { useToast } from './useToast'
 const DEFAULT_GROUPS = ['Administrators', 'Developers', 'Product Owners', 'Testers']
 type Person = { id: number; email: string; full_name: string; role?: string; profile_picture_url?: string | null }
 
-function ProjectMemberIdentity({ member, canRemove, disabled, onRemove }: { member: ProjectMember; canRemove: boolean; disabled: boolean; onRemove: () => void }) {
+function ProjectMemberIdentity({ member, canRemove, disabled, onRemove }: Readonly<{ member: ProjectMember; canRemove: boolean; disabled: boolean; onRemove: () => void }>) {
   const label = `Remove ${member.full_name} from project`
   return <span className="inline-flex min-w-0 items-center gap-2 align-middle">
     <span className="group/image relative inline-flex shrink-0">
@@ -53,7 +53,7 @@ function isEligibleForGroup(person: Person, group: Group, policies: Policy[]): b
   return true
 }
 
-export default function ProjectPolicyGroups({ projectId }: { projectId: number }) {
+export default function ProjectPolicyGroups({ projectId }: Readonly<{ projectId: number }>) {
   const { user } = useAuth()
   const groups = useQuery({ queryKey: ['groups'], queryFn: groupsApi.list })
   const policies = useQuery({ queryKey: ['policies'], queryFn: policiesApi.list })
@@ -101,9 +101,9 @@ export default function ProjectPolicyGroups({ projectId }: { projectId: number }
   </section>
 }
 
-function ProjectGroupRoster({ projectId, group, members, people, policies, canAssign, canRemove }: {
+function ProjectGroupRoster({ projectId, group, members, people, policies, canAssign, canRemove }: Readonly<{
   projectId: number; group: Group; members: ProjectMember[]; people: Person[]; policies: Policy[]; canAssign: boolean; canRemove: boolean
-}) {
+}>) {
   const queryClient = useQueryClient()
   const toast = useToast()
   const [choosing, setChoosing] = useState(false)
@@ -168,7 +168,7 @@ function ProjectGroupRoster({ projectId, group, members, people, policies, canAs
   </section>
 }
 
-function LegacyMember({ projectId, member, canRemove }: { projectId: number; member: ProjectMember; canRemove: boolean }) {
+function LegacyMember({ projectId, member, canRemove }: Readonly<{ projectId: number; member: ProjectMember; canRemove: boolean }>) {
   const queryClient = useQueryClient()
   const toast = useToast()
   const remove = useMutation({

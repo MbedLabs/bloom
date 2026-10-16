@@ -96,7 +96,8 @@ async def test_unsupported_requirement_read_does_not_invent_draft(workflow_http,
     assert registry.json()["items"][0]["status"] is None
     draft = await client.get("/api/projects/PRJ/docs", params={"status": "Draft"})
     assert draft.json()["total"] == 0
-    assert row.status == status and row.title == "Preserved content"
+    assert row.status == status
+    assert row.title == "Preserved content"
     response = await client.post(path + "/draft")
     assert response.status_code == 200, response.text
     assert row.status == "Draft"
@@ -274,7 +275,8 @@ async def test_actual_review_approval_and_revision_preserve_content(
     assert response.status_code == 201, response.text
     assert row.status == "Review"
     repeat = await client.post(path + "/requests", json={"kind": "review"})
-    assert repeat.status_code == 200 and repeat.json()["already_requested"] is True
+    assert repeat.status_code == 200
+    assert repeat.json()["already_requested"] is True
     requested_activity = await client.get(path + "/activity")
     assert requested_activity.status_code == 200, requested_activity.text
     requested_events = [event["event_type"] for event in requested_activity.json()]
@@ -756,7 +758,8 @@ async def test_project_pending_requests_filter_origin_membership_and_current_rev
     await db.flush()
     users[3].access_map = await _access_map(db, users[3])
     revoked = await client.get("/api/projects/1/artefact-requests")
-    assert revoked.status_code == 200 and revoked.json() == []
+    assert revoked.status_code == 200
+    assert revoked.json() == []
 
 
 async def test_request_delivery_repeat_suppression_decline_and_actual_audit_actor(workflow_http):
@@ -774,7 +777,8 @@ async def test_request_delivery_repeat_suppression_decline_and_actual_audit_acto
     assert first.status_code == 201, first.text
     assert [message["to_email"] for message in db.info["workflow_deliveries"]] == [users[1].email]
     repeat = await client.post(path, json={"kind": "review"})
-    assert repeat.status_code == 200 and repeat.json()["already_requested"] is True
+    assert repeat.status_code == 200
+    assert repeat.json()["already_requested"] is True
     assert len(db.info["workflow_deliveries"]) == 1
     assert len((await db.scalars(select(Notification))).all()) == 1
     current[0] = users[1]
@@ -785,7 +789,8 @@ async def test_request_delivery_repeat_suppression_decline_and_actual_audit_acto
         users[0].email,
     ]
     request = await db.get(ArtefactRequest, first.json()["id"])
-    assert request.status == "declined" and request.decided_by_id == 2
+    assert request.status == "declined"
+    assert request.decided_by_id == 2
     assert request.decided_at is not None
     events = (
         await db.scalars(
@@ -868,7 +873,8 @@ async def test_approved_correction_reapproves_without_advancing_numbers(
     )
     assert response.status_code == 200, response.text
     state = (await client.get(path + "/workflow")).json()
-    assert state["phase"] == "Draft" and state["revision_number"] == 1
+    assert state["phase"] == "Draft"
+    assert state["revision_number"] == 1
     assert state["creator"]["id"] == 4
     assert state["reviewed_by"] is state["approved_by"] is None
     assert getattr(row, "version", None) == original_version
@@ -889,7 +895,8 @@ async def test_approved_correction_reapproves_without_advancing_numbers(
     response = await client.post(path + "/sign-off", json={"step": "approve"})
     assert response.status_code == 200, response.text
     state = (await client.get(path + "/workflow")).json()
-    assert state["phase"] == "Approved" and state["revision_number"] == 1
+    assert state["phase"] == "Approved"
+    assert state["revision_number"] == 1
     assert getattr(row, "version", None) == original_version
     assert (await client.get(path + "/revisions/1")).json() == original.json()
 
@@ -927,11 +934,13 @@ async def test_used_linked_change_does_not_bump_each_correction(workflow_http):
         json={"title": "Changed", "status": "Approved", "version": "1.0"},
     )
     assert response.status_code == 200, response.text
-    assert row.version == "2" and row.status == "Draft"
+    assert row.version == "2"
+    assert row.status == "Draft"
     response = await client.patch(f"/api/documents/{row.id}", json={"title": "Further correction"})
     assert response.status_code == 200, response.text
     state = (await client.get(f"/api/artefacts/document/{row.id}/workflow")).json()
-    assert state["revision_number"] == 2 and row.version == "2"
+    assert state["revision_number"] == 2
+    assert row.version == "2"
     assert state["authorizing_change"]["id"] == change.id
 
     path = f"/api/artefacts/document/{row.id}"
@@ -956,7 +965,8 @@ async def test_used_linked_change_does_not_bump_each_correction(workflow_http):
     )
     assert response.status_code == 200, response.text
     state = (await client.get(path + "/workflow")).json()
-    assert state["phase"] == "Draft" and state["revision_number"] == 2
+    assert state["phase"] == "Draft"
+    assert state["revision_number"] == 2
     assert row.version == "2"
     assert (await client.get(path + "/revisions/2")).json() == retained
     next_change = ChangeRequest(
@@ -981,7 +991,8 @@ async def test_used_linked_change_does_not_bump_each_correction(workflow_http):
     )
     assert response.status_code == 200, response.text
     state = (await client.get(path + "/workflow")).json()
-    assert state["revision_number"] == 3 and row.version == "3"
+    assert state["revision_number"] == 3
+    assert row.version == "3"
     assert state["authorizing_change"]["id"] == next_change.id
 
 
@@ -1009,7 +1020,8 @@ async def test_linked_unapproved_change_cannot_authorize_saved_revision(workflow
         f"/api/requirements/{row.id}", json={"title": "Unauthorized change"}
     )
     assert response.status_code == 409, response.text
-    assert row.title == "Approved" and row.status == "Approved"
+    assert row.title == "Approved"
+    assert row.status == "Approved"
     state = (await client.get(f"/api/artefacts/requirement/{row.id}/workflow")).json()
     assert state["revision_number"] == 1
     assert state["revisions"] == []
@@ -1030,4 +1042,5 @@ async def test_controlled_version_cannot_be_changed_without_content_authorizatio
     await db.flush()
     response = await client.patch(f"/api/documents/{row.id}", json={"version": "4"})
     assert response.status_code == 409, response.text
-    assert row.version == "1" and row.status == "Approved"
+    assert row.version == "1"
+    assert row.status == "Approved"

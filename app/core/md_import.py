@@ -38,10 +38,10 @@ TYPE_TOKENS = {
     "defect": "DEF",
 }
 
-_HEADING_TAG_RE = re.compile(r"^\s*#{1,6}\s*\[(?P<tag>[A-Za-z-]+)\]\s*(?P<title>.*)$")
-_HEADING_RE = re.compile(r"^\s*#{1,6}\s+(?P<title>.*)$")
+_HEADING_TAG_RE = re.compile(r"^\s*#{1,6}\s*\[(?P<tag>[A-Za-z-]+)\](?P<title>.*)$")
+_HEADING_RE = re.compile(r"^\s*#{1,6}\s(?P<title>.*)$")
 _PARAM_RE = re.compile(
-    r"\{\{\s*parameter\s*:\s*(?P<name>[^{},]+?)\s*,\s*value\s*:\s*(?P<value>[^{}]*?)\s*\}\}",
+    r"\{\{\s*parameter\s*:(?P<name>[^{},]+),\s*value\s*:(?P<value>[^{}]*)\}\}",
     re.IGNORECASE,
 )
 
@@ -162,7 +162,7 @@ def parameter_name_collisions(parameters: list, existing_names: Iterable) -> lis
     return collisions
 
 
-_BARE_PARAM_RE = re.compile(r"\{\{\s*([^{}:,\n]+?)\s*\}\}")
+_BARE_PARAM_RE = re.compile(r"\{\{([^{}]*)\}\}")
 
 
 def rename_parameters(text: str, renames: dict) -> str:
@@ -177,7 +177,11 @@ def rename_parameters(text: str, renames: dict) -> str:
         return "{{parameter: " + new + ", value: " + match.group("value").strip() + "}}"
 
     def _bare(match: re.Match) -> str:
-        new = lookup.get(match.group(1).strip().lower())
+        raw = match.group(1)
+        name = raw.strip()
+        if not raw.replace("\n", "") or any(char in name for char in (":", ",", "\n")):
+            return match.group(0)
+        new = lookup.get(name.lower())
         return "{{" + new + "}}" if new else match.group(0)
 
     return _BARE_PARAM_RE.sub(_bare, _PARAM_RE.sub(_wrapped, text))

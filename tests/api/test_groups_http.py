@@ -169,7 +169,8 @@ def test_group_crud_membership_and_grants(api_client: TestClient):
     project_id = create_project(api_client, headers, "Group CRUD")["id"]
 
     group = _create_group(api_client, headers, policy_id=policy["id"])
-    assert group["members"] == [] and group["grants"] == []
+    assert group["members"] == []
+    assert group["grants"] == []
     assert "policy_id" not in group
 
     added = api_client.post(
@@ -223,7 +224,8 @@ def test_group_crud_membership_and_grants(api_client: TestClient):
         == 204
     )
     emptied = api_client.get(f"/api/groups/{group['id']}", headers=headers)
-    assert emptied.json()["members"] == [] and emptied.json()["grants"] == []
+    assert emptied.json()["members"] == []
+    assert emptied.json()["grants"] == []
 
     assert api_client.delete(f"/api/groups/{group['id']}", headers=headers).status_code == 204
     assert api_client.get(f"/api/groups/{group['id']}", headers=headers).status_code == 404

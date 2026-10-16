@@ -7,12 +7,12 @@ export default function TagPicker({
   value,
   onChange,
   showLabel = true,
-}: {
+}: Readonly<{
   projectId: number
   value: number[]
   onChange: (tagIds: number[]) => void
   showLabel?: boolean
-}) {
+}>) {
   const { data } = useQuery({
     queryKey: ['tag-scope', projectId],
     queryFn: () => tagsApi.scope(projectId),

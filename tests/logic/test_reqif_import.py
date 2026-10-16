@@ -357,7 +357,8 @@ async def test_reqif_unknown_relation_fails_with_identifier_and_type(session):
             current_user=await _admin(session),
         )
     assert failed.value.status_code == 422
-    assert "REL-1" in failed.value.detail and "Unknown Relation" in failed.value.detail
+    assert "REL-1" in failed.value.detail
+    assert "Unknown Relation" in failed.value.detail
     assert (await session.execute(select(Requirement))).scalars().all() == []
     assert (await session.execute(select(ArtefactLink))).scalars().all() == []
 
@@ -376,7 +377,8 @@ async def test_reqif_disallowed_mapped_role_fails_with_relation(session, monkeyp
             current_user=await _admin(session),
         )
     assert failed.value.status_code == 422
-    assert "REL-1" in failed.value.detail and "Refines" in failed.value.detail
+    assert "REL-1" in failed.value.detail
+    assert "Refines" in failed.value.detail
     assert (await session.execute(select(ArtefactLink))).scalars().all() == []
 
 

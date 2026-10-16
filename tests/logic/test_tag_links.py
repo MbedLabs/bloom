@@ -73,7 +73,8 @@ async def test_invalid_tag_pair_fails_loudly(session, source, target):
     with pytest.raises(HTTPException) as failed:
         await _sync(session, source, _mention(target))
     assert failed.value.status_code == 422
-    assert source in failed.value.detail and target in failed.value.detail
+    assert source in failed.value.detail
+    assert target in failed.value.detail
     assert (await session.execute(select(ArtefactLink))).scalars().all() == []
 
 

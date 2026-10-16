@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { authApi, type ProfilePerson } from '../api/client'
 
-export default function ProfilePicture({ user, className = 'w-8 h-8', own = false }: {
+export default function ProfilePicture({ user, className = 'w-8 h-8', own = false }: Readonly<{
   user: ProfilePerson | null
   className?: string
   own?: boolean
-}) {
+}>) {
   const [image, setImage] = useState<{ key: string; url: string } | null>(null)
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
   const id = user?.id

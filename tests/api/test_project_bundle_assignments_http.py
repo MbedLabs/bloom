@@ -35,7 +35,8 @@ def test_same_user_has_different_bundles_on_two_projects(api_client):
         entries.append(response.json())
     first = api_client.get(f"/api/projects/{projects[0]}/permissions", headers=headers).json()
     second = api_client.get(f"/api/projects/{projects[1]}/permissions", headers=headers).json()
-    assert "create" in first["REQ"] and "create" not in second["REQ"]
+    assert "create" in first["REQ"]
+    assert "create" not in second["REQ"]
     for bundle in bundles:
         assert api_client.get(f"/api/groups/{bundle['id']}", headers=admin).json()["members"] == []
     for project, origin in zip(projects, ["internal", "customer"]):
@@ -163,7 +164,8 @@ def test_viewer_app_grant_keeps_base_role_caps_and_no_project_admission(api_clie
     )
     assert saved.status_code == 200, saved.text
     permissions = api_client.get("/api/users/me/application-permissions", headers=headers).json()
-    assert "edit" in permissions["access"] and "delete" not in permissions["access"]
+    assert "edit" in permissions["access"]
+    assert "delete" not in permissions["access"]
     assert api_client.get("/api/groups/assignment-options", headers=headers).status_code == 200
     assert api_client.get("/api/projects", headers=headers).json() == []
     assert api_client.get(f"/api/users/{user['id']}", headers=admin).json()["role"] == "external"

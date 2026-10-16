@@ -20,7 +20,7 @@ const reviewButtonClass = 'w-full inline-flex items-center justify-center px-3 p
 const approvalButtonClass = 'w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-500 disabled:opacity-50'
 const ENTITY_KEYS: Record<string, string> = { requirement: 'requirement', 'test-case': 'testCase', document: 'document', design: 'design', risk: 'risk', change: 'change', 'test-concept': 'testConcept', defect: 'defect', 'test-suite': 'testSuite', campaign: 'campaign' }
 
-export default function WorkflowPanel({ artefactType, artefactId, projectPrefix, projectId }: { artefactType: string; artefactId: number; projectPrefix?: string; projectId?: number }) {
+export default function WorkflowPanel({ artefactType, artefactId, projectPrefix, projectId }: Readonly<{ artefactType: string; artefactId: number; projectPrefix?: string; projectId?: number }>) {
   const workflow = useDocumentWorkflow(artefactType, artefactId)
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -121,11 +121,11 @@ export default function WorkflowPanel({ artefactType, artefactId, projectPrefix,
     {tab === 'history' && state.controlled && <SectionCard title="Approved revisions">
       {state.revisions.length === 0 ? <p>No approved revisions recorded.</p> : state.revisions.map(item => <div key={item.revision_number} className="mb-3"><button className={actionButtonClass} type="button" onClick={() => setRevision(item.revision_number)}>Open revision {item.revision_number}</button><span> · {item.approved_by ? <UserIdentity user={item.approved_by} /> : 'Approval actor not recorded'} · {formatDateTime(item.approved_at ?? item.captured_at)}</span></div>)}
     </SectionCard>}
-    {revision !== null && <section role="dialog" aria-label={`Approved revision ${revision}`} className="rounded-lg border border-border bg-card p-6 space-y-4"><div className="flex justify-between"><h3>Approved revision {revision}</h3><button className={actionButtonClass} type="button" onClick={() => setRevision(null)}>Close revision</button></div>{archive.isPending ? <p>Loading approved content...</p> : archive.isError || !archive.data ? <p role="alert">Could not load this approved revision.</p> : <ArchivedBody archive={archive.data} projectPrefix={projectPrefix} download={download} downloadId={downloadId} />}</section>}
+    {revision !== null && <dialog open aria-label={`Approved revision ${revision}`} className="static m-0 w-full max-w-none text-foreground rounded-lg border border-border bg-card p-6 space-y-4"><div className="flex justify-between"><h3>Approved revision {revision}</h3><button className={actionButtonClass} type="button" onClick={() => setRevision(null)}>Close revision</button></div>{archive.isPending ? <p>Loading approved content...</p> : archive.isError || !archive.data ? <p role="alert">Could not load this approved revision.</p> : <ArchivedBody archive={archive.data} projectPrefix={projectPrefix} download={download} downloadId={downloadId} />}</dialog>}
   </section>
 }
 
-function ArchivedBody({ archive, projectPrefix, download, downloadId }: { archive: ApprovedDocumentRevision; projectPrefix?: string; download: (file: ApprovedDocumentRevision['snapshot']['attachments'][number]) => Promise<void>; downloadId: number | null }) {
+function ArchivedBody({ archive, projectPrefix, download, downloadId }: Readonly<{ archive: ApprovedDocumentRevision; projectPrefix?: string; download: (file: ApprovedDocumentRevision['snapshot']['attachments'][number]) => Promise<void>; downloadId: number | null }>) {
   const { fields, sections, attachments, suite_items: items } = archive.snapshot
   const html = typeof fields.content_html === 'string' ? new DOMParser().parseFromString(fields.content_html, 'text/html').body.textContent : null
   const steps = normalizeTcsRows(fields.steps)
@@ -144,6 +144,6 @@ function ArchivedBody({ archive, projectPrefix, download, downloadId }: { archiv
   </div>
 }
 
-function ArchivedSection({ section }: { section: DocumentSection }) {
+function ArchivedSection({ section }: Readonly<{ section: DocumentSection }>) {
   return <section><h4>{section.title}</h4><p className="whitespace-pre-wrap">{section.content}</p>{section.child_sections?.map(child => <ArchivedSection key={child.id} section={child} />)}</section>
 }

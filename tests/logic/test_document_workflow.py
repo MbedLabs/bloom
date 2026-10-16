@@ -195,7 +195,8 @@ async def test_capture_is_idempotent_keeps_nullable_history_and_immutable_file_r
         await session.flush()
     revision = await capture_revision(session, row, workflow)
     assert await capture_revision(session, row, workflow) is revision
-    assert revision.approved_by_id is None and revision.approved_at is None
+    assert revision.approved_by_id is None
+    assert revision.approved_at is None
     assert revision.content_snapshot["signoffs"]["approved_by_id"] is None
     file = (await session.execute(select(ArtefactRevisionFile))).scalar_one()
     assert file.storage_path == "approved/proof"
@@ -246,7 +247,8 @@ async def test_review_content_edit_supersedes_request_and_returns_draft(session)
     await session.flush()
     assert row.status == workflow.phase == "Draft"
     assert request.status == "superseded"
-    assert request.decided_by_id == 1 and request.decided_at is not None
+    assert request.decided_by_id == 1
+    assert request.decided_at is not None
     assert workflow.review_content_hash is None
 
 
@@ -344,7 +346,8 @@ async def test_review_scope_change_supersedes_pending_content_hash(session, scop
         setattr(row, scope, "customer" if scope == "visibility" else "External")
     await session.flush()
     assert row.status == workflow.phase == "Draft"
-    assert request.status == "superseded" and request.decided_at is not None
+    assert request.status == "superseded"
+    assert request.decided_at is not None
 
 
 async def test_approved_scope_and_tracker_transport_remain_legal_with_archive_scope_preserved(
@@ -381,7 +384,8 @@ async def test_controlled_identity_accepts_legacy_concept_and_protocol_aliases(s
     )
     assert artefact_identity(concept) == ("test-concept", "CPT")
     assert artefact_identity(protocol) == ("document", "PRT")
-    assert controlled(concept) and controlled(protocol)
+    assert controlled(concept)
+    assert controlled(protocol)
 
 
 async def test_approved_document_cannot_bypass_guard_by_changing_kind(session):
@@ -425,7 +429,8 @@ async def test_unguarded_review_authored_write_invalidates_cycle(session, change
     finally:
         audit_actor_var.reset(token)
     assert row.status == workflow.phase == "Draft"
-    assert request.status == "superseded" and request.decided_by_id == 1
+    assert request.status == "superseded"
+    assert request.decided_by_id == 1
 
 
 async def test_prepared_scope_edit_allows_approved_and_invalidates_review(session):

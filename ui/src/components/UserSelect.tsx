@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react'
 import type { ProfilePerson } from '../api/client'
 import UserIdentity from './UserIdentity'
 
-export default function UserSelect({ value, onChange, users, label, emptyLabel = 'Unassigned', options = [], className = '' }: {
+export default function UserSelect({ value, onChange, users, label, emptyLabel = 'Unassigned', options = [], className = '' }: Readonly<{
   value: string
   onChange: (value: string) => void
   users: Array<ProfilePerson & { id: number }>
@@ -11,7 +11,7 @@ export default function UserSelect({ value, onChange, users, label, emptyLabel =
   emptyLabel?: string
   options?: Array<{ value: string; label: string }>
   className?: string
-}) {
+}>) {
   const id = useId()
   const button = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)

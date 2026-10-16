@@ -21,7 +21,8 @@ def test_direct_policy_entry_controls_access_and_report(api_client):
     entry = created.json()
     assert entry["owner"] is False
     assert set(entry["policy_ids"]) == {read["id"], write["id"]}
-    assert "role" not in entry and "doc_types" not in entry
+    assert "role" not in entry
+    assert "doc_types" not in entry
     assert api_client.get(f"/api/projects/{project}", headers=headers).status_code == 200
     report = api_client.get(f"/api/projects/{project}/access", headers=admin).json()
     person = next(item for item in report if item["user_id"] == user["id"])
@@ -114,7 +115,8 @@ def test_new_project_creator_gets_owner_without_becoming_instance_admin(api_clie
     assert api_client.get(f"/api/projects/{project}", headers=headers).status_code == 200
     members = api_client.get(f"/api/projects/{project}/members", headers=admin).json()
     entry = next(item for item in members if item["user_id"] == user["id"])
-    assert entry["owner"] is True and entry["policy_ids"] == []
+    assert entry["owner"] is True
+    assert entry["policy_ids"] == []
     assert api_client.get("/api/users", headers=headers).status_code == 403
 
 

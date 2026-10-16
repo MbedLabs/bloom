@@ -1,5 +1,7 @@
 """Administrator-managed group policy sets, memberships and project admission."""
 
+from http import HTTPStatus
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -134,7 +136,13 @@ async def assignment_options(
     }
 
 
-@router.post("/{group_id}/assignments")
+@router.post(
+    "/{group_id}/assignments",
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+    },
+)
 async def assign_project_bundle(
     group_id: int,
     data: GroupAssignmentCreate,
@@ -187,7 +195,15 @@ async def assign_project_bundle(
     return result
 
 
-@router.post("", response_model=GroupResponse, status_code=201)
+@router.post(
+    "",
+    response_model=GroupResponse,
+    status_code=201,
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+    },
+)
 async def create_group(
     data: GroupCreate,
     _admin: User = Depends(require_app_permission("create")),
@@ -213,7 +229,11 @@ async def create_group(
     return await _group_response(db, group)
 
 
-@router.get("/{group_id}", response_model=GroupResponse)
+@router.get(
+    "/{group_id}",
+    response_model=GroupResponse,
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
 async def get_group(
     group_id: int,
     _admin: User = Depends(require_app_permission("view")),
@@ -222,7 +242,14 @@ async def get_group(
     return await _group_response(db, await _get_group_or_404(db, group_id))
 
 
-@router.patch("/{group_id}", response_model=GroupResponse)
+@router.patch(
+    "/{group_id}",
+    response_model=GroupResponse,
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+    },
+)
 async def update_group(
     group_id: int,
     data: GroupUpdate,
@@ -252,7 +279,14 @@ async def update_group(
     return await _group_response(db, group)
 
 
-@router.delete("/{group_id}", status_code=204)
+@router.delete(
+    "/{group_id}",
+    status_code=204,
+    responses={
+        404: {"description": HTTPStatus(404).phrase},
+        409: {"description": HTTPStatus(409).phrase},
+    },
+)
 async def delete_group(
     group_id: int,
     _admin: User = Depends(require_app_permission("delete")),
@@ -282,7 +316,15 @@ async def delete_group(
     await db.flush()
 
 
-@router.post("/{group_id}/members", response_model=GroupResponse, status_code=201)
+@router.post(
+    "/{group_id}/members",
+    response_model=GroupResponse,
+    status_code=201,
+    responses={
+        404: {"description": HTTPStatus(404).phrase},
+        409: {"description": HTTPStatus(409).phrase},
+    },
+)
 async def add_member(
     group_id: int,
     data: GroupMemberCreate | GroupMembersCreate,
@@ -321,7 +363,11 @@ async def add_member(
     return await _group_response(db, group)
 
 
-@router.delete("/{group_id}/members/{user_id}", status_code=204)
+@router.delete(
+    "/{group_id}/members/{user_id}",
+    status_code=204,
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
 async def remove_member(
     group_id: int,
     user_id: int,
@@ -349,7 +395,15 @@ async def remove_member(
     )
 
 
-@router.post("/{group_id}/grants", response_model=GroupResponse, status_code=201)
+@router.post(
+    "/{group_id}/grants",
+    response_model=GroupResponse,
+    status_code=201,
+    responses={
+        404: {"description": HTTPStatus(404).phrase},
+        409: {"description": HTTPStatus(409).phrase},
+    },
+)
 async def add_grant(
     group_id: int,
     data: GroupGrantCreate,
@@ -383,7 +437,11 @@ async def add_grant(
     return await _group_response(db, group)
 
 
-@router.patch("/{group_id}/grants/{grant_id}", response_model=GroupResponse)
+@router.patch(
+    "/{group_id}/grants/{grant_id}",
+    response_model=GroupResponse,
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
 async def update_grant(
     group_id: int,
     grant_id: int,
@@ -414,7 +472,11 @@ async def update_grant(
     return await _group_response(db, group)
 
 
-@router.delete("/{group_id}/grants/{grant_id}", status_code=204)
+@router.delete(
+    "/{group_id}/grants/{grant_id}",
+    status_code=204,
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
 async def remove_grant(
     group_id: int,
     grant_id: int,

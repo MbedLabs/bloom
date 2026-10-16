@@ -57,7 +57,7 @@ export default function UsersPage() {
 
   const deleteMutation = useMutation({
     mutationFn: usersApi.delete,
-    onMutate: async (id: number) => {
+    onMutate: (id: number) => {
       setDeleteError(null)
       setPendingDeleteUserId(id)
     },
@@ -492,22 +492,23 @@ function InviteUserModal({ onClose, onSubmit, isLoading, error }: {
 }
 
 
-function ApplicationPoliciesModal({ user, onClose }: { user: User; onClose: () => void }) {
+function ApplicationPoliciesModal({ user, onClose }: Readonly<{ user: User; onClose: () => void }>) {
   const { data: policies } = useQuery({ queryKey: ['policies'], queryFn: policiesApi.list })
   const { data: assignment, isError } = useQuery({ queryKey: ['user-application-policies', user.id], queryFn: () => usersApi.applicationPolicies(user.id) })
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label="Application policies" className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6" onClick={(event) => event.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <button type="button" aria-label="Close dialog backdrop" tabIndex={-1} className="absolute inset-0 h-full w-full cursor-default" onClick={onClose} />
+      <dialog open aria-modal="true" aria-label="Application policies" className="relative m-0 text-foreground w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6" onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); onClose() } }}>
         <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-semibold text-foreground">Application policies</h2><button title="Close" onClick={onClose}><X className="h-4 w-4" /></button></div>
         <p className="mb-2 text-sm text-foreground"><UserIdentity user={user} /></p>
         <p className="mb-4 text-sm text-muted-foreground">Assign app permissions such as Access Management. The account base role stays the same. Project policy groups are assigned separately for each project.</p>
         {isError ? <p role="alert">Could not load application policies.</p> : policies && assignment ? <ApplicationPolicyForm user={user} policies={policies.filter((policy) => policy.scope === 'app')} initial={assignment.policy_ids} onClose={onClose} /> : <p>Loading policies...</p>}
-      </div>
+      </dialog>
     </div>
   )
 }
 
-function ApplicationPolicyForm({ user, policies, initial, onClose }: { user: User; policies: Policy[]; initial: number[]; onClose: () => void }) {
+function ApplicationPolicyForm({ user, policies, initial, onClose }: Readonly<{ user: User; policies: Policy[]; initial: number[]; onClose: () => void }>) {
   const [selected, setSelected] = useState(initial)
   const toast = useToast()
   const queryClient = useQueryClient()

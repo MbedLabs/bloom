@@ -116,7 +116,8 @@ async def test_removing_group_membership_keeps_independent_direct_grant(session)
     await session.flush()
     del user.access_map
     terms = await access_terms(session, user, project.id)
-    assert len(terms) == 1 and terms[0].permissions == {"REQ": {"view"}}
+    assert len(terms) == 1
+    assert terms[0].permissions == {"REQ": {"view"}}
 
 
 @pytest.mark.asyncio

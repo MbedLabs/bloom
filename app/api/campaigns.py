@@ -1,6 +1,6 @@
 """Test campaign API: traceability scopes and Bud execution linkage."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -66,6 +66,8 @@ from app.schemas import (
 )
 from app.services.artefact_tags import attach_tags, creation_tags
 
+CAMPAIGN_NOT_FOUND = "Campaign not found"
+
 router = APIRouter()
 
 
@@ -84,8 +86,8 @@ def suite_frontend_url(project_prefix: str, suite_id: int) -> str | None:
 
 
 def _resolved_execution_time(value: Optional[datetime]) -> datetime:
-    resolved = value or datetime.utcnow()
-    return naive_utc(resolved) or datetime.utcnow()
+    resolved = value or datetime.now(timezone.utc).replace(tzinfo=None)
+    return naive_utc(resolved) or datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _apply_result_to_test_case(tc: TestCase, res) -> bool:
@@ -385,7 +387,7 @@ async def get_campaign(
         db,
         TestCampaign,
         campaign_id,
-        "Campaign not found",
+        CAMPAIGN_NOT_FOUND,
         current_user,
         permission=("view", "CMP"),
     )
@@ -403,7 +405,7 @@ async def update_campaign(
         db,
         TestCampaign,
         campaign_id,
-        "Campaign not found",
+        CAMPAIGN_NOT_FOUND,
         current_user,
         permission=("edit", "CMP"),
     )
@@ -508,7 +510,7 @@ async def delete_campaign(
         db,
         TestCampaign,
         campaign_id,
-        "Campaign not found",
+        CAMPAIGN_NOT_FOUND,
         current_user,
         permission=("delete", "CMP"),
     )
@@ -527,7 +529,7 @@ async def add_campaign_item(
         db,
         TestCampaign,
         campaign_id,
-        "Campaign not found",
+        CAMPAIGN_NOT_FOUND,
         current_user,
         permission=("plan", "CMP"),
     )
@@ -569,7 +571,7 @@ async def remove_campaign_item(
         db,
         TestCampaign,
         campaign_id,
-        "Campaign not found",
+        CAMPAIGN_NOT_FOUND,
         current_user,
         permission=("plan", "CMP"),
     )
@@ -595,7 +597,7 @@ async def update_campaign_item(
         db,
         TestCampaign,
         campaign_id,
-        "Campaign not found",
+        CAMPAIGN_NOT_FOUND,
         current_user,
         permission=("plan", "CMP"),
     )

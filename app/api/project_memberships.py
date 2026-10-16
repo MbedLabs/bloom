@@ -1,5 +1,7 @@
 """Administrator-managed direct user entries and project access provenance."""
 
+from http import HTTPStatus
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -78,7 +80,11 @@ async def _selected_group(db: AsyncSession, group_id: int) -> Group:
     return group
 
 
-@router.get("/{project_id}/members", response_model=list[ProjectMemberResponse])
+@router.get(
+    "/{project_id}/members",
+    response_model=list[ProjectMemberResponse],
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
 async def list_project_members(
     project_id: int,
     _admin: User = Depends(require_admin),
@@ -100,7 +106,16 @@ async def list_project_members(
     return [await _response(db, row) for row in rows]
 
 
-@router.post("/{project_id}/members", response_model=ProjectMemberResponse, status_code=201)
+@router.post(
+    "/{project_id}/members",
+    response_model=ProjectMemberResponse,
+    status_code=201,
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+        409: {"description": HTTPStatus(409).phrase},
+    },
+)
 async def add_project_member(
     project_id: int,
     data: ProjectMembershipCreate,
@@ -160,7 +175,15 @@ async def get_project_member(
     return await _response(db, await _entry(db, project_id, membership_id))
 
 
-@router.patch("/{project_id}/members/{membership_id}", response_model=ProjectMemberResponse)
+@router.patch(
+    "/{project_id}/members/{membership_id}",
+    response_model=ProjectMemberResponse,
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+        422: {"description": HTTPStatus(422).phrase},
+    },
+)
 async def update_project_member(
     project_id: int,
     membership_id: int,
@@ -263,7 +286,11 @@ class ProjectAccessEntry(BaseModel):
     origins: list[AccessOrigin]
 
 
-@router.get("/{project_id}/access", response_model=list[ProjectAccessEntry])
+@router.get(
+    "/{project_id}/access",
+    response_model=list[ProjectAccessEntry],
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
 async def list_project_access(
     project_id: int,
     _admin: User = Depends(require_admin),

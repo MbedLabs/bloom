@@ -7,7 +7,8 @@ import json
 import logging
 from contextlib import nullcontext
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from http import HTTPStatus
 from typing import Callable, Optional
 
 import httpx
@@ -51,6 +52,11 @@ from app.services.jira_inbound import (
     referenced_tc_ids,
     search_fields,
 )
+
+INTEGRATION_SETTING_NOT_FOUND = "Integration setting not found"
+INVALID_SIGNATURE = "Invalid signature"
+APPLICATION_JSON = "application/json"
+JIRA_ISSUE_DELETED = "jira:issue_deleted"
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +207,12 @@ async def list_integration_settings(
     return [_setting_response(s) for s in rows]
 
 
-@router.post("/settings", response_model=IntegrationSettingResponse, status_code=201)
+@router.post(
+    "/settings",
+    response_model=IntegrationSettingResponse,
+    status_code=201,
+    responses={400: {"description": HTTPStatus(400).phrase}},
+)
 async def create_integration_setting(
     data: IntegrationSettingCreate,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -263,7 +274,11 @@ async def create_integration_setting(
     return _setting_response(setting)
 
 
-@router.patch("/settings/{setting_id}", response_model=IntegrationSettingResponse)
+@router.patch(
+    "/settings/{setting_id}",
+    response_model=IntegrationSettingResponse,
+    responses={400: {"description": HTTPStatus(400).phrase}},
+)
 async def update_integration_setting(
     setting_id: int,
     data: IntegrationSettingUpdate,
@@ -274,7 +289,7 @@ async def update_integration_setting(
         await db.execute(select(IntegrationSetting).where(IntegrationSetting.id == setting_id))
     ).scalar_one_or_none()
     if not setting:
-        raise HTTPException(status_code=404, detail="Integration setting not found")
+        raise HTTPException(status_code=404, detail=INTEGRATION_SETTING_NOT_FOUND)
 
     await require_project_access(
         db,
@@ -332,7 +347,7 @@ async def delete_integration_setting(
         await db.execute(select(IntegrationSetting).where(IntegrationSetting.id == setting_id))
     ).scalar_one_or_none()
     if not setting:
-        raise HTTPException(status_code=404, detail="Integration setting not found")
+        raise HTTPException(status_code=404, detail=INTEGRATION_SETTING_NOT_FOUND)
     await require_project_access(
         db,
         current_user,
@@ -420,7 +435,7 @@ async def _reserve_webhook_delivery(
             signed=True,
         )
         await db.execute(select(func.pg_advisory_xact_lock(lock_key)))
-    window = datetime.utcnow() - timedelta(minutes=15)
+    window = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=15)
     count = await db.scalar(
         select(func.count(WebhookDelivery.id)).where(
             WebhookDelivery.integration_setting_id == setting.id,
@@ -446,7 +461,7 @@ async def _reserve_webhook_delivery(
             integration_setting_id=setting.id,
             tracker=tracker,
             delivery_id=delivery_id,
-            received_at=datetime.utcnow(),
+            received_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
     )
     try:
@@ -534,13 +549,13 @@ async def _apply_issue_webhook(
 
     old_state = defect.external_issue_state
     defect.external_issue_state = state
-    defect.external_last_event_at = datetime.utcnow()
+    defect.external_last_event_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     bloom_status = spec.status_map.get(state)
     if bloom_status and defect.status != bloom_status:
         defect.status = bloom_status
         if bloom_status == "Closed" and not defect.closed_at:
-            defect.closed_at = datetime.utcnow()
+            defect.closed_at = datetime.now(timezone.utc).replace(tzinfo=None)
         elif bloom_status != "Closed":
             defect.closed_at = None
 
@@ -564,13 +579,20 @@ _GITHUB_WEBHOOK = _IssueWebhook(
     status_map=GITHUB_STATUS_MAP,
     failed_event="signature_failed",
     failed_error="Missing or invalid HMAC signature",
-    failed_detail="Invalid signature",
+    failed_detail=INVALID_SIGNATURE,
     missing_id_detail="Missing GitHub delivery id.",
     duplicate_key="delivery",
 )
 
 
-@router.post("/github/webhook", status_code=200)
+@router.post(
+    "/github/webhook",
+    status_code=200,
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        403: {"description": HTTPStatus(403).phrase},
+    },
+)
 async def github_webhook(
     request: Request,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -629,7 +651,14 @@ _GITLAB_WEBHOOK = _IssueWebhook(
 )
 
 
-@router.post("/gitlab/webhook", status_code=200)
+@router.post(
+    "/gitlab/webhook",
+    status_code=200,
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        403: {"description": HTTPStatus(403).phrase},
+    },
+)
 async def gitlab_webhook(
     request: Request,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -678,7 +707,7 @@ JIRA_CATEGORY_STATUS_MAP = {
     "done": "Closed",
 }
 
-JIRA_ISSUE_EVENTS = {"jira:issue_created", "jira:issue_updated", "jira:issue_deleted"}
+JIRA_ISSUE_EVENTS = {"jira:issue_created", "jira:issue_updated", JIRA_ISSUE_DELETED}
 MAX_PULLED_ISSUES = 1000
 
 
@@ -744,7 +773,7 @@ def _set_defect_status(defect: Defect, bloom_status: Optional[str]) -> None:
         return
     defect.status = bloom_status
     if bloom_status == "Closed" and not defect.closed_at:
-        defect.closed_at = datetime.utcnow()
+        defect.closed_at = datetime.now(timezone.utc).replace(tzinfo=None)
     elif bloom_status != "Closed":
         defect.closed_at = None
 
@@ -825,7 +854,7 @@ async def _new_defect_from_issue(
         external_issue_number=issue_number,
         external_issue_url=issue_url(setting, issue_key),
         external_issue_state=_issue_state(fields),
-        external_last_event_at=datetime.utcnow(),
+        external_last_event_at=datetime.now(timezone.utc).replace(tzinfo=None),
         reporter_id=account_user,
     )
     _set_defect_status(defect, _jira_status(fields))
@@ -849,8 +878,8 @@ def _follow_issue(
     kind: str, target, setting: IntegrationSetting, event: str, fields: dict, issue_key: str
 ) -> None:
     """Carry a Jira event onto the linked defect or change request."""
-    target.external_last_event_at = datetime.utcnow()
-    if event == "jira:issue_deleted":
+    target.external_last_event_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    if event == JIRA_ISSUE_DELETED:
         target.external_issue_state = REMOVED_STATE
         return
     target.external_issue_state = _issue_state(fields)
@@ -896,12 +925,12 @@ async def _create_defect_from_jira_issue(
     if not signature or not _verify_sha256_signature(
         body, decrypt_integration_secret(setting.webhook_secret), signature
     ):
-        raise HTTPException(status_code=403, detail="Invalid signature")
+        raise HTTPException(status_code=403, detail=INVALID_SIGNATURE)
     if not delivery:
         raise HTTPException(status_code=400, detail="Missing Jira webhook identifier.")
     if not await _reserve_webhook_delivery(db, setting, "jira", delivery):
         return {"status": "duplicate", "delivery": delivery}
-    if event == "jira:issue_deleted" or not issue_matches(setting, fields):
+    if event == JIRA_ISSUE_DELETED or not issue_matches(setting, fields):
         return {"status": "ignored", "reason": "issue not taken in by this project"}
 
     defect = await _new_defect_from_issue(
@@ -917,7 +946,9 @@ async def _create_defect_from_jira_issue(
     return {"status": "created", "target": "defect", "id": defect.id}
 
 
-@router.post("/jira/webhook", status_code=200)
+@router.post(
+    "/jira/webhook", status_code=200, responses={400: {"description": HTTPStatus(400).phrase}}
+)
 async def jira_webhook(
     request: Request,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -978,7 +1009,7 @@ async def jira_webhook(
             error="Missing or invalid HMAC signature",
         )
         await db.flush()
-        raise HTTPException(status_code=403, detail="Invalid signature")
+        raise HTTPException(status_code=403, detail=INVALID_SIGNATURE)
     if not x_atlassian_webhook_identifier:
         raise HTTPException(status_code=400, detail="Missing Jira webhook identifier.")
     if not await _reserve_webhook_delivery(db, setting, "jira", x_atlassian_webhook_identifier):
@@ -988,7 +1019,7 @@ async def jira_webhook(
     legacy_closure = (
         kind == "change_request"
         and target.status == "Submitted"
-        and event != "jira:issue_deleted"
+        and event != JIRA_ISSUE_DELETED
         and JIRA_CATEGORY_STATUS_MAP.get(
             ((fields.get("status") or {}).get("statusCategory") or {}).get("key")
         )
@@ -1022,8 +1053,8 @@ async def _search_jira(setting: IntegrationSetting) -> list[dict]:
     """Every issue the project's filter matches, page by page, up to the pull cap."""
     headers = {
         "Authorization": _jira_auth_header(setting),
-        "Accept": "application/json",
-        "Content-Type": "application/json",
+        "Accept": APPLICATION_JSON,
+        "Content-Type": APPLICATION_JSON,
     }
     request = {"jql": build_jql(setting), "fields": search_fields(setting), "maxResults": 100}
     issues: list[dict] = []
@@ -1041,7 +1072,15 @@ async def _search_jira(setting: IntegrationSetting) -> list[dict]:
     return issues[:MAX_PULLED_ISSUES]
 
 
-@router.post("/settings/{setting_id}/jira/pull", response_model=JiraPullResult)
+@router.post(
+    "/settings/{setting_id}/jira/pull",
+    response_model=JiraPullResult,
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+        502: {"description": HTTPStatus(502).phrase},
+    },
+)
 async def pull_jira_issues(
     setting_id: int,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -1056,7 +1095,7 @@ async def pull_jira_issues(
         await db.execute(select(IntegrationSetting).where(IntegrationSetting.id == setting_id))
     ).scalar_one_or_none()
     if not setting:
-        raise HTTPException(status_code=404, detail="Integration setting not found")
+        raise HTTPException(status_code=404, detail=INTEGRATION_SETTING_NOT_FOUND)
     await require_project_access(db, current_user, setting.project_id)
     if setting.tracker != "jira" or not (
         setting.base_url
@@ -1151,7 +1190,7 @@ async def _sync_to_tracker(
             "update_pushed",
             payload_summary=f"fields: {', '.join(changed_fields.keys())}",
         )
-        item.external_last_event_at = datetime.utcnow()
+        item.external_last_event_at = datetime.now(timezone.utc).replace(tzinfo=None)
     except Exception as exc:
         logger.warning("Outbound sync failed for %s %s: %s", kind.replace("_", " "), item.id, exc)
         _log_target_sync_event(
@@ -1302,8 +1341,8 @@ async def _push_to_jira(target, setting: IntegrationSetting, changed_fields: dic
     issue_key = jira_issue_key(target)
     headers = {
         "Authorization": _jira_auth_header(setting),
-        "Accept": "application/json",
-        "Content-Type": "application/json",
+        "Accept": APPLICATION_JSON,
+        "Content-Type": APPLICATION_JSON,
     }
 
     async with httpx.AsyncClient(timeout=15) as client:

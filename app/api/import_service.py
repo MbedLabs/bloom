@@ -7,6 +7,7 @@ import functools
 import io
 import json
 import re
+from http import HTTPStatus
 from typing import Annotated, Dict, List, Optional
 
 from defusedxml import ElementTree as SafeET
@@ -91,6 +92,9 @@ from app.services.reqif_worker import (
     parse_reqif_in_worker,
 )
 
+TARGET_PROJECT_NOT_FOUND = "Target project not found"
+IMPORT_RUN = "import.run"
+
 router = APIRouter()
 
 
@@ -136,7 +140,7 @@ async def import_docs(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    target_project = await get_row_or_404(db, Project, project_id, "Target project not found")
+    target_project = await get_row_or_404(db, Project, project_id, TARGET_PROJECT_NOT_FOUND)
 
     source_project = await get_row_or_404(
         db, Project, data.source_project_id, "Source project not found"
@@ -159,7 +163,7 @@ async def import_docs(
     result = ImportResult(imported=0, skipped=0, new_ids=[], errors=[])
     await record_audit_event(
         db,
-        "import.run",
+        IMPORT_RUN,
         target_type="project",
         target_id=target_project.id,
         project_id=target_project.id,
@@ -375,6 +379,7 @@ def _requirement_title(obj: ReqIFObject) -> str:
     "/projects/{project_id}/import/reqif",
     response_model=ReqIFImportResult,
     status_code=201,
+    responses={422: {"description": HTTPStatus(422).phrase}},
 )
 async def import_reqif(
     project_id: int,
@@ -384,7 +389,7 @@ async def import_reqif(
     current_user: User = Depends(get_current_user),
 ):
     """Import a ReqIF (``.reqif`` / ``.reqifz``) export as project requirements."""
-    target_project = await get_row_or_404(db, Project, project_id, "Target project not found")
+    target_project = await get_row_or_404(db, Project, project_id, TARGET_PROJECT_NOT_FOUND)
 
     await require_project_access(db, current_user, target_project.id, permission=("import", "REQ"))
     import_tags = await creation_tags(db, current_user, target_project.id, tag_ids)
@@ -392,7 +397,7 @@ async def import_reqif(
     attempt = await begin_import_attempt(db, user_id=current_user.id, project_id=target_project.id)
     await record_audit_event(
         db,
-        "import.run",
+        IMPORT_RUN,
         target_type="project",
         target_id=target_project.id,
         project_id=target_project.id,
@@ -608,6 +613,11 @@ def _import_rows_from_xml(raw: bytes) -> List[dict]:
     "/projects/{project_id}/import/test-cases",
     response_model=TestCaseImportResult,
     status_code=201,
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        403: {"description": HTTPStatus(403).phrase},
+        413: {"description": HTTPStatus(413).phrase},
+    },
 )
 async def import_test_cases_file(
     project_id: int,
@@ -622,7 +632,7 @@ async def import_test_cases_file(
     A row whose tc_id already exists updates that test case; a new or absent tc_id
     creates one with a minted id. Returns created/updated/skipped counts.
     """
-    target_project = await get_row_or_404(db, Project, project_id, "Target project not found")
+    target_project = await get_row_or_404(db, Project, project_id, TARGET_PROJECT_NOT_FOUND)
     await require_project_access(
         db,
         current_user,
@@ -634,7 +644,7 @@ async def import_test_cases_file(
     attempt = await begin_import_attempt(db, user_id=current_user.id, project_id=target_project.id)
     await record_audit_event(
         db,
-        "import.run",
+        IMPORT_RUN,
         target_type="project",
         target_id=target_project.id,
         project_id=target_project.id,
@@ -903,6 +913,12 @@ def _collision_actions(raw: Optional[str]) -> dict:
     "/projects/{project_id}/import/markdown",
     response_model=MarkdownImportResult,
     status_code=201,
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        409: {"description": HTTPStatus(409).phrase},
+        413: {"description": HTTPStatus(413).phrase},
+        422: {"description": HTTPStatus(422).phrase},
+    },
 )
 async def import_markdown(
     project_id: int,
@@ -923,7 +939,7 @@ async def import_markdown(
     ``{"action": "rename", "to": NEW}`` (create NEW with the imported value and refer
     to NEW in the imported text).
     """
-    target_project = await get_row_or_404(db, Project, project_id, "Target project not found")
+    target_project = await get_row_or_404(db, Project, project_id, TARGET_PROJECT_NOT_FOUND)
     await require_project_access(db, current_user, target_project.id)
     import_tags = await creation_tags(db, current_user, target_project.id, tag_ids)
 
@@ -935,7 +951,7 @@ async def import_markdown(
     attempt = await begin_import_attempt(db, user_id=current_user.id, project_id=target_project.id)
     await record_audit_event(
         db,
-        "import.run",
+        IMPORT_RUN,
         target_type="project",
         target_id=target_project.id,
         project_id=target_project.id,
@@ -1199,12 +1215,19 @@ def _testrail_body(case: TestRailCase, unmatched: list) -> str:
 
 async def _testrail_project(db: AsyncSession, project_id: int, current_user: User) -> Project:
     """The target project, after the test-case import permission check."""
-    project = await get_row_or_404(db, Project, project_id, "Target project not found")
+    project = await get_row_or_404(db, Project, project_id, TARGET_PROJECT_NOT_FOUND)
     await require_project_access(db, current_user, project.id, permission=("import", "TC"))
     return project
 
 
-@router.post("/projects/{project_id}/import/testrail/columns", response_model=TestRailColumns)
+@router.post(
+    "/projects/{project_id}/import/testrail/columns",
+    response_model=TestRailColumns,
+    responses={
+        413: {"description": HTTPStatus(413).phrase},
+        422: {"description": HTTPStatus(422).phrase},
+    },
+)
 async def testrail_csv_columns(
     project_id: int,
     file: UploadFile = File(...),
@@ -1227,6 +1250,11 @@ async def testrail_csv_columns(
     "/projects/{project_id}/import/testrail",
     response_model=TestRailImportResult,
     status_code=201,
+    responses={
+        413: {"description": HTTPStatus(413).phrase},
+        422: {"description": HTTPStatus(422).phrase},
+        504: {"description": HTTPStatus(504).phrase},
+    },
 )
 async def import_testrail(
     project_id: int,
@@ -1256,7 +1284,7 @@ async def import_testrail(
     attempt = await begin_import_attempt(db, user_id=current_user.id, project_id=project.id)
     await record_audit_event(
         db,
-        "import.run",
+        IMPORT_RUN,
         target_type="project",
         target_id=project.id,
         project_id=project.id,

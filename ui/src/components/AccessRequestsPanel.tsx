@@ -4,7 +4,7 @@ import { useToast } from './useToast'
 import UserIdentity from './UserIdentity'
 
 /** Pending access requests, optionally filtered to one project. */
-export default function AccessRequestsPanel({ projectPrefix, showEmpty = false }: { projectPrefix?: string; showEmpty?: boolean }) {
+export default function AccessRequestsPanel({ projectPrefix, showEmpty = false }: Readonly<{ projectPrefix?: string; showEmpty?: boolean }>) {
   const queryClient = useQueryClient()
   const toast = useToast()
   const queryKey = ['access-requests', projectPrefix]
@@ -27,7 +27,7 @@ export default function AccessRequestsPanel({ projectPrefix, showEmpty = false }
   return (
     <section className="bg-card border border-border rounded-xl p-5">
       <h3 className="text-sm font-semibold text-foreground mb-3">Access requests</h3>
-      {isLoading && <p role="status" className="text-sm text-muted-foreground">Loading requests…</p>}
+      {isLoading && <output className="block text-sm text-muted-foreground">Loading requests…</output>}
       {isError && <p role="alert" className="text-sm text-destructive">Could not load access requests.</p>}
       {!isLoading && !isError && requests?.length === 0 && <p className="text-sm text-muted-foreground">No pending requests.</p>}
       <ul className="divide-y divide-border">

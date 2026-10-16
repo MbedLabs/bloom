@@ -10,11 +10,11 @@ export default function ParameterCollisions({
   collisions,
   choices,
   onChange,
-}: {
+}: Readonly<{
   collisions: MarkdownCollision[]
   choices: Record<string, MarkdownCollisionAction>
   onChange: (choices: Record<string, MarkdownCollisionAction>) => void
-}) {
+}>) {
   const set = (name: string, choice: MarkdownCollisionAction) => onChange({ ...choices, [name]: choice })
 
   return (

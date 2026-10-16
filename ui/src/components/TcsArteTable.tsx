@@ -148,7 +148,7 @@ function withParameterLinks(text: string, href?: string, values?: Record<string,
   })
 }
 
-function TcsArteTableView({ rows, parameterHref, parameterValues, people }: { rows: TcsRow[]; parameterHref?: string; parameterValues?: Record<string, string>; people: MentionSuggestion[] }) {
+function TcsArteTableView({ rows, parameterHref, parameterValues, people }: Readonly<{ rows: TcsRow[]; parameterHref?: string; parameterValues?: Record<string, string>; people: MentionSuggestion[] }>) {
   if (!rows || rows.length === 0) return null
   const visibleRows = getVisibleRows(rows)
 
@@ -172,7 +172,7 @@ function TcsArteTableView({ rows, parameterHref, parameterValues, people }: { ro
   )
 }
 
-function TcsViewRow({ row, hasChildren, parameterHref, parameterValues, people }: { row: TcsRow; hasChildren: boolean; parameterHref?: string; parameterValues?: Record<string, string>; people: MentionSuggestion[] }) {
+function TcsViewRow({ row, hasChildren, parameterHref, parameterValues, people }: Readonly<{ row: TcsRow; hasChildren: boolean; parameterHref?: string; parameterValues?: Record<string, string>; people: MentionSuggestion[] }>) {
   const styles = ROW_TYPE_STYLES[row.row_type]
   const isLoop = row.row_type === 'loop'
 

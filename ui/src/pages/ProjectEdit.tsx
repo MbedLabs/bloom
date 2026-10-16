@@ -277,7 +277,7 @@ export default function ProjectEdit() {
       </form>
 
       {isAdmin && confirmDeleteOpen && (
-        <div role="dialog" aria-modal="true" aria-label="Delete project" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs">
+        <dialog open aria-modal="true" aria-label="Delete project" className="m-0 h-full w-full max-w-none text-foreground fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs">
           <div className="mx-4 w-full max-w-md rounded-lg bg-card p-6 shadow-elegant">
             <h3 className="text-lg font-semibold text-foreground">Delete project?</h3>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -319,7 +319,7 @@ export default function ProjectEdit() {
               </button>
             </div>
           </div>
-        </div>
+        </dialog>
       )}
 
       {canManageAccess && <ProjectPolicyGroups key={project.id} projectId={project.id} />}

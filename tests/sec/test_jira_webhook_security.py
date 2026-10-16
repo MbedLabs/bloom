@@ -478,7 +478,8 @@ async def test_linked_defect_follows_the_issue_and_closes_on_resolution(env):
     _post(client, resolved, signature=_sign(resolved), delivery="u-2")
     async with maker() as session:
         defect = (await session.execute(select(Defect))).scalar_one()
-    assert defect.status == "Closed" and defect.closed_at is not None
+    assert defect.status == "Closed"
+    assert defect.closed_at is not None
 
 
 @pytest.mark.asyncio

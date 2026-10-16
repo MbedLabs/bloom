@@ -6,7 +6,8 @@ request per user and resource per 24 hours; the administrators are emailed and t
 request, its grant or its refusal are recorded in the audit log.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from http import HTTPStatus
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -112,7 +113,8 @@ async def _recent_request(
             AccessRequest.user_id == user_id,
             AccessRequest.resource_type == resource_type,
             AccessRequest.resource_ref == resource_ref,
-            AccessRequest.created_at >= datetime.utcnow() - REQUEST_WINDOW,
+            AccessRequest.created_at
+            >= datetime.now(timezone.utc).replace(tzinfo=None) - REQUEST_WINDOW,
         )
         .order_by(AccessRequest.created_at.desc())
         .limit(1)
@@ -224,7 +226,14 @@ async def list_access_requests(
     return [_response(row, user) for row, user in (await db.execute(query)).all()]
 
 
-@router.post("/{request_id}/decision", response_model=AccessRequestResponse)
+@router.post(
+    "/{request_id}/decision",
+    response_model=AccessRequestResponse,
+    responses={
+        404: {"description": HTTPStatus(404).phrase},
+        409: {"description": HTTPStatus(409).phrase},
+    },
+)
 async def decide_access_request(
     request_id: int,
     data: AccessDecision,
@@ -239,7 +248,7 @@ async def decide_access_request(
         raise HTTPException(status_code=409, detail="This request was already answered")
     row.status = data.decision
     row.decided_by_user_id = admin.id
-    row.decided_at = datetime.utcnow()
+    row.decided_at = datetime.now(timezone.utc).replace(tzinfo=None)
     await record_audit_event(
         db,
         f"access.{data.decision}",

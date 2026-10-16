@@ -199,8 +199,8 @@ export default function CampaignDetail({
 
       {/* Edit modal */}
       {canEditDocs && editOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50" onKeyDown={handleEditKeyDown}>
-          <div className="bg-card rounded-lg shadow-elegant p-6 max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50">
+          <dialog open aria-label="Edit campaign" onKeyDown={handleEditKeyDown} className="relative m-0 bg-card text-foreground rounded-lg shadow-elegant p-6 max-w-md w-full mx-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-foreground">Edit campaign</h3>
               <button onClick={() => setEditOpen(false)} aria-label="Close" className="p-1 hover:bg-accent/50 rounded-md text-muted-foreground">
@@ -243,7 +243,7 @@ export default function CampaignDetail({
                 <button type="submit" disabled={updateMutation.isPending} className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm">{updateMutation.isPending ? 'Saving...' : 'Save'}</button>
               </div>
             </form>
-          </div>
+          </dialog>
         </div>
       )}
 

@@ -4,7 +4,8 @@ Auth API endpoints: login, get current user, update profile.
 
 import io
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
+from http import HTTPStatus
 from typing import Optional
 
 from fastapi import (
@@ -71,6 +72,9 @@ from app.services.token_service import (
     mark_token_used,
 )
 
+AUTH_LOGIN = "auth.login"
+AUTH_REFRESH = "auth.refresh"
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -79,7 +83,7 @@ MAX_PICTURE_BYTES = 2_000_000
 MAX_PICTURE_PIXELS = 16_000_000
 
 
-@router.get("/me/picture")
+@router.get("/me/picture", responses={404: {"description": HTTPStatus(404).phrase}})
 async def get_profile_picture(current_user: User = Depends(get_current_user)):
     """Return the signed-in account's stored profile image."""
     if not current_user.profile_picture:
@@ -91,7 +95,15 @@ async def get_profile_picture(current_user: User = Depends(get_current_user)):
     )
 
 
-@router.put("/me/picture", response_model=UserResponse)
+@router.put(
+    "/me/picture",
+    response_model=UserResponse,
+    responses={
+        413: {"description": HTTPStatus(413).phrase},
+        415: {"description": HTTPStatus(415).phrase},
+        422: {"description": HTTPStatus(422).phrase},
+    },
+)
 async def set_profile_picture(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -191,7 +203,7 @@ async def login(
     if not user or not verify_password(data.password, user.hashed_password):
         await record_audit_failure(
             db,
-            "auth.login",
+            AUTH_LOGIN,
             target_type="user",
             target_id=user.id if user else None,
             details={"email": data.email, "reason": "invalid_credentials"},
@@ -203,7 +215,7 @@ async def login(
     if not user.is_active:
         await record_audit_failure(
             db,
-            "auth.login",
+            AUTH_LOGIN,
             target_type="user",
             target_id=user.id,
             details={"email": data.email, "reason": "deactivated"},
@@ -218,7 +230,7 @@ async def login(
     )
     await _issue_refresh_cookie(db, response, user.id)
     await record_audit_event(
-        db, "auth.login", actor_user_id=user.id, target_type="user", target_id=user.id
+        db, AUTH_LOGIN, actor_user_id=user.id, target_type="user", target_id=user.id
     )
 
     user.application_permissions = as_lists(await effective_permissions(db, user, None))
@@ -251,7 +263,7 @@ async def refresh(
         claimed = await claim_token(db, token=refresh_token, purpose=UserTokenPurpose.refresh)
     except TokenValidationError:
         _clear_refresh_cookie(response)
-        await record_audit_failure(db, "auth.refresh", details={"reason": "invalid_token"})
+        await record_audit_failure(db, AUTH_REFRESH, details={"reason": "invalid_token"})
         raise unauthorized
 
     user = await db.get(User, claimed.user_id)
@@ -259,7 +271,7 @@ async def refresh(
         _clear_refresh_cookie(response)
         await record_audit_failure(
             db,
-            "auth.refresh",
+            AUTH_REFRESH,
             target_type="user",
             target_id=claimed.user_id,
             details={"reason": "inactive_or_missing_user"},
@@ -269,7 +281,7 @@ async def refresh(
     # Consumed above; issue the replacement in the same transaction.
     await _issue_refresh_cookie(db, response, user.id)
     await record_audit_event(
-        db, "auth.refresh", actor_user_id=user.id, target_type="user", target_id=user.id
+        db, AUTH_REFRESH, actor_user_id=user.id, target_type="user", target_id=user.id
     )
     access_token = create_access_token(
         data={"sub": str(user.id), "type": "user", "ver": user.session_version}
@@ -355,7 +367,7 @@ async def request_email_change(
 
     await invalidate_tokens(db, current_user.id, purpose=UserTokenPurpose.email_change)
     current_user.pending_email = new_email
-    current_user.email_change_requested_at = datetime.utcnow()
+    current_user.email_change_requested_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     if current_user.role == UserRole.admin:
         current_user.email_change_status = "awaiting_current_confirmation"
@@ -520,7 +532,7 @@ async def confirm_email_change(
     user.pending_email = None
     user.email_change_status = None
     user.email_change_requested_at = None
-    user.email_verified_at = datetime.utcnow()
+    user.email_verified_at = datetime.now(timezone.utc).replace(tzinfo=None)
     # Confirmed identity change ends every existing session.
     user.session_version += 1
     await invalidate_all_refresh_tokens(db, user.id)
@@ -553,7 +565,7 @@ async def change_password(
         )
         raise HTTPException(status_code=400, detail="Current password is incorrect")
     current_user.hashed_password = get_password_hash(data.new_password)
-    current_user.password_set_at = datetime.utcnow()
+    current_user.password_set_at = datetime.now(timezone.utc).replace(tzinfo=None)
     # End every existing session: retire outstanding access tokens (version bump) and
     # refresh tokens, and drop this device's refresh cookie.
     current_user.session_version += 1
@@ -578,7 +590,7 @@ async def get_invite_info(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    expired = user_token.expires_at < datetime.utcnow()
+    expired = user_token.expires_at < datetime.now(timezone.utc).replace(tzinfo=None)
     used = user_token.used_at is not None
     return InviteInfoResponse(
         email=user.email,
@@ -605,7 +617,7 @@ async def accept_invite(
         raise HTTPException(status_code=400, detail="Invite already accepted")
 
     user.hashed_password = get_password_hash(data.password)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     user.invite_accepted_at = now
     user.password_set_at = now
     # Accepting an invitation proves control of the invited address, so treat it as
@@ -641,7 +653,7 @@ async def verify_email(
     if user.email_verified_at is not None:
         raise HTTPException(status_code=400, detail="Email already verified")
 
-    user.email_verified_at = datetime.utcnow()
+    user.email_verified_at = datetime.now(timezone.utc).replace(tzinfo=None)
     await record_audit_event(
         db, "auth.email_verified", actor_user_id=user.id, target_type="user", target_id=user.id
     )
@@ -756,7 +768,7 @@ async def reset_password(
         raise HTTPException(status_code=404, detail="User not found")
 
     user.hashed_password = get_password_hash(data.new_password)
-    user.password_set_at = datetime.utcnow()
+    user.password_set_at = datetime.now(timezone.utc).replace(tzinfo=None)
     # End every existing session, exactly as on password change.
     user.session_version += 1
     await invalidate_all_refresh_tokens(db, user.id)

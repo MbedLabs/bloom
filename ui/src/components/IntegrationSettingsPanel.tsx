@@ -312,15 +312,15 @@ export default function IntegrationSettingsPanel({ projectId }: { projectId: num
                 </div>
               )}
               {choice === 'jira' && (
-                <div>
-                  <label className={labelClass}>Account email</label>
+                <label className="block">
+                  <span className={labelClass}>Account email</span>
                   <input
                     value={accountEmail}
                     onChange={(e) => touch(setAccountEmail)(e.target.value)}
                     placeholder="The Atlassian account the API token belongs to"
                     className={inputClass}
                   />
-                </div>
+                </label>
               )}
               <div>
                 <label className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
@@ -428,7 +428,7 @@ export default function IntegrationSettingsPanel({ projectId }: { projectId: num
 }
 
 /** The Jira inbound filter, priority map and sync direction. */
-function JiraFields(props: {
+function JiraFields(props: Readonly<{
   projectKey: string
   onProjectKey: (value: string) => void
   createOnInbound: boolean
@@ -445,21 +445,21 @@ function JiraFields(props: {
   onPriorityMap: (value: Record<string, string>) => void
   twoWay: boolean
   onTwoWay: (value: boolean) => void
-}) {
+}>) {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div>
-          <label className={labelClass}>Jira project key</label>
+        <label className="block">
+          <span className={labelClass}>Jira project key</span>
           <input
             value={props.projectKey}
             onChange={(e) => props.onProjectKey(e.target.value)}
             placeholder="PROJ"
             className={`${inputClass} font-mono`}
           />
-        </div>
-        <div>
-          <label className={labelClass}>Issue types</label>
+        </label>
+        <label className="block">
+          <span className={labelClass}>Issue types</span>
           <input
             value={props.issueTypes}
             onChange={(e) => props.onIssueTypes(e.target.value)}
@@ -467,35 +467,35 @@ function JiraFields(props: {
             title="Comma-separated Jira issue types"
             className={inputClass}
           />
-        </div>
-        <div>
-          <label className={labelClass}>Label (optional)</label>
+        </label>
+        <label className="block">
+          <span className={labelClass}>Label (optional)</span>
           <input
             value={props.label}
             onChange={(e) => props.onLabel(e.target.value)}
             placeholder="Only issues with this label"
             className={inputClass}
           />
-        </div>
-        <div>
-          <label className={labelClass}>Test case reference field (optional)</label>
+        </label>
+        <label className="block">
+          <span className={labelClass}>Test case reference field (optional)</span>
           <input
             value={props.referenceField}
             onChange={(e) => props.onReferenceField(e.target.value)}
             placeholder="customfield_10042"
             className={`${inputClass} font-mono`}
           />
-        </div>
+        </label>
       </div>
-      <div>
-        <label className={labelClass}>Extra JQL for the pull (optional)</label>
+      <label className="block">
+        <span className={labelClass}>Extra JQL for the pull (optional)</span>
         <input
           value={props.jql}
           onChange={(e) => props.onJql(e.target.value)}
           placeholder='created >= "2026-01-01"'
           className={`${inputClass} font-mono`}
         />
-      </div>
+      </label>
       <fieldset>
         <legend className={labelClass}>Jira priority to Bloom priority</legend>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">

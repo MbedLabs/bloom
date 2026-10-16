@@ -1,5 +1,7 @@
 """Generic artefact comments, activity, workflow, and related endpoints."""
 
+from http import HTTPStatus
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -74,6 +76,7 @@ async def _artefact_rows(
 @router.get(
     "/{artefact_type}/{artefact_id}/comments",
     response_model=list[ArtefactCommentResponse],
+    responses={404: {"description": HTTPStatus(404).phrase}},
 )
 async def list_comments(
     artefact_type: str,
@@ -104,6 +107,10 @@ async def list_comments(
     "/{artefact_type}/{artefact_id}/comments",
     response_model=ArtefactCommentResponse,
     status_code=201,
+    responses={
+        403: {"description": HTTPStatus(403).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+    },
 )
 async def create_comment(
     artefact_type: str,
@@ -175,6 +182,7 @@ async def create_comment(
 @router.get(
     "/{artefact_type}/{artefact_id}/activity",
     response_model=list[ArtefactActivityResponse],
+    responses={404: {"description": HTTPStatus(404).phrase}},
 )
 async def list_activity(
     artefact_type: str,
@@ -192,7 +200,11 @@ async def list_activity(
     return [build_activity_response(row, actors.get(row.actor_user_id)) for row in rows]
 
 
-@router.get("/{artefact_type}/{artefact_id}/related", response_model=ArtefactRelatedResponse)
+@router.get(
+    "/{artefact_type}/{artefact_id}/related",
+    response_model=ArtefactRelatedResponse,
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
 async def get_related_items(
     artefact_type: str,
     artefact_id: str,
@@ -203,7 +215,10 @@ async def get_related_items(
     return await build_related_response(db, artefact_type, artefact.id, current_user)
 
 
-@router.post("/{artefact_type}/{artefact_id}/transition")
+@router.post(
+    "/{artefact_type}/{artefact_id}/transition",
+    responses={409: {"description": HTTPStatus(409).phrase}},
+)
 async def transition_status(
     artefact_type: str,
     artefact_id: str,
@@ -250,7 +265,15 @@ async def transition_status(
     }
 
 
-@router.post("/{artefact_type}/{artefact_id}/sign-off", response_model=ArtefactSignOffResponse)
+@router.post(
+    "/{artefact_type}/{artefact_id}/sign-off",
+    response_model=ArtefactSignOffResponse,
+    responses={
+        403: {"description": HTTPStatus(403).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+        409: {"description": HTTPStatus(409).phrase},
+    },
+)
 async def sign_off(
     artefact_type: str,
     artefact_id: str,

@@ -544,7 +544,7 @@ const EXPORTS: {
 ]
 
 /** One Export button listing every project report and export this page offers. */
-function ExportMenu({ projectId }: { projectId: number | undefined }) {
+function ExportMenu({ projectId }: Readonly<{ projectId: number | undefined }>) {
   const [open, setOpen] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
 

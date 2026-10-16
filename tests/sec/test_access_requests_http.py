@@ -128,7 +128,8 @@ def test_a_request_emails_every_administrator_once_a_day(harness, sent_mail):
     again = client.post("/api/access-requests", json=REQUEST, headers=headers)
 
     assert first.status_code == 201, first.text
-    assert first.json()["status"] == "pending" and first.json()["mail_sent"] is True
+    assert first.json()["status"] == "pending"
+    assert first.json()["mail_sent"] is True
     assert again.status_code == 200
     assert again.json()["already_requested"] is True
     assert again.json()["id"] == first.json()["id"]
@@ -138,11 +139,13 @@ def test_a_request_emails_every_administrator_once_a_day(harness, sent_mail):
     ]
     mail = sent_mail[0]
     assert mail["requester_email"] == "member@example.com"
-    assert mail["resource"] == "APO-REQ-001" and mail["project"] == "APO"
+    assert mail["resource"] == "APO-REQ-001"
+    assert mail["project"] == "APO"
     assert mail["review_link"].endswith("/projects/APO/edit")
     assert mail["request_id"] == first.headers["x-request-id"]
     [event] = _events(session_maker, "access.requested")
-    assert event.target_type == "requirement" and event.target_id == "APO-REQ-001"
+    assert event.target_type == "requirement"
+    assert event.target_id == "APO-REQ-001"
 
 
 def test_the_page_learns_a_request_is_pending(harness, sent_mail):
@@ -155,7 +158,8 @@ def test_the_page_learns_a_request_is_pending(harness, sent_mail):
     client.post("/api/access-requests", json=REQUEST, headers=headers)
     after = client.get("/api/access-requests/mine", params=REQUEST, headers=headers)
 
-    assert before.status_code == 200 and before.json() is None
+    assert before.status_code == 200
+    assert before.json() is None
     assert after.json()["status"] == "pending"
 
 
@@ -206,7 +210,8 @@ def test_an_administrator_decision_is_recorded_once(harness, sent_mail):
 
     assert [r["requester_email"] for r in listed.json()] == ["member@example.com"]
     assert refused_for_member.status_code == 403
-    assert granted.status_code == 200 and granted.json()["status"] == "granted"
+    assert granted.status_code == 200
+    assert granted.json()["status"] == "granted"
     assert twice.status_code == 409
     [event] = _events(session_maker, "access.granted")
     assert event.actor_user_id == admin.id
@@ -260,7 +265,8 @@ def test_global_request_listing_preserves_admin_guard_and_refusal_lifecycle(harn
         json={"decision": "refused"},
         headers=admin_headers,
     )
-    assert refused.status_code == 200 and refused.json()["status"] == "refused"
+    assert refused.status_code == 200
+    assert refused.json()["status"] == "refused"
     pending = client.get("/api/access-requests", headers=admin_headers)
     history = client.get(
         "/api/access-requests", params={"status": "refused"}, headers=admin_headers

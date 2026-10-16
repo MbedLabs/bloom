@@ -12,11 +12,19 @@ restrictions without parameter access. Instance administrators remain global.
 Downgrade drops what the upgrade added.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 import sqlalchemy as sa
 
 from alembic import op
+
+READ_CUSTOMER = "Read Customer"
+READ_INTERNAL = "Read Internal"
+SET_NULL = "SET NULL"
+GROUPS_ID = "groups.id"
+POLICIES_ID = "policies.id"
+PROJECTS_ID = "projects.id"
+USERS_ID = "users.id"
 
 revision = "c5e8a1f2b9d4"
 down_revision = "e1a7c3f9b204"
@@ -356,7 +364,7 @@ DEFAULT_POLICIES = [
         "type_tags": {},
     },
     {
-        "name": "Read Internal",
+        "name": READ_INTERNAL,
         "description": "",
         "scope": "project",
         "permissions": {
@@ -395,7 +403,7 @@ DEFAULT_POLICIES = [
         },
     },
     {
-        "name": "Read Customer",
+        "name": READ_CUSTOMER,
         "description": "",
         "scope": "project",
         "permissions": {
@@ -578,14 +586,14 @@ DEFAULT_GROUPS = [
     {
         "name": "Customers",
         "description": "",
-        "policy_names": ["Read Customer"],
+        "policy_names": [READ_CUSTOMER],
     },
     {
         "name": "Product Owners",
         "description": "",
         "policy_names": [
-            "Read Internal",
-            "Read Customer",
+            READ_INTERNAL,
+            READ_CUSTOMER,
             "Requirements",
             "Specifications",
             "Standards",
@@ -600,8 +608,8 @@ DEFAULT_GROUPS = [
         "name": "Developers",
         "description": "",
         "policy_names": [
-            "Read Internal",
-            "Read Customer",
+            READ_INTERNAL,
+            READ_CUSTOMER,
             "Designs",
             "Baselines",
             "Parameters",
@@ -612,8 +620,8 @@ DEFAULT_GROUPS = [
         "name": "Testers",
         "description": "",
         "policy_names": [
-            "Read Internal",
-            "Read Customer",
+            READ_INTERNAL,
+            READ_CUSTOMER,
             "Concepts",
             "Test Cases",
             "Suites",
@@ -710,7 +718,7 @@ def _insert_policy(
     description: str = "",
 ) -> int:
     """Insert a policy and return its id."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     bind.execute(
         policies.insert().values(
             name=name,
@@ -740,7 +748,7 @@ def _create_tables() -> None:
     for table in ARTEFACT_TABLES:
         op.add_column(
             table,
-            sa.Column("created_by_id", sa.Integer, sa.ForeignKey("users.id"), nullable=True),
+            sa.Column("created_by_id", sa.Integer, sa.ForeignKey(USERS_ID), nullable=True),
         )
     op.create_table(
         "policies",
@@ -767,16 +775,16 @@ def _create_tables() -> None:
         sa.Column(
             "group_id",
             sa.Integer,
-            sa.ForeignKey("groups.id", ondelete="CASCADE"),
+            sa.ForeignKey(GROUPS_ID, ondelete="CASCADE"),
             primary_key=True,
         ),
-        sa.Column("policy_id", sa.Integer, sa.ForeignKey("policies.id"), primary_key=True),
+        sa.Column("policy_id", sa.Integer, sa.ForeignKey(POLICIES_ID), primary_key=True),
     )
     op.create_table(
         "group_memberships",
         sa.Column("id", sa.Integer, primary_key=True),
-        sa.Column("group_id", sa.Integer, sa.ForeignKey("groups.id"), nullable=False),
-        sa.Column("user_id", sa.Integer, sa.ForeignKey("users.id"), nullable=False),
+        sa.Column("group_id", sa.Integer, sa.ForeignKey(GROUPS_ID), nullable=False),
+        sa.Column("user_id", sa.Integer, sa.ForeignKey(USERS_ID), nullable=False),
         sa.Column("created_at", sa.DateTime, nullable=False),
         sa.UniqueConstraint("group_id", "user_id", name="uq_group_membership_group_user"),
     )
@@ -792,7 +800,7 @@ def _create_tables() -> None:
         sa.Column("tag_id", sa.Integer, sa.ForeignKey("tags.id"), nullable=False),
         sa.Column("artefact_type", sa.String(30), nullable=False),
         sa.Column("artefact_id", sa.Integer, nullable=False),
-        sa.Column("project_id", sa.Integer, sa.ForeignKey("projects.id"), nullable=False),
+        sa.Column("project_id", sa.Integer, sa.ForeignKey(PROJECTS_ID), nullable=False),
         sa.Column("created_at", sa.DateTime, nullable=True),
         sa.UniqueConstraint("tag_id", "artefact_type", "artefact_id", name="uq_artefact_tag"),
     )
@@ -802,11 +810,11 @@ def _create_tables() -> None:
     op.create_table(
         "project_access",
         sa.Column("id", sa.Integer, primary_key=True),
-        sa.Column("project_id", sa.Integer, sa.ForeignKey("projects.id"), nullable=False),
-        sa.Column("user_id", sa.Integer, sa.ForeignKey("users.id"), nullable=True),
-        sa.Column("group_id", sa.Integer, sa.ForeignKey("groups.id"), nullable=True),
+        sa.Column("project_id", sa.Integer, sa.ForeignKey(PROJECTS_ID), nullable=False),
+        sa.Column("user_id", sa.Integer, sa.ForeignKey(USERS_ID), nullable=True),
+        sa.Column("group_id", sa.Integer, sa.ForeignKey(GROUPS_ID), nullable=True),
         sa.Column("owner", sa.Boolean, nullable=False, server_default=sa.false()),
-        sa.Column("policy_group_id", sa.Integer, sa.ForeignKey("groups.id"), nullable=True),
+        sa.Column("policy_group_id", sa.Integer, sa.ForeignKey(GROUPS_ID), nullable=True),
         sa.Column("inherit_policies", sa.Boolean, nullable=False, server_default=sa.false()),
         sa.Column("created_at", sa.DateTime, nullable=True),
         sa.CheckConstraint(
@@ -827,15 +835,15 @@ def _create_tables() -> None:
             sa.ForeignKey("project_access.id", ondelete="CASCADE"),
             primary_key=True,
         ),
-        sa.Column("policy_id", sa.Integer, sa.ForeignKey("policies.id"), primary_key=True),
+        sa.Column("policy_id", sa.Integer, sa.ForeignKey(POLICIES_ID), primary_key=True),
     )
 
     op.create_table(
         "user_application_policies",
         sa.Column(
-            "user_id", sa.Integer, sa.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+            "user_id", sa.Integer, sa.ForeignKey(USERS_ID, ondelete="CASCADE"), primary_key=True
         ),
-        sa.Column("policy_id", sa.Integer, sa.ForeignKey("policies.id"), primary_key=True),
+        sa.Column("policy_id", sa.Integer, sa.ForeignKey(POLICIES_ID), primary_key=True),
     )
 
 
@@ -876,7 +884,7 @@ def _seed(bind) -> dict:
         )
         for spec in DEFAULT_POLICIES
     }
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     for spec in DEFAULT_GROUPS:
         bind.execute(
             groups.insert().values(
@@ -899,7 +907,7 @@ def _convert_memberships(bind, ids: dict) -> None:
     read_matrix = {
         resource: actions
         for spec in DEFAULT_POLICIES
-        if spec["name"] == "Read Internal"
+        if spec["name"] == READ_INTERNAL
         for resource, actions in spec["permissions"].items()
         if resource != "parameter"
     }
@@ -907,8 +915,7 @@ def _convert_memberships(bind, ids: dict) -> None:
         spec["name"]
         for spec in DEFAULT_POLICIES
         if spec["scope"] in {"document", "project"}
-        and spec["name"]
-        not in {"Read Internal", "Read Customer", "Review Internal", "Review Customer"}
+        and spec["name"] not in {READ_INTERNAL, READ_CUSTOMER, "Review Internal", "Review Customer"}
     ]
     types_by_membership: dict = {}
     for membership_id, doc_type in bind.execute(
@@ -964,7 +971,7 @@ def _convert_memberships(bind, ids: dict) -> None:
                 project_id=membership.project_id,
                 user_id=membership.user_id,
                 owner=False,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc).replace(tzinfo=None),
             )
         )
         entry = bind.execute(
@@ -1003,9 +1010,7 @@ def _link_existing_activity(bind) -> None:
 
 def _workflow_actor(name: str) -> sa.Column:
     """Create a nullable workflow actor reference with existing user-deletion semantics."""
-    return sa.Column(
-        name, sa.Integer, sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
+    return sa.Column(name, sa.Integer, sa.ForeignKey(USERS_ID, ondelete=SET_NULL), nullable=True)
 
 
 def _create_workflow_tables() -> None:
@@ -1016,7 +1021,7 @@ def _create_workflow_tables() -> None:
         sa.Column(
             "project_id",
             sa.Integer,
-            sa.ForeignKey("projects.id", ondelete="SET NULL"),
+            sa.ForeignKey(PROJECTS_ID, ondelete=SET_NULL),
             nullable=True,
         ),
         sa.Column("artefact_type", sa.String(30), nullable=False),
@@ -1027,7 +1032,7 @@ def _create_workflow_tables() -> None:
         sa.Column(
             "authorizing_change_id",
             sa.Integer,
-            sa.ForeignKey("change_requests.id", ondelete="SET NULL"),
+            sa.ForeignKey("change_requests.id", ondelete=SET_NULL),
             nullable=True,
         ),
         _workflow_actor("reviewer_id"),
@@ -1055,7 +1060,7 @@ def _create_workflow_tables() -> None:
         sa.Column(
             "authorizing_change_id",
             sa.Integer,
-            sa.ForeignKey("change_requests.id", ondelete="SET NULL"),
+            sa.ForeignKey("change_requests.id", ondelete=SET_NULL),
             nullable=True,
         ),
         _workflow_actor("reviewer_id"),
@@ -1076,7 +1081,7 @@ def _create_workflow_tables() -> None:
         sa.Column("revision_number", sa.Integer, nullable=False),
         sa.Column("kind", sa.String(20), nullable=False),
         sa.Column(
-            "requester_id", sa.Integer, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=True
+            "requester_id", sa.Integer, sa.ForeignKey(USERS_ID, ondelete="CASCADE"), nullable=True
         ),
         sa.Column("content_hash", sa.String(64), nullable=False),
         sa.Column("status", sa.String(20), nullable=False),
@@ -1105,7 +1110,7 @@ def _create_workflow_tables() -> None:
             primary_key=True,
         ),
         sa.Column(
-            "user_id", sa.Integer, sa.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+            "user_id", sa.Integer, sa.ForeignKey(USERS_ID, ondelete="CASCADE"), primary_key=True
         ),
     )
     op.create_table(
@@ -1134,7 +1139,7 @@ def _create_workflow_tables() -> None:
         "artefact_requests",
         ["review_request_id"],
         ["id"],
-        ondelete="SET NULL",
+        ondelete=SET_NULL,
     )
 
 
@@ -1152,13 +1157,13 @@ def upgrade() -> None:
         "users",
         ["author_user_id"],
         ["id"],
-        ondelete="SET NULL",
+        ondelete=SET_NULL,
     )
 
     for table in ("artefact_activities", "notifications"):
         op.add_column(table, sa.Column("actor_user_id", sa.Integer(), nullable=True))
         op.create_foreign_key(
-            f"fk_{table}_actor_user", table, "users", ["actor_user_id"], ["id"], ondelete="SET NULL"
+            f"fk_{table}_actor_user", table, "users", ["actor_user_id"], ["id"], ondelete=SET_NULL
         )
     _link_existing_activity(bind)
     _create_link_rules(bind)

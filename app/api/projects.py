@@ -2,6 +2,8 @@
 Projects API endpoints.
 """
 
+from http import HTTPStatus
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -415,7 +417,11 @@ async def get_project_capabilities(
     }
 
 
-@router.patch("/{project_id}", response_model=ProjectResponse)
+@router.patch(
+    "/{project_id}",
+    response_model=ProjectResponse,
+    responses={403: {"description": HTTPStatus(403).phrase}},
+)
 async def update_project(
     project_id: int,
     data: ProjectUpdate,

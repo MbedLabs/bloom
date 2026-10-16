@@ -161,7 +161,7 @@ function TypeBadge({ type }: { type: string }) {
   return <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${cfg.color}`}>{cfg.label}</span>
 }
 
-function StatusBadge({ status }: { status: string | null }) {
+function StatusBadge({ status }: Readonly<{ status: string | null }>) {
   if (!status) return <span className="text-xs text-muted-foreground">-</span>
   const colors: Record<string, string> = {
     Draft: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',

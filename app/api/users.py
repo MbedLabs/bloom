@@ -4,7 +4,8 @@ Users API endpoints (admin only): CRUD for user management.
 
 import secrets
 import string
-from datetime import datetime
+from datetime import datetime, timezone
+from http import HTTPStatus
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -89,7 +90,9 @@ async def my_application_permissions(
     return as_lists(await effective_permissions(db, current_user, None))
 
 
-@router.get("/{user_id}/application-policies")
+@router.get(
+    "/{user_id}/application-policies", responses={404: {"description": HTTPStatus(404).phrase}}
+)
 async def application_policy_ids(
     user_id: int,
     _admin: User = Depends(require_admin),
@@ -106,7 +109,13 @@ async def application_policy_ids(
     return {"policy_ids": list(ids)}
 
 
-@router.put("/{user_id}/application-policies")
+@router.put(
+    "/{user_id}/application-policies",
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+    },
+)
 async def set_application_policies(
     user_id: int,
     data: ApplicationPoliciesInput,
@@ -178,7 +187,9 @@ async def _send_email_change_confirmation(
 
     user.pending_email = new_email
     user.email_change_status = "awaiting_confirmation"
-    user.email_change_requested_at = user.email_change_requested_at or datetime.utcnow()
+    user.email_change_requested_at = user.email_change_requested_at or datetime.now(
+        timezone.utc
+    ).replace(tzinfo=None)
     token = await create_user_token(
         db,
         user_id=user.id,
@@ -297,9 +308,9 @@ async def invite_user(
             hashed_password=get_password_hash(temp_password),
             role=data.role,
             is_active=True,
-            invited_at=datetime.utcnow(),
+            invited_at=datetime.now(timezone.utc).replace(tzinfo=None),
             invited_by_user_id=admin.id,
-            last_invite_sent_at=datetime.utcnow(),
+            last_invite_sent_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
         db.add(user)
         await db.flush()
@@ -307,9 +318,9 @@ async def invite_user(
         user.full_name = data.full_name
         user.role = data.role
         user.hashed_password = get_password_hash(temp_password)
-        user.invited_at = user.invited_at or datetime.utcnow()
+        user.invited_at = user.invited_at or datetime.now(timezone.utc).replace(tzinfo=None)
         user.invited_by_user_id = admin.id
-        user.last_invite_sent_at = datetime.utcnow()
+        user.last_invite_sent_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     invite_token = await create_user_token(
         db,
@@ -357,7 +368,7 @@ async def resend_invite(
     if user.password_set_at is not None:
         raise HTTPException(status_code=400, detail="Invite already accepted")
 
-    user.last_invite_sent_at = datetime.utcnow()
+    user.last_invite_sent_at = datetime.now(timezone.utc).replace(tzinfo=None)
     alphabet = string.ascii_letters + string.digits
     temp_password = "".join(secrets.choice(alphabet) for _ in range(12))
     user.hashed_password = get_password_hash(temp_password)
@@ -429,7 +440,7 @@ async def start_email_change(
 ):
     """Start the verified email-change workflow for a user."""
     user = await _get_user_or_404(db, user_id)
-    user.email_change_requested_at = datetime.utcnow()
+    user.email_change_requested_at = datetime.now(timezone.utc).replace(tzinfo=None)
     return await _send_email_change_confirmation(
         db,
         user=user,
@@ -480,7 +491,11 @@ async def reject_email_change(
     return UserResponse.model_validate(user)
 
 
-@router.patch("/{user_id}", response_model=UserResponse)
+@router.patch(
+    "/{user_id}",
+    response_model=UserResponse,
+    responses={403: {"description": HTTPStatus(403).phrase}},
+)
 async def update_user(
     user_id: int,
     data: UserUpdate,

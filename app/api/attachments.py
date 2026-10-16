@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import binascii
 import logging
+from http import HTTPStatus
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
@@ -36,6 +37,8 @@ from app.services.attachment_upload_policy import (
 )
 from app.services.audit import record_audit_event
 from app.services.document_workflow import prepare_content_write
+
+ATTACHMENT_NOT_FOUND = "Attachment not found"
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +130,10 @@ async def upload_attachment(
         await release_attachment_upload(db, lease.id)
 
 
-@router.get("/attachments/{attachment_id}/download")
+@router.get(
+    "/attachments/{attachment_id}/download",
+    responses={503: {"description": HTTPStatus(503).phrase}},
+)
 async def download_attachment(
     attachment_id: int,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -142,12 +148,12 @@ async def download_attachment(
         )
     ).scalar_one_or_none()
     if attachment is None:
-        raise HTTPException(status_code=404, detail="Attachment not found")
+        raise HTTPException(status_code=404, detail=ATTACHMENT_NOT_FOUND)
     await get_visible_row(
         db,
         Document,
         attachment.document_id,
-        "Attachment not found",
+        ATTACHMENT_NOT_FOUND,
         current_user,
         permission=("view", None),
     )
@@ -192,12 +198,12 @@ async def delete_attachment(
         )
     ).scalar_one_or_none()
     if attachment is None:
-        raise HTTPException(status_code=404, detail="Attachment not found")
+        raise HTTPException(status_code=404, detail=ATTACHMENT_NOT_FOUND)
     document = await get_visible_row(
         db,
         Document,
         attachment.document_id,
-        "Attachment not found",
+        ATTACHMENT_NOT_FOUND,
         current_user,
         permission=("delete", None),
     )

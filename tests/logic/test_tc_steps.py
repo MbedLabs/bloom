@@ -48,7 +48,8 @@ def test_rows_carry_the_editor_contract():
         "indent_level",
         "collapsed",
     }
-    assert row["collapsed"] is False and row["id"]
+    assert row["collapsed"] is False
+    assert row["id"]
 
 
 def test_older_stored_steps_still_write():

@@ -11,13 +11,13 @@ export default function ArtefactTags({
   projectId,
   canEdit,
   origin,
-}: {
+}: Readonly<{
   type: TaggedArtefactType
   id: number
   projectId: number
   canEdit: boolean
   origin?: ReactNode
-}) {
+}>) {
   const toast = useToast()
   const { user } = useAuth()
   const queryClient = useQueryClient()

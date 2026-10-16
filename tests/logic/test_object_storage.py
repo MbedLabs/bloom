@@ -67,7 +67,8 @@ async def test_persist_fetch_list_and_remove(s3):
     assert await object_store.bucket_answers() is True
 
     await attachment_storage.remove("a.txt")
-    assert _keys(s3) == [] and not path.exists()
+    assert _keys(s3) == []
+    assert not path.exists()
     await attachment_storage.remove("a.txt")
 
 
@@ -75,7 +76,8 @@ async def test_without_the_mirror_the_local_file_goes(s3, monkeypatch):
     monkeypatch.setattr(settings, "STORAGE_LOCAL_MIRROR", False)
     path = _local("b.txt")
     await attachment_storage.persist(path, "b.txt", "text/plain")
-    assert not path.exists() and _keys(s3) == ["bloom/b.txt"]
+    assert not path.exists()
+    assert _keys(s3) == ["bloom/b.txt"]
 
 
 async def test_a_refused_upload_leaves_nothing(s3, monkeypatch):
@@ -83,7 +85,8 @@ async def test_a_refused_upload_leaves_nothing(s3, monkeypatch):
     path = _local("c.txt")
     with pytest.raises(HTTPException) as refused:
         await attachment_storage.persist(path, "c.txt", "text/plain")
-    assert refused.value.status_code == 503 and not path.exists()
+    assert refused.value.status_code == 503
+    assert not path.exists()
     assert await object_store.bucket_answers() is False
 
 
@@ -93,7 +96,8 @@ async def test_local_storage_is_untouched(monkeypatch, tmp_path):
     monkeypatch.setattr(attachment_storage, "_ROOT", None)
     path = _local("d.txt")
     await attachment_storage.persist(path, "d.txt", "text/plain")
-    assert path.exists() and object_store.keeps_local_copy()
+    assert path.exists()
+    assert object_store.keeps_local_copy()
     assert object_store.object_key("d.txt") == "bloom/d.txt"
 
 
@@ -175,7 +179,8 @@ async def test_cleanup_reconciles_the_bucket(s3, db, monkeypatch):
     monkeypatch.setattr(settings, "STORAGE_LOCAL_MIRROR", False)
     await object_store.put_file(_local("late.txt"), "late.txt", "text/plain")
     again = await attachment_cleanup.reconcile_attachments(session, orphan_grace_seconds=-60)
-    assert again.orphan_files == 1 and _keys(s3) == ["bloom/kept.txt"]
+    assert again.orphan_files == 1
+    assert _keys(s3) == ["bloom/kept.txt"]
 
 
 async def test_migrate_copies_once_and_checks_sizes(s3, monkeypatch, capsys):

@@ -44,7 +44,7 @@ export default function AcceptInvite() {
       }
     }
 
-    loadInviteInfo()
+    void loadInviteInfo()
     return () => {
       cancelled = true
     }

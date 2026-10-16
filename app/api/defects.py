@@ -1,7 +1,7 @@
 """Defect API endpoints."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -42,6 +42,8 @@ from app.models.user import User
 from app.schemas import DefectCreate, DefectResponse, DefectUpdate, PaginatedResponse
 from app.services.artefact_tags import attach_tags, creation_tags
 from app.services.integration_secrets import decrypt_integration_secret
+
+DEFECT_NOT_FOUND = "Defect not found"
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +159,7 @@ async def get_defect(
     current_user: User = Depends(get_current_user),
 ):
     item = await get_visible_row(
-        db, Defect, defect_pk, "Defect not found", current_user, permission=("view", "DEF")
+        db, Defect, defect_pk, DEFECT_NOT_FOUND, current_user, permission=("view", "DEF")
     )
     return _defect_response(item)
 
@@ -170,7 +172,7 @@ async def update_defect(
     current_user: User = Depends(get_current_user),
 ):
     item = await get_visible_row(
-        db, Defect, defect_pk, "Defect not found", current_user, permission=("edit", "DEF")
+        db, Defect, defect_pk, DEFECT_NOT_FOUND, current_user, permission=("edit", "DEF")
     )
     changes = data.model_dump(exclude_unset=True)
     check_external_change(current_user, "DEF", item, changes)
@@ -209,7 +211,7 @@ async def update_defect(
     await audit_visibility_change(db, "defect", item, previous_visibility)
 
     if new_status and new_status in TERMINAL_STATUSES and item.closed_at is None:
-        item.closed_at = datetime.utcnow()
+        item.closed_at = datetime.now(timezone.utc).replace(tzinfo=None)
     elif new_status and new_status not in TERMINAL_STATUSES:
         item.closed_at = None
 
@@ -255,7 +257,7 @@ async def delete_defect(
         current_user,
         Defect,
         defect_pk,
-        "Defect not found",
+        DEFECT_NOT_FOUND,
         resource="DEF",
         audit_type="defect",
         activity=("defect", "defect_id"),
@@ -278,7 +280,7 @@ async def refresh_external_issue(
 ):
     """Fetch current state from GitHub/GitLab and update cached fields."""
     item = await get_visible_row(
-        db, Defect, defect_pk, "Defect not found", current_user, permission=("edit", "DEF")
+        db, Defect, defect_pk, DEFECT_NOT_FOUND, current_user, permission=("edit", "DEF")
     )
     if (
         not item.external_tracker
@@ -342,7 +344,7 @@ async def refresh_external_issue(
         ) from exc
 
     item.external_issue_state = result["state"]
-    item.external_last_event_at = datetime.utcnow()
+    item.external_last_event_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     await db.flush()
     await db.refresh(item)

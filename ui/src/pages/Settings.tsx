@@ -163,6 +163,7 @@ export default function Settings() {
   const [generatedToken, setGeneratedToken] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [copyMessage, setCopyMessage] = useState('')
   const [credentials, setCredentials] = useState<ServiceCredential[]>([])
 
   useEffect(() => {
@@ -205,6 +206,7 @@ export default function Settings() {
     setIsGenerating(true)
     try {
       const response = await serviceCredentialsApi.create()
+      setCopyMessage('')
       setGeneratedToken(response.token)
       setCredentials((current) => [response, ...current])
     } catch (error) {
@@ -218,6 +220,7 @@ export default function Settings() {
     setIsGenerating(true)
     try {
       const response = await serviceCredentialsApi.rotate(id)
+      setCopyMessage('')
       setGeneratedToken(response.token)
       setCredentials(await serviceCredentialsApi.list())
     } catch (error) {
@@ -238,9 +241,14 @@ export default function Settings() {
   }
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(generatedToken)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    navigator.clipboard.writeText(generatedToken).then(() => {
+      setCopyMessage('')
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }).catch(() => {
+      setCopied(false)
+      setCopyMessage('Could not copy the credential. Please try again.')
+    })
   }
 
   return (
@@ -287,7 +295,7 @@ export default function Settings() {
                   Upload
                 </button>
               </div>
-              {pictureMessage && <p role="status" className="text-sm text-muted-foreground">{pictureMessage}</p>}
+              {pictureMessage && <output className="block text-sm text-muted-foreground">{pictureMessage}</output>}
             </div>
           </div>
           <div>
@@ -459,6 +467,7 @@ export default function Settings() {
                     {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
                   </button>
                 </div>
+                {copyMessage && <p role="alert" className="text-sm text-destructive">{copyMessage}</p>}
                 <div className="flex justify-between items-center">
                   <p className="text-[10px] text-amber-600 font-medium">⚠️ Copy this token now. It will not be shown again.</p>
                   <button
@@ -585,7 +594,7 @@ export default function Settings() {
               </div>
             </div>
             {logoMessage && (
-              <p className="text-sm text-muted-foreground" role="status">{logoMessage}</p>
+              <output className="block text-sm text-muted-foreground">{logoMessage}</output>
             )}
           </div>
         </div>

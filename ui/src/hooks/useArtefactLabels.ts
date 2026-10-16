@@ -21,7 +21,7 @@ export function tagKeys(content: unknown): string[] {
     if (Array.isArray(children)) children.forEach(walk)
   }
   walk(content)
-  return Array.from(keys).sort().slice(0, MAX_TAG_KEYS)
+  return Array.from(keys).sort((left, right) => { if (left < right) return -1; if (left > right) return 1; return 0 }).slice(0, MAX_TAG_KEYS)
 }
 
 /**

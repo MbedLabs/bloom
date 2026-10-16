@@ -11,7 +11,7 @@ type BudRunLinkProps = {
   source?: Omit<ReportSource, 'run_id'>
 }
 
-export default function BudRunLink({ runId, className, label, source }: BudRunLinkProps) {
+export default function BudRunLink({ runId, className, label, source }: Readonly<BudRunLinkProps>) {
   if (!runId) {
     return <span className={className || 'text-muted-foreground'}>Not recorded</span>
   }

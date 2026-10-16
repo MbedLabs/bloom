@@ -5,7 +5,7 @@ interface ConfirmDeleteProps {
 }
 
 /** Render deletion confirmation and cancellation controls. */
-export default function ConfirmDelete({ pending, onConfirm, onCancel }: ConfirmDeleteProps) {
+export default function ConfirmDelete({ pending, onConfirm, onCancel }: Readonly<ConfirmDeleteProps>) {
   return (
     <div className="flex items-center gap-2">
       <span className="text-xs text-muted-foreground">Are you sure?</span>

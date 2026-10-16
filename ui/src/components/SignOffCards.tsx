@@ -56,7 +56,7 @@ function SignOffCard({
   buttonClassName,
   Icon,
   buttonLabel,
-}: SignOffCardProps) {
+}: Readonly<SignOffCardProps>) {
   return (
     <SectionCard title={title}>
       <div className="space-y-3">
@@ -93,7 +93,7 @@ interface SignOffCardsProps {
 }
 
 /** The Review and Approval cards of an artefact: who is assigned, who signed off and when; a sign-off is recorded as the person who signs. */
-export default function SignOffCards({ item, users, canReview, canApprove, markReviewed, markApproved }: SignOffCardsProps) {
+export default function SignOffCards({ item, users, canReview, canApprove, markReviewed, markApproved }: Readonly<SignOffCardsProps>) {
   return (
     <>
       <SignOffCard

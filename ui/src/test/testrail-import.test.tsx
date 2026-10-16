@@ -135,12 +135,12 @@ describe('TestRail import', () => {
     renderImport()
     fireEvent.click(screen.getByRole('button', { name: 'CSV' }))
     pick('empty.csv')
-    await screen.findByText('The file is empty.')
+    expect(await screen.findByText('The file is empty.')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'XML' }))
     pick('broken.xml')
     fireEvent.click(screen.getByRole('button', { name: /Import from TestRail/ }))
-    await screen.findByText('Importing from TestRail failed')
+    expect(await screen.findByText('Importing from TestRail failed')).toBeTruthy()
   })
 
   it('falls back to a generic message when reading the columns fails without detail', async () => {
@@ -148,6 +148,6 @@ describe('TestRail import', () => {
     renderImport()
     fireEvent.click(screen.getByRole('button', { name: 'CSV' }))
     pick('cases.csv')
-    await screen.findByText('Reading the columns failed')
+    expect(await screen.findByText('Reading the columns failed')).toBeTruthy()
   })
 })

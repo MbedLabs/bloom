@@ -165,11 +165,11 @@ export default function ArtefactDetail({
   kind,
   resolvedId,
   allowedActions,
-}: {
+}: Readonly<{
   kind: ArtefactKind
   resolvedId?: number
   allowedActions?: string[]
-}) {
+}>) {
   const { itemId, prefix } = useParams<{ prefix: string; itemId: string }>()
   const recordId = resolvedId || Number(itemId)
   const workflow = useDocumentWorkflow(kind, recordId)

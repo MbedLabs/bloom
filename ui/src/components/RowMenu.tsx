@@ -30,7 +30,7 @@ export function RowMenu({
   position,
   onToggle,
   children,
-}: {
+}: Readonly<{
   icon: ReactNode
   title: string
   buttonClassName: string
@@ -39,7 +39,7 @@ export function RowMenu({
   position: MenuPosition | null
   onToggle: (position: MenuPosition) => void
   children: ReactNode
-}) {
+}>) {
   return (
     <>
       <button
@@ -65,12 +65,12 @@ export function MenuAction({
   label,
   destructive = false,
   onClick,
-}: {
+}: Readonly<{
   icon: ReactNode
   label: string
   destructive?: boolean
   onClick: () => void
-}) {
+}>) {
   return (
     <button
       type="button"

@@ -22,6 +22,8 @@ from app.schemas import (
     PaginatedResponse,
 )
 
+DESIGN_ITEM = "design item"
+
 router = APIRouter()
 
 KIND = ArtefactKind(
@@ -29,8 +31,8 @@ KIND = ArtefactKind(
     type_code="DES",
     id_attr="design_id",
     activity_type="design",
-    created_label="design item",
-    updated_label="design item",
+    created_label=DESIGN_ITEM,
+    updated_label=DESIGN_ITEM,
     not_found="Design item not found",
     exists="Design item with this ID already exists",
 )
@@ -113,5 +115,5 @@ async def delete_design_item(
         "Design item not found",
         resource="DES",
         audit_type="design",
-        activity=("design item", "design_id"),
+        activity=(DESIGN_ITEM, "design_id"),
     )

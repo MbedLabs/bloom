@@ -13,10 +13,10 @@ import re
 from typing import Iterable, Optional
 
 STEP_ROW_RE = re.compile(
-    r"^(?P<indent>[ \t]*)[-*]\s+(?P<label>pre-?condition|step|loop)\s*:\s*(?P<text>.*)$",
+    r"^(?P<indent>[ \t]*)[-*]\s+(?P<label>pre-?condition|step|loop)\s*:(?P<text>.*)$",
     re.IGNORECASE,
 )
-_NUMBERED_RE = re.compile(r"^\s*\d+[.)]\s+(?P<text>.*)$")
+_NUMBERED_RE = re.compile(r"^\s*\d+[.)]\s(?P<text>.*)$")
 _ROW_TYPES = {
     "pre-condition": "precondition",
     "precondition": "precondition",
@@ -47,7 +47,7 @@ def parse_row(line: str, index: int = 0) -> Optional[dict]:
     match = STEP_ROW_RE.match(line)
     if not match:
         return None
-    description, _, expected = match.group("text").partition(EXPECTED_SEPARATOR)
+    description, _, expected = match.group("text").lstrip().partition(EXPECTED_SEPARATOR)
     indent = match.group("indent").replace("\t", "  ")
     return make_row(
         _ROW_TYPES[match.group("label").lower()],
@@ -88,7 +88,7 @@ def text_to_rows(text: Optional[str]) -> Optional[list]:
         return rows
     for line in lines:
         match = _NUMBERED_RE.match(line)
-        body = match.group("text") if match else line.strip()
+        body = match.group("text").lstrip() if match else line.strip()
         description, _, expected = body.partition(EXPECTED_SEPARATOR)
         rows.append(make_row("step", description, expected, index=len(rows)))
     return rows

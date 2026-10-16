@@ -7,6 +7,9 @@ from app.core.permissions import (
     actions_for_rule,
 )
 
+READ_CUSTOMER = "Read Customer"
+READ_INTERNAL = "Read Internal"
+
 DOCUMENT_POLICIES = (
     ("Requirements", "REQ"),
     ("Specifications", "SPEC"),
@@ -64,8 +67,8 @@ DEFAULT_POLICIES = [
     _policy("Parameters", "project", ("parameter",)),
     _policy("Traceability", "project", ("link",)),
     _policy("Project Management", "project", ("project",)),
-    _policy("Read Internal", "project", RESOURCES, read_only=True),
-    _policy("Read Customer", "project", RESOURCES, read_only=True, origin="customer"),
+    _policy(READ_INTERNAL, "project", RESOURCES, read_only=True),
+    _policy(READ_CUSTOMER, "project", RESOURCES, read_only=True, origin="customer"),
     _policy("Review Internal", "project", DOC_TYPE_RESOURCES, review_only=True),
     _policy("Review Customer", "project", DOC_TYPE_RESOURCES, review_only=True, origin="customer"),
     _policy("Access Management", "app", ("access",)),
@@ -76,14 +79,14 @@ DEFAULT_GROUPS = [
     {
         "name": "Customers",
         "description": "",
-        "policy_names": ["Read Customer"],
+        "policy_names": [READ_CUSTOMER],
     },
     {
         "name": "Product Owners",
         "description": "",
         "policy_names": [
-            "Read Internal",
-            "Read Customer",
+            READ_INTERNAL,
+            READ_CUSTOMER,
             "Requirements",
             "Specifications",
             "Standards",
@@ -98,8 +101,8 @@ DEFAULT_GROUPS = [
         "name": "Developers",
         "description": "",
         "policy_names": [
-            "Read Internal",
-            "Read Customer",
+            READ_INTERNAL,
+            READ_CUSTOMER,
             "Designs",
             "Baselines",
             "Parameters",
@@ -110,8 +113,8 @@ DEFAULT_GROUPS = [
         "name": "Testers",
         "description": "",
         "policy_names": [
-            "Read Internal",
-            "Read Customer",
+            READ_INTERNAL,
+            READ_CUSTOMER,
             "Concepts",
             "Test Cases",
             "Suites",

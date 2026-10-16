@@ -28,11 +28,11 @@ export default function TestRailImport({
   projectId,
   prefix,
   tagIds,
-}: {
+}: Readonly<{
   projectId: number
   prefix?: string
   tagIds?: number[]
-}) {
+}>) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const toast = useToast()

@@ -20,12 +20,12 @@ export default function DocumentAttachmentsPanel({
   projectId,
   docType,
   rowAllowsEdit = true,
-}: {
+}: Readonly<{
   documentId: number
   projectId?: number
   docType: DocType | null
   rowAllowsEdit?: boolean
-}) {
+}>) {
   const queryClient = useQueryClient()
   const toast = useToast()
   const fileInput = useRef<HTMLInputElement>(null)

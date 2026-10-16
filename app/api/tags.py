@@ -1,5 +1,6 @@
 """The tag base, managed by administrators, and the tags each artefact carries (R-t)."""
 
+from http import HTTPStatus
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -63,7 +64,11 @@ async def _tags(db: AsyncSession, ids) -> list[Tag]:
     )
 
 
-@router.get("/tags", response_model=list[TagResponse])
+@router.get(
+    "/tags",
+    response_model=list[TagResponse],
+    responses={403: {"description": HTTPStatus(403).phrase}},
+)
 async def list_tags(
     project_id: Optional[int] = Query(None),
     current_user: User = Depends(get_current_user),
@@ -99,7 +104,12 @@ async def my_tag_scope(
     return TagScopeResponse(limited=True, tags=await _tags(db, scope))
 
 
-@router.post("/tags", response_model=TagResponse, status_code=201)
+@router.post(
+    "/tags",
+    response_model=TagResponse,
+    status_code=201,
+    responses={409: {"description": HTTPStatus(409).phrase}},
+)
 async def create_tag(
     data: TagCreate,
     _admin: User = Depends(require_app_permission("create")),
@@ -119,7 +129,14 @@ async def create_tag(
     return tag
 
 
-@router.patch("/tags/{tag_id}", response_model=TagResponse)
+@router.patch(
+    "/tags/{tag_id}",
+    response_model=TagResponse,
+    responses={
+        404: {"description": HTTPStatus(404).phrase},
+        409: {"description": HTTPStatus(409).phrase},
+    },
+)
 async def rename_tag(
     tag_id: int,
     data: TagUpdate,
@@ -148,7 +165,11 @@ async def rename_tag(
     return tag
 
 
-@router.get("/artefacts/{artefact_type}/{artefact_id}/tags", response_model=list[TagResponse])
+@router.get(
+    "/artefacts/{artefact_type}/{artefact_id}/tags",
+    response_model=list[TagResponse],
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
 async def artefact_tags(
     artefact_type: str,
     artefact_id: int,
@@ -171,7 +192,15 @@ async def artefact_tags(
     return await _tags(db, carried if scope is None else carried & scope)
 
 
-@router.put("/artefacts/{artefact_type}/{artefact_id}/tags", response_model=list[TagResponse])
+@router.put(
+    "/artefacts/{artefact_type}/{artefact_id}/tags",
+    response_model=list[TagResponse],
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        403: {"description": HTTPStatus(403).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+    },
+)
 async def set_artefact_tags(
     artefact_type: str,
     artefact_id: int,

@@ -4,6 +4,7 @@ and a unified list endpoint for all doc types within a project.
 """
 
 from datetime import date, datetime, time
+from http import HTTPStatus
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -893,7 +894,11 @@ class NextDocIdResponse(BaseModel):
 _DOCUMENT_TYPE_CODES = {"SPEC", "PRT", "RPT", "STD"}
 
 
-@router.get("/projects/{project_ref}/next-doc-id/{type_code}", response_model=NextDocIdResponse)
+@router.get(
+    "/projects/{project_ref}/next-doc-id/{type_code}",
+    response_model=NextDocIdResponse,
+    responses={400: {"description": HTTPStatus(400).phrase}},
+)
 async def get_next_doc_id(
     project_ref: str,
     type_code: str,
@@ -924,7 +929,9 @@ async def get_next_doc_id(
 
 
 @router.get(
-    "/projects/{project_ref}/docs/{kind_slug}/{doc_id_str}", response_model=DocDetailFacadeResponse
+    "/projects/{project_ref}/docs/{kind_slug}/{doc_id_str}",
+    response_model=DocDetailFacadeResponse,
+    responses={404: {"description": HTTPStatus(404).phrase}},
 )
 async def get_doc_by_kind_and_string_id(
     project_ref: str,

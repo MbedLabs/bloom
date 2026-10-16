@@ -1,6 +1,7 @@
 """Content-bound document handoffs and preserved approved revisions."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from http import HTTPStatus
 from typing import Literal
 from urllib.parse import quote
 
@@ -49,6 +50,8 @@ from app.services.document_workflow import (
 )
 from app.services.mail_service import MailConfigurationError, send_email
 from app.services.notification_service import notify
+
+THIS_DOCUMENT_HAS_NO_APPROVAL_WORKFLOW = "This document has no approval workflow."
 
 router = APIRouter()
 REQUEST_WINDOW = timedelta(hours=24)
@@ -222,8 +225,8 @@ async def request_handoff(db, row, user, kind):
     """Deliver a content-bound request and record only actual review completion."""
     state = await get_workflow(db, row)
     if not controlled(row):
-        raise HTTPException(status_code=409, detail="This document has no approval workflow.")
-    now = datetime.utcnow()
+        raise HTTPException(status_code=409, detail=THIS_DOCUMENT_HAS_NO_APPROVAL_WORKFLOW)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     previous = await db.scalar(
         select(ArtefactRequest)
         .where(
@@ -315,7 +318,7 @@ async def complete_step(db, row, user, step):
         await request_handoff(db, row, user, "approval")
         return state
     if not controlled(row):
-        raise HTTPException(status_code=409, detail="This document has no approval workflow.")
+        raise HTTPException(status_code=409, detail=THIS_DOCUMENT_HAS_NO_APPROVAL_WORKFLOW)
     request = await _pending(db, state, "approval")
     fingerprint = content_hash(await content_snapshot(db, row))
     if (
@@ -331,7 +334,7 @@ async def complete_step(db, row, user, step):
         raise HTTPException(
             status_code=403, detail="This approval request is not assigned or delivered to you."
         )
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     with permit_workflow_write(db, row):
         request.status = "answered"
         request.decided_by_id = user.id
@@ -564,7 +567,10 @@ async def workflow_response(db, row, user):
     }
 
 
-@router.get("/artefacts/{slug}/{identifier}/workflow")
+@router.get(
+    "/artefacts/{slug}/{identifier}/workflow",
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
 async def read_workflow(
     slug: str,
     identifier: str,
@@ -575,7 +581,13 @@ async def read_workflow(
     return await workflow_response(db, row, user)
 
 
-@router.put("/artefacts/{slug}/{identifier}/workflow/assignees")
+@router.put(
+    "/artefacts/{slug}/{identifier}/workflow/assignees",
+    responses={
+        404: {"description": HTTPStatus(404).phrase},
+        422: {"description": HTTPStatus(422).phrase},
+    },
+)
 async def set_assignees(
     slug: str,
     identifier: str,
@@ -590,7 +602,7 @@ async def set_assignees(
     for field, person_id in values.items():
         step = "review" if field == "reviewer_id" else "approve"
         if step == "approve" and not controlled(row):
-            raise HTTPException(status_code=422, detail="This document has no approval workflow.")
+            raise HTTPException(status_code=422, detail=THIS_DOCUMENT_HAS_NO_APPROVAL_WORKFLOW)
         person = await db.get(User, person_id) if person_id else None
         if person_id and (
             person is None
@@ -615,7 +627,14 @@ async def set_assignees(
     return await workflow_response(db, row, user)
 
 
-@router.post("/artefacts/{slug}/{identifier}/requests")
+@router.post(
+    "/artefacts/{slug}/{identifier}/requests",
+    responses={
+        403: {"description": HTTPStatus(403).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+        409: {"description": HTTPStatus(409).phrase},
+    },
+)
 async def create_request(
     slug: str,
     identifier: str,
@@ -630,7 +649,14 @@ async def create_request(
     return result
 
 
-@router.post("/artefact-requests/{request_id}/decline")
+@router.post(
+    "/artefact-requests/{request_id}/decline",
+    responses={
+        403: {"description": HTTPStatus(403).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+        409: {"description": HTTPStatus(409).phrase},
+    },
+)
 async def decline_request(
     request_id: int,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -648,7 +674,7 @@ async def decline_request(
     with permit_workflow_write(db, row):
         request.status = "declined"
         request.decided_by_id = user.id
-        request.decided_at = datetime.utcnow()
+        request.decided_at = datetime.now(timezone.utc).replace(tzinfo=None)
         state.phase = "Draft" if request.kind == "review" else "Review"
         row.status = "Draft" if request.kind == "review" else "Review"
         await db.flush()
@@ -659,7 +685,10 @@ async def decline_request(
     return {"id": request.id, "status": request.status}
 
 
-@router.get("/projects/{project_id}/artefact-requests")
+@router.get(
+    "/projects/{project_id}/artefact-requests",
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
 async def project_requests(
     project_id: int,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -702,7 +731,13 @@ async def project_requests(
     return result
 
 
-@router.post("/artefacts/{slug}/{identifier}/draft")
+@router.post(
+    "/artefacts/{slug}/{identifier}/draft",
+    responses={
+        404: {"description": HTTPStatus(404).phrase},
+        409: {"description": HTTPStatus(409).phrase},
+    },
+)
 async def start_legacy_draft(
     slug: str,
     identifier: str,
@@ -726,7 +761,14 @@ async def start_legacy_draft(
     return await workflow_response(db, row, user)
 
 
-@router.post("/artefacts/{slug}/{identifier}/revisions", status_code=201)
+@router.post(
+    "/artefacts/{slug}/{identifier}/revisions",
+    status_code=201,
+    responses={
+        404: {"description": HTTPStatus(404).phrase},
+        409: {"description": HTTPStatus(409).phrase},
+    },
+)
 async def start_revision(
     slug: str,
     identifier: str,
@@ -769,7 +811,10 @@ async def _visible_revision(db, slug, identifier, number, user):
     return row, revision
 
 
-@router.get("/artefacts/{slug}/{identifier}/revisions/{number}")
+@router.get(
+    "/artefacts/{slug}/{identifier}/revisions/{number}",
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
 async def read_revision(
     slug: str,
     identifier: str,
@@ -823,7 +868,13 @@ async def read_revision(
     }
 
 
-@router.get("/artefacts/{slug}/{identifier}/revisions/{number}/attachments/{file_id}")
+@router.get(
+    "/artefacts/{slug}/{identifier}/revisions/{number}/attachments/{file_id}",
+    responses={
+        404: {"description": HTTPStatus(404).phrase},
+        503: {"description": HTTPStatus(503).phrase},
+    },
+)
 async def revision_file(
     slug: str,
     identifier: str,

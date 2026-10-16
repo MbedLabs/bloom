@@ -19,7 +19,7 @@ type RequestState = {
   doc_id: string | null
 }
 
-export default function ReportRequestAction({ source }: { source: ReportSource }) {
+export default function ReportRequestAction({ source }: Readonly<{ source: ReportSource }>) {
   const client = useQueryClient()
   const toast = useToast()
   const requesterId = getSessionUserId()

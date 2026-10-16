@@ -3,7 +3,7 @@
 import hashlib
 import json
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 from fastapi import HTTPException
@@ -517,7 +517,7 @@ def _invalidate_cycle(session, row, workflow, actor_id) -> None:
         if workflow.id is not None
         else []
     )
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     for request in requests:
         request.status = "superseded"
         request.decided_by_id = actor_id

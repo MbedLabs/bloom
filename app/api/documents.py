@@ -46,6 +46,8 @@ from app.services.artefact_tags import attach_tags, creation_tags
 from app.services.document_workflow import prepare_content_write
 from app.services.tag_links import sync_tag_links
 
+DOCUMENT_NOT_FOUND = "Document not found"
+
 router = APIRouter()
 
 
@@ -203,7 +205,7 @@ async def get_document(
     current_user: User = Depends(get_current_user),
 ):
     document = await get_visible_row(
-        db, Document, document_id, "Document not found", current_user, permission=("view", None)
+        db, Document, document_id, DOCUMENT_NOT_FOUND, current_user, permission=("view", None)
     )
 
     sections_result = await db.execute(
@@ -271,7 +273,7 @@ async def update_document(
     current_user: User = Depends(get_current_user),
 ):
     document = await get_visible_row(
-        db, Document, document_id, "Document not found", current_user, permission=("edit", None)
+        db, Document, document_id, DOCUMENT_NOT_FOUND, current_user, permission=("edit", None)
     )
     if data.doc_type is not None and data.doc_type != document.doc_type:
         await require_project_access(
@@ -370,7 +372,7 @@ async def delete_document(
         current_user,
         Document,
         document_id,
-        "Document not found",
+        DOCUMENT_NOT_FOUND,
         audit_type="document",
         activity=("document", "doc_id"),
     )
@@ -388,7 +390,7 @@ async def create_section(
     current_user: User = Depends(get_current_user),
 ):
     document = await get_visible_row(
-        db, Document, document_id, "Document not found", current_user, permission=("edit", None)
+        db, Document, document_id, DOCUMENT_NOT_FOUND, current_user, permission=("edit", None)
     )
 
     await prepare_content_write(db, document, current_user)
@@ -437,7 +439,7 @@ async def update_section(
         db,
         Document,
         section.document_id,
-        "Document not found",
+        DOCUMENT_NOT_FOUND,
         current_user,
         permission=("edit", None),
     )
@@ -511,7 +513,7 @@ async def delete_section(
         db,
         Document,
         section.document_id,
-        "Document not found",
+        DOCUMENT_NOT_FOUND,
         current_user,
         permission=("edit", None),
     )
@@ -528,7 +530,7 @@ async def reorder_sections(
     current_user: User = Depends(get_current_user),
 ):
     document = await get_visible_row(
-        db, Document, document_id, "Document not found", current_user, permission=("edit", None)
+        db, Document, document_id, DOCUMENT_NOT_FOUND, current_user, permission=("edit", None)
     )
 
     requested_ids = [item["id"] for item in data.section_orders]

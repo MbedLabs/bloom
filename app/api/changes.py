@@ -22,6 +22,8 @@ from app.schemas import (
     PaginatedResponse,
 )
 
+CHANGE_REQUEST = "change request"
+
 router = APIRouter()
 
 KIND = ArtefactKind(
@@ -29,8 +31,8 @@ KIND = ArtefactKind(
     type_code="CHG",
     id_attr="change_id",
     activity_type="change",
-    created_label="change request",
-    updated_label="change request",
+    created_label=CHANGE_REQUEST,
+    updated_label=CHANGE_REQUEST,
     not_found="Change request not found",
     exists="Change request with this ID already exists",
 )
@@ -122,5 +124,5 @@ async def delete_change_request(
         "Change request not found",
         resource="CHG",
         audit_type="change",
-        activity=("change request", "change_id"),
+        activity=(CHANGE_REQUEST, "change_id"),
     )

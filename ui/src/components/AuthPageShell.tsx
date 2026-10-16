@@ -3,7 +3,7 @@ import { APP_VERSION } from '../api/client'
 import { BLOOM_LOGO_DARK, BLOOM_LOGO_LIGHT } from '../brandAssets'
 
 /** The card with the Bloom logo and the version footer that frames the account pages. */
-export default function AuthPageShell({ children }: { children: ReactNode }) {
+export default function AuthPageShell({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br/srgb from-[#1a1028] via-[#3b1d6e] to-[#6b7280] p-4">
       <div className="w-full max-w-md bg-card rounded-2xl shadow-2xl p-8 border border-border">

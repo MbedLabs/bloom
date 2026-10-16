@@ -267,4 +267,5 @@ def test_deleting_a_delivered_document_preserves_the_request_history(requests_cl
     assert response.status_code == 204, response.text
     body = {"source_kind": "test-case", "source_id": ids[0], "run_id": 41}
     state = client.get("/api/report-requests", params=body, headers=reader).json()
-    assert state["status"] == "delivered" and state["doc_id"] is None
+    assert state["status"] == "delivered"
+    assert state["doc_id"] is None

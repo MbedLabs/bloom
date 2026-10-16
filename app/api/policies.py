@@ -1,6 +1,7 @@
 """Administrator-managed resource policies with independent permissions and origins."""
 
 import copy
+from http import HTTPStatus
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
@@ -157,7 +158,12 @@ async def list_policies(
     return [_response(p) for p in result.scalars().all()]
 
 
-@router.post("", response_model=PolicyResponse, status_code=201)
+@router.post(
+    "",
+    response_model=PolicyResponse,
+    status_code=201,
+    responses={400: {"description": HTTPStatus(400).phrase}},
+)
 async def create_policy(
     data: PolicyCreate,
     _admin: User = Depends(require_app_permission("create")),
@@ -184,7 +190,11 @@ async def create_policy(
     return _response(policy)
 
 
-@router.get("/{policy_id}", response_model=PolicyResponse)
+@router.get(
+    "/{policy_id}",
+    response_model=PolicyResponse,
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
 async def get_policy(
     policy_id: int,
     _admin: User = Depends(require_app_permission("view")),
@@ -193,7 +203,16 @@ async def get_policy(
     return _response(await _get_policy_or_404(db, policy_id))
 
 
-@router.patch("/{policy_id}", response_model=PolicyResponse)
+@router.patch(
+    "/{policy_id}",
+    response_model=PolicyResponse,
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        403: {"description": HTTPStatus(403).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+        409: {"description": HTTPStatus(409).phrase},
+    },
+)
 async def update_policy(
     policy_id: int,
     data: PolicyUpdate,
@@ -255,7 +274,12 @@ async def update_policy(
     return _response(policy)
 
 
-@router.post("/{policy_id}/duplicate", response_model=PolicyResponse, status_code=201)
+@router.post(
+    "/{policy_id}/duplicate",
+    response_model=PolicyResponse,
+    status_code=201,
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
 async def duplicate_policy(
     policy_id: int,
     _admin: User = Depends(require_app_permission("create")),
@@ -289,7 +313,15 @@ async def duplicate_policy(
     return _response(policy)
 
 
-@router.delete("/{policy_id}", status_code=204)
+@router.delete(
+    "/{policy_id}",
+    status_code=204,
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+        409: {"description": HTTPStatus(409).phrase},
+    },
+)
 async def delete_policy(
     policy_id: int,
     _admin: User = Depends(require_app_permission("delete")),

@@ -116,8 +116,10 @@ async def test_migration_preserves_invalid_rows_and_operator_refuses_validation(
     report = [json.loads(line) for line in lines]
     invalid = next(row for row in report if row["table"] == "artefact_links")
     legacy = next(row for row in report if row["table"] == "requirement_links")
-    assert invalid["id"] == old_id and invalid["role"] == "forbidden"
-    assert legacy["link_type"] == "derived_from" and legacy["mapped_role"] == "derives_from"
+    assert invalid["id"] == old_id
+    assert invalid["role"] == "forbidden"
+    assert legacy["link_type"] == "derived_from"
+    assert legacy["mapped_role"] == "derives_from"
     assert await _validated(connection) is False
     await connection.execute(
         text("UPDATE artefact_links SET role = 'refines' WHERE id = :id"), {"id": old_id}

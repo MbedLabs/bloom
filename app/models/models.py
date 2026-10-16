@@ -26,6 +26,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 from app.core.link_rules import allowed_link_triples
 
+SET_NULL = "SET NULL"
+USERS_ID = "users.id"
+
 
 class ArtefactVisibility(str, Enum):
     internal = "internal"
@@ -122,11 +125,11 @@ class Requirement(Base):
     req_type: Mapped[str] = mapped_column(String(30), default="Functional")
     req_origin: Mapped[str] = mapped_column(String(50), default="Internal")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
-    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
-    reviewer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
-    approver_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
-    reviewed_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
-    approved_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
+    reviewer_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
+    approver_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
+    reviewed_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
+    approved_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -172,11 +175,11 @@ class TestCase(Base):
     steps: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Draft")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
-    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
-    reviewer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
-    approver_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
-    reviewed_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
-    approved_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
+    reviewer_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
+    approver_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
+    reviewed_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
+    approved_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     last_execution_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
@@ -247,7 +250,7 @@ class Document(Base):
     doc_type: Mapped[str] = mapped_column(String(30), default="SPEC")
     status: Mapped[str] = mapped_column(String(20), default="Draft")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
-    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
     version: Mapped[str] = mapped_column(String(20), default="1")
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     content_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
@@ -318,7 +321,7 @@ class TestSuite(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Draft")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
-    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -363,7 +366,7 @@ class TestCampaign(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Planned")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
-    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
     bud_run_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     bud_run_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     bud_run_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
@@ -489,7 +492,7 @@ class DesignItem(Base):
     content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Draft")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
-    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
     priority: Mapped[str] = mapped_column(String(20), default="Medium")
     design_type: Mapped[str] = mapped_column(String(30), default="Architecture")
     linked_requirement_id: Mapped[Optional[int]] = mapped_column(
@@ -524,7 +527,7 @@ class RiskItem(Base):
     content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Open")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
-    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
     severity: Mapped[str] = mapped_column(String(20), default="Medium")
     probability: Mapped[str] = mapped_column(String(20), default="Medium")
     mitigation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -570,7 +573,7 @@ class ChangeRequest(Base):
     content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Draft")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
-    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
     priority: Mapped[str] = mapped_column(String(20), default="Medium")
     change_type: Mapped[str] = mapped_column(String(30), default="Enhancement")
     impact_assessment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -632,7 +635,7 @@ class TestConcept(Base):
     content_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Draft")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
-    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
     linked_requirement_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     coverage: Mapped[float] = mapped_column(Float, default=0)
     source_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -663,14 +666,14 @@ class Defect(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="Open")
     visibility: Mapped[str] = mapped_column(String(20), default=ArtefactVisibility.internal.value)
-    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
     severity: Mapped[str] = mapped_column(String(20), default="Medium")
     priority: Mapped[str] = mapped_column(String(20), default="Medium")
     source_type: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     source_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    owner_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
-    reporter_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
-    reviewer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    owner_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
+    reporter_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
+    reviewer_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
     resolution_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     external_tracker: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     external_repo_full_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -797,7 +800,7 @@ class ServiceCredential(Base):
     revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
     last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey(USERS_ID), nullable=False)
 
 
 class ArtefactComment(Base):
@@ -808,12 +811,12 @@ class ArtefactComment(Base):
     artefact_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     author_name: Mapped[str] = mapped_column(String(255), nullable=False)
     author_user_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        ForeignKey(USERS_ID, ondelete=SET_NULL), nullable=True
     )
     revision_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     content_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     review_request_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("artefact_requests.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("artefact_requests.id", ondelete=SET_NULL), nullable=True
     )
     body: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -828,7 +831,7 @@ class ArtefactActivity(Base):
     event_type: Mapped[str] = mapped_column(String(30), nullable=False)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
     actor_user_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        ForeignKey(USERS_ID, ondelete=SET_NULL), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -839,9 +842,9 @@ class Notification(Base):
     __tablename__ = "notifications"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey(USERS_ID), nullable=False, index=True)
     actor_user_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        ForeignKey(USERS_ID, ondelete=SET_NULL), nullable=True
     )
     project_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("projects.id"), nullable=True, index=True
@@ -869,7 +872,7 @@ class ImportAttempt(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey(USERS_ID), nullable=False, index=True)
     project_id: Mapped[int] = mapped_column(
         ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -897,7 +900,7 @@ class DocumentAttachment(Base):
     # Set when the file came from an external system rather than a person, so a
     # second delivery of the same thing replaces it instead of piling up.
     source_ref: Mapped[Optional[str]] = mapped_column(String(200), nullable=True, index=True)
-    uploaded_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    uploaded_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
     document: Mapped["Document"] = relationship(back_populates="attachments")
@@ -910,7 +913,7 @@ class AttachmentUploadLease(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False, index=True
+        ForeignKey(USERS_ID, ondelete="CASCADE"), unique=True, nullable=False, index=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
@@ -923,7 +926,7 @@ class AttachmentUploadAttempt(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey(USERS_ID, ondelete="CASCADE"), nullable=False, index=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 

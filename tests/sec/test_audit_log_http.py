@@ -111,7 +111,8 @@ def test_a_failed_login_is_recorded_although_the_request_fails(harness):
     [event] = _events(session_maker, "auth.login")
     assert event.outcome == "failure"
     assert event.actor_type == "anonymous"
-    assert event.target_type == "user" and event.target_id == str(user.id)
+    assert event.target_type == "user"
+    assert event.target_id == str(user.id)
     assert event.request_id == response.headers["x-request-id"]
     assert event.user_agent == "audit-test/1.0"
     assert event.ip
@@ -126,7 +127,8 @@ def test_a_successful_login_names_the_user(harness):
 
     [event] = _events(session_maker, "auth.login")
     assert event.outcome == "success"
-    assert event.actor_type == "user" and event.actor_user_id == user.id
+    assert event.actor_type == "user"
+    assert event.actor_user_id == user.id
 
 
 def test_a_role_change_records_the_admin_and_both_roles(harness):

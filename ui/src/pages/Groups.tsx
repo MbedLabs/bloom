@@ -337,17 +337,16 @@ function AccessContent() {
   )
 }
 
-function ModalShell({ title, onClose, children }: {
+function ModalShell({ title, onClose, children }: Readonly<{
   title: string
   onClose: () => void
   children: React.ReactNode
-}) {
+}>) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div
-        role="dialog" aria-modal="true" aria-label={title}
-        className="bg-card border border-border rounded-xl shadow-elegant p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <button type="button" aria-label="Close dialog backdrop" tabIndex={-1} className="absolute inset-0 h-full w-full cursor-default" onClick={onClose} />
+      <dialog open aria-modal="true" aria-label={title}
+        className="relative m-0 text-foreground bg-card border border-border rounded-xl shadow-elegant p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto" onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); onClose() } }}
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-foreground">{title}</h2>
@@ -356,7 +355,7 @@ function ModalShell({ title, onClose, children }: {
           </button>
         </div>
         {children}
-      </div>
+      </dialog>
     </div>
   )
 }
@@ -366,13 +365,13 @@ const inputClass =
 const submitClass =
   'w-full py-2 bg-linear-to-r/srgb from-primary to-[#6b7280] text-white text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50'
 
-function PolicyModal({ policy, tags, readOnly = false, onClose, onSaved }: {
+function PolicyModal({ policy, tags, readOnly = false, onClose, onSaved }: Readonly<{
   policy: Policy | null
   tags: Tag[]
   readOnly?: boolean
   onClose: () => void
   onSaved: () => void
-}) {
+}>) {
   const toast = useToast()
   const queryClient = useQueryClient()
   const [name, setName] = useState(policy?.name ?? '')
@@ -547,12 +546,12 @@ function PolicyModal({ policy, tags, readOnly = false, onClose, onSaved }: {
   )
 }
 
-function GroupModal({ group, policies, onClose, onSaved }: {
+function GroupModal({ group, policies, onClose, onSaved }: Readonly<{
   group: Group | null
   policies: Policy[]
   onClose: () => void
   onSaved: () => void
-}) {
+}>) {
   const toast = useToast()
   const [name, setName] = useState(group?.name ?? '')
   const [description, setDescription] = useState(group?.description ?? '')
@@ -579,14 +578,14 @@ function GroupModal({ group, policies, onClose, onSaved }: {
         }}
         className="space-y-3"
       >
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Name</label>
+        <label className="block">
+          <span className="block text-sm font-medium text-foreground mb-1">Name</span>
           <input value={name} onChange={(e) => setName(e.target.value)} required title="Group name" className={inputClass} />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Description</label>
+        </label>
+        <label className="block">
+          <span className="block text-sm font-medium text-foreground mb-1">Description</span>
           <input value={description} onChange={(e) => setDescription(e.target.value)} title="Description" className={inputClass} />
-        </div>
+        </label>
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium text-foreground mb-2">Policies owned by this group</legend>
           {policies.map((policy) => (
