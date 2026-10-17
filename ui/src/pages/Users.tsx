@@ -1,7 +1,7 @@
 import SelectField from '../components/SelectField'
 import ProfilePicture from '../components/ProfilePicture'
 import UserIdentity from '../components/UserIdentity'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { extractApiErrorMessage, InviteUserResponse, User, usersApi, policiesApi, type Policy } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
@@ -346,10 +346,16 @@ function EmailChangeModal({
   error: string | null
 }>) {
   const [newEmail, setNewEmail] = useState(user.pending_email ?? '')
+  const emailInput = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    emailInput.current?.focus()
+  }, [])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="bg-card border border-border rounded-xl shadow-elegant p-6 w-full max-w-md" onClick={(event) => event.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <button type="button" aria-label="Close dialog backdrop" tabIndex={-1} className="absolute inset-0 h-full w-full cursor-default" onClick={onClose} />
+      <dialog open aria-modal="true" aria-label="Change user email" className="relative m-0 text-foreground bg-card border border-border rounded-xl shadow-elegant p-6 w-full max-w-md" onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); onClose() } }}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-foreground">Change user email</h2>
           <button onClick={onClose} title="Close email change modal" className="p-1 rounded text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
@@ -375,6 +381,7 @@ function EmailChangeModal({
           <div>
             <label htmlFor="admin-new-email" className="block text-sm font-medium text-foreground mb-1">New email</label>
             <input
+              ref={emailInput}
               id="admin-new-email"
               type="email"
               value={newEmail}
@@ -391,7 +398,7 @@ function EmailChangeModal({
             {isLoading ? 'Sending confirmation…' : 'Send confirmation email'}
           </button>
         </form>
-      </div>
+      </dialog>
     </div>
   )
 }
@@ -408,6 +415,11 @@ function InviteUserModal({ onClose, onSubmit, isLoading, error }: Readonly<{
   const [inviteLink, setInviteLink] = useState<string | null>(null)
   const [invitedEmail, setInvitedEmail] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const fullNameInput = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    fullNameInput.current?.focus()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -435,8 +447,9 @@ function InviteUserModal({ onClose, onSubmit, isLoading, error }: Readonly<{
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="bg-card border border-border rounded-xl shadow-elegant p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <button type="button" aria-label="Close dialog backdrop" tabIndex={-1} className="absolute inset-0 h-full w-full cursor-default" onClick={onClose} />
+      <dialog open aria-modal="true" aria-label="Invite User" className="relative m-0 text-foreground bg-card border border-border rounded-xl shadow-elegant p-6 w-full max-w-md" onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); onClose() } }}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-foreground">Invite User</h2>
           <button onClick={onClose} title="Close invite modal" className="p-1 rounded text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
@@ -468,7 +481,7 @@ function InviteUserModal({ onClose, onSubmit, isLoading, error }: Readonly<{
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Full Name</label>
-            <input value={fullName} onChange={(e) => setFullName(e.target.value)} required title="Full name" placeholder="Jane Doe" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground" />
+            <input ref={fullNameInput} value={fullName} onChange={(e) => setFullName(e.target.value)} required title="Full name" placeholder="Jane Doe" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground" />
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Email</label>
@@ -486,7 +499,7 @@ function InviteUserModal({ onClose, onSubmit, isLoading, error }: Readonly<{
             {isLoading ? 'Sending Invite...' : 'Send Invite'}
           </button>
         </form>
-      </div>
+      </dialog>
     </div>
   )
 }

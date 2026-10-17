@@ -1,22 +1,63 @@
 import { spawnSync } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
+import { basename, isAbsolute } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-// Advisories reviewed and judged not to apply to this application, as
-// `package name -> set of advisory URLs`. Anything not listed here fails the
-// audit. Keep entries narrow (a specific advisory, never a whole package) and
-// record why the advisory cannot affect Bloom.
-//
-// Currently empty: GHSA-qwww-vcr4-c8h2 (React Router RSC) was the last entry and
-// is fixed by React Router 8.
-const reviewedAdvisories = new Map()
+const reviewedAdvisoriesFile = fileURLToPath(new URL('./reviewed-advisories.json', import.meta.url))
 
-const result = spawnSync('npm', ['audit', '--json'], {
+/** Prints a message to stderr and ends the process with exit code 1. */
+function fail(message) {
+  console.error(message)
+  process.exit(1)
+}
+
+/** Returns true for a JSON object that is neither null nor an array. */
+function isPlainObject(value) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** Returns the absolute path of the npm CLI script that started this process through `npm run audit`. */
+function npmCliPath() {
+  const cli = process.env.npm_execpath
+  if (!cli || !isAbsolute(cli) || !/^npm-cli\.[cm]?js$/.test(basename(cli)) || !existsSync(cli)) {
+    fail('Unable to locate the npm CLI: run this script with `npm run audit` so that npm_execpath names an absolute npm-cli.js.')
+  }
+  return cli
+}
+
+/**
+ * Reads reviewed-advisories.json next to this script into a map of package name to advisory URLs.
+ * The file maps each package name to an object of `advisory URL: reason the advisory does not apply to Bloom`;
+ * an advisory that is not listed there fails the audit.
+ */
+function loadReviewedAdvisories() {
+  let data
+  try {
+    data = JSON.parse(readFileSync(reviewedAdvisoriesFile, 'utf8'))
+  } catch (error) {
+    fail(`Unable to read ${reviewedAdvisoriesFile}: ${error.message}`)
+  }
+  if (!isPlainObject(data)) fail(`${reviewedAdvisoriesFile} must contain a JSON object`)
+  const advisories = new Map()
+  for (const [name, entries] of Object.entries(data)) {
+    const valid = isPlainObject(entries) && Object.entries(entries).every(
+      ([url, reason]) => url.startsWith('https://') && typeof reason === 'string' && reason.trim() !== '',
+    )
+    if (!valid) fail(`${reviewedAdvisoriesFile}: "${name}" must map each advisory URL to the reason it does not apply`)
+    advisories.set(name, new Set(Object.keys(entries)))
+  }
+  return advisories
+}
+
+const reviewedAdvisories = loadReviewedAdvisories()
+
+const result = spawnSync(process.execPath, [npmCliPath(), 'audit', '--json'], {
   encoding: 'utf8',
   maxBuffer: 20 * 1024 * 1024,
 })
 
 if (result.error) {
-  console.error(`Unable to run npm audit: ${result.error.message}`)
-  process.exit(1)
+  fail(`Unable to run npm audit: ${result.error.message}`)
 }
 
 let report
@@ -64,5 +105,5 @@ const reviewed = Object.keys(vulnerabilities)
 console.log(
   reviewed.length === 0
     ? 'npm audit found no vulnerabilities.'
-    : `npm audit found only the reviewed non-applicable RSC advisory (${reviewed.join(', ')}).`,
+    : `npm audit found only reviewed non-applicable advisories (${reviewed.join(', ')}).`,
 )

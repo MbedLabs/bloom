@@ -425,7 +425,7 @@ export function DocumentLinksPanel({
       const id = direction === 'outgoing' ? link.target_id : link.source_id
       keys.add(docKey(type, id))
     })
-    return Array.from(keys).sort().slice(0, MAX_LINK_LABELS)
+    return Array.from(keys).sort((a, b) => a.localeCompare(b)).slice(0, MAX_LINK_LABELS)
   }, [allLinks])
 
   const { data: labelData } = useQuery({

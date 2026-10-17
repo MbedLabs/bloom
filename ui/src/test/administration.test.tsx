@@ -467,6 +467,68 @@ describe('an administrator changing someone else’s email', () => {
     await settle()
     expect(client.usersApi.startEmailChange).not.toHaveBeenCalled()
   })
+
+  it('moves focus into the dialog and closes it with Escape without sending anything', async () => {
+    renderAt('/users', '/users', <Users />)
+    await screen.findByText(maintainer.full_name)
+
+    fireEvent.click(within(rowFor(maintainer.full_name)).getByTitle('Change email'))
+    const input = await screen.findByLabelText('New email')
+    await waitFor(() => expect(document.activeElement).toBe(input))
+    fireEvent.keyDown(input, { key: 'Escape' })
+
+    await waitFor(() => expect(screen.queryByLabelText('New email')).toBeNull())
+    await settle()
+    expect(client.usersApi.startEmailChange).not.toHaveBeenCalled()
+  })
+
+  it('stays open on a click inside the dialog and closes on a backdrop click', async () => {
+    renderAt('/users', '/users', <Users />)
+    await screen.findByText(maintainer.full_name)
+
+    fireEvent.click(within(rowFor(maintainer.full_name)).getByTitle('Change email'))
+    fireEvent.click(await screen.findByRole('dialog', { name: 'Change user email' }))
+    fireEvent.click(screen.getByText('Change user email'))
+    expect(screen.getByLabelText('New email')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close dialog backdrop' }))
+
+    await waitFor(() => expect(screen.queryByLabelText('New email')).toBeNull())
+    expect(client.usersApi.startEmailChange).not.toHaveBeenCalled()
+  })
+})
+
+describe('the invitation dialog', () => {
+  async function openInvite() {
+    renderAt('/users', '/users', <Users />)
+    await screen.findByText(user.full_name)
+    fireEvent.click(screen.getByRole('button', { name: /invite user/i }))
+    return screen.findByTitle('Full name')
+  }
+
+  it('moves focus to the name field and closes with Escape without inviting anyone', async () => {
+    const name = await openInvite()
+    await waitFor(() => expect(document.activeElement).toBe(name))
+
+    fireEvent.keyDown(name, { key: 'Escape' })
+
+    await waitFor(() => expect(screen.queryByTitle('Full name')).toBeNull())
+    await settle()
+    expect(client.usersApi.invite).not.toHaveBeenCalled()
+  })
+
+  it('stays open on a click inside the dialog and closes on a backdrop click', async () => {
+    await openInvite()
+
+    fireEvent.click(screen.getByRole('dialog', { name: 'Invite User' }))
+    fireEvent.click(screen.getByTitle('Email address'))
+    expect(screen.getByTitle('Full name')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close dialog backdrop' }))
+
+    await waitFor(() => expect(screen.queryByTitle('Full name')).toBeNull())
+    expect(client.usersApi.invite).not.toHaveBeenCalled()
+  })
 })
 
 describe('the invitation link', () => {
@@ -616,6 +678,25 @@ describe('the project list', () => {
     await screen.findByText(project.name)
 
     fireEvent.click(screen.getAllByRole('button', { name: /open/i })[0])
+
+    expect(await screen.findByText('project overview')).toBeTruthy()
+  })
+
+  it('opens a project from its card through a focusable native button', async () => {
+    renderProjects()
+    await screen.findByText(project.name)
+
+    const card = screen.getByRole('button', { name: `Open ${project.name}` })
+    expect(card.tagName).toBe('BUTTON')
+    expect(card.getAttribute('type')).toBe('button')
+    expect(card.tabIndex).toBe(0)
+    card.focus()
+    expect(document.activeElement).toBe(card)
+    for (const control of [screen.getAllByTitle('Edit project')[0], screen.getAllByRole('button', { name: 'Open' })[0]]) {
+      expect(control.className).toContain('relative z-10')
+    }
+
+    fireEvent.click(card)
 
     expect(await screen.findByText('project overview')).toBeTruthy()
   })
