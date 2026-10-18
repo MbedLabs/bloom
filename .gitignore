@@ -16,7 +16,5 @@ build/
 coverage.xml
 .worktrees/
 
-*.mutation-backup
-
 attachments/
 /node_modules/
