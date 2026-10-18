@@ -452,15 +452,8 @@
 
 @layer base {
   :root {
-    /*
-     * Tells the browser which palette to paint its own UI with - scrollbars
-     * above all, but also form controls and the overscroll gutter. Without it
-     * every scrollbar stayed light in dark mode, because the theme lives in a
-     * `.dark` class the browser knows nothing about.
-     */
     color-scheme: light;
 
-    /* Bloom brand: viola + gray */
     --background: 0 0% 100%;
     --foreground: 270 15% 12%;
     --card: 0 0% 100%;
@@ -568,11 +561,6 @@
     background: hsl(var(--sidebar-border) / 0.85);
   }
 
-  /*
-   * Content scrollbars. `color-scheme` already keeps the browser default on the
-   * right side of the theme; this draws the thinner, quieter bar the app uses,
-   * from the same tokens, so it tracks light and dark automatically.
-   */
   .themed-scrollbar {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent;
@@ -613,10 +601,6 @@
     background: rgba(18, 12, 28, 0.85);
   }
 
-  /*
-   * React Flow zoom/fit controls ship light-theme defaults on .react-flow__controls-button.
-   * Scope overrides to topology only so icons/backgrounds follow shadcn light + dark tokens.
-   */
   .topology-canvas .react-flow__controls {
     background-color: hsl(var(--card)) !important;
     border: 1px solid hsl(var(--border)) !important;

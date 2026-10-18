@@ -69,7 +69,6 @@ export default function ImportWizard() {
   const [docSearch, setDocSearch] = useState('')
   const debouncedDocSearch = useDebounced(docSearch, 250)
 
-  // One page of the source project, searched by the server.
   const { data: sourceDocsData, isLoading: sourceDocsLoading } = useQuery({
     queryKey: ['import-docs', sourceProject?.prefix, docType, debouncedDocSearch],
     queryFn: () => docsApi.list(sourceProject!.prefix, {
@@ -178,7 +177,6 @@ export default function ImportWizard() {
         <TagPicker projectId={projectId} value={importTagIds} onChange={setImportTagIds} />
       )}
 
-      {/* Import source mode */}
       <div className="flex gap-2">
         {([
           { key: 'project', label: 'From another project' },
@@ -199,7 +197,6 @@ export default function ImportWizard() {
         ))}
       </div>
 
-      {/* Step indicator */}
       {mode === 'project' && (
       <div className="flex items-center gap-2">
         {steps.map((label, i) => (
@@ -548,8 +545,6 @@ export default function ImportWizard() {
               <p className="text-muted-foreground">Fetching the lightweight document list from {sourceProject?.prefix}.</p>
             ) : sourceDocs && sourceDocs.length > 0 ? (
               <>
-                {/* "All" is what is on screen, not what is in the project — the
-                    list is a page now, so the label has to say which. */}
                 <button
                   onClick={() => {
                     const shown = sourceDocs.map((d) => d.id)

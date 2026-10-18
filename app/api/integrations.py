@@ -62,15 +62,15 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# ==================== Integration settings ====================
-
 
 class IntegrationSettingCreate(BaseModel):
+    """Input for an integration setting. account_email is the Jira Cloud account that owns the API
+    token (Basic auth `email:api_token`); GitHub and GitLab ignore it.
+    """
+
     project_id: int
     tracker: str = Field(..., pattern="^(github|gitlab|jira)$")
     base_url: Optional[str] = None
-    # Jira Cloud only: the account owning the API token (Basic auth is
-    # `email:api_token`). Ignored by GitHub and GitLab.
     account_email: Optional[str] = None
     token: Optional[str] = None
     webhook_secret: Optional[str] = None
@@ -302,7 +302,6 @@ async def update_integration_setting(
     if data.account_email is not None:
         setting.account_email = data.account_email
     if data.token is not None:
-        # Rotation: a new token replaces the previously stored encrypted value.
         setting.token_encrypted = encrypt_integration_secret(data.token) if data.token else None
     if data.webhook_secret is not None:
         setting.webhook_secret = (
@@ -366,9 +365,6 @@ async def delete_integration_setting(
     )
 
 
-# ==================== Sync log ====================
-
-
 @router.get("/sync-events", response_model=list[SyncEventResponse])
 async def list_sync_events(
     defect_id: int = Query(...),
@@ -393,8 +389,6 @@ async def list_sync_events(
     )
     return [SyncEventResponse.model_validate(e) for e in rows]
 
-
-# ==================== GitHub webhook ====================
 
 GITHUB_STATUS_MAP = {"open": "Open", "closed": "Closed"}
 MAX_WEBHOOK_BODY_BYTES = 1024 * 1024
@@ -633,8 +627,6 @@ async def github_webhook(
     )
 
 
-# ==================== GitLab webhook ====================
-
 GITLAB_STATUS_MAP = {"opened": "Open", "closed": "Closed"}
 
 
@@ -699,10 +691,6 @@ async def gitlab_webhook(
     )
 
 
-# ==================== Jira webhook ====================
-
-# Jira status *names* are configurable per project, so the stable signal is the
-# status category key rather than the display name.
 JIRA_CATEGORY_STATUS_MAP = {
     "new": "Open",
     "indeterminate": "In Progress",
@@ -1149,9 +1137,6 @@ async def pull_jira_issues(
     return result
 
 
-# ==================== Outbound sync ====================
-
-
 async def _sync_to_tracker(
     db: AsyncSession,
     kind: str,
@@ -1218,11 +1203,7 @@ async def sync_defect_to_tracker(
     await _sync_to_tracker(db, "defect", defect, changed_fields)
 
 
-# Terminal statuses across both artefact types: defects use Closed/Rejected,
-# change requests add Implemented. Anything here closes the external issue.
 CLOSING_BLOOM_STATUSES = {"Closed", "Rejected", "Implemented"}
-# Statuses that mean the external issue should be (re)opened. Defect statuses
-# first, then change-request statuses.
 REOPENING_BLOOM_STATUSES = {
     "Open",
     "Triaged",

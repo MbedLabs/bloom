@@ -88,7 +88,6 @@ async function reachPicker(type: 'Requirements' | 'Test Cases' = 'Requirements')
   fireEvent.click(await screen.findByText(source.name))
   fireEvent.click(await screen.findByText(type))
   await screen.findByText('Select Docs to Import')
-  // Step 3 renders before its query settles; wait for the list itself.
   await screen.findByText(first.doc_id)
 }
 
@@ -106,7 +105,6 @@ describe('choosing where to import from', () => {
     renderWizard()
 
     expect(await screen.findByText(source.name)).toBeTruthy()
-    // Importing a project into itself would duplicate every identifier.
     expect(screen.queryByText(project.name)).toBeNull()
   })
 
@@ -137,7 +135,6 @@ describe('choosing where to import from', () => {
     fireEvent.click(await screen.findByText(source.name))
     await screen.findByText('Select Doc Type')
 
-    // Step 3 is where the list is needed; a project may hold thousands.
     await settle()
     expect(client.docsApi.list).not.toHaveBeenCalled()
   })
@@ -187,7 +184,6 @@ describe('choosing what to import', () => {
     fireEvent.click(screen.getByRole('button', { name: /Back/ }))
     fireEvent.click(await screen.findByText('Test Cases'))
 
-    // The ids picked under REQ mean nothing under TC.
     expect(await screen.findByText('0 selected')).toBeTruthy()
   })
 
@@ -195,7 +191,6 @@ describe('choosing what to import', () => {
     await reachPicker()
 
     const [, params] = lastCall(client.docsApi.list) as [string, { limit?: number }]
-    // A source project may hold thousands; the picker renders a page of them.
     expect(params.limit).toBe(100)
   })
 
@@ -226,8 +221,6 @@ describe('choosing what to import', () => {
     fireEvent.click(screen.getByText(first.doc_id))
     await waitFor(() => expect(screen.getByText('1 selected')).toBeTruthy())
 
-    // The page no longer holds the picked document. Selection is the user's,
-    // not the page's, so narrowing the view must not silently drop it.
     vi.mocked(client.docsApi.list).mockResolvedValue(envelope([second]) as never)
     fireEvent.change(screen.getByLabelText('Search source documents'), {
       target: { value: 'balancing' },
@@ -248,8 +241,6 @@ describe('choosing what to import', () => {
     })
     await waitFor(() => expect(screen.queryByText(first.doc_id)).toBeNull())
 
-    // "Select these 1" is about the page on screen. Whatever was ticked on an
-    // earlier page is still the user's choice and must survive it.
     fireEvent.click(screen.getByRole('button', { name: 'Select these 1' }))
 
     await waitFor(() => expect(screen.getByText('2 selected')).toBeTruthy())
@@ -307,7 +298,6 @@ describe('reviewing and running the import', () => {
 
     expect(screen.getByText(`${source.name} (${source.prefix})`)).toBeTruthy()
     expect(screen.getByText(`${project.name} (${project.prefix})`)).toBeTruthy()
-    // Imported documents are renumbered into the target project's scheme.
     expect(screen.getByText(`${project.prefix}-REQ-NNN`)).toBeTruthy()
     expect(screen.getByText('1 docs')).toBeTruthy()
   })
@@ -394,7 +384,6 @@ describe('reviewing and running the import', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Import 1 Docs/ }))
 
-    // A partial import is the normal case, so both halves have to be shown.
     expect(await screen.findByText(/already exists/)).toBeTruthy()
     expect(screen.getByText('1 doc imported successfully')).toBeTruthy()
   })
@@ -418,7 +407,6 @@ describe('the two import routes', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /from reqif file/i }))
     expect(await screen.findByRole('button', { name: /import reqif/i })).toBeTruthy()
-    // The two routes are exclusive; the project picker goes away.
     expect(screen.queryByText('Select Source Project')).toBeNull()
   })
 

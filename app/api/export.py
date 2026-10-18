@@ -51,8 +51,6 @@ router = APIRouter()
 
 CSV_MEDIA_TYPE = "text/csv; charset=utf-8"
 
-# Report letterhead assets. The Bloom mark and the EmbedLabs footer are shipped
-# with the app; the customer's own logo is uploaded and passed in at render time.
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 BLOOM_LOGO = ASSETS / "bloom-logo.png"
 EMBEDLABS_LOGO = ASSETS / "embedlabs-logo.png"
@@ -79,17 +77,17 @@ class _BrandedPDF(FPDF):
         self._company_logo = company_logo
 
     def header(self) -> None:
+        """Draw the letterhead: the company logo top-left, fitted inside a fixed box, and the Bloom
+        mark top-right.
+        """
         top = 9
-        # Customer company logo, top-left, fit inside a fixed box so a wide or
-        # tall logo can never be cropped or pushed off the page edge.
         if self._company_logo:
             try:
                 with Image.open(io.BytesIO(self._company_logo)) as im:
                     w, h = _fit(im.width, im.height, 55, 15)
                 self.image(io.BytesIO(self._company_logo), x=self.l_margin, y=top, w=w, h=h)
-            except Exception:  # noqa: BLE001 - a bad logo must never break the report
+            except Exception:  # noqa: BLE001
                 pass
-        # Bloom application mark, top-right.
         if BLOOM_LOGO.exists():
             try:
                 with Image.open(BLOOM_LOGO) as im:
@@ -99,6 +97,9 @@ class _BrandedPDF(FPDF):
                 pass
 
     def footer(self) -> None:
+        """Draw the footer: a rule, the EmbedLabs mark with the Powered by EmbedLabs link, and the page
+        number bottom-right on the same baseline.
+        """
         self.set_y(-14)
         self.set_draw_color(0xC7, 0xCD, 0xD6)
         self.set_line_width(0.2)
@@ -119,7 +120,6 @@ class _BrandedPDF(FPDF):
         self.set_text_color(0x25, 0x63, 0xEB)
         label = "Powered by EmbedLabs"
         self.cell(self.get_string_width(label) + 1, 5, label, link=EMBEDLABS_URL)
-        # Page number, bottom-right, on the same baseline.
         self.set_text_color(0x64, 0x74, 0x8B)
         self.set_xy(self.l_margin, y)
         self.cell(0, 5, f"Page {self.page_no()}", align="R")

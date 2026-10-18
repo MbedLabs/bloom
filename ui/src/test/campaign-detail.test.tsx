@@ -137,7 +137,6 @@ describe('the scope of a campaign', () => {
     renderCampaign()
     await screen.findByText(campaignDetail.name)
 
-    // "Suites" is both a stat tile and the section heading.
     expect(screen.getByRole('heading', { name: 'Suites' })).toBeTruthy()
     expect(screen.getByText(testSuite.name)).toBeTruthy()
     expect(screen.getByText(secondSuite.name)).toBeTruthy()
@@ -148,7 +147,6 @@ describe('the scope of a campaign', () => {
     await screen.findByText(testSuite.name)
 
     expect(within(suiteHeader(testSuite.name)).getByText('2 TCs')).toBeTruthy()
-    // One test case would be "1 TC", and none is "0 TCs".
     expect(within(suiteHeader(secondSuite.name)).getByText('0 TCs')).toBeTruthy()
   })
 
@@ -180,7 +178,6 @@ describe('the scope of a campaign', () => {
 
     fireEvent.click(suiteHeader(secondSuite.name))
 
-    // The empty suite says so rather than showing the other suite's cases.
     expect(await screen.findByText(/no test cases resolved for this suite yet/i)).toBeTruthy()
     expect(screen.queryByText('Cold boot timing')).toBeNull()
   })
@@ -221,7 +218,6 @@ describe('the scope of a campaign', () => {
     expect(within(adHoc).getByText('1 TC')).toBeTruthy()
 
     fireEvent.click(adHoc)
-    // The item never resolved to a test case, so it falls back to its id.
     expect(await screen.findByText('TC#99')).toBeTruthy()
   })
 
@@ -234,7 +230,6 @@ describe('the scope of a campaign', () => {
     renderCampaign()
     await screen.findByText(campaignDetail.name)
 
-    // The stat tile counting suites stays; the scope section itself goes.
     expect(screen.queryByRole('heading', { name: 'Suites' })).toBeNull()
   })
 
@@ -396,8 +391,6 @@ describe('deleting a campaign', () => {
     const confirms = await screen.findAllByRole('button', { name: /^delete$/i })
     fireEvent.click(confirms[confirms.length - 1])
 
-    // The dialog closes so the campaign is readable again, and the reason is
-    // reported rather than swallowed.
     await waitFor(() => expect(screen.queryByText('Delete Campaign?')).toBeNull())
     expect(await screen.findByText(/still references this campaign/i)).toBeTruthy()
   })
@@ -411,7 +404,6 @@ describe('what a reader may do', () => {
 
     expect(screen.queryByRole('button', { name: /edit/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /^delete$/i })).toBeNull()
-    // The scope is still readable.
     expect(screen.getByText(testSuite.name)).toBeTruthy()
   })
 })

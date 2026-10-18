@@ -261,6 +261,10 @@ async def create_campaign(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
+    """Create a campaign. suite_ids, or the legacy suite_id, name its suites, each a visible suite of
+    the project (404 for any other); the items are the visible test cases of the project among the
+    given test_case_ids and the test cases of those suites.
+    """
     project = await get_row_or_404(db, Project, data.project_id, "Project not found")
     await require_project_access(
         db,
@@ -270,12 +274,10 @@ async def create_campaign(
     )
     forced = external_create_values(current_user, "CMP", data.model_dump(exclude_unset=True))
 
-    # Resolve suite_ids: prefer new field, fall back to legacy suite_id
     resolved_suite_ids = list(data.suite_ids) if data.suite_ids else []
     if not resolved_suite_ids and data.suite_id is not None:
         resolved_suite_ids = [data.suite_id]
 
-    # Validate all suites exist and belong to the project.
     suites_by_id = (
         {
             suite.id: suite
@@ -331,11 +333,9 @@ async def create_campaign(
     await attach_tags(db, "campaign", campaign, tag_ids, current_user)
     await db.refresh(campaign)
 
-    # Create CampaignSuite rows for multi-suite support
     for suite in validated_suites:
         db.add(CampaignSuite(campaign_id=campaign.id, suite_id=suite.id))
 
-    # Collect test case IDs from all suites (union, dedup)
     selected_test_case_ids: set[int] = set(data.test_case_ids)
     if validated_suites:
         suite_item_rows = (
@@ -410,6 +410,9 @@ async def update_campaign(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
+    """Update a campaign. suite_ids, or the legacy suite_id, set its suites, each a visible suite of
+    the project (404 for any other).
+    """
     campaign = await get_visible_row(
         db,
         TestCampaign,
@@ -431,7 +434,6 @@ async def update_campaign(
         previous_visibility = campaign.visibility
         campaign.visibility = data.visibility
         await audit_visibility_change(db, "campaign", campaign, previous_visibility)
-    # Handle suite_ids (multi-suite) or legacy suite_id
     resolved_suite_ids = data.suite_ids
     if resolved_suite_ids is None and data.suite_id is not None:
         resolved_suite_ids = [data.suite_id]
@@ -660,9 +662,6 @@ async def _campaign_item_response(
     )
 
 
-# ==================== Helpers ====================
-
-
 async def _build_campaign_responses_batch(
     campaigns: list[TestCampaign], db: AsyncSession, current_user: User | None = None
 ) -> list[TestCampaignResponse]:
@@ -799,7 +798,6 @@ async def _build_campaign_response(
         latest_query = apply_external_visibility_filter(latest_query, TestCase, current_user)
     latest_execution = (await db.execute(latest_query)).one_or_none()
 
-    # Build suites list from CampaignSuite join table
     cs_rows = (
         await db.execute(
             apply_external_visibility_filter(
@@ -821,7 +819,6 @@ async def _build_campaign_response(
                 )
             )
 
-    # Legacy single-suite field: first suite or direct FK
     suite_resp = suites_list[0] if suites_list else None
     public_id = campaign.campaign_id or ""
     if not public_id:
@@ -868,7 +865,6 @@ async def _build_campaign_detail(
     )
     items = items_result.scalars().all()
 
-    # Pre-fetch all TestCases for these items
     tc_ids = [item.test_case_id for item in items]
     test_cases_map = {}
     if tc_ids:
@@ -881,7 +877,6 @@ async def _build_campaign_detail(
         )
         test_cases_map = {tc.id: tc for tc in tc_result.scalars().all()}
 
-    # Pre-fetch all requirement links for these TestCases
     linked_reqs_by_tc: dict[int, list[RequirementSummary]] = {}
     requirement_ids = set()
     if tc_ids:
@@ -964,7 +959,6 @@ async def _build_campaign_detail(
         )
         related_requirements = [requirement_summary(req) for req in reqs]
 
-    # Related concepts: find CPTs linked to any TC in the campaign via ArtefactLink
     tc_ids = [item.test_case_id for item in items]
     related_concepts: list[TestConceptSummary] = []
     if tc_ids:
@@ -1002,7 +996,6 @@ async def _build_campaign_detail(
                 for c in concepts
             ]
 
-    # Build suite_scopes: group campaign items under their linked suites
     item_by_tc_id: dict[int, TestCampaignItemResponse] = {
         ir.test_case_id: ir for ir in item_responses
     }

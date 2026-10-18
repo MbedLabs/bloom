@@ -213,8 +213,6 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
       : editMode
         ? [...new Set([editDocFacade?.status ?? firstStatus, ...(config.statusOptions.includes('Draft') ? ['Draft'] : [])])]
         : [firstStatus]
-  // The server allocates ids with MAX(suffix)+1, so ask it rather than assuming
-  // -001, which was almost always already taken.
   const { data: nextDocId } = useQuery({
     queryKey: ['next-doc-id', prefix, config.typeCode],
     queryFn: () => docsApi.nextDocId(prefix!, config.typeCode),
@@ -233,9 +231,6 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
     }
   }, [navigate, listBackUrl])
 
-  // The project's people, not the admin-only user directory: a maintainer has
-  // to be able to tag the colleagues on their own project, and `@` reads a 403
-  // as an empty list rather than as an error, so the gate was invisible.
   const { data: users } = useQuery({
     queryKey: ['mentionableUsers', projectId],
     queryFn: () => usersApi.listMentionable(projectId),
@@ -248,8 +243,6 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
     enabled: can('view', 'parameter') && !!projectId,
   })
 
-  // `{{` inserts a project parameter *or* a project variable - both kinds live on the
-  // Parameters & Variables screen and both are addressed the same way in a document.
   const parameterMentionItems = useMemo(
     () => (projectVariables ?? []).map((variable) => ({
       id: variable.id,
@@ -292,8 +285,6 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
     return map[type]
   }, [])
 
-  // Types with a dedicated page never open the generic document editor - not on create
-  // and not on edit either.
   useEffect(() => {
     if (!prefix || usesDocumentEditor(docType)) return
     if (editMode) {
@@ -578,7 +569,6 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
 
   return (
     <div className="animate-fade-in -m-6 flex flex-col flex-1 min-h-0">
-      {/* Top bar */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-card shrink-0">
         <div className="flex items-center gap-3">
           <button
@@ -592,7 +582,6 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
           <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${DOC_TYPE_COLORS[docType]}`}>
             {DOC_TYPE_LABELS[docType]}
           </span>
-          {/* The only place the document id is rendered. */}
           <span className="text-xs font-mono text-muted-foreground">
             {editMode ? editDocFacade?.doc_id || docIdStr : expectedDocIdExample}
           </span>
@@ -646,19 +635,14 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
         </div>
       ) : null}
 
-      {/* Document frame */}
       <div className="flex">
-        {/* Editor area with outline */}
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Document header inside frame */}
           <div className={`${docType === 'TC' ? 'max-w-none' : 'max-w-4xl mx-auto'} w-full px-8 pt-8 pb-0`}>
-            {/* Status only: the type and document id are already shown in the top bar. */}
             <div className="flex items-center gap-2 mb-4 flex-wrap">
               <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground">
                 {displayedStatus}
               </span>
             </div>
-            {/* Title inside the document frame */}
             <input
               type="text"
               value={title}
@@ -668,7 +652,6 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
               className="w-full text-3xl font-bold text-foreground placeholder:text-muted-foreground/40 bg-transparent border-none outline-hidden mb-2"
             />
 
-            {/* Description field inside frame for applicable types */}
             {showDescriptionMetadata && (
               <input
                 type="text"
@@ -680,7 +663,6 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
             )}
           </div>
 
-          {/* Editor body */}
           <div className="flex-1">
             <div className={`${docType === 'TC' ? 'max-w-none' : 'max-w-4xl mx-auto'} w-full px-4 py-4`}>
               {docType === 'TC' ? (
@@ -715,13 +697,11 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
           </div>
         </div>
 
-        {/* Metadata sidebar */}
         {sidebarOpen && (
           <div className="w-72 border-l border-border bg-card/50 overflow-y-auto themed-scrollbar shrink-0">
             <div className="p-4 space-y-4">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Properties</h3>
 
-              {/* Status */}
               <MetaField label="Status">
                 {editMode && controlled ? <span>{displayedStatus}</span> :
                 <SelectField
@@ -759,7 +739,6 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
                 <UserSelect value={metadata.reviewer_id || ''} onChange={value => setMetadata({ ...metadata, reviewer_id: value })} users={users ?? []} label="Select reviewer" />
               </MetaField>}
 
-              {/* Priority (if applicable) */}
               {config.priorityOptions && (
                 <MetaField label="Priority">
                   <SelectField
@@ -775,7 +754,6 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
                 </MetaField>
               )}
 
-              {/* Type-specific fields */}
               {visibleConfigFields.length > 0 && (
                 <>
                   {visibleConfigFields.filter((field) => field.type !== 'textarea').map((field) => (

@@ -125,7 +125,6 @@ function LayoutInner() {
     queryFn: projectsApi.list,
   })
 
-  // Debounce global search keystrokes so we query at most ~4x/second.
   useEffect(() => {
     const handle = window.setTimeout(() => setDebouncedQuery(searchQuery.trim()), 250)
     return () => window.clearTimeout(handle)
@@ -162,7 +161,6 @@ function LayoutInner() {
     void navigate(searchResultUrl(item))
   }
 
-  // Notifications: unread badge polls every 60s; list loads when the panel opens.
   const queryClient = useQueryClient()
   const [notifOpen, setNotifOpen] = useState(false)
   const notifRef = useRef<HTMLDivElement>(null)
@@ -262,9 +260,7 @@ function LayoutInner() {
 
   return (
     <div className="h-screen flex overflow-hidden">
-      {/* Sidebar */}
       <aside className={`${sidebarCollapsed ? 'w-14' : 'w-60'} sidebar-scrollbar bg-gradient-sidebar text-white flex flex-col fixed inset-y-0 left-0 z-30 overflow-x-hidden overflow-y-auto transition-all duration-200`}>
-        {/* Logo */}
         <div className={`${sidebarCollapsed ? 'px-2 pt-4 pb-2.5' : 'px-3 pt-4 pb-2.5'}`}>
           <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-2.5'}`}>
             <div className="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center shrink-0 bg-white/10">
@@ -279,7 +275,6 @@ function LayoutInner() {
           </div>
         </div>
 
-        {/* Main Navigation */}
         <nav className={`${sidebarCollapsed ? 'px-2' : 'px-3'} space-y-1`}>
           {mainNav.map((item) => {
             const isActive = location.pathname === item.href ||
@@ -357,12 +352,10 @@ function LayoutInner() {
           )}
         </nav>
 
-        {/* Project Section */}
         <div className={`mt-4 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}>
           <div className="h-px bg-white/10 mb-2" />
           {!sidebarCollapsed && <p className="px-3 text-xs font-semibold text-violet-300/40 uppercase tracking-widest mb-2">Project</p>}
 
-          {/* Project Selector */}
           {projects && projects.length > 0 && !sidebarCollapsed && (
             <div className="relative mb-2">
               <button
@@ -392,7 +385,6 @@ function LayoutInner() {
             </div>
           )}
 
-          {/* Project Context Nav (shown when inside a project) */}
           {isInProject && (
             <div className="space-y-0.5 mt-2">
               {projectNav
@@ -431,7 +423,6 @@ function LayoutInner() {
           )}
         </div>
 
-        {/* Reports & Settings */}
         <div className={`${sidebarCollapsed ? 'px-2' : 'px-3'} mt-4 space-y-0.5`}>
           <Link
             to="/reports"
@@ -461,7 +452,6 @@ function LayoutInner() {
           </Link>
         </div>
 
-        {/* Bottom section */}
         <div className={`mt-auto ${sidebarCollapsed ? 'px-2' : 'px-3'} pb-4 pt-2 space-y-1`} style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
           <div className="h-px bg-white/10 mx-2 mb-2" />
           {BUD_APP_URL && (
@@ -506,12 +496,9 @@ function LayoutInner() {
         {sidebarCollapsed ? <ChevronRight className="h-4 w-4" strokeWidth={2.25} /> : <ChevronLeft className="h-4 w-4" strokeWidth={2.25} />}
       </button>
 
-      {/* Main content */}
       <div className={`flex-1 flex flex-col min-w-0 min-h-0 ${sidebarCollapsed ? 'ml-14' : 'ml-60'} transition-all duration-200`}>
-        {/* Header */}
         <header className="glass border-b border-border sticky top-0 z-20">
           <div className="px-3 py-2 flex items-center gap-3 min-w-0">
-            {/* Breadcrumbs — extra left inset so seam toggle does not cover “Home” */}
             <div className="flex min-w-0 shrink-0 items-center gap-2 overflow-x-auto overflow-y-hidden pl-6 text-sm">
               {breadcrumbs.map((crumb, i) => (
                 <div key={i} className="flex items-center gap-2 shrink-0">
@@ -532,7 +519,6 @@ function LayoutInner() {
               ))}
             </div>
 
-            {/* Inline search */}
             <div className="flex-1 min-w-0 flex justify-center">
               <div className="relative w-full max-w-sm" ref={searchBoxRef}>
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
@@ -590,9 +576,7 @@ function LayoutInner() {
               </div>
             </div>
 
-            {/* Right side */}
             <div className="flex shrink-0 items-center gap-1.5">
-              {/* Notifications */}
               <div className="relative" ref={notifRef}>
                 <button
                   onClick={() => setNotifOpen((open) => !open)}
@@ -656,7 +640,6 @@ function LayoutInner() {
                 )}
               </div>
 
-              {/* Dark mode toggle */}
               <button
                 onClick={() => setDark(!dark)}
                 className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
@@ -664,7 +647,6 @@ function LayoutInner() {
                 {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </button>
 
-              {/* User menu */}
               <div className="relative" ref={userMenuRef}>
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}

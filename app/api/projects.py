@@ -159,7 +159,6 @@ async def _project_counts(
     }
 
 
-# (model, doc type, response key) for every artefact counted on a project card.
 _COUNTED_ARTEFACTS = (
     (Requirement, "REQ", "requirement_count"),
     (TestCase, "TC", "test_case_count"),
@@ -178,7 +177,11 @@ async def _project_counts_bulk(
     project_ids: list[int],
     current_user: User,
 ) -> dict[int, dict[str, int]]:
-    """Counts for many projects in a fixed number of queries."""
+    """Counts for many projects in a fixed number of queries.
+
+    Types hidden from an external member count 0, and a requirement verified by several test cases
+    counts once, as in the single-project helper.
+    """
     if not project_ids:
         return {}
 
@@ -196,8 +199,6 @@ async def _project_counts_bulk(
         )
         query = apply_external_visibility_filter(query, model, current_user)
         for pid, total in (await db.execute(query)).all():
-            # Mask types this external member may not see, matching the
-            # single-project helper, which returns 0 rather than omitting them.
             if not type_visible(types_by_project[pid], doc_type):
                 continue
             counts[pid][key] = total or 0
@@ -211,8 +212,6 @@ async def _project_counts_bulk(
         TestCase,
         current_user,
     )
-    # Distinct over (project, requirement) so a requirement verified by several
-    # test cases still counts once, which is what the per-project version does.
     covered_sub = covered_query.add_columns(ArtefactLink.project_id).distinct().subquery()
     covered_rows = await db.execute(
         select(covered_sub.c.project_id, func.count()).group_by(covered_sub.c.project_id)

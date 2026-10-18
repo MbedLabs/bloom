@@ -87,7 +87,6 @@ describe('the step table', () => {
     expect(rowCount()).toBe(2)
     const actions = screen.getAllByPlaceholderText('Action / description') as HTMLTextAreaElement[]
     expect(actions.map((field) => field.value)).toEqual(['Power on', 'Power on'])
-    // Editing the copy must not edit the original.
     fireEvent.change(actions[1], { target: { value: 'Power on again' } })
     const after = screen.getAllByPlaceholderText('Action / description') as HTMLTextAreaElement[]
     expect(after.map((field) => field.value)).toEqual(['Power on', 'Power on again'])

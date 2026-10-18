@@ -119,7 +119,7 @@ def test_github_webhook_rejects_missing_signature(env):
         content=body,
         headers={"X-GitHub-Event": "issues", "Content-Type": "application/json"},
     )
-    assert response.status_code == 403  # bypass attempt rejected
+    assert response.status_code == 403
 
 
 def test_github_webhook_rejects_wrong_signature(env):
@@ -186,7 +186,6 @@ async def test_github_webhook_accepts_valid_signature_and_syncs(env):
     assert response.json()["status"] == "processed"
     assert await _defect_status(maker, "ALP-DEF-001") == "Closed"
 
-    # replayed delivery id is deduplicated
     replay = client.post(
         "/api/integrations/github/webhook",
         content=body,
@@ -212,7 +211,7 @@ async def test_gitlab_webhook_rejects_missing_token(env):
         headers={"X-Gitlab-Event": "Issue Hook"},
     )
     assert response.status_code == 403
-    assert await _defect_status(maker, "ALP-DEF-002") == "Open"  # unchanged
+    assert await _defect_status(maker, "ALP-DEF-002") == "Open"
 
 
 def test_gitlab_webhook_accepts_valid_token(env):
@@ -243,9 +242,9 @@ async def test_rejected_github_attempt_does_not_mutate_defect(env):
         headers={"X-GitHub-Event": "issues", "Content-Type": "application/json"},
     )
     assert response.status_code == 403
-    assert await _defect_status(maker, "ALP-DEF-001") == "Open"  # spoof had no effect
+    assert await _defect_status(maker, "ALP-DEF-001") == "Open"
 
     async with maker() as session:
         events = (await session.execute(select(DefectSyncEvent))).scalars().all()
         processed = [e for e in events if e.success]
-        assert processed == []  # nothing recorded as successful
+        assert processed == []

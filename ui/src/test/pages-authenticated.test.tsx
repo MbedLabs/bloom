@@ -51,13 +51,10 @@ vi.mock('../contexts/AuthContext', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => children,
 }))
 
-// The editor pulls in ProseMirror, which needs layout APIs jsdom does not
-// implement. The editor has its own tests; here it stands in for itself.
 vi.mock('../components/editor/DocEditor', () => ({
   default: () => <div data-testid="doc-editor" />,
 }))
 
-// The topology view measures nodes through ResizeObserver.
 vi.mock('../components/ProjectDocTopology', () => ({
   default: () => <div data-testid="doc-topology" />,
 }))
@@ -162,8 +159,6 @@ await registerRoutes()
 beforeEach(() => {
   window.sessionStorage.clear()
   window.localStorage.clear()
-  // The theme toggle asks the browser for the OS preference; jsdom has no
-  // media-query engine, so answer "light" rather than throw.
   window.matchMedia = ((query: string) => ({
     matches: false,
     media: query,
@@ -177,9 +172,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  // vitest runs without `globals`, so Testing Library never registers its
-  // own cleanup; without this the previous test's DOM stays mounted and every
-  // query finds two of everything.
   cleanup()
   vi.clearAllMocks()
 })

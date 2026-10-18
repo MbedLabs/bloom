@@ -192,8 +192,6 @@ def test_the_card_counts_a_requirement_a_draft_test_case_verifies(
     assert card["coverage_percent"] == 100.0
     assert card["uncovered_requirement_count"] == 0
 
-    # Traceability still reports the quality state separately, but Partial is
-    # included in Total Coverage.
     gaps = api_client.get(
         f"/api/traceability/coverage-gaps/{project_id}", headers=auth_headers
     ).json()

@@ -40,8 +40,6 @@ def test_cloudron_release_metadata_matches_product_version():
     assert not current["manifest"]["changelog"].startswith("file://")
     assert current["publishState"] in {"testing", "published"}
     changelog = (ROOT / "cloudron" / "CHANGELOG").read_text()
-    # The changelog may open with a prerelease entry for the next, unreleased
-    # version; what must hold is that the shipped version has its own section.
     assert f"[{version}]\n" in changelog
     top = changelog.splitlines()[0]
     match = re.fullmatch(r"\[(\d+(?:\.\d+){0,2})[^\]]*\]", top)

@@ -84,8 +84,6 @@ export default function MentionTextarea({
   }, [])
 
   const syncTrigger = useCallback((element: HTMLTextAreaElement) => {
-    // A selection is not a caret; offering a mention there would replace text
-    // the user deliberately highlighted.
     if (element.selectionStart !== element.selectionEnd) {
       close()
       return
@@ -99,8 +97,6 @@ export default function MentionTextarea({
     if (!trigger) return
     const element = textareaRef.current
     if (!element) return
-    // Anchored to the field rather than the caret: a caret-accurate position in
-    // a textarea needs a mirrored div, which is not worth it for a table cell.
     const rect = element.getBoundingClientRect()
     setAnchor({ left: rect.left, top: rect.bottom + 4 })
   }, [trigger])
@@ -116,7 +112,6 @@ export default function MentionTextarea({
     onChange(next)
     close()
     const caretAfter = trigger.start + replacement.length
-    // The value lands on the next render, so move the caret after it.
     requestAnimationFrame(() => {
       const target = textareaRef.current
       if (!target) return
@@ -132,7 +127,6 @@ export default function MentionTextarea({
         close()
         return
       }
-      // Only hand navigation keys to the list when it has something to select.
       if (items.length > 0 && ['ArrowUp', 'ArrowDown', 'Enter'].includes(event.key)) {
         if (listRef.current?.onKeyDown({ event: event.nativeEvent })) {
           event.preventDefault()
@@ -156,7 +150,6 @@ export default function MentionTextarea({
         onSelect={(event) => syncTrigger(event.currentTarget)}
         onKeyDown={handleKeyDown}
         onBlur={(event) => {
-          // Let a click on the popover land before it is torn down.
           window.setTimeout(close, 150)
           onBlur?.(event)
         }}

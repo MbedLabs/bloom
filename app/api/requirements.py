@@ -113,9 +113,11 @@ async def _build_prefetch_context(
     db: AsyncSession,
     current_user: User | None = None,
 ) -> ReqPrefetchContext:
+    """Prefetch, for the requirement tree under root_req_id, the descendants, the verified_by links,
+    the test run links and the suites and campaigns holding the verifying test cases.
+    """
     ctx = ReqPrefetchContext()
 
-    # 1. Fetch all descendants using a recursive CTE
     hierarchy = (
         select(Requirement)
         .where(Requirement.id == root_req_id)
@@ -144,7 +146,6 @@ async def _build_prefetch_context(
         if req.parent_id is not None:
             ctx.children_by_parent[req.parent_id].append(req)
 
-    # 2. Fetch all verified_by links
     if req_ids:
         verified_by_query = (
             select(ArtefactLink, TestCase)
@@ -174,7 +175,6 @@ async def _build_prefetch_context(
                 )
             )
 
-        # 3. Fetch all test run links
         tr_links_result = await db.execute(
             select(TestRunLink)
             .where(TestRunLink.requirement_id.in_(req_ids))
@@ -183,14 +183,12 @@ async def _build_prefetch_context(
         for tr_link in tr_links_result.scalars().all():
             ctx.test_run_links_by_req[tr_link.requirement_id].append(tr_link)
 
-    # 4. Fetch Suite/Campaign backlinks for all involved TestCases
     tc_ids = []
     for links in ctx.verified_by_by_req.values():
         for link in links:
             tc_ids.append(link.test_case.id)
 
     if tc_ids:
-        # Suites
         suite_query = (
             select(TestSuiteItem, TestSuite)
             .join(TestSuite, TestSuite.id == TestSuiteItem.suite_id)
@@ -209,7 +207,6 @@ async def _build_prefetch_context(
                 )
             )
 
-        # Campaigns
         campaign_query = (
             select(TestCampaignItem, TestCampaign)
             .join(TestCampaign, TestCampaign.id == TestCampaignItem.campaign_id)

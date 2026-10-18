@@ -236,7 +236,6 @@ async def test_replayed_delivery_is_ignored(env):
     body = _payload("PROJ-42")
     assert _post(client, body, signature=_sign(body), delivery="same").status_code == 200
 
-    # Flip the defect back, then replay the identical signed request.
     async with maker() as session:
         row = (
             await session.execute(select(Defect).where(Defect.defect_id == "ALP-DEF-001"))

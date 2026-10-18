@@ -9,7 +9,6 @@ const API_URL = import.meta.env.VITE_API_URL || '/api'
 
 export const api = axios.create({
   baseURL: API_URL,
-  // Send the httpOnly refresh cookie on same-origin auth calls.
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -33,13 +32,11 @@ function redirectToLogin() {
   }
 }
 
-// De-duplicate concurrent refreshes: when the short access token expires, many
-// in-flight requests can 401 at once; they all await a single /auth/refresh.
 let refreshPromise: Promise<string | null> | null = null
 
+/** Renews the access token through /auth/refresh on bare axios, outside the interceptors; the response interceptor shares one renewal among concurrent 401s through refreshPromise. */
 async function refreshAccessToken(): Promise<string | null> {
   try {
-    // Bare axios (no interceptors) so a 401 here cannot recurse into itself.
     const resp = await axios.post<{ access_token: string; user?: { id: number } }>(
       `${API_URL}/auth/refresh`,
       {},
@@ -187,8 +184,6 @@ export function extractApiErrorMessage(error: unknown, fallback = 'Request faile
     if (typeof detail === 'string' && detail.trim().length > 0) {
       return detail
     }
-    // FastAPI reports validation failures as a list, which previously fell
-    // through to axios's opaque "Request failed with status code 422".
     if (Array.isArray(detail)) {
       const formatted = formatValidationIssues(detail as ApiValidationIssue[])
       if (formatted) return formatted
@@ -350,8 +345,7 @@ export const usersApi = {
     const response = await api.get<User[]>('/users')
     return response.data
   },
-  // `/users` is the admin-only directory. Anyone working a project may address
-  // the people on it, so the mention and reviewer lists come from here instead.
+  /** The people a project member may mention or name as reviewer on one project; `/users` is the admin-only directory. */
   listMentionable: async (projectId: number): Promise<MentionableUser[]> => {
     const response = await api.get<MentionableUser[]>('/users/mentionable', {
       params: { project_id: projectId },
@@ -1223,7 +1217,6 @@ export const docsApi = {
     if (params?.updatedTo) query.set('updated_to', params.updatedTo)
     if (params?.sort) query.set('sort', params.sort)
     if (params?.dir) query.set('dir', params.dir)
-    // Relationship filter: only documents linked to `relatedTo`.
     if (params?.relatedTo) query.set('related_to', params.relatedTo)
     if (params?.keys) params.keys.forEach(k => query.append('keys', k))
     if (params?.role) query.set('role', params.role)
@@ -2137,8 +2130,7 @@ export const companyLogoApi = {
     )
     return response.data
   },
-  // Fetched through the authenticated client (not a bare <img src>) so the
-  // admin actually sees the stored logo; 404 means none is set yet.
+  /** Fetches the stored company logo through the authenticated client; resolves to null when none is set (404). */
   fetchLogo: async (): Promise<Blob | null> => {
     try {
       const response = await api.get('/company-logo/logo', { responseType: 'blob' })
@@ -2375,8 +2367,7 @@ export interface SetupStatusResponse {
 }
 
 export const setupApi = {
-  // Unauthenticated on purpose: this is what a brand new instance answers
-  // before any account exists. It stops reporting true the moment one does.
+  /** Asks the unauthenticated /setup/status whether the instance still has no account. */
   getStatus: async (): Promise<SetupStatusResponse> => {
     const response = await api.get<SetupStatusResponse>('/setup/status')
     return response.data

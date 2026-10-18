@@ -57,8 +57,6 @@ export default function TraceabilityMatrix() {
 
   const [page, setPage] = useState(0)
 
-  // A filter or sort change reorders the whole set, so page 3 of the old result
-  // is meaningless against the new one.
   useEffect(() => {
     setPage(0)
   }, [coverageFilter, priorityFilter, sortBy, projId])

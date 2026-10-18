@@ -61,8 +61,6 @@ vi.mock('@tanstack/react-query', async () => {
   const actual = await vi.importActual<typeof import('@tanstack/react-query')>('@tanstack/react-query')
   return {
     ...actual,
-    // `enabled` is honoured so a role-gated query really is absent, which is
-    // the whole difference between the two readers below.
     useQuery: ({ queryKey, enabled = true }: { queryKey: unknown[]; enabled?: boolean }) => {
       let data: unknown = requirement
       if (queryKey[0] === 'project') data = { id: 7, name: 'Flight', prefix: 'FLT' }
@@ -120,7 +118,6 @@ describe('reviewer and approver names on a detail page', () => {
   it('names a reviewer who is on the project, for a maintainer', async () => {
     const html = await renderAs('maintainer')
 
-    // The bug: this used to render "User #5".
     expect(html).toContain('Grace Hopper')
     expect(html).not.toContain('User #5')
   })
@@ -134,7 +131,6 @@ describe('reviewer and approver names on a detail page', () => {
   it('still names a departed approver for an admin', async () => {
     const html = await renderAs('admin')
 
-    // Admins read the directory too, so this must not regress to an id.
     expect(html).toContain('Departed Approver')
     expect(html).not.toContain('User #12')
   })

@@ -73,7 +73,6 @@ async def test_creates_an_active_admin_then_closes_the_window(fresh_client, sess
         admin = result.scalar_one()
         assert admin.role is UserRole.admin
         assert admin.is_active is True
-        # The password must be hashed, never stored as given.
         assert admin.hashed_password != VALID_PASSWORD
 
     assert fresh_client.get("/api/setup/status").json() == {"setup_required": False}

@@ -11,7 +11,6 @@ from defusedxml import ElementTree as SafeET
 from app.core.config import settings
 from app.core.reqif_policy import ReqIFParseError, extract_reqif_xml
 
-# Attribute long-names commonly used by tools for the requirement heading/title.
 TITLE_ATTRIBUTE_HINTS = (
     "reqif.chaptername",
     "reqif.name",
@@ -22,7 +21,6 @@ TITLE_ATTRIBUTE_HINTS = (
     "name",
 )
 
-# Attribute long-names commonly used for the requirement body/statement.
 TEXT_ATTRIBUTE_HINTS = (
     "reqif.text",
     "object text",
@@ -32,7 +30,6 @@ TEXT_ATTRIBUTE_HINTS = (
     "description",
 )
 
-# Attribute long-names commonly carrying the originating tool's own id.
 FOREIGN_ID_HINTS = (
     "reqif.foreignid",
     "foreign id",
@@ -75,22 +72,26 @@ _XHTML_KEEP_TAGS = {
 
 @dataclass
 class ReqIFObject:
-    """A single SPEC-OBJECT (a requirement candidate)."""
+    """A single SPEC-OBJECT (a requirement candidate).
+
+    attributes maps lower-cased attribute long-names to plain text; html_attributes holds the HTML
+    of XHTML values.
+    """
 
     identifier: str
     long_name: Optional[str] = None
-    # attribute long-name (lower-cased) -> plain-text value
     attributes: Dict[str, str] = field(default_factory=dict)
-    # attribute long-name (lower-cased) -> html value (only for XHTML attributes)
     html_attributes: Dict[str, str] = field(default_factory=dict)
 
     def first_attr(self, hints: tuple) -> Optional[str]:
-        """Return the first non-empty attribute value whose name matches a hint."""
+        """Return the first non-empty attribute value whose name matches a hint.
+
+        Exact names are tried first, then a substring match.
+        """
         for hint in hints:
             for name, value in self.attributes.items():
                 if name == hint and value and value.strip():
                     return value.strip()
-        # fall back to a substring match (e.g. "reqif.text" inside a longer name)
         for hint in hints:
             for name, value in self.attributes.items():
                 if hint in name and value and value.strip():
@@ -145,7 +146,6 @@ class ReqIFBundle:
                 seen.add(node.object_ref)
                 effective_parent = node.object_ref
             else:
-                # keep descending even if this node's object is missing/duplicate
                 effective_parent = parent_ref
             for child in node.children:
                 walk(child, effective_parent)
@@ -184,7 +184,10 @@ def _first_child(elem: ET.Element, local_name: str) -> Optional[ET.Element]:
 
 
 def _xhtml_to_html(elem: ET.Element) -> str:
-    """Render an XHTML THE-VALUE subtree to a compact HTML string."""
+    """Render an XHTML THE-VALUE subtree to a compact HTML string.
+
+    Text placed directly on THE-VALUE is kept.
+    """
     parts: List[str] = []
 
     def render(node: ET.Element) -> None:
@@ -205,7 +208,6 @@ def _xhtml_to_html(elem: ET.Element) -> str:
         render(child)
         if child.tail:
             parts.append(_escape(child.tail))
-    # some tools put text directly on THE-VALUE with no child elements
     if not list(elem) and elem.text:
         parts.append(_escape(elem.text))
     return "".join(parts).strip()
@@ -225,7 +227,11 @@ def _extract_bytes(data: bytes) -> bytes:
 
 
 def parse_reqif(data: bytes) -> ReqIFBundle:
-    """Parse ReqIF ``.reqif`` (XML) or ``.reqifz`` (zip) bytes into a bundle."""
+    """Parse ReqIF ``.reqif`` (XML) or ``.reqifz`` (zip) bytes into a bundle.
+
+    A document whose outer element is wrapped or missing is accepted when it holds SPEC-OBJECT
+    content.
+    """
     if not data:
         raise ReqIFParseError("Empty file.")
 
@@ -236,12 +242,9 @@ def parse_reqif(data: bytes) -> ReqIFBundle:
         raise ReqIFParseError(f"Not valid XML: {exc}") from exc
 
     if _local(root.tag) != "req-if":
-        # some exporters wrap or omit the outer element; tolerate as long as
-        # ReqIF content is present somewhere in the tree
         if not _find_all(root, "SPEC-OBJECT"):
             raise ReqIFParseError("No ReqIF content (SPEC-OBJECT) found.")
 
-    # 1. enum option identifier -> long-name (to resolve enumeration values)
     enum_option_name: Dict[str, str] = {}
     for opt in _find_all(root, "ENUM-VALUE"):
         ident = opt.get("IDENTIFIER")
@@ -249,7 +252,6 @@ def parse_reqif(data: bytes) -> ReqIFBundle:
         if ident:
             enum_option_name[ident] = name or ident
 
-    # 2. attribute-definition identifier -> long-name
     attr_def_name: Dict[str, str] = {}
     for adef in root.iter():
         if _local(adef.tag).startswith("attribute-definition-"):
@@ -257,7 +259,6 @@ def parse_reqif(data: bytes) -> ReqIFBundle:
             if ident:
                 attr_def_name[ident] = adef.get("LONG-NAME") or ident
 
-    # 3. spec-relation-type identifier -> long-name (for link typing)
     rel_type_name: Dict[str, str] = {}
     for rtype in _find_all(root, "SPEC-RELATION-TYPE"):
         ident = rtype.get("IDENTIFIER")
@@ -266,7 +267,6 @@ def parse_reqif(data: bytes) -> ReqIFBundle:
 
     bundle = ReqIFBundle()
 
-    # 4. spec objects + their attribute values
     spec_objects = _find_all(root, "SPEC-OBJECT")
     if len(spec_objects) > settings.REQIF_MAX_OBJECTS:
         raise ReqIFParseError(
@@ -282,7 +282,6 @@ def parse_reqif(data: bytes) -> ReqIFBundle:
             _consume_attribute_value(av, obj, attr_def_name, enum_option_name)
         bundle.objects[ident] = obj
 
-    # 5. specifications + hierarchy (parent/child ordering)
     for spec in _find_all(root, "SPECIFICATION"):
         ident = spec.get("IDENTIFIER")
         if not ident:
@@ -297,7 +296,6 @@ def parse_reqif(data: bytes) -> ReqIFBundle:
                         specification.roots.append(node)
         bundle.specifications.append(specification)
 
-    # 6. spec relations (traceability links)
     spec_relations = _find_all(root, "SPEC-RELATION")
     if len(spec_relations) > settings.REQIF_MAX_RELATIONS:
         raise ReqIFParseError(
@@ -328,11 +326,13 @@ def _consume_attribute_value(
     attr_def_name: Dict[str, str],
     enum_option_name: Dict[str, str],
 ) -> None:
+    """Record one attribute value on a spec object under its definition's lower-cased long-name: XHTML
+    as HTML and plain text, enumerations as option names, other kinds from THE-VALUE.
+    """
     kind = _local(av.tag)
     if not kind.startswith("attribute-value-"):
         return
 
-    # resolve which attribute definition this value belongs to
     definition = _first_child(av, "DEFINITION")
     def_name: Optional[str] = None
     if definition is not None:
@@ -354,7 +354,6 @@ def _consume_attribute_value(
         names = [enum_option_name.get((r.text or "").strip()) for r in refs]
         obj.attributes[key] = ", ".join(n for n in names if n)
     else:
-        # string / integer / real / date / boolean carry THE-VALUE as an attribute
         value = av.get("THE-VALUE")
         if value is None:
             the_value = _first_child(av, "THE-VALUE")
@@ -396,12 +395,14 @@ def _build_hierarchy(
 
 
 def _ref_text(parent: ET.Element, wrapper_local: str) -> Optional[str]:
-    """Return the *-REF text inside a wrapper such as SOURCE/TARGET/TYPE/OBJECT."""
+    """Return the *-REF text inside a wrapper such as SOURCE/TARGET/TYPE/OBJECT.
+
+    Text placed directly on the wrapper counts too.
+    """
     wrapper = _first_child(parent, wrapper_local)
     if wrapper is None:
         return None
     for ref in wrapper:
         if _local(ref.tag).endswith("-ref") and ref.text:
             return ref.text.strip()
-    # some tools place the ref text directly on the wrapper
     return wrapper.text.strip() if wrapper.text and wrapper.text.strip() else None

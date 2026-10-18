@@ -48,8 +48,6 @@ describe('saving a document refreshes the page you go back to', () => {
   })
 
   it('clears every artefact kind ArtefactDetail can show', () => {
-    // ArtefactDetail picks its key from a per-kind config, so a new kind added
-    // there is the most likely way for this to drift back out of step.
     const kinds = Array.from(artefactDetailSource.matchAll(/queryKey: '([A-Za-z]+)'/g)).map((m) => m[1])
     expect(kinds.length).toBeGreaterThan(0)
 
@@ -60,8 +58,6 @@ describe('saving a document refreshes the page you go back to', () => {
   })
 
   it('still clears the record on the same id the detail pages use', () => {
-    // The pages key on `resolvedId || parseInt(itemId)`, which is the same
-    // numeric id DocCreate holds as resolvedDocId - so the loop must use it.
     expect(docCreateSource).toMatch(/for \(const key of DETAIL_QUERY_KEYS\)[\s\S]{0,120}\[key, resolvedDocId\]/)
   })
 })

@@ -45,8 +45,6 @@ vi.mock('../contexts/AuthContext', () => ({
 }))
 
 const client = await import('../api/client')
-// `client` above is a value binding, so it cannot be used in a type
-// position; the shapes this file annotates with come from here.
 import type { DocListParams, DocShell } from '../api/client'
 const Documents = (await import('../pages/Documents')).default
 
@@ -102,8 +100,6 @@ const charlie: DocShell = {
   req_type: null,
   req_origin: null,
   reviewer_id: null,
-  // Linked both ways but with nothing suspect, which is what tells the
-  // incoming filter apart from the suspect one.
   incoming_links: 1,
   outgoing_links: 3,
   suspect_links: 0,
@@ -210,8 +206,6 @@ function fakeRegistry(rows: Shell[]) {
       const cmp = key === 'updated_at' || key === 'created_at'
         ? new Date(pick(a)).getTime() - new Date(pick(b)).getTime()
         : pick(a).toLowerCase().localeCompare(pick(b).toLowerCase())
-      // The real endpoint breaks ties the same way, so a page boundary cannot
-      // show the same row twice.
       return cmp !== 0 ? cmp * factor : a.doc_type.localeCompare(b.doc_type) || a.id - b.id
     })
 
@@ -268,8 +262,6 @@ beforeEach(() => {
   vi.mocked(client.docsApi.list).mockImplementation(fakeRegistry(ALL) as never)
   vi.mocked(client.usersApi.list).mockResolvedValue([user, reviewer] as never)
   window.localStorage.clear()
-  // The registry remembers a sort per project for the length of the session, in a
-  // module-level map that outlives a render.
   clearRegistrySortSession('VCU')
 })
 
@@ -347,8 +339,6 @@ describe('narrowing the registry', () => {
     renderRegistry()
     await screen.findByText('Alpha boot timing')
 
-    // An unbounded request is the bug this screen was fixed for: it reads one
-    // page and takes the count from the envelope.
     expect(lastQuery().limit).toBe(30)
     expect(lastQuery().skip).toBe(0)
   })
@@ -364,7 +354,6 @@ describe('narrowing the registry', () => {
     fireEvent.change(search, { target: { value: 'REQ-002' } })
     await waitFor(() => expect(rows()).toEqual(['VCU-REQ-002']))
 
-    // "Test Case" is the label of the TC kind, not a word in any title.
     fireEvent.change(search, { target: { value: 'test case' } })
     await waitFor(() => expect(rows()).toEqual(['VCU-TC-001', 'VCU-TC-002']))
   })
@@ -380,8 +369,6 @@ describe('narrowing the registry', () => {
     }
 
     await waitFor(() => expect(rows()).toEqual(['VCU-TC-002']))
-    // Six keystrokes, one request - five of the six would have been stale
-    // before they landed.
     expect(vi.mocked(client.docsApi.list).mock.calls.length - before).toBe(1)
   })
 
@@ -404,7 +391,6 @@ describe('narrowing the registry', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Draft' }))
     await waitFor(() => expect(rows()).toEqual(['VCU-REQ-002', 'VCU-TC-002']))
 
-    // Statuses accumulate rather than replace each other.
     fireEvent.click(screen.getByRole('button', { name: 'Review' }))
     await waitFor(() => expect(rows()).toHaveLength(3))
     expect(lastQuery().status).toEqual(['Draft', 'Review'])
@@ -441,8 +427,6 @@ describe('narrowing the registry', () => {
     fireEvent.click(screen.getByRole('option', { name: reviewer.full_name }))
     await waitFor(() => expect(rows()).toEqual(['VCU-REQ-001', 'VCU-TC-002']))
 
-    // A reviewer with nothing assigned empties the table rather than being
-    // ignored.
     fireEvent.click(picker)
     fireEvent.click(screen.getByRole('option', { name: user.full_name }))
     await waitFor(() => expect(rows()).toHaveLength(0))
@@ -485,8 +469,6 @@ describe('narrowing the registry', () => {
     await screen.findByText('Alpha boot timing')
     await openFilters()
 
-    // Delta was created last but updated first, so the two ranges must not be
-    // reading the same field.
     fireEvent.change(screen.getByLabelText('Updated To'), { target: { value: '2026-01-31' } })
     await waitFor(() => expect(rows()).toEqual(['VCU-TC-002']))
 
@@ -503,7 +485,6 @@ describe('narrowing the registry', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Draft' }))
     changeControl(screen.getByLabelText(/Priority/i), { target: { value: 'High' } })
 
-    // Draft alone keeps two; High alone keeps two; together only Delta.
     await waitFor(() => expect(rows()).toEqual(['VCU-TC-002']))
   })
 
@@ -576,8 +557,6 @@ describe('ordering the registry', () => {
     renderRegistry()
     await screen.findByText('Alpha boot timing')
 
-    // The registry opens on updated_at descending, so the order is Charlie,
-    // Alpha, Bravo, Delta rather than the order the API returned.
     expect(rows()).toEqual(['VCU-TC-001', 'VCU-REQ-001', 'VCU-REQ-002', 'VCU-TC-002'])
     expect(lastQuery()).toMatchObject({ sort: 'updated_at', dir: 'desc' })
   })
@@ -586,7 +565,6 @@ describe('ordering the registry', () => {
     renderRegistry()
     await screen.findByText('Alpha boot timing')
 
-    // Text columns start ascending.
     fireEvent.click(screen.getByText('ID').closest('th') as HTMLElement)
     await waitFor(() =>
       expect(rows()).toEqual(['VCU-REQ-001', 'VCU-REQ-002', 'VCU-TC-001', 'VCU-TC-002']),
@@ -621,7 +599,6 @@ describe('ordering the registry', () => {
     await waitFor(() => expect(rows()[0]).toBe('VCU-REQ-001'))
 
     fireEvent.click(screen.getByText('Priority').closest('th') as HTMLElement)
-    // High, High, Low, Medium - ascending, alphabetically.
     await waitFor(() => expect(rows().slice(0, 2).sort()).toEqual(['VCU-REQ-001', 'VCU-TC-002']))
 
     fireEvent.click(screen.getByText('Kind').closest('th') as HTMLElement)
@@ -634,7 +611,6 @@ describe('ordering the registry', () => {
 
     fireEvent.click(screen.getByText('Reviewer').closest('th') as HTMLElement)
 
-    // Ascending by name: the two with no reviewer sort as the empty string.
     await waitFor(() => expect(rows().slice(0, 2).sort()).toEqual(['VCU-REQ-002', 'VCU-TC-001']))
   })
 
@@ -647,7 +623,6 @@ describe('ordering the registry', () => {
       .find((box) => /Sort by/.test(box.textContent ?? '')) as HTMLSelectElement
     changeControl(picker, { target: { value: 'updated_at' } })
 
-    // Updated descending: Charlie, Alpha, Bravo, Delta.
     await waitFor(() =>
       expect(rows()).toEqual(['VCU-TC-001', 'VCU-REQ-001', 'VCU-REQ-002', 'VCU-TC-002']),
     )
@@ -666,8 +641,6 @@ describe('ordering the registry', () => {
     renderRegistry('/projects/VCU/docs?sort=whatever&dir=asc')
     await screen.findByText('Alpha boot timing')
 
-    // Falling back to the default beats asking the server to sort by a column
-    // it will reject with a 422.
     expect(lastQuery().sort).toBe('updated_at')
     await waitFor(() =>
       expect(rows()).toEqual(['VCU-TC-001', 'VCU-REQ-001', 'VCU-REQ-002', 'VCU-TC-002']),
@@ -681,8 +654,6 @@ describe('paging the registry', () => {
     id: 200 + index,
     doc_id: `VCU-REQ-${String(index + 1).padStart(3, '0')}`,
     title: `Requirement ${index + 1}`,
-    // One shared timestamp, so the default sort has nothing but the tiebreaker
-    // to go on - which is what a page boundary actually leans on.
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
   }))
@@ -695,8 +666,6 @@ describe('paging the registry', () => {
     renderRegistry()
     await screen.findByText('Requirement 1')
 
-    // 25 documents, 30 to a page: the count comes from the envelope's `total`,
-    // not from the length of what arrived.
     expect(screen.getByText(/1.*25 of 25/)).toBeTruthy()
   })
 
@@ -717,15 +686,12 @@ describe('paging the registry', () => {
     changeControl(screen.getByDisplayValue('30'), { target: { value: '10' } })
     await waitFor(() => expect(rows()).toHaveLength(10))
 
-    // The page counter moves at once - the rows follow when the request lands,
-    // because the previous page is held on screen rather than flashing empty.
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     await waitFor(() => expect(rows()[0]).toBe('VCU-REQ-011'))
     expect(screen.getByText('2 / 3')).toBeTruthy()
     expect(lastQuery()).toMatchObject({ skip: 10, limit: 10 })
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
-    // The last page holds the remainder, and there is nowhere further to go.
     await waitFor(() => expect(rows()).toHaveLength(5))
     expect(screen.getByText('3 / 3')).toBeTruthy()
     expect((screen.getByRole('button', { name: 'Next' }) as HTMLButtonElement).disabled).toBe(true)
@@ -747,8 +713,6 @@ describe('paging the registry', () => {
       seen.push(...rows())
     }
 
-    // Every document sorts on the same timestamp here, so without a stable
-    // tiebreaker the server is free to return one of them on two pages.
     expect(new Set(seen).size).toBe(25)
   })
 
@@ -764,9 +728,6 @@ describe('paging the registry', () => {
       target: { value: 'Requirement 1' },
     })
 
-    // "Requirement 1" also matches 10 to 19, so eleven rows survive - but the
-    // view has to be back on the first page, not on a page two that no longer
-    // has ten rows above it.
     await waitFor(() => expect(screen.getByText('1 / 2')).toBeTruthy())
     expect(rows()[0]).toBe('VCU-REQ-001')
   })

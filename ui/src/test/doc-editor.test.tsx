@@ -39,12 +39,9 @@ const EMPTY_RECT = {
 } as DOMRect
 
 beforeEach(() => {
-  // The outline builds a selector with CSS.escape, which jsdom does not provide.
   if (typeof globalThis.CSS?.escape !== 'function') {
     globalThis.CSS = { ...(globalThis.CSS ?? {}), escape: (value: string) => value } as never
   }
-  // ProseMirror measures and scrolls; jsdom implements neither, and the
-  // outline's scroll tracking calls getClientRects on every transaction.
   Element.prototype.scrollIntoView = vi.fn()
   Element.prototype.getClientRects = (() => Object.assign([], { item: () => null })) as never
   Element.prototype.getBoundingClientRect = () => EMPTY_RECT
@@ -90,7 +87,6 @@ describe('showing a document', () => {
     const { container } = render(<DocEditor content={doc(paragraph('Frozen'))} editable={false} />)
     const surface = await editorSurface(container)
     expect(surface.getAttribute('contenteditable')).toBe('false')
-    // A read-only editor offers no formatting controls either.
     expect(screen.queryByTitle('Bold (Ctrl+B)')).toBeNull()
   })
 })
@@ -145,11 +141,9 @@ describe('editing', () => {
     )
     const surface = await editorSurface(container)
 
-    // Typing through ProseMirror's own transaction, the way a keystroke lands.
     fireEvent.input(surface, { target: { textContent: 'After' } })
     fireEvent.keyDown(surface, { key: 'a' })
 
-    // The editor may batch, so assert on what it eventually reported.
     await waitFor(() => expect(onChange).toHaveBeenCalled())
     const [json, html] = onChange.mock.calls[onChange.mock.calls.length - 1]
     expect(json).toHaveProperty('type', 'doc')
@@ -185,7 +179,6 @@ describe('the toolbar', () => {
     const { container } = render(<DocEditor content={doc(paragraph('Make me bold'))} />)
     const surface = await editorSurface(container)
 
-    // Select everything the way Ctrl+A does, then apply the mark.
     fireEvent.keyDown(surface, { key: 'a', ctrlKey: true })
     fireEvent.click(screen.getByTitle('Bold (Ctrl+B)'))
 
@@ -225,8 +218,6 @@ describe('the toolbar', () => {
   })
 
   it('keeps the toolbar in step with the document', async () => {
-    // TipTap 3 stopped re-rendering on transactions by default, which froze
-    // every toolbar state at whatever it showed when the editor mounted.
     const { container } = render(<DocEditor content={doc(paragraph('An item'))} />)
     const surface = await editorSurface(container)
     const bulletList = screen.getByTitle('Bullet list')
@@ -235,7 +226,6 @@ describe('the toolbar', () => {
     fireEvent.click(bulletList)
     await waitFor(() => expect(surface.querySelector('ul li')).toBeTruthy())
 
-    // The button now shows the list as the active block.
     await waitFor(() => expect(screen.getByTitle('Bullet list').className).not.toBe(before))
   })
 
@@ -265,7 +255,6 @@ describe('the toolbar menus', () => {
     fireEvent.click(await screen.findByText('Heading 2'))
 
     await waitFor(() => expect(surface.querySelector('h2')?.textContent).toBe('A title'))
-    // The menu button now names the level the caret sits in.
     await waitFor(() => expect(screen.getByText('H2')).toBeTruthy())
 
     fireEvent.click(screen.getByText('H2'))
@@ -309,14 +298,11 @@ describe('the toolbar menus', () => {
     fireEvent.click(screen.getByTitle('Line spacing'))
     fireEvent.click(await screen.findByText('1.5'))
 
-    // Spacing is a property of the document, so the class lands on the editor
-    // surface rather than on the block the caret happens to be in.
     await waitFor(() => expect(surface.classList.contains('line-height-1_5')).toBe(true))
 
     fireEvent.click(screen.getByTitle('Line spacing'))
     fireEvent.click(await screen.findByText('2.0'))
 
-    // Only one spacing applies at a time.
     await waitFor(() => expect(surface.classList.contains('line-height-2')).toBe(true))
     expect(surface.classList.contains('line-height-1_5')).toBe(false)
   })
@@ -423,7 +409,6 @@ describe('the outline', () => {
     const { container } = render(<DocEditor content={document_} showOutline />)
     await editorSurface(container)
 
-    // Once in the document itself and once in the outline.
     await waitFor(() => expect(screen.getAllByText('Scope').length).toBeGreaterThan(1))
     expect(screen.getAllByText('Boot timing').length).toBeGreaterThan(1)
     expect(screen.getAllByText('Shutdown').length).toBeGreaterThan(1)
@@ -444,9 +429,6 @@ describe('the outline', () => {
     fireEvent.click(entry as HTMLElement)
 
     await waitFor(() => expect(scrollIntoView).toHaveBeenCalled())
-    // The element scrolled to is the heading itself - resolving the position
-    // *before* it would hand back the editor's own content element, which is
-    // what used to send every entry to the top.
     const target = scrollIntoView.mock.instances[scrollIntoView.mock.instances.length - 1] as
       | HTMLElement
       | undefined

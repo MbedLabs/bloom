@@ -17,6 +17,15 @@ const ROLE_CONFIG = {
   external: { label: ROLE_LABELS.external, color: 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400', icon: Eye },
 }
 
+/** Resolves to the submit result, or to null when the request fails; the caller's mutation state carries the error. */
+async function settleSubmit<T>(submit: Promise<T>): Promise<T | null> {
+  try {
+    return await submit
+  } catch {
+    return null
+  }
+}
+
 export default function UsersPage() {
   const { user: currentUser } = useAuth()
   const queryClient = useQueryClient()
@@ -369,13 +378,7 @@ function EmailChangeModal({
           className="space-y-4"
           onSubmit={async (event) => {
             event.preventDefault()
-            try {
-              await onSubmit(newEmail)
-            } catch {
-              // Error is shown via mutation state in parent; without this the
-              // rejection escapes as an unhandled promise every time the
-              // server refuses the address.
-            }
+            await settleSubmit(onSubmit(newEmail))
           }}
         >
           <div>
@@ -424,12 +427,10 @@ function InviteUserModal({ onClose, onSubmit, isLoading, error }: Readonly<{
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setCopied(false)
-    try {
-      const response = await onSubmit({ email, full_name: fullName, role })
+    const response = await settleSubmit(onSubmit({ email, full_name: fullName, role }))
+    if (response) {
       setInviteLink(response.invite_link ?? null)
       setInvitedEmail(response.user.email)
-    } catch {
-      // Error is shown via mutation state in parent.
     }
   }
 

@@ -123,8 +123,6 @@ describe('mentions in the step table', () => {
     expect(document.querySelector('.mention-suggestion-popover')).toBeNull()
   })
 
-  // A `{` that never becomes `{{`, or an `@` with no match, must not leave a
-  // popover sitting over the table.
   it('closes once the trigger no longer matches anything', () => {
     render(<Harness />)
     type(actionCell(), '{{ZZZ')
@@ -168,7 +166,6 @@ describe('keyboard handling in the step table', () => {
     expect(screen.getByTestId('description').textContent).toBe('ramp to {{')
   })
 
-  // The cell has to stay a textarea.
   it('leaves Enter to the textarea when the list has nothing to offer', () => {
     render(<Harness />)
     const cell = actionCell()

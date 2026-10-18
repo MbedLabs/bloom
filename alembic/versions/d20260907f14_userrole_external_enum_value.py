@@ -33,8 +33,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Mirror image: external becomes reviewer again. A deployment that has
-    # already created external users keeps them, renamed.
+    """Turn the external role value back into reviewer; existing external users stay, under reviewer."""
     op.execute(
         """
         DO $$

@@ -1,11 +1,12 @@
-"""Shared password policy."""
+"""Shared password policy.
 
-# Normal user passwords must be at least this long. The production administrator
-# bootstrap keeps its own, stronger requirement (>= 16) in app.core.config.
+User passwords have at least PASSWORD_MIN_LENGTH characters (the production administrator bootstrap
+requires 16, in app.core.config) and at most PASSWORD_MAX_BYTES bytes, the part of a password bcrypt
+hashes.
+"""
+
 PASSWORD_MIN_LENGTH = 12
 
-# bcrypt only hashes the first 72 bytes of a password; any tail beyond that is silently
-# ignored by the hashing backend.
 PASSWORD_MAX_BYTES = 72
 
 

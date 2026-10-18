@@ -82,8 +82,6 @@ def registry(api_client: TestClient, auth_headers, reviewer):
         {"title": "Delta brownout", "status": "Draft", "reviewer_id": reviewer["id"]},
     )
 
-    # Charlie is linked both ways with nothing suspect; Alpha carries the only
-    # suspect link. Bravo is linked to nothing at all.
     def link(source, source_type, target, target_type, role, suspect):
         response = api_client.post(
             "/api/links",
@@ -100,8 +98,6 @@ def registry(api_client: TestClient, auth_headers, reviewer):
         )
         assert response.status_code in (200, 201), response.text
 
-    # Bloom validates the role against the pair of types, so these are the roles
-    # those pairs actually allow.
     link(charlie, "TC", alpha, "REQ", "verifies", suspect=True)
     link(charlie, "TC", delta, "TC", "relates_to", suspect=False)
 
@@ -168,9 +164,6 @@ class TestTheShellItReturns:
         items = fetch(api_client, auth_headers, registry["prefix"]).json()["items"]
         alpha = next(item for item in items if item["doc_id"] == registry["alpha"])
 
-        # The listing is projected down to the shell columns; every one of these
-        # is a column the table draws, so dropping one from the projection has
-        # to fail here rather than render a blank cell.
         assert alpha["title"] == "Alpha boot timing"
         assert alpha["doc_type"] == "REQ"
         assert alpha["status"] == "Approved"
@@ -178,9 +171,6 @@ class TestTheShellItReturns:
         assert alpha["req_type"] == "Functional"
         assert alpha["req_origin"] == "Customer"
         assert alpha["reviewer_id"] == registry["reviewer"]["id"]
-        # A customer-origin requirement is stored customer-visible, and that
-        # stored value is what decides whether an external user sees the row -
-        # so the listing has to report it rather than assume a default.
         assert alpha["visibility"] == "customer"
         assert alpha["created_at"]
         assert alpha["updated_at"]
@@ -188,8 +178,6 @@ class TestTheShellItReturns:
     def test_never_returns_the_document_body(self, api_client, auth_headers, registry):
         items = fetch(api_client, auth_headers, registry["prefix"]).json()["items"]
 
-        # These used to be read for every row and thrown away. The listing has
-        # no use for them and must not start carrying them again.
         for item in items:
             assert "content_json" not in item
             assert "content_html" not in item
@@ -199,7 +187,6 @@ class TestTheShellItReturns:
         items = fetch(api_client, auth_headers, registry["prefix"]).json()["items"]
         by_id = {item["doc_id"]: item for item in items}
 
-        # Charlie is the source of both links, Alpha and Delta a target each.
         assert by_id[registry["charlie"]]["outgoing_links"] == 2
         assert by_id[registry["charlie"]]["incoming_links"] == 0
         assert by_id[registry["alpha"]]["incoming_links"] == 1
@@ -210,8 +197,6 @@ class TestTheShellItReturns:
         items = fetch(api_client, auth_headers, registry["prefix"]).json()["items"]
         by_id = {item["doc_id"]: item for item in items}
 
-        # One suspect link, so the document it points at and the one it leaves
-        # both report it - that is what puts a document on the suspect filter.
         assert by_id[registry["alpha"]]["suspect_links"] == 1
         assert by_id[registry["charlie"]]["suspect_links"] == 1
         assert by_id[registry["delta"]]["suspect_links"] == 0
@@ -235,7 +220,6 @@ class TestNarrowing:
         one = ids(fetch(api_client, auth_headers, registry["prefix"], status="Draft"))
         assert sorted(one) == sorted([registry["bravo"], registry["delta"]])
 
-        # Statuses accumulate rather than replace each other.
         both = ids(fetch(api_client, auth_headers, registry["prefix"], status=["Draft", "Review"]))
         assert len(both) == 3
 
@@ -286,8 +270,6 @@ class TestNarrowing:
     def test_applies_a_link_filter_even_without_the_counts(
         self, api_client, auth_headers, registry
     ):
-        # The counts are what the filter is a question about, so asking not to
-        # be told them cannot quietly drop the filter.
         found = ids(
             fetch(
                 api_client,
@@ -300,7 +282,6 @@ class TestNarrowing:
         assert found == [registry["bravo"]]
 
     def test_applies_every_filter_rather_than_the_last(self, api_client, auth_headers, registry):
-        # Draft alone keeps two, TC alone keeps two, together only Delta.
         found = ids(fetch(api_client, auth_headers, registry["prefix"], status="Draft", type="TC"))
         assert found == [registry["delta"]]
 
@@ -308,8 +289,6 @@ class TestNarrowing:
         items = fetch(api_client, auth_headers, registry["prefix"]).json()["items"]
         today = items[0]["created_at"][:10]
 
-        # Everything was created in this test, so a range that is exactly today
-        # has to keep all four - an exclusive bound would silently drop them.
         same_day = fetch(
             api_client, auth_headers, registry["prefix"], created_from=today, created_to=today
         )
@@ -330,7 +309,6 @@ class TestSearching:
         assert sorted(found) == sorted([registry["alpha"], registry["bravo"]])
 
     def test_matches_the_human_label_of_the_kind(self, api_client, auth_headers, registry):
-        # "Test Case" is what the table shows; "TC" is what it stores.
         found = ids(fetch(api_client, auth_headers, registry["prefix"], q="test case"))
         assert sorted(found) == sorted([registry["charlie"], registry["delta"]])
 
@@ -385,12 +363,9 @@ class TestOrdering:
     def test_sorts_by_reviewer_name_not_by_reviewer_id(self, api_client, auth_headers, registry):
         found = ids(fetch(api_client, auth_headers, registry["prefix"], sort="reviewer", dir="asc"))
 
-        # The two without a reviewer sort as the empty string, so they lead.
         assert sorted(found[:2]) == sorted([registry["bravo"], registry["charlie"]])
 
     def test_sorts_by_a_column_only_one_type_has(self, api_client, auth_headers, registry):
-        # req_origin exists on requirements alone; the test cases contribute a typed
-        # NULL, which has to sort as the empty string rather than fail or scatter.
         response = fetch(api_client, auth_headers, registry["prefix"], sort="req_origin", dir="asc")
         assert response.status_code == 200
         found = ids(response)
@@ -400,8 +375,6 @@ class TestOrdering:
     def test_refuses_a_column_it_cannot_sort_by(self, api_client, auth_headers, registry):
         response = fetch(api_client, auth_headers, registry["prefix"], sort="content_html")
 
-        # Falling back silently would show an arbitrary order under a heading
-        # that claims otherwise.
         assert response.status_code == 422
         assert "content_html" in response.json()["detail"]
 
@@ -428,8 +401,6 @@ class TestPaging:
     ):
         body = fetch(api_client, auth_headers, registry["prefix"], type="TC", limit=1).json()
 
-        # The count has to describe the filtered set, or the page control shows
-        # pages that hold nothing.
         assert body["total"] == 2
         assert len(body["items"]) == 1
 
@@ -459,8 +430,6 @@ class TestTheTypeSummary:
             f"/api/projects/{registry['prefix']}/doc-type-summary", headers=auth_headers
         ).json()
 
-        # The topology used to compute these by folding the full listing down,
-        # so the two have to keep producing the same numbers.
         from collections import Counter
 
         expected_counts = Counter(item["doc_type"] for item in listed)
@@ -606,7 +575,6 @@ class TestAskingForNamedDocuments:
         prefix = registry["prefix"]
         keys = self.keys_for(api_client, auth_headers, prefix, registry["alpha"], registry["bravo"])
 
-        # Charlie links to alpha and delta; bravo is linked to nothing.
         returned = fetch(
             api_client, auth_headers, prefix, keys=keys, related_to=registry["charlie"]
         ).json()

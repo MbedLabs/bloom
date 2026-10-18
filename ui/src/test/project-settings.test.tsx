@@ -246,7 +246,6 @@ describe('changing a project’s prefix', () => {
 
     fireEvent.change(prefix, { target: { value: 'BMS' } })
 
-    // Identifiers would collide across the two projects.
     expect(await screen.findByText(/already uses prefix BMS/i)).toBeTruthy()
     await waitFor(() => expect(saveButton().disabled).toBe(true))
   })
@@ -255,8 +254,6 @@ describe('changing a project’s prefix', () => {
     renderEdit()
     await screen.findByTitle('Project prefix')
 
-    // The project's current prefix is "taken" by the project itself, which
-    // must not count against it.
     expect(saveButton().disabled).toBe(false)
     expect(screen.queryByText(/already uses prefix/i)).toBeNull()
   })
@@ -278,7 +275,6 @@ describe('changing a project’s prefix', () => {
     fireEvent.change(await screen.findByTitle('Project prefix'), { target: { value: 'VCX' } })
     fireEvent.click(saveButton())
 
-    // Staying on /projects/VCU/edit would 404 the moment the page reloaded.
     await waitFor(() =>
       expect((lastCall(client.projectsApi.update)[1] as { prefix: string }).prefix).toBe('VCX'),
     )
@@ -345,7 +341,6 @@ describe('deleting a project', () => {
 
     fireEvent.change(dialog.field, { target: { value: 'delete vcu' } })
 
-    // The phrase is compared exactly; lower case is not the same phrase.
     await waitFor(() => expect(dialog.confirm.disabled).toBe(true))
     fireEvent.click(dialog.confirm)
     await settle()

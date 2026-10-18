@@ -100,7 +100,6 @@ def test_starttls_on_a_plaintext_port_reports_where_and_why(monkeypatch):
     else:
         raise AssertionError("a failing STARTTLS handshake must not look like success")
 
-    # The operator needs the endpoint and the TLS mode, not just the library text.
     assert "mail:2525" in message
     assert "STARTTLS=True" in message
     assert "SMTPNotSupportedError" in message

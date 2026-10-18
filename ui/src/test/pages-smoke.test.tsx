@@ -26,8 +26,6 @@ vi.mock('../components/ProtectedRoute', () => ({
 }))
 
 describe('source-available readiness smoke', () => {
-  // These tests run in the node environment, so `window` only exists because it is
-  // stubbed here.
   beforeEach(() => {
     vi.stubGlobal('window', { runtimeConfig: {} })
   })

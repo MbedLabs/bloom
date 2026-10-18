@@ -17,7 +17,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from app.core.config import settings  # noqa: E402
 from app.core.database import Base  # noqa: E402
 
-# Import all models so Base.metadata sees them
 import app.models  # noqa: E402, F401
 import app.models.user  # noqa: E402, F401
 

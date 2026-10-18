@@ -143,9 +143,6 @@ beforeEach(() => {
   })
 })
 
-// vitest runs without `globals`, so Testing Library never registers its own
-// cleanup; without this the previous test's DOM stays mounted and every query
-// finds two of everything.
 afterEach(cleanup)
 
 describe('the user table', () => {
@@ -206,7 +203,6 @@ describe('the user table', () => {
 
     expect(within(rowFor(awaitingApproval.full_name)).getByTitle('Approve email change')).toBeTruthy()
     expect(within(rowFor(awaitingMailbox.full_name)).queryByTitle('Approve email change')).toBeNull()
-    // Nothing is pending for the others, so there is nothing to approve or reject.
     expect(within(rowFor(maintainer.full_name)).queryByTitle(/email change/i)).toBeNull()
   })
 
@@ -271,8 +267,6 @@ describe('changing what a user may do', () => {
     renderAt('/users', '/users', <Users />)
     await screen.findByText(maintainer.full_name)
 
-    // Nobody may lock themselves out, so their own row carries neither a role
-    // editor nor the destructive actions.
     const self = within(rowFor(admin.full_name))
     expect(self.queryByTitle('Edit role')).toBeNull()
     expect(self.queryByTitle('Delete user')).toBeNull()
@@ -283,11 +277,8 @@ describe('changing what a user may do', () => {
     renderAt('/users', '/users', <Users />)
     await screen.findByText(otherAdmin.full_name)
 
-    // A second administrator is not the signed-in user, so the self rule does
-    // not cover them; the role editor is withheld because they are an admin.
     const row = within(rowFor(otherAdmin.full_name))
     expect(row.queryByTitle('Edit role')).toBeNull()
-    // The other destructive actions are still offered - only the role is fixed.
     expect(row.getByTitle('Delete user')).toBeTruthy()
   })
 
@@ -587,7 +578,6 @@ describe('the invitation link', () => {
     fireEvent.click(await screen.findByRole('button', { name: /copy link/i }))
 
     await waitFor(() => expect(prompt).toHaveBeenCalledWith('Copy invite link:', inviteLink))
-    // Nothing was copied, so the button must not claim otherwise.
     expect(screen.queryByRole('button', { name: /copied/i })).toBeNull()
   })
 
@@ -659,8 +649,6 @@ describe('the project list', () => {
     })
 
     expect(screen.getByText('No projects found')).toBeTruthy()
-    // The empty state offers to create one only when the list is genuinely
-    // empty - offering it here would create a project the search still hides.
     expect(screen.queryByRole('button', { name: /new project/i })).toBeTruthy()
     expect(screen.getAllByRole('button', { name: /new project/i })).toHaveLength(1)
   })
@@ -728,7 +716,6 @@ describe('the project list', () => {
     await screen.findByText(project.name)
 
     expect(screen.queryByTitle('Edit project')).toBeNull()
-    // A maintainer may still create projects.
     expect(screen.getByRole('button', { name: /new project/i })).toBeTruthy()
   })
 
@@ -765,10 +752,8 @@ describe('creating a project', () => {
     const form = await openForm()
     fireEvent.change(form.name, { target: { value: 'Battery Management' } })
 
-    // Exactly three, so both a shorter one and one carrying a digit are out.
     for (const bad of ['BM', 'B1']) {
       fireEvent.change(form.prefix, { target: { value: bad } })
-      // The hint under the field and the form-level error can both be showing.
       expect((await screen.findAllByText(/exactly three uppercase letters/i)).length)
         .toBeGreaterThan(0)
       expect(form.submit.disabled).toBe(true)
@@ -817,7 +802,6 @@ describe('creating a project', () => {
     fireEvent.click(form.submit)
 
     expect((await screen.findAllByText(/already exists/i)).length).toBeGreaterThan(0)
-    // The form stays up so the prefix can be corrected without retyping.
     expect(screen.getByPlaceholderText('PRJ')).toBeTruthy()
   })
 
@@ -909,8 +893,6 @@ describe('project parameters', () => {
     fireEvent.change(await screen.findByPlaceholderText('Enter a key'), {
       target: { value: 'MAX_TEMP_C' },
     })
-    // The value is left empty; `required` stops the browser, and the handler
-    // stops jsdom, which does not enforce it.
     fireEvent.submit(screen.getByPlaceholderText('Enter a key').closest('form') as HTMLFormElement)
 
     await settle()

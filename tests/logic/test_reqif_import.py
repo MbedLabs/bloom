@@ -13,8 +13,6 @@ from app.core.reqif import (
     parse_reqif,
 )
 
-# A small but representative ReqIF 1.x document with namespaces, an enumeration
-# datatype, an XHTML body, a two-level specification hierarchy and one relation.
 SAMPLE_REQIF = """<?xml version="1.0" encoding="UTF-8"?>
 <REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
@@ -129,7 +127,6 @@ def test_xhtml_body_preserved_as_html_and_plain_text():
     assert html is not None
     assert "<b>shall</b>" in html
     assert "allow login" in html
-    # plain-text fallback strips markup
     assert obj.first_attr(TEXT_ATTRIBUTE_HINTS) == "The system shall allow login."
 
 
@@ -166,7 +163,6 @@ def test_reqifz_zip_container_is_unwrapped():
 
 
 def test_objects_not_in_hierarchy_are_not_dropped():
-    # OBJ-3 exists but is absent from any specification hierarchy
     xml = SAMPLE_REQIF.replace(
         b"</SPEC-OBJECTS>",
         b'<SPEC-OBJECT IDENTIFIER="OBJ-3"><VALUES/></SPEC-OBJECT></SPEC-OBJECTS>',
@@ -191,12 +187,6 @@ def test_xml_without_reqif_content_rejected():
     with pytest.raises(ReqIFParseError):
         parse_reqif(b"<html><body>nope</body></html>")
 
-
-# ---------------------------------------------------------------------------
-# End-to-end mapping against an in-memory SQLite database (no Postgres needed):
-# drives the import endpoint directly, since require_project_access short-circuits
-# for admin users.
-# ---------------------------------------------------------------------------
 
 import pytest_asyncio  # noqa: E402
 from sqlalchemy import select  # noqa: E402
@@ -263,12 +253,12 @@ async def test_import_creates_requirements_with_hierarchy_and_links(session):
     child = reqs["SYS-REQ-002"]
     assert parent.title == "System Requirements"
     assert child.title == "Login"
-    assert child.parent_id == parent.id  # hierarchy preserved
-    assert child.priority == "High"  # enum resolved
+    assert child.parent_id == parent.id
+    assert child.priority == "High"
     assert child.content_html
     assert "<b>shall</b>" in child.content_html
     assert child.req_origin == "External"
-    assert parent.source_ref == "OBJ-1"  # provenance kept for re-import
+    assert parent.source_ref == "OBJ-1"
 
     link = (await session.execute(select(ArtefactLink))).scalars().one()
     assert (link.source_id, link.target_id) == (child.id, parent.id)
@@ -289,10 +279,10 @@ async def test_reimport_is_idempotent(session):
     )
     assert second.imported == 0
     assert second.skipped == 2
-    assert second.links_created == 0  # existing link not duplicated
+    assert second.links_created == 0
 
     total = len((await session.execute(select(Requirement))).scalars().all())
-    assert total == 2  # no duplicates created
+    assert total == 2
 
 
 async def test_missing_project_returns_404(session):

@@ -91,7 +91,6 @@ export default function Projects() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-xl font-bold text-foreground">Projects</h2>
@@ -108,7 +107,6 @@ export default function Projects() {
         )}
       </div>
 
-      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <input
@@ -120,7 +118,6 @@ export default function Projects() {
         />
       </div>
 
-      {/* Project Grid */}
       {isLoading ? (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-8 text-center text-muted-foreground">
           Loading...
@@ -297,7 +294,6 @@ function ProjectCard({
           <p className="text-xs text-muted-foreground mb-4 line-clamp-2">{project.description}</p>
         )}
 
-        {/* Stats */}
         <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
           <div className="flex items-center gap-1">
             <FileText className="h-3.5 w-3.5" />
@@ -309,7 +305,6 @@ function ProjectCard({
           </div>
         </div>
 
-        {/* Coverage bar */}
         <div className="flex items-center gap-2">
           <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
             <div
@@ -322,7 +317,6 @@ function ProjectCard({
           <span className="text-[11px] text-muted-foreground font-medium">{coverage}%</span>
         </div>
 
-        {/* Arrow */}
         <div className="flex justify-end mt-3">
           <button
             type="button"

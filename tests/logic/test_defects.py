@@ -18,8 +18,6 @@ from app.core.link_rules import (
     is_known_linkable_type,
 )
 
-# ==================== Link rules for DEF and CMP ====================
-
 
 def test_def_is_known_linkable_type():
     assert is_known_linkable_type("DEF") is True
@@ -73,9 +71,6 @@ def test_chg_to_def_roles():
     assert "references" in roles
 
 
-# ==================== External issue URL parsing ====================
-
-
 def test_parse_github_url():
     ref = parse_github_url("https://github.com/octocat/Hello-World/issues/42")
     assert ref is not None
@@ -115,9 +110,6 @@ def test_parse_issue_url_auto_detects():
     gl = parse_issue_url("https://gitlab.com/ns/proj/-/issues/3")
     assert gl is not None
     assert gl.tracker == "gitlab"
-
-
-# ==================== External field validation ====================
 
 
 def test_validate_external_fields_valid():
@@ -179,9 +171,6 @@ def test_validate_external_fields_bad_url():
 
 def test_validate_external_fields_none_fields():
     assert validate_external_fields(None, None, None, None) is None
-
-
-# ==================== Webhook signature verification ====================
 
 
 def test_github_hmac_signature():

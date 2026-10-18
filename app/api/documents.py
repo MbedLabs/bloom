@@ -73,8 +73,6 @@ async def list_documents(
     result = await db.execute(query)
     documents = result.scalars().all()
 
-    # Section counts for the whole page in one statement; this used to be a
-    # count query per document returned.
     section_counts: dict[int, int] = {}
     if documents:
         section_counts = {

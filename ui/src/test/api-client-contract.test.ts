@@ -31,9 +31,6 @@ let nextResponse: { status: number; data: unknown; headers: Record<string, strin
   headers: {},
 }
 
-// Installed before the client module is imported: `axios.create()` copies the
-// adapter out of the defaults at creation time, so the instance the client
-// builds picks this up and no request ever leaves the process.
 axios.defaults.adapter = async (config: InternalAxiosRequestConfig) => {
   requests.push({
     method: (config.method ?? '').toLowerCase(),
@@ -380,7 +377,6 @@ beforeEach(() => {
 
 describe('api client request contract', () => {
   it.each(CALLS)('%s issues the right request', async (name, args, method, url) => {
-    // The download helper reaches for browser APIs jsdom does not implement.
     vi.stubGlobal('URL', Object.assign(URL, {
       createObjectURL: () => 'blob:stub',
       revokeObjectURL: () => {},
@@ -394,8 +390,6 @@ describe('api client request contract', () => {
     expect(requests).toHaveLength(1)
     expect(requests[0].method).toBe(method)
     expect(requests[0].url).toBe(url)
-    // A template literal that names the wrong variable fails here rather than
-    // in the browser.
     expect(requests[0].url).not.toMatch(/undefined|NaN|\[object Object\]/)
 
     clickSpy.mockRestore()
@@ -489,8 +483,6 @@ describe('query parameters', () => {
     })
     const url = requests[0].url
     expect(url).toContain('type=requirements&type=test-cases')
-    // Every filter the registry offers has to reach the server, or the screen
-    // silently shows an unfiltered page of a filtered set.
     expect(url).toContain('status=Approved&status=Released')
     expect(url).toContain('q=boot')
     expect(url).toContain('priority=High')

@@ -13,7 +13,6 @@ def test_health_and_root(api_client: TestClient):
     payload = h.json()
     assert payload.get("status") == "healthy"
     assert "version" in payload
-    # Liveness must never claim a database connection it has not verified.
     assert payload.get("database") != "connected"
 
     r = api_client.get("/")

@@ -548,9 +548,12 @@ class RiskItem(Base):
 
 
 class ChangeRequest(Base):
+    """A change request. The external_* columns link it to an issue in GitHub, GitLab or Jira; inbound
+    webhooks look it up by tracker, repository and issue number.
+    """
+
     __tablename__ = "change_requests"
     __table_args__ = (
-        # Inbound webhooks resolve a change request by tracker + repo + issue number.
         Index(
             "ix_change_requests_external_issue",
             "external_tracker",
@@ -573,8 +576,6 @@ class ChangeRequest(Base):
     change_type: Mapped[str] = mapped_column(String(30), default="Enhancement")
     impact_assessment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     justification: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    # External tracker linkage, mirroring Defect so a change request can be kept in
-    # step with an issue in GitHub, GitLab, or Jira.
     external_tracker: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     external_repo_full_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     external_issue_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -684,7 +685,14 @@ class Defect(Base):
 
 
 class IntegrationSetting(Base):
-    """Per-project external tracker integration credentials and config."""
+    """Per-project external tracker integration credentials and config.
+
+    account_email is the Jira Cloud account that owns the API token (Basic auth `email:api_token`).
+    webhook_secret holds a Fernet envelope (Text). jira_project_key is the Jira project key this
+    integration owns, unique across Jira integrations, and with create_defects_on_inbound an inbound
+    Jira issue without a matching defect creates one. GitHub and GitLab leave the Jira columns
+    unused.
+    """
 
     __tablename__ = "integration_settings"
     __table_args__ = (
@@ -696,18 +704,10 @@ class IntegrationSetting(Base):
     project_id: Mapped[int] = mapped_column(ForeignKey(PROJECTS_ID), nullable=False)
     tracker: Mapped[str] = mapped_column(String(20), nullable=False)
     base_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    # Jira Cloud authenticates with `email:api_token` Basic auth, so the account the
-    # token belongs to is stored alongside it. Unused by GitHub and GitLab.
     account_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     token_encrypted: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    # Text (not String(255)) because the stored value is a Fernet envelope, which
-    # can exceed 255 chars for longer secrets.
     webhook_secret: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    # Jira Cloud only: the Jira project key (e.g. "PROJ") this integration owns, so an
-    # inbound webhook for PROJ-123 resolves to this Bloom project. Unique across jira
-    # integrations. Unused by GitHub and GitLab.
     jira_project_key: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    # Jira only: when true, an inbound issue with no matching defect creates one.
     create_defects_on_inbound: Mapped[bool] = mapped_column(default=True)
     jira_issue_types: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     jira_label: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -874,7 +874,11 @@ class ImportAttempt(Base):
 
 
 class DocumentAttachment(Base):
-    """A file held against a document."""
+    """A file held against a document.
+
+    source_ref is set for a file delivered by an external system; a second delivery with the same
+    source_ref replaces the file.
+    """
 
     __tablename__ = "document_attachments"
 
@@ -888,8 +892,6 @@ class DocumentAttachment(Base):
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
     storage_path: Mapped[str] = mapped_column(String(500), nullable=False)
     sha256: Mapped[str] = mapped_column(String(64), nullable=False)
-    # Set when the file came from an external system rather than a person, so a
-    # second delivery of the same thing replaces it instead of piling up.
     source_ref: Mapped[Optional[str]] = mapped_column(String(200), nullable=True, index=True)
     uploaded_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey(USERS_ID), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)

@@ -22,8 +22,6 @@ describe('extractApiErrorMessage', () => {
   })
 
   it('explains a FastAPI validation failure instead of the opaque status text', () => {
-    // Previously this fell through to "Request failed with status code 422",
-    // which told the user nothing about which field was rejected.
     const error = axiosErrorWith(422, {
       detail: [
         {

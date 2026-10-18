@@ -447,8 +447,6 @@ def test_development_allows_missing_integration_encryption_key(monkeypatch):
 
 
 def test_legacy_frontend_base_url_backfills_app_base_url(monkeypatch):
-    # Backward compatibility: an install that still sets only the legacy
-    # FRONTEND_BASE_URL keeps working because APP_BASE_URL falls back to it.
     clear_config_env(monkeypatch)
     monkeypatch.setenv("BLOOM_SECRET_KEY", "b" * 32)
     monkeypatch.setenv("BLOOM_FRONTEND_BASE_URL", "https://legacy.example.com")

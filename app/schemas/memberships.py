@@ -1,5 +1,8 @@
 """
 Pydantic schemas for project-scoped user membership management.
+
+EXTERNAL_DOC_TYPES mirrors the DocType union in ui/src/types/doc.ts; DEFAULT_EXTERNAL_DOC_TYPES are
+the types an external member sees when a membership names no doc_types.
 """
 
 from datetime import datetime
@@ -7,8 +10,6 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
-# ── Doc types exposed to external visibility configuration ──────────────
-# Mirrors the UI DocType union in ui/src/types/doc.ts
 EXTERNAL_DOC_TYPES = {
     "REQ",
     "SPEC",
@@ -25,8 +26,6 @@ EXTERNAL_DOC_TYPES = {
     "STD",
 }
 
-# Default doc types visible to external users when an admin creates a
-# membership without specifying doc_types.
 DEFAULT_EXTERNAL_DOC_TYPES = {"REQ", "TC", "CPT", "CMP"}
 
 

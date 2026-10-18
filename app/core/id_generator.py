@@ -1,6 +1,9 @@
 """
 Safe ID generation using MAX(numeric_suffix)+1 instead of COUNT()+1.
 Handles gaps from deletions correctly.
+
+Ids have at least three digits. When a project and type passes 999, every id of that project and
+type widens to the new width: FLT-REQ-001 becomes FLT-REQ-0001 when FLT-REQ-1000 is issued.
 """
 
 import re
@@ -28,9 +31,6 @@ ALLOWED_TYPE_CODES = frozenset(
 )
 
 PROJECT_PREFIX_PATTERN = re.compile(r"^[A-Z]{3}$")
-# Three digits is the floor, not the ceiling: a project that passes 999 keeps counting
-# and every id in that project and type widens to match, so FLT-REQ-001 becomes
-# FLT-REQ-0001 the moment FLT-REQ-1000 is needed.
 DOC_ID_PATTERN = re.compile(r"^([A-Z]{3})-([A-Z]+)-([0-9]{3,})$")
 ID_MIN_WIDTH = 3
 
@@ -159,8 +159,6 @@ async def next_doc_id(
     next_id = compute_next_id(rows, prefix, type_code)
     width = len(next_id.rsplit("-", 1)[1])
 
-    # Crossing a power of ten widens every id in this project and type, so FLT-REQ-001
-    # becomes FLT-REQ-0001 alongside the new FLT-REQ-1000.
     for old_id, new_id in widened_ids(rows, prefix, type_code, width).items():
         await db.execute(
             update(model)

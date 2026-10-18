@@ -232,14 +232,16 @@ async def list_users(
     return [UserResponse.model_validate(u) for u in result.scalars().all()]
 
 
-# Declared before GET /{user_id}, or "mentionable" is parsed as a user id.
 @router.get("/mentionable", response_model=list[MentionableUserResponse])
 async def list_mentionable_users(
     project_id: int,
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    """Who may be addressed with `@` in one project."""
+    """Who may be addressed with `@` in one project.
+
+    Registered ahead of GET /{user_id}, which would read "mentionable" as a user id.
+    """
     await get_row_or_404(db, Project, project_id, "Project not found")
 
     await require_project_access(db, current_user, project_id)
@@ -594,6 +596,13 @@ async def delete_user(
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
+    """Delete a user. The handler deletes the rows that exist only for the user (report requests,
+    tokens, memberships, project access, group memberships, notifications, import attempts, external
+    doc types), clears the user's defect, requirement and test case people fields, attachment
+    uploader, invited_by and created_by columns, passes service credentials the user created to the
+    deleting administrator, and flushes and audits the deletion before the response; other
+    references follow the ondelete rule of their foreign key.
+    """
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
@@ -651,7 +660,6 @@ async def delete_user(
             .values(approved_by_id=None, approved_at=None)
         )
 
-        # Rows that cannot exist without their user.
         await db.execute(
             delete(ProjectExternalDocType).where(
                 ProjectExternalDocType.membership_id.in_(
@@ -665,9 +673,6 @@ async def delete_user(
         await db.execute(delete(Notification).where(Notification.user_id == user_id))
         await db.execute(delete(ImportAttempt).where(ImportAttempt.user_id == user_id))
 
-        # A service credential outlives whoever minted it: deleting one because
-        # its creator left would silently break a working integration, so it is
-        # reassigned to the administrator performing the deletion instead.
         await db.execute(
             update(ServiceCredential)
             .where(ServiceCredential.created_by_user_id == user_id)
@@ -695,7 +700,6 @@ async def delete_user(
         deleted_email = user.email
         await db.delete(user)
 
-        # Force the statement out now.
         await db.flush()
         await record_audit_event(
             db,

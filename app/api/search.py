@@ -25,7 +25,11 @@ MIN_QUERY_LENGTH = 2
 
 
 class SearchResultItem(BaseModel):
-    type: str  # canonical type code: REQ, TC, DES, ... or a Document's own doc_type
+    """One search hit; type is the canonical type code (REQ, TC, DES, ...) or a document's own
+    doc_type.
+    """
+
+    type: str
     id: int
     doc_id: Optional[str] = None
     title: str

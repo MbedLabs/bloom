@@ -5,7 +5,6 @@ import os
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-# ── Rate limiter (H2) ──────────────────────────────────────────────────────────
 _rate_limit_disabled = os.environ.get("BLOOM_DISABLE_RATE_LIMIT", "").lower() in {
     "1",
     "true",

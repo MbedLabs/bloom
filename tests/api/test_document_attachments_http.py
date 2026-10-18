@@ -232,7 +232,6 @@ class TestHoldingFilesAgainstADocument:
 
         assert got.status_code == 200
         assert got.content == PDF
-        # Never inline: a stored SVG would otherwise run in the reader's session.
         assert "attachment" in got.headers["content-disposition"]
         assert got.headers["x-content-type-options"] == "nosniff"
 
@@ -247,7 +246,6 @@ class TestHoldingFilesAgainstADocument:
         )
 
         assert created.status_code == 201, created.text
-        # The path is discarded; what is shown is a name, not a location.
         assert "/" not in created.json()["original_filename"]
 
     def test_refuses_a_type_that_is_not_allowed(self, api_client, auth_headers, document):
@@ -374,7 +372,6 @@ class TestPublishingABudReport:
         listed = api_client.get(
             f"/api/documents/{first['document_id']}/attachments", headers=auth_headers
         ).json()
-        # Replaced, not appended.
         assert len(listed) == 2
 
     def test_a_different_run_gets_its_own_document(

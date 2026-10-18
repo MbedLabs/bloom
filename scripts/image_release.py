@@ -70,8 +70,11 @@ def eligible_aliases(aliases, ref, latest_tag, branch_current=True):
 
 
 def promote(image, aliases, inspect=digest, execute=run):
+    """Point every alias at the tested image. Exact version aliases are checked first, and a published
+    version with another digest aborts before any alias moves; each alias is verified by digest
+    after it moves.
+    """
     expected = image.split("@", 1)[1]
-    # Preflight every exact version before changing any aliases.
     for alias in aliases:
         tag = alias.rsplit(":", 1)[1]
         if re.fullmatch(r"v?\d+\.\d+\.\d+(?:[-+].+)?", tag):

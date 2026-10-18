@@ -415,7 +415,6 @@ export default function SuiteDetail({
 
       <WorkflowPanel artefactType="test-suite" artefactId={parsedSuiteId} projectPrefix={prefix} projectId={suite.project_id} />
 
-      {/* Activity */}
       <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
         <DocumentActivityPanel artefactType="test-suite" artefactId={parsedSuiteId} />
       </div>

@@ -31,7 +31,6 @@ export default function Setup() {
         if (!cancelled) setSetupRequired(status.setup_required)
       })
       .catch(() => {
-        // An instance that cannot answer is not one we should offer to claim.
         if (!cancelled) setSetupRequired(false)
       })
 

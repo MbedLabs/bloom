@@ -1,3 +1,5 @@
+"""Deleting a user removes the user, also when the user is a project member."""
+
 import os
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characters-long")
@@ -6,8 +8,6 @@ from fastapi.testclient import TestClient
 
 from tests.access_fixtures import add_policy_member
 from tests.conftest import create_project, unique_email, unique_suffix
-
-"""Deleting a user must actually delete the user."""
 
 
 def _admin_headers(api_client: TestClient) -> dict[str, str]:
@@ -78,7 +78,6 @@ def test_deleting_a_project_member_removes_it(api_client: TestClient):
     deleted = api_client.delete(f"/api/users/{user_id}", headers=headers)
     assert deleted.status_code == 204, deleted.text
 
-    # The assertion that actually caught this: a 204 alone proved nothing.
     assert not _user_exists(
         api_client, headers, user_id
     ), "the API reported success but the user is still there"

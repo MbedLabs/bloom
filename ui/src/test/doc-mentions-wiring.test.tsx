@@ -87,7 +87,6 @@ beforeEach(() => {
   resetApiMocks(client as unknown as Record<string, unknown>, vi)
   lastEditorProps = {}
   vi.mocked(client.projectVariablesApi.list).mockResolvedValue([parameter, variable] as never)
-  // `@` reads the project's people, not the admin-only directory.
   vi.mocked(client.usersApi.listMentionable).mockResolvedValue([user, person] as never)
 })
 
@@ -98,9 +97,6 @@ describe('what each mention trigger offers', () => {
     renderCreate()
     await screen.findByTestId('doc-editor')
 
-    // Both kinds are managed on the same Parameters & Variables screen and both
-    // are written the same way in a document; filtering to one kind made the
-    // other unreachable from the editor.
     await waitFor(() =>
       expect(labels(lastEditorProps.mentionItems)).toEqual(['BOARD_REV', 'BOOT_BUDGET_MS']),
     )
@@ -120,7 +116,6 @@ describe('what each mention trigger offers', () => {
     await screen.findByTestId('doc-editor')
     await waitFor(() => expect(lastEditorProps.mentionItems?.length).toBe(2))
 
-    // No person may be reached with `{{`, and no parameter with `@`.
     expect(labels(lastEditorProps.mentionItems)).not.toContain(person.full_name)
     expect(labels(lastEditorProps.userMentionItems)).not.toContain(parameter.key)
   })
@@ -130,8 +125,6 @@ describe('what each mention trigger offers', () => {
     await screen.findByTestId('doc-editor')
     await waitFor(() => expect(lastEditorProps.mentionItems?.length).toBe(2))
 
-    // The label is what ends up between the braces, so it has to be the name
-    // the parameter is looked up by.
     expect(lastEditorProps.mentionItems).toContainEqual(
       expect.objectContaining({ id: parameter.id, label: parameter.key }),
     )
@@ -143,8 +136,6 @@ describe('what each mention trigger offers', () => {
     await screen.findByTestId('doc-editor')
     await waitFor(() => expect(lastEditorProps.mentionItems?.length).toBe(2))
 
-    // The value travels beside the key for the picker to show. It has to stay
-    // out of the label, or it would be what gets written into the document.
     const offered = lastEditorProps.mentionItems?.find((item) => item.id === parameter.id)
     expect(offered?.hint).toBe(parameter.value)
     expect(offered?.label).toBe(parameter.key)

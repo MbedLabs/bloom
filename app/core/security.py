@@ -65,6 +65,9 @@ async def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db, scope="function"),
 ) -> User:
+    """Return the active user of the bearer token. A token minted before the user's session_version
+    changed (password change or reset, confirmed email change) is rejected.
+    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -86,8 +89,6 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
 
-    # Reject tokens minted before a password/reset/email-change bumped the user's
-    # session_version.
     if payload.get("ver") != user.session_version:
         raise credentials_exception
 

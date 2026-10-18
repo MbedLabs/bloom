@@ -167,7 +167,6 @@ export default function CampaignDetail({
   return (
     <>
     <div className="animate-fade-in space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Link to={backUrl} className="p-2 hover:bg-accent/50 rounded-md">
@@ -197,7 +196,6 @@ export default function CampaignDetail({
         ) : null}
       </div>
 
-      {/* Edit modal */}
       {canEditDocs && editOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50">
           <dialog open aria-label="Edit campaign" onKeyDown={handleEditKeyDown} className="relative m-0 bg-card text-foreground rounded-lg shadow-elegant p-6 max-w-md w-full mx-4">
@@ -247,7 +245,6 @@ export default function CampaignDetail({
         </div>
       )}
 
-      {/* Delete confirmation modal */}
       {canEditDocs && confirmDelete && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50">
           <div className="bg-card rounded-lg shadow-elegant p-6 max-w-sm w-full mx-4">
@@ -261,7 +258,6 @@ export default function CampaignDetail({
         </div>
       )}
 
-      {/* Stats row */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <StatCard label="Suites" value={suiteScopes.length} color="text-primary" />
         <StatCard label="Bud Run" value={campaign.bud_run_id || '-'} color="text-foreground" />
@@ -273,7 +269,6 @@ export default function CampaignDetail({
         />
       </div>
 
-      {/* Suites — expandable inline list */}
       {(suiteScopes.length > 0 || adHocItems.length > 0) && (
         <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
           <div className="px-6 py-4 border-b border-border">
@@ -356,7 +351,6 @@ export default function CampaignDetail({
         </div>
       )}
 
-      {/* Bud Execution Link */}
       <div className="bg-card rounded-lg shadow-elegant p-5">
         <div className="flex items-center justify-between mb-3">
           <span className="text-sm font-medium text-foreground">Bud Execution Link</span>
@@ -374,7 +368,6 @@ export default function CampaignDetail({
         )}
       </div>
 
-      {/* Configuration */}
       {campaign.configuration && (
         <div className="bg-card rounded-lg shadow-elegant p-5">
           <h3 className="text-sm font-medium text-muted-foreground mb-2">Configuration</h3>
@@ -394,7 +387,6 @@ export default function CampaignDetail({
         <ArtefactTags type="campaign" id={campaign.id} projectId={campaign.project_id} canEdit={canEditDocs && rowAllows('edit')} origin={campaign.visibility === 'customer' ? 'Customer' : 'Internal'} />
       </div>
 
-      {/* Linked documents */}
       <DocumentLinksPanel
         projectId={campaign.project_id}
         projectPrefix={prefix || ''}
@@ -403,7 +395,6 @@ export default function CampaignDetail({
         sourceDocId={campaign.campaign_id}
       />
 
-      {/* Activity */}
       <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
         <DocumentActivityPanel artefactType="campaign" artefactId={campId} />
       </div>

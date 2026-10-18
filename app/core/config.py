@@ -15,7 +15,17 @@ ENV_FILES = (BACKEND_DIR / ".env",)
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
+    """Application settings loaded from environment variables.
+
+    INTEGRATION_ENCRYPTION_KEY is the Fernet key for tracker credentials and webhook secrets at
+    rest. The access token is short-lived and renewed by the refresh-token cookie, which is
+    httpOnly, rotates on every use and is revocable through user_tokens. When unset,
+    AUTH_COOKIE_SECURE and LOG_JSON are on in production only, and RUN_STARTUP_DATA_REPAIR and
+    AUTO_SEED_ADMIN are on outside production only. FRONTEND_BASE_URL is the legacy name of
+    APP_BASE_URL. CORS allows the listed origins only, API docs are off unless enabled, and the
+    ReqIF request and member limits stay at or below 25 MiB. ALLOWED_ATTACHMENT_MIME_TYPES admits
+    SVG; attachments are served for download only (Content-Disposition: attachment).
+    """
 
     model_config = SettingsConfigDict(
         env_file=ENV_FILES,
@@ -52,31 +62,24 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("BLOOM_SERVICE_TOKEN_PEPPER", "SERVICE_TOKEN_PEPPER"),
     )
-    # Fernet key encrypting external tracker credentials and webhook secrets at rest.
     INTEGRATION_ENCRYPTION_KEY: str = Field(
         default="",
         validation_alias=AliasChoices(
             "BLOOM_INTEGRATION_ENCRYPTION_KEY", "INTEGRATION_ENCRYPTION_KEY"
         ),
     )
-    # Short-lived access token: kept small because a rotating refresh-token cookie
-    # (below) silently renews it.
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
         default=30,
         validation_alias=AliasChoices(
             "BLOOM_ACCESS_TOKEN_EXPIRE_MINUTES", "ACCESS_TOKEN_EXPIRE_MINUTES"
         ),
     )
-    # Refresh token lifetime (delivered as an httpOnly cookie, rotated on every
-    # use, revocable via the user_tokens table).
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(
         default=30,
         validation_alias=AliasChoices(
             "BLOOM_REFRESH_TOKEN_EXPIRE_DAYS", "REFRESH_TOKEN_EXPIRE_DAYS"
         ),
     )
-    # Set the Secure flag on the refresh cookie. None -> on in production, off
-    # elsewhere so local HTTP dev still receives the cookie.
     AUTH_COOKIE_SECURE: bool | None = Field(
         default=None,
         validation_alias=AliasChoices("BLOOM_AUTH_COOKIE_SECURE", "AUTH_COOKIE_SECURE"),
@@ -89,9 +92,6 @@ class Settings(BaseSettings):
         default=HTTP_LOCALHOST_8000,
         validation_alias=AliasChoices("BLOOM_APP_BASE_URL", "APP_BASE_URL"),
     )
-    # Legacy name for APP_BASE_URL. Kept for backward compatibility and left out
-    # of .env.example and the docs on purpose. No code reads it directly;
-    # APP_BASE_URL falls back to it when only this variable is set.
     FRONTEND_BASE_URL: str = Field(
         default=HTTP_LOCALHOST_8000,
         validation_alias=AliasChoices("BLOOM_FRONTEND_BASE_URL", "FRONTEND_BASE_URL"),
@@ -102,7 +102,6 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("BLOOM_TESTSTATION_APP_URL", "TESTSTATION_APP_URL"),
     )
 
-    # M1: Restrict CORS to explicit origins only (no wildcard)
     CORS_ORIGINS: List[str] = Field(
         default=[
             "http://localhost:3000",
@@ -114,16 +113,13 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("BLOOM_CORS_ORIGINS", "CORS_ORIGINS"),
     )
 
-    # L1: Disable API docs in production by default
     ENABLE_DOCS: bool = Field(
         default=False, validation_alias=AliasChoices("BLOOM_ENABLE_DOCS", "ENABLE_DOCS")
     )
 
-    # Observability
     LOG_LEVEL: str = Field(
         default="INFO", validation_alias=AliasChoices("BLOOM_LOG_LEVEL", "LOG_LEVEL")
     )
-    # None -> JSON logs in production, human-readable text elsewhere
     LOG_JSON: bool | None = Field(
         default=None, validation_alias=AliasChoices("BLOOM_LOG_JSON", "LOG_JSON")
     )
@@ -131,20 +127,16 @@ class Settings(BaseSettings):
         default=True, validation_alias=AliasChoices("BLOOM_ENABLE_METRICS", "ENABLE_METRICS")
     )
 
-    # Run legacy startup data repair (prefer Alembic in production)
     RUN_STARTUP_DATA_REPAIR: bool | None = Field(
         default=None,
         validation_alias=AliasChoices("BLOOM_RUN_STARTUP_DATA_REPAIR", "RUN_STARTUP_DATA_REPAIR"),
     )
 
-    # Explicit startup admin bootstrap; defaults on in development, off in production.
     AUTO_SEED_ADMIN: bool | None = Field(
         default=None,
         validation_alias=AliasChoices("BLOOM_AUTO_SEED_ADMIN", "AUTO_SEED_ADMIN"),
     )
 
-    # ReqIF/ReqIFZ public-beta resource policy. Request/member ceilings are
-    # intentionally bounded at 25 MiB and cannot be relaxed by deployment config.
     REQIF_MAX_REQUEST_BYTES: int = Field(
         default=25 * 1024 * 1024,
         ge=1,
@@ -307,9 +299,6 @@ class Settings(BaseSettings):
         "text/xml",
         "application/xml",
         "text/csv",
-        # Images and plots. SVG is text and a browser would run script inside
-        # one if it were ever served inline; it is not, and the download header
-        # is what keeps that true.
         "image/png",
         "image/jpeg",
         "image/svg+xml",
@@ -372,12 +361,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def prefer_app_base_url_over_legacy_frontend_url(self):
-        # APP_BASE_URL is the public URL Bloom uses in the links it emails
-        # (invites, email verification, password resets) and in report and campaign links.
-        # FRONTEND_BASE_URL is the former name of this setting and is kept
-        # only for backward compatibility: an install that sets
-        # FRONTEND_BASE_URL but not APP_BASE_URL keeps working. When both
-        # are set, APP_BASE_URL wins.
+        """Use FRONTEND_BASE_URL as APP_BASE_URL when only the legacy name is set; APP_BASE_URL wins
+        when both are set. APP_BASE_URL is the public URL in emailed links and in report and
+        campaign links.
+        """
         if (
             "APP_BASE_URL" not in self.model_fields_set
             and "FRONTEND_BASE_URL" in self.model_fields_set
@@ -432,7 +419,6 @@ class Settings(BaseSettings):
             raise ValueError("ADMIN_PASSWORD must be at least 16 characters long in production.")
         return self
 
-    # C1: SECRET_KEY must be set explicitly — no insecure fallback in production
     @field_validator("SECRET_KEY")
     @classmethod
     def secret_key_must_be_set(cls, v: str) -> str:

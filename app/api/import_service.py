@@ -99,8 +99,10 @@ router = APIRouter()
 
 
 class ImportRequest(BaseModel):
+    """A cross-project import request; doc_type is "REQ" or "TC"."""
+
     source_project_id: int
-    doc_type: str  # "REQ" or "TC"
+    doc_type: str
     doc_ids: list[int]
     include_links: bool = True
     tag_ids: list[int] = []
@@ -342,9 +344,6 @@ async def _import_docs(
         await attach_tags(db, TAG_TYPE_OF_MODEL[model], copy, tag_ids, current_user)
 
 
-# ==================== ReqIF import (DOORS / Polarion / Jama) ====================
-
-
 class ReqIFImportResult(BaseModel):
     imported: int
     skipped: int
@@ -396,7 +395,11 @@ async def import_reqif(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    """Import a ReqIF (``.reqif`` / ``.reqifz``) export as project requirements."""
+    """Import a ReqIF (``.reqif`` / ``.reqifz``) export as project requirements.
+
+    Objects whose source_ref exists are reused on re-import, the tool's own id is stored for later
+    matching, and spec relations become requirement links when both ends exist.
+    """
     target_project = await get_row_or_404(db, Project, project_id, TARGET_PROJECT_NOT_FOUND)
 
     await require_project_access(db, current_user, target_project.id, permission=("import", "REQ"))
@@ -435,7 +438,6 @@ async def import_reqif(
     prefix = target_project.prefix
     next_num = await _next_number(db, target_project.id, prefix, "REQ")
 
-    # Existing source_refs let a re-import reuse rather than duplicate objects.
     existing_rows = (
         (
             await db.execute(
@@ -500,7 +502,6 @@ async def import_reqif(
         await attach_tags(db, "requirement", requirement, import_tags, current_user)
         ref_to_req_id[source_ref] = requirement.id
         own_req_ids.add(requirement.id)
-        # foreign id (tool's own key), if any, is stored separately for later dedupe
         foreign = obj.first_attr(FOREIGN_ID_HINTS)
         if foreign:
             ref_to_req_id.setdefault(foreign[:100], requirement.id)
@@ -510,7 +511,6 @@ async def import_reqif(
         result.imported += 1
         next_num += 1
 
-    # Spec relations -> requirement links (only when both ends exist)
     seen_links: set = set()
     known_ids = set(ref_to_req_id.values())
     if known_ids:
@@ -665,7 +665,7 @@ async def import_test_cases_file(
         raise HTTPException(status_code=413, detail="Import file too large")
     try:
         rows = _import_rows_from_csv(raw) if format == "csv" else _import_rows_from_xml(raw)
-    except Exception as exc:  # noqa: BLE001 - surface any parse failure as a 400
+    except Exception as exc:  # noqa: BLE001
         await finish_import_attempt(db, attempt_id, "failed")
         raise HTTPException(status_code=400, detail=f"Could not parse {format.upper()}: {exc}")
 
@@ -834,7 +834,6 @@ async def import_test_cases_file(
     )
 
 
-# type code -> (model, id attribute, id type code, title attribute, extra kwargs)
 ARTEFACT_FACTORY = {
     "REQ": (Requirement, "req_id", "REQ", "title", {}),
     "DES": (DesignItem, "design_id", "DES", "title", {}),
@@ -859,7 +858,6 @@ ARTEFACT_SLUG_FOR_CODE = {
     "STD": "documents",
 }
 
-# Types for which the uploader is prompted to check link necessity.
 LINK_REVIEW_CODES = {"REQ", "DES", "CPT", "SPEC", "STD"}
 
 ARTEFACT_TYPE_FOR_CODE = {
