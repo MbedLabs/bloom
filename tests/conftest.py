@@ -76,7 +76,7 @@ def _postgres_available_from_env() -> bool:
 
 @pytest.fixture(scope="session")
 def api_client():
-    """One TestClient per pytest session — avoids asyncpg teardown across HTTP modules."""
+    """One TestClient per pytest session (avoids asyncpg teardown across HTTP modules)."""
     if not _postgres_available_from_env():
         pytest.skip("api_client tests require reachable Postgres for app lifespan startup")
 

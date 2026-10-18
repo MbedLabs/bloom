@@ -29,7 +29,7 @@ describe('getBreadcrumbs', () => {
     expect(crumbs[crumbs.length - 1]?.label).toBe('Documents')
   })
 
-  it('does not show Edit crumb — sticks to doc list', () => {
+  it('does not show Edit crumb (sticks to doc list)', () => {
     const crumbs = getBreadcrumbs(
       '/projects/VCU/docs/des/VCU-DES-001/edit',
       '?type=des',

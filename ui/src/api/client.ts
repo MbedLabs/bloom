@@ -1180,7 +1180,7 @@ export interface DocListParams {
   relatedTo?: string
   role?: string
   direction?: 'incoming' | 'outgoing'
-  /** Only these documents, as `TYPE:row_id` pairs — the shape a link stores. */
+  /** Only these documents, as `TYPE:row_id` pairs (the shape a link stores). */
   keys?: string[]
 }
 

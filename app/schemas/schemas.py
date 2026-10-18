@@ -12,7 +12,7 @@ T = TypeVar("T")
 
 
 class StrictModel(BaseModel):
-    """Base model that forbids extra fields — user-supplied IDs get rejected loudly."""
+    """Base model that forbids extra fields: user-supplied IDs get rejected loudly."""
 
     model_config = ConfigDict(extra="forbid")
 

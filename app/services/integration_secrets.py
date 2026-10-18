@@ -41,7 +41,7 @@ def encrypt_integration_secret(secret: str) -> str:
 
 def decrypt_integration_secret(envelope: str) -> str:
     """Decrypt a stored envelope. Fails closed on legacy plaintext or any key /
-    ciphertext problem — the caller must rotate the credential."""
+    ciphertext problem; the caller must rotate the credential."""
     if not envelope.startswith(ENVELOPE_PREFIX):
         raise HTTPException(
             status_code=503,

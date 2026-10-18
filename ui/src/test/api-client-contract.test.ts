@@ -65,7 +65,7 @@ const BODY = {
 /**
  * `[method path, arguments, expected request]` for every endpoint.
  *
- * The expected URL is the path as the client writes it — axios appends
+ * The expected URL is the path as the client writes it: axios appends
  * `params` to it later, so query strings appear here only where the client
  * builds them into the path itself.
  */

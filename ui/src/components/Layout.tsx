@@ -23,7 +23,7 @@ import { useProjectPermissions } from '../hooks/useProjectPermissions'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { formatDateTime } from '../test/date-utils'
 
-/** Must match Tailwind `w-60` / `w-14` and main `ml-*` — also positions the seam toggle. */
+/** Must match Tailwind `w-60` / `w-14` and main `ml-*`. Also positions the seam toggle. */
 const SIDEBAR_EDGE = { expanded: '15rem', collapsed: '3.5rem' } as const
 
 const BUD_APP_URL = getBudAppBaseUrl()

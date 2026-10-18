@@ -51,7 +51,7 @@ export default function ImpactAnalysis() {
           <h2 className="text-2xl font-bold text-foreground">Impact Analysis</h2>
           <p className="text-muted-foreground">
             <span className="font-mono text-primary">{analysis.root_requirement.req_id}</span>
-            {' '}&mdash; {analysis.root_requirement.title}
+            : {analysis.root_requirement.title}
           </p>
         </div>
       </div>

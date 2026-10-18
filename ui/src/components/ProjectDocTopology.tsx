@@ -681,7 +681,7 @@ export default function ProjectDocTopology({ projectId, prefix }: Readonly<Props
         {edges.length === 0 && (
           <Panel position="bottom-center" className="m-3">
             <div className="rounded-lg border border-border bg-card/95 backdrop-blur-xs shadow-xs px-3 py-2 text-xs text-muted-foreground">
-              No relationships between document types yet — link documents to see them here.
+              No relationships between document types yet. Link documents to see them here.
             </div>
           </Panel>
         )}
