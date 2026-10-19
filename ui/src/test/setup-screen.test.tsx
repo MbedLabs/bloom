@@ -61,7 +61,7 @@ describe('first-run setup screen', () => {
     mockedApi.getStatus.mockResolvedValue({ setup_required: true })
     renderSetup()
 
-    expect(await screen.findByText('Welcome to Bloom')).toBeTruthy()
+    expect(await screen.findByText('Welcome to Bloom PLM')).toBeTruthy()
     expect(screen.getByPlaceholderText('you@example.com')).toBeTruthy()
   })
 
@@ -83,7 +83,7 @@ describe('first-run setup screen', () => {
     mockedApi.getStatus.mockResolvedValue({ setup_required: true })
     mockedApi.createFirstAdmin.mockResolvedValue({ message: 'created' })
     renderSetup()
-    await screen.findByText('Welcome to Bloom')
+    await screen.findByText('Welcome to Bloom PLM')
 
     await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Create Administrator' }))
@@ -101,7 +101,7 @@ describe('first-run setup screen', () => {
   it('rejects a mismatched confirmation without calling the backend', async () => {
     mockedApi.getStatus.mockResolvedValue({ setup_required: true })
     renderSetup()
-    await screen.findByText('Welcome to Bloom')
+    await screen.findByText('Welcome to Bloom PLM')
 
     await fillForm({ confirm: 'a-different-password' })
     fireEvent.click(screen.getByRole('button', { name: 'Create Administrator' }))
@@ -113,7 +113,7 @@ describe('first-run setup screen', () => {
   it('rejects a password below the policy without calling the backend', async () => {
     mockedApi.getStatus.mockResolvedValue({ setup_required: true })
     renderSetup()
-    await screen.findByText('Welcome to Bloom')
+    await screen.findByText('Welcome to Bloom PLM')
 
     await fillForm({ password: 'short', confirm: 'short' })
     fireEvent.click(screen.getByRole('button', { name: 'Create Administrator' }))
@@ -126,7 +126,7 @@ describe('first-run setup screen', () => {
     mockedApi.getStatus.mockResolvedValue({ setup_required: true })
     mockedApi.createFirstAdmin.mockRejectedValue(new Error('boom'))
     renderSetup()
-    await screen.findByText('Welcome to Bloom')
+    await screen.findByText('Welcome to Bloom PLM')
 
     await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Create Administrator' }))

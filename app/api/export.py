@@ -29,6 +29,7 @@ from app.api.link_read_utils import (
     VERIFY_TARGET_TYPE,
 )
 from app.core.database import get_db
+from app.core.identity import POWERED_BY
 from app.core.security import (
     apply_external_visibility_filter,
     get_current_user,
@@ -118,7 +119,7 @@ class _BrandedPDF(FPDF):
         self.set_xy(x, y)
         self.set_font("Helvetica", "", 8)
         self.set_text_color(0x25, 0x63, 0xEB)
-        label = "Powered by EmbedLabs"
+        label = POWERED_BY
         self.cell(self.get_string_width(label) + 1, 5, label, link=EMBEDLABS_URL)
         self.set_text_color(0x64, 0x74, 0x8B)
         self.set_xy(self.l_margin, y)

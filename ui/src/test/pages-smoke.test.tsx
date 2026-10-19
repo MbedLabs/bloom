@@ -55,7 +55,7 @@ describe('source-available readiness smoke', () => {
   })
 
   it.each([
-    ['/login', 'Welcome to Bloom', 'text-gray-300/60'],
+    ['/login', 'Welcome to Bloom PLM', 'text-gray-300/60'],
     ['/accept-invite', 'Accept Invitation', 'text-gray-300/50'],
     ['/verify-email', 'Verify Email', 'text-gray-300/50'],
     ['/forgot-password', 'Forgot Password', 'text-gray-300/50'],

@@ -85,7 +85,6 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("BLOOM_AUTH_COOKIE_SECURE", "AUTH_COOKIE_SECURE"),
     )
 
-    BLOOM_APP_NAME: str = "EmbedLabs Bloom"
     BLOOM_APP_VERSION: str = "1.2.0"
 
     APP_BASE_URL: str = Field(

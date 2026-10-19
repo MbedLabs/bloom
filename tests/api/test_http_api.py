@@ -18,7 +18,7 @@ def test_health_and_root(api_client: TestClient):
     r = api_client.get("/")
     assert r.status_code == 200
     body = r.json()
-    assert "Bloom" in str(body.get("message", ""))
+    assert body.get("message") == "Bloom PLM by EmbedLabs"
     assert "version" in body
 
 

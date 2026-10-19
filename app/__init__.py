@@ -1,5 +1,5 @@
 """
-bloom-app backend - FastAPI application for Bloom Product Lifecycle Management by EmbedLabs
+FastAPI backend of Bloom PLM by EmbedLabs.
 """
 
 __version__ = "1.2.0"

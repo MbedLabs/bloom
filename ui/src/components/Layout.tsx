@@ -1,3 +1,4 @@
+import { PRODUCT_IDENTITY, PRODUCT_NAME } from '../brandAssets'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Suspense } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router'
@@ -264,12 +265,12 @@ function LayoutInner() {
         <div className={`${sidebarCollapsed ? 'px-2 pt-4 pb-2.5' : 'px-3 pt-4 pb-2.5'}`}>
           <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-2.5'}`}>
             <div className="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center shrink-0 bg-white/10">
-              <img src="/favicon-96x96.png" alt="Bloom" className="w-full h-full object-contain" />
+              <img src="/favicon-96x96.png" alt={PRODUCT_IDENTITY} className="w-full h-full object-contain" />
             </div>
             {!sidebarCollapsed && (
               <div className="min-w-0">
-                <h1 className="text-base font-bold text-violet-100 tracking-tight">Bloom</h1>
-                <p className="text-[10px] text-violet-300/60 font-medium uppercase tracking-wider leading-snug">Product Lifecycle Management</p>
+                <h1 className="text-base font-bold text-violet-100 tracking-tight">{PRODUCT_NAME}</h1>
+                <p className="text-[10px] text-violet-300/60 font-medium uppercase tracking-wider leading-snug">by EmbedLabs</p>
               </div>
             )}
           </div>

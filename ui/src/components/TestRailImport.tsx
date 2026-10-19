@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '../brandAssets'
 import SelectField from './SelectField'
 import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useState } from 'react'
@@ -123,7 +124,7 @@ export default function TestRailImport({
         <div className="space-y-2">
           <p className="text-sm text-foreground font-medium">Columns</p>
           <p className="text-xs text-muted-foreground">
-            Bloom matched these from the header. Point any field at a different column before importing.
+            {PRODUCT_NAME} matched these from the header. Point any field at a different column before importing.
           </p>
           <div className="grid gap-2 sm:grid-cols-2">
             {MAPPED_FIELDS.map((f) => (

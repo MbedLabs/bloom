@@ -1,4 +1,4 @@
-Open Bloom at $CLOUDRON-APP-ORIGIN and create your administrator account.
+Open Bloom PLM at $CLOUDRON-APP-ORIGIN and create your administrator account.
 
 The instance starts with no accounts, so the first visit shows a setup screen
 that asks for your name, email address and a password. It stops being reachable

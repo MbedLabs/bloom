@@ -741,7 +741,7 @@ describe('the Jira tracker of a project', () => {
       target: { value: 'customfield_1' },
     })
     fireEvent.change(screen.getByPlaceholderText(/created >=/), { target: { value: 'priority = High' } })
-    changeControl(screen.getByLabelText('Bloom priority for Jira Lowest'), {
+    changeControl(screen.getByLabelText('Bloom PLM priority for Jira Lowest'), {
       target: { value: 'Medium' },
     })
     fireEvent.click(screen.getByLabelText(/create a defect for each new matching issue/i))
@@ -770,7 +770,7 @@ describe('the Jira tracker of a project', () => {
     await screen.findByText(/one-way/i)
 
     fireEvent.click(screen.getByLabelText(/two-way sync/i))
-    expect(screen.getByText(/bloom pushes defect title and status changes back to jira/i)).toBeTruthy()
+    expect(screen.getByText(/bloom plm pushes defect title and status changes back to jira/i)).toBeTruthy()
     expect(screen.getByText(/save first; the pull uses the saved filter/i)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /save integration/i }))
 

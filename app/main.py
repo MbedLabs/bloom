@@ -1,4 +1,4 @@
-"""FastAPI application for EmbedLabs Bloom - Product Lifecycle Management."""
+"""FastAPI application for Bloom PLM by EmbedLabs."""
 
 import asyncio
 import contextlib
@@ -56,6 +56,7 @@ from app.core.database import async_session_maker, create_tables, engine
 from app.core.deps import limiter
 from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS, normalize_document_kind
 from app.core.id_generator import compute_next_id, id_width, next_doc_id
+from app.core.identity import PRODUCT_IDENTITY
 from app.core.observability import (
     RequestObservabilityMiddleware,
     metrics_router,
@@ -341,8 +342,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title=settings.BLOOM_APP_NAME,
-    description="Backend API for EmbedLabs Bloom - Product Lifecycle Management",
+    title=PRODUCT_IDENTITY,
+    description=f"Backend API for {PRODUCT_IDENTITY}",
     version=settings.BLOOM_APP_VERSION,
     docs_url="/api/docs" if settings.ENABLE_DOCS else None,
     redoc_url="/api/redoc" if settings.ENABLE_DOCS else None,
@@ -488,6 +489,6 @@ app.include_router(docs_facade.router, prefix="/api", tags=["Docs Facade"])
 async def root():
     """Root endpoint."""
     return {
-        "message": settings.BLOOM_APP_NAME,
+        "message": PRODUCT_IDENTITY,
         "version": settings.BLOOM_APP_VERSION,
     }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router'
 import { APP_VERSION, extractApiErrorMessage, setupApi } from '../api/client'
-import { BLOOM_LOGO_DARK, BLOOM_LOGO_LIGHT } from '../brandAssets'
+import { BLOOM_LOGO_DARK, BLOOM_LOGO_LIGHT, PRODUCT_IDENTITY, PRODUCT_NAME } from '../brandAssets'
 import { newPasswordProblem } from '../lib/passwordRules'
 
 /**
@@ -81,17 +81,17 @@ export default function Setup() {
         <div className="flex flex-col items-center mb-6">
           <img
             src={BLOOM_LOGO_DARK}
-            alt="Bloom by EmbedLabs"
+            alt={PRODUCT_IDENTITY}
             className="h-16 w-auto max-w-full object-contain mb-3 hidden dark:block"
           />
           <img
             src={BLOOM_LOGO_LIGHT}
-            alt="Bloom by EmbedLabs"
+            alt={PRODUCT_IDENTITY}
             className="h-16 w-auto max-w-full object-contain mb-3 dark:hidden"
           />
         </div>
 
-        <h1 className="text-2xl font-bold text-foreground mb-2">Welcome to Bloom</h1>
+        <h1 className="text-2xl font-bold text-foreground mb-2">{`Welcome to ${PRODUCT_NAME}`}</h1>
         <p className="text-sm text-muted-foreground mb-6">
           This instance has no accounts yet. Create the administrator to get started.
         </p>
@@ -163,7 +163,7 @@ export default function Setup() {
         </form>
 
         <div className="text-center mt-6">
-          <p className="text-sm text-muted-foreground">Bloom</p>
+          <p className="text-sm text-muted-foreground">{PRODUCT_NAME}</p>
           <p className="text-xs text-muted-foreground/70 mt-1">v{APP_VERSION}</p>
           <a
             href="https://www.embedlabs.net"

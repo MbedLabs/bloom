@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '../brandAssets'
 import SelectField from '../components/SelectField'
 import ProfilePicture from '../components/ProfilePicture'
 import UserIdentity from '../components/UserIdentity'
@@ -370,7 +371,7 @@ function EmailChangeModal({
           <button onClick={onClose} title="Close email change modal" className="p-1 rounded text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
         </div>
         <p className="text-sm text-muted-foreground mb-4">
-          Bloom will send a confirmation link to the new address. The login email remains {user.email} until the recipient confirms it.
+          {PRODUCT_NAME} will send a confirmation link to the new address. The login email remains {user.email} until the recipient confirms it.
         </p>
         <div className="mb-4"><UserIdentity user={user} /></div>
         {error && <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">{error}</div>}

@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '../brandAssets'
 import SelectField from './SelectField'
 import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -497,13 +498,13 @@ function JiraFields(props: Readonly<{
         />
       </label>
       <fieldset>
-        <legend className={labelClass}>Jira priority to Bloom priority</legend>
+        <legend className={labelClass}>Jira priority to {PRODUCT_NAME} priority</legend>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
           {JIRA_PRIORITIES.map((jira) => (
             <label key={jira} className="text-xs text-muted-foreground">
               {jira}
               <SelectField
-                aria-label={`Bloom priority for Jira ${jira}`}
+                aria-label={`${PRODUCT_NAME} priority for Jira ${jira}`}
                 value={props.priorityMap[jira]}
                 onChange={(e) => props.onPriorityMap({ ...props.priorityMap, [jira]: e.target.value })}
                 className={`${inputClass} mt-1`}
@@ -538,8 +539,8 @@ function JiraFields(props: Readonly<{
       </label>
       <p className="text-xs text-muted-foreground">
         {props.twoWay
-          ? 'Two-way: Jira issues create and update defects, and Bloom pushes defect title and status changes back to Jira.'
-          : 'One-way: Jira issues create and update defects; Bloom never writes to Jira.'}
+          ? `Two-way: Jira issues create and update defects, and ${PRODUCT_NAME} pushes defect title and status changes back to Jira.`
+          : `One-way: Jira issues create and update defects; ${PRODUCT_NAME} never writes to Jira.`}
       </p>
     </div>
   )

@@ -3,7 +3,7 @@ import { Link } from 'react-router'
 import { useNavigate } from 'react-router'
 import { useAuth } from '../contexts/AuthContext'
 import { APP_VERSION, extractApiErrorMessage, setupApi } from '../api/client'
-import { BLOOM_LOGO_DARK, BLOOM_LOGO_LIGHT } from '../brandAssets'
+import { BLOOM_LOGO_DARK, BLOOM_LOGO_LIGHT, PRODUCT_IDENTITY, PRODUCT_NAME } from '../brandAssets'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -48,15 +48,15 @@ export default function Login() {
           <div className="flex flex-col items-center mb-8">
             <img
               src={BLOOM_LOGO_DARK}
-              alt="Bloom by EmbedLabs"
+              alt={PRODUCT_IDENTITY}
               className="h-24 w-auto max-w-full object-contain mb-4 hidden dark:block"
             />
             <img
               src={BLOOM_LOGO_LIGHT}
-              alt="Bloom by EmbedLabs"
+              alt={PRODUCT_IDENTITY}
               className="h-24 w-auto max-w-full object-contain mb-4 dark:hidden"
             />
-            <h1 className="text-2xl font-bold text-foreground">Welcome to Bloom</h1>
+            <h1 className="text-2xl font-bold text-foreground">{`Welcome to ${PRODUCT_NAME}`}</h1>
             <p className="text-sm text-muted-foreground mt-1">Sign in to your account</p>
           </div>
 
@@ -109,7 +109,7 @@ export default function Login() {
         </div>
 
         <div className="text-center mt-6">
-          <p className="text-sm text-violet-100/70">Bloom PLM</p>
+          <p className="text-sm text-violet-100/70">{PRODUCT_NAME}</p>
           <p className="text-xs text-violet-200/50 mt-1">v{APP_VERSION}</p>
           <a
             href="https://www.embedlabs.net"

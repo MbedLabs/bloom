@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.artefact_utils import get_row_or_404, get_visible_row
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
+from app.core.identity import PRODUCT_NAME
 from app.core.security import get_current_user, require_project_access, require_role
 from app.models import (
     ChangeRequest,
@@ -158,7 +159,7 @@ def _validate_jira_filter(issue_types_value, priority_map) -> None:
     if unknown:
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown Bloom priorities {unknown}. Allowed: {list(BLOOM_LEVELS)}",
+            detail=f"Unknown {PRODUCT_NAME} priorities {unknown}. Allowed: {list(BLOOM_LEVELS)}",
         )
 
 
