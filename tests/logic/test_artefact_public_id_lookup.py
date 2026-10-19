@@ -85,5 +85,4 @@ async def test_backlinks_identical_by_public_id_and_db_id(env):
     by_public = await build_related_response(env, "defect", "ALP-DEF-001", admin)
     by_pk = await build_related_response(env, "defect", str(defect_pk), admin)
     assert by_public.model_dump() == by_pk.model_dump()
-    # the linked requirement resolves either way, so backlinks work by public id
     assert "ALP-REQ-001" in json.dumps(by_public.model_dump(), default=str)

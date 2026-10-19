@@ -1,6 +1,6 @@
 {
-  "name": "BloomByEmbedLabs",
-  "short_name": "BloomByEmbedLabs",
+  "name": "Bloom PLM by EmbedLabs",
+  "short_name": "Bloom PLM",
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",

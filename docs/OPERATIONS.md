@@ -2,7 +2,7 @@
 
 A practical guide for running Bloom in production: monitoring, logs, backup and
 restore, upgrades, and disaster recovery. Runtime configuration lives in
-environment variables — see [`.env.example`](../.env.example) for the full list.
+environment variables (see [`.env.example`](../.env.example) for the full list).
 
 ## Image tags
 
@@ -11,20 +11,20 @@ Images are published to `ghcr.io/mbedlabs/bloom`:
 | Tag | Moves? | Use for |
 |---|---|---|
 | `sha-<commit>` | immutable | exact reproducibility / debugging |
-| `1.2.3` (full semver) | immutable | **production — pin this** |
+| `1.2.3` (full semver) | immutable | **production: pin this** |
 | `1.2`, `1` | moving (stable releases) | tracking a minor/major line |
 | `stable` | moving → newest stable release | low-maintenance production |
 | `latest` | moving → newest `main` build | **development / staging only** |
 
 Set `BLOOM_VERSION` in `.env` to a pinned version (e.g. `1.2.3`) or `stable`.
-Never run `latest` in production — it is the rolling development build. `stable`
+Never run `latest` in production: it is the rolling development build. `stable`
 starts existing once you publish your first `vX.Y.Z` release tag.
 
 ## Health checks
 
-- `GET /api/health` — **liveness**. Confirms the web process responds; it does not
+- `GET /api/health`: **liveness**. Confirms the web process responds; it does not
   query PostgreSQL, so it never claims a database connection it has not verified.
-- `GET /api/ready` — **readiness**. Runs `SELECT 1` against PostgreSQL and returns
+- `GET /api/ready`: **readiness**. Runs `SELECT 1` against PostgreSQL and returns
   `200` only when the database is reachable, `503` otherwise. This is what the
   container `HEALTHCHECK` and `docker-compose` healthcheck probe, and it is the
   right target for load-balancer / orchestrator readiness checks.
@@ -54,9 +54,9 @@ Bud, and your log aggregator. Pass the header from your edge (nginx:
 
 ## Metrics (Prometheus)
 
-- `GET /api/metrics` — Prometheus text format.
-- `http_requests_total{method,path,status}` — request counts by route template.
-- `http_request_duration_seconds{method,path}` — latency histogram.
+- `GET /api/metrics`: Prometheus text format.
+- `http_requests_total{method,path,status}`: request counts by route template.
+- `http_request_duration_seconds{method,path}`: latency histogram.
 - Plus standard Python process/GC metrics.
 
 Scrape config:
@@ -245,7 +245,7 @@ tag. Never run a newer schema against an older application version.
 
 ## Disaster recovery
 
-- **RPO** equals your backup cadence — nightly dumps mean up to 24h of loss;
+- **RPO** equals your backup cadence: nightly dumps mean up to 24h of loss;
   schedule to your tolerance and copy backups off the host.
 - **RTO** is dominated by Postgres restore time; rehearse the restore path
   against a scratch database at least once before you depend on it.
@@ -272,6 +272,6 @@ pip install pip-tools
 pip-compile --strip-extras --output-file=constraints.txt pyproject.toml
 ```
 
-The container runs unprivileged end to end (`USER appuser` — supervisord,
+The container runs unprivileged end to end (`USER appuser`: supervisord,
 nginx on port 8080, and uvicorn), which also satisfies Kubernetes
 `runAsNonRoot` policies.

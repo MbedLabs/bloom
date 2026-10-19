@@ -8,7 +8,6 @@ import App from './App'
 import { createQueryClient } from './lib/queryClient'
 import './index.css'
 
-// Apply theme before first paint so auth pages (outside Layout) respect dark mode.
 ;(() => {
   const stored = localStorage.getItem('bloom-theme')
   const dark = stored

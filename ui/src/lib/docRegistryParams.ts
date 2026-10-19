@@ -34,10 +34,14 @@ function sessionKey(prefix: string, scope: RegistrySortScope): string {
   return `${prefix}:${scope}`
 }
 
-function removeLegacyLocalStorage(prefix: string): void {
+/** Removes the legacy localStorage sort entry of a prefix and reports whether the browser allowed it. */
+function removeLegacyLocalStorage(prefix: string): boolean {
   try {
     localStorage.removeItem(`${LEGACY_STORAGE_PREFIX}${prefix}`)
-  } catch { /* ignore */ }
+    return true
+  } catch {
+    return false
+  }
 }
 
 export function isRegistrySortField(v: string | null | undefined): v is RegistrySortField {

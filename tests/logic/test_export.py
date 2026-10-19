@@ -93,7 +93,6 @@ async def test_requirements_csv_contains_rows_and_parent_ref(session):
     by_id = {r[0]: r for r in rows[1:]}
     assert by_id["ALP-REQ-001"][1] == "Login shall be possible"
     assert by_id["ALP-REQ-001"][2] == "Approved"
-    # child row references its parent by human id, not database pk
     parent_col = rows[0].index("parent_req_id")
     assert by_id["ALP-REQ-002"][parent_col] == "ALP-REQ-001"
 
@@ -103,7 +102,7 @@ async def test_requirements_pdf_is_valid_pdf(session):
     response = await export_requirements(project_id=1, format="pdf", db=session, current_user=admin)
     assert response.media_type == "application/pdf"
     assert response.body[:5] == b"%PDF-"
-    assert len(response.body) > 800  # a real document, not an empty shell
+    assert len(response.body) > 800
 
 
 async def test_traceability_csv_marks_coverage(session):
@@ -124,7 +123,7 @@ async def test_traceability_csv_marks_coverage(session):
     assert covered[4] == "ALP-TC-001"
     assert covered[6] == "passed"
     uncovered = data[("ALP-REQ-002", "no")]
-    assert uncovered[4] == ""  # gap visible in the same file
+    assert uncovered[4] == ""
 
 
 async def test_export_missing_project_404(session):

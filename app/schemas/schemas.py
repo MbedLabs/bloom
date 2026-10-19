@@ -12,7 +12,7 @@ T = TypeVar("T")
 
 
 class StrictModel(BaseModel):
-    """Base model that forbids extra fields — user-supplied IDs get rejected loudly."""
+    """Base model that forbids extra fields: user-supplied IDs get rejected loudly."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -23,8 +23,6 @@ class PaginatedResponse(BaseModel, Generic[T]):
     skip: int
     limit: int
 
-
-# ==================== Project Schemas ====================
 
 PROJECT_PREFIX_PATTERN = re.compile(r"^[A-Z]{3}$")
 ARTEFACT_VISIBILITY_PATTERN = r"^(internal|customer)$"
@@ -205,9 +203,6 @@ class TestCaseVerifiesLinkResponse(BaseModel):
         return f"{dt.isoformat()}Z"
 
 
-# ==================== Requirement Schemas ====================
-
-
 class RequirementCreate(StrictModel):
     """Schema for creating a requirement."""
 
@@ -284,9 +279,6 @@ class RequirementResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-# ==================== TestCase Schemas ====================
 
 
 class TestCaseCreate(StrictModel):
@@ -397,9 +389,6 @@ class TestRunLinkResponse(BaseModel):
         from_attributes = True
 
 
-# ==================== Traceability Schemas ====================
-
-
 class TraceabilityItem(BaseModel):
     requirement: RequirementResponse
     linked_test_cases: List[TestCaseResponse]
@@ -438,16 +427,14 @@ class CoverageGapReport(BaseModel):
     gaps: List[CoverageGap]
 
 
-# ==================== Health Schemas ====================
-
-
 class HealthResponse(BaseModel):
-    """Schema for the liveness probe response."""
+    """Schema for the liveness probe response.
+
+    database stays "not_checked": liveness never inspects the database, and /api/ready checks it.
+    """
 
     status: str = "healthy"
     version: str
-    # Liveness never inspects the database, so it must not claim a connection it
-    # has not verified. The real dependency check lives at /api/ready.
     database: str = "not_checked"
 
 
@@ -628,9 +615,6 @@ class DocumentDetailResponse(BaseModel):
 
 class SectionReorder(BaseModel):
     section_orders: List[dict]
-
-
-# ==================== Test Campaign Schemas ====================
 
 
 class TestSuiteCreate(StrictModel):
@@ -831,9 +815,6 @@ class ArtefactLinkResponse(BaseModel):
         from_attributes = True
 
 
-# ==================== Design Schemas ====================
-
-
 class DesignItemCreate(StrictModel):
     project_id: int
     tag_ids: List[int] = Field(default_factory=list)
@@ -879,9 +860,6 @@ class DesignItemResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-# ==================== Risk Schemas ====================
 
 
 class RiskItemCreate(StrictModel):
@@ -935,9 +913,6 @@ class RiskItemResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-# ==================== Change Request Schemas ====================
 
 
 class ChangeRequestCreate(StrictModel):
@@ -1006,9 +981,6 @@ class ChangeRequestResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-# ==================== Defect Schemas ====================
 
 
 class DefectCreate(StrictModel):
@@ -1092,9 +1064,6 @@ class DefectResponse(BaseModel):
         from_attributes = True
 
 
-# ==================== Baseline Schemas ====================
-
-
 class BaselineCreate(StrictModel):
     project_id: int
     name: str = Field(..., min_length=1, max_length=255)
@@ -1126,9 +1095,6 @@ class BaselineResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-# ==================== Test Concept Schemas ====================
 
 
 class TestConceptCreate(StrictModel):
@@ -1174,9 +1140,6 @@ class TestConceptResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-# ==================== Artefact Detail Schemas ====================
 
 
 class ArtefactCommentCreate(StrictModel):
@@ -1280,15 +1243,18 @@ class ArtefactRelatedResponse(BaseModel):
     related_documents: List[RelatedDocumentSummary] = []
 
 
-# Resolve forward references
 RequirementResponse.model_rebuild()
 DocumentSectionResponse.model_rebuild()
 ImpactNode.model_rebuild()
 
 
 class AutomatedResult(BaseModel):
-    tc_id: str = Field(min_length=1, max_length=100)  # e.g., "PRJ-TC-001"
-    status: str  # "Passed", "Failed", "Skipped"
+    """One automated result: tc_id is a test case public id such as PRJ-TC-001, status is the reported
+    result, such as Passed, Failed or Skipped.
+    """
+
+    tc_id: str = Field(min_length=1, max_length=100)
+    status: str
     comment: Optional[str] = None
     executed_at: Optional[datetime] = None
     bud_run_id: Optional[int] = None

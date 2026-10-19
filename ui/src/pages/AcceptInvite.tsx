@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '../brandAssets'
 import UserIdentity from '../components/UserIdentity'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
@@ -85,7 +86,7 @@ export default function AcceptInvite() {
       {!submitMessage && (
         <>
           <h1 className="text-2xl font-bold text-foreground mb-2">Accept Invitation</h1>
-          <p className="text-sm text-muted-foreground mb-6">Set your account password to activate Bloom access.</p>
+          <p className="text-sm text-muted-foreground mb-6">Set your account password to activate {PRODUCT_NAME} access.</p>
         </>
       )}
 

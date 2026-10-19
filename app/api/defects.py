@@ -273,9 +273,6 @@ async def delete_defect(
     )
 
 
-# ==================== External issue refresh ====================
-
-
 class RefreshTokenPayload(BaseModel):
     token: str | None = None
 

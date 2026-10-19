@@ -16,8 +16,10 @@ export const TCS_ROW_TYPE_OPTIONS: { value: TcsRowType; label: string }[] = [
   { value: 'loop', label: 'Loop' },
 ]
 
+/** Returns a row id of the form `row-<epoch ms>-<14 base-36 characters from crypto.getRandomValues>`. */
 function generateId(): string {
-  return `row-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  const random = Array.from(crypto.getRandomValues(new Uint32Array(2)), (value) => value.toString(36).padStart(7, '0'))
+  return `row-${Date.now()}-${random.join('')}`
 }
 
 function getDefaultTcsLabel(type: TcsRowType): string {

@@ -38,7 +38,7 @@ async def notify(
         db.add(notification)
         await db.flush()
         return notification
-    except Exception:  # pragma: no cover - defensive
+    except Exception:  # pragma: no cover
         logger.exception("Failed to create notification for user %s", user_id)
         return None
 

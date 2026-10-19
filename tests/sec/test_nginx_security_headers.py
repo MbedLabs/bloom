@@ -54,8 +54,6 @@ def test_every_header_is_marked_always():
 
 def test_the_server_block_includes_the_shared_file():
     text = NGINX_CONF.read_text()
-    # Everything before the first location *block* - matched the same way the
-    # blocks themselves are, so the word "location" in a comment is not it.
     first = re.search(r"^\s*location[^\n{]*\{", text, re.MULTILINE)
     server_head = text[: first.start()] if first else text
 

@@ -1,4 +1,4 @@
-"""FastAPI application for EmbedLabs Bloom - Product Lifecycle Management."""
+"""FastAPI application for Bloom PLM by EmbedLabs."""
 
 import asyncio
 import contextlib
@@ -56,6 +56,7 @@ from app.core.database import async_session_maker, create_tables, engine
 from app.core.deps import limiter
 from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS, normalize_document_kind
 from app.core.id_generator import compute_next_id, id_width, next_doc_id
+from app.core.identity import PRODUCT_IDENTITY
 from app.core.observability import (
     RequestObservabilityMiddleware,
     metrics_router,
@@ -78,7 +79,6 @@ from app.models import (
 from app.models.user import User, UserRole
 from app.services.attachment_cleanup import reconcile_attachments
 
-# Structured logging: JSON lines in production, text in dev (see LOG_LEVEL/LOG_JSON)
 setup_logging(level=settings.LOG_LEVEL, json_logs=bool(settings.LOG_JSON))
 logger = logging.getLogger(__name__)
 
@@ -269,7 +269,6 @@ async def normalize_non_document_public_ids() -> None:
 
                 correct_prefix = f"{project.prefix}-{type_code}-"
                 existing_ids: list[str] = [correct_prefix]
-                # First pass: collect correct IDs
                 for row in rows:
                     current = str(getattr(row, col_name) or "")
                     if (
@@ -278,7 +277,6 @@ async def normalize_non_document_public_ids() -> None:
                     ):
                         existing_ids.append(current)
 
-                # Second pass: repair malformed IDs
                 for row in rows:
                     current = str(getattr(row, col_name) or "")
                     if (
@@ -287,12 +285,9 @@ async def normalize_non_document_public_ids() -> None:
                     ):
                         continue
 
-                    # Try to extract numeric suffix from PRJ-OLDCODE-NNN
                     match = re.match(r"^[A-Z0-9]+-[A-Z]+-(\d+)$", current)
                     new_id = None
                     if match:
-                        # Width comes from the number, so a repair pass cannot
-                        # squash a four-digit id back to three.
                         suffix = int(match.group(1))
                         candidate = f"{correct_prefix}{suffix:0{id_width(suffix)}d}"
                         if candidate not in existing_ids:
@@ -347,8 +342,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title=settings.BLOOM_APP_NAME,
-    description="Backend API for EmbedLabs Bloom - Product Lifecycle Management",
+    title=PRODUCT_IDENTITY,
+    description=f"Backend API for {PRODUCT_IDENTITY}",
     version=settings.BLOOM_APP_VERSION,
     docs_url="/api/docs" if settings.ENABLE_DOCS else None,
     redoc_url="/api/redoc" if settings.ENABLE_DOCS else None,
@@ -356,7 +351,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# H2: Attach rate-limiter state and error handler
 app.state.limiter = limiter
 
 
@@ -427,7 +421,6 @@ app.add_exception_handler(Exception, _unhandled_exception_handler)
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# Outermost middleware: request-id propagation, access logs, Prometheus metrics
 app.add_middleware(RequestObservabilityMiddleware)
 app.add_middleware(
     CORSMiddleware,
@@ -496,6 +489,6 @@ app.include_router(docs_facade.router, prefix="/api", tags=["Docs Facade"])
 async def root():
     """Root endpoint."""
     return {
-        "message": settings.BLOOM_APP_NAME,
+        "message": PRODUCT_IDENTITY,
         "version": settings.BLOOM_APP_VERSION,
     }

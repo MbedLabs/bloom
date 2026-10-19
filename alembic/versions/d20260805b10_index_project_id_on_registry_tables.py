@@ -8,8 +8,6 @@ branch_labels = None
 depends_on = None
 
 
-# (index name, table, columns) - the tables the registry union reads that had
-# no index leading on project_id.
 _INDEXES = [
     ("ix_design_items_project_id", "design_items", "project_id"),
     ("ix_risk_items_project_id", "risk_items", "project_id"),

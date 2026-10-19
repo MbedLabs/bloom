@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '../brandAssets'
 import { refreshProjectViews } from '../lib/refreshProjectViews'
 import { useState } from 'react'
 import TagPicker from '../components/TagPicker'
@@ -69,7 +70,6 @@ export default function ImportWizard() {
   const [docSearch, setDocSearch] = useState('')
   const debouncedDocSearch = useDebounced(docSearch, 250)
 
-  // One page of the source project, searched by the server.
   const { data: sourceDocsData, isLoading: sourceDocsLoading } = useQuery({
     queryKey: ['import-docs', sourceProject?.prefix, docType, debouncedDocSearch],
     queryFn: () => docsApi.list(sourceProject!.prefix, {
@@ -178,7 +178,6 @@ export default function ImportWizard() {
         <TagPicker projectId={projectId} value={importTagIds} onChange={setImportTagIds} />
       )}
 
-      {/* Import source mode */}
       <div className="flex gap-2">
         {([
           { key: 'project', label: 'From another project' },
@@ -199,7 +198,6 @@ export default function ImportWizard() {
         ))}
       </div>
 
-      {/* Step indicator */}
       {mode === 'project' && (
       <div className="flex items-center gap-2">
         {steps.map((label, i) => (
@@ -305,8 +303,8 @@ export default function ImportWizard() {
       <div className="bg-card rounded-lg border border-border shadow-elegant p-6 space-y-4">
         <h3 className="text-lg font-semibold text-foreground">Import test cases from a file</h3>
         <p className="text-sm text-muted-foreground">
-          Upload a <span className="font-mono">.csv</span> or <span className="font-mono">.xml</span> file in
-          Bloom&apos;s export format. A row whose ID already exists updates that test case; new rows are created.
+          Upload a <span className="font-mono">.csv</span> or <span className="font-mono">.xml</span> file in{' '}
+          {PRODUCT_NAME}&apos;s export format. A row whose ID already exists updates that test case; new rows are created.
         </p>
 
         <div className="flex gap-2">
@@ -548,8 +546,6 @@ export default function ImportWizard() {
               <p className="text-muted-foreground">Fetching the lightweight document list from {sourceProject?.prefix}.</p>
             ) : sourceDocs && sourceDocs.length > 0 ? (
               <>
-                {/* "All" is what is on screen, not what is in the project — the
-                    list is a page now, so the label has to say which. */}
                 <button
                   onClick={() => {
                     const shown = sourceDocs.map((d) => d.id)

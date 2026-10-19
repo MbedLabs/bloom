@@ -1,9 +1,9 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { TcsArteTable } from '../components/TcsArteTable'
-import { migrateOldSteps, normalizeTcsRows } from '../utils/tcs'
+import { createDefaultTcsRow, migrateOldSteps, normalizeTcsRows } from '../utils/tcs'
 
 describe('migrateOldSteps', () => {
   it('maps legacy steps into table rows without numbered labels', () => {
@@ -23,6 +23,24 @@ describe('migrateOldSteps', () => {
     })
     expect(rows[1].label).toBe('Step')
     expect(rows[0].id).toMatch(/^row-/)
+  })
+})
+
+describe('createDefaultTcsRow', () => {
+  it('builds unique row ids from crypto.getRandomValues and never from Math.random', () => {
+    const mathRandom = vi.spyOn(Math, 'random')
+    const getRandomValues = vi.spyOn(crypto, 'getRandomValues')
+    try {
+      const ids = Array.from({ length: 500 }, () => createDefaultTcsRow('step').id)
+
+      expect(new Set(ids).size).toBe(ids.length)
+      for (const id of ids) expect(id).toMatch(/^row-\d+-[0-9a-z]{14}$/)
+      expect(getRandomValues).toHaveBeenCalled()
+      expect(mathRandom).not.toHaveBeenCalled()
+    } finally {
+      mathRandom.mockRestore()
+      getRandomValues.mockRestore()
+    }
   })
 })
 

@@ -242,13 +242,14 @@ MAX_DOC_KEYS = 500
 
 
 def _parse_doc_keys(keys: list[str]) -> set[tuple[str, int]]:
-    """Parse ``TYPE:row_id`` pairs into the key set the union already filters on."""
+    """Parse ``TYPE:row_id`` pairs into the key set the union filters on.
+
+    The Document-backed kinds count as known types beside TYPE_MAP.
+    """
     parsed: set[tuple[str, int]] = set()
     for key in keys:
         type_code, _, raw_id = key.partition(":")
         type_code = type_code.strip().upper()
-        # The four Document-backed kinds are not in TYPE_MAP but are perfectly
-        # good link targets, so both families count as known.
         if type_code not in TYPE_MAP and type_code not in CANONICAL_DOCUMENT_KINDS:
             raise HTTPException(status_code=422, detail=f"Unknown document type in key '{key}'")
         try:
@@ -294,22 +295,6 @@ async def _related_doc_keys(
     return related
 
 
-# ---------------------------------------------------------------------------
-# The registry listing
-#
-# This used to run `select(model)` against every type table and finish the job
-# in Python. `select(model)` is whole rows, so `description`, `content_json`
-# and `content_html` came back for every document and were then discarded -
-# DocShellResponse carries none of them. The browser then received the entire
-# project and did the filtering, sorting and paging a second time.
-#
-# Now each type contributes one arm of a UNION ALL carrying only the columns
-# the shell actually has, and filtering, sorting and paging happen in SQL over
-# that union. Callers that pass no filters and no limit get exactly what they
-# got before, so the topology's paged fetch is unaffected.
-# ---------------------------------------------------------------------------
-
-# The labels the registry shows for each type.
 _TYPE_LABELS = {
     "REQ": "Requirement",
     "TC": "Test Case",
@@ -351,7 +336,10 @@ def _optional_column(model, name: str, type_):
 
 
 def _shell_arm(model, type_code: str, id_col_name: str):
-    """One type's contribution to the registry union: shell columns, nothing else."""
+    """One type's contribution to the registry union: shell columns, nothing else.
+
+    A row without a public id is shown as `TYPE-<row id>`.
+    """
     id_col = getattr(model, id_col_name)
     title_col = model.title if hasattr(model, "title") else model.name
 
@@ -379,12 +367,8 @@ def _shell_arm(model, type_code: str, id_col_name: str):
         )
     query = select(
         model.id.label("row_id"),
-        # Campaigns may carry no campaign_id, and older documents no doc_id;
-        # both used to fall back to "TYPE-<row id>" in Python.
         func.coalesce(
             cast(id_col, String),
-            # `+` on a String-typed literal is the concatenation operator, which
-            # both Postgres and the SQLite the tests run on spell `||`.
             literal(f"{type_code}-", String) + cast(model.id, String),
         ).label("doc_id"),
         literal(type_code).label("doc_type"),
@@ -462,7 +446,10 @@ async def _registry_union(
     types: frozenset[str] | None,
 ):
     """The set of documents of the ``types`` (from `visible_types`) this user may see in
-    this project, as one union."""
+    this project, as one union.
+
+    The shared Document table contributes one arm per document kind.
+    """
     arms = []
 
     for type_code, (model, id_col_name, _slug) in TYPE_MAP.items():
@@ -482,8 +469,6 @@ async def _registry_union(
             arm = arm.where(model.id.in_(allowed_ids))
         arms.append(apply_external_visibility_filter(arm, model, current_user))
 
-    # The shared Document table backs four types at once, so it contributes one
-    # arm per kind rather than one arm overall.
     document_kinds = [
         kind
         for kind in (type_filter if type_filter else CANONICAL_DOCUMENT_KINDS)
@@ -559,7 +544,12 @@ async def list_all_docs(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    """List all docs across all types for a project."""
+    """List all docs across all types for a project.
+
+    related_to and anchor filters together keep the documents that satisfy both; a link filter joins
+    the link counts also when they are not requested; search covers the kind label and the reviewer
+    name besides the stored fields; the row id breaks ties in the ordering for stable pages.
+    """
     project = await resolve_project(db, project_ref)
     await require_project_access(db, current_user, project.id)
 
@@ -587,8 +577,6 @@ async def list_all_docs(
         if anchor is None:
             raise HTTPException(status_code=404, detail=f"Document {related_to} not found")
         anchor_keys = await _related_doc_keys(db, project.id, anchor, role, direction)
-        # Both narrow to a key set, so asking for both means asking for the
-        # documents that satisfy both.
         related_keys = anchor_keys if related_keys is None else related_keys & anchor_keys
         if not related_keys:
             return empty
@@ -605,8 +593,6 @@ async def list_all_docs(
     if registry is None:
         return empty
 
-    # A link filter is a question about the counts, so it needs them joined even
-    # if the caller did not ask for the numbers themselves.
     want_counts = include_link_counts or links is not None
     if want_counts:
         incoming, outgoing = _link_count_subqueries(project.id, types)
@@ -689,15 +675,10 @@ async def list_all_docs(
 
     if q and q.strip():
         needle = f"%{q.strip()}%"
-        # The reader searches what the table shows them, so this covers the human label
-        # of the kind and the reviewer's name as well as the stored fields.
         type_label = case(
             *[(registry.c.doc_type == code, label) for code, label in _TYPE_LABELS.items()],
             else_=registry.c.doc_type,
         )
-        # One OR of ilikes rather than one ilike over a concatenation: the
-        # concatenation has to be built for every row before it can be tested,
-        # and it cannot use an index on any of the columns in it.
         query = query.where(
             or_(
                 registry.c.doc_id.ilike(needle),
@@ -731,7 +712,6 @@ async def list_all_docs(
         "reviewer": func.lower(reviewer_name) if needs_reviewer_name else literal(""),
     }
     order = sort_columns[sort]
-    # A tiebreaker, so page 2 cannot repeat a row page 1 already showed.
     query = query.order_by(
         order.desc() if dir == "desc" else order.asc(),
         registry.c.doc_type,
@@ -894,7 +874,6 @@ class NextDocIdResponse(BaseModel):
     next_id: str
 
 
-# Document-backed types share one table and are distinguished by doc_type.
 _DOCUMENT_TYPE_CODES = {"SPEC", "PRT", "RPT", "STD"}
 
 

@@ -106,9 +106,9 @@ async def test_admin_searches_all_projects(session):
     res = await run_global_search(session, admin, q="login")
     types = {(i.type, i.doc_id) for i in res.items}
     assert ("REQ", "ALP-REQ-001") in types
-    assert ("REQ", "BET-REQ-001") in types  # cross-project
+    assert ("REQ", "BET-REQ-001") in types
     assert ("TC", "ALP-TC-001") in types
-    assert ("SPEC", "ALP-SPEC-001") in types  # Document reports its own doc_type
+    assert ("SPEC", "ALP-SPEC-001") in types
     assert ("DEF", "ALP-DEF-001") in types
     assert ("TS", "ALP-TS-001") in types
 
@@ -169,7 +169,6 @@ async def test_external_gated_by_doc_type_and_visibility(session):
     await session.commit()
 
     res = await run_global_search(session, ext, q="login")
-    # Only customer-visible REQs: not the internal crypto REQ, not TC/DOC/DEF/TS
     assert {(i.type, i.doc_id) for i in res.items} == {("REQ", "ALP-REQ-001")}
 
     res_internal = await run_global_search(session, ext, q="crypto")
@@ -198,9 +197,9 @@ async def test_external_with_no_allowlist_sees_nothing(session):
 
 def test_rank_match_ordering():
     q = "alp-req-001"
-    assert rank_match(q, "ALP-REQ-001", "anything") == 0  # exact id
-    assert rank_match("alp-req", "ALP-REQ-001", "x") == 1  # id prefix
-    assert rank_match("login", "ALP-REQ-001", "Login shall") == 2  # title prefix
-    assert rank_match("req-001", "ALP-REQ-001", "x") == 3  # id substring
-    assert rank_match("shall", "ALP-REQ-001", "Login shall") == 4  # title substring
+    assert rank_match(q, "ALP-REQ-001", "anything") == 0
+    assert rank_match("alp-req", "ALP-REQ-001", "x") == 1
+    assert rank_match("login", "ALP-REQ-001", "Login shall") == 2
+    assert rank_match("req-001", "ALP-REQ-001", "x") == 3
+    assert rank_match("shall", "ALP-REQ-001", "Login shall") == 4
     assert rank_match("zzz", "ALP-REQ-001", "Login shall") == 5

@@ -144,7 +144,6 @@ describe('the campaign list', () => {
     fireEvent.change(search, { target: { value: 'soak' } })
     await waitFor(() => expect(cardNames()).toEqual(['Charlie soak']))
 
-    // The description is searched too, and only Bravo mentions a build.
     fireEvent.change(search, { target: { value: 'every build' } })
     await waitFor(() => expect(cardNames()).toEqual(['Bravo smoke']))
 
@@ -170,7 +169,6 @@ describe('the campaign list', () => {
     })
 
     expect(await screen.findByText(/no campaigns match the current filters/i)).toBeTruthy()
-    // That is a different message from having no campaigns at all.
     expect(screen.queryByText('No Campaign Scopes')).toBeNull()
   })
 
@@ -202,7 +200,6 @@ describe('the campaign list', () => {
 
     changeControl(screen.getByLabelText('Sort by'), { target: { value: 'status' } })
 
-    // Descending: Planned, In Progress, Completed.
     await waitFor(() =>
       expect(cardNames()).toEqual(['Bravo smoke', 'Alpha regression', 'Charlie soak']),
     )
@@ -214,7 +211,6 @@ describe('the campaign list', () => {
 
     expect(await screen.findByText('No Campaign Scopes')).toBeTruthy()
     expect(screen.getByRole('button', { name: /create first campaign/i })).toBeTruthy()
-    // With nothing to filter, the toolbar is not shown at all.
     expect(screen.queryByPlaceholderText('Search campaigns...')).toBeNull()
   })
 
@@ -236,7 +232,6 @@ describe('the suites of a project', () => {
     expect(screen.getByText('VCU-TS-001')).toBeTruthy()
     expect(screen.getByText('Regression suite')).toBeTruthy()
     expect(screen.getByText('12 TCs')).toBeTruthy()
-    // One test case is singular; the label must not read "1 TCs".
     expect(screen.getByText('1 TC')).toBeTruthy()
   })
 
@@ -254,8 +249,6 @@ describe('the suites of a project', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /new suite/i }))
     const heading = await screen.findByText('New Test Suite')
-    // The modal holds a name input and a description textarea, and the page
-    // behind it has its own search box; scope to the dialog and take the name.
     const modal = heading.closest('div')?.parentElement as HTMLElement
 
     fireEvent.change(within(modal).getAllByRole('textbox')[0], {
@@ -278,8 +271,6 @@ describe('the suites of a project', () => {
     renderCampaigns()
     await screen.findByText('Smoke suite')
 
-    // The list is only needed inside the new-suite form, and a project can
-    // hold a lot of test cases.
     expect(client.testCasesApi.list).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: /new suite/i }))
@@ -328,7 +319,6 @@ describe('creating a campaign', () => {
     const form = await openForm()
     fireEvent.change(form.name, { target: { value: 'Unscoped' } })
 
-    // A campaign's items are copied from its suites, so it cannot have none.
     expect(form.submit.disabled).toBe(true)
     fireEvent.submit(form.name.closest('form') as HTMLFormElement)
     expect(await screen.findByText(/select at least one suite/i)).toBeTruthy()

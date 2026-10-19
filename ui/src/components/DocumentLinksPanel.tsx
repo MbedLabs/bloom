@@ -141,8 +141,6 @@ function LinkDocumentModal({
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounced(search, 250)
 
-  // Which kinds this project actually holds. The picker used to learn this by
-  // reading every document; the summary answers it in one row per type.
   const { data: summary } = useQuery({
     queryKey: ['doc-type-summary', projectPrefix],
     queryFn: () => docsApi.typeSummary(projectPrefix),
@@ -213,8 +211,6 @@ function LinkDocumentModal({
     onError: (error) => toast.failed('Adding the relationship', error),
   })
 
-  // One page of candidates of the chosen kind, searched by the server. The
-  // search box used to filter a copy of the whole project held in the browser.
   const { data: candidates, isFetching: candidatesLoading } = useQuery({
     queryKey: ['link-candidates', projectPrefix, targetType, debouncedSearch],
     queryFn: () => docsApi.list(projectPrefix, {
@@ -234,7 +230,6 @@ function LinkDocumentModal({
     return items
       .map(docShellToTarget)
       .filter((target): target is LinkTarget => !!target)
-      // A document cannot be linked to itself.
       .filter((target) => !(target.doc_type === normalizedSourceType && target.id === sourceId))
   }, [candidates, normalizedSourceType, sourceId])
 
@@ -425,7 +420,7 @@ export function DocumentLinksPanel({
       const id = direction === 'outgoing' ? link.target_id : link.source_id
       keys.add(docKey(type, id))
     })
-    return Array.from(keys).sort().slice(0, MAX_LINK_LABELS)
+    return Array.from(keys).sort((a, b) => a.localeCompare(b)).slice(0, MAX_LINK_LABELS)
   }, [allLinks])
 
   const { data: labelData } = useQuery({

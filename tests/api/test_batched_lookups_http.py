@@ -1,3 +1,6 @@
+"""Batched lookups: campaigns refuse unknown and foreign suites by id, suite creation skips foreign
+test cases, and section counts stay per document."""
+
 import os
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characters-long")
@@ -5,8 +8,6 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-at-least-32-characte
 from fastapi.testclient import TestClient
 
 from tests.conftest import create_project, unique_suffix
-
-"""Behaviour preserved when per-row lookups were replaced by batched ones."""
 
 
 def _admin_headers(api_client: TestClient) -> dict[str, str]:
@@ -42,7 +43,6 @@ def test_campaign_rejects_an_unknown_suite_by_id(api_client: TestClient):
     )
 
     assert created.status_code == 404, created.text
-    # The offending id must still be named, not just "a suite was missing".
     assert "987654" in created.text
 
 
@@ -60,8 +60,6 @@ def test_campaign_rejects_a_suite_from_another_project(api_client: TestClient):
     assert foreign_suite.status_code in (200, 201), foreign_suite.text
     foreign_id = foreign_suite.json()["id"]
 
-    # The row exists, so only the project check can reject it — the part most
-    # easily lost when the per-id query becomes an IN lookup.
     created = api_client.post(
         "/api/campaigns",
         headers=headers,

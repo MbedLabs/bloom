@@ -91,7 +91,6 @@ beforeEach(() => {
     removeListener: () => {},
     dispatchEvent: () => false,
   })) as unknown as typeof window.matchMedia
-  // jsdom refuses to navigate; the page only needs the call to be made.
   Object.defineProperty(window, 'location', {
     configurable: true,
     value: { ...window.location, reload: () => void (reloads += 1) },
@@ -142,8 +141,6 @@ describe('changing your own email', () => {
     fireEvent.change(screen.getByLabelText('Current password'), { target: { value: 'pw' } })
     fireEvent.click(screen.getByRole('button', { name: /send authorization email/i }))
 
-    // Leaving the password on screen after a successful request is the kind of
-    // thing that ends up in a screenshot.
     await waitFor(() =>
       expect((screen.getByLabelText('Current password') as HTMLInputElement).value).toBe(''),
     )
@@ -246,8 +243,6 @@ describe('appearance and region', () => {
     changeControl(picker, { target: { value: 'Etc/GMT+5' } })
 
     expect(window.localStorage.getItem('bloom-timezone')).toBe('Etc/GMT+5')
-    // Dates are formatted all over the app, so the page reloads rather than
-    // trying to re-render each of them.
     expect(reloads).toBe(1)
   })
 })
@@ -326,7 +321,6 @@ describe('the credentials Bud submits results with', () => {
     renderSettings()
 
     await waitFor(() => expect(client.serviceCredentialsApi.list).toHaveBeenCalled())
-    // The rest of the settings screen still has to work.
     expect(screen.getByText('Account')).toBeTruthy()
     expect(screen.queryByText(new RegExp(serviceCredential.token_prefix))).toBeNull()
   })

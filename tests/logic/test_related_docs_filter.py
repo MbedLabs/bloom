@@ -31,7 +31,6 @@ async def env():
 
         session.add_all(
             [
-                # anchor -> TC-001 (outgoing, role "verifies")
                 ArtefactLink(
                     project_id=project.id,
                     source_type="REQ",
@@ -41,7 +40,6 @@ async def env():
                     role="verifies",
                     suspect=False,
                 ),
-                # TC-002 -> anchor (incoming, role "covers")
                 ArtefactLink(
                     project_id=project.id,
                     source_type="TC",
@@ -90,7 +88,6 @@ async def test_related_keys_cover_both_directions(env):
         related = await _related_doc_keys(session, ids["project"], ("REQ", ids["req"]), None, None)
 
     assert related == {("TC", ids["verifying"]), ("TC", ids["covering"])}
-    # The unrelated requirement must never appear.
     assert ("REQ", ids["other_req"]) not in related
 
 

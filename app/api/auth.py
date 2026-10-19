@@ -152,8 +152,6 @@ async def delete_profile_picture(
     return UserResponse.model_validate(current_user)
 
 
-# Refresh token is delivered as an httpOnly cookie scoped to the auth endpoints,
-# rotated on every use, and revocable via the user_tokens table.
 REFRESH_COOKIE_NAME = "bloom_refresh_token"
 REFRESH_COOKIE_PATH = "/api/auth"
 
@@ -181,12 +179,16 @@ def _clear_refresh_cookie(response: Response) -> None:
 
 
 async def _issue_refresh_cookie(db: AsyncSession, response: Response, user_id: int) -> None:
+    """Issue a refresh token beside the user's other sessions and set it as an httpOnly cookie scoped
+    to the auth endpoints. Refresh tokens rotate on every use and are revocable through the
+    user_tokens table.
+    """
     raw_token = await create_user_token(
         db,
         user_id=user_id,
         purpose=UserTokenPurpose.refresh,
         ttl_hours=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24,
-        invalidate_existing=False,  # allow concurrent sessions (multiple devices/tabs)
+        invalidate_existing=False,
     )
     _set_refresh_cookie(response, raw_token)
 
@@ -252,15 +254,17 @@ async def refresh(
 ):
     """Exchange a valid refresh cookie for a new access token, rotating the
     refresh token (single-use). A replayed token (already rotated by the real
-    client) is marked used and rejected."""
+    client) is marked used and rejected.
+
+    The presented token is claimed atomically: of two requests racing on one cookie, one gets a
+    replacement, issued in the same transaction.
+    """
     unauthorized = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid or expired session",
     )
     if not refresh_token:
         raise unauthorized
-    # Atomically consume the presented token. Two requests racing on the same
-    # cookie can only produce one winner here, so only one replacement is issued.
     try:
         claimed = await claim_token(db, token=refresh_token, purpose=UserTokenPurpose.refresh)
     except TokenValidationError:
@@ -280,7 +284,6 @@ async def refresh(
         )
         raise unauthorized
 
-    # Consumed above; issue the replacement in the same transaction.
     await _issue_refresh_cookie(db, response, user.id)
     await record_audit_event(
         db, AUTH_REFRESH, actor_user_id=user.id, target_type="user", target_id=user.id
@@ -329,10 +332,11 @@ async def update_me(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
+    """Update the signed-in user's profile. An email change goes through request_email_change, with the current
+    password and a confirmation from the new address.
+    """
     if data.full_name is not None:
         current_user.full_name = data.full_name
-    # Email changes are not applied here: they require the current password and a
-    # confirmation of the new address via POST /me/email.
 
     await db.flush()
     await db.refresh(current_user)
@@ -467,7 +471,11 @@ async def confirm_email_change(
     response: Response,
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
-    """Advance or complete a verified email change."""
+    """Advance or complete a verified email change.
+
+    An address taken by another account since the request clears the pending change and answers 400.
+    A confirmed change ends every existing session.
+    """
     try:
         candidate = await get_valid_token(
             db,
@@ -503,7 +511,6 @@ async def confirm_email_change(
     if claimed.target_email != candidate.target_email:
         raise HTTPException(status_code=400, detail="Invalid token")
 
-    # Guard against the address being taken between request and confirmation.
     existing = await db.execute(
         select(User).where(User.email == candidate.target_email, User.id != user.id)
     )
@@ -555,7 +562,6 @@ async def confirm_email_change(
     user.email_change_status = None
     user.email_change_requested_at = None
     user.email_verified_at = datetime.now(timezone.utc).replace(tzinfo=None)
-    # Confirmed identity change ends every existing session.
     user.session_version += 1
     await invalidate_all_refresh_tokens(db, user.id)
     _clear_refresh_cookie(response)
@@ -579,6 +585,10 @@ async def change_password(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
+    """Change the signed-in user's password and end every existing session: access tokens are retired
+    through the session version, refresh tokens are revoked and this device's refresh cookie is
+    cleared.
+    """
     if not verify_password(data.current_password, current_user.hashed_password):
         await record_audit_failure(
             db,
@@ -590,8 +600,6 @@ async def change_password(
         raise HTTPException(status_code=400, detail="Current password is incorrect")
     current_user.hashed_password = get_password_hash(data.new_password)
     current_user.password_set_at = datetime.now(timezone.utc).replace(tzinfo=None)
-    # End every existing session: retire outstanding access tokens (version bump) and
-    # refresh tokens, and drop this device's refresh cookie.
     current_user.session_version += 1
     await invalidate_all_refresh_tokens(db, current_user.id)
     _clear_refresh_cookie(response)
@@ -637,6 +645,7 @@ async def get_invite_info(
 async def accept_invite(
     data: AcceptInviteRequest, db: AsyncSession = Depends(get_db, scope="function")
 ):
+    """Accept an invitation: set the password and mark the invited address verified."""
     try:
         claimed = await claim_token(db, token=data.token, purpose=UserTokenPurpose.invite)
     except TokenValidationError as exc:
@@ -652,8 +661,6 @@ async def accept_invite(
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     user.invite_accepted_at = now
     user.password_set_at = now
-    # Accepting an invitation proves control of the invited address, so treat it as
-    # verification.
     user.email_verified_at = now
 
     await record_audit_event(
@@ -795,6 +802,9 @@ async def reset_password(
     response: Response,
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
+    """Reset a password with a one-time token and end every existing session, as a password change
+    does.
+    """
     try:
         claimed = await claim_token(
             db,
@@ -813,7 +823,6 @@ async def reset_password(
 
     user.hashed_password = get_password_hash(data.new_password)
     user.password_set_at = datetime.now(timezone.utc).replace(tzinfo=None)
-    # End every existing session, exactly as on password change.
     user.session_version += 1
     await invalidate_all_refresh_tokens(db, user.id)
     _clear_refresh_cookie(response)

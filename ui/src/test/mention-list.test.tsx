@@ -83,8 +83,6 @@ describe('the mention popover', () => {
 
     expect(screen.getByText('@Ada Lovelace')).toBeTruthy()
     expect(screen.getByText('@Grace Hopper')).toBeTruthy()
-    // A person is never wrapped in braces; that spelling belongs to a
-    // parameter, and the two are looked up in different places.
     expect(screen.queryByText('{{Ada Lovelace}}')).toBeNull()
   })
 
@@ -138,8 +136,6 @@ describe('the mention popover', () => {
   it('leaves any other key to the editor', () => {
     const { ref, command } = mountList()
 
-    // Returning false is what lets the keystroke reach the document; claiming
-    // it would swallow ordinary typing while the popover is open.
     expect(press(ref, 'a')).toBe(false)
     expect(press(ref, 'Escape')).toBe(false)
     expect(command).not.toHaveBeenCalled()
@@ -160,8 +156,6 @@ describe('the mention popover', () => {
     press(ref, 'ArrowDown')
     expect(highlighted()).toBe('{{BOARD_REV}}')
 
-    // Typing another character re-filters; a highlight left at index 2 would
-    // point past the end of the shorter list.
     rerender(
       <MentionList
         ref={ref}

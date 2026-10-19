@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { APP_VERSION } from '../api/client'
-import { BLOOM_LOGO_DARK, BLOOM_LOGO_LIGHT } from '../brandAssets'
+import { BLOOM_LOGO_DARK, BLOOM_LOGO_LIGHT, PRODUCT_IDENTITY, PRODUCT_NAME } from '../brandAssets'
 
 /** The card with the Bloom logo and the version footer that frames the account pages. */
 export default function AuthPageShell({ children }: Readonly<{ children: ReactNode }>) {
@@ -10,18 +10,18 @@ export default function AuthPageShell({ children }: Readonly<{ children: ReactNo
         <div className="flex flex-col items-center mb-6">
           <img
             src={BLOOM_LOGO_DARK}
-            alt="Bloom by EmbedLabs"
+            alt={PRODUCT_IDENTITY}
             className="h-16 w-auto max-w-full object-contain mb-3 hidden dark:block"
           />
           <img
             src={BLOOM_LOGO_LIGHT}
-            alt="Bloom by EmbedLabs"
+            alt={PRODUCT_IDENTITY}
             className="h-16 w-auto max-w-full object-contain mb-3 dark:hidden"
           />
         </div>
         {children}
         <div className="text-center mt-6">
-          <p className="text-sm text-violet-100/70">Bloom PLM</p>
+          <p className="text-sm text-violet-100/70">{PRODUCT_NAME}</p>
           <p className="text-xs text-violet-200/50 mt-1">v{APP_VERSION}</p>
           <a
             href="https://www.embedlabs.net"

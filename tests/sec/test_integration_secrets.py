@@ -23,11 +23,6 @@ from app.services.integration_secrets import (
     is_encrypted,
 )
 
-# ---------------------------------------------------------------------------
-# Crypto module: correctly encrypted values are usable; wrong/missing keys fail
-# closed; legacy plaintext is rejected.
-# ---------------------------------------------------------------------------
-
 
 def test_round_trip_hides_plaintext():
     envelope = encrypt_integration_secret("ghp_super_secret_token")
@@ -39,7 +34,7 @@ def test_round_trip_hides_plaintext():
 def test_rotation_yields_a_new_ciphertext():
     first = encrypt_integration_secret("same-secret")
     second = encrypt_integration_secret("same-secret")
-    assert first != second  # Fernet IV/timestamp differ; a rotation replaces the value
+    assert first != second
     assert decrypt_integration_secret(first) == decrypt_integration_secret(second) == "same-secret"
 
 
@@ -58,7 +53,7 @@ def test_malformed_key_fails_closed(monkeypatch):
 
 
 def test_wrong_key_cannot_decrypt(monkeypatch):
-    envelope = encrypt_integration_secret("secret")  # encrypted with the conftest key
+    envelope = encrypt_integration_secret("secret")
     monkeypatch.setattr(settings, "INTEGRATION_ENCRYPTION_KEY", Fernet.generate_key().decode())
     with pytest.raises(HTTPException) as exc:
         decrypt_integration_secret(envelope)
@@ -75,12 +70,6 @@ def test_is_encrypted():
     assert is_encrypted(encrypt_integration_secret("x"))
     assert not is_encrypted("plaintext")
     assert not is_encrypted(None)
-
-
-# ---------------------------------------------------------------------------
-# API path: the create/update endpoints store only ciphertext (raw secrets never
-# reach the database), and rotation replaces the stored envelope.
-# ---------------------------------------------------------------------------
 
 
 def _build_harness():
@@ -167,7 +156,6 @@ def test_created_credentials_are_encrypted_at_rest_and_rotate():
             },
         )
         assert resp.status_code == 201, resp.text
-        # The response never echoes the raw secrets.
         body = resp.json()
         assert body["has_token"] is True
         assert body["has_webhook_secret"] is True
@@ -175,7 +163,6 @@ def test_created_credentials_are_encrypted_at_rest_and_rotate():
         assert raw_secret not in resp.text
 
         stored_token, stored_secret = _stored_secrets(session_maker, project_id)
-        # Raw values never reach the database; both are Fernet envelopes.
         assert stored_token != raw_token
         assert is_encrypted(stored_token)
         assert stored_secret != raw_secret
@@ -183,7 +170,6 @@ def test_created_credentials_are_encrypted_at_rest_and_rotate():
         assert decrypt_integration_secret(stored_token) == raw_token
         assert decrypt_integration_secret(stored_secret) == raw_secret
 
-        # Rotation: a new token replaces the stored envelope.
         setting_id = body["id"]
         rotate = client.patch(
             f"/api/integrations/settings/{setting_id}",

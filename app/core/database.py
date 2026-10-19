@@ -40,7 +40,10 @@ class Base(DeclarativeBase):
 
 
 async def create_tables():
-    """Create all database tables."""
+    """Create all database tables.
+
+    Campaigns that carry a suite_id are backfilled into campaign_suites.
+    """
     from app import models  # noqa: F401
 
     async with engine.begin() as conn:
@@ -207,7 +210,6 @@ async def create_tables():
             text("CREATE INDEX IF NOT EXISTS ix_user_tokens_used_at ON user_tokens(used_at)")
         )
 
-        # Backfill existing campaigns that have suite_id into the new campaign_suites join table
         await conn.execute(
             text(
                 "INSERT INTO campaign_suites (campaign_id, suite_id, created_at) "

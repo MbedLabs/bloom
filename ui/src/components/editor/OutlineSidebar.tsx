@@ -26,7 +26,6 @@ export default function OutlineSidebar({ editor, open, onToggle }: Readonly<Outl
 
   const updateHeadings = useCallback(() => {
     const next = extractHeadings(editor)
-    // Every transaction fires this, including plain cursor moves.
     setHeadings((current) => (sameHeadings(current, next) ? current : next))
   }, [editor])
 
@@ -60,7 +59,6 @@ export default function OutlineSidebar({ editor, open, onToggle }: Readonly<Outl
     }
   }, [editor, headings])
 
-  // Reading is scrolling, not typing.
   useEffect(() => {
     if (!editor || !open || headings.length === 0) return
     const container = scrollParentOf(editor.view.dom)
@@ -85,7 +83,6 @@ export default function OutlineSidebar({ editor, open, onToggle }: Readonly<Outl
     }
   }, [editor, headings, open])
 
-  // Keep the highlighted entry visible in a long outline.
   useEffect(() => {
     if (!activeId) return
     navRef.current
@@ -98,8 +95,6 @@ export default function OutlineSidebar({ editor, open, onToggle }: Readonly<Outl
       const el = headingElement(editor, heading.pos)
       if (!el) return
       el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      // +1 puts the cursor inside the heading; `heading.pos` is the position
-      // before it, which belongs to the node above.
       editor?.commands.setTextSelection(heading.pos + 1)
     },
     [editor],

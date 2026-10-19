@@ -6,15 +6,12 @@ from alembic import op
 import sqlalchemy as sa
 
 
-# revision identifiers, used by Alembic.
 revision: str = "d20260731a09"
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-# Indexes that are not expressed on the SQLAlchemy models and were previously added by
-# dedicated revisions.
 _PERFORMANCE_INDEXES = (
     ("ix_test_cases_tc_id", "test_cases", ["tc_id"]),
     ("ix_test_campaign_items_campaign_id", "test_campaign_items", ["campaign_id"]),
@@ -29,8 +26,6 @@ _PERFORMANCE_INDEXES = (
     ),
 )
 
-# Trigram search indexes. Postgres-only, and skipped when pg_trgm cannot be
-# installed - search then falls back to ILIKE.
 _SEARCH_COLUMNS = (
     ("requirements", "req_id"),
     ("requirements", "title"),
@@ -67,11 +62,13 @@ def _pg_trgm_available(bind) -> bool:
 
 
 def _create_search_indexes() -> None:
+    """Create the trigram search indexes on PostgreSQL; without an installable pg_trgm extension it
+    returns and search uses ILIKE.
+    """
     bind = op.get_bind()
     if bind.dialect.name != "postgresql":
         return
     if not _pg_trgm_available(bind):
-        # Extension not installable on this server; search still works via ILIKE.
         return
 
     op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
@@ -981,12 +978,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Downgrade schema: drop the indexes and tables, then the userrole and usertokenpurpose types."""
     _drop_search_indexes()
 
     for name, table, _columns in reversed(_PERFORMANCE_INDEXES):
         op.drop_index(name, table_name=table)
 
-    """Downgrade schema."""
     op.drop_table("test_campaign_items")
     op.drop_table("campaign_suites")
     op.drop_index(op.f("ix_webhook_deliveries_received_at"), table_name="webhook_deliveries")
@@ -1063,7 +1060,5 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_artefact_activities_artefact_id"), table_name="artefact_activities")
     op.drop_table("artefact_activities")
 
-    # Alembic's autogenerate drops tables but not the enum types they use, which
-    # would make a re-upgrade fail with "type already exists".
     for enum_name in ("userrole", "usertokenpurpose"):
         op.execute(f"DROP TYPE IF EXISTS {enum_name}")

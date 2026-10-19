@@ -194,7 +194,6 @@ async def _build_suite_detail(
         for campaign in campaigns
     ]
 
-    # Related concepts: find CPTs linked to any TC in this suite via ArtefactLink
     related_concepts: list[TestConceptSummary] = []
     if tc_ids and type_visible(types, "CPT"):
         concept_links = (
@@ -275,6 +274,7 @@ async def create_suite(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
+    """Create a test suite. test_case_ids that are missing or belong to another project are skipped."""
     project = await get_row_or_404(db, Project, data.project_id, "Project not found")
 
     await require_project_access(
@@ -305,8 +305,6 @@ async def create_suite(
     await attach_tags(db, "test-suite", suite, tag_ids, current_user)
     await db.refresh(suite)
 
-    # One statement for the whole selection. Ids that do not exist, or belong to
-    # another project, are still skipped silently rather than rejected.
     if data.test_case_ids and await doc_type_visible(db, current_user, data.project_id, "TC"):
         valid_test_case_ids = set(
             (

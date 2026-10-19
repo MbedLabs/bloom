@@ -64,6 +64,7 @@ interface DocEditorProps {
 
 type MentionSpec = [string, Record<string, string>, string]
 
+/** Rich-text document editor. Its extensions are built once, and the list and callback props they use are read through refs that track the latest values. */
 export default function DocEditor({
   content,
   onChange,
@@ -85,9 +86,6 @@ export default function DocEditor({
 }: Readonly<DocEditorProps>) {
   const mentionItemsRef = useRef(mentionItems)
   const userMentionItemsRef = useRef(userMentionItems)
-  // Read through a ref for the same reason the lists are: the extensions are
-  // built once, so reading the prop directly would freeze whatever it was on
-  // the render that created the editor.
   const parameterHrefRef = useRef(parameterHref)
   const artefactSearchRef = useRef(artefactSearch)
   const parameterValuesRef = useRef(parameterValues)
@@ -274,9 +272,6 @@ export default function DocEditor({
   }, [])
 
   const editor = useEditor({
-    // The toolbar reads its whole state off the editor at render time - which mark is
-    // active, whether undo is available - and TipTap 3 stopped re-rendering on
-    // transactions by default.
     shouldRerenderOnTransaction: true,
     extensions: [
       StarterKit.configure({

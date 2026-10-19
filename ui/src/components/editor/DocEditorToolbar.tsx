@@ -66,7 +66,6 @@ export default function DocEditorToolbar({
 
   return (
     <div className="sticky top-0 z-10 flex items-center gap-0.5 p-2 border-b border-border bg-card flex-wrap">
-      {/* Undo / Redo */}
       <ToolbarButton
         onClick={() => editor.chain().focus().undo().run()}
         disabled={!editor.can().undo()}
@@ -82,7 +81,6 @@ export default function DocEditorToolbar({
 
       <Separator />
 
-      {/* Text formatting */}
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBold().run()}
         active={editor.isActive('bold')}
@@ -120,7 +118,6 @@ export default function DocEditorToolbar({
         title="Subscript"
       />
 
-      {/* Color picker */}
       <div className="relative" ref={colorRef}>
         <ToolbarButton
           onClick={() => setColorOpen(!colorOpen)}
@@ -173,7 +170,6 @@ export default function DocEditorToolbar({
 
       <Separator />
 
-      {/* Heading dropdown */}
       <div className="relative" ref={headingRef}>
         <button
           onClick={() => setHeadingOpen(!headingOpen)}
@@ -205,7 +201,6 @@ export default function DocEditorToolbar({
 
       <Separator />
 
-      {/* Lists */}
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBulletList().run()}
         active={editor.isActive('bulletList')}
@@ -233,7 +228,6 @@ export default function DocEditorToolbar({
 
       <Separator />
 
-      {/* Alignment */}
       <ToolbarButton
         onClick={() => editor.chain().focus().setTextAlign('left').run()}
         active={editor.isActive({ textAlign: 'left' })}
@@ -253,7 +247,6 @@ export default function DocEditorToolbar({
         title="Align right"
       />
 
-      {/* Line height dropdown */}
       <div className="relative" ref={lineHeightRef}>
         <ToolbarButton
           onClick={() => setLineHeightOpen(!lineHeightOpen)}
@@ -283,7 +276,6 @@ export default function DocEditorToolbar({
 
       <Separator />
 
-      {/* Inserts */}
       <ToolbarButton onClick={onAddTable} icon={<TableIcon className="h-4 w-4" />} title="Insert table" />
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleCodeBlock().run()}
@@ -312,7 +304,6 @@ export default function DocEditorToolbar({
         title="Clear formatting"
       />
 
-      {/* Table controls (show only when inside a table) */}
       {editor.isActive('table') && (
         <>
           <Separator />
@@ -333,7 +324,6 @@ export default function DocEditorToolbar({
 
       <Separator />
 
-      {/* Heading numbering toggle */}
       <ToolbarButton
         onClick={() => onHeadingNumberedChange?.(!headingNumbered)}
         active={headingNumbered}
@@ -341,7 +331,6 @@ export default function DocEditorToolbar({
         title={headingNumbered ? 'Disable heading numbering' : 'Enable heading numbering'}
       />
 
-      {/* Outline toggle */}
       <ToolbarButton
         onClick={onOutlineToggle ?? (() => {})}
         active={outlineOpen}

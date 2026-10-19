@@ -95,7 +95,6 @@ def test_existing_ids_widen_when_the_boundary_is_crossed():
         "PRJ-REQ-099": "PRJ-REQ-0099",
         "PRJ-REQ-999": "PRJ-REQ-0999",
     }
-    # Already at the target width, so untouched.
     assert "PRJ-REQ-1000" not in renames
 
 
@@ -141,7 +140,6 @@ def test_zero_padded_consistency():
     assert result2 == "PRJ-REQ-099"
     assert len(result2.split("-")[-1]) == 3
 
-    # Beyond three digits the width follows the number.
     assert compute_next_id(["PRJ-REQ-1000"], "PRJ", "REQ") == "PRJ-REQ-1001"
 
 

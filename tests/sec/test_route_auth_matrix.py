@@ -19,15 +19,10 @@ PUBLIC_ENDPOINTS = {
     "forgot_password",
     "reset_password",
     "confirm_email_change",
-    # First-run setup. Unauthenticated by necessity — there is no account to
-    # authenticate as yet — and safe because both endpoints refuse to act once any user
-    # exists.
     "setup_status",
     "create_first_admin",
 }
 
-# These endpoints authenticate with provider-specific webhook signatures rather than a
-# FastAPI bearer-token dependency.
 SIGNED_WEBHOOK_ENDPOINTS = {"github_webhook", "gitlab_webhook", "jira_webhook"}
 
 AUTH_DEPENDENCIES = {

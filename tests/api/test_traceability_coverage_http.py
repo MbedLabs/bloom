@@ -108,7 +108,6 @@ def test_coverage_gap_report_counts_requirements_by_verification_state(api_clien
     assert body["uncovered"] == 1
     assert body["partial"] == 1
     assert body["covered"] == 1
-    # Total coverage counts requirements with any verifying test case.
     assert body["coverage_percent"] == 66.7
     assert len(body["gaps"]) == 2
 
@@ -126,7 +125,6 @@ def test_coverage_gap_report_counts_requirements_by_verification_state(api_clien
         headers=headers,
     )
     assert filtered.status_code == 200
-    # Filtering happens in the query now, so total reflects the filter too.
     assert filtered.json()["total"] == 1
     assert len(filtered.json()["items"]) == 1
 

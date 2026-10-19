@@ -88,8 +88,6 @@ function lastCall(fn: unknown): unknown[] {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  // An override installed with `mockResolvedValue` outlives `clearAllMocks`,
-  // so without this one test's stubbing leaks into every test after it.
   resetApiMocks(client as unknown as Record<string, unknown>, vi)
   currentUser = user
   window.confirm = () => true
@@ -201,7 +199,6 @@ describe('the links of a document', () => {
     linksPanel()
     expect(await screen.findByText('Linked Documents')).toBeTruthy()
     await waitFor(() => expect(client.linksApi.list).toHaveBeenCalled())
-    // The fixture links this test case to a requirement, as verifying it.
     await waitFor(() => expect(screen.queryByText('No links yet.')).toBeNull())
   })
 
@@ -340,7 +337,6 @@ describe('the links of a document', () => {
     fireEvent.click(await screen.findByRole('button', { name: /link artefact/i }))
     await screen.findByTitle(/filter targets/i)
 
-    // The source is VCU-TC-001; only the requirement may be picked.
     expect(await screen.findByText(/VCU-REQ-001/)).toBeTruthy()
     expect(screen.queryByText('VCU-TC-001')).toBeNull()
   })
@@ -351,8 +347,6 @@ describe('the links of a document', () => {
 
     await waitFor(() => expect(client.docsApi.list).toHaveBeenCalled())
     const calls = vi.mocked(client.docsApi.list).mock.calls
-    // The fixture links VCU-TC-001 to requirement 11; that is the one label this panel
-    // needs, and the only document it may ask for.
     for (const [, params] of calls as [string, { keys?: string[]; type?: string[] }][]) {
       expect(params?.keys ?? params?.type).toBeTruthy()
     }
@@ -364,8 +358,6 @@ describe('the links of a document', () => {
     linksPanel()
     await screen.findByText('Linked Documents')
 
-    // Without the label the chip falls back to a bare row id, which tells a
-    // reader nothing about what the document is linked to.
     expect(await screen.findByText('VCU-REQ-001')).toBeTruthy()
   })
 
@@ -382,8 +374,6 @@ describe('the links of a document', () => {
     linksPanel()
     fireEvent.click(await screen.findByRole('button', { name: /link artefact/i }))
 
-    // One row per type answers "which kinds can I link to", which the picker
-    // used to work out by folding every document in the project.
     await waitFor(() => expect(client.docsApi.typeSummary).toHaveBeenCalledWith('VCU'))
   })
 
@@ -423,7 +413,6 @@ describe('the links of a document', () => {
 
     fireEvent.click((await screen.findAllByTitle('Remove link'))[0])
 
-    // react-query hands the mutation a context object alongside the id.
     await waitFor(() => expect(client.linksApi.delete).toHaveBeenCalled())
     expect(vi.mocked(client.linksApi.delete).mock.calls[0][0]).toBe(link.id)
   })
@@ -436,8 +425,6 @@ describe('the external tracker of a project', () => {
 
   it('reports what is configured', async () => {
     trackerPanel()
-    // A token is on file, so the field offers to replace it rather than to set
-    // one - that is the only way the panel reveals a credential exists.
     expect(await screen.findByText(/replace token/i)).toBeTruthy()
     expect((screen.getByLabelText('GitHub') as HTMLInputElement).checked).toBe(true)
   })
@@ -458,7 +445,6 @@ describe('the external tracker of a project', () => {
     fireEvent.click(screen.getByLabelText('GitHub'))
     fireEvent.click(screen.getByRole('button', { name: /save integration/i }))
 
-    // Without a credential the integration could never authenticate.
     expect(await screen.findByText(/enter an api token/i)).toBeTruthy()
     await settle()
     expect(client.integrationsApi.createSetting).not.toHaveBeenCalled()
@@ -497,8 +483,6 @@ describe('the external tracker of a project', () => {
     trackerPanel()
     await screen.findByText(/replace token/i)
 
-    // The API returns only `has_token`; the secret itself is encrypted at rest
-    // and never travels back, so the field starts empty.
     const tokenField = screen.getByPlaceholderText(/ghp_/) as HTMLInputElement
     expect(tokenField.value).toBe('')
   })
@@ -532,8 +516,6 @@ describe('the external tracker of a project', () => {
     ]
     expect(id).toBe(integrationSetting.id)
     expect(payload.webhook_secret).toBe('a-new-secret')
-    // Omitting the key is what tells the server to leave the credential alone;
-    // sending an empty string would wipe it.
     expect('token' in payload).toBe(false)
   })
 
@@ -610,7 +592,6 @@ describe('the external tracker of a project', () => {
     fireEvent.click(screen.getByRole('button', { name: /save integration/i }))
 
     await waitFor(() => expect(client.integrationsApi.deleteSetting).not.toHaveBeenCalled())
-    // Backing out is not a failure, so nothing is reported as one.
     expect(screen.queryByText(/failed to save integration/i)).toBeNull()
   })
 
@@ -651,8 +632,6 @@ describe('the external tracker of a project', () => {
     fireEvent.change(screen.getByPlaceholderText(/glpat-/), { target: { value: 'glpat-token' } })
     fireEvent.click(screen.getByRole('button', { name: /save integration/i }))
 
-    // At most one tracker per project, so the GitHub row goes before the
-    // GitLab one is created.
     await waitFor(() => expect(client.integrationsApi.createSetting).toHaveBeenCalled())
     expect(vi.mocked(client.integrationsApi.deleteSetting).mock.calls[0][0]).toBe(
       integrationSetting.id,
@@ -687,7 +666,6 @@ describe('the external tracker of a project', () => {
 
     fireEvent.click(screen.getByLabelText('None'))
 
-    // No tracker means no credentials to enter.
     await waitFor(() => expect(screen.queryByPlaceholderText(/ghp_/)).toBeNull())
     expect(screen.queryByText(/inbound webhook/i)).toBeNull()
   })
@@ -763,7 +741,7 @@ describe('the Jira tracker of a project', () => {
       target: { value: 'customfield_1' },
     })
     fireEvent.change(screen.getByPlaceholderText(/created >=/), { target: { value: 'priority = High' } })
-    changeControl(screen.getByLabelText('Bloom priority for Jira Lowest'), {
+    changeControl(screen.getByLabelText('Bloom PLM priority for Jira Lowest'), {
       target: { value: 'Medium' },
     })
     fireEvent.click(screen.getByLabelText(/create a defect for each new matching issue/i))
@@ -792,7 +770,7 @@ describe('the Jira tracker of a project', () => {
     await screen.findByText(/one-way/i)
 
     fireEvent.click(screen.getByLabelText(/two-way sync/i))
-    expect(screen.getByText(/bloom pushes defect title and status changes back to jira/i)).toBeTruthy()
+    expect(screen.getByText(/bloom plm pushes defect title and status changes back to jira/i)).toBeTruthy()
     expect(screen.getByText(/save first; the pull uses the saved filter/i)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /save integration/i }))
 

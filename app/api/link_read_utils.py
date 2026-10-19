@@ -8,7 +8,6 @@ from app.core.security import apply_external_visibility_filter
 from app.models import ArtefactLink, Requirement, TestCase
 from app.models.user import User
 
-# Legacy requirement_links.link_type → artefact role (for ad-hoc SQL migration if needed).
 LEGACY_REQ_LINK_TYPE_TO_ROLE = {
     "depends_on": "depends_on",
     "derived_from": "derives_from",

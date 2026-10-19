@@ -67,8 +67,6 @@ export const requirement = {
   req_type: 'Functional',
   req_origin: 'Customer',
   parent_id: null,
-  // A reviewer and approver are named but neither has signed off yet, which is
-  // what makes the "mark reviewed" and "mark approved" actions available.
   reviewer_id: 1,
   approver_id: 1,
   reviewed_by_id: null,
@@ -87,7 +85,6 @@ export const testCase = {
   content_json: null,
   content_html: null,
   preconditions: 'Battery connected',
-  // The step table is the test case; these are the rows the detail page shows.
   steps: [
     {
       id: 'row-1',
@@ -105,7 +102,6 @@ export const testCase = {
   priority: 'High',
   test_type: 'Functional',
   automation_status: 'Manual',
-  // Named but not yet signed off, so both actions are available.
   reviewer_id: 1,
   approver_id: 1,
   reviewed_by_id: null,
@@ -168,8 +164,6 @@ export const campaign = {
   campaign_id: 'VCU-CMP-001',
   name: 'Release candidate sweep',
   description: 'Full regression before release.',
-  // One of Planned | Scope | In Progress | Completed | Aborted, which is what
-  // the app and the dashboard both count by; "Running" was not among them.
   status: 'In Progress',
   visibility: 'internal' as const,
   configuration_id: null,
@@ -222,7 +216,6 @@ export const campaignDetail = {
 }
 
 export const testSuite = {
-  // The campaign form counts a suite's test cases before it will scope one.
   total_items: 1,
   id: 41,
   project_id: 1,
@@ -371,8 +364,6 @@ export const integrationSetting = {
   project_id: 1,
   tracker: 'github',
   base_url: 'https://github.com/embedlabs/vcu',
-  // The API reports only whether a credential exists; the secret itself is
-  // encrypted at rest and never returned.
   has_token: true,
   has_webhook_secret: true,
   enabled: true,
@@ -576,8 +567,6 @@ export const RESPONSES: Record<string, unknown> = {
 
   'docsApi.nextDocId': 'VCU-REQ-004',
   'docsApi.list': { items: [docShell, testCaseDocShell], total: 2, skip: 0, limit: 50 },
-  // The per-type tally the topology and the project screen read. It agrees with
-  // `docsApi.list` above: one REQ and one TC, neither carrying a suspect link.
   'docsApi.typeSummary': {
     types: [
       { doc_type: 'REQ', count: 1, suspect_links: 0 },
@@ -605,8 +594,6 @@ export const RESPONSES: Record<string, unknown> = {
   'testCasesApi.setApproved': testCase,
   'testCasesApi.delete': undefined,
 
-  // Paginated like the other list endpoints: the matrix lists every
-  // requirement in a project, which runs to thousands.
   'traceabilityApi.getMatrix': { items: [traceabilityItem], total: 1, skip: 0, limit: 50 },
   'traceabilityApi.getImpactAnalysis': impactAnalysis,
   'traceabilityApi.getCoverageGaps': coverageGaps,
@@ -755,8 +742,6 @@ export const RESPONSES: Record<string, unknown> = {
  */
 export function mockApiModule(
   actual: Record<string, unknown>,
-  // Vitest's own `vi`; typed loosely so this helper does not depend on its
-  // internal generics.
   vi: { fn: (impl: (...args: never[]) => unknown) => unknown },
 ): Record<string, unknown> {
   const mocked: Record<string, unknown> = { ...actual }

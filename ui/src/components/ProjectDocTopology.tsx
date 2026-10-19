@@ -37,10 +37,6 @@ import { docRegistryListUrl } from '../lib/docRegistryParams'
 import { DOC_TYPE_LABELS, type DocType } from '../types/doc'
 import TopologyLinkEdge, { type RoleEntry, type TopologyLinkData } from './TopologyLinkEdge'
 
-// ────────────────────────────────────────────────────────────────────────────
-// Type-level visual config
-// ────────────────────────────────────────────────────────────────────────────
-
 const TYPE_ORDER: DocType[] = ['REQ', 'SPEC', 'STD', 'DES', 'RSK', 'CHG', 'CPT', 'TC', 'TS', 'CMP', 'DEF', 'PRT', 'RPT']
 
 interface TypeStyle {
@@ -159,10 +155,6 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
   },
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Dark mode hook
-// ────────────────────────────────────────────────────────────────────────────
-
 function subscribeDarkMode(cb: () => void) {
   const root = document.documentElement
   const mo = new MutationObserver(cb)
@@ -178,10 +170,6 @@ function useIsDarkMode(): boolean {
   return useSyncExternalStore(subscribeDarkMode, darkModeSnapshot, () => false)
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Role helpers
-// ────────────────────────────────────────────────────────────────────────────
-
 const ROLE_INVERSE: Record<string, string> = {
   verifies: 'verified by',
   implements: 'implemented by',
@@ -195,10 +183,6 @@ const ROLE_INVERSE: Record<string, string> = {
 function roleDisplayLabel(role: string): string {
   return role.replace(/_/g, ' ')
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// Node sizing
-// ────────────────────────────────────────────────────────────────────────────
 
 const NODE_MIN_W = 180
 const NODE_MAX_W = 260
@@ -214,10 +198,6 @@ function sizeForCount(count: number, maxCount: number): { width: number; height:
     scale,
   }
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// Custom React Flow node
-// ────────────────────────────────────────────────────────────────────────────
 
 interface TypeNodeData {
   docType: DocType
@@ -300,10 +280,6 @@ function FitViewOnLayout({ layoutToken }: { layoutToken: number }) {
   return null
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Aggregation – one edge per directional (source, target) pair
-// ────────────────────────────────────────────────────────────────────────────
-
 interface AggregatedEdge {
   id: string
   source: DocType
@@ -314,6 +290,7 @@ interface AggregatedEdge {
   isSyntheticInverse: boolean
 }
 
+/** Aggregates the links between the types present into one edge per directional (source type, target type) pair, with role counts and suspect totals, and adds a synthetic inverse edge with the inverse role labels for each pair without a reverse link. */
 function aggregateEdges(
   links: { source_type: string; target_type: string; role: string; suspect: boolean }[],
   docTypesPresent: Set<DocType>,
@@ -381,10 +358,7 @@ function aggregateEdges(
   return result
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Layout – dagre runs on acyclic collapsed edges; render uses full set
-// ────────────────────────────────────────────────────────────────────────────
-
+/** Positions the nodes with dagre from the given edges, collapsing duplicate pairs and skipping self-loops. */
 function applyDagreLayout(nodes: Node[], layoutEdges: { source: string; target: string }[]): Node[] {
   const g = new dagre.graphlib.Graph()
   g.setDefaultEdgeLabel(() => ({}))
@@ -409,10 +383,6 @@ function applyDagreLayout(nodes: Node[], layoutEdges: { source: string; target: 
   })
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Component
-// ────────────────────────────────────────────────────────────────────────────
-
 interface Props {
   projectId: number
   prefix: string
@@ -426,8 +396,6 @@ export default function ProjectDocTopology({ projectId, prefix }: Readonly<Props
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null)
   const [layoutToken, setLayoutToken] = useState(0)
 
-  // This graph has one node per doc *type*, never one per document, so all it has ever
-  // needed is a count and a suspect tally per type.
   const { data: summary, isLoading: docsLoading } = useQuery({
     queryKey: ['project-doc-type-summary', prefix],
     queryFn: () => docsApi.typeSummary(prefix),
@@ -527,7 +495,6 @@ export default function ProjectDocTopology({ projectId, prefix }: Readonly<Props
       }
     })
 
-    // Dagre layout: only forward (non-synthetic) edges, collapsed per (src,tgt)
     const layoutEdges = aggEdges
       .filter((e) => !e.isSyntheticInverse)
       .map((e) => ({ source: e.source, target: e.target }))
@@ -591,8 +558,6 @@ export default function ProjectDocTopology({ projectId, prefix }: Readonly<Props
     [navigate, prefix],
   )
 
-  // ─────────── Loading / empty states ───────────
-
   if (docsLoading || linksLoading) {
     return (
       <div className="flex h-[60vh] min-h-[480px] items-center justify-center rounded-xl border border-border bg-card text-sm text-muted-foreground">
@@ -648,7 +613,6 @@ export default function ProjectDocTopology({ projectId, prefix }: Readonly<Props
           className="m-3! overflow-hidden! rounded-lg! border! border-border! bg-card! shadow-xs! [&>button]:h-8! [&>button]:w-8! [&>button]:border-border! [&>button]:bg-card! [&>button]:fill-muted-foreground! [&>button]:text-muted-foreground! [&>button]:hover:bg-accent! [&>button]:hover:fill-foreground!"
         />
 
-        {/* Top-left header / stats */}
         <Panel position="top-left" className="m-3">
           <div className="rounded-lg border border-border bg-card/95 backdrop-blur-xs shadow-xs px-3 py-2.5">
             <div className="flex items-center gap-2 text-foreground">
@@ -671,7 +635,6 @@ export default function ProjectDocTopology({ projectId, prefix }: Readonly<Props
           </div>
         </Panel>
 
-        {/* Top-right: reset layout */}
         <Panel position="top-right" className="m-3">
           <button
             onClick={rebuild}
@@ -683,7 +646,6 @@ export default function ProjectDocTopology({ projectId, prefix }: Readonly<Props
           </button>
         </Panel>
 
-        {/* Hovered edge detail */}
         {hoveredEdge && (
           <Panel position="bottom-left" className="m-3">
             <div className="rounded-lg border border-border bg-card/95 backdrop-blur-xs shadow-md px-3 py-2 max-w-sm">
@@ -716,11 +678,10 @@ export default function ProjectDocTopology({ projectId, prefix }: Readonly<Props
           </Panel>
         )}
 
-        {/* Empty-links hint */}
         {edges.length === 0 && (
           <Panel position="bottom-center" className="m-3">
             <div className="rounded-lg border border-border bg-card/95 backdrop-blur-xs shadow-xs px-3 py-2 text-xs text-muted-foreground">
-              No relationships between document types yet — link documents to see them here.
+              No relationships between document types yet. Link documents to see them here.
             </div>
           </Panel>
         )}

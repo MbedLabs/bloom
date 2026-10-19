@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '../brandAssets'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { useOneTimeToken } from '../hooks/useOneTimeToken'
@@ -47,7 +48,7 @@ export default function ResetPassword() {
       {!message && (
         <>
           <h1 className="text-2xl font-bold text-foreground mb-2">Reset Password</h1>
-          <p className="text-sm text-muted-foreground mb-6">Set a new password for your Bloom account.</p>
+          <p className="text-sm text-muted-foreground mb-6">Set a new password for your {PRODUCT_NAME} account.</p>
         </>
       )}
 

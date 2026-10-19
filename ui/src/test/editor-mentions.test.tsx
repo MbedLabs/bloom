@@ -68,7 +68,6 @@ function popover(): HTMLElement | null {
 }
 
 beforeEach(() => {
-  // The outline builds a selector with CSS.escape, which jsdom does not provide.
   if (typeof globalThis.CSS?.escape !== 'function') {
     globalThis.CSS = { ...(globalThis.CSS ?? {}), escape: (value: string) => value } as never
   }
@@ -91,7 +90,6 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
-  // The popover lives outside the React tree, so cleanup does not remove it.
   document.querySelectorAll('.mention-suggestion-popover').forEach((node) => {
     node.parentElement?.remove()
   })
@@ -260,7 +258,6 @@ describe('the {{ trigger', () => {
       const mention = surface.querySelector('span[data-type="mention"]')
       expect(mention?.textContent).toBe('{{BOOT_BUDGET_MS}}')
     })
-    // A parameter is not a person, and must not be styled as one.
     expect(surface.querySelector('.mention-user')).toBeNull()
   })
 
@@ -272,8 +269,6 @@ describe('the {{ trigger', () => {
     await waitFor(() => expect(popover()).toBeTruthy())
     fireEvent.click(screen.getByText('{{BOARD_REV}}'))
 
-    // The popover is mounted outside the editor, so it has to be taken down
-    // explicitly or it is left hanging over the page.
     await waitFor(() => expect(popover()).toBeNull())
   })
 
@@ -298,7 +293,6 @@ describe('the {{ trigger', () => {
     const host = popover()?.parentElement as HTMLElement
     expect(host.style.position).toBe('fixed')
     expect(host.style.zIndex).toBe('50')
-    // Placed against the caret, not left at the origin by default.
     expect(host.style.top).not.toBe('')
   })
 })
@@ -347,8 +341,6 @@ describe('the @ trigger', () => {
       const mention = surface.querySelector('span[data-type="mention"]')
       expect(mention?.textContent).toBe('@Ada Lovelace')
     })
-    // A person is styled as a person, which is how the two are told apart on
-    // the page.
     expect(surface.querySelector('.mention-user')).toBeTruthy()
   })
 
@@ -389,7 +381,6 @@ describe('mentions already in a document', () => {
 
     expect(surface.textContent).toContain('{{BOOT_BUDGET_MS}}')
     expect(surface.textContent).toContain('@Ada Lovelace')
-    // Never the other way round.
     expect(surface.textContent).not.toContain('@BOOT_BUDGET_MS')
     expect(surface.textContent).not.toContain('{{Ada Lovelace}}')
   })
@@ -421,7 +412,6 @@ describe('mentions already in a document', () => {
     })
     const surface = await editorSurface(container)
 
-    // A parameter that has since been deleted still has to render as something.
     expect(surface.textContent).toContain('{{42}}')
   })
 })

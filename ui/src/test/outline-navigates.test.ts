@@ -73,7 +73,6 @@ describe('activeHeadingAt', () => {
   }
 
   it('picks the last heading scrolled past', () => {
-    // A and B are above the fold, C is still below it.
     const editor = editorWithTops([-200, ACTIVE_HEADING_OFFSET - 1, 600])
     expect(activeHeadingAt(editor, headings, 0)).toBe('b')
   })
@@ -84,7 +83,6 @@ describe('activeHeadingAt', () => {
   })
 
   it('measures relative to the scroll container, not the window', () => {
-    // Container starts 300px down the page, so a heading at 320 is barely past it.
     const editor = editorWithTops([320, 900, 1400])
     expect(activeHeadingAt(editor, headings, 300)).toBe('a')
   })

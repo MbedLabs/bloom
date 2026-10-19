@@ -100,7 +100,6 @@ def test_starttls_on_a_plaintext_port_reports_where_and_why(monkeypatch):
     else:
         raise AssertionError("a failing STARTTLS handshake must not look like success")
 
-    # The operator needs the endpoint and the TLS mode, not just the library text.
     assert "mail:2525" in message
     assert "STARTTLS=True" in message
     assert "SMTPNotSupportedError" in message
@@ -114,7 +113,7 @@ def test_delivery_failures_reach_the_existing_error_handlers(monkeypatch):
 
 
 def test_an_unreachable_relay_is_also_reported(monkeypatch):
-    """OSError, not SMTPException — a refused connection must be translated too."""
+    """OSError, not SMTPException: a refused connection must be translated too."""
     _configure_smtp(monkeypatch, starttls=False, port=2525)
 
     def _refused(host, port, timeout):

@@ -1,3 +1,4 @@
+import { PRODUCT_IDENTITY, PRODUCT_NAME } from '../brandAssets'
 import SelectField from '../components/SelectField'
 import { useState, useEffect, useRef } from 'react'
 import { Sun, Moon, Monitor, Info, ExternalLink, Globe, ShieldCheck, Copy, Check, Loader2, RefreshCw, Mail, X } from 'lucide-react'
@@ -156,10 +157,8 @@ export default function Settings() {
   const [currentPassword, setCurrentPassword] = useState('')
   const [emailMessage, setEmailMessage] = useState<string | null>(null)
 
-  // Timezone state
   const [timezone, setTimezone] = useState(() => localStorage.getItem('bloom-timezone') || 'auto')
 
-  // Scoped Bud result-sync credential state
   const [generatedToken, setGeneratedToken] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -253,7 +252,6 @@ export default function Settings() {
 
   return (
     <div className="max-w-2xl space-y-6 animate-fade-in pb-20">
-      {/* Account */}
       <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-muted/30">
           <Mail className="h-4 w-4 text-primary" />
@@ -319,7 +317,7 @@ export default function Settings() {
                   {user.email_change_status === 'requested'
                     ? 'Waiting for an administrator to approve or reject this request.'
                     : user.email_change_status === 'awaiting_current_confirmation'
-                      ? 'Use the authorization link sent to your current address before Bloom contacts the new address.'
+                      ? `Use the authorization link sent to your current address before ${PRODUCT_NAME} contacts the new address.`
                       : 'Current address authorized. Use the verification link sent to the new address to finish the change.'}
                 </p>
               </div>
@@ -335,8 +333,8 @@ export default function Settings() {
             <form className="space-y-4" onSubmit={handleRequestEmailChange}>
               <p className="text-xs text-muted-foreground">
                 {isAdmin
-                  ? 'Enter a new login email. Bloom sends an authorization link to your current email first, then verifies the new address.'
-                  : 'Request a new login email. An administrator must approve it before Bloom sends a confirmation link to the new address.'}
+                  ? `Enter a new login email. ${PRODUCT_NAME} sends an authorization link to your current email first, then verifies the new address.`
+                  : `Request a new login email. An administrator must approve it before ${PRODUCT_NAME} sends a confirmation link to the new address.`}
               </p>
               <div>
                 <label htmlFor="new-email" className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
@@ -381,7 +379,6 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Appearance */}
       <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-muted/30">
           <Monitor className="h-4 w-4 text-primary" />
@@ -409,7 +406,6 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Regional Settings */}
       <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-muted/30">
           <Globe className="h-4 w-4 text-primary" />
@@ -438,7 +434,6 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Scoped Bud integration credentials (Admin Only) */}
       {isAdmin && (
         <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden border-primary/20">
           <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-primary/5">
@@ -448,7 +443,7 @@ export default function Settings() {
           <div className="p-5 space-y-4">
             <div className="space-y-2">
               <p className="text-sm font-medium text-foreground">Scoped service credential</p>
-              <p className="text-xs text-muted-foreground">Creates a revocable 90-day credential that can only submit test-case results. It cannot access Bloom user, project, or admin APIs.</p>
+              <p className="text-xs text-muted-foreground">Creates a revocable 90-day credential that can only submit test-case results. It cannot access {PRODUCT_NAME} user, project, or admin APIs.</p>
             </div>
 
             {generatedToken ? (
@@ -600,7 +595,6 @@ export default function Settings() {
         </div>
       )}
 
-      {/* About */}
       <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center gap-2 bg-muted/30">
           <Info className="h-4 w-4 text-primary" />
@@ -609,10 +603,10 @@ export default function Settings() {
         <div className="p-5">
           <div className="flex items-center gap-4 mb-4">
             <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-muted">
-              <img src="/favicon-96x96.png" alt="Bloom" className="w-full h-full object-contain" />
+              <img src="/favicon-96x96.png" alt={PRODUCT_IDENTITY} className="w-full h-full object-contain" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-foreground">Bloom PLM</p>
+              <p className="text-sm font-semibold text-foreground">{PRODUCT_NAME}</p>
               <p className="text-xs text-muted-foreground">v{APP_VERSION}</p>
             </div>
           </div>

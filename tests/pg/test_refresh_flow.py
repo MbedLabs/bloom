@@ -47,7 +47,7 @@ def test_refresh_rotates_and_replayed_old_token_is_rejected(api_client: TestClie
     _login(api_client)
     old_value = api_client.cookies.get(COOKIE)
 
-    first = api_client.post("/api/auth/refresh")  # rotates: jar now holds a new token
+    first = api_client.post("/api/auth/refresh")
     assert first.status_code == 200
     new_value = api_client.cookies.get(COOKIE)
     assert new_value

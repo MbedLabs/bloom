@@ -208,12 +208,14 @@ async def get_traceability_matrix(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    """The matrix lists every requirement in the project, which runs to thousands."""
+    """The matrix lists every requirement in the project, which runs to thousands.
+
+    Coverage status comes from each requirement's count of verifying test cases and how many of them
+    are past Draft; filtering, sorting and paging run in the query.
+    """
     await require_project_access(db, current_user, project_id)
     types = await visible_types(db, current_user, project_id)
 
-    # Verifying links per requirement: how many test cases point at it, and how
-    # many of those are past Draft. That pair is what coverage_status decides on.
     link_counts = (
         apply_external_visibility_filter(
             select(
@@ -275,8 +277,6 @@ async def get_traceability_matrix(
             Requirement.req_id,
         )
     else:
-        # Ids inside one project and type share a suffix width, so ordering them
-        # as plain strings matches the natural order the Python key produced.
         order = (Requirement.req_id,)
 
     requirements = (
@@ -302,7 +302,6 @@ async def get_traceability_matrix(
             )
         )
 
-    # Already filtered, sorted and paged by the query above.
     return PaginatedResponse[TraceabilityItem](items=items, total=total, skip=skip, limit=limit)
 
 

@@ -169,7 +169,6 @@ def test_a_maintainer_can_reach_the_other_people_on_the_project(mention_harness)
     )
 
     assert response.status_code == 200
-    # The whole point: a maintainer sees their colleague, not a 403.
     assert "Alan Turing" in _names(response.json())
 
 
@@ -210,7 +209,6 @@ def test_a_deactivated_member_is_not_offered(mention_harness):
         "/api/users/mentionable", params={"project_id": ids["project"]}
     )
 
-    # There is no point addressing someone who cannot answer.
     assert "Retired Member" not in _names(response.json())
 
 
@@ -222,7 +220,6 @@ def test_it_discloses_only_project_identity_and_picture(mention_harness):
         "/api/users/mentionable", params={"project_id": ids["project"]}
     )
 
-    # Addressing a colleague must not hand out the user directory.
     for entry in response.json():
         assert set(entry) == {"id", "full_name", "profile_picture_url"}
         assert entry["profile_picture_url"] is None

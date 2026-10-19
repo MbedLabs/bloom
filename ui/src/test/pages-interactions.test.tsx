@@ -139,9 +139,6 @@ beforeEach(() => {
   })) as unknown as typeof window.matchMedia
 })
 
-// vitest runs without `globals`, so Testing Library never registers its own
-// cleanup; without this the previous test's DOM stays mounted and every query
-// finds two of everything.
 afterEach(cleanup)
 
 /** The arguments of the most recent call to a mocked endpoint. */
@@ -158,8 +155,6 @@ describe('the document registry', () => {
 
     fireEvent.change(screen.getByPlaceholderText(/search/i), { target: { value: 'brownout' } })
 
-    // The registry no longer holds the project - it holds one page of it - so
-    // a search it answers locally is a search over the wrong set.
     await waitFor(() => {
       const [, params] = lastCall(client.docsApi.list) as [string, { q?: string }]
       expect(params.q).toBe('brownout')
@@ -171,7 +166,6 @@ describe('the document registry', () => {
     await screen.findAllByText('VCU-REQ-001')
 
     fireEvent.click(screen.getAllByRole('button', { name: /^Filters/ })[0])
-    // The kind chips are labelled with the type code the API expects.
     fireEvent.click(await screen.findByRole('button', { name: 'TC' }))
 
     await waitFor(() => {
@@ -209,7 +203,6 @@ describe('the document registry', () => {
 
     fireEvent.change(screen.getByPlaceholderText(/search/i), { target: { value: 'boot' } })
 
-    // The registry reads its state back out of the query string.
     await waitFor(() =>
       expect((screen.getByPlaceholderText(/search/i) as HTMLInputElement).value).toBe('boot'),
     )
@@ -223,7 +216,6 @@ describe('the document registry', () => {
 
     await waitFor(() => {
       const [, params] = lastCall(client.docsApi.list) as [string, { sort?: string; dir?: string }]
-      // Text columns open ascending; the ordering itself is the server's.
       expect(params).toMatchObject({ sort: 'title', dir: 'asc' })
     })
   })
@@ -341,8 +333,6 @@ describe('baselines', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: /new baseline/i })[0])
     expect(await screen.findByRole('heading', { name: 'Create Baseline' })).toBeTruthy()
-    // The project field is fixed by the route, so the name is the first input
-    // the form leaves editable.
     const editable = screen
       .getAllByRole('textbox')
       .filter((field) => !(field as HTMLInputElement).disabled)
@@ -395,14 +385,12 @@ describe('the registry table', () => {
     await screen.findByText('VCU-TC-001')
 
     const table = screen.getByRole('table')
-    // Both fixtures carry an execution status; only the test-case row shows it.
     expect(within(table).getAllByText('Passed')).toHaveLength(1)
   })
 
   it('links the execution to Bud only once a Bud URL is configured', async () => {
     renderAt('/projects/:prefix/docs', '/projects/VCU/docs', <Documents />)
     await screen.findByText('VCU-TC-001')
-    // Nothing is configured, so the run is named but not linked.
     expect(screen.getByText('Bud run #77').closest('a')).toBeNull()
     cleanup()
 
@@ -460,7 +448,6 @@ describe('creating a document', () => {
   it('shows the identifier the server would actually assign', async () => {
     renderAt('/projects/:prefix/docs/new', '/projects/VCU/docs/new?type=REQ', <DocCreate />)
 
-    // Not a hardcoded "-001": the create screen asks for the next free one.
     expect(await screen.findByText(/VCU-REQ-004/)).toBeTruthy()
     expect(lastCall(client.docsApi.nextDocId)).toEqual(['VCU', 'REQ'])
   })
@@ -597,7 +584,6 @@ describe('editing an existing document', () => {
   it('never asks for a new identifier when editing', async () => {
     renderEdit()
     await screen.findByPlaceholderText('Untitled')
-    // The document already has one; asking would show a misleading number.
     expect(client.docsApi.nextDocId).not.toHaveBeenCalled()
   })
 
@@ -654,7 +640,6 @@ describe('a defect in detail', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /edit/i }))
 
-    // The defect's own fields, not the generic editor that would drop them.
     expect(await screen.findByTitle('Defect title')).toBeTruthy()
     expect(screen.getByTitle('Defect description')).toBeTruthy()
     expect(screen.queryByTestId('doc-editor')).toBeNull()
@@ -682,7 +667,6 @@ describe('a defect in detail', () => {
     await screen.findAllByText(defect.title)
 
     fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
-    // Nothing is destroyed by the first click.
     await settle()
     expect(client.defectsApi.delete).not.toHaveBeenCalled()
 
@@ -705,8 +689,6 @@ describe('a defect in detail', () => {
     renderDefect()
     await screen.findAllByText(defect.title)
 
-    // An open defect can only be triaged, rejected or marked a duplicate -
-    // the screen offers exactly the transitions the workflow allows.
     expect(screen.queryByRole('button', { name: 'Move to Resolved' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Move to Triaged' }))
 
@@ -760,7 +742,6 @@ describe('campaigns', () => {
     fireEvent.change(name, { target: { value: 'Unscoped' } })
     fireEvent.submit(name.closest('form') as HTMLFormElement)
 
-    // A campaign's items are copied from its suites, so it cannot have none.
     expect(await screen.findByText(/select at least one suite/i)).toBeTruthy()
     await settle()
     expect(client.campaignsApi.create).not.toHaveBeenCalled()
@@ -899,7 +880,6 @@ describe('a test suite in detail', () => {
 
     await waitFor(() => {
       const [payload] = lastCall(client.campaignsApi.create) as [{ suite_ids?: number[] }]
-      // A campaign's items are copied from the suite it was scoped from.
       expect(payload.suite_ids).toContain(testSuite.id)
     })
   })
@@ -930,7 +910,6 @@ describe('project settings', () => {
     renderProjectEdit()
     const prefix = (await screen.findByTitle('Project prefix')) as HTMLInputElement
 
-    // A prefix is exactly three letters; anything else cannot be saved.
     fireEvent.change(prefix, { target: { value: 'TOOLONG' } })
 
     await waitFor(() =>
@@ -1012,7 +991,6 @@ describe('a campaign in detail', () => {
   it('links the campaign to the Bud run that executed it', async () => {
     renderCampaign()
     await screen.findAllByText(/Release candidate sweep/)
-    // Bud's URL is not configured here, so the run is named but not linked.
     expect(screen.getAllByText(/Bud run #77|77/).length).toBeGreaterThan(0)
   })
 
@@ -1055,8 +1033,6 @@ describe('account settings', () => {
 
   it('shows the credentials that let Bud submit results', async () => {
     renderSettings()
-    // Only the prefix is ever shown; the token itself is returned once, at
-    // creation, and never again.
     expect(await screen.findByText(/blm_sync_abcd/)).toBeTruthy()
     expect(document.body.textContent).not.toContain('blm_sync_secret')
   })
@@ -1160,7 +1136,6 @@ describe('a test case in detail', () => {
     renderTestCase()
     await screen.findAllByText(new RegExp(testCase.title))
 
-    // The steps come back as structured rows and are rendered as such.
     expect(await screen.findByText('Power on the controller')).toBeTruthy()
     expect(screen.getByText('It reaches ready within 2s')).toBeTruthy()
   })
@@ -1169,7 +1144,6 @@ describe('a test case in detail', () => {
     renderTestCase()
     await screen.findByText('Power on the controller')
 
-    // Editing happens on the edit screen; the detail page never offers it.
     expect(screen.queryByTitle('Add row')).toBeNull()
     expect(screen.queryByTitle('Row actions')).toBeNull()
   })

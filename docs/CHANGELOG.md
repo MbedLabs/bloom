@@ -1,6 +1,17 @@
 # Changelog
 
-## 1.2.0 - unreleased
+## 1.3.0 - unreleased
+
+### Changed
+
+- The product identity is fixed as Bloom PLM by EmbedLabs across the application, emails and API. The sidebar shows Bloom PLM with by EmbedLabs beneath it. The `BLOOM_APP_NAME` setting is removed; an existing environment variable or `.env` entry with that name is ignored.
+- The invitation and email change dialogs close with Escape and put the focus on their first field when they open. A project card opens with the keyboard as well as with the mouse.
+
+### Fixed
+
+- Administrator welcome emails confirm the account is ready and give product-specific next steps, with matching HTML and plain-text instructions. The obsolete one-time runner registration key instructions are removed.
+
+## 1.2.0 - 2026-10-17
 
 ### Added
 
@@ -9,12 +20,13 @@
 
 - Admin company logo on PDF reports: an administrator uploads a company logo in Settings; it renders on the report letterhead (top-left) alongside the EmbedLabs tamper-evidence footer, which is always present. The Settings preview loads through the authenticated client so the admin sees exactly what was stored.
 - Markdown document import: classifies a Markdown document into artefacts (by heading tag, front matter, or an at-import marker); a parameter is written inside a sentence as `{{parameter: NAME, value: VALUE}}`, created on import and replaced with `{{NAME}}`, and a name that already exists is never overwritten: the import stops and, for each such name, you keep the project's value or import the file's value under a new name; classified sections are persisted as artefacts; an unlinked imported artefact raises a notification to link it; documented per template. A Markdown mode is added to the Import Wizard.
-- Test-case import from CSV and XML, round-tripping with the export, on the `POST /projects/{id}/import` convention; every step row (preconditions, loops, nesting, multi-line text, expected results) is kept; a CSV/XML mode in the Import Wizard.
+- Test-case import from CSV and XML, round-tripping with the export, through `POST /projects/{id}/import/test-cases?format=csv|xml`; every step row (preconditions, loops, nesting, multi-line text, expected results) is kept; a CSV/XML mode in the Import Wizard.
 - Export test cases as Markdown, CSV, XML and PDF, with every step row; the Markdown export re-imports as the same test cases.
 - More PDF reports on the report letterhead: the traceability matrix, the test cases, and a verification dossier (each requirement with the test cases that verify it, their last results and the linked runs). Every project export and report is offered from one Export menu on the traceability page. A requirement lists the Bud runs linked to it; each opens in Bud, where the user signs in with their own Bud account and downloads the run report. An export holds only what the user may see: artefacts hidden from external users and document types outside their allowlist are left out.
 - A `{{` parameter chip shows the parameter's name while a body is edited, with its value on hover, and its value when the body is read; a parameter without a value keeps showing its name. Test-case steps show values the same way when read. The stored document keeps `{{NAME}}`.
 - S3-compatible object storage: `STORAGE_BACKEND=s3` keeps attachments in a bucket (AWS S3, MinIO, Hetzner, Ceph) under a per-instance prefix, with the local directory as a mirror that reads fall back to when the bucket does not answer (`STORAGE_LOCAL_MIRROR`, default on). `python -m app.storage migrate --to s3` copies existing files and checks their sizes; cleanup reconciles the bucket; `/api/ready` reports the storage. Local storage stays the default and is unchanged. Adds boto3 to the locked dependencies.
 - Access management: a group is a set of policies. Assign people to a policy group separately in each project. Administrators, Developers, Product Owners and Testers are available in every project; Customers is optional. Policies control actions by resource and document origin; Write includes Read, while Review remains independent. Read Internal covers all origins; Read Customer and Review Customer cover customer content. Application Administration and Access Management are assigned separately from project access. Default policies are protected and can be duplicated; groups remain editable.
+- Custom origins (stored as tags): the Access Management application permissions control the origin catalogue. An artefact editor assigns origins from their permitted scope on the detail page, and policies can restrict access by origin. Viewer (`external`) accounts choose origins only when creating an artefact; they cannot change them afterwards. Renaming is available through `PATCH /tags/{id}`, rather than a rename control in the web app, and preserves references from artefacts and policies.
 - Controlled documents start in Draft. Their creator requests review, the assigned reviewer comments and requests approval, and an eligible approver records approval. Requests produce notifications and email. Approved content is preserved when edited; a new linked approved CHG advances Version and Revision on Save. A correction without a new CHG returns to Draft at the same numbers. Approved CHGs cannot be edited. Risks, defects, campaigns, reports and standards retain their operational lifecycles.
 - Migrate test cases from TestRail: `POST /projects/{id}/import/testrail?format=xml|csv` reads a TestRail XML suite or CSV export (separated steps, text steps, preconditions, nested sections, one CSV row per step). CSV columns are detected from the header and can be remapped in the Import Wizard (`POST /projects/{id}/import/testrail/columns`). Each top-level section becomes a test suite, references that match a requirement id become `verifies` links, the rest are kept in the case body with type, priority and estimate, and cases import as Draft. A case keeps `source_ref = testrail:C<id>`, so importing the same export again updates it instead of duplicating it. A From TestRail mode is added to the Import Wizard.
 - Resolve artefact detail references by public id; existing database identifiers continue to resolve.

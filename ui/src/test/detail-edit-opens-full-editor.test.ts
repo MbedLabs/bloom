@@ -50,7 +50,6 @@ describe('detail pages render the stored body', () => {
 
 describe('RequirementDetail content', () => {
   it('still shows the description when a document predates rich content', () => {
-    // Legacy requirements carry only `description`; they must not render blank.
     expect(requirementDetailSource).toContain('No description provided.')
   })
 })

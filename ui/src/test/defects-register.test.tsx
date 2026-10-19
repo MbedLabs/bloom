@@ -138,7 +138,6 @@ describe('finding a defect', () => {
 
     changeControl(screen.getByTitle('Filter by status'), { target: { value: 'Triaged' } })
 
-    // Status is a server-side filter, so the query has to be re-issued.
     await waitFor(() =>
       expect(lastCall(client.defectsApi.list)).toEqual([project.id, { status: 'Triaged' }]),
     )
@@ -179,7 +178,6 @@ describe('finding a defect', () => {
       expect(lastCall(client.defectsApi.list)).toEqual([project.id, { status: 'Open' }]),
     )
 
-    // An empty choice must not be sent as status="" - that would match nothing.
     changeControl(screen.getByTitle('Filter by status'), { target: { value: '' } })
     await waitFor(() => expect(lastCall(client.defectsApi.list)).toEqual([project.id, {}]))
   })
@@ -236,11 +234,9 @@ describe('ordering the defect register', () => {
     fireEvent.click(screen.getByText('ID').closest('th') as HTMLElement)
     await waitFor(() => expect(rows()).toEqual(['VCU-DEF-001', 'VCU-DEF-002', 'VCU-DEF-003']))
 
-    // Open, Resolved, Triaged - alphabetical, not workflow order.
     fireEvent.click(screen.getByText('Status').closest('th') as HTMLElement)
     await waitFor(() => expect(rows()).toEqual(['VCU-DEF-001', 'VCU-DEF-003', 'VCU-DEF-002']))
 
-    // Critical, High, Low.
     fireEvent.click(screen.getByText('Severity').closest('th') as HTMLElement)
     await waitFor(() => expect(rows()).toEqual(['VCU-DEF-002', 'VCU-DEF-001', 'VCU-DEF-003']))
   })
@@ -265,7 +261,6 @@ describe('the defect rows', () => {
     expect(link.rel).toContain('noopener')
     expect(link.target).toBe('_blank')
 
-    // Two of the three defects have no external issue.
     expect(screen.getAllByText('—')).toHaveLength(2)
   })
 
@@ -275,7 +270,6 @@ describe('the defect rows', () => {
 
     fireEvent.click(screen.getByText('#42'))
 
-    // The click is stopped at the link, so the row underneath does not navigate.
     expect(screen.queryByText('defect detail')).toBeNull()
   })
 
@@ -352,7 +346,6 @@ describe('raising a defect', () => {
       expect(lastCall(client.defectsApi.create)[0]).toMatchObject({
         external_tracker: 'github',
         external_repo_full_name: 'embedlabs/vcu',
-        // The field is typed text; the API wants a number.
         external_issue_number: 99,
         external_issue_url: 'https://github.com/embedlabs/vcu/issues/99',
       }),

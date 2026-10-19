@@ -77,8 +77,6 @@ async def test_delete_user_cleans_known_user_references_before_delete():
 
     stmt_texts = [str(call.args[0]) for call in db.execute.await_args_list]
 
-    # Every table referencing users.id has to be dealt with before the row goes,
-    # or the delete fails at commit time - after the endpoint answered 204.
     for expected in (
         "user_tokens",
         "users",
@@ -94,7 +92,6 @@ async def test_delete_user_cleans_known_user_references_before_delete():
     ):
         assert any(expected in stmt for stmt in stmt_texts), f"{expected} was never touched"
 
-    # The external allowlist hangs off the membership, so it has to go first.
     doc_types_at = next(i for i, t in enumerate(stmt_texts) if "project_external_doc_types" in t)
     memberships_at = next(
         i
@@ -104,8 +101,6 @@ async def test_delete_user_cleans_known_user_references_before_delete():
     assert doc_types_at < memberships_at
 
     db.delete.assert_awaited_once_with(target_user)
-    # Flushed inside the handler so an unhandled reference surfaces as a 409,
-    # not during get_db's commit long after the 204 was sent.
     db.flush.assert_awaited_once()
 
 
@@ -247,8 +242,6 @@ async def test_reset_password_updates_user_hash_and_marks_token_used(monkeypatch
     assert result.message == "Password reset successfully"
     assert verify_password("new-password-123", user.hashed_password)
     assert user.password_set_at is not None
-    # Reset atomically consumes the token, then ends every existing session:
-    # version bump + refresh-token revocation.
     assert user.session_version == 2
     claim.assert_awaited_once()
     invalidate.assert_awaited_once_with(db, user.id)

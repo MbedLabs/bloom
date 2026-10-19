@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '../brandAssets'
 import SelectField from '../components/SelectField'
 import { DOC_TYPE_SLUGS } from '../types/doc'
 import { refreshProjectViews, finishArtefactDeletion } from '../lib/refreshProjectViews'
@@ -804,7 +805,7 @@ function ExternalIssueCard({
           <p className="mt-2">
             Configure your repository to POST issue events to{' '}
             <code className="font-mono text-foreground">{webhookPath}</code> using the secret stored in project
-            settings. Bloom updates the linked defect when the webhook fires.
+            settings. {PRODUCT_NAME} updates the linked defect when the webhook fires.
           </p>
         </details>
       </div>

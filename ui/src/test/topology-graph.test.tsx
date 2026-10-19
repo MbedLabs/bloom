@@ -67,8 +67,6 @@ beforeEach(() => {
   )
   linksApi.list.mockResolvedValue([link])
 
-  // React Flow measures its container and observes it for resizes; jsdom has
-  // neither a layout engine nor ResizeObserver.
   globalThis.ResizeObserver = class {
     observe() {}
     unobserve() {}
@@ -111,8 +109,6 @@ describe('loading', () => {
     renderTopology()
     await settled()
 
-    // One node per type is all this graph ever draws, so downloading the project to
-    // count it was a page load spent on two numbers.
     expect(docsApi.typeSummary).toHaveBeenCalledWith('VCU')
     expect(docsApi.list).not.toHaveBeenCalled()
     expect(await screen.findByText('2')).toBeTruthy()
@@ -124,7 +120,6 @@ describe('the roll-up', () => {
     renderTopology()
     await settled()
 
-    // Two documents, one link between their types.
     const header = screen.getByText('Topology').closest('div')?.parentElement as HTMLElement
     expect(header.textContent).toContain('2')
     expect(header.textContent).toContain('docs')
@@ -134,12 +129,9 @@ describe('the roll-up', () => {
   it('calls out suspect links, and stays quiet when there are none', async () => {
     renderTopology()
     await settled()
-    // Neither fixture carries a suspect link.
     expect(screen.queryByText(/suspect/i)).toBeNull()
     cleanup()
 
-    // The header's tally comes from the links, not the documents: a link is
-    // suspect when what it points at changed after it was made.
     linksApi.list.mockResolvedValue([
       { ...link, suspect: true },
       { ...link, id: 132, suspect: true },
@@ -148,7 +140,6 @@ describe('the roll-up', () => {
     renderTopology()
     await settled()
 
-    // The count and the word are separate text nodes inside one span.
     await waitFor(() =>
       expect(
         screen.getByText('Topology').closest('div')?.parentElement?.textContent,
@@ -160,7 +151,6 @@ describe('the roll-up', () => {
     renderTopology()
     await settled()
 
-    // A requirement and a test case were returned; nothing else was.
     expect(screen.getAllByText(/Requirement/).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/Test Case/).length).toBeGreaterThan(0)
     expect(screen.queryByText('Risk')).toBeNull()
@@ -233,7 +223,6 @@ describe('the controls', () => {
     const reset = screen.getByTitle('Reset layout')
     fireEvent.click(reset)
 
-    // The graph survives a rebuild rather than emptying itself.
     await waitFor(() => expect(container.querySelector('.react-flow')).toBeTruthy())
     expect(screen.getByText('Topology')).toBeTruthy()
   })

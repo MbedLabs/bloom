@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from '../brandAssets'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import {
@@ -74,9 +75,9 @@ export default function Dashboard() {
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             <CircleDot className="h-3.5 w-3.5 text-primary" />
-            Bloom PLM
+            {PRODUCT_NAME}
           </div>
-          <h2 className="mt-1 text-lg font-semibold tracking-tight text-foreground">Bloom Dashboard</h2>
+          <h2 className="mt-1 text-lg font-semibold tracking-tight text-foreground">{PRODUCT_NAME} Dashboard</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Portfolio health across requirements, specifications, protocols, test assets, designs, risks, changes, reports, and standards.
           </p>

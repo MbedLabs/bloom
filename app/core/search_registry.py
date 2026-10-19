@@ -19,13 +19,17 @@ from app.models import (
 
 @dataclass(frozen=True)
 class SearchTarget:
-    """One searchable artefact type."""
+    """One searchable artefact type.
 
-    type_code: str  # canonical doc type code shown to the client (REQ, TC, ...)
+    type_code is the canonical code shown to the client, id_attr the human-readable id column,
+    title_attr the display title column, and doc_type_attr is set for documents, which carry their
+    own doc_type.
+    """
+
+    type_code: str
     model: type
-    id_attr: str  # human-readable id column name (req_id, tc_id, ...)
-    title_attr: str  # display title column name (title or name)
-    # Documents carry their own doc_type column; everything else is fixed.
+    id_attr: str
+    title_attr: str
     doc_type_attr: Optional[str] = None
 
 

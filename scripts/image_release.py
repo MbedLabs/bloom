@@ -10,7 +10,33 @@ def run(*args):
     return subprocess.run(args, text=True, capture_output=True, check=True).stdout.strip()
 
 
+HOST_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?"
+IMAGE_REFERENCE = re.compile(
+    rf"(?:localhost|{HOST_LABEL}(?:\.{HOST_LABEL})+|{HOST_LABEL}(?=:))"
+    r"(?::(?P<port>[0-9]{1,5}))?"
+    r"(?:/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)+"
+    r"(?::[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}|@sha256:[0-9a-f]{64})?",
+    re.ASCII,
+)
+
+
+def is_image_reference(image):
+    """Return True for `registry[:port]/name`, optionally followed by `:tag` or `@sha256:<64 hex>`."""
+    match = IMAGE_REFERENCE.fullmatch(image) if isinstance(image, str) else None
+    if match is None:
+        return False
+    port = match["port"]
+    return port is None or 1 <= int(port) <= 65535
+
+
 def digest(image):
+    """Return the manifest digest of a registry image, or None when the registry has no such image.
+
+    Raises ValueError, without calling docker, for a reference that is not
+    `registry/name`, `registry/name:tag` or `registry/name@sha256:<64 hex>`.
+    """
+    if not is_image_reference(image):
+        raise ValueError(f"Invalid image reference: {image!r}")
     result = subprocess.run(
         ["docker", "buildx", "imagetools", "inspect", image, "--format", "{{.Manifest.Digest}}"],
         text=True,
@@ -47,8 +73,11 @@ def eligible_aliases(aliases, ref, latest_tag, branch_current=True):
 
 
 def promote(image, aliases, inspect=digest, execute=run):
+    """Point every alias at the tested image. Exact version aliases are checked first, and a published
+    version with another digest aborts before any alias moves; each alias is verified by digest
+    after it moves.
+    """
     expected = image.split("@", 1)[1]
-    # Preflight every exact version before changing any aliases.
     for alias in aliases:
         tag = alias.rsplit(":", 1)[1]
         if re.fullmatch(r"v?\d+\.\d+\.\d+(?:[-+].+)?", tag):

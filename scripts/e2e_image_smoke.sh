@@ -1,25 +1,4 @@
 #!/usr/bin/env bash
-#
-# End-to-end smoke test against a *published* Bloom image.
-#
-# Proves the release-blocking path the unit suite cannot, using a real named
-# volume and a full container teardown/recreate (not just a restart):
-#   empty named-volume PostgreSQL
-#     -> `alembic upgrade head` builds the schema on the real image (before the
-#        app boots; RUN_STARTUP_DATA_REPAIR=false, so no create_all rescue)
-#     -> `alembic current` is at head (migrations are complete on their own)
-#     -> app boots; admin can log in
-#     -> a project is created (database write)
-#     -> a >1 MB ReqIF import succeeds THROUGH nginx (client_max_body_size)
-#     -> BOTH containers are removed and recreated with the SAME named volume
-#     -> the project and imported requirements still exist, and re-importing the
-#        same ReqIF is idempotent (skipped, not duplicated)
-#     -> /api/health is liveness-only; /api/ready confirms the database
-#
-# Usage:
-#   scripts/e2e_image_smoke.sh <image-ref>
-#
-# Requires: docker, curl, python3. The published image supplies the app + alembic.
 set -euo pipefail
 
 IMAGE="${1:?usage: e2e_image_smoke.sh <image-ref>}"
@@ -43,23 +22,17 @@ DB_NAME="e2e_bloom"
 DATABASE_URL="postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@${PG}:5432/${DB_NAME}"
 
 ADMIN_EMAIL="e2e-admin@e2e.example.com"
-ADMIN_PASSWORD="E2eAdminPassword-1234567"   # >= 16 chars, non-default
+ADMIN_PASSWORD="E2eAdminPassword-1234567"
 
 ENV_ARGS=(
   -e "BLOOM_ENV=production"
   -e "DATABASE_URL=${DATABASE_URL}"
   -e "SECRET_KEY=e2e-secret-key-that-is-definitely-long-enough-0123456789"
-  # Production now refuses to boot without a valid Fernet key (credentials are
-  # encrypted at rest). Throwaway key for this ephemeral container only.
   -e "BLOOM_INTEGRATION_ENCRYPTION_KEY=i4d1_ToTN0MIR05ZRrKzNyUQo3f2UOsYT37dmkQ0oe0="
   -e "ADMIN_EMAIL=${ADMIN_EMAIL}"
   -e "ADMIN_PASSWORD=${ADMIN_PASSWORD}"
   -e "ADMIN_FULL_NAME=E2E Admin"
   -e "AUTO_SEED_ADMIN=true"
-  # Production-path migration test: the app must NOT build or repair the schema.
-  # alembic (run explicitly below, before the app boots) is the only schema
-  # builder, so a missing/incomplete migration fails instead of being rescued by
-  # create_all().
   -e "RUN_STARTUP_DATA_REPAIR=false"
   -e "BLOOM_DISABLE_RATE_LIMIT=1"
   -e "ENABLE_DOCS=false"
@@ -104,7 +77,6 @@ wait_ready() {
 }
 
 start_pg() {
-  # Reuses the named PGVOL so data survives a container recreate.
   docker run -d --name "$PG" --network "$NET" \
     -v "${PGVOL}:/var/lib/postgresql/data" \
     -e "POSTGRES_USER=${DB_USER}" \
@@ -201,8 +173,6 @@ python3 - "$FIXTURE" "$PADDED" <<'PY'
 import sys
 src, dst = sys.argv[1], sys.argv[2]
 data = open(src, "rb").read()
-# Pad with a large XML comment (ignored by the parser) to clear 1 MB. The unit
-# contains no double hyphen, so the comment stays well-formed.
 pad = b"<!-- " + (b"e2e padding data 0123456789 " * 60000) + b" -->\n"
 data = data.replace(b"</REQ-IF>", pad + b"</REQ-IF>")
 open(dst, "wb").write(data)
@@ -219,7 +189,6 @@ imported="$(printf '%s' "$import_result" | json_field imported)"
 log "Removing BOTH containers and recreating them with the SAME named volume"
 docker rm -f "$APP" "$PG" >/dev/null
 start_pg
-# No alembic re-run: the schema and data live in the persistent PGVOL.
 start_app
 wait_ready "after container recreation"
 

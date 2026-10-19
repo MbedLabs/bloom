@@ -91,7 +91,6 @@ export default function Projects() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-xl font-bold text-foreground">Projects</h2>
@@ -108,7 +107,6 @@ export default function Projects() {
         )}
       </div>
 
-      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <input
@@ -120,7 +118,6 @@ export default function Projects() {
         />
       </div>
 
-      {/* Project Grid */}
       {isLoading ? (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-8 text-center text-muted-foreground">
           Loading...
@@ -256,10 +253,13 @@ function ProjectCard({
   const coverage = Math.round(project.coverage_percent)
 
   return (
-    <div
-      className="group bg-card rounded-lg border border-border shadow-elegant hover:shadow-glow hover:border-primary/20 transition-all duration-300 overflow-hidden cursor-pointer"
-      onClick={() => navigate(`/projects/${project.prefix}`)}
-    >
+    <div className="group relative bg-card rounded-lg border border-border shadow-elegant hover:shadow-glow hover:border-primary/20 transition-all duration-300 overflow-hidden cursor-pointer">
+      <button
+        type="button"
+        aria-label={`Open ${project.name}`}
+        onClick={() => navigate(`/projects/${project.prefix}`)}
+        className="absolute inset-0 h-full w-full cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      />
       <div className={`h-1 ${
         project.status === 'Active' ? 'bg-linear-to-r/srgb from-primary via-[#7c3aed] to-[#6b7280]' : 'bg-muted'
       }`} />
@@ -277,7 +277,7 @@ function ProjectCard({
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); onEdit() }}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                    className="relative z-10 inline-flex h-7 w-7 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                     title="Edit project"
                   >
                     <Pencil className="h-3.5 w-3.5" />
@@ -294,7 +294,6 @@ function ProjectCard({
           <p className="text-xs text-muted-foreground mb-4 line-clamp-2">{project.description}</p>
         )}
 
-        {/* Stats */}
         <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
           <div className="flex items-center gap-1">
             <FileText className="h-3.5 w-3.5" />
@@ -306,7 +305,6 @@ function ProjectCard({
           </div>
         </div>
 
-        {/* Coverage bar */}
         <div className="flex items-center gap-2">
           <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
             <div
@@ -319,12 +317,11 @@ function ProjectCard({
           <span className="text-[11px] text-muted-foreground font-medium">{coverage}%</span>
         </div>
 
-        {/* Arrow */}
         <div className="flex justify-end mt-3">
           <button
             type="button"
             onClick={() => navigate(`/projects/${project.prefix}`)}
-            className="inline-flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors"
+            className="relative z-10 inline-flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors"
           >
             Open
             <ArrowRight className="h-4 w-4 transition-all duration-200 -translate-x-1 group-hover:translate-x-0" />

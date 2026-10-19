@@ -185,8 +185,6 @@ export default function Reports() {
               </thead>
               <tbody className="divide-y divide-border">
                 {sortedProjects.map((p) => {
-                  // Coverage = requirements with >=1 verifying test case / total
-                  // requirements (NOT test-case count / requirement count).
                   const cov = getCoverage(p)
                   const health = getHealth(p, cov)
                   return (
@@ -312,6 +310,7 @@ function HealthBadge({ level }: Readonly<{ level: string }>) {
 
 const HEALTH_LABELS: Record<string, string> = { good: 'Good', warning: 'Warning', critical: 'Critical', empty: 'N/A' }
 
+/** Percentage of a project's requirements that have at least one verifying test case. */
 function getCoverage(project: { requirement_count: number; uncovered_requirement_count: number }) {
   const covered = Math.max(0, project.requirement_count - project.uncovered_requirement_count)
   return project.requirement_count > 0 ? Math.round((covered / project.requirement_count) * 100) : 0

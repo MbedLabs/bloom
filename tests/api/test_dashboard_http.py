@@ -55,7 +55,6 @@ def test_dashboard_stats_shape(api_client: TestClient):
         assert key in data
     assert isinstance(data["projects"], list)
 
-    # Cached second call should match
     resp2 = api_client.get("/api/dashboard/stats", headers=headers)
     assert resp2.status_code == 200
     assert resp2.json()["total_projects"] == data["total_projects"]

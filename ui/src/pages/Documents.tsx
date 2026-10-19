@@ -289,11 +289,8 @@ export default function Documents() {
   const [pageSize, setPageSize] = useState(30)
   const [page, setPage] = useState(0)
 
-  // The address bar keeps the typed value so the input stays responsive and the
-  // filter stays shareable; the server only hears about it once typing pauses.
   const debouncedSearch = useDebounced(search, 250)
 
-  // Every filter, the sort and the page are the server's job now.
   const { data: docsData, isLoading } = useQuery({
     queryKey: [
       'all-docs', prefix, typeFilters, statusFilters, debouncedSearch, priorityFilter,
@@ -327,7 +324,6 @@ export default function Documents() {
   const totalDocs = docsData?.total ?? 0
   const totalPages = Math.ceil(totalDocs / pageSize)
 
-  // Narrowing the set can leave the reader on a page that no longer exists.
   useEffect(() => {
     setPage(0)
   }, [

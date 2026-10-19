@@ -269,7 +269,6 @@ export default function TestCampaigns() {
         </div>
 
         <div>
-          {/* Campaigns toolbar */}
           {(campaigns?.length ?? 0) > 0 && (
             <div className="flex flex-wrap items-center gap-2 mb-4">
               <div className="relative flex-1 min-w-[200px] max-w-xs">

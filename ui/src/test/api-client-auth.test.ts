@@ -116,7 +116,6 @@ describe('a 401 refreshes once and retries', () => {
     }
 
     await expect(client.projectsApi.list()).rejects.toBeDefined()
-    // One refresh, and the original request tried exactly twice.
     expect(requests.filter((r) => r.url === '/api/auth/refresh')).toHaveLength(1)
     expect(requests.filter((r) => r.url === '/projects')).toHaveLength(2)
   })
@@ -127,7 +126,6 @@ describe('a 401 refreshes once and retries', () => {
     script = {
       '/api/auth/refresh': [{ status: 200, data: { access_token: 'fresh-token' } }],
     }
-    // Every /projects call 401s until the refresh has happened.
     Object.defineProperty(script, '/projects', {
       enumerable: true,
       get: () => [{ status: projectCalls++ < 3 ? 401 : 200, data: [] }],

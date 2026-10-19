@@ -181,8 +181,6 @@ def test_email_change_requires_confirmation_and_ends_sessions(api_client: TestCl
     finally:
         users_module.send_email_change_email = original
 
-    # Approved but unconfirmed: login email is unchanged, and the new mailbox
-    # receives an email naming both addresses.
     me = api_client.get("/api/auth/me", headers=_bearer(access1))
     assert me.status_code == 200
     assert me.json()["email"] == old_email
@@ -198,7 +196,6 @@ def test_email_change_requires_confirmation_and_ends_sessions(api_client: TestCl
     confirm = api_client.post("/api/auth/confirm-email-change", json={"token": match.group(1)})
     assert confirm.status_code == 200, confirm.text
 
-    # Confirmed: pre-change tokens dead, old address cannot log in, new can, verified.
     assert api_client.get("/api/auth/me", headers=_bearer(access1)).status_code == 401
     api_client.cookies.clear()
     assert api_client.post("/api/auth/refresh", cookies={COOKIE: refresh1}).status_code == 401

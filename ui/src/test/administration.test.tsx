@@ -143,9 +143,6 @@ beforeEach(() => {
   })
 })
 
-// vitest runs without `globals`, so Testing Library never registers its own
-// cleanup; without this the previous test's DOM stays mounted and every query
-// finds two of everything.
 afterEach(cleanup)
 
 describe('the user table', () => {
@@ -206,7 +203,6 @@ describe('the user table', () => {
 
     expect(within(rowFor(awaitingApproval.full_name)).getByTitle('Approve email change')).toBeTruthy()
     expect(within(rowFor(awaitingMailbox.full_name)).queryByTitle('Approve email change')).toBeNull()
-    // Nothing is pending for the others, so there is nothing to approve or reject.
     expect(within(rowFor(maintainer.full_name)).queryByTitle(/email change/i)).toBeNull()
   })
 
@@ -271,8 +267,6 @@ describe('changing what a user may do', () => {
     renderAt('/users', '/users', <Users />)
     await screen.findByText(maintainer.full_name)
 
-    // Nobody may lock themselves out, so their own row carries neither a role
-    // editor nor the destructive actions.
     const self = within(rowFor(admin.full_name))
     expect(self.queryByTitle('Edit role')).toBeNull()
     expect(self.queryByTitle('Delete user')).toBeNull()
@@ -283,11 +277,8 @@ describe('changing what a user may do', () => {
     renderAt('/users', '/users', <Users />)
     await screen.findByText(otherAdmin.full_name)
 
-    // A second administrator is not the signed-in user, so the self rule does
-    // not cover them; the role editor is withheld because they are an admin.
     const row = within(rowFor(otherAdmin.full_name))
     expect(row.queryByTitle('Edit role')).toBeNull()
-    // The other destructive actions are still offered - only the role is fixed.
     expect(row.getByTitle('Delete user')).toBeTruthy()
   })
 
@@ -467,6 +458,68 @@ describe('an administrator changing someone else’s email', () => {
     await settle()
     expect(client.usersApi.startEmailChange).not.toHaveBeenCalled()
   })
+
+  it('moves focus into the dialog and closes it with Escape without sending anything', async () => {
+    renderAt('/users', '/users', <Users />)
+    await screen.findByText(maintainer.full_name)
+
+    fireEvent.click(within(rowFor(maintainer.full_name)).getByTitle('Change email'))
+    const input = await screen.findByLabelText('New email')
+    await waitFor(() => expect(document.activeElement).toBe(input))
+    fireEvent.keyDown(input, { key: 'Escape' })
+
+    await waitFor(() => expect(screen.queryByLabelText('New email')).toBeNull())
+    await settle()
+    expect(client.usersApi.startEmailChange).not.toHaveBeenCalled()
+  })
+
+  it('stays open on a click inside the dialog and closes on a backdrop click', async () => {
+    renderAt('/users', '/users', <Users />)
+    await screen.findByText(maintainer.full_name)
+
+    fireEvent.click(within(rowFor(maintainer.full_name)).getByTitle('Change email'))
+    fireEvent.click(await screen.findByRole('dialog', { name: 'Change user email' }))
+    fireEvent.click(screen.getByText('Change user email'))
+    expect(screen.getByLabelText('New email')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close dialog backdrop' }))
+
+    await waitFor(() => expect(screen.queryByLabelText('New email')).toBeNull())
+    expect(client.usersApi.startEmailChange).not.toHaveBeenCalled()
+  })
+})
+
+describe('the invitation dialog', () => {
+  async function openInvite() {
+    renderAt('/users', '/users', <Users />)
+    await screen.findByText(user.full_name)
+    fireEvent.click(screen.getByRole('button', { name: /invite user/i }))
+    return screen.findByTitle('Full name')
+  }
+
+  it('moves focus to the name field and closes with Escape without inviting anyone', async () => {
+    const name = await openInvite()
+    await waitFor(() => expect(document.activeElement).toBe(name))
+
+    fireEvent.keyDown(name, { key: 'Escape' })
+
+    await waitFor(() => expect(screen.queryByTitle('Full name')).toBeNull())
+    await settle()
+    expect(client.usersApi.invite).not.toHaveBeenCalled()
+  })
+
+  it('stays open on a click inside the dialog and closes on a backdrop click', async () => {
+    await openInvite()
+
+    fireEvent.click(screen.getByRole('dialog', { name: 'Invite User' }))
+    fireEvent.click(screen.getByTitle('Email address'))
+    expect(screen.getByTitle('Full name')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close dialog backdrop' }))
+
+    await waitFor(() => expect(screen.queryByTitle('Full name')).toBeNull())
+    expect(client.usersApi.invite).not.toHaveBeenCalled()
+  })
 })
 
 describe('the invitation link', () => {
@@ -525,7 +578,6 @@ describe('the invitation link', () => {
     fireEvent.click(await screen.findByRole('button', { name: /copy link/i }))
 
     await waitFor(() => expect(prompt).toHaveBeenCalledWith('Copy invite link:', inviteLink))
-    // Nothing was copied, so the button must not claim otherwise.
     expect(screen.queryByRole('button', { name: /copied/i })).toBeNull()
   })
 
@@ -597,8 +649,6 @@ describe('the project list', () => {
     })
 
     expect(screen.getByText('No projects found')).toBeTruthy()
-    // The empty state offers to create one only when the list is genuinely
-    // empty - offering it here would create a project the search still hides.
     expect(screen.queryByRole('button', { name: /new project/i })).toBeTruthy()
     expect(screen.getAllByRole('button', { name: /new project/i })).toHaveLength(1)
   })
@@ -616,6 +666,25 @@ describe('the project list', () => {
     await screen.findByText(project.name)
 
     fireEvent.click(screen.getAllByRole('button', { name: /open/i })[0])
+
+    expect(await screen.findByText('project overview')).toBeTruthy()
+  })
+
+  it('opens a project from its card through a focusable native button', async () => {
+    renderProjects()
+    await screen.findByText(project.name)
+
+    const card = screen.getByRole('button', { name: `Open ${project.name}` })
+    expect(card.tagName).toBe('BUTTON')
+    expect(card.getAttribute('type')).toBe('button')
+    expect(card.tabIndex).toBe(0)
+    card.focus()
+    expect(document.activeElement).toBe(card)
+    for (const control of [screen.getAllByTitle('Edit project')[0], screen.getAllByRole('button', { name: 'Open' })[0]]) {
+      expect(control.className).toContain('relative z-10')
+    }
+
+    fireEvent.click(card)
 
     expect(await screen.findByText('project overview')).toBeTruthy()
   })
@@ -647,7 +716,6 @@ describe('the project list', () => {
     await screen.findByText(project.name)
 
     expect(screen.queryByTitle('Edit project')).toBeNull()
-    // A maintainer may still create projects.
     expect(screen.getByRole('button', { name: /new project/i })).toBeTruthy()
   })
 
@@ -684,10 +752,8 @@ describe('creating a project', () => {
     const form = await openForm()
     fireEvent.change(form.name, { target: { value: 'Battery Management' } })
 
-    // Exactly three, so both a shorter one and one carrying a digit are out.
     for (const bad of ['BM', 'B1']) {
       fireEvent.change(form.prefix, { target: { value: bad } })
-      // The hint under the field and the form-level error can both be showing.
       expect((await screen.findAllByText(/exactly three uppercase letters/i)).length)
         .toBeGreaterThan(0)
       expect(form.submit.disabled).toBe(true)
@@ -736,7 +802,6 @@ describe('creating a project', () => {
     fireEvent.click(form.submit)
 
     expect((await screen.findAllByText(/already exists/i)).length).toBeGreaterThan(0)
-    // The form stays up so the prefix can be corrected without retyping.
     expect(screen.getByPlaceholderText('PRJ')).toBeTruthy()
   })
 
@@ -828,8 +893,6 @@ describe('project parameters', () => {
     fireEvent.change(await screen.findByPlaceholderText('Enter a key'), {
       target: { value: 'MAX_TEMP_C' },
     })
-    // The value is left empty; `required` stops the browser, and the handler
-    // stops jsdom, which does not enforce it.
     fireEvent.submit(screen.getByPlaceholderText('Enter a key').closest('form') as HTMLFormElement)
 
     await settle()

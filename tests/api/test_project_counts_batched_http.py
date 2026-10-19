@@ -6,8 +6,6 @@ from fastapi.testclient import TestClient
 
 from tests.conftest import create_project, unique_suffix
 
-# Every count the project card shows. The list endpoint computes these in bulk
-# and the detail endpoint one project at a time; the two must never disagree.
 COUNT_KEYS = (
     "requirement_count",
     "test_case_count",
@@ -42,8 +40,6 @@ def test_listed_counts_match_the_per_project_endpoint(api_client: TestClient):
     headers = _admin_headers(api_client)
     suffix = unique_suffix()
 
-    # Two projects with different contents, so a bulk query that mixed rows
-    # between projects would show up as a mismatch rather than cancelling out.
     busy = create_project(api_client, headers, f"Counts Busy {suffix}")["id"]
     empty = create_project(api_client, headers, f"Counts Empty {suffix}")["id"]
 
@@ -70,8 +66,6 @@ def test_listed_counts_match_the_per_project_endpoint(api_client: TestClient):
                 f"list={by_id[project_id][key]} detail={detail_body[key]}"
             )
 
-    # The busy project must actually carry the requirements, so the comparison
-    # above is not two zeroes agreeing with each other.
     assert by_id[busy]["requirement_count"] == 3
     assert by_id[empty]["requirement_count"] == 0
 
@@ -126,7 +120,6 @@ def test_listing_projects_does_not_issue_a_query_per_project(api_client: TestCli
         create_project(api_client, headers, f"Scale {n} {suffix}")
     grown = count_list_queries()
 
-    # Four more projects previously meant roughly forty more statements.
     assert grown - baseline <= 2, (
         f"listing grew by {grown - baseline} queries for 4 more projects "
         f"({baseline} -> {grown}); the per-project N+1 has returned"

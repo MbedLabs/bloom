@@ -242,7 +242,7 @@ export default function RequirementDetail({
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <span className="text-sm text-blue-600 font-medium">Parent Requirement: </span>
           <Link to={docUrl(projectPrefix, 'REQ', parentReq.req_id)} className="text-sm text-primary hover:text-primary/80 font-medium">
-            {parentReq.req_id} — {parentReq.title} →
+            {parentReq.req_id} ({parentReq.title}) →
           </Link>
         </div>
       )}

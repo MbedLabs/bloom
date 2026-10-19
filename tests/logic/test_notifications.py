@@ -86,7 +86,7 @@ async def test_notify_assignment_only_fires_on_change(session):
     await notify_assignment(
         session,
         assignee_id=reviewer.id,
-        previous_assignee_id=reviewer.id,  # unchanged
+        previous_assignee_id=reviewer.id,
         role_label="reviewer",
         artefact_label="requirement ALP-REQ-001",
         project_id=1,
@@ -133,7 +133,6 @@ async def test_requirement_update_notifies_new_approver_once(session):
     assert rows[0].event_type == "assignment"
     assert "approver" in rows[0].title
 
-    # unchanged approver on a second update -> no duplicate
     await update_requirement(
         requirement_id=req.id,
         data=RequirementUpdate(approver_id=reviewer.id, title="Renamed"),

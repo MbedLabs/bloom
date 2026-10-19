@@ -6,25 +6,9 @@ const sources = import.meta.glob(['../{pages,components}/*.tsx', '../hooks/*.ts'
   import: 'default',
 }) as Record<string, string>
 
-/**
- * Every save and delete says whether it worked.
- *
- * Six detail pages each carried their own copy of a toast. Everything else
- * reported nothing, or an inline banner that could be scrolled out of view: the
- * document editor flipped its button to "Saved" for two seconds and, on delete,
- * simply navigated away - indistinguishable from a misclick. Adding or removing
- * a relationship, creating a baseline, editing a project parameter and inviting
- * a user all failed silently.
- *
- * This walks the real mutation call sites rather than a hand-kept list, so a new
- * one cannot quietly skip its feedback.
- */
-
 /** Files whose mutations are not user-initiated saves. */
 const EXEMPT = new Set([
-  // Long-running import with its own progress and result screens.
   'ImportWizard.tsx',
-  // Sign-out and the command palette: navigation, not persistence.
   'Layout.tsx',
 ])
 
@@ -38,7 +22,6 @@ function mutationSites(): Site[] {
   for (const [path, source] of Object.entries(sources)) {
     const file = path.split('/').pop()!
     if (EXEMPT.has(file)) continue
-    // Each useMutation({...}) block up to the line that closes it.
     const pattern = /useMutation\(\{[\s\S]*?\n {2}\}\)/g
     for (const match of source.match(pattern) ?? []) {
       sites.push({ file, body: match })
@@ -51,7 +34,6 @@ const SITES = mutationSites()
 
 describe('mutation inventory', () => {
   it('finds the app mutations', () => {
-    // Guards the regexes above: if this collapses, the suite silently passes.
     expect(SITES.length).toBeGreaterThan(30)
   })
 })
@@ -79,14 +61,11 @@ describe('feedback is the shared toast', () => {
       .map(([path, source]) => [path.split('/').pop()!, source] as const),
   )('%s uses useToast rather than a private copy', (_file, source) => {
     expect(source).toContain('useToast')
-    // The six hand-rolled copies this replaced.
     expect(source).not.toContain('setToast(')
   })
 })
 
 describe('failure messages read as sentences', () => {
-  // toast.failed appends " failed" itself, so the argument names the action
-  // alone. Passing the old inline fallback verbatim produced "Save failed failed".
   const callSites = Object.entries(sources).flatMap(([path, source]) =>
     (source.match(/toast\.failed\(\s*[`'"][^`'"]*[`'"]/g) ?? []).map(
       (call) => [path.split('/').pop()!, call] as const,

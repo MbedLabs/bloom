@@ -4,8 +4,6 @@ import pytest
 
 from app.schemas import schemas
 
-# Artefact types whose model has content_json/content_html columns and whose
-# detail page opens the rich-text editor.
 RICH_CONTENT_TYPES = [
     "Requirement",
     "TestCase",
@@ -36,7 +34,6 @@ def test_create_schema_accepts_an_editor_payload(artefact):
         "content_json": {"type": "doc", "content": []},
         "content_html": "<p>body</p>",
     }
-    # Required scalar fields differ per artefact; supply the common ones.
     for name, field in model.model_fields.items():
         if field.is_required() and name not in payload:
             payload[name] = "Title" if name in {"title", "name"} else "x"
