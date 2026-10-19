@@ -1,6 +1,17 @@
 # Changelog
 
-## 1.2.0 - unreleased
+## 1.3.0 - unreleased
+
+### Changed
+
+- The product identity is fixed as Bloom PLM by EmbedLabs across the application, emails and API. The sidebar shows Bloom PLM with by EmbedLabs beneath it. The `BLOOM_APP_NAME` setting is removed; an existing environment variable or `.env` entry with that name is ignored.
+- The invitation and email change dialogs close with Escape and put the focus on their first field when they open. A project card opens with the keyboard as well as with the mouse.
+
+### Fixed
+
+- Administrator welcome emails confirm the account is ready and give product-specific next steps, with matching HTML and plain-text instructions. The obsolete one-time runner registration key instructions are removed.
+
+## 1.2.0 - 2026-10-17
 
 ### Added
 

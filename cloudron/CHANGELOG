@@ -1,3 +1,8 @@
+[1.3.0]
+* Bloom PLM by EmbedLabs is the product name across the application, emails and API; the BLOOM_APP_NAME environment setting no longer changes it.
+* The invitation and email change dialogs close with Escape and focus their first field; project cards open with the keyboard.
+* The administrator welcome email confirms the account and names the next steps; the outdated runner key paragraph is removed.
+
 [1.2.0]
 * Request the report beside a linked Bud run and follow pending, delivered or refused status.
 * Assign groups of policies per project, with separate application and access management.
