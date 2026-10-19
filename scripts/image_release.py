@@ -23,7 +23,10 @@ IMAGE_REFERENCE = re.compile(
 def is_image_reference(image):
     """Return True for `registry[:port]/name`, optionally followed by `:tag` or `@sha256:<64 hex>`."""
     match = IMAGE_REFERENCE.fullmatch(image) if isinstance(image, str) else None
-    return bool(match) and (match["port"] is None or 1 <= int(match["port"]) <= 65535)
+    if match is None:
+        return False
+    port = match["port"]
+    return port is None or 1 <= int(port) <= 65535
 
 
 def digest(image):
