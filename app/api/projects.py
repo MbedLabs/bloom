@@ -188,7 +188,7 @@ async def _project_counts_bulk(
     types_by_project = {pid: await visible_types(db, current_user, pid) for pid in project_ids}
 
     counts: dict[int, dict[str, int]] = {
-        pid: {key: 0 for _, _, key in _COUNTED_ARTEFACTS} for pid in project_ids
+        pid: dict.fromkeys((key for _, _, key in _COUNTED_ARTEFACTS), 0) for pid in project_ids
     }
 
     for model, doc_type, key in _COUNTED_ARTEFACTS:

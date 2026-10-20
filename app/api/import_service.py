@@ -801,16 +801,16 @@ async def import_test_cases_file(
         else:
             new_tc_id = format_doc_id(prefix, "TC", next_num)
             next_num += 1
-            kwargs = dict(
-                project_id=target_project.id,
-                created_by_id=current_user.id,
-                tc_id=new_tc_id,
-                title=title,
-                description=description,
-                preconditions=preconditions,
-                steps=steps,
-                status=status,
-            )
+            kwargs = {
+                "project_id": target_project.id,
+                "created_by_id": current_user.id,
+                "tc_id": new_tc_id,
+                "title": title,
+                "description": description,
+                "preconditions": preconditions,
+                "steps": steps,
+                "status": status,
+            }
             if visibility:
                 kwargs["visibility"] = visibility
             kwargs.update(forced)

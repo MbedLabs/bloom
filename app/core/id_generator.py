@@ -31,7 +31,7 @@ ALLOWED_TYPE_CODES = frozenset(
 )
 
 PROJECT_PREFIX_PATTERN = re.compile(r"^[A-Z]{3}$")
-DOC_ID_PATTERN = re.compile(r"^([A-Z]{3})-([A-Z]+)-([0-9]{3,})$")
+DOC_ID_PATTERN = re.compile(r"^([A-Z]{3})-([A-Z]+)-(\d{3,})$", re.ASCII)
 ID_MIN_WIDTH = 3
 
 

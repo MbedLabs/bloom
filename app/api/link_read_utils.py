@@ -123,7 +123,7 @@ async def verify_link_counts(
 
     With ``other_column`` (the link column of the other end), ``other_model`` and
     ``current_user``, only links whose other end the user may see are counted."""
-    counts = {anchor_id: 0 for anchor_id in anchor_ids}
+    counts = dict.fromkeys(anchor_ids, 0)
     if anchor_ids:
         query = (
             select(anchor_column, func.count(ArtefactLink.id))
@@ -140,7 +140,7 @@ async def verify_link_counts(
                 query.join(other_model, other_model.id == other_column), other_model, current_user
             )
         rows = (await db.execute(query)).all()
-        counts.update({anchor_id: count for anchor_id, count in rows})
+        counts.update(dict(rows))
     return counts
 
 

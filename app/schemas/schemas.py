@@ -27,7 +27,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
 PROJECT_PREFIX_PATTERN = re.compile(r"^[A-Z]{3}$")
 ARTEFACT_VISIBILITY_PATTERN = r"^(internal|customer)$"
 PROJECT_PREFIX_ERROR = (
-    "Project prefix must be exactly three uppercase letters so generated IDs follow " "PRJ-TYP-001."
+    "Project prefix must be exactly three uppercase letters so generated IDs follow PRJ-TYP-001."
 )
 
 
