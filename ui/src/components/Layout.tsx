@@ -1,6 +1,5 @@
 import { PRODUCT_IDENTITY, PRODUCT_NAME } from '../brandAssets'
-import { useState, useEffect, useMemo, useRef } from 'react'
-import { Suspense } from 'react'
+import { Suspense, useState, useEffect, useMemo, useRef } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { APP_VERSION, notificationsApi, projectsApi, searchApi } from '../api/client'
@@ -584,7 +583,7 @@ function LayoutInner() {
                 <button
                   onClick={() => setNotifOpen((open) => !open)}
                   className="relative p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                  aria-label={`Notifications${unreadCount ? ` (${unreadCount} unread)` : ''}`}
+                  aria-label={unreadCount ? `Notifications (${unreadCount} unread)` : 'Notifications'}
                 >
                   <Bell className="h-4 w-4" />
                   {unreadCount > 0 && (

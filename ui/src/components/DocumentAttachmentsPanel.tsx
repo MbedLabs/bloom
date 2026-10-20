@@ -74,8 +74,8 @@ export default function DocumentAttachmentsPanel({
       link.download = filename
       link.click()
       URL.revokeObjectURL(url)
-    } catch (failure) {
-      toast.failed('Downloading the attachment', extractApiErrorMessage(failure))
+    } catch (error_) {
+      toast.failed('Downloading the attachment', extractApiErrorMessage(error_))
     } finally {
       setBusyId(null)
     }

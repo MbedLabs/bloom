@@ -56,8 +56,7 @@ export default function UsersPage() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Parameters<typeof usersApi.update>[1] }) =>
       usersApi.update(id, data),
-    onSuccess: (_updated) => {
-      void _updated
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['users'] })
       setEditingUser(null)
       toast.saved('User')

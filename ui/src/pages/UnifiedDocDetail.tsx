@@ -35,7 +35,7 @@ export default function UnifiedDocDetail() {
         <div className="text-center">
           <h3 className="text-lg font-semibold text-foreground mb-2">Document not found</h3>
           <p className="text-sm text-muted-foreground">Could not find document &quot;{docId}&quot; in project {prefix}</p>
-          <Link to={`/projects/${prefix}/docs${kind ? `?type=${kind}` : ''}`} className="mt-4 inline-block text-primary hover:text-primary/80">
+          <Link to={kind ? `/projects/${prefix}/docs?type=${kind}` : `/projects/${prefix}/docs`} className="mt-4 inline-block text-primary hover:text-primary/80">
             &larr; Back to Documents
           </Link>
         </div>

@@ -118,7 +118,7 @@ export default function IntegrationSettingsPanel({ projectId }: Readonly<{ proje
     setJiraLabel(row?.jira_label ?? '')
     setJiraJql(row?.jira_jql ?? '')
     setReferenceField(row?.jira_reference_field ?? '')
-    setPriorityMap({ ...DEFAULT_PRIORITY_MAP, ...(row?.jira_priority_map ?? {}) })
+    setPriorityMap({ ...DEFAULT_PRIORITY_MAP, ...row?.jira_priority_map })
     setTwoWay(row?.two_way ?? false)
   }, [])
 
@@ -216,8 +216,7 @@ export default function IntegrationSettingsPanel({ projectId }: Readonly<{ proje
         ...extra,
       })
     },
-    onSuccess: (_updated) => {
-      void _updated
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['integrationSettings', projectId] })
       setToken('')
       setDirty(false)

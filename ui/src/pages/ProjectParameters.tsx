@@ -76,8 +76,7 @@ export default function ProjectParameters() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Parameters<typeof projectVariablesApi.update>[1] }) =>
       projectVariablesApi.update(id, data),
-    onSuccess: (_updated) => {
-      void _updated
+    onSuccess: () => {
       refreshProjectViews(queryClient, { prefix, projectId })
       setEditingId(null)
       toast.saved('Parameter')

@@ -500,6 +500,8 @@ export default function Documents() {
     </SortableHeader>
   )
 
+  const relatedRoleText = relatedRole ? ` (${relatedRole})` : ''
+  const relatedDirectionText = relatedDirection ? `, ${relatedDirection}` : ''
   const filterSummaryChips = (
     <>
       <FilterChip label={`Sort: ${sortLabel}`} muted={!hasSortOverride} />
@@ -518,7 +520,7 @@ export default function Documents() {
       )}
       {relatedTo && (
         <FilterChip
-          label={`Related to ${relatedTo}${relatedRole ? ` (${relatedRole})` : ''}${relatedDirection ? `, ${relatedDirection}` : ''}`}
+          label={`Related to ${relatedTo}${relatedRoleText}${relatedDirectionText}`}
         />
       )}
       {linkFilter && <FilterChip label={`Links: ${LINK_FILTER_OPTIONS.find((option) => option.code === linkFilter)?.label}`} />}

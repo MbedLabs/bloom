@@ -118,7 +118,7 @@ export default function DocumentDetail({
       <div className="flex items-center justify-center h-64 animate-fade-in">
         <div className="text-center">
           <h3 className="text-lg font-semibold text-foreground mb-2">Document not found</h3>
-          <Link to={`/projects/${projectPrefix}/docs${kind ? `?type=${kind}` : ''}`} className="text-sm text-primary hover:text-primary/80 transition-colors">&larr; Back to Documents</Link>
+          <Link to={kind ? `/projects/${projectPrefix}/docs?type=${kind}` : `/projects/${projectPrefix}/docs`} className="text-sm text-primary hover:text-primary/80 transition-colors">&larr; Back to Documents</Link>
         </div>
       </div>
     )
