@@ -231,6 +231,21 @@ function ExecutionBadge({ status }: Readonly<{ status: string | null }>) {
   return <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[status] || 'bg-muted text-muted-foreground'}`}>{status}</span>
 }
 
+/** A sortable header cell of the document table; compact cells use narrower padding. */
+function SortHeader({ field, sortField, sortDir, onSort, children, compact = false }: Readonly<{ field: SortField; sortField: SortField; sortDir: string; onSort: (field: SortField) => void; children: React.ReactNode; compact?: boolean }>) {
+  return (
+    <SortableHeader
+      field={field}
+      sortField={sortField}
+      sortDir={sortDir}
+      onSort={onSort}
+      className={`${compact ? 'px-3' : 'px-5'} py-2.5 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer select-none hover:text-foreground transition-colors`}
+    >
+      {children}
+    </SortableHeader>
+  )
+}
+
 export default function Documents() {
   const { user } = useAuth()
   const { prefix } = useParams<{ prefix: string }>()
@@ -488,17 +503,7 @@ export default function Documents() {
   const docCreateLinkClass =
     'inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors'
 
-  const SortHeader = ({ field, children, compact = false }: { field: SortField; children: React.ReactNode; compact?: boolean }) => (
-    <SortableHeader
-      field={field}
-      sortField={sortField}
-      sortDir={sortDir}
-      onSort={toggleSort}
-      className={`${compact ? 'px-3' : 'px-5'} py-2.5 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer select-none hover:text-foreground transition-colors`}
-    >
-      {children}
-    </SortableHeader>
-  )
+  const sortProps = { sortField, sortDir, onSort: toggleSort }
 
   const relatedRoleText = relatedRole ? ` (${relatedRole})` : ''
   const relatedDirectionText = relatedDirection ? `, ${relatedDirection}` : ''
@@ -759,17 +764,17 @@ export default function Documents() {
             <table className="min-w-full divide-y divide-border">
               <thead className="bg-muted/50">
                 <tr>
-                  <SortHeader field="doc_id">ID</SortHeader>
-                  {showKindColumn && <SortHeader field="doc_type">Kind</SortHeader>}
-                  <SortHeader field="title">Name / Title</SortHeader>
-                  <SortHeader field="status">Status</SortHeader>
-                  {showReqColumns && <SortHeader field="req_type">Type</SortHeader>}
-                  {showReqColumns && <SortHeader field="req_origin">Origin</SortHeader>}
-                  {showExecColumn && <SortHeader field="updated_at">Execution</SortHeader>}
-                  <SortHeader field="priority" compact>Priority</SortHeader>
-                  <SortHeader field="reviewer" compact>Reviewer</SortHeader>
-                  <SortHeader field="created_at">Created</SortHeader>
-                  <SortHeader field="updated_at">Updated</SortHeader>
+                  <SortHeader field="doc_id" {...sortProps}>ID</SortHeader>
+                  {showKindColumn && <SortHeader field="doc_type" {...sortProps}>Kind</SortHeader>}
+                  <SortHeader field="title" {...sortProps}>Name / Title</SortHeader>
+                  <SortHeader field="status" {...sortProps}>Status</SortHeader>
+                  {showReqColumns && <SortHeader field="req_type" {...sortProps}>Type</SortHeader>}
+                  {showReqColumns && <SortHeader field="req_origin" {...sortProps}>Origin</SortHeader>}
+                  {showExecColumn && <SortHeader field="updated_at" {...sortProps}>Execution</SortHeader>}
+                  <SortHeader field="priority" compact {...sortProps}>Priority</SortHeader>
+                  <SortHeader field="reviewer" compact {...sortProps}>Reviewer</SortHeader>
+                  <SortHeader field="created_at" {...sortProps}>Created</SortHeader>
+                  <SortHeader field="updated_at" {...sortProps}>Updated</SortHeader>
                 </tr>
               </thead>
               <tbody className="bg-card divide-y divide-border">

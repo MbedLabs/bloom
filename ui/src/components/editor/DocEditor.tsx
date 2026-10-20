@@ -162,61 +162,7 @@ export default function DocEditor({
     return [href ? 'a' : 'span', attrs, `{{${label}}}`]
   }, [])
 
-  const renderParameterMentionList = useCallback(() => {
-    let component: ReactRenderer<MentionListRef> | null = null
-    let popup: HTMLDivElement | null = null
-
-    const destroy = () => {
-      component?.destroy()
-      component = null
-      popup?.remove()
-      popup = null
-    }
-
-    const position = (clientRect: (() => DOMRect | null) | null | undefined) => {
-      if (!popup || !clientRect) return
-      const rect = clientRect()
-      if (!rect) return
-      popup.style.left = `${rect.left}px`
-      popup.style.top = `${rect.bottom + 8}px`
-    }
-
-    return {
-      onStart: (props: SuggestionProps) => {
-        component = new ReactRenderer(MentionList, {
-          editor: props.editor,
-          props: {
-            items: props.items,
-            command: props.command,
-            triggerPrefix: PARAMETER_MENTION_TRIGGER,
-            triggerSuffix: PARAMETER_MENTION_SUFFIX,
-          },
-          as: 'div',
-          className: 'mention-suggestion-popover',
-        })
-
-        popup = document.createElement('div')
-        popup.style.position = 'fixed'
-        popup.style.zIndex = '50'
-        popup.appendChild(component.element)
-        document.body.appendChild(popup)
-        position(props.clientRect)
-      },
-      onUpdate: (props: SuggestionProps) => {
-        component?.updateProps({
-          items: props.items,
-          command: props.command,
-          triggerPrefix: PARAMETER_MENTION_TRIGGER,
-          triggerSuffix: PARAMETER_MENTION_SUFFIX,
-        })
-        position(props.clientRect)
-      },
-      onKeyDown: (props: { event: KeyboardEvent }) => component?.ref?.onKeyDown(props) ?? false,
-      onExit: destroy,
-    }
-  }, [])
-
-  const makeMentionRenderer = useCallback((triggerPrefix: string) => () => {
+  const makeMentionRenderer = useCallback((triggerPrefix: string, triggerSuffix = '') => () => {
     let component: ReactRenderer<MentionListRef> | null = null
     let popup: HTMLDivElement | null = null
 
@@ -243,7 +189,7 @@ export default function DocEditor({
             items: props.items,
             command: props.command,
             triggerPrefix,
-            triggerSuffix: '',
+            triggerSuffix,
           },
           as: 'div',
           className: 'mention-suggestion-popover',
@@ -261,7 +207,7 @@ export default function DocEditor({
           items: props.items,
           command: props.command,
           triggerPrefix,
-          triggerSuffix: '',
+          triggerSuffix,
         })
         position(props.clientRect)
       },
@@ -348,7 +294,7 @@ export default function DocEditor({
                 },
               }).run()
             },
-            render: renderParameterMentionList,
+            render: makeMentionRenderer(PARAMETER_MENTION_TRIGGER, PARAMETER_MENTION_SUFFIX),
           },
           {
             char: '#',

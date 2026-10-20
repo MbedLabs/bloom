@@ -205,7 +205,6 @@ export default function SuiteDetail({
   const availableCases = (testCases || []).filter((tc) => !includedCaseIds.has(tc.id))
 
   return (
-    <>
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -420,7 +419,6 @@ export default function SuiteDetail({
         <DocumentActivityPanel artefactType="test-suite" artefactId={parsedSuiteId} />
       </div>
     </div>
-    </>
   )
 }
 

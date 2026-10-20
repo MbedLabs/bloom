@@ -138,7 +138,6 @@ export default function DocumentDetail({
   const editUrl = docEditUrl(projectPrefix, resolvedDocType, doc.doc_id || String(docId))
 
   return (
-    <>
     <DocDetailShell
       projectPrefix={projectPrefix}
       docType={resolvedDocType}
@@ -256,6 +255,5 @@ export default function DocumentDetail({
         sourceDocId={doc.doc_id ?? undefined}
       />
     </DocDetailShell>
-    </>
   )
 }

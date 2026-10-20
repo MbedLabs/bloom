@@ -165,7 +165,6 @@ export default function CampaignDetail({
   const campaignBudRunUrl = campaign.bud_run_url || (campaign.bud_run_id ? buildBudRunUrl(campaign.bud_run_id) : null)
 
   return (
-    <>
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
@@ -399,7 +398,6 @@ export default function CampaignDetail({
         <DocumentActivityPanel artefactType="campaign" artefactId={campId} />
       </div>
     </div>
-    </>
   )
 }
 

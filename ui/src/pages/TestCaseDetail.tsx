@@ -141,7 +141,6 @@ export default function TestCaseDetail({
   const showDelete = canEditDocs && can('delete', 'TC') && rowAllows('delete')
 
   return (
-    <>
     <DocDetailShell
       projectPrefix={projectPrefix}
       docType="TC"
@@ -255,6 +254,5 @@ export default function TestCaseDetail({
       )}
 
     </DocDetailShell>
-    </>
   )
 }

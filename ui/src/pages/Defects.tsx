@@ -35,6 +35,21 @@ const SEVERITY_OPTIONS = ['Critical', 'High', 'Medium', 'Low']
 type SortField = 'updated_at' | 'defect_id' | 'title' | 'status' | 'severity'
 type SortDir = 'asc' | 'desc'
 
+/** A sortable header cell of the defect table. */
+function SortHeader({ field, sortField, sortDir, onSort, children }: Readonly<{ field: SortField; sortField: SortField; sortDir: string; onSort: (field: SortField) => void; children: React.ReactNode }>) {
+  return (
+    <SortableHeader
+      field={field}
+      sortField={sortField}
+      sortDir={sortDir}
+      onSort={onSort}
+      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer select-none hover:text-foreground transition-colors"
+    >
+      {children}
+    </SortableHeader>
+  )
+}
+
 export default function Defects() {
   const { prefix } = useParams<{ prefix: string }>()
   const { data: project } = useProjectByPrefix(prefix)
@@ -158,17 +173,7 @@ export default function Defects() {
     })
   }
 
-  const SortHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
-    <SortableHeader
-      field={field}
-      sortField={sortField}
-      sortDir={sortDir}
-      onSort={toggleSort}
-      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer select-none hover:text-foreground transition-colors"
-    >
-      {children}
-    </SortableHeader>
-  )
+  const sortProps = { sortField, sortDir, onSort: toggleSort }
 
   if (!project) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading project...</div>
@@ -400,13 +405,13 @@ export default function Defects() {
             <table className="w-full text-sm min-w-[800px]">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
-                  <SortHeader field="defect_id">ID</SortHeader>
-                  <SortHeader field="title">Title</SortHeader>
-                  <SortHeader field="status">Status</SortHeader>
-                  <SortHeader field="severity">Severity</SortHeader>
+                  <SortHeader field="defect_id" {...sortProps}>ID</SortHeader>
+                  <SortHeader field="title" {...sortProps}>Title</SortHeader>
+                  <SortHeader field="status" {...sortProps}>Status</SortHeader>
+                  <SortHeader field="severity" {...sortProps}>Severity</SortHeader>
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Priority</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">External</th>
-                  <SortHeader field="updated_at">Updated</SortHeader>
+                  <SortHeader field="updated_at" {...sortProps}>Updated</SortHeader>
                 </tr>
               </thead>
               <tbody className="bg-card divide-y divide-border">

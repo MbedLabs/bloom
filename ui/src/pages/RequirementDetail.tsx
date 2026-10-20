@@ -162,7 +162,6 @@ export default function RequirementDetail({
   const showDelete = canEditDocs && can('delete', 'REQ') && rowAllows('delete')
 
   return (
-    <>
     <DocDetailShell
       projectPrefix={projectPrefix}
       docType="REQ"
@@ -349,6 +348,5 @@ export default function RequirementDetail({
         derivedLinks={derivedMembershipLinks}
       />
     </DocDetailShell>
-    </>
   )
 }

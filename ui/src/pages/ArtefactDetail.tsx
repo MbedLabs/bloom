@@ -370,7 +370,6 @@ export default function ArtefactDetail({
   const showDelete = canEditDocs && can('delete', SOURCE_TYPE_CODES[kind]) && rowAllows('delete')
 
   return (
-    <>
     <DocDetailShell
       projectPrefix={projectPrefix}
       docType={config.docType}
@@ -523,7 +522,6 @@ export default function ArtefactDetail({
               </div>
             ))}
             {kind === 'defect' && (
-              <>
                 <div>
                   <label htmlFor="artefact-resolution-summary" className="block text-sm font-medium text-foreground mb-1">Resolution Summary</label>
                   <textarea
@@ -535,7 +533,6 @@ export default function ArtefactDetail({
                     placeholder="What was done to resolve this defect?"
                   />
                 </div>
-              </>
             )}
             {updateMutation.isError && (
               <div className="text-sm text-destructive">{extractApiErrorMessage(updateMutation.error)}</div>
@@ -713,7 +710,6 @@ export default function ArtefactDetail({
         </SectionCard>
       )}
     </DocDetailShell>
-    </>
   )
 }
 
