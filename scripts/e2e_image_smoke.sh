@@ -8,7 +8,7 @@ BASE=""
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FIXTURE="${SCRIPT_DIR}/e2e/sample.reqif"
-[ -f "$FIXTURE" ] || { echo "missing ReqIF fixture: $FIXTURE" >&2; exit 1; }
+[[ -f "$FIXTURE" ]] || { echo "missing ReqIF fixture: $FIXTURE" >&2; exit 1; }
 
 SUFFIX="$$"
 NET="bloom-e2e-net-${SUFFIX}"
@@ -43,7 +43,7 @@ fail() { printf '\n\033[1;31mFAIL:\033[0m %s\n' "$*" >&2; exit 1; }
 
 cleanup() {
   local code=$?
-  [ "$code" = 0 ] || { log "Dumping app logs (exit ${code})"; docker logs "$APP" 2>&1 | tail -80 || true; }
+  [[ "$code" = 0 ]] || { log "Dumping app logs (exit ${code})"; docker logs "$APP" 2>&1 | tail -80 || true; }
   docker rm -f "$APP" "$PG" >/dev/null 2>&1 || true
   docker volume rm "$PGVOL" >/dev/null 2>&1 || true
   docker network rm "$NET" >/dev/null 2>&1 || true
@@ -51,13 +51,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
-json_field() { python3 -c 'import sys,json;print(json.load(sys.stdin)["'"$1"'"])'; }
+json_field() { local field="$1"; python3 -c 'import sys,json;print(json.load(sys.stdin)["'"$field"'"])'; }
 
 refresh_base() {
   local port_binding
   port_binding="$(docker port "$APP" 8080/tcp | head -n 1)"
   APP_PORT="${port_binding##*:}"
-  [ -n "$APP_PORT" ] || fail "Docker did not allocate an application port"
+  [[ -n "$APP_PORT" ]] || fail "Docker did not allocate an application port"
   BASE="http://127.0.0.1:${APP_PORT}"
 }
 
@@ -93,7 +93,7 @@ start_pg() {
 
 start_app() {
   local publish="127.0.0.1::8080"
-  if [ -n "$APP_PORT" ]; then publish="127.0.0.1:${APP_PORT}:8080"; fi
+  if [[ -n "$APP_PORT" ]]; then publish="127.0.0.1:${APP_PORT}:8080"; fi
   docker run -d --name "$APP" --network "$NET" \
     -p "$publish" \
     --platform "$PLATFORM" \
@@ -147,24 +147,24 @@ printf '%s' "$ready" | grep -q '"database":"connected"' \
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 expected_version="$(sed -nE 's/^version = "([^"]+)".*/\1/p' "${repo_root}/pyproject.toml" | head -1)"
-[ -n "$expected_version" ] || fail "could not read the version from pyproject.toml"
+[[ -n "$expected_version" ]] || fail "could not read the version from pyproject.toml"
 
 log "/api/version must report the released version (${expected_version})"
 version="$(curl -fsS "${BASE}/api/version" | json_field version)"
 echo "    /api/version = ${version}"
-[ "$version" = "$expected_version" ] \
+[[ "$version" = "$expected_version" ]] \
   || fail "/api/version reported '${version}', expected ${expected_version}"
 
 log "Admin login"
 token="$(login)"
-[ -n "$token" ] || fail "login returned no access_token"
+[[ -n "$token" ]] || fail "login returned no access_token"
 
 log "Creating a project (database write)"
 project_id="$(curl -fsS -X POST "${BASE}/api/projects" \
   -H "Authorization: Bearer ${token}" \
   -H 'Content-Type: application/json' \
   -d '{"name":"E2E Project","prefix":"EET"}' | json_field id)"
-[ -n "$project_id" ] || fail "project creation did not return an id"
+[[ -n "$project_id" ]] || fail "project creation did not return an id"
 echo "    project id = ${project_id}"
 
 log "Building a >1 MB ReqIF payload from the sample fixture"
@@ -178,13 +178,13 @@ data = data.replace(b"</REQ-IF>", pad + b"</REQ-IF>")
 open(dst, "wb").write(data)
 print("padded size:", len(data))
 PY
-[ "$(wc -c < "$PADDED")" -gt 1048576 ] || fail "padded ReqIF is not over 1 MB"
+[[ "$(wc -c < "$PADDED")" -gt 1048576 ]] || fail "padded ReqIF is not over 1 MB"
 
 log "Importing the >1 MB ReqIF through nginx (exercises client_max_body_size)"
 import_result="$(import_reqif "$token")"
 echo "    import = ${import_result}"
 imported="$(printf '%s' "$import_result" | json_field imported)"
-[ "$imported" = "2" ] || fail "expected 2 imported requirements, got '${imported}'"
+[[ "$imported" = "2" ]] || fail "expected 2 imported requirements, got '${imported}'"
 
 log "Removing BOTH containers and recreating them with the SAME named volume"
 docker rm -f "$APP" "$PG" >/dev/null
@@ -194,11 +194,11 @@ wait_ready "after container recreation"
 
 log "The project and its imported requirements must still exist"
 token="$(login)"
-[ -n "$token" ] || fail "admin login failed after recreation (database did not persist)"
+[[ -n "$token" ]] || fail "admin login failed after recreation (database did not persist)"
 project_json="$(curl -fsS "${BASE}/api/projects/${project_id}" -H "Authorization: Bearer ${token}")"
 echo "    project = ${project_json}"
 req_count="$(printf '%s' "$project_json" | json_field requirement_count)"
-[ "$req_count" = "2" ] \
+[[ "$req_count" = "2" ]] \
   || fail "project/requirements did not persist across recreation (requirement_count=${req_count})"
 
 log "Re-importing the same ReqIF must be idempotent (proves the data persisted)"
@@ -206,7 +206,7 @@ reimport="$(import_reqif "$token")"
 echo "    reimport = ${reimport}"
 reimported="$(printf '%s' "$reimport" | json_field imported)"
 reskipped="$(printf '%s' "$reimport" | json_field skipped)"
-[ "$reimported" = "0" ] || fail "re-import created ${reimported} duplicates; data did not persist"
-[ "$reskipped" = "2" ] || fail "re-import skipped '${reskipped}', expected 2 persisted requirements"
+[[ "$reimported" = "0" ]] || fail "re-import created ${reimported} duplicates; data did not persist"
+[[ "$reskipped" = "2" ]] || fail "re-import skipped '${reskipped}', expected 2 persisted requirements"
 
 log "PASS: Bloom published image survives full container recreation with a named volume"
