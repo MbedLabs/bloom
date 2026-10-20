@@ -164,7 +164,11 @@ async def add_project_member(
     return await _response(db, entry)
 
 
-@router.get("/{project_id}/members/{membership_id}", response_model=ProjectMemberResponse)
+@router.get(
+    "/{project_id}/members/{membership_id}",
+    response_model=ProjectMemberResponse,
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
 async def get_project_member(
     project_id: int,
     membership_id: int,
@@ -237,7 +241,11 @@ async def update_project_member(
     return await _response(db, entry)
 
 
-@router.delete("/{project_id}/members/{membership_id}", status_code=204)
+@router.delete(
+    "/{project_id}/members/{membership_id}",
+    status_code=204,
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
 async def remove_project_member(
     project_id: int,
     membership_id: int,
@@ -374,16 +382,16 @@ async def list_project_access(
                     if source not in entry.origins:
                         entry.origins.append(source)
                 continue
+            if row.policy_group_id:
+                origin_group = row.policy_group.name
+            else:
+                origin_group = group.name if group else None
             entry.origins.append(
                 AccessOrigin(
                     kind="direct" if row.user_id is not None else "group",
                     owner=row.owner,
                     inherit_policies=False,
-                    group=(
-                        row.policy_group.name
-                        if row.policy_group_id
-                        else group.name if group else None
-                    ),
+                    group=origin_group,
                     policies=[
                         policy.name
                         for policy in sorted(

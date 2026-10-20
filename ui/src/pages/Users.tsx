@@ -56,8 +56,7 @@ export default function UsersPage() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Parameters<typeof usersApi.update>[1] }) =>
       usersApi.update(id, data),
-    onSuccess: (_updated) => {
-      void _updated
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['users'] })
       setEditingUser(null)
       toast.saved('User')
@@ -482,16 +481,16 @@ function InviteUserModal({ onClose, onSubmit, isLoading, error }: Readonly<{
         )}
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Full Name</label>
-            <input ref={fullNameInput} value={fullName} onChange={(e) => setFullName(e.target.value)} required title="Full name" placeholder="Jane Doe" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground" />
+            <label htmlFor="user-full-name" className="block text-sm font-medium text-foreground mb-1">Full Name</label>
+            <input id="user-full-name" ref={fullNameInput} value={fullName} onChange={(e) => setFullName(e.target.value)} required title="Full name" placeholder="Jane Doe" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required title="Email address" placeholder="name@company.com" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground" />
+            <label htmlFor="user-email" className="block text-sm font-medium text-foreground mb-1">Email</label>
+            <input id="user-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required title="Email address" placeholder="name@company.com" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Role</label>
-            <SelectField value={role} onChange={(e) => setRole(e.target.value)} title="Role" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground">
+            <label htmlFor="user-role" className="block text-sm font-medium text-foreground mb-1">Role</label>
+            <SelectField id="user-role" value={role} onChange={(e) => setRole(e.target.value)} title="Role" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground">
               <option value="external">Viewer</option>
               <option value="maintainer">Maintainer</option>
               <option value="admin">Admin</option>
@@ -517,7 +516,9 @@ function ApplicationPoliciesModal({ user, onClose }: Readonly<{ user: User; onCl
         <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-semibold text-foreground">Application policies</h2><button title="Close" onClick={onClose}><X className="h-4 w-4" /></button></div>
         <p className="mb-2 text-sm text-foreground"><UserIdentity user={user} /></p>
         <p className="mb-4 text-sm text-muted-foreground">Assign app permissions such as Access Management. The account base role stays the same. Project policy groups are assigned separately for each project.</p>
-        {isError ? <p role="alert">Could not load application policies.</p> : policies && assignment ? <ApplicationPolicyForm user={user} policies={policies.filter((policy) => policy.scope === 'app')} initial={assignment.policy_ids} onClose={onClose} /> : <p>Loading policies...</p>}
+        {isError && <p role="alert">Could not load application policies.</p>}
+        {!isError && policies && assignment && <ApplicationPolicyForm user={user} policies={policies.filter((policy) => policy.scope === 'app')} initial={assignment.policy_ids} onClose={onClose} />}
+        {!isError && !(policies && assignment) && <p>Loading policies...</p>}
       </dialog>
     </div>
   )

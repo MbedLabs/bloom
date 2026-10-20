@@ -23,11 +23,9 @@ export function SortableHeader<F extends string>({
     <th className={className} onClick={() => onSort(field)}>
       <div className="flex items-center gap-1">
         {children}
-        {sortField === field ? (
-          sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
-        ) : (
-          <ArrowUpDown className="h-3 w-3 opacity-30" />
-        )}
+        {sortField === field && sortDir === 'asc' && <ChevronUp className="h-3 w-3" />}
+        {sortField === field && sortDir !== 'asc' && <ChevronDown className="h-3 w-3" />}
+        {sortField !== field && <ArrowUpDown className="h-3 w-3 opacity-30" />}
       </div>
     </th>
   )

@@ -681,7 +681,7 @@ CHANGES_OWN_ONLY = "External users change only what they created."
 def changes_allowed(user: User, row) -> bool:
     """False when the user's access on the row's project is customer-only and they did not
     create the row; a row with no recorded creator is another's."""
-    if not hasattr(row, "created_by_id") or not customer_only(user, row.project_id):
+    if not hasattr(row, "created_by_id") or not customer_only(user):
         return True
     return row.created_by_id == user.id
 
@@ -718,7 +718,7 @@ def check_external_change(user: User, type_code: str, row, changes: dict) -> Non
     requirement, of an origin giving another visibility) and of its status other than to
     Draft, or of any status on defects, risks, changes and campaigns. ``changes`` holds the
     fields the request sets; a value equal to the stored one is no change."""
-    if not customer_only(user, row.project_id):
+    if not customer_only(user):
         return
     visibility = changes.get("visibility")
     if type_code == "REQ" and changes.get("req_origin") is not None:
@@ -799,11 +799,7 @@ async def may_sign_as(
     visibility: str | None = None,
 ) -> bool:
     """Check active project authority and visible scope for review or internal approval."""
-    if (
-        user is None
-        or not user.is_active
-        or (step == "approve" and await is_customer_only(db, user, project_id))
-    ):
+    if user is None or not user.is_active or (step == "approve" and is_customer_only(user)):
         return False
     if row is not None:
         return await row_allows(

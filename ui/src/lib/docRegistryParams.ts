@@ -143,5 +143,5 @@ export function docRegistryListUrl(
     }
   }
   const qs = params.toString()
-  return `/projects/${prefix}/docs${qs ? `?${qs}` : ''}`
+  return qs ? `/projects/${prefix}/docs?${qs}` : `/projects/${prefix}/docs`
 }

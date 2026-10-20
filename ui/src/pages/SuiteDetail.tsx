@@ -205,7 +205,6 @@ export default function SuiteDetail({
   const availableCases = (testCases || []).filter((tc) => !includedCaseIds.has(tc.id))
 
   return (
-    <>
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -268,17 +267,18 @@ export default function SuiteDetail({
           <h3 className="text-sm font-medium text-muted-foreground mb-3">Edit Suite</h3>
           <form onSubmit={handleEditSubmit} className="space-y-3">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Name</label>
-              <input type="text" required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring" />
+              <label htmlFor="suite-edit-name" className="block text-sm font-medium text-foreground mb-1">Name</label>
+              <input id="suite-edit-name" type="text" required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Description</label>
-              <textarea value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring" rows={2} />
+              <label htmlFor="suite-edit-description" className="block text-sm font-medium text-foreground mb-1">Description</label>
+              <textarea id="suite-edit-description" value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring" rows={2} />
             </div>
             {!external && (
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Visibility</label>
+              <label htmlFor="suite-edit-visibility" className="block text-sm font-medium text-foreground mb-1">Visibility</label>
               <SelectField
+                id="suite-edit-visibility"
                 value={editForm.visibility}
                 onChange={(e) => setEditForm({ ...editForm, visibility: e.target.value })}
                 className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring"
@@ -419,7 +419,6 @@ export default function SuiteDetail({
         <DocumentActivityPanel artefactType="test-suite" artefactId={parsedSuiteId} />
       </div>
     </div>
-    </>
   )
 }
 

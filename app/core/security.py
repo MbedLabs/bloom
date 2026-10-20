@@ -203,23 +203,19 @@ async def _access_map(db: AsyncSession, user: User) -> dict:
             continue
         merged = by_project.setdefault(entry.project_id, {})
         terms = [_owner_term(external)] if entry.owner else []
-        selected = (
-            entry.policy_group.policies
-            if entry.policy_group_id is not None
-            else inherited.values() if entry.inherit_policies else entry.policies
-        )
+        if entry.policy_group_id is not None:
+            selected = entry.policy_group.policies
+        else:
+            selected = inherited.values() if entry.inherit_policies else entry.policies
         for policy in selected:
             terms.extend(_policy_terms(policy, external))
         for term in terms:
             key = (term.doc_types is None, term.visibilities, term.tags, term.customer_only)
             known = merged.get(key)
+            known_doc_types = known.doc_types if known else frozenset()
             merged[key] = AccessTerm(
                 merge(merge({}, known.permissions if known else {}), term.permissions),
-                (
-                    None
-                    if term.doc_types is None
-                    else term.doc_types | (known.doc_types if known else frozenset())
-                ),
+                None if term.doc_types is None else term.doc_types | known_doc_types,
                 term.visibilities,
                 term.tags,
                 term.customer_only,
@@ -267,14 +263,14 @@ async def accessible_project_ids(db: AsyncSession, user: User):
     return [project_id for project_id, terms in access_map.items() if terms]
 
 
-def customer_only(user: User, project_id: int) -> bool:
+def customer_only(user: User) -> bool:
     """Identify the stored external account for retained external workflow restrictions."""
     return user.role == UserRole.external
 
 
-async def is_customer_only(db: AsyncSession, user: User, project_id: int) -> bool:
+def is_customer_only(user: User) -> bool:
     """Identify an external account independently of its policy visibility scope."""
-    return customer_only(user, project_id)
+    return customer_only(user)
 
 
 def term_type_allows(term: AccessTerm, action: str, type_code: Optional[str]) -> bool:
@@ -462,7 +458,6 @@ async def require_external_doc_type_access(
 
 
 def external_doc_type_allowed(
-    current_user: User,
     allowed_doc_types: Optional[set[str]],
     doc_type: str,
 ) -> bool:
@@ -475,7 +470,7 @@ async def doc_type_visible(
 ) -> bool:
     """Whether some term of the user on the project covers the document type."""
     return external_doc_type_allowed(
-        current_user, await get_external_doc_types(db, current_user, project_id), doc_type
+        await get_external_doc_types(db, current_user, project_id), doc_type
     )
 
 

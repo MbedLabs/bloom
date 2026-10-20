@@ -79,8 +79,9 @@ async def test_set_get_delete_logo_roundtrip(session):
 
 async def test_non_image_rejected(session):
     admin = await _admin(session)
+    upload = _upload(b"nope", "text/plain")
     with pytest.raises(HTTPException) as exc:
-        await set_company_logo(file=_upload(b"nope", "text/plain"), db=session, current_user=admin)
+        await set_company_logo(file=upload, db=session, current_user=admin)
     assert exc.value.status_code == 415
 
 

@@ -74,8 +74,8 @@ export default function DocumentAttachmentsPanel({
       link.download = filename
       link.click()
       URL.revokeObjectURL(url)
-    } catch (failure) {
-      toast.failed('Downloading the attachment', extractApiErrorMessage(failure))
+    } catch (error_) {
+      toast.failed('Downloading the attachment', extractApiErrorMessage(error_))
     } finally {
       setBusyId(null)
     }
@@ -110,11 +110,13 @@ export default function DocumentAttachmentsPanel({
         ) : undefined
       }
     >
-      {isLoading ? (
+      {isLoading && (
         <p className="text-muted-foreground">Loading attachments...</p>
-      ) : !attachments || attachments.length === 0 ? (
+      )}
+      {!isLoading && (!attachments || attachments.length === 0) && (
         <p className="text-muted-foreground">Nothing attached yet.</p>
-      ) : (
+      )}
+      {!isLoading && attachments && attachments.length > 0 && (
         <ul className="divide-y divide-border -mx-6 -mb-6">
           {attachments.map((attachment) => (
             <li key={attachment.id} className="flex items-center gap-3 px-6 py-3">

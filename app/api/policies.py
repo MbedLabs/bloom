@@ -83,11 +83,12 @@ async def _validate_rules(
     db: AsyncSession, rules: dict[str, PolicyRule], scope: str = "project"
 ) -> None:
     """Validate assignment scope, supported actions and document origin selections."""
-    allowed = (
-        DOC_TYPE_RESOURCES
-        if scope == "document"
-        else RESOURCES if scope == "project" else POLICY_RESOURCES
-    )
+    if scope == "document":
+        allowed = DOC_TYPE_RESOURCES
+    elif scope == "project":
+        allowed = RESOURCES
+    else:
+        allowed = POLICY_RESOURCES
     unknown = sorted(set(rules) - set(allowed))
     if unknown:
         raise HTTPException(status_code=400, detail=f"Unknown resources: {unknown}")

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 import { extractApiErrorMessage, groupsApi, projectsApi, type Project } from '../api/client'
 import { Plus, FolderKanban, Search, FileText, CheckCircle, ArrowRight, Pencil } from 'lucide-react'
 import { applicationAllows } from '../lib/applicationAccess'
+import { percentTone } from '../lib/percentTone'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
 
@@ -118,11 +119,12 @@ export default function Projects() {
         />
       </div>
 
-      {isLoading ? (
+      {isLoading && (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-8 text-center text-muted-foreground">
           Loading...
         </div>
-      ) : (!filteredProjects || filteredProjects.length === 0) && accessProjects.length > 0 ? null : !filteredProjects || filteredProjects.length === 0 ? (
+      )}
+      {!isLoading && (!filteredProjects || filteredProjects.length === 0) && accessProjects.length === 0 && (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-16 text-center">
           <div className="w-20 h-20 rounded-2xl bg-linear-to-br/srgb from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-5">
             <FolderKanban className="h-10 w-10 text-primary/40" />
@@ -143,7 +145,8 @@ export default function Projects() {
             </button>
           )}
         </div>
-      ) : (
+      )}
+      {!isLoading && filteredProjects && filteredProjects.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredProjects.map((project) => (
             <ProjectCard
@@ -177,8 +180,9 @@ export default function Projects() {
                   </div>
                 )}
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Name</label>
+                  <label htmlFor="project-name" className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Name</label>
                   <input
+                    id="project-name"
                     type="text"
                     required
                     value={name}
@@ -188,8 +192,9 @@ export default function Projects() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Prefix</label>
+                  <label htmlFor="project-prefix" className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Prefix</label>
                   <input
+                    id="project-prefix"
                     type="text"
                     required
                     value={prefix}
@@ -206,8 +211,9 @@ export default function Projects() {
                   </p>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Description</label>
+                  <label htmlFor="project-description" className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Description</label>
                   <textarea
+                    id="project-description"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
@@ -309,7 +315,7 @@ function ProjectCard({
           <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${
-                coverage >= 80 ? 'bg-linear-to-r/srgb from-emerald-500 to-emerald-400' : coverage >= 50 ? 'bg-linear-to-r/srgb from-amber-500 to-amber-400' : 'bg-linear-to-r/srgb from-red-400 to-red-300'
+                percentTone(coverage, 'bg-linear-to-r/srgb from-emerald-500 to-emerald-400', 'bg-linear-to-r/srgb from-amber-500 to-amber-400', 'bg-linear-to-r/srgb from-red-400 to-red-300')
               }`}
               style={{ width: `${Math.max(coverage, 3)}%` }}
             />

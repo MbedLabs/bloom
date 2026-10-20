@@ -17,7 +17,7 @@ export function extractHeadings(editor: Editor | null): HeadingItem[] {
     if (node.type.name.startsWith('heading')) {
       headings.push({
         id: `heading-${pos}`,
-        level: parseInt(node.attrs.level, 10),
+        level: Number.parseInt(node.attrs.level, 10),
         text: node.textContent || 'Untitled',
         pos,
       })

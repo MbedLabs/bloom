@@ -285,13 +285,15 @@ function LinkDocumentModal({
           </SelectField>
         </div>
         <div className="overflow-y-auto themed-scrollbar p-3">
-          {availableTargetTypes.length === 0 ? (
+          {availableTargetTypes.length === 0 && (
             <div className="p-8 text-center text-muted-foreground">No valid link targets for this artefact type yet.</div>
-          ) : filteredTargets.length === 0 ? (
+          )}
+          {availableTargetTypes.length > 0 && filteredTargets.length === 0 && (
             <div className="p-8 text-center text-muted-foreground">
               {candidatesLoading ? 'Searching...' : 'No matching items for the selected kind.'}
             </div>
-          ) : (
+          )}
+          {availableTargetTypes.length > 0 && filteredTargets.length > 0 && (
             <div className="divide-y divide-border">
               {filteredTargets.map((target) => (
                 <button
@@ -472,9 +474,10 @@ export function DocumentLinksPanel({
       ) : undefined}
     >
       <p className="text-xs text-muted-foreground mb-3">Typed links to requirements, specifications, designs, risks, defects, campaigns, test suites, and other controlled documents.</p>
-      {allLinks.length === 0 ? (
+      {allLinks.length === 0 && (
         <p className="text-muted-foreground">No links yet.</p>
-      ) : collapsedGroups.length > 0 ? (
+      )}
+      {allLinks.length > 0 && collapsedGroups.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {collapsedGroups.map((group) => {
             const label = getDocLinkRoleLabel(group.role, group.direction)
@@ -505,7 +508,8 @@ export function DocumentLinksPanel({
             )
           })}
         </div>
-      ) : (
+      )}
+      {allLinks.length > 0 && collapsedGroups.length === 0 && (
         <div className="flex flex-wrap gap-1.5 -mx-6 -mb-6 px-6 pb-6">
           {allLinks.map(({ link, direction, isDerived }) => {
             const targetType = (direction === 'outgoing' ? link.target_type : link.source_type) as DocType

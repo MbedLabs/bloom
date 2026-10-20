@@ -2,6 +2,8 @@
 Dashboard statistics API.
 """
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,8 +47,8 @@ router = APIRouter()
 
 @router.get("/stats")
 async def get_dashboard_stats(
-    db: AsyncSession = Depends(get_db, scope="function"),
-    current_user: User = Depends(get_current_user),
+    db: Annotated[AsyncSession, Depends(get_db, scope="function")],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     user_scope = f"user:{current_user.id}" if current_user.role != UserRole.admin else "admin"
     cache_key = f"dashboard:stats:{user_scope}"

@@ -259,12 +259,10 @@ async def test_reset_password_rejects_invalid_expired_or_used_tokens(detail, mon
 
     db = SimpleNamespace(get=AsyncMock(), flush=AsyncMock())
 
+    data = ResetPasswordRequest(token="bad-token", new_password="new-password-123")
+    response = Response()
     with pytest.raises(HTTPException) as exc:
-        await auth_api.reset_password(
-            data=ResetPasswordRequest(token="bad-token", new_password="new-password-123"),
-            response=Response(),
-            db=db,
-        )
+        await auth_api.reset_password(data=data, response=response, db=db)
 
     assert exc.value.status_code == 400
     assert exc.value.detail == detail
@@ -343,13 +341,9 @@ async def test_update_user_non_seed_admin_cannot_promote_to_admin():
         execute=AsyncMock(return_value=_ScalarResult(user)),
     )
 
+    data = UserUpdate(role=UserRole.admin)
     with pytest.raises(HTTPException) as exc:
-        await users_api.update_user(
-            user_id=42,
-            data=UserUpdate(role=UserRole.admin),
-            admin=admin,
-            db=db,
-        )
+        await users_api.update_user(user_id=42, data=data, admin=admin, db=db)
     assert exc.value.status_code == 403
     assert exc.value.detail == "Only the initial administrator can promote users to admin"
     assert user.role == UserRole.maintainer
@@ -385,13 +379,9 @@ async def test_update_user_cannot_demote_admin():
         execute=AsyncMock(return_value=_ScalarResult(user)),
     )
 
+    data = UserUpdate(role=UserRole.maintainer)
     with pytest.raises(HTTPException) as exc:
-        await users_api.update_user(
-            user_id=42,
-            data=UserUpdate(role=UserRole.maintainer),
-            admin=admin,
-            db=db,
-        )
+        await users_api.update_user(user_id=42, data=data, admin=admin, db=db)
     assert exc.value.status_code == 400
     assert exc.value.detail == "Admin role cannot be changed"
     assert user.role == UserRole.admin

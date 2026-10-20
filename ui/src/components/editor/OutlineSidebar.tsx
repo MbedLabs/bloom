@@ -124,7 +124,7 @@ export default function OutlineSidebar({ editor, open, onToggle }: Readonly<Outl
           className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           title="Hide outline"
         >
-          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M18 6L6 18" /><path d="M6 6l12 12" />
           </svg>
         </button>

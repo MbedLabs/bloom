@@ -58,7 +58,7 @@ export default function TestCaseDetail({
   const { prefix, itemId } = useParams<{ prefix: string; itemId: string }>()
   const { can } = useProjectPermissions(prefix)
   const parameterValues = useParameterValues(prefix)
-  const tcId = resolvedId || parseInt(itemId || '0')
+  const tcId = resolvedId || Number.parseInt(itemId || '0')
   const workflow = useDocumentWorkflow('test-case', tcId)
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -141,7 +141,6 @@ export default function TestCaseDetail({
   const showDelete = canEditDocs && can('delete', 'TC') && rowAllows('delete')
 
   return (
-    <>
     <DocDetailShell
       projectPrefix={projectPrefix}
       docType="TC"
@@ -218,7 +217,7 @@ export default function TestCaseDetail({
         </>
       }
     >
-      {(testCase.content_json as Record<string, unknown> | null) ? (
+      {!!testCase.content_json && (
         <SectionCard title="Content">
           <DocEditor
             content={testCase.content_json as Record<string, unknown>}
@@ -230,11 +229,12 @@ export default function TestCaseDetail({
             className="border-0"
           />
         </SectionCard>
-      ) : testCase.description ? (
+      )}
+      {!testCase.content_json && !!testCase.description && (
         <SectionCard title="Description">
           <p className="text-foreground whitespace-pre-wrap">{testCase.description}</p>
         </SectionCard>
-      ) : null}
+      )}
 
       {tcsRows.length > 0 && (
         <TcsArteTable userMentionItems={users.map(person => ({ id: person.id, label: person.full_name, user: person }))} rows={tcsRows} onChange={() => {}} editable={false} parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues} />
@@ -254,6 +254,5 @@ export default function TestCaseDetail({
       )}
 
     </DocDetailShell>
-    </>
   )
 }

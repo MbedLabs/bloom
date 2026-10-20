@@ -239,7 +239,7 @@ export default function ArtefactDetail({
     if (!artefact) return
     const next: Record<string, string> = {}
     Object.entries(artefact as unknown as Record<string, unknown>).forEach(([key, value]) => {
-      next[key] = Array.isArray(value) ? value.join(', ') : value == null ? '' : String(value)
+      next[key] = formText(value)
     })
     setForm(next)
   }, [artefact])
@@ -370,7 +370,6 @@ export default function ArtefactDetail({
   const showDelete = canEditDocs && can('delete', SOURCE_TYPE_CODES[kind]) && rowAllows('delete')
 
   return (
-    <>
     <DocDetailShell
       projectPrefix={projectPrefix}
       docType={config.docType}
@@ -486,8 +485,9 @@ export default function ArtefactDetail({
             {kind === 'defect' && (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Title</label>
+                  <label htmlFor="artefact-title" className="block text-sm font-medium text-foreground mb-1">Title</label>
                   <input
+                    id="artefact-title"
                     value={form.title ?? ''}
                     onChange={(e) => setForm({ ...form, title: e.target.value })}
                     title="Defect title"
@@ -496,8 +496,9 @@ export default function ArtefactDetail({
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Description</label>
+                  <label htmlFor="artefact-description" className="block text-sm font-medium text-foreground mb-1">Description</label>
                   <textarea
+                    id="artefact-description"
                     rows={4}
                     value={form.description ?? ''}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -521,10 +522,10 @@ export default function ArtefactDetail({
               </div>
             ))}
             {kind === 'defect' && (
-              <>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Resolution Summary</label>
+                  <label htmlFor="artefact-resolution-summary" className="block text-sm font-medium text-foreground mb-1">Resolution Summary</label>
                   <textarea
+                    id="artefact-resolution-summary"
                     rows={3}
                     value={form.resolution_summary ?? ''}
                     onChange={(e) => setForm({ ...form, resolution_summary: e.target.value })}
@@ -532,7 +533,6 @@ export default function ArtefactDetail({
                     placeholder="What was done to resolve this defect?"
                   />
                 </div>
-              </>
             )}
             {updateMutation.isError && (
               <div className="text-sm text-destructive">{extractApiErrorMessage(updateMutation.error)}</div>
@@ -544,11 +544,12 @@ export default function ArtefactDetail({
           </form>
         ) : (
           <div className="space-y-6">
-            {kind === 'defect' ? (
+            {kind === 'defect' && (
               <SectionCard title="Description">
                 <p className="text-foreground whitespace-pre-wrap leading-relaxed">{description || 'No description provided.'}</p>
               </SectionCard>
-            ) : (artefactRecord.content_json as Record<string, unknown> | null) ? (
+            )}
+            {kind !== 'defect' && !!artefactRecord.content_json && (
               <SectionCard title="Content">
                 <DocEditor
                   content={artefactRecord.content_json as Record<string, unknown>}
@@ -560,7 +561,8 @@ export default function ArtefactDetail({
                   className="border-0"
                 />
               </SectionCard>
-            ) : (
+            )}
+            {kind !== 'defect' && !artefactRecord.content_json && (
               <SectionCard title="Description">
                 <p className="text-foreground whitespace-pre-wrap leading-relaxed">{description || 'No description provided.'}</p>
               </SectionCard>
@@ -708,8 +710,23 @@ export default function ArtefactDetail({
         </SectionCard>
       )}
     </DocDetailShell>
-    </>
   )
+}
+
+/** Display name of an external tracker; null for an unknown tracker. */
+function trackerName(tracker: string | null | undefined): string | null {
+  if (tracker === 'github') return 'GitHub'
+  if (tracker === 'gitlab') return 'GitLab'
+  return tracker === 'jira' ? 'Jira' : null
+}
+
+/** The text of an artefact field in the edit form. */
+function formText(value: unknown): string {
+  if (Array.isArray(value)) return value.join(', ')
+  if (value == null) return ''
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return String(value)
+  return JSON.stringify(value) ?? ''
 }
 
 function ExternalIssueCard({
@@ -728,7 +745,7 @@ function ExternalIssueCard({
   refreshError: string | null
 }>) {
   const tracker = defect.external_tracker
-  const trackerLabel = tracker === 'github' ? 'GitHub' : tracker === 'gitlab' ? 'GitLab' : tracker === 'jira' ? 'Jira' : null
+  const trackerLabel = trackerName(tracker)
   const webhookPath = `/api/integrations/${tracker === 'gitlab' || tracker === 'jira' ? tracker : 'github'}/webhook`
   const issueLabel = tracker === 'jira' ? `${defect.external_repo_full_name}-${defect.external_issue_number}` : null
 

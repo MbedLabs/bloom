@@ -1,6 +1,5 @@
 import { PRODUCT_IDENTITY, PRODUCT_NAME } from '../brandAssets'
-import { useState, useEffect, useMemo, useRef } from 'react'
-import { Suspense } from 'react'
+import { Suspense, useState, useEffect, useMemo, useRef } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { APP_VERSION, notificationsApi, projectsApi, searchApi } from '../api/client'
@@ -52,9 +51,15 @@ const projectNav = [
   { name: 'Parameters', icon: SlidersHorizontal, tab: '', href: 'parameters' as const },
 ]
 
+/** Badge colour classes of a base role. */
+function roleBadgeClass(role: string | undefined): string {
+  if (role === 'admin') return 'bg-red-500/10 text-red-400'
+  return role === 'maintainer' ? 'bg-blue-500/10 text-violet-400' : 'bg-green-500/10 text-green-400'
+}
+
 function Beaker(props: Readonly<{ className?: string }>) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className} aria-hidden="true">
       <path d="M4.5 3h15" /><path d="M6 3v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V3" /><path d="M6 14h12" />
     </svg>
   )
@@ -239,11 +244,7 @@ function LayoutInner() {
     [location.pathname, location.search, projects, pageCrumbLabel],
   )
 
-  const roleBadgeColor = user?.role === 'admin'
-    ? 'bg-red-500/10 text-red-400'
-    : user?.role === 'maintainer'
-    ? 'bg-blue-500/10 text-violet-400'
-    : 'bg-green-500/10 text-green-400'
+  const roleBadgeColor = roleBadgeClass(user?.role)
   const currentProjectId = projects?.find(
     (p) => p.prefix === currentProjectSlug || String(p.id) === currentProjectSlug,
   )?.id
@@ -582,7 +583,7 @@ function LayoutInner() {
                 <button
                   onClick={() => setNotifOpen((open) => !open)}
                   className="relative p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                  aria-label={`Notifications${unreadCount ? ` (${unreadCount} unread)` : ''}`}
+                  aria-label={unreadCount ? `Notifications (${unreadCount} unread)` : 'Notifications'}
                 >
                   <Bell className="h-4 w-4" />
                   {unreadCount > 0 && (

@@ -187,7 +187,7 @@ async def test_customer_scope_does_not_change_account_identity(session):
     session.add(ProjectAccess(user_id=internal.id, project_id=project.id, policies=[policy]))
     await session.flush()
     await access_terms(session, internal, project.id)
-    assert not customer_only(internal, project.id)
+    assert not customer_only(internal)
     external = User(
         email="external@example.com",
         full_name="External",
@@ -198,7 +198,7 @@ async def test_customer_scope_does_not_change_account_identity(session):
     await session.flush()
     session.add(ProjectAccess(user_id=external.id, project_id=project.id, policies=[policy]))
     await session.flush()
-    assert customer_only(external, project.id)
+    assert customer_only(external)
 
 
 @pytest.mark.asyncio

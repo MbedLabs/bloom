@@ -310,7 +310,7 @@ export default function TestCampaigns() {
             </div>
           )}
 
-          {!campaigns || campaigns.length === 0 ? (
+          {(!campaigns || campaigns.length === 0) && (
             <div className="bg-card rounded-lg shadow-elegant p-12 text-center">
               <div className="w-16 h-16 rounded-2xl bg-linear-to-br/srgb from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-4">
                 <FlaskConical className="h-8 w-8 text-primary/40" />
@@ -329,11 +329,13 @@ export default function TestCampaigns() {
                 </button>
               )}
             </div>
-          ) : filteredCampaigns.length === 0 ? (
+          )}
+          {campaigns && campaigns.length > 0 && filteredCampaigns.length === 0 && (
             <div className="bg-card rounded-lg shadow-elegant p-12 text-center text-muted-foreground">
               No campaigns match the current filters.
             </div>
-          ) : (
+          )}
+          {campaigns && campaigns.length > 0 && filteredCampaigns.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {filteredCampaigns.map((campaign) => (
                 <CampaignCard key={campaign.id} campaign={campaign} prefix={prefix!} />
@@ -352,8 +354,9 @@ export default function TestCampaigns() {
             <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
               <div className="p-6 space-y-4 overflow-y-auto themed-scrollbar">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Name</label>
+                  <label htmlFor="campaign-name" className="block text-sm font-medium text-foreground mb-1">Name</label>
                   <input
+                    id="campaign-name"
                     type="text"
                     required
                     value={form.name}
@@ -363,8 +366,9 @@ export default function TestCampaigns() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Description</label>
+                  <label htmlFor="campaign-description" className="block text-sm font-medium text-foreground mb-1">Description</label>
                   <textarea
+                    id="campaign-description"
                     value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
                     className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
@@ -461,8 +465,9 @@ export default function TestCampaigns() {
             <form onSubmit={handleSuiteSubmit} className="flex flex-col flex-1 overflow-hidden">
               <div className="p-6 space-y-4 overflow-y-auto themed-scrollbar">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Name</label>
+                  <label htmlFor="suite-name" className="block text-sm font-medium text-foreground mb-1">Name</label>
                   <input
+                    id="suite-name"
                     type="text"
                     required
                     value={suiteForm.name}
@@ -471,8 +476,9 @@ export default function TestCampaigns() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Description</label>
+                  <label htmlFor="suite-description" className="block text-sm font-medium text-foreground mb-1">Description</label>
                   <textarea
+                    id="suite-description"
                     value={suiteForm.description}
                     onChange={(e) => setSuiteForm({ ...suiteForm, description: e.target.value })}
                     className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"

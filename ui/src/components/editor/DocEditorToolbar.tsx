@@ -192,7 +192,7 @@ export default function DocEditorToolbar({
                 label={`Heading ${level}`}
                 active={editor.isActive('heading', { level })}
                 onClick={() => { editor.chain().focus().toggleHeading({ level }).run(); setHeadingOpen(false) }}
-                className={level <= 2 ? 'text-lg font-bold' : level <= 4 ? 'text-base font-semibold' : 'text-sm font-medium'}
+                className={headingOptionClass(level)}
               />
             ))}
           </div>
@@ -341,6 +341,18 @@ export default function DocEditorToolbar({
   )
 }
 
+/** Text size classes of a heading level option. */
+function headingOptionClass(level: number): string {
+  if (level <= 2) return 'text-lg font-bold'
+  return level <= 4 ? 'text-base font-semibold' : 'text-sm font-medium'
+}
+
+/** State classes of a toolbar button. */
+function toolbarButtonState(active: boolean | undefined, disabled: boolean | undefined): string {
+  if (active) return 'bg-primary/15 text-primary'
+  return disabled ? 'text-muted-foreground/30 cursor-not-allowed' : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+}
+
 function ToolbarButton({
   onClick,
   active = false,
@@ -359,13 +371,7 @@ function ToolbarButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`p-1.5 rounded-md transition-colors ${
-        active
-          ? 'bg-primary/15 text-primary'
-          : disabled
-            ? 'text-muted-foreground/30 cursor-not-allowed'
-            : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-      }`}
+      className={`p-1.5 rounded-md transition-colors ${toolbarButtonState(active, disabled)}`}
       title={title}
     >
       {icon}

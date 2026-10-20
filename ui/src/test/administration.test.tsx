@@ -649,7 +649,7 @@ describe('the project list', () => {
     })
 
     expect(screen.getByText('No projects found')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /new project/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /new project/i })).toBeTruthy()
     expect(screen.getAllByRole('button', { name: /new project/i })).toHaveLength(1)
   })
 

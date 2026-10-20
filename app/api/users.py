@@ -459,7 +459,15 @@ async def get_user(
     return UserResponse.model_validate(user)
 
 
-@router.post("/{user_id}/email", response_model=UserResponse)
+@router.post(
+    "/{user_id}/email",
+    response_model=UserResponse,
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+        503: {"description": HTTPStatus(503).phrase},
+    },
+)
 async def start_email_change(
     user_id: int,
     data: AdminEmailChangeRequest,
@@ -481,7 +489,11 @@ async def start_email_change(
 @router.post(
     "/{user_id}/email/approve",
     response_model=UserResponse,
-    responses={400: {"description": "Bad Request"}},
+    responses={
+        400: {"description": "Bad Request"},
+        404: {"description": HTTPStatus(404).phrase},
+        503: {"description": HTTPStatus(503).phrase},
+    },
 )
 async def approve_email_change(
     user_id: int,
@@ -504,7 +516,9 @@ async def approve_email_change(
 
 
 @router.delete(
-    "/{user_id}/email", response_model=UserResponse, responses={400: {"description": "Bad Request"}}
+    "/{user_id}/email",
+    response_model=UserResponse,
+    responses={400: {"description": "Bad Request"}, 404: {"description": HTTPStatus(404).phrase}},
 )
 async def reject_email_change(
     user_id: int,

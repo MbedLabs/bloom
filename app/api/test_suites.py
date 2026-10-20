@@ -1,5 +1,7 @@
 """Reusable test suite API endpoints."""
 
+from http import HTTPStatus
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -379,7 +381,15 @@ async def delete_suite(
     )
 
 
-@router.post("/{suite_id}/items", response_model=TestSuiteItemResponse, status_code=201)
+@router.post(
+    "/{suite_id}/items",
+    response_model=TestSuiteItemResponse,
+    status_code=201,
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+    },
+)
 async def add_suite_item(
     suite_id: int,
     test_case_id: int = Query(...),

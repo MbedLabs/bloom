@@ -19,6 +19,12 @@ type RequestState = {
   doc_id: string | null
 }
 
+/** Label of the report request button. */
+function requestLabel(pending: boolean, refused: boolean): string {
+  if (pending) return 'Requesting…'
+  return refused ? 'Request again' : 'Request report'
+}
+
 export default function ReportRequestAction({ source }: Readonly<{ source: ReportSource }>) {
   const client = useQueryClient()
   const toast = useToast()
@@ -49,7 +55,7 @@ export default function ReportRequestAction({ source }: Readonly<{ source: Repor
       {!state.isPending && !state.isError && value?.status !== 'pending' && value?.status !== 'delivered' && (
         <button type="button" className="px-2 py-1 rounded border border-border text-foreground hover:bg-accent disabled:opacity-50"
           disabled={request.isPending} onClick={() => request.mutate()}>
-          {request.isPending ? 'Requesting…' : value?.status === 'refused' ? 'Request again' : 'Request report'}
+          {requestLabel(request.isPending, value?.status === 'refused')}
         </button>
       )}
       {(state.isError || request.isError) && <span role="alert" className="text-destructive">

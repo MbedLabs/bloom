@@ -74,9 +74,8 @@ export default function MentionTextarea({
   const [trigger, setTrigger] = useState<ActiveTrigger | null>(null)
   const [anchor, setAnchor] = useState<{ left: number; top: number } | null>(null)
 
-  const items = trigger
-    ? filterSuggestions(trigger.kind === 'parameter' ? mentionItems : userMentionItems, trigger.query)
-    : []
+  const suggestionPool = trigger?.kind === 'parameter' ? mentionItems : userMentionItems
+  const items = trigger ? filterSuggestions(suggestionPool, trigger.query) : []
 
   const close = useCallback(() => {
     setTrigger(null)

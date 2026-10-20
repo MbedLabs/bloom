@@ -75,16 +75,15 @@ async def list_documents(
 
     section_counts: dict[int, int] = {}
     if documents:
-        section_counts = {
-            document_id: total
-            for document_id, total in (
+        section_counts = dict(
+            (
                 await db.execute(
                     select(DocumentSection.document_id, func.count(DocumentSection.id))
                     .where(DocumentSection.document_id.in_([d.id for d in documents]))
                     .group_by(DocumentSection.document_id)
                 )
             ).all()
-        }
+        )
 
     response = []
     for doc in documents:

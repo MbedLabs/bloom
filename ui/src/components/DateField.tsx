@@ -29,6 +29,29 @@ function moveMonth(date: Date, change: number): Date {
   return next
 }
 
+/** Placeholder letters of each date part. */
+const PART_PLACEHOLDERS: Readonly<Partial<Record<string, string>>> = { day: 'DD', month: 'MM', year: 'YYYY' }
+
+/** The field text: an unsaved draft of the current value, else the formatted date. */
+function shownText(draft: { source: string; text: string } | null, value: string, selected: Date | null, display: Intl.DateTimeFormat): string {
+  if (draft?.source === value) return draft.text
+  return selected ? display.format(selected) : ''
+}
+
+/** The date the calendar opens on: the selected value, else today within min and max. */
+function openingDate(selected: Date | null, value: string, today: string, min?: string, max?: string): string {
+  if (selected) return value
+  if (min && today < min) return min
+  if (max && today > max) return max
+  return today
+}
+
+/** Colour classes of a calendar day button. */
+function dayClass(isValue: boolean, outsideMonth: boolean): string {
+  if (isValue) return 'bg-primary text-primary-foreground'
+  return outsideMonth ? 'text-muted-foreground hover:bg-accent' : 'hover:bg-accent'
+}
+
 /** An editable date filter with an app-themed calendar popup. */
 export default function DateField({ label, value, onChange, className = '', placeholder, min, max, disabled = false }: Readonly<{
   label: string
@@ -57,9 +80,9 @@ export default function DateField({ label, value, onChange, className = '', plac
   const firstDay = (localeInfo.getWeekInfo?.().firstDay ?? localeInfo.weekInfo?.firstDay ?? 1) % 7
   const parts = display.formatToParts(new Date(2026, 9, 14))
   const order = parts.filter(part => ['year', 'month', 'day'].includes(part.type)).map(part => part.type)
-  const empty = placeholder ?? parts.map(part => part.type === 'day' ? 'DD' : part.type === 'month' ? 'MM' : part.type === 'year' ? 'YYYY' : part.value).join('')
+  const empty = placeholder ?? parts.map(part => PART_PLACEHOLDERS[part.type] ?? part.value).join('')
   const selected = dateFromValue(value)
-  const text = draft?.source === value ? draft.text : selected ? display.format(selected) : ''
+  const text = shownText(draft, value, selected, display)
   const allowed = (day: string) => !!dateFromValue(day) && (!min || day >= min) && (!max || day <= max)
   const commit = (next: string) => {
     setError('')
@@ -70,7 +93,7 @@ export default function DateField({ label, value, onChange, className = '', plac
   }
   const parse = (next: string) => {
     if (dateFromValue(next)) return next
-    const values = next.match(/^(\d{1,4})\D+(\d{1,4})\D+(\d{1,4})$/)?.slice(1)
+    const values = /^(\d{1,4})\D+(\d{1,4})\D+(\d{1,4})$/.exec(next)?.slice(1)
     if (!values) return null
     const mapped = Object.fromEntries(order.map((part, index) => [part, values[index]]))
     const day = `${mapped.year?.padStart(4, '0')}-${mapped.month?.padStart(2, '0')}-${mapped.day?.padStart(2, '0')}`
@@ -86,7 +109,7 @@ export default function DateField({ label, value, onChange, className = '', plac
     const upwards = below < 330 && above > below
     setPosition({ left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)), top: upwards ? undefined : rect.bottom + 4, bottom: upwards ? window.innerHeight - rect.top + 4 : undefined, width, maxHeight: Math.max(80, upwards ? above : below) })
     const today = dateValue(new Date())
-    const next = selected ? value : min && today < min ? min : max && today > max ? max : today
+    const next = openingDate(selected, value, today, min, max)
     setActive(next)
     setMonth(dateFromValue(next) ?? new Date())
     setOpen(true)
@@ -176,7 +199,7 @@ export default function DateField({ label, value, onChange, className = '', plac
         <tbody>{Array.from({ length: 6 }, (_, week) => <tr key={week}>{days.slice(week * 7, week * 7 + 7).map(day => {
           const iso = dateValue(day)
           return <td key={iso}><button type="button" data-date={iso} aria-label={fullDate.format(day)} aria-pressed={iso === value} aria-current={iso === dateValue(new Date()) ? 'date' : undefined} tabIndex={iso === active ? 0 : -1} disabled={!allowed(iso)}
-            onKeyDown={event => dayKeys(event, day)} onClick={() => commit(iso)} className={`h-8 w-full rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-30 ${iso === value ? 'bg-primary text-primary-foreground' : day.getMonth() !== month.getMonth() ? 'text-muted-foreground hover:bg-accent' : 'hover:bg-accent'}`}>{day.getDate()}</button></td>
+            onKeyDown={event => dayKeys(event, day)} onClick={() => commit(iso)} className={`h-8 w-full rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-30 ${dayClass(iso === value, day.getMonth() !== month.getMonth())}`}>{day.getDate()}</button></td>
         })}</tr>)}</tbody>
       </table>
       <div className="mt-2 flex justify-between border-t border-border pt-2 text-xs">

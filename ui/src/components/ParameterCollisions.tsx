@@ -38,8 +38,7 @@ export default function ParameterCollisions({
                 name={`collision-${c.name}`}
                 checked={choice?.action === 'existing'}
                 onChange={() => set(c.name, { action: 'existing' })}
-              />
-              Use the project&apos;s value
+              />Use the project&apos;s value
             </label>
             <label className="flex items-center gap-2 text-sm text-foreground">
               <input
@@ -47,8 +46,7 @@ export default function ParameterCollisions({
                 name={`collision-${c.name}`}
                 checked={choice?.action === 'rename'}
                 onChange={() => set(c.name, { action: 'rename', to: `${c.name}_2` })}
-              />
-              Import the file&apos;s value as a new parameter
+              />Import the file&apos;s value as a new parameter
             </label>
             {choice?.action === 'rename' && (
               <input

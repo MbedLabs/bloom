@@ -76,8 +76,7 @@ export default function ProjectParameters() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Parameters<typeof projectVariablesApi.update>[1] }) =>
       projectVariablesApi.update(id, data),
-    onSuccess: (_updated) => {
-      void _updated
+    onSuccess: () => {
       refreshProjectViews(queryClient, { prefix, projectId })
       setEditingId(null)
       toast.saved('Parameter')
@@ -181,8 +180,9 @@ export default function ProjectParameters() {
           <h3 className="font-semibold text-foreground mb-4">New Parameter / Variable</h3>
           <form onSubmit={onCreate} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Kind</label>
+              <label htmlFor="new-parameter-kind" className="block text-sm font-medium text-foreground mb-1">Kind</label>
               <SelectField
+                id="new-parameter-kind"
                 value={createForm.kind}
                 onChange={(e) => setCreateForm({ ...createForm, kind: e.target.value as ProjectVariable['kind'] })}
                 title="Select item kind"
@@ -193,8 +193,9 @@ export default function ProjectParameters() {
               </SelectField>
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Key</label>
+              <label htmlFor="new-parameter-key" className="block text-sm font-medium text-foreground mb-1">Key</label>
               <input
+                id="new-parameter-key"
                 required
                 value={createForm.key}
                 onChange={(e) => setCreateForm({ ...createForm, key: e.target.value })}
@@ -204,8 +205,9 @@ export default function ProjectParameters() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Value</label>
+              <label htmlFor="new-parameter-value" className="block text-sm font-medium text-foreground mb-1">Value</label>
               <textarea
+                id="new-parameter-value"
                 required
                 rows={3}
                 value={createForm.value}
@@ -216,8 +218,9 @@ export default function ProjectParameters() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Description</label>
+              <label htmlFor="new-parameter-description" className="block text-sm font-medium text-foreground mb-1">Description</label>
               <textarea
+                id="new-parameter-description"
                 rows={2}
                 value={createForm.description}
                 onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
@@ -239,11 +242,13 @@ export default function ProjectParameters() {
           <SlidersHorizontal className="h-4 w-4 text-primary" />
           <h3 className="font-semibold text-foreground">Parameters & Variables</h3>
         </div>
-        {variablesLoading ? (
+        {variablesLoading && (
           <div className="text-sm text-muted-foreground">Loading...</div>
-        ) : !variables || variables.length === 0 ? (
+        )}
+        {!variablesLoading && (!variables || variables.length === 0) && (
           <div className="text-sm text-muted-foreground">No items yet.</div>
-        ) : (
+        )}
+        {!variablesLoading && variables && variables.length > 0 && (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-border">
               <thead className="bg-muted/50">

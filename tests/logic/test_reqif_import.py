@@ -289,10 +289,9 @@ async def test_missing_project_returns_404(session):
     from fastapi import HTTPException
 
     admin = await _admin(session)
+    upload = _FakeUpload(SAMPLE_REQIF)
     with pytest.raises(HTTPException) as exc:
-        await import_reqif(
-            project_id=999, file=_FakeUpload(SAMPLE_REQIF), db=session, current_user=admin
-        )
+        await import_reqif(project_id=999, file=upload, db=session, current_user=admin)
     assert exc.value.status_code == 404
 
 
@@ -300,10 +299,9 @@ async def test_unparseable_upload_returns_422(session):
     from fastapi import HTTPException
 
     admin = await _admin(session)
+    upload = _FakeUpload(b"not reqif")
     with pytest.raises(HTTPException) as exc:
-        await import_reqif(
-            project_id=1, file=_FakeUpload(b"not reqif"), db=session, current_user=admin
-        )
+        await import_reqif(project_id=1, file=upload, db=session, current_user=admin)
     assert exc.value.status_code == 422
 
 
@@ -339,15 +337,12 @@ async def test_reqif_relations_are_visible_as_normalized_links(session, type_nam
 async def test_reqif_unknown_relation_fails_with_identifier_and_type(session):
     from fastapi import HTTPException
 
+    upload = _FakeUpload(
+        SAMPLE_REQIF.replace(b'LONG-NAME="Refines"', b'LONG-NAME="Unknown Relation"')
+    )
+    admin = await _admin(session)
     with pytest.raises(HTTPException) as failed:
-        await import_reqif(
-            project_id=1,
-            file=_FakeUpload(
-                SAMPLE_REQIF.replace(b'LONG-NAME="Refines"', b'LONG-NAME="Unknown Relation"')
-            ),
-            db=session,
-            current_user=await _admin(session),
-        )
+        await import_reqif(project_id=1, file=upload, db=session, current_user=admin)
     assert failed.value.status_code == 422
     assert "REL-1" in failed.value.detail
     assert "Unknown Relation" in failed.value.detail
@@ -361,13 +356,10 @@ async def test_reqif_disallowed_mapped_role_fails_with_relation(session, monkeyp
     from app.core import link_rules
 
     monkeypatch.setattr(link_rules, "LINK_RULE_ROWS", ())
+    upload = _FakeUpload(SAMPLE_REQIF)
+    admin = await _admin(session)
     with pytest.raises(HTTPException) as failed:
-        await import_reqif(
-            project_id=1,
-            file=_FakeUpload(SAMPLE_REQIF),
-            db=session,
-            current_user=await _admin(session),
-        )
+        await import_reqif(project_id=1, file=upload, db=session, current_user=admin)
     assert failed.value.status_code == 422
     assert "REL-1" in failed.value.detail
     assert "Refines" in failed.value.detail

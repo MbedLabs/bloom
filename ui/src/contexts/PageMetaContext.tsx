@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useMemo, type ReactNode } from 'react'
 
 interface PageMetaState {
   crumbLabel?: string
@@ -14,11 +14,11 @@ const PageMetaContext = createContext<PageMetaContextType>({
 })
 
 export function PageMetaProvider({ children }: Readonly<{ children: ReactNode }>) {
-  const [crumbLabel, setCrumbLabelRaw] = useState<string | undefined>()
-  const setCrumbLabel = useCallback((label: string | undefined) => setCrumbLabelRaw(label), [])
+  const [crumbLabel, setCrumbLabel] = useState<string | undefined>()
+  const value = useMemo(() => ({ crumbLabel, setCrumbLabel }), [crumbLabel])
 
   return (
-    <PageMetaContext.Provider value={{ crumbLabel, setCrumbLabel }}>
+    <PageMetaContext.Provider value={value}>
       {children}
     </PageMetaContext.Provider>
   )

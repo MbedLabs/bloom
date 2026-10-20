@@ -99,8 +99,9 @@ async def test_project_replacement_does_not_replace_global_app_rules(session):
 async def test_configured_app_rules_do_not_open_admin_only_management(session):
     user, _, _ = await _setup(session)
     assert (await effective_permissions(session, user, None))["users"] == {"view", "create", "edit"}
+    admin_only = require_role(UserRole.admin)
     with pytest.raises(HTTPException) as refused:
-        await require_role(UserRole.admin)(user)
+        await admin_only(user)
     assert refused.value.status_code == 403
 
 

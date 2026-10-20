@@ -436,8 +436,7 @@ def _link_count_subqueries(project_id: int, types: frozenset[str] | None = None)
     return incoming, outgoing
 
 
-async def _registry_union(
-    db: AsyncSession,
+def _registry_union(
     project: Project,
     current_user: User,
     *,
@@ -582,8 +581,7 @@ async def list_all_docs(
             return empty
 
     types = await visible_types(db, current_user, project.id)
-    registry = await _registry_union(
-        db,
+    registry = _registry_union(
         project,
         current_user,
         type_filter=type_filter,
@@ -774,6 +772,7 @@ class DocTypeSummaryResponse(BaseModel):
 @router.get(
     "/projects/{project_ref}/doc-type-summary",
     response_model=DocTypeSummaryResponse,
+    responses={404: {"description": HTTPStatus(404).phrase}},
 )
 async def get_doc_type_summary(
     project_ref: str,
@@ -785,8 +784,8 @@ async def get_doc_type_summary(
     await require_project_access(db, current_user, project.id)
 
     visible = await visible_types(db, current_user, project.id)
-    registry = await _registry_union(
-        db, project, current_user, type_filter=None, related_keys=None, types=visible
+    registry = _registry_union(
+        project, current_user, type_filter=None, related_keys=None, types=visible
     )
     if registry is None:
         return DocTypeSummaryResponse(types=[], total=0, membership_edges=[])
@@ -880,7 +879,10 @@ _DOCUMENT_TYPE_CODES = {"SPEC", "PRT", "RPT", "STD"}
 @router.get(
     "/projects/{project_ref}/next-doc-id/{type_code}",
     response_model=NextDocIdResponse,
-    responses={400: {"description": HTTPStatus(400).phrase}},
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+    },
 )
 async def get_next_doc_id(
     project_ref: str,
@@ -928,15 +930,13 @@ async def get_doc_by_kind_and_string_id(
     await require_project_access(db, current_user, project.id)
     kind_slug = LEGACY_TYPE_SLUG_ALIASES.get(kind_slug, kind_slug)
     requested_kind = None
-    if kind_slug in {slug for _, (_, _, slug) in TYPE_MAP.items()}:
-        pass
-    else:
+    if kind_slug not in {slug for _, (_, _, slug) in TYPE_MAP.items()}:
         requested_kind = document_kind_from_slug(kind_slug)
 
     allowed_doc_types = await get_external_doc_types(db, current_user, project.id)
 
     if requested_kind in CANONICAL_DOCUMENT_KINDS:
-        if not external_doc_type_allowed(current_user, allowed_doc_types, requested_kind):
+        if not external_doc_type_allowed(allowed_doc_types, requested_kind):
             raise HTTPException(status_code=404, detail="Document not found")
         document_query = select(Document).where(
             Document.project_id == project.id,
@@ -983,7 +983,7 @@ async def get_doc_by_kind_and_string_id(
             if slug != kind_slug:
                 continue
 
-            if not external_doc_type_allowed(current_user, allowed_doc_types, type_code):
+            if not external_doc_type_allowed(allowed_doc_types, type_code):
                 continue
             id_col = getattr(model, id_col_name)
             if id_col_name == "id":

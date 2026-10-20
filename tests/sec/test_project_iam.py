@@ -46,8 +46,9 @@ async def test_require_project_access_rejects_a_missing_action():
         role=UserRole.maintainer,
         access_map={42: (AccessTerm({"REQ": {"view"}}, None, None, frozenset(), False),)},
     )
+    db = AsyncMock()
     with pytest.raises(HTTPException, match="Missing permission"):
-        await require_project_access(AsyncMock(), user, 42, permission=("edit", "REQ"))
+        await require_project_access(db, user, 42, permission=("edit", "REQ"))
 
 
 @pytest.mark.asyncio

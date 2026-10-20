@@ -35,6 +35,21 @@ const SEVERITY_OPTIONS = ['Critical', 'High', 'Medium', 'Low']
 type SortField = 'updated_at' | 'defect_id' | 'title' | 'status' | 'severity'
 type SortDir = 'asc' | 'desc'
 
+/** A sortable header cell of the defect table. */
+function SortHeader({ field, sortField, sortDir, onSort, children }: Readonly<{ field: SortField; sortField: SortField; sortDir: string; onSort: (field: SortField) => void; children: React.ReactNode }>) {
+  return (
+    <SortableHeader
+      field={field}
+      sortField={sortField}
+      sortDir={sortDir}
+      onSort={onSort}
+      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer select-none hover:text-foreground transition-colors"
+    >
+      {children}
+    </SortableHeader>
+  )
+}
+
 export default function Defects() {
   const { prefix } = useParams<{ prefix: string }>()
   const { data: project } = useProjectByPrefix(prefix)
@@ -158,17 +173,7 @@ export default function Defects() {
     })
   }
 
-  const SortHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
-    <SortableHeader
-      field={field}
-      sortField={sortField}
-      sortDir={sortDir}
-      onSort={toggleSort}
-      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer select-none hover:text-foreground transition-colors"
-    >
-      {children}
-    </SortableHeader>
-  )
+  const sortProps = { sortField, sortDir, onSort: toggleSort }
 
   if (!project) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading project...</div>
@@ -252,8 +257,9 @@ export default function Defects() {
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Title</label>
+                <label htmlFor="defect-title" className="block text-sm font-medium text-foreground mb-1">Title</label>
                 <input
+                  id="defect-title"
                   required
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
@@ -263,8 +269,9 @@ export default function Defects() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Description</label>
+              <label htmlFor="defect-description" className="block text-sm font-medium text-foreground mb-1">Description</label>
               <textarea
+                id="defect-description"
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 rows={3}
@@ -274,8 +281,9 @@ export default function Defects() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Severity</label>
+                <label htmlFor="defect-severity" className="block text-sm font-medium text-foreground mb-1">Severity</label>
                 <SelectField
+                  id="defect-severity"
                   value={form.severity}
                   onChange={(e) => setForm({ ...form, severity: e.target.value })}
                   title="Severity"
@@ -289,8 +297,9 @@ export default function Defects() {
                 </SelectField>
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Priority</label>
+                <label htmlFor="defect-priority" className="block text-sm font-medium text-foreground mb-1">Priority</label>
                 <SelectField
+                  id="defect-priority"
                   value={form.priority}
                   onChange={(e) => setForm({ ...form, priority: e.target.value })}
                   title="Priority"
@@ -309,8 +318,9 @@ export default function Defects() {
               <h4 className="text-sm font-semibold text-foreground mb-3">External issue (optional)</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Tracker</label>
+                  <label htmlFor="defect-tracker" className="block text-sm font-medium text-foreground mb-1">Tracker</label>
                   <SelectField
+                    id="defect-tracker"
                     value={form.external_tracker}
                     onChange={(e) => setForm({ ...form, external_tracker: e.target.value })}
                     title="External tracker"
@@ -322,8 +332,9 @@ export default function Defects() {
                   </SelectField>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Repository</label>
+                  <label htmlFor="defect-repository" className="block text-sm font-medium text-foreground mb-1">Repository</label>
                   <input
+                    id="defect-repository"
                     value={form.external_repo_full_name}
                     onChange={(e) => setForm({ ...form, external_repo_full_name: e.target.value })}
                     placeholder="owner/repo"
@@ -332,8 +343,9 @@ export default function Defects() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Issue number</label>
+                  <label htmlFor="defect-issue-number" className="block text-sm font-medium text-foreground mb-1">Issue number</label>
                   <input
+                    id="defect-issue-number"
                     type="number"
                     value={form.external_issue_number}
                     onChange={(e) => setForm({ ...form, external_issue_number: e.target.value })}
@@ -343,8 +355,9 @@ export default function Defects() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Issue URL</label>
+                  <label htmlFor="defect-issue-url" className="block text-sm font-medium text-foreground mb-1">Issue URL</label>
                   <input
+                    id="defect-issue-url"
                     value={form.external_issue_url}
                     onChange={(e) => setForm({ ...form, external_issue_url: e.target.value })}
                     placeholder="https://github.com/..."
@@ -372,30 +385,33 @@ export default function Defects() {
         </div>
       )}
 
-      {isLoading ? (
+      {isLoading && (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-8 text-center text-muted-foreground">Loading defects...</div>
-      ) : !defects || defects.length === 0 ? (
+      )}
+      {!isLoading && (!defects || defects.length === 0) && (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-16 text-center">
           <Bug className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
           <p className="text-muted-foreground">No defects yet.</p>
         </div>
-      ) : sortedFiltered.length === 0 ? (
+      )}
+      {!isLoading && defects && defects.length > 0 && sortedFiltered.length === 0 && (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-8 text-center text-muted-foreground">
           No defects match your search.
         </div>
-      ) : (
+      )}
+      {!isLoading && defects && defects.length > 0 && sortedFiltered.length > 0 && (
         <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[800px]">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
-                  <SortHeader field="defect_id">ID</SortHeader>
-                  <SortHeader field="title">Title</SortHeader>
-                  <SortHeader field="status">Status</SortHeader>
-                  <SortHeader field="severity">Severity</SortHeader>
+                  <SortHeader field="defect_id" {...sortProps}>ID</SortHeader>
+                  <SortHeader field="title" {...sortProps}>Title</SortHeader>
+                  <SortHeader field="status" {...sortProps}>Status</SortHeader>
+                  <SortHeader field="severity" {...sortProps}>Severity</SortHeader>
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Priority</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">External</th>
-                  <SortHeader field="updated_at">Updated</SortHeader>
+                  <SortHeader field="updated_at" {...sortProps}>Updated</SortHeader>
                 </tr>
               </thead>
               <tbody className="bg-card divide-y divide-border">

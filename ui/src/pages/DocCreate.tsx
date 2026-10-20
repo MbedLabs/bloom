@@ -40,6 +40,20 @@ import { useParameterValues } from '../hooks/useParameterValues'
 import { useArtefactLabels } from '../hooks/useArtefactLabels'
 import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
 
+/** The statuses offered by the status picker of the document form. */
+function statusChoicesFor(draftOnly: boolean, external: boolean, editMode: boolean, statusOptions: readonly string[], editStatus: string, firstStatus: string): readonly string[] {
+  if (draftOnly) return ['Draft']
+  if (!external) return statusOptions
+  if (!editMode) return [firstStatus]
+  return [...new Set([editStatus, ...(statusOptions.includes('Draft') ? ['Draft'] : [])])]
+}
+
+/** Label of the save button. */
+function saveLabel(saved: boolean, pending: boolean): string {
+  if (saved) return 'Saved'
+  return pending ? 'Saving...' : 'Save'
+}
+
 function artefactActivityTypeForDocType(docType: DocType): string | null {
   if (docType === 'REQ') return 'requirement'
   if (docType === 'TC') return 'test-case'
@@ -206,13 +220,14 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
   const controlled = isWorkflowControlledDocType(docType)
   const firstStatus = controlled ? 'Draft' : config.statusOptions[0]
   const displayedStatus = editMode && controlled ? workflow.data?.phase ?? editDocFacade?.status ?? '' : metadata.status || firstStatus
-  const statusChoices: readonly string[] = !editMode && (controlled || isControlledSharedDocument(docType))
-    ? ['Draft']
-    : !external
-      ? config.statusOptions
-      : editMode
-        ? [...new Set([editDocFacade?.status ?? firstStatus, ...(config.statusOptions.includes('Draft') ? ['Draft'] : [])])]
-        : [firstStatus]
+  const statusChoices = statusChoicesFor(
+    !editMode && (controlled || isControlledSharedDocument(docType)),
+    external,
+    editMode,
+    config.statusOptions,
+    editDocFacade?.status ?? firstStatus,
+    firstStatus,
+  )
   const { data: nextDocId } = useQuery({
     queryKey: ['next-doc-id', prefix, config.typeCode],
     queryFn: () => docsApi.nextDocId(prefix!, config.typeCode),
@@ -624,7 +639,7 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
                 : 'bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50'
             }`}
           >
-            {saveSuccess ? 'Saved' : isPending ? 'Saving...' : 'Save'}
+            {saveLabel(saveSuccess, isPending)}
           </button>
         </div>
       </div>
@@ -758,7 +773,7 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
                 <>
                   {visibleConfigFields.filter((field) => field.type !== 'textarea').map((field) => (
                     <MetaField key={field.key} label={field.label}>
-                      {field.type === 'select' && field.options ? (
+                      {field.type === 'select' && field.options && (
                         <SelectField
                           value={metadata[field.key] || field.options[0]}
                           onChange={(e) => setMetadata({ ...metadata, [field.key]: e.target.value })}
@@ -769,7 +784,8 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
                             <option key={opt} value={opt}>{opt}</option>
                           ))}
                         </SelectField>
-                      ) : field.type === 'number' ? (
+                      )}
+                      {field.type === 'number' && (
                         <input
                           type="number"
                           value={metadata[field.key] || ''}
@@ -778,7 +794,8 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
                           placeholder={field.label}
                           className="w-full px-2 py-1.5 bg-background border border-input rounded-md text-sm"
                         />
-                      ) : (
+                      )}
+                      {field.type !== 'number' && (field.type !== 'select' || !field.options) && (
                         <input
                           type="text"
                           value={metadata[field.key] || ''}

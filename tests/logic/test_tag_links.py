@@ -70,8 +70,9 @@ async def test_tag_rule_allows_reference_without_manual_role(session):
 
 @pytest.mark.parametrize(("source", "target"), [("TC", "REQ"), ("REQ", "UNKNOWN")])
 async def test_invalid_tag_pair_fails_loudly(session, source, target):
+    content = _mention(target)
     with pytest.raises(HTTPException) as failed:
-        await _sync(session, source, _mention(target))
+        await _sync(session, source, content)
     assert failed.value.status_code == 422
     assert source in failed.value.detail
     assert target in failed.value.detail

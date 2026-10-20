@@ -23,11 +23,11 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-const PUBLIC_PATHS = ['/login', '/accept-invite', '/verify-email', '/forgot-password', '/reset-password']
+const PUBLIC_PATHS = new Set(['/login', '/accept-invite', '/verify-email', '/forgot-password', '/reset-password'])
 
 function redirectToLogin() {
   clearAuthToken()
-  if (!PUBLIC_PATHS.includes(window.location.pathname)) {
+  if (!PUBLIC_PATHS.has(window.location.pathname)) {
     window.location.href = '/login'
   }
 }
@@ -65,11 +65,9 @@ api.interceptors.response.use(
 
     if (error.response?.status === 401 && original && !original._retried && !isAuthCall) {
       original._retried = true
-      if (!refreshPromise) {
-        refreshPromise = refreshAccessToken().finally(() => {
-          refreshPromise = null
-        })
-      }
+      refreshPromise ??= refreshAccessToken().finally(() => {
+        refreshPromise = null
+      })
       const newToken = await refreshPromise
       if (newToken) {
         original.headers.Authorization = `Bearer ${newToken}`
@@ -79,7 +77,7 @@ api.interceptors.response.use(
     } else if (error.response?.status === 401 && !isAuthCall) {
       redirectToLogin()
     }
-    return Promise.reject(error)
+    throw error
   },
 )
 
@@ -1240,7 +1238,7 @@ export const docsApi = {
     const response = await api.get<DocTypeSummary>(`/projects/${projectRef}/doc-type-summary`)
     return response.data
   },
-  get: async (projectRef: string, kind: string | DocType, docId: string) => {
+  get: async (projectRef: string, kind: string, docId: string) => {
     const kindSlug = Object.prototype.hasOwnProperty.call(DOC_TYPE_SLUGS, kind)
       ? DOC_TYPE_SLUGS[kind as DocType]
       : kind
@@ -2039,7 +2037,7 @@ export interface TestRailImportResult {
 }
 
 function tagQuery(tagIds?: number[], join = '?'): string {
-  return tagIds && tagIds.length ? join + tagIds.map((id) => `tag_ids=${id}`).join('&') : ''
+  return tagIds?.length ? join + tagIds.map((id) => `tag_ids=${id}`).join('&') : ''
 }
 
 export const importApi = {

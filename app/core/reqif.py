@@ -241,9 +241,8 @@ def parse_reqif(data: bytes) -> ReqIFBundle:
     except ET.ParseError as exc:
         raise ReqIFParseError(f"Not valid XML: {exc}") from exc
 
-    if _local(root.tag) != "req-if":
-        if not _find_all(root, "SPEC-OBJECT"):
-            raise ReqIFParseError("No ReqIF content (SPEC-OBJECT) found.")
+    if _local(root.tag) != "req-if" and not _find_all(root, "SPEC-OBJECT"):
+        raise ReqIFParseError("No ReqIF content (SPEC-OBJECT) found.")
 
     enum_option_name: Dict[str, str] = {}
     for opt in _find_all(root, "ENUM-VALUE"):
