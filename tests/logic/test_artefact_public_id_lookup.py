@@ -74,8 +74,9 @@ async def test_resolves_by_database_id_still_works(env):
 
 
 async def test_unknown_public_id_404(env):
+    admin = await _admin(env)
     with pytest.raises(HTTPException) as exc:
-        await get_artefact_or_404(env, "test-case", "ALP-TC-999", await _admin(env))
+        await get_artefact_or_404(env, "test-case", "ALP-TC-999", admin)
     assert exc.value.status_code == 404
 
 

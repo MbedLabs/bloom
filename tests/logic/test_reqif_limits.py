@@ -75,8 +75,9 @@ def _archive(entries: list[tuple[str, bytes]], compression=zipfile.ZIP_STORED) -
     ],
 )
 def test_archive_requires_exactly_one_reqif_member(entries, error):
+    payload = _archive(entries)
     with pytest.raises(ReqIFParseError, match=error):
-        parse_reqif(_archive(entries))
+        parse_reqif(payload)
 
 
 def test_archive_entry_limit_is_enforced(monkeypatch):
@@ -90,8 +91,9 @@ def test_archive_entry_limit_is_enforced(monkeypatch):
 def test_uncompressed_member_limit_is_enforced(monkeypatch):
     monkeypatch.setattr(settings, "REQIF_MAX_MEMBER_BYTES", len(MINIMAL_REQIF) - 1)
 
+    payload = _archive([("document.reqif", MINIMAL_REQIF)])
     with pytest.raises(ReqIFParseError, match="uncompressed"):
-        parse_reqif(_archive([("document.reqif", MINIMAL_REQIF)]))
+        parse_reqif(payload)
 
 
 def test_compression_ratio_limit_is_enforced(monkeypatch):
@@ -147,8 +149,9 @@ def test_object_limit_is_enforced_while_building(monkeypatch):
         for index in range(3)
     )
 
+    payload = _document(objects=objects)
     with pytest.raises(ReqIFParseError, match="object limit"):
-        parse_reqif(_document(objects=objects))
+        parse_reqif(payload)
 
 
 def test_relation_limit_is_enforced_while_building(monkeypatch):
@@ -164,8 +167,9 @@ def test_relation_limit_is_enforced_while_building(monkeypatch):
         for index in range(2)
     )
 
+    payload = _document(objects=obj, relations=relations)
     with pytest.raises(ReqIFParseError, match="relation limit"):
-        parse_reqif(_document(objects=obj, relations=relations))
+        parse_reqif(payload)
 
 
 def test_hierarchy_depth_limit_is_enforced(monkeypatch):
@@ -179,8 +183,9 @@ def test_hierarchy_depth_limit_is_enforced(monkeypatch):
         b"</CHILDREN></SPECIFICATION>"
     )
 
+    payload = _document(hierarchy=hierarchy)
     with pytest.raises(ReqIFParseError, match="hierarchy depth"):
-        parse_reqif(_document(hierarchy=hierarchy))
+        parse_reqif(payload)
 
 
 def test_repeated_ancestor_reference_is_rejected_as_hierarchy_cycle():
@@ -192,5 +197,6 @@ def test_repeated_ancestor_reference_is_rejected_as_hierarchy_cycle():
         b"</CHILDREN></SPECIFICATION>"
     )
 
+    payload = _document(hierarchy=hierarchy)
     with pytest.raises(ReqIFParseError, match="cycle"):
-        parse_reqif(_document(hierarchy=hierarchy))
+        parse_reqif(payload)

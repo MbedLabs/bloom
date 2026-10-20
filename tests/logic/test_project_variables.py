@@ -76,12 +76,11 @@ async def test_update_project_variable_rejects_duplicate_kind_key_combination():
         get=AsyncMock(return_value=SimpleNamespace(id=7)),
     )
 
+    data = ProjectVariableUpdate(kind="parameter", key="API_BASE_URL")
+    admin = SimpleNamespace(role=UserRole.admin)
     with pytest.raises(HTTPException) as exc:
         await project_variables_api.update_project_variable(
-            item_id=item.id,
-            data=ProjectVariableUpdate(kind="parameter", key="API_BASE_URL"),
-            db=db,
-            current_user=SimpleNamespace(role=UserRole.admin),
+            item_id=item.id, data=data, db=db, current_user=admin
         )
 
     assert exc.value.status_code == 400

@@ -166,14 +166,16 @@ async def test_rejected_actions(session):
             await _import(session, MD, actions)
         assert refused.value.status_code == 422
         assert expected in refused.value.detail
+    upload = _upload(MD)
+    admin = await _admin(session)
     with pytest.raises(HTTPException) as broken:
         await import_markdown(
             project_id=1,
             default_type=None,
-            file=_upload(MD),
+            file=upload,
             collision_actions="{not json",
             db=session,
-            current_user=await _admin(session),
+            current_user=admin,
         )
     assert "not valid JSON" in broken.value.detail
     assert await _count(session, Requirement) == 0
@@ -238,12 +240,14 @@ async def test_the_import_needs_import_on_every_imported_type(session):
     )
     await session.commit()
 
+    upload = _upload(MD)
+    actions = json.dumps({"BOOT_MS": {"action": "existing"}})
     with pytest.raises(HTTPException) as denied:
         await import_markdown(
             project_id=1,
             default_type=None,
-            file=_upload(MD),
-            collision_actions=json.dumps({"BOOT_MS": {"action": "existing"}}),
+            file=upload,
+            collision_actions=actions,
             db=session,
             current_user=author,
         )

@@ -51,8 +51,9 @@ def test_repeated_promotion_preserves_digest():
 
 
 def test_post_promotion_digest_mismatch_fails():
+    execute = Mock()
     with pytest.raises(RuntimeError, match="Digest verification"):
-        release.promote(IMAGE, ["image:stable"], lambda _: OTHER, Mock())
+        release.promote(IMAGE, ["image:stable"], lambda _: OTHER, execute)
 
 
 @pytest.mark.parametrize(

@@ -73,8 +73,9 @@ def test_review_rule_requires_an_origin_without_granting_read():
     from fastapi import HTTPException
 
     rule = PolicyRule(review=True)
+    validation = _validate_rules(None, {"REQ": rule})
     with pytest.raises(HTTPException, match="Choose at least one tag for REQ"):
-        asyncio.run(_validate_rules(None, {"REQ": rule}))
+        asyncio.run(validation)
 
 
 @pytest.mark.parametrize(
@@ -83,16 +84,18 @@ def test_review_rule_requires_an_origin_without_granting_read():
 def test_review_is_not_a_project_or_application_operation(resource):
     from fastapi import HTTPException
 
+    validation = _validate_rules(None, {resource: PolicyRule(review=True)}, "app")
     with pytest.raises(HTTPException, match=f"Review is not supported on {resource}"):
-        asyncio.run(_validate_rules(None, {resource: PolicyRule(review=True)}, "app"))
+        asyncio.run(validation)
 
 
 @pytest.mark.parametrize("resource", ["STD", "RSK", "CMP"])
 def test_review_does_not_make_exception_approval_supported(resource):
     from fastapi import HTTPException
 
+    validation = _validate_rules(None, {resource: PolicyRule(approve=True, all_origins=True)})
     with pytest.raises(HTTPException, match=f"Approve is not supported on {resource}"):
-        asyncio.run(_validate_rules(None, {resource: PolicyRule(approve=True, all_origins=True)}))
+        asyncio.run(validation)
 
 
 def test_external_review_is_permitted_without_approval_or_deletion():

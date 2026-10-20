@@ -137,8 +137,9 @@ async def test_migration_preserves_invalid_rows_and_operator_refuses_validation(
 async def test_database_rejects_new_invalid_storage_triples(database, source, target, role):
     connection, session, project = database
     await connection.run_sync(_upgrade, "head")
+    savepoint = connection.begin_nested()
     with pytest.raises(IntegrityError) as rejected:
-        async with connection.begin_nested():
+        async with savepoint:
             await _insert(connection, project, source, target, role)
     assert CONSTRAINT in str(rejected.value)
 

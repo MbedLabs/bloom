@@ -261,10 +261,11 @@ async def test_a_comment_notifies_only_assignees_who_can_see_the_requirement(ses
 async def test_a_change_that_hides_a_requirement_from_its_reviewer_is_refused(session):
     admin, _, _, requirement = await _external_assignee_requirement(session, "Customer")
 
+    data = RequirementUpdate(req_origin="Internal")
     with pytest.raises(HTTPException) as refused:
         await update_requirement(
             requirement_id=requirement.id,
-            data=RequirementUpdate(req_origin="Internal"),
+            data=data,
             db=session,
             current_user=admin,
         )
