@@ -51,7 +51,7 @@ dnspython==2.8.0
     # via email-validator
 email-validator==2.3.0
     # via pydantic
-fastapi==0.142.2
+fastapi==0.153.0
     # via bloom-app (pyproject.toml)
 fonttools==4.65.0
     # via fpdf2
@@ -86,12 +86,16 @@ mako==1.4.3
     # via alembic
 markupsafe==3.0.4
     # via mako
+opentelemetry-api==1.45.1
+    # via fastapi
 packaging==26.3
     # via limits
 passlib==1.7.4
     # via bloom-app (pyproject.toml)
 pillow==12.3.0
-    # via fpdf2
+    # via
+    #   bloom-app (pyproject.toml)
+    #   fpdf2
 prometheus-client==0.26.0
     # via bloom-app (pyproject.toml)
 pycparser==3.0
@@ -127,7 +131,7 @@ sqlalchemy==2.0.54
     # via
     #   alembic
     #   bloom-app (pyproject.toml)
-starlette==1.7.0
+starlette==1.9.0
     # via fastapi
 typing-extensions==4.16.0
     # via
@@ -135,6 +139,7 @@ typing-extensions==4.16.0
     #   anyio
     #   fastapi
     #   limits
+    #   opentelemetry-api
     #   pydantic
     #   pydantic-core
     #   sqlalchemy
