@@ -650,8 +650,7 @@ export default function ImportWizard() {
                   checked={includeLinks}
                   onChange={(e) => setIncludeLinks(e.target.checked)}
                   className="rounded"
-                />
-                Include links
+                />Include links
               </label>
             </div>
             <div className="flex justify-between pt-4">

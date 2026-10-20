@@ -490,11 +490,9 @@ function PolicyModal({ policy, tags, readOnly = false, onClose, onSaved }: Reado
   return (
     <ModalShell title={policyModalTitle(readOnly, !!policy)} onClose={onClose}>
       <form onSubmit={(event) => { event.preventDefault(); if (!readOnly) save.mutate() }} className="space-y-4">
-        <label className="block text-sm font-medium text-foreground">Name
-          <input value={name} onChange={(event) => setName(event.target.value)} readOnly={readOnly} required title="Policy name" className={inputClass} />
+        <label className="block text-sm font-medium text-foreground">Name<input value={name} onChange={(event) => setName(event.target.value)} readOnly={readOnly} required title="Policy name" className={inputClass} />
         </label>
-        <label className="block text-sm font-medium text-foreground">Description
-          <input value={description} onChange={(event) => setDescription(event.target.value)} readOnly={readOnly} title="Description" className={inputClass} />
+        <label className="block text-sm font-medium text-foreground">Description<input value={description} onChange={(event) => setDescription(event.target.value)} readOnly={readOnly} title="Description" className={inputClass} />
         </label>
         <label className="block text-sm font-medium text-foreground">Assignment scope
           <SelectField disabled={readOnly} value={scope} title="Assignment scope" className={inputClass} onChange={(event) => {
@@ -543,8 +541,7 @@ function PolicyModal({ policy, tags, readOnly = false, onClose, onSaved }: Reado
                       {isDocType(resource) && (
                         <fieldset aria-label={`Origins for ${resource}`} className="flex flex-wrap gap-x-3 gap-y-1 min-w-56">
                           <label className="inline-flex items-center gap-1.5">
-                            <input type="checkbox" aria-label={`All origins on ${resource}`} disabled={readOnly || !active} checked={current.all_origins} onChange={() => toggleAllOrigins(resource)} />
-                            All
+                            <input type="checkbox" aria-label={`All origins on ${resource}`} disabled={readOnly || !active} checked={current.all_origins} onChange={() => toggleAllOrigins(resource)} />All
                           </label>
                           {BUILTIN_ORIGINS.map((origin) => (
                             <label key={origin.key} className="inline-flex items-center gap-1.5">

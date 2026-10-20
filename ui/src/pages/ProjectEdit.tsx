@@ -289,8 +289,7 @@ export default function ProjectEdit() {
               Type <span className="font-mono text-foreground">{deleteExpectedPhrase}</span> to confirm.
             </p>
             <label className="mt-4 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Confirmation
-              <input
+              Confirmation<input
                 type="text"
                 value={deleteConfirmationText}
                 onChange={(e) => setDeleteConfirmationText(e.target.value)}

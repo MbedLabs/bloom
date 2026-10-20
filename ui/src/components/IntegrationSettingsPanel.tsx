@@ -388,8 +388,7 @@ export default function IntegrationSettingsPanel({ projectId }: Readonly<{ proje
                     setDirty(true)
                   }}
                   className="rounded"
-                />
-                Enabled
+                />Enabled
               </label>
               {choice === 'jira' && (
                 <JiraFields
@@ -545,8 +544,7 @@ function JiraFields(props: Readonly<{
           checked={props.createOnInbound}
           onChange={(e) => props.onCreateOnInbound(e.target.checked)}
           className="rounded"
-        />
-        Create a defect for each new matching issue
+        />Create a defect for each new matching issue
       </label>
       <label className="flex items-center gap-2 text-sm text-foreground">
         <input
@@ -554,8 +552,7 @@ function JiraFields(props: Readonly<{
           checked={props.twoWay}
           onChange={(e) => props.onTwoWay(e.target.checked)}
           className="rounded"
-        />
-        Two-way sync
+        />Two-way sync
       </label>
       <p className="text-xs text-muted-foreground">
         {props.twoWay
