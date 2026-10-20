@@ -723,7 +723,9 @@ function trackerName(tracker: string | null | undefined): string | null {
 /** The text of an artefact field in the edit form. */
 function formText(value: unknown): string {
   if (Array.isArray(value)) return value.join(', ')
-  return value == null ? '' : String(value)
+  if (value == null) return ''
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
 }
 
 function ExternalIssueCard({
