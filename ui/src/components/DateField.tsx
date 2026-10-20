@@ -93,7 +93,7 @@ export default function DateField({ label, value, onChange, className = '', plac
   }
   const parse = (next: string) => {
     if (dateFromValue(next)) return next
-    const values = next.match(/^(\d{1,4})\D+(\d{1,4})\D+(\d{1,4})$/)?.slice(1)
+    const values = /^(\d{1,4})\D+(\d{1,4})\D+(\d{1,4})$/.exec(next)?.slice(1)
     if (!values) return null
     const mapped = Object.fromEntries(order.map((part, index) => [part, values[index]]))
     const day = `${mapped.year?.padStart(4, '0')}-${mapped.month?.padStart(2, '0')}-${mapped.day?.padStart(2, '0')}`

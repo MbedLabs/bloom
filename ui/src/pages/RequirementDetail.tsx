@@ -74,7 +74,7 @@ export default function RequirementDetail({
   const { prefix, itemId } = useParams<{ prefix: string; itemId: string }>()
   const { can } = useProjectPermissions(prefix)
   const parameterValues = useParameterValues(prefix)
-  const reqId = resolvedId || parseInt(itemId || '0')
+  const reqId = resolvedId || Number.parseInt(itemId || '0')
   const workflow = useDocumentWorkflow('requirement', reqId)
   const queryClient = useQueryClient()
   const toast = useToast()

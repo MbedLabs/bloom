@@ -116,7 +116,8 @@ function withUserPictures(text: string, people: MentionSuggestion[]): ReactNode 
   const unique = people.filter(person => person.user?.profile_picture_url && people.filter(other => other.label === person.label).length === 1)
   const labels = unique.map(person => person.label).sort((a, b) => b.length - a.length)
   if (!labels.length || !text.includes('@')) return text
-  const pattern = new RegExp(`@(${labels.map(label => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?![\\w])`, 'g')
+  const alternatives = labels.map(label => label.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)).join('|')
+  const pattern = new RegExp(String.raw`@(${alternatives})(?![\w])`, 'g')
   const output: ReactNode[] = []
   let start = 0
   for (const match of text.matchAll(pattern)) {

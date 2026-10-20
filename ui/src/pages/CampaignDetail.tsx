@@ -29,7 +29,7 @@ export default function CampaignDetail({
 }: { resolvedId?: number; allowedActions?: string[] } = {}) {
   const { prefix, campaignId } = useParams<{ prefix: string; campaignId: string }>()
   const { can } = useProjectPermissions(prefix)
-  const campId = resolvedId || parseInt(campaignId || '0')
+  const campId = resolvedId || Number.parseInt(campaignId || '0')
   const navigate = useNavigate()
   const location = useLocation()
   const backUrl = (location.state as { returnTo?: string } | null)?.returnTo

@@ -85,11 +85,15 @@ export function getBreadcrumbs(
         crumbs.push({ label: docLabel })
       }
     } else if (sub === 'campaigns' && parts[4]) {
-      crumbs.push({ label: 'Test Campaigns', href: `/projects/${slug}/campaigns` })
-      crumbs.push({ label: pageCrumbLabel || parts[4] })
+      crumbs.push(
+        { label: 'Test Campaigns', href: `/projects/${slug}/campaigns` },
+        { label: pageCrumbLabel || parts[4] },
+      )
     } else if (sub === 'suites' && parts[4]) {
-      crumbs.push({ label: 'Suites', href: docRegistryListUrl(slug, 'TS') })
-      crumbs.push({ label: pageCrumbLabel || parts[4] })
+      crumbs.push(
+        { label: 'Suites', href: docRegistryListUrl(slug, 'TS') },
+        { label: pageCrumbLabel || parts[4] },
+      )
     } else if (subMap[sub]) {
       crumbs.push({ label: subMap[sub] })
     }

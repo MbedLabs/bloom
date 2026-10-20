@@ -32,8 +32,8 @@ export function allows(
   action: PermissionAction,
   resource: PermissionResource,
 ): boolean {
-  const granted = [...(permissions[resource] ?? []), ...(permissions['*'] ?? [])]
-  return granted.includes(action) || granted.includes('*')
+  const granted = new Set([...(permissions[resource] ?? []), ...(permissions['*'] ?? [])])
+  return granted.has(action) || granted.has('*')
 }
 
 /**

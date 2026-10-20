@@ -23,11 +23,11 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-const PUBLIC_PATHS = ['/login', '/accept-invite', '/verify-email', '/forgot-password', '/reset-password']
+const PUBLIC_PATHS = new Set(['/login', '/accept-invite', '/verify-email', '/forgot-password', '/reset-password'])
 
 function redirectToLogin() {
   clearAuthToken()
-  if (!PUBLIC_PATHS.includes(window.location.pathname)) {
+  if (!PUBLIC_PATHS.has(window.location.pathname)) {
     window.location.href = '/login'
   }
 }

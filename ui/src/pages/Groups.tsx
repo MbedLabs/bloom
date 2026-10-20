@@ -78,7 +78,7 @@ function AccessContent() {
   const { data: tags } = useQuery({ queryKey: ['tags'], queryFn: () => tagsApi.list() })
 
   const [view, setView] = useState<'groups' | 'policies' | 'requests'>('policies')
-  const views = user?.role === 'admin' ? ['policies', 'groups', 'requests'] as const : ['policies', 'groups'] as const
+  const views: readonly ('groups' | 'policies' | 'requests')[] = user?.role === 'admin' ? ['policies', 'groups', 'requests'] : ['policies', 'groups']
   const [viewingPolicy, setViewingPolicy] = useState<Policy | null>(null)
   const [editingPolicy, setEditingPolicy] = useState<Policy | 'new' | null>(null)
   const [editingGroup, setEditingGroup] = useState<Group | 'new' | null>(null)
@@ -164,7 +164,7 @@ function AccessContent() {
             tabIndex={view === tab ? 0 : -1}
             onClick={() => setView(tab)}
             onKeyDown={(event) => {
-              const index = views.findIndex((item) => item === tab)
+              const index = views.indexOf(tab)
               const next = tabForKey(event.key, views, index)
               if (next) {
                 event.preventDefault()

@@ -26,7 +26,7 @@ import ConfirmDelete from '../components/ConfirmDelete'
 function flattenSections(sections: DocumentSection[]): DocumentSection[] {
   const result: DocumentSection[] = []
   const walk = (items: DocumentSection[]) => {
-    for (const s of items.sort((a, b) => a.order - b.order)) {
+    for (const s of [...items].sort((a, b) => a.order - b.order)) {
       result.push(s)
       if (s.child_sections?.length) walk(s.child_sections)
     }

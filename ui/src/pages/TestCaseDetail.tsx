@@ -58,7 +58,7 @@ export default function TestCaseDetail({
   const { prefix, itemId } = useParams<{ prefix: string; itemId: string }>()
   const { can } = useProjectPermissions(prefix)
   const parameterValues = useParameterValues(prefix)
-  const tcId = resolvedId || parseInt(itemId || '0')
+  const tcId = resolvedId || Number.parseInt(itemId || '0')
   const workflow = useDocumentWorkflow('test-case', tcId)
   const queryClient = useQueryClient()
   const toast = useToast()
