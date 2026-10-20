@@ -382,16 +382,16 @@ async def list_project_access(
                     if source not in entry.origins:
                         entry.origins.append(source)
                 continue
+            if row.policy_group_id:
+                origin_group = row.policy_group.name
+            else:
+                origin_group = group.name if group else None
             entry.origins.append(
                 AccessOrigin(
                     kind="direct" if row.user_id is not None else "group",
                     owner=row.owner,
                     inherit_policies=False,
-                    group=(
-                        row.policy_group.name
-                        if row.policy_group_id
-                        else group.name if group else None
-                    ),
+                    group=origin_group,
                     policies=[
                         policy.name
                         for policy in sorted(

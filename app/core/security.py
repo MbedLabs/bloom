@@ -203,23 +203,19 @@ async def _access_map(db: AsyncSession, user: User) -> dict:
             continue
         merged = by_project.setdefault(entry.project_id, {})
         terms = [_owner_term(external)] if entry.owner else []
-        selected = (
-            entry.policy_group.policies
-            if entry.policy_group_id is not None
-            else inherited.values() if entry.inherit_policies else entry.policies
-        )
+        if entry.policy_group_id is not None:
+            selected = entry.policy_group.policies
+        else:
+            selected = inherited.values() if entry.inherit_policies else entry.policies
         for policy in selected:
             terms.extend(_policy_terms(policy, external))
         for term in terms:
             key = (term.doc_types is None, term.visibilities, term.tags, term.customer_only)
             known = merged.get(key)
+            known_doc_types = known.doc_types if known else frozenset()
             merged[key] = AccessTerm(
                 merge(merge({}, known.permissions if known else {}), term.permissions),
-                (
-                    None
-                    if term.doc_types is None
-                    else term.doc_types | (known.doc_types if known else frozenset())
-                ),
+                None if term.doc_types is None else term.doc_types | known_doc_types,
                 term.visibilities,
                 term.tags,
                 term.customer_only,

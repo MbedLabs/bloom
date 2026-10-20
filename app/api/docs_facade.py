@@ -930,9 +930,7 @@ async def get_doc_by_kind_and_string_id(
     await require_project_access(db, current_user, project.id)
     kind_slug = LEGACY_TYPE_SLUG_ALIASES.get(kind_slug, kind_slug)
     requested_kind = None
-    if kind_slug in {slug for _, (_, _, slug) in TYPE_MAP.items()}:
-        pass
-    else:
+    if kind_slug not in {slug for _, (_, _, slug) in TYPE_MAP.items()}:
         requested_kind = document_kind_from_slug(kind_slug)
 
     allowed_doc_types = await get_external_doc_types(db, current_user, project.id)
