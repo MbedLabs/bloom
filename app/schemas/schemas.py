@@ -322,7 +322,7 @@ class TestCaseResponse(BaseModel):
     title: str
     description: Optional[str] = None
     preconditions: Optional[str] = None
-    steps: Optional[List[Dict[str, Any]]]
+    steps: List[Dict[str, Any]] | None
     status: str
     visibility: str = "internal"
     reviewer_id: Optional[int] = None

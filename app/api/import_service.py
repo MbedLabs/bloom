@@ -874,12 +874,12 @@ ARTEFACT_TYPE_FOR_CODE = {
 
 
 class ClassifiedSection(BaseModel):
-    type_code: Optional[str]
+    type_code: str | None
     title: str
 
 
 class MarkdownImportResult(BaseModel):
-    doc_type: Optional[str]
+    doc_type: str | None
     parameters_created: int
     parameter_collisions: List[str]
     parameters_renamed: dict[str, str] = {}
