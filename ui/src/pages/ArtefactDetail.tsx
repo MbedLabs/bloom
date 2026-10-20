@@ -486,8 +486,9 @@ export default function ArtefactDetail({
             {kind === 'defect' && (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Title</label>
+                  <label htmlFor="artefact-title" className="block text-sm font-medium text-foreground mb-1">Title</label>
                   <input
+                    id="artefact-title"
                     value={form.title ?? ''}
                     onChange={(e) => setForm({ ...form, title: e.target.value })}
                     title="Defect title"
@@ -496,8 +497,9 @@ export default function ArtefactDetail({
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Description</label>
+                  <label htmlFor="artefact-description" className="block text-sm font-medium text-foreground mb-1">Description</label>
                   <textarea
+                    id="artefact-description"
                     rows={4}
                     value={form.description ?? ''}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -523,8 +525,9 @@ export default function ArtefactDetail({
             {kind === 'defect' && (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Resolution Summary</label>
+                  <label htmlFor="artefact-resolution-summary" className="block text-sm font-medium text-foreground mb-1">Resolution Summary</label>
                   <textarea
+                    id="artefact-resolution-summary"
                     rows={3}
                     value={form.resolution_summary ?? ''}
                     onChange={(e) => setForm({ ...form, resolution_summary: e.target.value })}

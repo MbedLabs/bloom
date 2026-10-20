@@ -482,16 +482,16 @@ function InviteUserModal({ onClose, onSubmit, isLoading, error }: Readonly<{
         )}
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Full Name</label>
-            <input ref={fullNameInput} value={fullName} onChange={(e) => setFullName(e.target.value)} required title="Full name" placeholder="Jane Doe" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground" />
+            <label htmlFor="user-full-name" className="block text-sm font-medium text-foreground mb-1">Full Name</label>
+            <input id="user-full-name" ref={fullNameInput} value={fullName} onChange={(e) => setFullName(e.target.value)} required title="Full name" placeholder="Jane Doe" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required title="Email address" placeholder="name@company.com" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground" />
+            <label htmlFor="user-email" className="block text-sm font-medium text-foreground mb-1">Email</label>
+            <input id="user-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required title="Email address" placeholder="name@company.com" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Role</label>
-            <SelectField value={role} onChange={(e) => setRole(e.target.value)} title="Role" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground">
+            <label htmlFor="user-role" className="block text-sm font-medium text-foreground mb-1">Role</label>
+            <SelectField id="user-role" value={role} onChange={(e) => setRole(e.target.value)} title="Role" className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground">
               <option value="external">Viewer</option>
               <option value="maintainer">Maintainer</option>
               <option value="admin">Admin</option>

@@ -204,8 +204,9 @@ export default function ProjectEdit() {
           </div>
         )}
         <div>
-          <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Name</label>
+          <label htmlFor="project-edit-name" className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Name</label>
           <input
+            id="project-edit-name"
             type="text"
             required
             value={name}
@@ -216,8 +217,9 @@ export default function ProjectEdit() {
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Prefix</label>
+          <label htmlFor="project-edit-prefix" className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Prefix</label>
           <input
+            id="project-edit-prefix"
             type="text"
             required
             value={projectPrefix}
@@ -234,8 +236,9 @@ export default function ProjectEdit() {
           </p>
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Status</label>
+          <label htmlFor="project-edit-status" className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Status</label>
           <SelectField
+            id="project-edit-status"
             value={status}
             onChange={(e) => setStatus(e.target.value)}
             title="Project status"
@@ -249,8 +252,9 @@ export default function ProjectEdit() {
           </SelectField>
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Description</label>
+          <label htmlFor="project-edit-description" className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Description</label>
           <textarea
+            id="project-edit-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}

@@ -210,12 +210,12 @@ export default function Baselines() {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Name</label>
-                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md" required />
+                <label htmlFor="baseline-name" className="block text-sm font-medium text-foreground mb-1">Name</label>
+                <input id="baseline-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md" required />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Type</label>
-                <SelectField value={form.baseline_type} onChange={(e) => setForm({ ...form, baseline_type: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md">
+                <label htmlFor="baseline-type" className="block text-sm font-medium text-foreground mb-1">Type</label>
+                <SelectField id="baseline-type" value={form.baseline_type} onChange={(e) => setForm({ ...form, baseline_type: e.target.value })} className="w-full px-3 py-2 bg-background border border-input rounded-md">
                   <option>Milestone</option>
                   <option>Release</option>
                   <option>Audit</option>
@@ -223,8 +223,8 @@ export default function Baselines() {
                 </SelectField>
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Description</label>
-                <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} className="w-full px-3 py-2 bg-background border border-input rounded-md" />
+                <label htmlFor="baseline-description" className="block text-sm font-medium text-foreground mb-1">Description</label>
+                <textarea id="baseline-description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} className="w-full px-3 py-2 bg-background border border-input rounded-md" />
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setShowCreate(false)} className="px-4 py-2 border border-border rounded-md text-sm text-muted-foreground hover:bg-accent">Cancel</button>

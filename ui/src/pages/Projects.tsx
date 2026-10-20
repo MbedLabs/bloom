@@ -180,8 +180,9 @@ export default function Projects() {
                   </div>
                 )}
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Name</label>
+                  <label htmlFor="project-name" className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Name</label>
                   <input
+                    id="project-name"
                     type="text"
                     required
                     value={name}
@@ -191,8 +192,9 @@ export default function Projects() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Prefix</label>
+                  <label htmlFor="project-prefix" className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Prefix</label>
                   <input
+                    id="project-prefix"
                     type="text"
                     required
                     value={prefix}
@@ -209,8 +211,9 @@ export default function Projects() {
                   </p>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Description</label>
+                  <label htmlFor="project-description" className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Description</label>
                   <textarea
+                    id="project-description"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:border-ring transition-colors"

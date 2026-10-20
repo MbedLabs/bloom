@@ -354,8 +354,9 @@ export default function TestCampaigns() {
             <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
               <div className="p-6 space-y-4 overflow-y-auto themed-scrollbar">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Name</label>
+                  <label htmlFor="campaign-name" className="block text-sm font-medium text-foreground mb-1">Name</label>
                   <input
+                    id="campaign-name"
                     type="text"
                     required
                     value={form.name}
@@ -365,8 +366,9 @@ export default function TestCampaigns() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Description</label>
+                  <label htmlFor="campaign-description" className="block text-sm font-medium text-foreground mb-1">Description</label>
                   <textarea
+                    id="campaign-description"
                     value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
                     className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
@@ -463,8 +465,9 @@ export default function TestCampaigns() {
             <form onSubmit={handleSuiteSubmit} className="flex flex-col flex-1 overflow-hidden">
               <div className="p-6 space-y-4 overflow-y-auto themed-scrollbar">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Name</label>
+                  <label htmlFor="suite-name" className="block text-sm font-medium text-foreground mb-1">Name</label>
                   <input
+                    id="suite-name"
                     type="text"
                     required
                     value={suiteForm.name}
@@ -473,8 +476,9 @@ export default function TestCampaigns() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Description</label>
+                  <label htmlFor="suite-description" className="block text-sm font-medium text-foreground mb-1">Description</label>
                   <textarea
+                    id="suite-description"
                     value={suiteForm.description}
                     onChange={(e) => setSuiteForm({ ...suiteForm, description: e.target.value })}
                     className="w-full px-3 py-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring focus:border-ring"

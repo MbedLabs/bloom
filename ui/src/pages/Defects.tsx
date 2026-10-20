@@ -252,8 +252,9 @@ export default function Defects() {
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Title</label>
+                <label htmlFor="defect-title" className="block text-sm font-medium text-foreground mb-1">Title</label>
                 <input
+                  id="defect-title"
                   required
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
@@ -263,8 +264,9 @@ export default function Defects() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Description</label>
+              <label htmlFor="defect-description" className="block text-sm font-medium text-foreground mb-1">Description</label>
               <textarea
+                id="defect-description"
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 rows={3}
@@ -274,8 +276,9 @@ export default function Defects() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Severity</label>
+                <label htmlFor="defect-severity" className="block text-sm font-medium text-foreground mb-1">Severity</label>
                 <SelectField
+                  id="defect-severity"
                   value={form.severity}
                   onChange={(e) => setForm({ ...form, severity: e.target.value })}
                   title="Severity"
@@ -289,8 +292,9 @@ export default function Defects() {
                 </SelectField>
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Priority</label>
+                <label htmlFor="defect-priority" className="block text-sm font-medium text-foreground mb-1">Priority</label>
                 <SelectField
+                  id="defect-priority"
                   value={form.priority}
                   onChange={(e) => setForm({ ...form, priority: e.target.value })}
                   title="Priority"
@@ -309,8 +313,9 @@ export default function Defects() {
               <h4 className="text-sm font-semibold text-foreground mb-3">External issue (optional)</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Tracker</label>
+                  <label htmlFor="defect-tracker" className="block text-sm font-medium text-foreground mb-1">Tracker</label>
                   <SelectField
+                    id="defect-tracker"
                     value={form.external_tracker}
                     onChange={(e) => setForm({ ...form, external_tracker: e.target.value })}
                     title="External tracker"
@@ -322,8 +327,9 @@ export default function Defects() {
                   </SelectField>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Repository</label>
+                  <label htmlFor="defect-repository" className="block text-sm font-medium text-foreground mb-1">Repository</label>
                   <input
+                    id="defect-repository"
                     value={form.external_repo_full_name}
                     onChange={(e) => setForm({ ...form, external_repo_full_name: e.target.value })}
                     placeholder="owner/repo"
@@ -332,8 +338,9 @@ export default function Defects() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Issue number</label>
+                  <label htmlFor="defect-issue-number" className="block text-sm font-medium text-foreground mb-1">Issue number</label>
                   <input
+                    id="defect-issue-number"
                     type="number"
                     value={form.external_issue_number}
                     onChange={(e) => setForm({ ...form, external_issue_number: e.target.value })}
@@ -343,8 +350,9 @@ export default function Defects() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Issue URL</label>
+                  <label htmlFor="defect-issue-url" className="block text-sm font-medium text-foreground mb-1">Issue URL</label>
                   <input
+                    id="defect-issue-url"
                     value={form.external_issue_url}
                     onChange={(e) => setForm({ ...form, external_issue_url: e.target.value })}
                     placeholder="https://github.com/..."
