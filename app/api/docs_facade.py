@@ -774,6 +774,7 @@ class DocTypeSummaryResponse(BaseModel):
 @router.get(
     "/projects/{project_ref}/doc-type-summary",
     response_model=DocTypeSummaryResponse,
+    responses={404: {"description": HTTPStatus(404).phrase}},
 )
 async def get_doc_type_summary(
     project_ref: str,
@@ -880,7 +881,10 @@ _DOCUMENT_TYPE_CODES = {"SPEC", "PRT", "RPT", "STD"}
 @router.get(
     "/projects/{project_ref}/next-doc-id/{type_code}",
     response_model=NextDocIdResponse,
-    responses={400: {"description": HTTPStatus(400).phrase}},
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+    },
 )
 async def get_next_doc_id(
     project_ref: str,

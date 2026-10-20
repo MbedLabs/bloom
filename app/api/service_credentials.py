@@ -1,6 +1,7 @@
 """Admin lifecycle endpoints for scoped machine credentials."""
 
 from datetime import datetime
+from http import HTTPStatus
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -75,7 +76,12 @@ async def list_service_credentials(
     )
 
 
-@router.post("", response_model=ServiceCredentialCreated, status_code=201)
+@router.post(
+    "",
+    response_model=ServiceCredentialCreated,
+    status_code=201,
+    responses={422: {"description": HTTPStatus(422).phrase}},
+)
 async def create_credential(
     data: ServiceCredentialCreate,
     db: AsyncSession = Depends(get_db, scope="function"),

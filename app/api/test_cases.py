@@ -2,6 +2,8 @@
 Test cases API endpoints.
 """
 
+from http import HTTPStatus
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -248,7 +250,12 @@ async def list_test_cases(
     )
 
 
-@router.post("", response_model=TestCaseResponse, status_code=201)
+@router.post(
+    "",
+    response_model=TestCaseResponse,
+    status_code=201,
+    responses={400: {"description": HTTPStatus(400).phrase}},
+)
 async def create_test_case(
     data: TestCaseCreate,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -343,7 +350,11 @@ async def get_test_case(
     )
 
 
-@router.patch("/{test_case_id}", response_model=TestCaseResponse)
+@router.patch(
+    "/{test_case_id}",
+    response_model=TestCaseResponse,
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
 async def update_test_case(
     test_case_id: int,
     data: TestCaseUpdate,

@@ -164,7 +164,11 @@ async def add_project_member(
     return await _response(db, entry)
 
 
-@router.get("/{project_id}/members/{membership_id}", response_model=ProjectMemberResponse)
+@router.get(
+    "/{project_id}/members/{membership_id}",
+    response_model=ProjectMemberResponse,
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
 async def get_project_member(
     project_id: int,
     membership_id: int,
@@ -237,7 +241,11 @@ async def update_project_member(
     return await _response(db, entry)
 
 
-@router.delete("/{project_id}/members/{membership_id}", status_code=204)
+@router.delete(
+    "/{project_id}/members/{membership_id}",
+    status_code=204,
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
 async def remove_project_member(
     project_id: int,
     membership_id: int,

@@ -238,6 +238,10 @@ async def delete_attachment(
     "/bud/test-reports",
     response_model=TestReportPublishResponse,
     status_code=201,
+    responses={
+        413: {"description": HTTPStatus(413).phrase},
+        422: {"description": HTTPStatus(422).phrase},
+    },
 )
 async def publish_test_report(
     data: TestReportPublish,

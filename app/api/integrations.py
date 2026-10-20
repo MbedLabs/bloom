@@ -588,6 +588,9 @@ _GITHUB_WEBHOOK = _IssueWebhook(
     responses={
         400: {"description": HTTPStatus(400).phrase},
         403: {"description": HTTPStatus(403).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+        413: {"description": HTTPStatus(413).phrase},
+        429: {"description": HTTPStatus(429).phrase},
     },
 )
 async def github_webhook(
@@ -652,6 +655,9 @@ _GITLAB_WEBHOOK = _IssueWebhook(
     responses={
         400: {"description": HTTPStatus(400).phrase},
         403: {"description": HTTPStatus(403).phrase},
+        404: {"description": HTTPStatus(404).phrase},
+        413: {"description": HTTPStatus(413).phrase},
+        429: {"description": HTTPStatus(429).phrase},
     },
 )
 async def gitlab_webhook(
@@ -940,7 +946,13 @@ async def _create_defect_from_jira_issue(
 @router.post(
     "/jira/webhook",
     status_code=200,
-    responses={400: {"description": HTTPStatus(400).phrase}, 403: {"description": "Forbidden"}},
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        403: {"description": "Forbidden"},
+        404: {"description": HTTPStatus(404).phrase},
+        413: {"description": HTTPStatus(413).phrase},
+        429: {"description": HTTPStatus(429).phrase},
+    },
 )
 async def jira_webhook(
     request: Request,
