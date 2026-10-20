@@ -724,8 +724,9 @@ function trackerName(tracker: string | null | undefined): string | null {
 function formText(value: unknown): string {
   if (Array.isArray(value)) return value.join(', ')
   if (value == null) return ''
-  if (typeof value === 'object') return JSON.stringify(value)
-  return String(value)
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return String(value)
+  return JSON.stringify(value) ?? ''
 }
 
 function ExternalIssueCard({
