@@ -24,6 +24,12 @@ const ACTION_GROUPS: { value: string; label: string }[] = [
   { value: 'attachment.', label: 'Attachments' },
 ]
 
+/** The sort direction after a column is chosen: the sorted column flips, another column starts descending for the event time and ascending otherwise. */
+function nextSortDir(field: string, sortField: string, sortDir: 'asc' | 'desc'): 'asc' | 'desc' {
+  if (field === sortField) return sortDir === 'asc' ? 'desc' : 'asc'
+  return field === 'occurred_at' ? 'desc' : 'asc'
+}
+
 /** The admin audit log: security-relevant events, newest first, filterable. */
 export default function AuditPage() {
   const [action, setAction] = useState('')
@@ -52,7 +58,7 @@ export default function AuditPage() {
   const lastPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1)
   const resetPage = () => setPage(0)
   const toggleSort = (field: NonNullable<AuditFilters['sort']>) => {
-    setSortDir(field === sortField ? (sortDir === 'asc' ? 'desc' : 'asc') : field === 'occurred_at' ? 'desc' : 'asc')
+    setSortDir(nextSortDir(field, sortField, sortDir))
     setSortField(field)
     resetPage()
   }

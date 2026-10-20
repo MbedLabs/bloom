@@ -31,6 +31,34 @@ const DEFAULT_PRIORITY_MAP: Record<string, string> = {
   Lowest: 'Low',
 }
 
+const TOKEN_PLACEHOLDERS: Record<TrackerChoice, string> = {
+  github: 'ghp_… or fine-grained PAT',
+  gitlab: 'glpat-…',
+  jira: 'Atlassian API token',
+  none: 'glpat-…',
+}
+
+/** The tracker of the first configured setting, in GitHub, GitLab, Jira order. */
+function configuredTracker(github: unknown, gitlab: unknown, jira: unknown): TrackerChoice {
+  if (github) return 'github'
+  if (gitlab) return 'gitlab'
+  if (jira) return 'jira'
+  return 'none'
+}
+
+/** The setting row of a tracker choice; null for no tracker. */
+function settingFor<T>(kind: TrackerChoice, rows: Readonly<Record<TrackerKind, T>>): T | null {
+  return kind === 'none' ? null : rows[kind]
+}
+
+/** The text next to the Jira pull button. */
+function pullHint(dirty: boolean, pulled: JiraPullResult | null): string {
+  if (dirty) return 'Save first; the pull uses the saved filter.'
+  return pulled
+    ? `Found ${pulled.searched}: ${pulled.created} created, ${pulled.already_linked} already linked, ${pulled.skipped} skipped.`
+    : 'Creates the defects for issues that match the filter. Reads from Jira only.'
+}
+
 const inputClass = 'w-full px-3 py-1.5 text-sm bg-background border border-input rounded-md'
 const labelClass = 'block text-xs uppercase tracking-wide text-muted-foreground mb-1'
 
@@ -60,15 +88,9 @@ export default function IntegrationSettingsPanel({ projectId }: Readonly<{ proje
     [settings]
   )
 
-  const activeFromServer: TrackerChoice = githubSetting
-    ? 'github'
-    : gitlabSetting
-      ? 'gitlab'
-      : jiraSetting
-        ? 'jira'
-        : 'none'
+  const activeFromServer = configuredTracker(githubSetting, gitlabSetting, jiraSetting)
   const rowFor = (kind: TrackerChoice) =>
-    kind === 'github' ? githubSetting : kind === 'gitlab' ? gitlabSetting : kind === 'jira' ? jiraSetting : null
+    settingFor(kind, { github: githubSetting, gitlab: gitlabSetting, jira: jiraSetting })
 
   const [choice, setChoice] = useState<TrackerChoice>('none')
   const [baseUrl, setBaseUrl] = useState('')
@@ -123,7 +145,7 @@ export default function IntegrationSettingsPanel({ projectId }: Readonly<{ proje
   useEffect(() => {
     if (!settings) return
     setChoice(activeFromServer)
-    const cur = activeFromServer === 'github' ? githubSetting : activeFromServer === 'gitlab' ? gitlabSetting : activeFromServer === 'jira' ? jiraSetting : null
+    const cur = settingFor(activeFromServer, { github: githubSetting, gitlab: gitlabSetting, jira: jiraSetting })
     setBaseUrl(cur?.base_url ?? '')
     loadJira(jiraSetting)
     setToken('')
@@ -255,15 +277,17 @@ export default function IntegrationSettingsPanel({ projectId }: Readonly<{ proje
         {!isAdmin && ' Only project admins can change these settings.'}
       </p>
 
-      {isLoading ? (
+      {isLoading && (
         <div className="text-sm text-muted-foreground">Loading...</div>
-      ) : !isAdmin ? (
+      )}
+      {!isLoading && !isAdmin && (
         <div className="rounded-md border border-border bg-background/40 p-4 text-sm text-muted-foreground">
           {activeFromServer === 'none'
             ? 'No external tracker configured.'
             : `${TRACKER_LABELS[activeFromServer]} is configured for this project.`}
         </div>
-      ) : (
+      )}
+      {!isLoading && isAdmin && (
         <form
           className="space-y-4"
           onSubmit={(e) => {
@@ -334,7 +358,7 @@ export default function IntegrationSettingsPanel({ projectId }: Readonly<{ proje
                     setToken(e.target.value)
                     setDirty(true)
                   }}
-                  placeholder={choice === 'github' ? 'ghp_… or fine-grained PAT' : choice === 'jira' ? 'Atlassian API token' : 'glpat-…'}
+                  placeholder={TOKEN_PLACEHOLDERS[choice]}
                   className="w-full px-3 py-1.5 text-sm bg-background border border-input rounded-md font-mono"
                   autoComplete="new-password"
                 />
@@ -403,11 +427,7 @@ export default function IntegrationSettingsPanel({ projectId }: Readonly<{ proje
                     {pullMutation.isPending ? 'Pulling...' : 'Pull existing issues'}
                   </button>
                   <span className="text-xs text-muted-foreground">
-                    {dirty
-                      ? 'Save first; the pull uses the saved filter.'
-                      : pulled
-                        ? `Found ${pulled.searched}: ${pulled.created} created, ${pulled.already_linked} already linked, ${pulled.skipped} skipped.`
-                        : 'Creates the defects for issues that match the filter. Reads from Jira only.'}
+                    {pullHint(dirty, pulled)}
                   </span>
                 </div>
               )}

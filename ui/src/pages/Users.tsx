@@ -517,7 +517,9 @@ function ApplicationPoliciesModal({ user, onClose }: Readonly<{ user: User; onCl
         <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-semibold text-foreground">Application policies</h2><button title="Close" onClick={onClose}><X className="h-4 w-4" /></button></div>
         <p className="mb-2 text-sm text-foreground"><UserIdentity user={user} /></p>
         <p className="mb-4 text-sm text-muted-foreground">Assign app permissions such as Access Management. The account base role stays the same. Project policy groups are assigned separately for each project.</p>
-        {isError ? <p role="alert">Could not load application policies.</p> : policies && assignment ? <ApplicationPolicyForm user={user} policies={policies.filter((policy) => policy.scope === 'app')} initial={assignment.policy_ids} onClose={onClose} /> : <p>Loading policies...</p>}
+        {isError && <p role="alert">Could not load application policies.</p>}
+        {!isError && policies && assignment && <ApplicationPolicyForm user={user} policies={policies.filter((policy) => policy.scope === 'app')} initial={assignment.policy_ids} onClose={onClose} />}
+        {!isError && !(policies && assignment) && <p>Loading policies...</p>}
       </dialog>
     </div>
   )

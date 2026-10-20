@@ -27,11 +27,16 @@ export const emptyRule = (): PolicyRule => ({
   tags: [],
 })
 export const isDocType = (resource: string) => (DOC_TYPES as string[]).includes(resource)
-export const resourcesFor = (scope: PolicyScope) =>
-  scope === 'document' ? DOC_TYPES : scope === 'project' ? [...DOC_TYPES, ...PROJECT_RESOURCES] : RESOURCES
+export const resourcesFor = (scope: PolicyScope) => {
+  if (scope === 'document') return DOC_TYPES
+  return scope === 'project' ? [...DOC_TYPES, ...PROJECT_RESOURCES] : RESOURCES
+}
 export const activeRule = (rule: PolicyRule) => PERMISSIONS.some((permission) => rule[permission])
-export const supportedPermission = (resource: string, permission: Permission) =>
-  permission === 'review' ? isDocType(resource) : permission === 'approve' ? APPROVABLE_RESOURCES.has(resource) : permission !== 'delete' || resource !== 'project'
+export const supportedPermission = (resource: string, permission: Permission) => {
+  if (permission === 'review') return isDocType(resource)
+  if (permission === 'approve') return APPROVABLE_RESOURCES.has(resource)
+  return permission !== 'delete' || resource !== 'project'
+}
 const RESOURCE_LABELS: Record<string, string> = {
   project: 'Project Management',
   users: 'User Management',
@@ -69,10 +74,17 @@ export function policyScopeLabel(policy: Policy) {
     : SCOPE_LABELS[policy.scope]
 }
 
+/** Whether a policy summary lists the permission of a rule. */
+function summaryLists(rule: PolicyRule, resource: string, permission: Permission) {
+  if (permission === 'read') return rule.read && !rule.write
+  if (permission === 'review') return rule.review && !(rule.approve && approveIncludesReview(resource))
+  return rule[permission]
+}
+
 export function policyPermissions(policy: Policy) {
   if (isCompleteAppPolicy(policy)) return ['All']
   return ruleSummaries(policyRules(policy), (resource, rule) => {
-    const permissions = PERMISSIONS.filter((permission) => (permission === 'read' ? rule.read && !rule.write : permission === 'review' ? rule.review && !(rule.approve && approveIncludesReview(resource)) : rule[permission]) && supportedPermission(resource, permission))
+    const permissions = PERMISSIONS.filter((permission) => summaryLists(rule, resource, permission) && supportedPermission(resource, permission))
     const label = permissions.map((permission) => permission.charAt(0).toUpperCase() + permission.slice(1)).join(', ') || 'None'
     return { key: permissions.join(','), label }
   })

@@ -310,7 +310,7 @@ export default function TestCampaigns() {
             </div>
           )}
 
-          {!campaigns || campaigns.length === 0 ? (
+          {(!campaigns || campaigns.length === 0) && (
             <div className="bg-card rounded-lg shadow-elegant p-12 text-center">
               <div className="w-16 h-16 rounded-2xl bg-linear-to-br/srgb from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-4">
                 <FlaskConical className="h-8 w-8 text-primary/40" />
@@ -329,11 +329,13 @@ export default function TestCampaigns() {
                 </button>
               )}
             </div>
-          ) : filteredCampaigns.length === 0 ? (
+          )}
+          {campaigns && campaigns.length > 0 && filteredCampaigns.length === 0 && (
             <div className="bg-card rounded-lg shadow-elegant p-12 text-center text-muted-foreground">
               No campaigns match the current filters.
             </div>
-          ) : (
+          )}
+          {campaigns && campaigns.length > 0 && filteredCampaigns.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {filteredCampaigns.map((campaign) => (
                 <CampaignCard key={campaign.id} campaign={campaign} prefix={prefix!} />

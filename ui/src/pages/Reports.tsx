@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { dashboardApi } from '../api/client'
 import { FolderKanban, FileText, CheckCircle, FlaskConical, AlertTriangle, ArrowRight, TrendingUp, Shield } from 'lucide-react'
 import { SortableHeader } from '../components/ListControls'
+import { percentTone } from '../lib/percentTone'
 
 type SortField = 'name' | 'status' | 'requirement_count' | 'test_case_count' | 'coverage' | 'health'
 
@@ -45,9 +46,11 @@ export default function Reports() {
     .filter((project) => project.uncovered_requirement_count > 0)
     .sort((a, b) => a.prefix.localeCompare(b.prefix))
   const sortedProjects = [...s.projects].sort((a, b) => {
-    const value = (project: typeof a) => sortField === 'coverage' ? getCoverage(project)
-      : sortField === 'health' ? HEALTH_LABELS[getHealth(project, getCoverage(project))]
-      : project[sortField]
+    const value = (project: typeof a) => {
+      if (sortField === 'coverage') return getCoverage(project)
+      if (sortField === 'health') return HEALTH_LABELS[getHealth(project, getCoverage(project))]
+      return project[sortField]
+    }
     const av = value(a)
     const bv = value(b)
     const order = typeof av === 'number' && typeof bv === 'number' ? av - bv : String(av).localeCompare(String(bv))
@@ -83,14 +86,14 @@ export default function Reports() {
           value={`${s.coverage_percent}%`}
           subtitle={`${s.uncovered_requirements} uncovered requirements`}
           icon={Shield}
-          color={s.coverage_percent >= 80 ? 'text-emerald-600' : s.coverage_percent >= 50 ? 'text-amber-600' : 'text-red-600'}
+          color={percentTone(s.coverage_percent, 'text-emerald-600', 'text-amber-600', 'text-red-600')}
         />
         <ReportStatCard
           title="Campaign Pass Rate"
           value={`${passRate}%`}
           subtitle={`${totalExecuted} total executions`}
           icon={TrendingUp}
-          color={passRate >= 80 ? 'text-emerald-600' : passRate >= 50 ? 'text-amber-600' : 'text-red-600'}
+          color={percentTone(passRate, 'text-emerald-600', 'text-amber-600', 'text-red-600')}
         />
         <ReportStatCard
           title="Requirements"
@@ -202,7 +205,7 @@ export default function Reports() {
                         <div className="flex items-center gap-2">
                           <div className="w-20 bg-muted rounded-full h-1.5">
                             <div
-                              className={`h-1.5 rounded-full ${cov >= 80 ? 'bg-emerald-500' : cov >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
+                              className={`h-1.5 rounded-full ${percentTone(cov, 'bg-emerald-500', 'bg-amber-500', 'bg-red-500')}`}
                               style={{ width: `${cov}%` }}
                             />
                           </div>

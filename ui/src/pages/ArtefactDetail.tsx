@@ -239,7 +239,7 @@ export default function ArtefactDetail({
     if (!artefact) return
     const next: Record<string, string> = {}
     Object.entries(artefact as unknown as Record<string, unknown>).forEach(([key, value]) => {
-      next[key] = Array.isArray(value) ? value.join(', ') : value == null ? '' : String(value)
+      next[key] = formText(value)
     })
     setForm(next)
   }, [artefact])
@@ -544,11 +544,12 @@ export default function ArtefactDetail({
           </form>
         ) : (
           <div className="space-y-6">
-            {kind === 'defect' ? (
+            {kind === 'defect' && (
               <SectionCard title="Description">
                 <p className="text-foreground whitespace-pre-wrap leading-relaxed">{description || 'No description provided.'}</p>
               </SectionCard>
-            ) : (artefactRecord.content_json as Record<string, unknown> | null) ? (
+            )}
+            {kind !== 'defect' && !!artefactRecord.content_json && (
               <SectionCard title="Content">
                 <DocEditor
                   content={artefactRecord.content_json as Record<string, unknown>}
@@ -560,7 +561,8 @@ export default function ArtefactDetail({
                   className="border-0"
                 />
               </SectionCard>
-            ) : (
+            )}
+            {kind !== 'defect' && !artefactRecord.content_json && (
               <SectionCard title="Description">
                 <p className="text-foreground whitespace-pre-wrap leading-relaxed">{description || 'No description provided.'}</p>
               </SectionCard>
@@ -712,6 +714,19 @@ export default function ArtefactDetail({
   )
 }
 
+/** Display name of an external tracker; null for an unknown tracker. */
+function trackerName(tracker: string | null | undefined): string | null {
+  if (tracker === 'github') return 'GitHub'
+  if (tracker === 'gitlab') return 'GitLab'
+  return tracker === 'jira' ? 'Jira' : null
+}
+
+/** The text of an artefact field in the edit form. */
+function formText(value: unknown): string {
+  if (Array.isArray(value)) return value.join(', ')
+  return value == null ? '' : String(value)
+}
+
 function ExternalIssueCard({
   defect,
   projectPrefix,
@@ -728,7 +743,7 @@ function ExternalIssueCard({
   refreshError: string | null
 }>) {
   const tracker = defect.external_tracker
-  const trackerLabel = tracker === 'github' ? 'GitHub' : tracker === 'gitlab' ? 'GitLab' : tracker === 'jira' ? 'Jira' : null
+  const trackerLabel = trackerName(tracker)
   const webhookPath = `/api/integrations/${tracker === 'gitlab' || tracker === 'jira' ? tracker : 'github'}/webhook`
   const issueLabel = tracker === 'jira' ? `${defect.external_repo_full_name}-${defect.external_issue_number}` : null
 

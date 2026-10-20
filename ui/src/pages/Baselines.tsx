@@ -111,9 +111,10 @@ export default function Baselines() {
         ) : null}
       </div>
 
-      {isLoading ? (
+      {isLoading && (
         <div className="bg-card rounded-lg shadow-elegant p-8 text-center text-muted-foreground">Loading...</div>
-      ) : !baselines || baselines.length === 0 ? (
+      )}
+      {!isLoading && (!baselines || baselines.length === 0) && (
         <div className="bg-card rounded-lg shadow-elegant p-12 text-center">
           <div className="w-16 h-16 rounded-2xl bg-linear-to-br/srgb from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-4">
             <Layers className="h-8 w-8 text-primary/40" />
@@ -121,7 +122,8 @@ export default function Baselines() {
           <h3 className="text-lg font-medium text-foreground mb-2">No Baselines Yet</h3>
           <p className="text-muted-foreground max-w-md mx-auto">Create a baseline to freeze the current project state for audit, comparison, and release tracking.</p>
         </div>
-      ) : (
+      )}
+      {!isLoading && baselines && baselines.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-6">
           <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden">
             <div className="px-4 py-3 border-b border-border text-sm font-medium text-foreground">Available Baselines</div>

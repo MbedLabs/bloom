@@ -5,18 +5,21 @@ interface ProjectScope {
   projectId?: number
 }
 
+/** The cached project metadata matching the supplied scope. */
+function cachedProject(client: QueryClient, scope: ProjectScope): { id: number; prefix: string } | undefined {
+  if (scope.prefix) return client.getQueryData<{ id: number; prefix: string }>(['project-by-prefix', scope.prefix])
+  if (!scope.projectId) return undefined
+  return client.getQueryData<{ id: number; prefix: string }>(['project', scope.projectId])
+    ?? client.getQueryCache().findAll({ queryKey: ['project-by-prefix'] })
+      .map(query => query.state.data as { id: number; prefix: string } | undefined)
+      .find(item => item?.id === scope.projectId)
+    ?? client.getQueryData<{ id: number; prefix: string }[]>(['projects'])
+      ?.find(item => item.id === scope.projectId)
+}
+
 /** Resolve the project identity from the supplied scope and cached project metadata. */
 function projectScope(client: QueryClient, scope: ProjectScope): ProjectScope {
-  const project = scope.prefix
-    ? client.getQueryData<{ id: number; prefix: string }>(['project-by-prefix', scope.prefix])
-    : scope.projectId
-      ? client.getQueryData<{ id: number; prefix: string }>(['project', scope.projectId])
-        ?? client.getQueryCache().findAll({ queryKey: ['project-by-prefix'] })
-          .map(query => query.state.data as { id: number; prefix: string } | undefined)
-          .find(item => item?.id === scope.projectId)
-        ?? client.getQueryData<{ id: number; prefix: string }[]>(['projects'])
-          ?.find(item => item.id === scope.projectId)
-      : undefined
+  const project = cachedProject(client, scope)
   return { prefix: scope.prefix || project?.prefix, projectId: scope.projectId || project?.id }
 }
 

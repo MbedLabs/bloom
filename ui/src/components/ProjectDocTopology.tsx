@@ -184,6 +184,11 @@ function roleDisplayLabel(role: string): string {
   return role.replace(/_/g, ' ')
 }
 
+const EDGE_STROKES = {
+  suspect: { dark: '#f87171', light: '#b91c1c' },
+  normal: { dark: '#94a3b8', light: '#64748b' },
+}
+
 const NODE_MIN_W = 180
 const NODE_MAX_W = 260
 const NODE_MIN_H = 110
@@ -503,9 +508,8 @@ export default function ProjectDocTopology({ projectId, prefix }: Readonly<Props
 
     const newEdges: Edge[] = aggEdges.map((e) => {
       const hasSuspect = e.totalSuspect > 0
-      const stroke = hasSuspect
-        ? (isDark ? '#f87171' : '#b91c1c')
-        : (isDark ? '#94a3b8' : '#64748b')
+      const palette = hasSuspect ? EDGE_STROKES.suspect : EDGE_STROKES.normal
+      const stroke = isDark ? palette.dark : palette.light
       const curvature = 0.25
 
       return {

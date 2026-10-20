@@ -31,6 +31,18 @@ function ProjectMemberIdentity({ member, canRemove, disabled, onRemove }: Readon
   </>
 }
 
+/** How a member's policies are set, in the group member picker. */
+function pickerPolicySource(member: ProjectMember): string {
+  if (member.owner) return 'Owner'
+  return member.inherit_policies ? 'Inherited policies' : 'Individual policies'
+}
+
+/** How a member's policies are set, under a member without a group. */
+function memberPolicySource(member: ProjectMember): string {
+  if (member.owner) return 'Owner'
+  return member.inherit_policies ? 'Inherited group policies' : 'Individually selected policies'
+}
+
 function groupRequiresRole(group: Group, policies: Policy[]): 'admin' | 'maintainer' | 'external' {
   if (group.name === 'Administrators') return 'maintainer'
   if (['Developers', 'Product Owners', 'Testers'].includes(group.name)) return 'maintainer'
@@ -161,7 +173,7 @@ function ProjectGroupRoster({ projectId, group, members, people, policies, canAs
       <div className="max-h-56 space-y-2 overflow-y-auto">
         {filtered.map((person) => {
           const current = members.find((member) => member.user_id === person.id)
-          return <label key={person.id} className="flex items-start gap-2 text-sm"><input type="checkbox" aria-label={`Select ${person.full_name}`} disabled={busy || (assignedIds.includes(person.id) && !canRemove)} checked={selected.includes(person.id)} onChange={() => setSelected((values) => values.includes(person.id) ? values.filter((id) => id !== person.id) : [...values, person.id].sort((a, b) => a - b))} className="mt-1" /><span className="min-w-0"><span className="block truncate"><UserIdentity user={person} /></span><span className="block truncate text-xs text-muted-foreground">{person.email}</span>{current && current.policy_group_id !== group.id && <span className="text-xs text-muted-foreground">Currently: {current.policy_group_name ?? (current.owner ? 'Owner' : current.inherit_policies ? 'Inherited policies' : 'Individual policies')}</span>}</span></label>
+          return <label key={person.id} className="flex items-start gap-2 text-sm"><input type="checkbox" aria-label={`Select ${person.full_name}`} disabled={busy || (assignedIds.includes(person.id) && !canRemove)} checked={selected.includes(person.id)} onChange={() => setSelected((values) => values.includes(person.id) ? values.filter((id) => id !== person.id) : [...values, person.id].sort((a, b) => a - b))} className="mt-1" /><span className="min-w-0"><span className="block truncate"><UserIdentity user={person} /></span><span className="block truncate text-xs text-muted-foreground">{person.email}</span>{current && current.policy_group_id !== group.id && <span className="text-xs text-muted-foreground">Currently: {current.policy_group_name ?? pickerPolicySource(current)}</span>}</span></label>
         })}
         {filtered.length === 0 && <p className="text-sm text-muted-foreground">{search ? 'No matching people.' : 'No people available.'}</p>}
       </div>
@@ -178,5 +190,5 @@ function LegacyMember({ projectId, member, canRemove }: Readonly<{ projectId: nu
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['project-members', projectId] }); void queryClient.invalidateQueries({ queryKey: ['project-access', projectId] }); void queryClient.invalidateQueries({ queryKey: ['project-permissions', projectId] }); void queryClient.invalidateQueries({ queryKey: ['project-capabilities', projectId] }); void queryClient.invalidateQueries({ queryKey: ['projects'] }); toast.notify('Project assignment removed', 'success') },
     onError: (failure) => toast.failed('Removing project assignment', failure),
   })
-  return <div className="mt-3 text-sm"><div className="flex items-center gap-2"><ProjectMemberIdentity member={member} canRemove={canRemove} disabled={remove.isPending} onRemove={() => remove.mutate()} /></div><p className="text-xs text-muted-foreground">{member.owner ? 'Owner' : member.inherit_policies ? 'Inherited group policies' : 'Individually selected policies'}</p></div>
+  return <div className="mt-3 text-sm"><div className="flex items-center gap-2"><ProjectMemberIdentity member={member} canRemove={canRemove} disabled={remove.isPending} onRemove={() => remove.mutate()} /></div><p className="text-xs text-muted-foreground">{memberPolicySource(member)}</p></div>
 }

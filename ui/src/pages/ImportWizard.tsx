@@ -26,6 +26,18 @@ type ImportMode = 'project' | 'reqif' | 'file' | 'md' | 'testrail'
 /** How many source documents the picker shows at once. */
 const IMPORT_PAGE = 100
 
+/** Colour classes of a wizard step chip: done, current or ahead. */
+function stepClass(step: number, position: number): string {
+  if (step > position) return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+  return step === position ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+}
+
+/** Label of the Markdown import button. */
+function markdownImportLabel(pending: boolean, hasCollisions: boolean): string {
+  if (pending) return 'Importing...'
+  return hasCollisions ? 'Import with these choices' : 'Import Markdown'
+}
+
 export default function ImportWizard() {
   const { prefix } = useParams<{ prefix: string }>()
   const { data: currentProject } = useProjectByPrefix(prefix)
@@ -37,6 +49,7 @@ export default function ImportWizard() {
   const [mode, setMode] = useState<ImportMode>('project')
   const [sourceProjectId, setSourceProjectId] = useState<number | null>(null)
   const [docType, setDocType] = useState<'REQ' | 'TC'>('REQ')
+  const sourceDocsName = docType === 'REQ' ? 'requirements' : 'test cases'
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [includeLinks, setIncludeLinks] = useState(true)
   const [result, setResult] = useState<ImportResult | null>(null)
@@ -203,11 +216,7 @@ export default function ImportWizard() {
         {steps.map((label, i) => (
           <div key={i} className="flex items-center gap-2">
             {i > 0 && <ChevronRight className="h-4 w-4 text-muted-foreground/40" />}
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
-              step > i + 1 ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' :
-              step === i + 1 ? 'bg-primary/10 text-primary' :
-              'bg-muted text-muted-foreground'
-            }`}>
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${stepClass(step, i + 1)}`}>
               {step > i + 1 ? <Check className="h-3 w-3" /> : <span>{i + 1}</span>}
               {label}
             </div>
@@ -433,7 +442,7 @@ export default function ImportWizard() {
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50 inline-flex items-center gap-2"
           >
             <Download className="h-4 w-4" />
-            {mdMutation.isPending ? 'Importing...' : mdCollisions ? 'Import with these choices' : 'Import Markdown'}
+            {markdownImportLabel(mdMutation.isPending, !!mdCollisions)}
           </button>
         </div>
 
@@ -538,13 +547,12 @@ export default function ImportWizard() {
               className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm"
             />
             <p className="text-sm text-muted-foreground">
-              {sourceDocsLoading
-                ? `Loading ${docType === 'REQ' ? 'requirements' : 'test cases'}...`
-                : `${selectedIds.length} selected`}
+              {sourceDocsLoading ? `Loading ${sourceDocsName}...` : `${selectedIds.length} selected`}
             </p>
-            {sourceDocsLoading ? (
+            {sourceDocsLoading && (
               <p className="text-muted-foreground">Fetching the lightweight document list from {sourceProject?.prefix}.</p>
-            ) : sourceDocs && sourceDocs.length > 0 ? (
+            )}
+            {!sourceDocsLoading && sourceDocs && sourceDocs.length > 0 && (
               <>
                 <button
                   onClick={() => {
@@ -591,7 +599,8 @@ export default function ImportWizard() {
                   </p>
                 )}
               </>
-            ) : (
+            )}
+            {!sourceDocsLoading && (!sourceDocs || sourceDocs.length === 0) && (
               <p className="text-muted-foreground">
                 {docSearch.trim()
                   ? 'No docs match that search.'

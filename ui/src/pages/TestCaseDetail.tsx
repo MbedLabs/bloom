@@ -218,7 +218,7 @@ export default function TestCaseDetail({
         </>
       }
     >
-      {(testCase.content_json as Record<string, unknown> | null) ? (
+      {!!testCase.content_json && (
         <SectionCard title="Content">
           <DocEditor
             content={testCase.content_json as Record<string, unknown>}
@@ -230,11 +230,12 @@ export default function TestCaseDetail({
             className="border-0"
           />
         </SectionCard>
-      ) : testCase.description ? (
+      )}
+      {!testCase.content_json && !!testCase.description && (
         <SectionCard title="Description">
           <p className="text-foreground whitespace-pre-wrap">{testCase.description}</p>
         </SectionCard>
-      ) : null}
+      )}
 
       {tcsRows.length > 0 && (
         <TcsArteTable userMentionItems={users.map(person => ({ id: person.id, label: person.full_name, user: person }))} rows={tcsRows} onChange={() => {}} editable={false} parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues} />

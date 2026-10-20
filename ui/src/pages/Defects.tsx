@@ -372,18 +372,21 @@ export default function Defects() {
         </div>
       )}
 
-      {isLoading ? (
+      {isLoading && (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-8 text-center text-muted-foreground">Loading defects...</div>
-      ) : !defects || defects.length === 0 ? (
+      )}
+      {!isLoading && (!defects || defects.length === 0) && (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-16 text-center">
           <Bug className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
           <p className="text-muted-foreground">No defects yet.</p>
         </div>
-      ) : sortedFiltered.length === 0 ? (
+      )}
+      {!isLoading && defects && defects.length > 0 && sortedFiltered.length === 0 && (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-8 text-center text-muted-foreground">
           No defects match your search.
         </div>
-      ) : (
+      )}
+      {!isLoading && defects && defects.length > 0 && sortedFiltered.length > 0 && (
         <div className="bg-card rounded-lg border border-border shadow-elegant overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[800px]">

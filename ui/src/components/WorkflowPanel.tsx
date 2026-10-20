@@ -115,13 +115,15 @@ export default function WorkflowPanel({ artefactType, artefactId, projectPrefix,
     </SectionCard>}
     {mutation.isError && <p role="alert" className="text-destructive">{extractApiErrorMessage(mutation.error)}</p>}
     {tab === 'comments' && <SectionCard title="Discussion">
-      {comments.isPending ? <p>Loading comments...</p> : comments.isError ? <p role="alert">Could not load comments.</p> : (comments.data ?? []).map(item => <article key={item.id} className="mb-4"><UserIdentity user={{ id: item.author_user_id ?? undefined, full_name: item.author_name, profile_picture_url: item.author_profile_picture_url }} /><p className="whitespace-pre-wrap">{item.body}</p><time>{formatDateTime(item.created_at)}</time></article>)}
+      {comments.isPending && <p>Loading comments...</p>}
+      {!comments.isPending && comments.isError && <p role="alert">Could not load comments.</p>}
+      {!comments.isPending && !comments.isError && (comments.data ?? []).map(item => <article key={item.id} className="mb-4"><UserIdentity user={{ id: item.author_user_id ?? undefined, full_name: item.author_name, profile_picture_url: item.author_profile_picture_url }} /><p className="whitespace-pre-wrap">{item.body}</p><time>{formatDateTime(item.created_at)}</time></article>)}
       {state.actions.comment && <fieldset disabled={busy} className="mt-4 space-y-3"><label className="block">Comment<textarea aria-label="Comment" value={comment} onChange={event => setComment(event.target.value)} className="block w-full rounded-md border border-input bg-background p-3" /></label><button className={actionButtonClass} type="button" disabled={!comment.trim()} onClick={() => mutation.mutate({ kind: 'comment' })}>Post Comment</button></fieldset>}
     </SectionCard>}
     {tab === 'history' && state.controlled && <SectionCard title="Approved revisions">
       {state.revisions.length === 0 ? <p>No approved revisions recorded.</p> : state.revisions.map(item => <div key={item.revision_number} className="mb-3"><button className={actionButtonClass} type="button" onClick={() => setRevision(item.revision_number)}>Open revision {item.revision_number}</button><span> · {item.approved_by ? <UserIdentity user={item.approved_by} /> : 'Approval actor not recorded'} · {formatDateTime(item.approved_at ?? item.captured_at)}</span></div>)}
     </SectionCard>}
-    {revision !== null && <dialog open aria-label={`Approved revision ${revision}`} className="static m-0 w-full max-w-none text-foreground rounded-lg border border-border bg-card p-6 space-y-4"><div className="flex justify-between"><h3>Approved revision {revision}</h3><button className={actionButtonClass} type="button" onClick={() => setRevision(null)}>Close revision</button></div>{archive.isPending ? <p>Loading approved content...</p> : archive.isError || !archive.data ? <p role="alert">Could not load this approved revision.</p> : <ArchivedBody archive={archive.data} projectPrefix={projectPrefix} download={download} downloadId={downloadId} />}</dialog>}
+    {revision !== null && <dialog open aria-label={`Approved revision ${revision}`} className="static m-0 w-full max-w-none text-foreground rounded-lg border border-border bg-card p-6 space-y-4"><div className="flex justify-between"><h3>Approved revision {revision}</h3><button className={actionButtonClass} type="button" onClick={() => setRevision(null)}>Close revision</button></div>{archive.isPending && <p>Loading approved content...</p>}{!archive.isPending && (archive.isError || !archive.data) && <p role="alert">Could not load this approved revision.</p>}{!archive.isPending && !archive.isError && archive.data && <ArchivedBody archive={archive.data} projectPrefix={projectPrefix} download={download} downloadId={downloadId} />}</dialog>}
   </section>
 }
 
@@ -129,6 +131,7 @@ function ArchivedBody({ archive, projectPrefix, download, downloadId }: Readonly
   const { fields, sections, attachments, suite_items: items } = archive.snapshot
   const html = typeof fields.content_html === 'string' ? new DOMParser().parseFromString(fields.content_html, 'text/html').body.textContent : null
   const steps = normalizeTcsRows(fields.steps)
+  const showEditor = !!fields.content_json && typeof fields.content_json === 'object'
   const properties = Object.entries(fields).filter(([key, value]) => value !== null && value !== undefined && !['title', 'name', 'description', 'content_json', 'content_html', 'steps'].includes(key))
   return <div className="space-y-4">
     <h4>{String(fields.title ?? fields.name ?? 'Approved document')}</h4>
@@ -136,7 +139,8 @@ function ArchivedBody({ archive, projectPrefix, download, downloadId }: Readonly
     {archive.authorizing_change && <p>Authorizing change: {archive.authorizing_change.change_id} · {archive.authorizing_change.title}</p>}
     {fields.description ? <p className="whitespace-pre-wrap">{String(fields.description)}</p> : null}
     {properties.length > 0 && <dl className="grid gap-3 sm:grid-cols-2">{properties.map(([key, value]) => <div key={key}><dt className="text-xs uppercase tracking-wide text-muted-foreground">{key.replace(/_/g, ' ')}</dt><dd className="whitespace-pre-wrap">{typeof value === 'object' ? JSON.stringify(value) : String(value)}</dd></div>)}</dl>}
-    {fields.content_json && typeof fields.content_json === 'object' ? <DocEditor content={fields.content_json as Record<string, unknown>} editable={false} artefactHref={(type, _id, label) => docUrl(projectPrefix, type as DocType, label)} /> : html ? <p className="whitespace-pre-wrap">{html}</p> : null}
+    {showEditor && <DocEditor content={fields.content_json as Record<string, unknown>} editable={false} artefactHref={(type, _id, label) => docUrl(projectPrefix, type as DocType, label)} />}
+    {!showEditor && !!html && <p className="whitespace-pre-wrap">{html}</p>}
     {steps.length > 0 && <TcsArteTable rows={steps} editable={false} onChange={() => {}} />}
     {sections.map(section => <ArchivedSection key={section.id} section={section} />)}
     {items.length > 0 && <SectionCard title="Suite membership">{items.map(item => <p key={item.id}>{item.test_case ? `${item.test_case.tc_id} · ${item.test_case.title}` : 'Test case unavailable'}</p>)}</SectionCard>}

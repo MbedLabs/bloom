@@ -26,6 +26,40 @@ import {
   resourceLabel, resourcesFor, SCOPE_LABELS, supportedPermission, type Permission,
 } from '../lib/policySummary'
 
+/** The tab a key moves to in a tab list: first, last, next or previous with wrap-around; null for any other key. */
+function tabForKey<T>(key: string, views: readonly T[], index: number): T | null {
+  if (key === 'Home') return views[0]
+  if (key === 'End') return views[views.length - 1]
+  if (key === 'ArrowRight') return views[(index + 1) % views.length]
+  if (key === 'ArrowLeft') return views[(index + views.length - 1) % views.length]
+  return null
+}
+
+/** The read flag of a rule after one of its permissions is toggled. */
+function toggledRead(permission: Permission, current: PolicyRule): boolean {
+  if (permission === 'write' && !current.write) return true
+  return permission === 'read' ? !current.read : current.read
+}
+
+/** The review flag of a rule after one of its permissions is toggled. */
+function toggledReview(permission: Permission, current: PolicyRule, resource: string): boolean {
+  if (permission === 'approve' && !current.approve && approveIncludesReview(resource)) return true
+  return permission === 'review' ? !current.review : current.review ?? false
+}
+
+/** Whether the permission checkbox of a rule shows as checked. */
+function permissionChecked(permission: Permission, current: PolicyRule, resource: string): boolean {
+  if (permission === 'read') return current.read || current.write
+  if (permission === 'review') return current.review || current.approve && approveIncludesReview(resource)
+  return current[permission]
+}
+
+/** Title of the policy dialog. */
+function policyModalTitle(readOnly: boolean, editing: boolean): string {
+  if (readOnly) return 'View policy'
+  return editing ? 'Edit policy' : 'New policy'
+}
+
 export default function GroupsPage() {
   const { user } = useAuth()
   if (!applicationAllows(user, 'view')) {
@@ -64,10 +98,12 @@ function AccessContent() {
       const resources = policyResourceSummary(policy)
       return policy.scope !== 'document' && !isCompleteAppPolicy(policy) && resources !== label ? `${label} ${resources}` : label
     }
-    const value = (policy: Policy) => policySort === 'name' ? policy.name
-      : policySort === 'scope' ? scope(policy)
-      : policySort === 'permissions' ? policyPermissions(policy).join(', ')
-      : policyOrigins(policy, tags ?? []).join(', ')
+    const value = (policy: Policy) => {
+      if (policySort === 'name') return policy.name
+      if (policySort === 'scope') return scope(policy)
+      if (policySort === 'permissions') return policyPermissions(policy).join(', ')
+      return policyOrigins(policy, tags ?? []).join(', ')
+    }
     return value(a).localeCompare(value(b)) * (policyDir === 'asc' ? 1 : -1) || a.id - b.id
   })
   const toggleGroupSort = (field: typeof groupSort) => {
@@ -129,9 +165,7 @@ function AccessContent() {
             onClick={() => setView(tab)}
             onKeyDown={(event) => {
               const index = views.findIndex((item) => item === tab)
-              const next = event.key === 'Home' ? views[0] : event.key === 'End' ? views[views.length - 1]
-                : event.key === 'ArrowRight' ? views[(index + 1) % views.length]
-                : event.key === 'ArrowLeft' ? views[(index + views.length - 1) % views.length] : null
+              const next = tabForKey(event.key, views, index)
               if (next) {
                 event.preventDefault()
                 setView(next)
@@ -387,8 +421,8 @@ function PolicyModal({ policy, tags, readOnly = false, onClose, onSaved }: Reado
     change(resource, (current) => ({
       ...current,
       [permission]: !current[permission],
-      read: permission === 'write' && !current.write ? true : permission === 'read' ? !current.read : current.read,
-      review: permission === 'approve' && !current.approve && approveIncludesReview(resource) ? true : permission === 'review' ? !current.review : current.review ?? false,
+      read: toggledRead(permission, current),
+      review: toggledReview(permission, current, resource),
     }))
   const toggleAllOrigins = (resource: string) =>
     change(resource, (current) => ({
@@ -454,7 +488,7 @@ function PolicyModal({ policy, tags, readOnly = false, onClose, onSaved }: Reado
     onError: (error) => toast.failed('Adding the origin', error),
   })
   return (
-    <ModalShell title={readOnly ? 'View policy' : policy ? 'Edit policy' : 'New policy'} onClose={onClose}>
+    <ModalShell title={policyModalTitle(readOnly, !!policy)} onClose={onClose}>
       <form onSubmit={(event) => { event.preventDefault(); if (!readOnly) save.mutate() }} className="space-y-4">
         <label className="block text-sm font-medium text-foreground">Name
           <input value={name} onChange={(event) => setName(event.target.value)} readOnly={readOnly} required title="Policy name" className={inputClass} />
@@ -499,7 +533,7 @@ function PolicyModal({ policy, tags, readOnly = false, onClose, onSaved }: Reado
                         <input
                           type="checkbox"
                           aria-label={`${permission.charAt(0).toUpperCase() + permission.slice(1)} ${resource}`}
-                          checked={permission === 'read' ? current.read || current.write : permission === 'review' ? current.review || current.approve && approveIncludesReview(resource) : current[permission]}
+                          checked={permissionChecked(permission, current, resource)}
                           disabled={readOnly || !supportedPermission(resource, permission) || permission === 'read' && current.write || permission === 'review' && current.approve && approveIncludesReview(resource)}
                           onChange={() => togglePermission(resource, permission)}
                         />

@@ -239,11 +239,13 @@ export default function ProjectParameters() {
           <SlidersHorizontal className="h-4 w-4 text-primary" />
           <h3 className="font-semibold text-foreground">Parameters & Variables</h3>
         </div>
-        {variablesLoading ? (
+        {variablesLoading && (
           <div className="text-sm text-muted-foreground">Loading...</div>
-        ) : !variables || variables.length === 0 ? (
+        )}
+        {!variablesLoading && (!variables || variables.length === 0) && (
           <div className="text-sm text-muted-foreground">No items yet.</div>
-        ) : (
+        )}
+        {!variablesLoading && variables && variables.length > 0 && (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-border">
               <thead className="bg-muted/50">

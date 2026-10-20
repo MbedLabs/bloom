@@ -6,6 +6,7 @@ import { traceabilityApi, projectsApi, exportApi, extractApiErrorMessage } from 
 import { docUrl } from '../types/doc'
 import { ArrowLeft, CheckCircle, AlertCircle, XCircle, Shield, Filter, GitBranch, AlertTriangle, X, Download } from 'lucide-react'
 import { FilterChip, FiltersToggle } from '../components/ListControls'
+import { percentTone } from '../lib/percentTone'
 
 const COVERAGE_OPTIONS = ['Covered', 'Partial', 'Uncovered'] as const
 const PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Critical']
@@ -156,7 +157,7 @@ export default function TraceabilityMatrix() {
           label="Total Coverage"
           value={`${coveragePercent}%`}
           icon={Shield}
-          color={coveragePercent >= 80 ? 'text-emerald-600' : coveragePercent >= 50 ? 'text-amber-600' : 'text-red-600'}
+          color={percentTone(coveragePercent, 'text-emerald-600', 'text-amber-600', 'text-red-600')}
         />
         <SummaryCard
           label="Partial Coverage"

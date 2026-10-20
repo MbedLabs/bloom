@@ -125,6 +125,20 @@ const SORT_OPTIONS: { field: SortField; label: string }[] = [
   { field: 'req_origin', label: 'Origin' },
 ]
 
+/** Heading of the empty document list. */
+function emptyListHeading(hasActiveFilters: boolean, soleDocType: DocType | null): string {
+  if (soleDocType) return hasActiveFilters ? `No ${TYPE_PAGE_TITLE[soleDocType]} match your filters` : `No ${TYPE_PAGE_TITLE[soleDocType]} yet`
+  return hasActiveFilters ? 'No documents found' : 'No documents yet'
+}
+
+/** Hint under the heading of the empty document list. */
+function emptyListHint(hasActiveFilters: boolean, soleDocType: DocType | null): string {
+  if (hasActiveFilters) return 'Try a different filter combination.'
+  return soleDocType
+    ? `Create your first ${DOC_TYPE_LABELS[soleDocType]} to get started.`
+    : 'Use Import to add items from a file, or open a specific document type from the sidebar to create one.'
+}
+
 function isDocType(value: string): value is DocType {
   return DOC_TYPE_OPTIONS.some((option) => option.code === value)
 }
@@ -496,11 +510,9 @@ export default function Documents() {
       {reviewerFilter && (
         <FilterChip
           label={<>Reviewer: {
-            reviewerFilter === 'assigned'
-              ? 'assigned'
-              : reviewerFilter === 'unassigned'
-                ? 'unassigned'
-                : <UserIdentity className="ml-1" pictureClassName="w-4 h-4" user={users?.find(person => person.id === Number(reviewerFilter)) ?? { id: Number(reviewerFilter), full_name: userMap.get(Number(reviewerFilter)) || reviewerFilter }} />
+            reviewerFilter === 'assigned' || reviewerFilter === 'unassigned'
+              ? reviewerFilter
+              : <UserIdentity className="ml-1" pictureClassName="w-4 h-4" user={users?.find(person => person.id === Number(reviewerFilter)) ?? { id: Number(reviewerFilter), full_name: userMap.get(Number(reviewerFilter)) || reviewerFilter }} />
           }</>}
         />
       )}
@@ -721,33 +733,25 @@ export default function Documents() {
         )}
       </section>
 
-      {isLoading ? (
+      {isLoading && (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-5 text-center text-muted-foreground">
           Loading...
         </div>
-      ) : totalDocs === 0 ? (
+      )}
+      {!isLoading && totalDocs === 0 && (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-10 text-center">
           <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
             <BookOpen className="h-9 w-9 text-primary/40" />
           </div>
           <h3 className="text-sm font-semibold text-foreground mb-2">
-            {hasActiveFilters
-              ? soleDocType
-                ? `No ${TYPE_PAGE_TITLE[soleDocType]} match your filters`
-                : 'No documents found'
-              : soleDocType
-                ? `No ${TYPE_PAGE_TITLE[soleDocType]} yet`
-                : 'No documents yet'}
+            {emptyListHeading(hasActiveFilters, soleDocType)}
           </h3>
           <p className="text-sm text-muted-foreground mb-3 max-w-md mx-auto">
-            {hasActiveFilters
-              ? 'Try a different filter combination.'
-              : soleDocType
-                ? `Create your first ${DOC_TYPE_LABELS[soleDocType]} to get started.`
-                : 'Use Import to add items from a file, or open a specific document type from the sidebar to create one.'}
+            {emptyListHint(hasActiveFilters, soleDocType)}
           </p>
         </div>
-      ) : (
+      )}
+      {!isLoading && totalDocs !== 0 && (
         <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-border">
