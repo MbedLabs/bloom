@@ -99,7 +99,7 @@ async def _build_traceability_context(
         apply_external_visibility_filter(links_query, TestCase, current_user)
     )
     for link, tc in links_result.all():
-        ctx.linked_tcs_by_req[link.target_id].append(await _build_tc_response(tc))
+        ctx.linked_tcs_by_req[link.target_id].append(_build_tc_response(tc))
 
     tr_links_result = await db.execute(
         select(TestRunLink).where(TestRunLink.requirement_id.in_(req_ids))
@@ -144,7 +144,7 @@ def _build_req_response_sync(req: Requirement, ctx: TraceabilityContext) -> Requ
     )
 
 
-async def _build_tc_response(tc: TestCase) -> TestCaseResponse:
+def _build_tc_response(tc: TestCase) -> TestCaseResponse:
     return TestCaseResponse(
         id=tc.id,
         project_id=tc.project_id,
@@ -170,7 +170,7 @@ async def _build_tc_response(tc: TestCase) -> TestCaseResponse:
 async def _get_linked_test_cases(req_id: int, db: AsyncSession):
     linked = []
     for _link, tc in await get_verifying_test_case_links_for_requirement(req_id, db):
-        linked.append(await _build_tc_response(tc))
+        linked.append(_build_tc_response(tc))
     return linked
 
 

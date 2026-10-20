@@ -22,7 +22,6 @@ from app.core.link_rules import (
     normalize_linkable_type,
 )
 from app.core.security import (
-    effective_permissions,
     get_current_user,
     get_external_doc_types,
     require_project_access,
@@ -56,7 +55,7 @@ async def list_links(
     current_user: User = Depends(get_current_user),
 ):
     await require_project_access(db, current_user, project_id, permission=("view", "link"))
-    allowed_doc_types = await get_external_doc_types(db, current_user, project_id)
+    await get_external_doc_types(db, current_user, project_id)
 
     query = select(ArtefactLink).where(ArtefactLink.project_id == project_id)
     if source_type:
@@ -86,7 +85,7 @@ async def list_links(
             ends = (row.source_type, row.source_id), (row.target_type, row.target_id)
             if all(
                 [
-                    (await link_end(db, project_id, kind, item, current_user, allowed_doc_types))[1]
+                    (await link_end(db, project_id, kind, item, current_user))[1]
                     for kind, item in ends
                 ]
             ):
@@ -140,16 +139,13 @@ async def create_link(
                 f"{data.source_type} -> {data.target_type}. Allowed roles: {', '.join(allowed_roles)}"
             ),
         )
-    allowed_doc_types = await get_external_doc_types(db, current_user, data.project_id)
-    permissions = await effective_permissions(db, current_user, data.project_id)
+    await get_external_doc_types(db, current_user, data.project_id)
     source, source_visible = await link_end(
         db,
         data.project_id,
         data.source_type,
         data.source_id,
         current_user,
-        allowed_doc_types,
-        permissions,
     )
     if not source_visible:
         raise HTTPException(status_code=404, detail="Source document not found in project")
@@ -159,8 +155,6 @@ async def create_link(
         data.target_type,
         data.target_id,
         current_user,
-        allowed_doc_types,
-        permissions,
     )
     if not target_visible:
         raise HTTPException(status_code=404, detail="Target document not found in project")
@@ -199,12 +193,9 @@ async def delete_link(
     current_user: User = Depends(get_current_user),
 ):
     link = await get_visible_row(db, ArtefactLink, link_id, "Link not found", current_user)
-    allowed_doc_types = await get_external_doc_types(db, current_user, link.project_id)
-    permissions = await effective_permissions(db, current_user, link.project_id)
+    await get_external_doc_types(db, current_user, link.project_id)
     ends = [
-        await link_end(
-            db, link.project_id, kind, item, current_user, allowed_doc_types, permissions
-        )
+        await link_end(db, link.project_id, kind, item, current_user)
         for kind, item in ((link.source_type, link.source_id), (link.target_type, link.target_id))
     ]
     if any(row is not None and not visible for row, visible in ends):
