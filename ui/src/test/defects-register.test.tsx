@@ -192,7 +192,7 @@ describe('finding a defect', () => {
     })
 
     await waitFor(() => expect(rows()).toEqual(['VCU-DEF-002']))
-    expect(vi.mocked(client.defectsApi.list).mock.calls.length).toBe(before)
+    expect(vi.mocked(client.defectsApi.list).mock.calls).toHaveLength(before)
   })
 
   it('searches the identifier and the status as well as the title', async () => {

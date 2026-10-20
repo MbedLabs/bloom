@@ -28,44 +28,22 @@ beforeEach(() => goTo('/'))
 afterEach(() => goTo('/'))
 
 describe('reading a one-time token', () => {
-  it('reads it from the fragment', () => {
-    goTo('/accept-invite#token=abc123')
+  it.each([
+    ['reads it from the fragment', '/accept-invite#token=abc123', 'abc123'],
+    ['refuses a token in the query string', '/accept-invite?token=abc123', ''],
+    [
+      'takes the fragment even when a query token is also present',
+      '/accept-invite?token=from-the-query#token=from-the-fragment',
+      'from-the-fragment',
+    ],
+    ['ignores other fragment parameters', '/accept-invite#other=abc123', ''],
+    ['reads nothing from a bare URL', '/accept-invite', ''],
+  ])('%s', (_name, url, expected) => {
+    goTo(url)
 
     const { result } = renderHook(() => useOneTimeToken())
 
-    expect(result.current).toBe('abc123')
-  })
-
-  it('refuses a token in the query string', () => {
-    goTo('/accept-invite?token=abc123')
-
-    const { result } = renderHook(() => useOneTimeToken())
-
-    expect(result.current).toBe('')
-  })
-
-  it('takes the fragment even when a query token is also present', () => {
-    goTo('/accept-invite?token=from-the-query#token=from-the-fragment')
-
-    const { result } = renderHook(() => useOneTimeToken())
-
-    expect(result.current).toBe('from-the-fragment')
-  })
-
-  it('ignores other fragment parameters', () => {
-    goTo('/accept-invite#other=abc123')
-
-    const { result } = renderHook(() => useOneTimeToken())
-
-    expect(result.current).toBe('')
-  })
-
-  it('reads nothing from a bare URL', () => {
-    goTo('/accept-invite')
-
-    const { result } = renderHook(() => useOneTimeToken())
-
-    expect(result.current).toBe('')
+    expect(result.current).toBe(expected)
   })
 })
 
