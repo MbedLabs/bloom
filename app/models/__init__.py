@@ -2,6 +2,7 @@
 
 from app.models.access_request import AccessRequest
 from app.models.audit import AuditEvent
+from app.models.cli_auth_session import CliAuthSession
 from app.models.groups import Group, GroupMembership, Policy
 from app.models.models import (
     AllowedLinkTriple,
@@ -70,6 +71,7 @@ __all__ = [
     "Tag",
     "AccessRequest",
     "AuditEvent",
+    "CliAuthSession",
     "AttachmentUploadAttempt",
     "AttachmentUploadLease",
     "Project",

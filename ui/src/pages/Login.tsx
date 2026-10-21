@@ -1,8 +1,16 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { useAuth } from '../contexts/AuthContext'
 import { APP_VERSION, extractApiErrorMessage, setupApi } from '../api/client'
 import { BLOOM_LOGO_DARK, BLOOM_LOGO_LIGHT, PRODUCT_IDENTITY, PRODUCT_NAME } from '../brandAssets'
+
+const CLI_APPROVAL_PATH = /^\/auth\/cli\?session_id=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** The page to open after sign-in: a CLI approval request named in `next`, otherwise the dashboard. */
+function destinationAfterLogin(search: string): string {
+  const next = new URLSearchParams(search).get('next')
+  return next && CLI_APPROVAL_PATH.test(next) ? next : '/'
+}
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -11,6 +19,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
     let cancelled = false
@@ -31,7 +40,7 @@ export default function Login() {
     setLoading(true)
     try {
       await login(email, password)
-      void navigate('/', { replace: true })
+      void navigate(destinationAfterLogin(location.search), { replace: true })
     } catch (err: unknown) {
       const message = extractApiErrorMessage(err, 'Login failed')
       setError(message)
