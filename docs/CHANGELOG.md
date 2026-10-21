@@ -11,6 +11,10 @@
 
 - Administrator welcome emails confirm the account is ready and give product-specific next steps, with matching HTML and plain-text instructions. The obsolete one-time runner registration key instructions are removed.
 
+### Security
+
+- Pillow raised to 13.0.0, certifi to 2026.10.19 and follow-redirects to 1.16.1, the patched releases.
+
 ## 1.2.0 - 2026-10-17
 
 ### Added

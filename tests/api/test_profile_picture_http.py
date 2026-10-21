@@ -2,6 +2,7 @@
 
 import asyncio
 import io
+import struct
 
 import pytest
 from fastapi import FastAPI
@@ -172,3 +173,41 @@ def test_jpeg_orientation_is_normalized_without_exif(picture_client):
     with Image.open(io.BytesIO(stored.content)) as picture:
         assert picture.size == (128, 256)
         assert not picture.getexif()
+
+
+def jpeg_with_segment(marker, payload):
+    """A 600x300 JPEG carrying one extra application segment right after its start marker."""
+    base = io.BytesIO()
+    Image.new("RGB", (600, 300), "orange").save(base, format="JPEG")
+    data = base.getvalue()
+    return data[:2] + marker + struct.pack(">H", len(payload) + 2) + payload + data[2:]
+
+
+def test_jpeg_with_a_repeated_orientation_tag_is_turned_by_the_first(picture_client):
+    client, (headers, _) = picture_client
+    entries = struct.pack("<HHIHH", 274, 3, 1, 6, 0) + struct.pack("<HHIHH", 274, 3, 1, 1, 0)
+    exif = b"Exif\x00\x00II*\x00" + struct.pack("<IH", 8, 2) + entries + struct.pack("<I", 0)
+    result = upload(client, headers, jpeg_with_segment(b"\xff\xe1", exif), "image/jpeg")
+    assert result.status_code == 200, result.text
+    stored = client.get("/api/auth/me/picture", headers=headers)
+    with Image.open(io.BytesIO(stored.content)) as picture:
+        assert picture.size == (128, 256)
+        assert not picture.getexif()
+
+
+def test_jpeg_whose_mpf_header_repeats_the_image_count_is_judged_by_the_first(picture_client):
+    client, (headers, _) = picture_client
+    directory = (
+        struct.pack("<H", 3)
+        + struct.pack("<HHII", 0xB001, 4, 1, 2)
+        + struct.pack("<HHII", 0xB001, 4, 1, 1)
+        + struct.pack("<HHII", 0xB002, 7, 32, 50)
+        + struct.pack("<I", 0)
+    )
+    entries = struct.pack("<LLLHH", 0x20030000, 0, 0, 0, 0) + struct.pack(
+        "<LLLHH", 0x00010001, 0, 0, 0, 0
+    )
+    mpf = b"MPF\x00II*\x00" + struct.pack("<I", 8) + directory + entries
+    result = upload(client, headers, jpeg_with_segment(b"\xff\xe2", mpf), "image/jpeg")
+    assert result.status_code == 415
+    assert client.get("/api/auth/me/picture", headers=headers).status_code == 404
