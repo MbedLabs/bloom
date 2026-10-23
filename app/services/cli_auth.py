@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from uuid import UUID
 
-from sqlalchemy import delete, or_, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -23,7 +23,9 @@ from app.models.user_token import UserTokenPurpose
 from app.schemas.auth import UserResponse
 from app.schemas.cli_auth import (
     CliCallbackApproval,
+    CliCallbackDenial,
     CliCodeApproval,
+    CliCodeDenial,
     CliExchangeRequest,
     CliStartRequest,
     CliTokenResponse,
@@ -46,6 +48,9 @@ INACTIVE_OR_CHANGED_USER = "inactive_or_changed_user"
 EXPIRED_OR_CONSUMED = "expired_or_consumed"
 INVALID_REFRESH_TOKEN = "invalid_token"
 INACTIVE_OR_MISSING_USER = "inactive_or_missing_user"
+CODE_MODE_DISABLED = "code_mode_disabled"
+
+REQUEST_CODE_BYTES = 5
 
 
 class CliAuthorizationError(Exception):
@@ -62,6 +67,39 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+def code_mode_refused(mode: str) -> bool:
+    """Return whether this instance refuses a request in the given mode."""
+    return mode == "code" and not settings.CLI_CODE_MODE_ENABLED
+
+
+async def ensure_mode_allowed(db: AsyncSession, session_id: UUID) -> None:
+    """Refuse a stored manual-code request with code_mode_disabled while code sign-in is off."""
+    mode = await db.scalar(select(CliAuthSession.mode).where(CliAuthSession.id == session_id))
+    if mode is not None and code_mode_refused(mode):
+        raise CliAuthorizationError(CODE_MODE_DISABLED)
+
+
+def request_code(code_challenge: str) -> str:
+    """Return the XXXX-XXXX request code of a PKCE challenge.
+
+    The code is the RFC 4648 base32 text of the first five bytes of the challenge's SHA-256.
+    """
+    digest = hashlib.sha256(code_challenge.encode("ascii")).digest()[:REQUEST_CODE_BYTES]
+    letters = base64.b32encode(digest).decode("ascii")
+    return f"{letters[:4]}-{letters[4:]}"
+
+
+def pending_conditions(session_id: UUID) -> tuple:
+    """Return the filters selecting one unexpired request that is not approved or exchanged."""
+    return (
+        CliAuthSession.id == session_id,
+        CliAuthSession.expires_at > utcnow(),
+        CliAuthSession.consumed_at.is_(None),
+        CliAuthSession.exchange_code_hash.is_(None),
+        CliAuthSession.user_id.is_(None),
+    )
+
+
 async def purge_finished_sessions(db: AsyncSession, now: datetime) -> None:
     """Delete the authorization sessions that have expired or been exchanged."""
     await db.execute(
@@ -72,7 +110,12 @@ async def purge_finished_sessions(db: AsyncSession, now: datetime) -> None:
 
 
 async def start_session(db: AsyncSession, data: CliStartRequest) -> CliAuthSession:
-    """Delete finished sessions, then create one pending session for ten minutes."""
+    """Delete finished sessions, then create one pending session for ten minutes.
+
+    A manual-code request is refused with code_mode_disabled while code sign-in is off.
+    """
+    if code_mode_refused(data.mode):
+        raise CliAuthorizationError(CODE_MODE_DISABLED)
     now = utcnow()
     await purge_finished_sessions(db, now)
     session = CliAuthSession(**data.model_dump(), created_at=now, expires_at=now + SESSION_LIFETIME)
@@ -82,8 +125,13 @@ async def start_session(db: AsyncSession, data: CliStartRequest) -> CliAuthSessi
 
 
 async def pending_session(db: AsyncSession, session_id: UUID) -> CliAuthSession:
-    """Load an unexpired request that has not been approved or exchanged."""
+    """Load an unexpired request that has not been approved or exchanged.
+
+    A stored manual-code request is refused with code_mode_disabled while code sign-in is off.
+    """
     session = await db.get(CliAuthSession, session_id)
+    if session is not None and code_mode_refused(session.mode):
+        raise CliAuthorizationError(CODE_MODE_DISABLED)
     if (
         session is None
         or session.expires_at <= utcnow()
@@ -99,6 +147,7 @@ async def approve_session(
     db: AsyncSession, session_id: UUID, user: User
 ) -> tuple[CliAuthSession, str]:
     """Bind one pending request to the locked, active approving account and a code digest."""
+    await ensure_mode_allowed(db, session_id)
     version = user.session_version
     current = await db.get(
         User, user.id, populate_existing=True, with_for_update={"key_share": True}
@@ -108,13 +157,7 @@ async def approve_session(
     code = secrets.token_urlsafe(32)
     result = await db.execute(
         update(CliAuthSession)
-        .where(
-            CliAuthSession.id == session_id,
-            CliAuthSession.expires_at > utcnow(),
-            CliAuthSession.consumed_at.is_(None),
-            CliAuthSession.exchange_code_hash.is_(None),
-            CliAuthSession.user_id.is_(None),
-        )
+        .where(*pending_conditions(session_id))
         .values(
             exchange_code_hash=hash_token(code),
             user_id=current.id,
@@ -128,19 +171,45 @@ async def approve_session(
     return session, code
 
 
-def approval_response(session: CliAuthSession, code: str) -> CliCallbackApproval | CliCodeApproval:
-    """Return the manual code, or the stored loopback callback carrying the code and state."""
-    if session.mode != "callback":
-        return CliCodeApproval(exchange_code=code, expires_at=session.expires_at)
+async def deny_session(db: AsyncSession, session_id: UUID) -> CliAuthSession:
+    """Delete one pending request and return the deleted row."""
+    result = await db.execute(
+        delete(CliAuthSession).where(*pending_conditions(session_id)).returning(CliAuthSession)
+    )
+    session = result.scalar_one_or_none()
+    if session is None:
+        raise CliAuthorizationError(NOT_PENDING)
+    return session
+
+
+def loopback_target(session: CliAuthSession, name: str, value: str) -> str:
+    """Return the stored loopback callback, validated again, with one parameter and the state."""
     try:
         target = urlsplit(validate_loopback_redirect(session.redirect_uri))
     except (ValueError, TypeError) as exc:
         raise CliAuthorizationError(NOT_PENDING) from exc
     query = parse_qsl(target.query, keep_blank_values=True) + [
-        ("code", code),
+        (name, value),
         ("state", session.state),
     ]
-    return CliCallbackApproval(redirect_to=urlunsplit(target._replace(query=urlencode(query))))
+    return urlunsplit(target._replace(query=urlencode(query)))
+
+
+def approval_response(session: CliAuthSession, code: str) -> CliCallbackApproval | CliCodeApproval:
+    """Return the manual code, or the stored loopback callback carrying the code and state."""
+    if session.mode != "callback":
+        return CliCodeApproval(exchange_code=code, expires_at=session.expires_at)
+    return CliCallbackApproval(redirect_to=loopback_target(session, "code", code))
+
+
+def denial_response(session: CliAuthSession) -> CliCallbackDenial | CliCodeDenial:
+    """Return the denial answer: empty for a manual-code request, else the loopback callback.
+
+    The callback carries error=access_denied and the stored state.
+    """
+    if session.mode != "callback":
+        return CliCodeDenial()
+    return CliCallbackDenial(redirect_to=loopback_target(session, "error", "access_denied"))
 
 
 async def issue_credentials(db: AsyncSession, user: User) -> CliTokenResponse:
@@ -176,8 +245,13 @@ def pkce_challenge(verifier: str) -> str:
 
 
 async def exchange_session(db: AsyncSession, data: CliExchangeRequest) -> CliTokenResponse:
-    """Consume an approved code once after validating PKCE and the account version."""
+    """Consume an approved code once after validating PKCE and the account version.
+
+    A stored manual-code request is refused with code_mode_disabled while code sign-in is off.
+    """
     session = await db.get(CliAuthSession, data.session_id)
+    if session is not None and code_mode_refused(session.mode):
+        raise CliAuthorizationError(CODE_MODE_DISABLED)
     if session is None or session.user_id is None or session.exchange_code_hash is None:
         raise CliAuthorizationError(NOT_APPROVED)
     code_matches = secrets.compare_digest(hash_token(data.code), session.exchange_code_hash)

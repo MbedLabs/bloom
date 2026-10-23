@@ -94,13 +94,20 @@ class CliStartResponse(CliExpiryResponse):
 
 
 class CliSessionResponse(CliExpiryResponse):
-    """Consent metadata without authorization secrets."""
+    """Consent metadata, the request time and the request code, without authorization secrets."""
 
     session_id: UUID
     client_name: str
     mode: Literal["callback", "code"]
     redirect_uri: str | None
     consumed: bool
+    created_at: datetime
+    request_code: str
+
+    @field_serializer("created_at")
+    def serialize_created(self, dt: datetime) -> str:
+        """Serialize the stored UTC request time with the UTC marker."""
+        return f"{dt.isoformat()}Z"
 
 
 class CliApproveRequest(BaseModel):
@@ -114,6 +121,22 @@ class CliCallbackApproval(BaseModel):
     """The registered loopback callback carrying the one-time code and the state."""
 
     redirect_to: str
+
+
+class CliDenyRequest(CliApproveRequest):
+    """The browser's explicit denial of one pending request."""
+
+
+class CliCallbackDenial(BaseModel):
+    """The registered loopback callback carrying error=access_denied and the state."""
+
+    redirect_to: str
+
+
+class CliCodeDenial(BaseModel):
+    """The empty answer to a denied manual-code request."""
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class CliCodeApproval(CliExpiryResponse):

@@ -1,5 +1,5 @@
-"""The CLI session migration keeps existing rows and concurrent CLI steps succeed once
-(real PostgreSQL)."""
+"""The CLI session migration keeps existing rows and concurrent CLI steps, deny included, succeed
+once (real PostgreSQL)."""
 
 import asyncio
 import os
@@ -229,25 +229,36 @@ def _race(request):
         return [future.result() for future in [pool.submit(request) for _ in range(4)]]
 
 
-def test_cli_approval_exchange_and_refresh_succeed_once_on_postgresql(api_client):
+def _admin_headers(api_client) -> dict:
+    """Sign in as the seeded administrator and return the bearer header without cookies."""
     api_client.cookies.clear()
     login = api_client.post(
         "/api/auth/login", json={"email": settings.ADMIN_EMAIL, "password": settings.ADMIN_PASSWORD}
     )
     assert login.status_code == 200, login.text
     api_client.cookies.clear()
-    headers = {"Authorization": "Bearer " + login.json()["access_token"]}
+    return {"Authorization": "Bearer " + login.json()["access_token"]}
+
+
+def _start_code_session(api_client, state: str) -> str:
+    """Start one manual-code request and return its session id."""
     session = api_client.post(
         PREFIX + "/start",
         json={
             "client_name": "Concurrent client",
             "mode": "code",
             "code_challenge": CHALLENGE,
-            "state": "race-state",
+            "state": state,
         },
     )
     assert session.status_code == 200, session.text
-    session_id = session.json()["session_id"]
+    return session.json()["session_id"]
+
+
+def test_cli_approval_exchange_and_refresh_succeed_once_on_postgresql(api_client, monkeypatch):
+    monkeypatch.setattr(settings, "CLI_CODE_MODE_ENABLED", True)
+    headers = _admin_headers(api_client)
+    session_id = _start_code_session(api_client, "race-state")
     approved = _race(
         lambda: api_client.post(
             PREFIX + "/approve", headers=headers, json={"session_id": session_id}
@@ -272,6 +283,37 @@ def test_cli_approval_exchange_and_refresh_succeed_once_on_postgresql(api_client
     )
     assert [r.status_code for r in refreshed].count(200) == 1
     assert all(r.status_code in (200, 401) for r in refreshed)
+
+
+def test_cli_deny_and_approve_end_a_request_once_on_postgresql(api_client, monkeypatch):
+    monkeypatch.setattr(settings, "CLI_CODE_MODE_ENABLED", True)
+    headers = _admin_headers(api_client)
+    session_id = _start_code_session(api_client, "deny-race-state")
+
+    def send(path):
+        return path, api_client.post(
+            f"{PREFIX}/{path}", headers=headers, json={"session_id": session_id}
+        )
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(send, ["deny", "approve", "deny", "approve"]))
+    assert [r.status_code for _, r in results].count(200) == 1
+    assert all(r.status_code in (200, 400) for _, r in results)
+    winner, answer = next((path, r) for path, r in results if r.status_code == 200)
+    assert api_client.get(PREFIX + "/sessions/" + session_id, headers=headers).status_code == 400
+    exchanged = api_client.post(
+        PREFIX + "/exchange",
+        json={
+            "session_id": session_id,
+            "code": answer.json().get("exchange_code", "denied"),
+            "code_verifier": VERIFIER,
+        },
+    )
+    if winner == "deny":
+        assert answer.json() == {}
+        assert exchanged.status_code == 400
+    else:
+        assert exchanged.status_code == 200, exchanged.text
 
 
 def test_cli_refresh_waits_for_and_honours_an_account_revocation():

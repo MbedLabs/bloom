@@ -2,11 +2,13 @@
 
 import asyncio
 from datetime import datetime, timedelta
+from urllib.parse import parse_qs, urlsplit
 from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import select, update
 
+from app.core.config import settings
 from app.core.security import create_access_token
 from app.models import AuditEvent, User, UserToken, UserTokenPurpose
 from app.models.cli_auth_session import CliAuthSession
@@ -20,13 +22,21 @@ from tests.api.test_cli_auth import (
     audit_rows,
     bearer,
     cli_client,
+    deny,
     exchange,
     run_db,
     signed_in,
     start,
+    stored_ids,
 )
 
 __all__ = ["cli_client"]
+
+CODE_MODE_OFF = "Code sign-in is turned off on this instance. Use callback mode."
+INVALID_AUTHORIZATION = (
+    "Invalid or expired authorization. Request a new sign-in link from your client."
+)
+CALLBACK = "http://127.0.0.1:8123/callback"
 
 
 @pytest.mark.parametrize(
@@ -320,3 +330,171 @@ def test_public_cli_endpoints_enforce_their_rate_limit(cli_client, monkeypatch, 
     responses = [client.post(f"{PREFIX}/{path}", json=body) for _ in range(limit + 1)]
     assert all(response.status_code != 429 for response in responses[:-1])
     assert responses[-1].status_code == 429
+
+
+def test_code_mode_off_refuses_a_new_code_request_and_keeps_callback(cli_client, monkeypatch):
+    client, maker, headers, _, _ = cli_client
+    monkeypatch.setattr(settings, "CLI_CODE_MODE_ENABLED", False)
+    refused = client.post(
+        PREFIX + "/start",
+        json={"client_name": "Client", "mode": "code", "code_challenge": CHALLENGE, "state": "s"},
+    )
+    assert refused.status_code == 403
+    assert refused.json() == {"detail": CODE_MODE_OFF}
+    assert stored_ids(maker) == set()
+    created = start(client, mode="callback", redirect_uri=CALLBACK)
+    lookup = client.get(PREFIX + "/sessions/" + created["session_id"], headers=headers)
+    assert lookup.status_code == 200, lookup.text
+    target = approve(client, headers, created["session_id"])["redirect_to"]
+    code = parse_qs(urlsplit(target).query)["code"][0]
+    assert exchange(client, created["session_id"], code).status_code == 200
+    denied = start(client, mode="callback", redirect_uri=CALLBACK)
+    assert deny(client, headers, denied["session_id"]).status_code == 200
+
+
+def test_code_mode_off_refuses_every_stored_code_request(cli_client, monkeypatch):
+    client, maker, headers, user_id, _ = cli_client
+    pending = start(client)["session_id"]
+    approved = start(client)["session_id"]
+    code = approve(client, headers, approved)["exchange_code"]
+    expired = start(client)["session_id"]
+    run_db(
+        maker,
+        lambda db: db.execute(
+            update(CliAuthSession)
+            .where(CliAuthSession.id == UUID(expired))
+            .values(expires_at=datetime.utcnow() - timedelta(seconds=1))
+        ),
+    )
+    monkeypatch.setattr(settings, "CLI_CODE_MODE_ENABLED", False)
+    for session_id in (pending, approved, expired):
+        lookup = client.get(PREFIX + "/sessions/" + session_id, headers=headers)
+        assert (lookup.status_code, lookup.json()) == (403, {"detail": CODE_MODE_OFF})
+        refused = client.post(PREFIX + "/approve", headers=headers, json={"session_id": session_id})
+        assert (refused.status_code, refused.json()) == (403, {"detail": CODE_MODE_OFF})
+    blocked = exchange(client, approved, code)
+    assert (blocked.status_code, blocked.json()) == (400, {"detail": INVALID_AUTHORIZATION})
+    assert not run_db(maker, lambda db: db.scalars(select(UserToken))).all()
+    approvals = audit_rows(maker, "auth.cli_approve")
+    assert [(e.outcome, e.actor_user_id, e.target_id, e.details) for e in approvals[1:]] == [
+        ("failure", user_id, session_id, {"reason": "code_mode_disabled"})
+        for session_id in (pending, approved, expired)
+    ]
+    exchanges = audit_rows(maker, "auth.cli_exchange")
+    assert [(e.outcome, e.target_id, e.details) for e in exchanges] == [
+        ("failure", approved, {"reason": "code_mode_disabled"})
+    ]
+    assert stored_ids(maker) == {pending, approved, expired}
+    stored = run_db(maker, lambda db: db.get(CliAuthSession, UUID(pending)))
+    assert stored.user_id is None and stored.exchange_code_hash is None
+
+
+def test_code_mode_off_keeps_the_answers_for_a_missing_request(cli_client, monkeypatch):
+    client, maker, headers, _, _ = cli_client
+    monkeypatch.setattr(settings, "CLI_CODE_MODE_ENABLED", False)
+    unknown = str(uuid4())
+    lookup = client.get(PREFIX + "/sessions/" + unknown, headers=headers)
+    assert (lookup.status_code, lookup.json()) == (400, {"detail": INVALID_AUTHORIZATION})
+    refused = client.post(PREFIX + "/approve", headers=headers, json={"session_id": unknown})
+    assert (refused.status_code, refused.json()) == (400, {"detail": INVALID_AUTHORIZATION})
+    assert exchange(client, unknown, "code").status_code == 400
+    assert audit_rows(maker, "auth.cli_approve")[-1].details == {"reason": "not_pending"}
+    assert audit_rows(maker, "auth.cli_exchange")[-1].details == {
+        "reason": "unknown_or_unapproved_session"
+    }
+
+
+def test_code_mode_off_still_allows_denying_a_stored_code_request(cli_client, monkeypatch):
+    client, maker, headers, user_id, _ = cli_client
+    pending = start(client)["session_id"]
+    monkeypatch.setattr(settings, "CLI_CODE_MODE_ENABLED", False)
+    response = deny(client, headers, pending)
+    assert (response.status_code, response.json()) == (200, {})
+    assert stored_ids(maker) == set()
+    lookup = client.get(PREFIX + "/sessions/" + pending, headers=headers)
+    assert lookup.status_code == 400
+    assert [(e.outcome, e.actor_user_id) for e in audit_rows(maker, "auth.cli_deny")] == [
+        ("success", user_id)
+    ]
+
+
+def test_deny_requires_a_signed_in_account_and_a_strict_body(cli_client):
+    client, maker, headers, _, _ = cli_client
+    session_id = start(client)["session_id"]
+    assert client.post(PREFIX + "/deny", json={"session_id": session_id}).status_code == 401
+    unknown_account = create_access_token({"sub": "999999", "type": "user", "ver": 1})
+    assert deny(client, bearer(unknown_account), session_id).status_code == 401
+    extra = client.post(
+        PREFIX + "/deny", headers=headers, json={"session_id": session_id, "state": "x"}
+    )
+    assert extra.status_code == 422
+    assert client.post(PREFIX + "/deny", headers=headers, json={}).status_code == 422
+    assert stored_ids(maker) == {session_id}
+    assert audit_rows(maker, "auth.cli_deny") == []
+
+
+def test_deny_refuses_a_request_that_is_not_pending(cli_client):
+    client, maker, headers, user_id, _ = cli_client
+    approved = start(client)["session_id"]
+    code = approve(client, headers, approved)["exchange_code"]
+    expired = start(client)["session_id"]
+    run_db(
+        maker,
+        lambda db: db.execute(
+            update(CliAuthSession)
+            .where(CliAuthSession.id == UUID(expired))
+            .values(expires_at=datetime.utcnow() - timedelta(seconds=1))
+        ),
+    )
+    unknown = str(uuid4())
+    for session_id in (approved, expired, unknown):
+        response = deny(client, headers, session_id)
+        assert (response.status_code, response.json()) == (400, {"detail": INVALID_AUTHORIZATION})
+    events = audit_rows(maker, "auth.cli_deny")
+    assert [(e.outcome, e.actor_user_id, e.target_id, e.details) for e in events] == [
+        ("failure", user_id, session_id, {"reason": "not_pending"})
+        for session_id in (approved, expired, unknown)
+    ]
+    assert stored_ids(maker) == {approved, expired}
+    assert exchange(client, approved, code).status_code == 200
+
+
+def test_deny_has_the_audience_of_approve(cli_client):
+    client, maker, _, _, other_id = cli_client
+    other = bearer(create_access_token({"sub": str(other_id), "type": "user", "ver": 1}))
+    denied = start(client)["session_id"]
+    approved = start(client)["session_id"]
+    assert deny(client, other, denied).status_code == 200
+    assert approve(client, other, approved)["exchange_code"]
+    assert audit_rows(maker, "auth.cli_deny")[0].actor_user_id == other_id
+    assert audit_rows(maker, "auth.cli_approve")[0].actor_user_id == other_id
+
+
+def test_deny_refuses_a_stored_callback_that_is_no_longer_valid(cli_client):
+    client, maker, headers, _, _ = cli_client
+    session_id = start(client, mode="callback", redirect_uri=CALLBACK)["session_id"]
+    run_db(
+        maker,
+        lambda db: db.execute(
+            update(CliAuthSession)
+            .where(CliAuthSession.id == UUID(session_id))
+            .values(redirect_uri="https://evil.test/callback")
+        ),
+    )
+    assert deny(client, headers, session_id).status_code == 400
+    assert stored_ids(maker) == {session_id}
+    assert audit_rows(maker, "auth.cli_deny")[-1].details == {"reason": "not_pending"}
+
+
+def test_consent_endpoints_have_no_rate_limit(cli_client, monkeypatch):
+    from app.core.deps import limiter
+
+    client, _, headers, _, _ = cli_client
+    limiter.reset()
+    monkeypatch.setattr(limiter, "enabled", True)
+    unknown = {"session_id": str(uuid4())}
+    for path in ("deny", "approve"):
+        responses = [
+            client.post(f"{PREFIX}/{path}", headers=headers, json=unknown) for _ in range(12)
+        ]
+        assert {response.status_code for response in responses} == {400}

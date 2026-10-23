@@ -1,7 +1,9 @@
-"""Browser approval and rotating credentials for user-scoped CLI clients.
+"""Browser approval, denial and rotating credentials for user-scoped CLI clients.
 
-A refused approve, exchange or refresh rolls back the request's changes, records a failure
-audit event with its rejection code and answers with a generic message.
+A refused approve, deny, exchange or refresh rolls back the request's changes, records a failure
+audit event with its rejection code and answers with a generic message. While code sign-in is
+off, a manual-code request is refused with 403 at start, session lookup and approve, and with the
+generic 400 at exchange.
 """
 
 from http import HTTPStatus
@@ -18,7 +20,10 @@ from app.models.user import User
 from app.schemas.cli_auth import (
     CliApproveRequest,
     CliCallbackApproval,
+    CliCallbackDenial,
     CliCodeApproval,
+    CliCodeDenial,
+    CliDenyRequest,
     CliExchangeRequest,
     CliRefreshRequest,
     CliSessionResponse,
@@ -32,6 +37,7 @@ from app.services.audit import record_audit_event, record_audit_failure
 router = APIRouter()
 
 AUTH_CLI_APPROVE = "auth.cli_approve"
+AUTH_CLI_DENY = "auth.cli_deny"
 AUTH_CLI_EXCHANGE = "auth.cli_exchange"
 AUTH_CLI_REFRESH = "auth.cli_refresh"
 SESSION_TARGET = "cli_auth_session"
@@ -39,9 +45,11 @@ INVALID_AUTHORIZATION = (
     "Invalid or expired authorization. Request a new sign-in link from your client."
 )
 INVALID_SESSION = "Invalid or expired session"
+CODE_MODE_OFF = "Code sign-in is turned off on this instance. Use callback mode."
 NO_STORE = "no-store"
 BAD_REQUEST = {400: {"description": HTTPStatus(400).phrase}}
 UNAUTHORIZED = {401: {"description": HTTPStatus(401).phrase}}
+FORBIDDEN = {403: {"description": HTTPStatus(403).phrase}}
 
 Database = Annotated[AsyncSession, Depends(get_db, scope="function")]
 CurrentUser = Annotated[User, Depends(get_current_user)]
@@ -62,12 +70,22 @@ async def _rejection(
     return HTTPException(status_code=status_code, detail=detail)
 
 
-@router.post("/start", response_model=CliStartResponse)
+def _consent_refusal(error: cli_auth.CliAuthorizationError) -> tuple[int, str]:
+    """Return 403 with the code-mode message for a refused manual-code request, else 400."""
+    if error.reason == cli_auth.CODE_MODE_DISABLED:
+        return 403, CODE_MODE_OFF
+    return 400, INVALID_AUTHORIZATION
+
+
+@router.post("/start", response_model=CliStartResponse, responses=FORBIDDEN)
 @limiter.limit("10/minute")
 async def cli_start(request: Request, data: CliStartRequest, response: Response, db: Database):
     """Start a ten-minute browser authorization request without credentials."""
     response.headers["Cache-Control"] = NO_STORE
-    session = await cli_auth.start_session(db, data)
+    try:
+        session = await cli_auth.start_session(db, data)
+    except cli_auth.CliAuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=CODE_MODE_OFF) from exc
     return CliStartResponse(
         session_id=session.id,
         authorize_url=f"/auth/cli?session_id={session.id}",
@@ -75,16 +93,21 @@ async def cli_start(request: Request, data: CliStartRequest, response: Response,
     )
 
 
-@router.get("/sessions/{session_id}", response_model=CliSessionResponse, responses=BAD_REQUEST)
+@router.get(
+    "/sessions/{session_id}",
+    response_model=CliSessionResponse,
+    responses={**BAD_REQUEST, **FORBIDDEN},
+)
 async def cli_session(
     session_id: UUID, response: Response, current_user: CurrentUser, db: Database
 ):
-    """Show the signed-in user the client and destination awaiting their approval."""
+    """Show the signed-in user the client, destination, request time and request code."""
     response.headers["Cache-Control"] = NO_STORE
     try:
         session = await cli_auth.pending_session(db, session_id)
     except cli_auth.CliAuthorizationError as exc:
-        raise HTTPException(status_code=400, detail=INVALID_AUTHORIZATION) from exc
+        status_code, detail = _consent_refusal(exc)
+        raise HTTPException(status_code=status_code, detail=detail) from exc
     return CliSessionResponse(
         session_id=session.id,
         client_name=session.client_name,
@@ -92,13 +115,15 @@ async def cli_session(
         redirect_uri=session.redirect_uri,
         expires_at=session.expires_at,
         consumed=session.consumed_at is not None,
+        created_at=session.created_at,
+        request_code=cli_auth.request_code(session.code_challenge),
     )
 
 
 @router.post(
     "/approve",
     response_model=CliCallbackApproval | CliCodeApproval,
-    responses=BAD_REQUEST,
+    responses={**BAD_REQUEST, **FORBIDDEN},
 )
 async def cli_approve(
     data: CliApproveRequest, response: Response, current_user: CurrentUser, db: Database
@@ -110,12 +135,13 @@ async def cli_approve(
         session, code = await cli_auth.approve_session(db, data.session_id, current_user)
         approval = cli_auth.approval_response(session, code)
     except cli_auth.CliAuthorizationError as exc:
+        status_code, detail = _consent_refusal(exc)
         raise await _rejection(
             db,
             AUTH_CLI_APPROVE,
             exc,
-            status_code=400,
-            detail=INVALID_AUTHORIZATION,
+            status_code=status_code,
+            detail=detail,
             actor_user_id=actor_id,
             target_type=SESSION_TARGET,
             target_id=data.session_id,
@@ -128,6 +154,41 @@ async def cli_approve(
         target_id=session.id,
     )
     return approval
+
+
+@router.post(
+    "/deny",
+    response_model=CliCallbackDenial | CliCodeDenial,
+    responses=BAD_REQUEST,
+)
+async def cli_deny(
+    data: CliDenyRequest, response: Response, current_user: CurrentUser, db: Database
+):
+    """End a pending request as the signed-in user and return the client's denial callback."""
+    response.headers["Cache-Control"] = NO_STORE
+    actor_id = current_user.id
+    try:
+        session = await cli_auth.deny_session(db, data.session_id)
+        denial = cli_auth.denial_response(session)
+    except cli_auth.CliAuthorizationError as exc:
+        raise await _rejection(
+            db,
+            AUTH_CLI_DENY,
+            exc,
+            status_code=400,
+            detail=INVALID_AUTHORIZATION,
+            actor_user_id=actor_id,
+            target_type=SESSION_TARGET,
+            target_id=data.session_id,
+        ) from exc
+    await record_audit_event(
+        db,
+        AUTH_CLI_DENY,
+        actor_user_id=actor_id,
+        target_type=SESSION_TARGET,
+        target_id=data.session_id,
+    )
+    return denial
 
 
 @router.post("/exchange", response_model=CliTokenResponse, responses=BAD_REQUEST)

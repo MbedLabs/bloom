@@ -22,6 +22,7 @@ from app.models import AuditEvent, Policy, Project, User, UserToken, UserTokenPu
 from app.models.cli_auth_session import CliAuthSession
 from app.models.groups import user_application_policies
 from app.models.user import UserRole
+from app.services import cli_auth
 from app.services.token_service import create_user_token, invalidate_all_refresh_tokens
 from tests.access_fixtures import project_access_fixture
 
@@ -29,13 +30,27 @@ VERIFIER = "v" * 43
 CHALLENGE = (
     base64.urlsafe_b64encode(hashlib.sha256(VERIFIER.encode()).digest()).decode().rstrip("=")
 )
+RFC7636_VERIFIER = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+RFC7636_CHALLENGE = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+RFC7636_REQUEST_CODE = "BUUZ-WHVV"
 PREFIX = "/api/auth/cli"
 REFRESH_COOKIE = "bloom_refresh_token"
+SESSION_FIELDS = {
+    "session_id",
+    "client_name",
+    "mode",
+    "redirect_uri",
+    "expires_at",
+    "consumed",
+    "created_at",
+    "request_code",
+}
 
 
 @pytest.fixture
-def cli_client():
-    """Use real JWT guards and permission resolution on an isolated database."""
+def cli_client(monkeypatch):
+    """Use real JWT guards and permission resolution on an isolated database with code sign-in on."""
+    monkeypatch.setattr(settings, "CLI_CODE_MODE_ENABLED", True)
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
     maker = async_sessionmaker(engine, expire_on_commit=False)
 
@@ -128,6 +143,20 @@ def exchange(client, session_id, code, verifier=VERIFIER):
     )
 
 
+def deny(client, headers, session_id):
+    """Post one deny request as the signed-in user."""
+    return client.post(PREFIX + "/deny", headers=headers, json={"session_id": session_id})
+
+
+def stored_ids(maker):
+    """Return the ids of every stored authorization session."""
+
+    async def ids(db):
+        return {str(value) for value in (await db.scalars(select(CliAuthSession.id))).all()}
+
+    return run_db(maker, ids)
+
+
 def signed_in(client, session_id, headers):
     """Approve and exchange a manual-code session and return the issued credentials."""
     code = approve(client, headers, session_id)["exchange_code"]
@@ -180,6 +209,7 @@ def test_manual_exchange_preserves_user_permissions_and_hashes_secrets(cli_clien
     assert timedelta(minutes=9) < expiry - datetime.utcnow() <= timedelta(minutes=10)
     metadata = client.get(PREFIX + "/sessions/" + created["session_id"], headers=headers)
     assert metadata.status_code == 200, metadata.text
+    assert set(metadata.json()) == SESSION_FIELDS
     assert metadata.json()["client_name"] == "Example client"
     assert metadata.headers["cache-control"] == "no-store"
     assert (
@@ -381,3 +411,94 @@ def test_a_new_start_deletes_expired_and_consumed_sessions(cli_client):
     newest = start(client)["session_id"]
     assert run_db(maker, ids) == {pending, newest}
     assert client.get(PREFIX + "/sessions/" + pending, headers=headers).status_code == 200
+
+
+def test_request_code_matches_the_shared_vector():
+    challenge = (
+        base64.urlsafe_b64encode(hashlib.sha256(RFC7636_VERIFIER.encode("ascii")).digest())
+        .decode()
+        .rstrip("=")
+    )
+    assert challenge == RFC7636_CHALLENGE
+    assert cli_auth.request_code(RFC7636_CHALLENGE) == RFC7636_REQUEST_CODE
+    assert cli_auth.request_code(CHALLENGE) != RFC7636_REQUEST_CODE
+
+
+@pytest.mark.parametrize(
+    "mode,redirect_uri", [("code", None), ("callback", "http://127.0.0.1:8123/callback")]
+)
+def test_session_shows_request_time_and_request_code(cli_client, mode, redirect_uri):
+    client, _, headers, _, _ = cli_client
+    before = datetime.utcnow().replace(microsecond=0)
+    created = start(client, mode=mode, redirect_uri=redirect_uri, code_challenge=RFC7636_CHALLENGE)
+    response = client.get(PREFIX + "/sessions/" + created["session_id"], headers=headers)
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert set(data) == SESSION_FIELDS
+    assert data["request_code"] == RFC7636_REQUEST_CODE
+    assert data["created_at"].endswith("Z") and data["expires_at"].endswith("Z")
+    requested = datetime.fromisoformat(data["created_at"][:-1])
+    expires = datetime.fromisoformat(data["expires_at"][:-1])
+    assert before <= requested <= datetime.utcnow()
+    assert expires - requested == timedelta(minutes=10)
+    assert RFC7636_CHALLENGE not in response.text
+
+
+@pytest.mark.parametrize(
+    "redirect_uri",
+    [
+        "http://127.0.0.1:8123/callback",
+        "http://localhost:8123/callback?existing=a%20b",
+        "http://[::1]:8123/callback",
+    ],
+)
+def test_deny_ends_a_callback_request_with_access_denied_and_its_state(cli_client, redirect_uri):
+    client, maker, headers, user_id, _ = cli_client
+    state = "state with & and + and ="
+    created = start(client, mode="callback", redirect_uri=redirect_uri, state=state)
+    response = deny(client, headers, created["session_id"])
+    assert response.status_code == 200, response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert set(response.json()) == {"redirect_to"}
+    target = urlsplit(response.json()["redirect_to"])
+    assert (target.scheme, target.netloc, target.path) == (
+        "http",
+        urlsplit(redirect_uri).netloc,
+        urlsplit(redirect_uri).path,
+    )
+    params = parse_qs(target.query, keep_blank_values=True)
+    for name, values in parse_qs(urlsplit(redirect_uri).query).items():
+        assert params[name] == values
+    assert params["error"] == ["access_denied"]
+    assert params["state"] == [state]
+    assert "code" not in params
+    assert stored_ids(maker) == set()
+    events = audit_rows(maker, "auth.cli_deny")
+    assert [(e.outcome, e.actor_user_id, e.target_type, e.target_id) for e in events] == [
+        ("success", user_id, "cli_auth_session", created["session_id"])
+    ]
+
+
+def test_deny_ends_a_code_request_with_an_empty_answer(cli_client):
+    client, maker, headers, user_id, _ = cli_client
+    created = start(client)
+    response = deny(client, headers, created["session_id"])
+    assert response.status_code == 200, response.text
+    assert response.json() == {}
+    assert stored_ids(maker) == set()
+    assert [(e.outcome, e.actor_user_id) for e in audit_rows(maker, "auth.cli_deny")] == [
+        ("success", user_id)
+    ]
+
+
+@pytest.mark.parametrize("mode", ["code", "callback"])
+def test_a_denied_request_answers_as_a_missing_one(cli_client, mode):
+    client, _, headers, _, _ = cli_client
+    redirect_uri = "http://127.0.0.1:8123/callback" if mode == "callback" else None
+    session_id = start(client, mode=mode, redirect_uri=redirect_uri)["session_id"]
+    assert deny(client, headers, session_id).status_code == 200
+    assert client.get(PREFIX + "/sessions/" + session_id, headers=headers).status_code == 400
+    again = client.post(PREFIX + "/approve", headers=headers, json={"session_id": session_id})
+    assert again.status_code == 400
+    assert exchange(client, session_id, "any-code").status_code == 400
+    assert deny(client, headers, session_id).status_code == 400

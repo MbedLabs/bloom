@@ -19,6 +19,7 @@ CONFIG_ENV_KEYS = [
     "BLOOM_APP_BASE_URL",
     "BLOOM_ATTACHMENT_DIR",
     "BLOOM_ATTACHMENT_UPLOADS_PER_15_MINUTES",
+    "BLOOM_CLI_CODE_MODE_ENABLED",
     "BLOOM_CORS_ORIGINS",
     "BLOOM_DATABASE_URL",
     "BLOOM_ENV",
@@ -61,6 +62,7 @@ CONFIG_ENV_KEYS = [
     "APP_ENV",
     "ATTACHMENT_DIR",
     "ATTACHMENT_UPLOADS_PER_15_MINUTES",
+    "CLI_CODE_MODE_ENABLED",
     "EMAIL_VERIFICATION_TOKEN_TTL_HOURS",
     "ENABLE_DOCS",
     "FRONTEND_BASE_URL",
@@ -253,6 +255,31 @@ def test_settings_prefers_bloom_prefixed_env(monkeypatch):
 
     assert settings.SECRET_KEY == "b" * 32
     assert settings.SMTP_HOST == "smtp.bloom-prefixed.example.com"
+
+
+def test_cli_code_mode_is_off_by_default(monkeypatch):
+    clear_config_env(monkeypatch)
+    monkeypatch.setenv("SECRET_KEY", "s" * 32)
+
+    assert Settings(_env_file=None).CLI_CODE_MODE_ENABLED is False
+
+
+def test_cli_code_mode_reads_the_bloom_prefixed_and_the_plain_name(monkeypatch):
+    for name in ("BLOOM_CLI_CODE_MODE_ENABLED", "CLI_CODE_MODE_ENABLED"):
+        clear_config_env(monkeypatch)
+        monkeypatch.setenv("SECRET_KEY", "s" * 32)
+        monkeypatch.setenv(name, "true")
+
+        assert Settings(_env_file=None).CLI_CODE_MODE_ENABLED is True
+
+
+def test_cli_code_mode_prefers_the_bloom_prefixed_name(monkeypatch):
+    clear_config_env(monkeypatch)
+    monkeypatch.setenv("SECRET_KEY", "s" * 32)
+    monkeypatch.setenv("CLI_CODE_MODE_ENABLED", "true")
+    monkeypatch.setenv("BLOOM_CLI_CODE_MODE_ENABLED", "false")
+
+    assert Settings(_env_file=None).CLI_CODE_MODE_ENABLED is False
 
 
 def test_production_rejects_default_admin_email(monkeypatch):

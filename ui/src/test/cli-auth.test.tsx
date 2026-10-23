@@ -10,7 +10,7 @@ import CliAuthApprovePage from '../pages/CliAuthApprovePage'
 
 const mocks = vi.hoisted(() => ({
   login: vi.fn(), navigate: vi.fn(), get: vi.fn(), post: vi.fn(),
-  auth: { isAuthenticated: true, isLoading: false },
+  auth: { isAuthenticated: true, isLoading: false, user: { id: 7, full_name: 'Dana Reader', email: 'dana@example.com' } },
 }))
 
 vi.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ ...mocks.auth, login: mocks.login }) }))
@@ -26,6 +26,8 @@ vi.mock('../api/client', async (original) => ({
 const sessionId = '2cad0f2e-2d68-40ea-82cc-c4fcc57346da'
 const approvalPath = `/auth/cli?session_id=${sessionId}`
 const originalLocation = window.location
+const callbackUri = 'http://127.0.0.1:8123/callback'
+const codeModeOff = 'Code sign-in is turned off on this instance. Use callback mode.'
 
 function inTenMinutes() {
   return new Date(Date.now() + 600_000).toISOString()
@@ -34,8 +36,19 @@ function inTenMinutes() {
 function session(overrides: Record<string, unknown> = {}) {
   return { data: {
     session_id: sessionId, client_name: 'Example client', mode: 'code', redirect_uri: null,
-    expires_at: inTenMinutes(), consumed: false, ...overrides,
+    expires_at: inTenMinutes(), consumed: false, created_at: new Date(Date.now() - 60_000).toISOString(),
+    request_code: 'BUUZ-WHVV', ...overrides,
   } }
+}
+
+function refused(status: number, detail: string) {
+  return { isAxiosError: true, message: detail, response: { status, data: { detail }, headers: {} } }
+}
+
+function captureNavigation() {
+  const assign = vi.fn()
+  Object.defineProperty(window, 'location', { configurable: true, writable: true, value: { assign } })
+  return assign
 }
 
 beforeEach(() => {
@@ -77,7 +90,7 @@ describe('CLI browser approval', () => {
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: copy } })
     renderApproval()
     expect(await screen.findByText('Example client')).toBeInTheDocument()
-    expect(screen.getByText(/current account permissions/i)).toBeInTheDocument()
+    expect(screen.getByText(/with your full permissions/i)).toBeInTheDocument()
     expect(screen.getByText(/one-time code to paste/i)).toBeInTheDocument()
     expect(mocks.get).toHaveBeenCalledWith(`/auth/cli/sessions/${sessionId}`)
     fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
@@ -95,11 +108,132 @@ describe('CLI browser approval', () => {
     expect(await screen.findByText(/returns to your local client at http:\/\/127\.0\.0\.1:8123\/callback/i)).toBeInTheDocument()
   })
 
-  it('allows cancelling consent without approving the request', async () => {
+  it('shows the request code, the unverified client name, the account, the request time and the expiry', async () => {
+    const created = '2026-10-22T08:00:00Z'
+    const expires = '2026-10-22T08:10:00Z'
+    mocks.get.mockResolvedValue(session({ created_at: created, expires_at: expires }))
     renderApproval()
-    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
-    expect(mocks.navigate).toHaveBeenCalledWith('/', { replace: true })
-    expect(mocks.post).not.toHaveBeenCalled()
+    expect(await screen.findByText('BUUZ-WHVV')).toBeInTheDocument()
+    expect(screen.getByText('It must match the code your client shows. If it does not, deny this request.')).toBeInTheDocument()
+    expect(screen.getByText('Name given by the requesting client, not verified.')).toBeInTheDocument()
+    expect(screen.getByText(/as Dana Reader \(dana@example\.com\), with your full permissions\./)).toBeInTheDocument()
+    expect(screen.getByText(`Requested ${new Date(created).toLocaleString()}. Expires ${new Date(expires).toLocaleString()}.`)).toBeInTheDocument()
+    expect(screen.getByText('Approve only a sign-in you started yourself, on your own computer, in the last few minutes.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+  })
+
+  it('warns before approving a code request and repeats the warning with the one-time code', async () => {
+    renderApproval()
+    expect(await screen.findByText(/If someone else sent you this link or asks you for the code, deny it/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    expect(await screen.findByText('Paste this code only into the client where you started this sign-in. Never send it to anyone.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Deny' })).not.toBeInTheDocument()
+  })
+
+  it('shows no code warning for a callback request', async () => {
+    mocks.get.mockResolvedValue(session({ mode: 'callback', redirect_uri: callbackUri }))
+    renderApproval()
+    expect(await screen.findByText('BUUZ-WHVV')).toBeInTheDocument()
+    expect(screen.queryByText(/asks you for the code/)).not.toBeInTheDocument()
+  })
+
+  it.each([
+    [callbackUri, `${callbackUri}?error=access_denied&state=expected`],
+    [`${callbackUri}?existing=a`, `${callbackUri}?existing=a&error=access_denied&state=expected`],
+  ])('denies a callback request for %s on the server and returns the denial to %s', async (redirectUri, target) => {
+    const assign = captureNavigation()
+    mocks.get.mockResolvedValue(session({ mode: 'callback', redirect_uri: redirectUri }))
+    mocks.post.mockResolvedValue({ data: { redirect_to: target } })
+    renderApproval()
+    fireEvent.click(await screen.findByRole('button', { name: 'Deny' }))
+    await waitFor(() => expect(assign).toHaveBeenCalledWith(target))
+    expect(mocks.post).toHaveBeenCalledTimes(1)
+    expect(mocks.post).toHaveBeenCalledWith('/auth/cli/deny', { session_id: sessionId })
+  })
+
+  it('denies a code request on the server and says the link no longer works', async () => {
+    mocks.post.mockResolvedValue({ data: {} })
+    renderApproval()
+    fireEvent.click(await screen.findByRole('button', { name: 'Deny' }))
+    expect(await screen.findByText('This sign-in request was denied. The link no longer works.')).toBeInTheDocument()
+    expect(mocks.post).toHaveBeenCalledWith('/auth/cli/deny', { session_id: sessionId })
+    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Deny' })).not.toBeInTheDocument()
+  })
+
+  it.each([
+    'https://evil.test/callback?error=access_denied&state=s', 'http://127.0.0.1/callback?error=access_denied&state=s',
+    'http://127.0.0.1:9999/callback?error=access_denied&state=s', 'http://127.0.0.1:8123/other?error=access_denied&state=s',
+    'http://user@127.0.0.1:8123/callback?error=access_denied&state=s', 'http://127.0.0.1:8123/callback?error=access_denied&state=s#',
+    'http://127.0.0.1:8123/callback?error=access_denied&error=access_denied&state=s', 'http://127.0.0.1:8123/callback?error=server_error&state=s',
+    'http://127.0.0.1:8123/callback?state=s', 'http://127.0.0.1:8123/callback?error=access_denied',
+    'http://127.0.0.1:8123/callback?error=access_denied&state=s&state=t', 'http://127.0.0.1:8123/callback?error=access_denied&state=',
+    'http://127.0.0.1:8123/callback?error=access_denied&state=s&code=c', 'http://127.0.0.1:8123/callback?code=c&state=s',
+    'http://127.0.0.1:8123/call back?error=access_denied&state=s', '',
+  ])('rejects an invalid denial response %s', async (target) => {
+    const assign = captureNavigation()
+    mocks.get.mockResolvedValue(session({ mode: 'callback', redirect_uri: callbackUri }))
+    mocks.post.mockResolvedValue({ data: { redirect_to: target } })
+    renderApproval()
+    fireEvent.click(await screen.findByRole('button', { name: 'Deny' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/callback/i)
+    expect(assign).not.toHaveBeenCalled()
+  })
+
+  it('rejects a denial response as an approval target', async () => {
+    const assign = captureNavigation()
+    mocks.get.mockResolvedValue(session({ mode: 'callback', redirect_uri: callbackUri }))
+    mocks.post.mockResolvedValue({ data: { redirect_to: `${callbackUri}?error=access_denied&state=s` } })
+    renderApproval()
+    fireEvent.click(await screen.findByRole('button', { name: 'Approve' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/callback/i)
+    expect(assign).not.toHaveBeenCalled()
+  })
+
+  it('keeps the Approve label while a denial is in flight', async () => {
+    mocks.post.mockReturnValue(new Promise(() => {}))
+    renderApproval()
+    fireEvent.click(await screen.findByRole('button', { name: 'Deny' }))
+    expect(await screen.findByRole('button', { name: 'Approve' })).toBeDisabled()
+    expect(screen.queryByText('Approving...')).not.toBeInTheDocument()
+  })
+
+  it('shows a refused denial without approving', async () => {
+    mocks.post.mockRejectedValue(refused(400, 'Invalid or expired authorization. Request a new sign-in link from your client.'))
+    renderApproval()
+    fireEvent.click(await screen.findByRole('button', { name: 'Deny' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/new sign-in link/i)
+    expect(mocks.post).toHaveBeenCalledTimes(1)
+    expect(mocks.post).toHaveBeenCalledWith('/auth/cli/deny', { session_id: sessionId })
+  })
+
+  it('shows the code sign-in refusal with Deny and without Approve', async () => {
+    mocks.get.mockRejectedValue(refused(403, codeModeOff))
+    mocks.post.mockResolvedValue({ data: {} })
+    renderApproval()
+    expect(await screen.findByRole('alert')).toHaveTextContent(codeModeOff)
+    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Deny' }))
+    expect(await screen.findByText('This sign-in request was denied. The link no longer works.')).toBeInTheDocument()
+    expect(mocks.post).toHaveBeenCalledWith('/auth/cli/deny', { session_id: sessionId })
+  })
+
+  it('does not follow a denial callback when the request details are unknown', async () => {
+    const assign = captureNavigation()
+    mocks.get.mockRejectedValue(refused(403, codeModeOff))
+    mocks.post.mockResolvedValue({ data: { redirect_to: `${callbackUri}?error=access_denied&state=s` } })
+    renderApproval()
+    fireEvent.click(await screen.findByRole('button', { name: 'Deny' }))
+    expect(await screen.findByText(/callback destination is invalid/i)).toBeInTheDocument()
+    expect(assign).not.toHaveBeenCalled()
+  })
+
+  it('shows any other refusal of the request details without actions', async () => {
+    mocks.get.mockRejectedValue(refused(400, 'Invalid or expired authorization. Request a new sign-in link from your client.'))
+    renderApproval()
+    expect(await screen.findByRole('alert')).toHaveTextContent(/new sign-in link/i)
+    expect(screen.queryByRole('button', { name: 'Deny' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument()
   })
 
   it.each(['/auth/cli', '/auth/cli?session_id=bad', `/auth/cli?session_id=${sessionId}&session_id=${sessionId}`])('handles an invalid approval link %s', async (path) => {
@@ -149,8 +283,7 @@ describe('CLI browser approval', () => {
   it.each([
     'http://127.0.0.1:8123/callback', 'http://localhost:80/callback', 'http://[::1]:8123/callback',
   ])('returns an approved callback to %s', async (redirectUri) => {
-    const assign = vi.fn()
-    Object.defineProperty(window, 'location', { configurable: true, writable: true, value: { assign } })
+    const assign = captureNavigation()
     mocks.get.mockResolvedValue(session({ mode: 'callback', redirect_uri: redirectUri }))
     const target = `${redirectUri}?code=approved&state=expected`
     mocks.post.mockResolvedValue({ data: { redirect_to: target } })
