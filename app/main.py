@@ -23,6 +23,7 @@ from app.api import (
     baselines,
     campaigns,
     changes,
+    cli_auth,
     company_logo,
     dashboard,
     defects,
@@ -433,6 +434,7 @@ app.add_middleware(
 app.include_router(health.router, prefix="/api", tags=["Health"])
 app.include_router(metrics_router, prefix="/api", tags=["Observability"])
 app.include_router(auth_api.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(cli_auth.router, prefix="/api/auth/cli", tags=["Auth"])
 app.include_router(
     service_credentials.router,
     prefix="/api/service-credentials",

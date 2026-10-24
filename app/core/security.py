@@ -36,6 +36,7 @@ from app.models.project_membership import ProjectAccess
 from app.models.tags import TAG_TYPE_OF_MODEL, TYPE_CODES, ArtefactTag
 from app.models.user import User, UserRole
 from app.services.audit import set_audit_actor
+from app.services.token_service import is_cli_access_token_active
 
 ALGORITHM = "HS256"
 
@@ -90,6 +91,9 @@ async def get_current_user(
         raise credentials_exception
 
     if payload.get("ver") != user.session_version:
+        raise credentials_exception
+
+    if "cli_refresh_id" in payload and not await is_cli_access_token_active(db, payload, user.id):
         raise credentials_exception
 
     if not user.is_active:

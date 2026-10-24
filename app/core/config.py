@@ -217,6 +217,10 @@ class Settings(BaseSettings):
         default="Admin", validation_alias=AliasChoices("BLOOM_ADMIN_FULL_NAME", "ADMIN_FULL_NAME")
     )
 
+    CLI_CODE_MODE_ENABLED: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("BLOOM_CLI_CODE_MODE_ENABLED", "CLI_CODE_MODE_ENABLED"),
+    )
     SMTP_ENABLED: bool = Field(
         default=False, validation_alias=AliasChoices("BLOOM_SMTP_ENABLED", "SMTP_ENABLED")
     )

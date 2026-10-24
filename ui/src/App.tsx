@@ -9,6 +9,7 @@ import ResetPassword from './pages/ResetPassword'
 import ForgotPassword from './pages/ForgotPassword'
 import VerifyEmail from './pages/VerifyEmail'
 import AcceptInvite from './pages/AcceptInvite'
+import CliAuthApprovePage from './pages/CliAuthApprovePage'
 import ErrorBoundary from './components/ErrorBoundary'
 
 /* v8 ignore start */
@@ -56,6 +57,7 @@ function App() {
     <Routes>
       <Route path="/setup" element={<Setup />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/auth/cli" element={<CliAuthApprovePage />} />
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />

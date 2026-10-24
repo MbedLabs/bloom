@@ -6,10 +6,15 @@
 
 - The product identity is fixed as Bloom PLM by EmbedLabs across the application, emails and API. The sidebar shows Bloom PLM with by EmbedLabs beneath it. The `BLOOM_APP_NAME` setting is removed; an existing environment variable or `.env` entry with that name is ignored.
 - The invitation and email change dialogs close with Escape and put the focus on their first field when they open. A project card opens with the keyboard as well as with the mouse.
+- A source install needs Python 3.11 or later.
 
 ### Fixed
 
 - Administrator welcome emails confirm the account is ready and give product-specific next steps, with matching HTML and plain-text instructions. The obsolete one-time runner registration key instructions are removed.
+
+### Security
+
+- Pillow raised to 13.0.0, certifi to 2026.10.19, follow-redirects to 1.16.1, vitest to 4.1.12 and zod to 4.6.7, the patched releases.
 
 ## 1.2.0 - 2026-10-17
 

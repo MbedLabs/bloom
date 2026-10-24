@@ -21,6 +21,9 @@ PUBLIC_ENDPOINTS = {
     "confirm_email_change",
     "setup_status",
     "create_first_admin",
+    "cli_start",
+    "cli_exchange",
+    "cli_refresh",
 }
 
 SIGNED_WEBHOOK_ENDPOINTS = {"github_webhook", "gitlab_webhook", "jira_webhook"}

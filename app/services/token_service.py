@@ -160,3 +160,20 @@ async def invalidate_tokens(db: AsyncSession, user_id: int, *, purpose: UserToke
 async def invalidate_all_refresh_tokens(db: AsyncSession, user_id: int) -> None:
     """Revoke every unused refresh token for a user (all active sessions)."""
     await invalidate_tokens(db, user_id, purpose=UserTokenPurpose.refresh)
+
+
+async def is_cli_access_token_active(db: AsyncSession, payload: dict, user_id: int) -> bool:
+    """Check the unused, unexpired refresh row bound to a CLI access token."""
+    token_id = payload.get("cli_refresh_id")
+    if type(token_id) is not int or token_id <= 0:
+        return False
+    result = await db.scalar(
+        select(UserToken.id).where(
+            UserToken.id == token_id,
+            UserToken.user_id == user_id,
+            UserToken.purpose == UserTokenPurpose.refresh,
+            UserToken.used_at.is_(None),
+            UserToken.expires_at > datetime.now(timezone.utc).replace(tzinfo=None),
+        )
+    )
+    return result is not None
