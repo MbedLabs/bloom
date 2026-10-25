@@ -101,7 +101,7 @@ function ManualCode({ code }: Readonly<{ code: string }>) {
       <label htmlFor="cli-code" className="block text-sm font-medium text-foreground">One-time sign-in code</label>
       <input id="cli-code" value={code} readOnly autoComplete="off" className="w-full rounded-lg border border-input bg-background px-3 py-2 text-foreground font-mono text-sm" />
       <button type="button" onClick={() => { void copyCode() }} className="w-full rounded-lg bg-primary px-4 py-2 text-primary-foreground">Copy code</button>
-      <p role="status" className="text-sm text-muted-foreground">{copyStatus}</p>
+      <output className="block text-sm text-muted-foreground">{copyStatus}</output>
     </div>
   )
 }
@@ -233,11 +233,11 @@ export default function CliAuthApprovePage() {
 
   const problem = error || (sessionId ? '' : NEW_LINK)
 
-  let content = <p role="status" className="text-sm text-muted-foreground">Loading sign-in request...</p>
+  let content = <output className="block text-sm text-muted-foreground">Loading sign-in request...</output>
   if (problem) {
     content = <div role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{problem}</div>
   } else if (denied) {
-    content = <p role="status" className="text-sm text-foreground">{DENIED}</p>
+    content = <output className="block text-sm text-foreground">{DENIED}</output>
   } else if (codeModeOff) {
     content = (
       <div className="space-y-4">
