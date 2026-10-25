@@ -113,3 +113,31 @@ async def test_instance_admin_keeps_global_authority_without_policy_assignment(s
     session.add(user)
     await session.flush()
     assert await effective_permissions(session, user, None) == {"*": {"*"}}
+
+
+@pytest.mark.asyncio
+async def test_multiple_direct_bundles_combine_without_restoring_indirect_project_rights(session):
+    user, project, inherited = await _setup(session)
+    first = Policy(
+        name="Direct requirements", permissions={"REQ": ["view"]}, type_tags={"REQ": {"all": True}}
+    )
+    second = Policy(
+        name="Direct tests", permissions={"TC": ["edit"]}, type_tags={"TC": {"all": True}}
+    )
+    bundles = [Group(name="Readers", policies=[first]), Group(name="Testers", policies=[second])]
+    session.add_all(bundles)
+    await session.flush()
+    session.add_all(
+        [
+            ProjectAccess(project_id=project.id, group_id=inherited.id, inherit_policies=True),
+            *[
+                ProjectAccess(project_id=project.id, user_id=user.id, policy_group=bundle)
+                for bundle in bundles
+            ],
+        ]
+    )
+    await session.flush()
+    permissions = await effective_permissions(session, user, project.id)
+    assert permissions == {"REQ": {"view"}, "TC": {"view", "comment", "edit"}}
+    assert "project" not in permissions
+    assert (await effective_permissions(session, user, None))["access"] == {"delete"}

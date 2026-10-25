@@ -2,6 +2,10 @@
 
 ## 1.3.0 - unreleased
 
+### Added
+
+- Assign a person to several policy groups in one project. Their effective access combines the assigned groups within the existing policy scopes; removing one membership retains the others.
+
 ### Changed
 
 - Document discussions are visible beside the content in a scrolling right panel on desktop and above the content on compact screens.

@@ -24,7 +24,7 @@ from tests.api.test_cli_auth import CHALLENGE, PREFIX, VERIFIER
 
 ROOT = Path(__file__).resolve().parents[2]
 BEFORE = "d6f9b2c3a0e5"
-HEAD = "8134a1512496"
+HEAD = "9e4a2c7d18b0"
 
 
 def _dsn() -> str:
@@ -197,7 +197,7 @@ def test_cli_migration_upgrades_downgrades_with_sessions_and_reupgrades():
 
         asyncio.run(_add_sessions(target, ids["user"]))
         assert asyncio.run(_state(target, ids))["sessions"] == 2
-        _alembic(url, "downgrade", "-1")
+        _alembic(url, "downgrade", BEFORE)
         downgraded = asyncio.run(_state(target, ids))
         assert downgraded["revision"] == BEFORE
         assert downgraded["table"] is False
