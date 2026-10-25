@@ -1,6 +1,7 @@
 import SelectField from '../components/SelectField'
 import { refreshProjectViews, finishArtefactDeletion } from '../lib/refreshProjectViews'
 import WorkflowPanel from '../components/WorkflowPanel'
+import DocumentDetailColumns from '../components/DocumentDetailColumns'
 import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
 import { type ReactNode, useState, useEffect } from 'react'
 import ArtefactTags from '../components/ArtefactTags'
@@ -262,6 +263,7 @@ export default function SuiteDetail({
         )}
       </div>
 
+      <DocumentDetailColumns rightRail={<WorkflowPanel artefactType="test-suite" artefactId={parsedSuiteId} projectPrefix={prefix} projectId={suite.project_id} />}>
       {canEditDocs && workflow.data?.actions?.edit_current && editing && (
         <div className="bg-card rounded-lg shadow-elegant p-5">
           <h3 className="text-sm font-medium text-muted-foreground mb-3">Edit Suite</h3>
@@ -413,11 +415,10 @@ export default function SuiteDetail({
         </div>
       )}
 
-      <WorkflowPanel artefactType="test-suite" artefactId={parsedSuiteId} projectPrefix={prefix} projectId={suite.project_id} />
-
       <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
         <DocumentActivityPanel artefactType="test-suite" artefactId={parsedSuiteId} />
       </div>
+      </DocumentDetailColumns>
     </div>
   )
 }

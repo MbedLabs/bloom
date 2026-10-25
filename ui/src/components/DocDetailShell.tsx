@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router'
 import { ArrowLeft } from 'lucide-react'
 import type { DocType } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
+import DocumentDetailColumns from './DocumentDetailColumns'
 
 const STATUS_COLORS: Record<string, string> = {
   Draft: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
@@ -114,10 +115,7 @@ export default function DocDetailShell({
       </div>
 
       {rightRail ? (
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6">
-          <div className="space-y-6">{children}</div>
-          <div className="space-y-6">{rightRail}</div>
-        </div>
+        <DocumentDetailColumns rightRail={rightRail}>{children}</DocumentDetailColumns>
       ) : (
         <div className="space-y-6">{children}</div>
       )}

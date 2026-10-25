@@ -65,6 +65,7 @@ vi.mock('@tanstack/react-query', async () => {
       let data: unknown = requirement
       if (queryKey[0] === 'project') data = { id: 7, name: 'Flight', prefix: 'FLT' }
       else if (queryKey[0] === 'mentionableUsers') data = ON_THE_PROJECT
+      else if (queryKey[0] === 'artefactComments') data = []
       else if (queryKey[0] === 'users') data = DIRECTORY
       else if (queryKey[0] === 'document-workflow') data = {
         ...workflowFixture,

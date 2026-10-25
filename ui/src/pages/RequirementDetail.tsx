@@ -199,6 +199,8 @@ export default function RequirementDetail({
       ) : undefined}
       rightRail={
         <>
+          <WorkflowPanel artefactType="requirement" artefactId={reqId} projectPrefix={projectPrefix} projectId={requirement.project_id} />
+
           <SectionCard title="Metadata">
             <div className="space-y-4">
               <div>
@@ -216,8 +218,6 @@ export default function RequirementDetail({
               <MetaItem label="Updated" value={formatDateTime(requirement.updated_at) + ' ago'} />
             </div>
           </SectionCard>
-
-          <WorkflowPanel artefactType="requirement" artefactId={reqId} projectPrefix={projectPrefix} projectId={requirement.project_id} />
 
           {requirement.linked_test_runs?.length > 0 && (
             <SectionCard title="Test runs">

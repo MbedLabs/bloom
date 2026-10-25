@@ -1,5 +1,5 @@
 import { refreshProjectViews } from '../lib/refreshProjectViews'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { UserCheck, UserCog } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -24,11 +24,12 @@ export default function WorkflowPanel({ artefactType, artefactId, projectPrefix,
   const workflow = useDocumentWorkflow(artefactType, artefactId)
   const queryClient = useQueryClient()
   const toast = useToast()
-  const [tab, setTab] = useState<'workflow' | 'comments' | 'history'>('workflow')
+  const [tab, setTab] = useState<'workflow' | 'history'>('workflow')
+  const discussion = useRef<HTMLElement>(null)
   const [comment, setComment] = useState('')
   const [revision, setRevision] = useState<number | null>(null)
   const [downloadId, setDownloadId] = useState<number | null>(null)
-  const comments = useQuery({ queryKey: ['artefactComments', artefactType, artefactId], queryFn: () => artefactsApi.listComments(artefactType, artefactId), enabled: !!workflow.data && tab === 'comments', retry: false })
+  const comments = useQuery({ queryKey: ['artefactComments', artefactType, artefactId], queryFn: () => artefactsApi.listComments(artefactType, artefactId), enabled: !!workflow.data, retry: false })
   const archive = useQuery({ queryKey: ['document-revision', artefactType, artefactId, revision], queryFn: () => workflowApi.getRevision(artefactType, artefactId, revision!), enabled: !!workflow.data && revision !== null, retry: false })
   const mutation = useMutation({
     mutationFn: (operation: Operation) => {
@@ -70,6 +71,15 @@ export default function WorkflowPanel({ artefactType, artefactId, projectPrefix,
   const state = workflow.data
   const busy = mutation.isPending
   return <section aria-label="Document review" className="space-y-4">
+    <section aria-label="Document discussion" ref={discussion} tabIndex={-1}>
+      <SectionCard title="Discussion">
+        {comments.isPending && <p>Loading comments...</p>}
+        {!comments.isPending && comments.isError && <p role="alert">Could not load comments.</p>}
+        {!comments.isPending && !comments.isError && (comments.data ?? []).length === 0 && <p className="text-sm text-muted-foreground">No comments yet.</p>}
+        {!comments.isPending && !comments.isError && (comments.data ?? []).map(item => <article key={item.id} className="mb-4 break-words"><UserIdentity user={{ id: item.author_user_id ?? undefined, full_name: item.author_name, profile_picture_url: item.author_profile_picture_url }} /><p className="whitespace-pre-wrap">{item.body}</p><time className="text-xs text-muted-foreground">{formatDateTime(item.created_at)}</time></article>)}
+        {state.actions.comment && <fieldset disabled={busy} className="mt-4 space-y-3"><label className="block">Comment<textarea aria-label="Comment" value={comment} onChange={event => setComment(event.target.value)} className="block w-full rounded-md border border-input bg-background p-3" /></label><button className={actionButtonClass} type="button" disabled={!comment.trim()} onClick={() => mutation.mutate({ kind: 'comment' })}>Post Comment</button></fieldset>}
+      </SectionCard>
+    </section>
     <SectionCard title="Review">
       <div className="space-y-3">
         {state.controlled && state.phase && state.revision_number !== null && <div className="text-sm text-muted-foreground">{state.phase} · Revision {state.revision_number}</div>}
@@ -88,7 +98,7 @@ export default function WorkflowPanel({ artefactType, artefactId, projectPrefix,
           {state.controlled && <button className={reviewButtonClass} type="button" disabled={!state.actions.request_approval} onClick={() => mutation.mutate({ kind: 'approval' })}><UserCheck className="h-3.5 w-3.5 mr-1" />Mark Reviewed</button>}
           {state.controlled && state.actions.decline && state.pending_request?.kind === 'review' && <button className={actionButtonClass} type="button" onClick={() => mutation.mutate({ kind: 'decline' })}>Decline</button>}
         </fieldset>
-        <button className={actionButtonClass} type="button" aria-pressed={tab === 'comments'} onClick={() => setTab(tab === 'comments' ? 'workflow' : 'comments')}>Comments</button>
+        <button className={actionButtonClass} type="button" onClick={() => discussion.current?.focus()}>Comments</button>
       </div>
     </SectionCard>
     {state.controlled && <SectionCard title="Approval">
@@ -114,12 +124,6 @@ export default function WorkflowPanel({ artefactType, artefactId, projectPrefix,
       </div>
     </SectionCard>}
     {mutation.isError && <p role="alert" className="text-destructive">{extractApiErrorMessage(mutation.error)}</p>}
-    {tab === 'comments' && <SectionCard title="Discussion">
-      {comments.isPending && <p>Loading comments...</p>}
-      {!comments.isPending && comments.isError && <p role="alert">Could not load comments.</p>}
-      {!comments.isPending && !comments.isError && (comments.data ?? []).map(item => <article key={item.id} className="mb-4"><UserIdentity user={{ id: item.author_user_id ?? undefined, full_name: item.author_name, profile_picture_url: item.author_profile_picture_url }} /><p className="whitespace-pre-wrap">{item.body}</p><time>{formatDateTime(item.created_at)}</time></article>)}
-      {state.actions.comment && <fieldset disabled={busy} className="mt-4 space-y-3"><label className="block">Comment<textarea aria-label="Comment" value={comment} onChange={event => setComment(event.target.value)} className="block w-full rounded-md border border-input bg-background p-3" /></label><button className={actionButtonClass} type="button" disabled={!comment.trim()} onClick={() => mutation.mutate({ kind: 'comment' })}>Post Comment</button></fieldset>}
-    </SectionCard>}
     {tab === 'history' && state.controlled && <SectionCard title="Approved revisions">
       {state.revisions.length === 0 ? <p>No approved revisions recorded.</p> : state.revisions.map(item => <div key={item.revision_number} className="mb-3"><button className={actionButtonClass} type="button" onClick={() => setRevision(item.revision_number)}>Open revision {item.revision_number}</button><span> · {item.approved_by ? <UserIdentity user={item.approved_by} /> : 'Approval actor not recorded'} · {formatDateTime(item.approved_at ?? item.captured_at)}</span></div>)}
     </SectionCard>}
