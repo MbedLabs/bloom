@@ -7,6 +7,7 @@
 - The product identity is fixed as Bloom PLM by EmbedLabs across the application, emails and API. The sidebar shows Bloom PLM with by EmbedLabs beneath it. The `BLOOM_APP_NAME` setting is removed; an existing environment variable or `.env` entry with that name is ignored.
 - The invitation and email change dialogs close with Escape and put the focus on their first field when they open. A project card opens with the keyboard as well as with the mouse.
 - A source install needs Python 3.11 or later.
+- The container starts as root only to prepare its directories, data ownership and, on Cloudron, its secrets and migrations; supervisord, nginx and uvicorn then run as `appuser`. Kubernetes `runAsNonRoot` policies are not supported.
 
 ### Fixed
 
