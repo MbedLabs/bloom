@@ -180,7 +180,8 @@ def test_cli_migration_upgrades_downgrades_with_sessions_and_reupgrades():
         _alembic(url, "upgrade", BEFORE)
         ids = asyncio.run(_seed_before(target))
         before = asyncio.run(_state(target, ids))
-        assert before["revision"] == BEFORE and before["table"] is False
+        assert before["revision"] == BEFORE
+        assert before["table"] is False
 
         _alembic(url, "upgrade", "head")
         upgraded = asyncio.run(_state(target, ids))
@@ -198,7 +199,8 @@ def test_cli_migration_upgrades_downgrades_with_sessions_and_reupgrades():
         assert asyncio.run(_state(target, ids))["sessions"] == 2
         _alembic(url, "downgrade", "-1")
         downgraded = asyncio.run(_state(target, ids))
-        assert downgraded["revision"] == BEFORE and downgraded["table"] is False
+        assert downgraded["revision"] == BEFORE
+        assert downgraded["table"] is False
         assert {k: downgraded[k] for k in retained} == retained
 
         _alembic(url, "upgrade", "head")

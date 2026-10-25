@@ -250,15 +250,18 @@ def test_manual_exchange_preserves_user_permissions_and_hashes_secrets(cli_clien
 
     row, tokens = run_db(maker, inspect)
     assert row[0] == hashlib.sha256(approval["exchange_code"].encode()).hexdigest()
-    assert row[1] is not None and row[2] == 1
-    assert len(tokens) == 1 and tokens[0].purpose == UserTokenPurpose.refresh
+    assert row[1] is not None
+    assert row[2] == 1
+    assert len(tokens) == 1
+    assert tokens[0].purpose == UserTokenPurpose.refresh
     assert tokens[0].token_hash == hashlib.sha256(data["refresh_token"].encode()).hexdigest()
     assert payload["cli_refresh_id"] == tokens[0].id
     secrets_issued = [VERIFIER, approval["exchange_code"], data["access_token"]]
     secrets_issued.append(data["refresh_token"])
     for action in ("auth.cli_approve", "auth.cli_exchange"):
         events = audit_rows(maker, action)
-        assert len(events) == 1 and events[0].outcome == "success"
+        assert len(events) == 1
+        assert events[0].outcome == "success"
         assert events[0].actor_user_id == user_id
         assert events[0].target_type == "cli_auth_session"
         assert events[0].target_id == created["session_id"]
@@ -436,7 +439,8 @@ def test_session_shows_request_time_and_request_code(cli_client, mode, redirect_
     data = response.json()
     assert set(data) == SESSION_FIELDS
     assert data["request_code"] == RFC7636_REQUEST_CODE
-    assert data["created_at"].endswith("Z") and data["expires_at"].endswith("Z")
+    assert data["created_at"].endswith("Z")
+    assert data["expires_at"].endswith("Z")
     requested = datetime.fromisoformat(data["created_at"][:-1])
     expires = datetime.fromisoformat(data["expires_at"][:-1])
     assert before <= requested <= datetime.utcnow()
