@@ -197,3 +197,30 @@ def send_access_request_email(
             "access_request.html", {key: html.escape(value) for key, value in context.items()}
         ),
     )
+
+
+def send_workflow_request_email(
+    *,
+    to_email: str,
+    recipient_name: str,
+    actor_name: str,
+    event_title: str,
+    document_link: str,
+) -> None:
+    """Render matching branded text and HTML for a document workflow delivery."""
+    context = {
+        "recipient_name": recipient_name,
+        "actor_name": actor_name,
+        "event_title": event_title,
+        "document_link": document_link,
+        "app_name": PRODUCT_NAME,
+        "app_identity": PRODUCT_IDENTITY,
+    }
+    send_email(
+        to_email=to_email,
+        subject=event_title,
+        text_body=render_template("workflow_request.txt", context),
+        html_body=render_template(
+            "workflow_request.html", {key: html.escape(value) for key, value in context.items()}
+        ),
+    )

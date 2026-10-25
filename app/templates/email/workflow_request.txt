@@ -1,0 +1,13 @@
+${app_identity}
+
+Hello ${recipient_name},
+
+${actor_name}: ${event_title}.
+
+View the discussion and document status in ${app_name}.
+
+Open document: ${document_link}
+
+${app_identity}
+
+(c) 2026 EmbedLabs. All rights reserved.

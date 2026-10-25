@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Every email carries the product identity as its heading and one action. Access request and workflow request emails also open their plain text with the identity and give a product-specific next step in HTML and plain text. Workflow request emails are sent in HTML as well as plain text.
 - The product identity is fixed as Bloom PLM by EmbedLabs across the application, emails and API. The sidebar shows Bloom PLM with by EmbedLabs beneath it. The `BLOOM_APP_NAME` setting is removed; an existing environment variable or `.env` entry with that name is ignored.
 - The invitation and email change dialogs close with Escape and put the focus on their first field when they open. A project card opens with the keyboard as well as with the mouse.
 - A source install needs Python 3.11 or later.
