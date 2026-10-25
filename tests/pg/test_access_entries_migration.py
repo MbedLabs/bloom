@@ -55,7 +55,7 @@ async def _seed(dsn: str) -> dict:
                 "INSERT INTO users (email, full_name, hashed_password, role, is_active, "
                 "created_at, updated_at) VALUES ($1, $2, 'x', $3, true, now(), now()) "
                 "RETURNING id",
-                f"{key}@example.com",
+                f"{key}@access-migration.example.com",
                 key,
                 role,
             )
@@ -264,23 +264,7 @@ def test_the_access_migration_seeds_defaults_and_converts_memberships():
             if resource not in {"users", "access", "application"}
         }
 
-        environment = {
-            **os.environ,
-            "DATABASE_URL": url,
-            "BLOOM_DOTENV_DISABLED": "1",
-            "ADMIN_EMAIL": "access-validation@example.com",
-            "ADMIN_PASSWORD": "ci-admin-password-123",
-            "AUTO_SEED_ADMIN": "true",
-            "RUN_STARTUP_DATA_REPAIR": "false",
-        }
-        for key in (
-            "BLOOM_DATABASE_URL",
-            "BLOOM_ADMIN_EMAIL",
-            "BLOOM_ADMIN_PASSWORD",
-            "BLOOM_AUTO_SEED_ADMIN",
-            "BLOOM_RUN_STARTUP_DATA_REPAIR",
-        ):
-            environment.pop(key, None)
+        environment = {**os.environ, "DATABASE_URL": url, "BLOOM_DOTENV_DISABLED": "1"}
         checked = subprocess.run(
             [
                 sys.executable,

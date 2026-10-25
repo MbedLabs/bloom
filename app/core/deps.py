@@ -10,4 +10,8 @@ _rate_limit_disabled = os.environ.get("BLOOM_DISABLE_RATE_LIMIT", "").lower() in
     "true",
     "yes",
 }
-limiter = Limiter(key_func=get_remote_address, enabled=not _rate_limit_disabled)
+limiter = Limiter(
+    key_func=get_remote_address,
+    enabled=not _rate_limit_disabled,
+    config_filename=os.devnull if os.environ.get("BLOOM_DOTENV_DISABLED") == "1" else None,
+)
