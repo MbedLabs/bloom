@@ -169,11 +169,13 @@ function ProjectGroupRoster({ projectId, group, members, people, policies, canAs
     {choosing && <fieldset disabled={busy} className="mt-4 min-w-0 space-y-3">
       <legend className="text-sm font-medium">Select members</legend>
       <input aria-label={`Search people for ${group.name}`} placeholder="Search people..." value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
-      <p className="text-xs text-muted-foreground">Assigning a person replaces their current policy group in this project. Their assignments in other projects stay separate.</p>
+      <p className="text-xs text-muted-foreground">People can receive several policy groups in this project. Assignments in other projects stay separate.</p>
       <div className="max-h-56 space-y-2 overflow-y-auto">
         {filtered.map((person) => {
-          const current = members.find((member) => member.user_id === person.id)
-          return <label key={person.id} className="flex items-start gap-2 text-sm"><input type="checkbox" aria-label={`Select ${person.full_name}`} disabled={busy || (assignedIds.includes(person.id) && !canRemove)} checked={selected.includes(person.id)} onChange={() => setSelected((values) => values.includes(person.id) ? values.filter((id) => id !== person.id) : [...values, person.id].sort((a, b) => a - b))} className="mt-1" /><span className="min-w-0"><span className="block truncate"><UserIdentity user={person} /></span><span className="block truncate text-xs text-muted-foreground">{person.email}</span>{current && current.policy_group_id !== group.id && <span className="text-xs text-muted-foreground">Currently: {current.policy_group_name ?? pickerPolicySource(current)}</span>}</span></label>
+          const current = members.filter((member) => member.user_id === person.id)
+          const currentGroups = current.filter((member) => member.policy_group_id).map((member) => member.policy_group_name ?? 'Policy group').sort((a, b) => a.localeCompare(b))
+          const individual = current.find((member) => !member.policy_group_id)
+          return <label key={person.id} className="flex items-start gap-2 text-sm"><input type="checkbox" aria-label={`Select ${person.full_name}`} disabled={busy || (assignedIds.includes(person.id) && !canRemove)} checked={selected.includes(person.id)} onChange={() => setSelected((values) => values.includes(person.id) ? values.filter((id) => id !== person.id) : [...values, person.id].sort((a, b) => a - b))} className="mt-1" /><span className="min-w-0"><span className="block truncate"><UserIdentity user={person} /></span><span className="block truncate text-xs text-muted-foreground">{person.email}</span>{currentGroups.length > 0 && <span className="text-xs text-muted-foreground">Current groups: {currentGroups.join(', ')}</span>}{individual && <span className="text-xs text-muted-foreground">Replaces: {pickerPolicySource(individual)}</span>}</span></label>
         })}
         {filtered.length === 0 && <p className="text-sm text-muted-foreground">{search ? 'No matching people.' : 'No people available.'}</p>}
       </div>
