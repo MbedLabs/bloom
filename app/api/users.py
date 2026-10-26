@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import get_row_or_404
 from app.api.groups import _selected_policies
+from app.api.project_memberships import project_access_entries
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.permissions import as_lists
@@ -26,7 +27,7 @@ from app.core.security import (
     require_role,
 )
 from app.models import Project, ReportRequest
-from app.models.groups import GroupMembership, user_application_policies
+from app.models.groups import Group, GroupMembership, user_application_policies
 from app.models.models import (
     ARTEFACT_MODELS,
     Defect,
@@ -53,6 +54,7 @@ from app.schemas.auth import (
     UserResponse,
     UserUpdate,
 )
+from app.schemas.memberships import UserAccessSummary, UserProjectAccess
 from app.services.audit import record_audit_event
 from app.services.mail_service import (
     MailConfigurationError,
@@ -109,6 +111,70 @@ async def application_policy_ids(
         .order_by(user_application_policies.c.policy_id)
     )
     return {"policy_ids": list(ids)}
+
+
+@router.get(
+    "/{user_id}/access-summary",
+    response_model=UserAccessSummary,
+    responses={404: {"description": HTTPStatus(404).phrase}},
+)
+async def user_access_summary(
+    user_id: int,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    """List the account's groups and the projects it can access, with the groups behind each."""
+    user = await db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
+    group_ids = select(GroupMembership.group_id).where(GroupMembership.user_id == user_id)
+    group_names = await db.scalars(
+        select(Group.name).where(Group.id.in_(group_ids)).order_by(Group.name)
+    )
+    projects = await db.execute(
+        select(Project.id, Project.name)
+        .where(
+            Project.id.in_(
+                select(ProjectAccess.project_id).where(
+                    or_(ProjectAccess.user_id == user_id, ProjectAccess.group_id.in_(group_ids))
+                )
+            )
+        )
+        .order_by(Project.name)
+    )
+    summaries = []
+    for project_id, project_name in projects.all():
+        entry = next(
+            (
+                entry
+                for entry in await project_access_entries(db, project_id)
+                if entry.user_id == user_id
+            ),
+            None,
+        )
+        if entry is None:
+            continue
+        groups = []
+        for origin in entry.origins:
+            if origin.group and origin.group not in groups:
+                groups.append(origin.group)
+        summaries.append(
+            UserProjectAccess(
+                project_id=project_id,
+                project_name=project_name,
+                owner=any(origin.owner for origin in entry.origins),
+                groups=groups,
+                direct=any(
+                    origin.kind == "direct" and origin.group is None and not origin.owner
+                    for origin in entry.origins
+                ),
+            )
+        )
+    return UserAccessSummary(
+        every_project=user.role == UserRole.admin,
+        groups=list(group_names),
+        projects=summaries,
+    )
 
 
 @router.put(

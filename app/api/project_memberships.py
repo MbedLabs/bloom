@@ -345,6 +345,11 @@ async def list_project_access(
 ):
     """Report direct and group entries from the same storage authorization reads."""
     await _project(db, project_id)
+    return await project_access_entries(db, project_id)
+
+
+async def project_access_entries(db: AsyncSession, project_id: int) -> list[ProjectAccessEntry]:
+    """One entry per user with access to the project, with every origin of that access."""
     entries = {}
     rows = (
         (

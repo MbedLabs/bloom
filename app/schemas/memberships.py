@@ -116,3 +116,21 @@ class ProjectMemberResponse(BaseModel):
     def serialize_dt(self, dt: datetime, _info):
         """Serialize a stored UTC timestamp with the UTC designator."""
         return f"{dt.isoformat()}Z"
+
+
+class UserProjectAccess(BaseModel):
+    """One project a user has access to, with the groups that give it."""
+
+    project_id: int
+    project_name: str
+    owner: bool
+    groups: list[str]
+    direct: bool
+
+
+class UserAccessSummary(BaseModel):
+    """A user's groups and project access by name, without policies or permissions."""
+
+    every_project: bool
+    groups: list[str]
+    projects: list[UserProjectAccess]
