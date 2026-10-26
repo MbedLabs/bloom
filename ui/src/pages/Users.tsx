@@ -2,12 +2,12 @@ import { PRODUCT_NAME } from '../brandAssets'
 import SelectField from '../components/SelectField'
 import ProfilePicture from '../components/ProfilePicture'
 import UserIdentity from '../components/UserIdentity'
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { extractApiErrorMessage, InviteUserResponse, User, usersApi, policiesApi, type Policy } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
-import { UserPlus, Edit2, Trash2, X, Shield, Wrench, Eye, Copy, Check, Mail } from 'lucide-react'
+import { UserPlus, Edit2, Trash2, X, Shield, Wrench, Eye, Copy, Check, Mail, ChevronDown, ChevronRight } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
 import { ROLE_LABELS } from '../lib/roles'
 import { policyPermissions, policyResourceSummary } from '../lib/policySummary'
@@ -38,6 +38,10 @@ export default function UsersPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [emailActionError, setEmailActionError] = useState<string | null>(null)
   const [pendingDeleteUserId, setPendingDeleteUserId] = useState<number | null>(null)
+  const [openUserIds, setOpenUserIds] = useState<number[]>([])
+
+  const toggleUser = (id: number) =>
+    setOpenUserIds((ids) => (ids.includes(id) ? ids.filter((openId) => openId !== id) : [...ids, id]))
 
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
@@ -166,10 +170,22 @@ export default function UsersPage() {
               const roleConf = ROLE_CONFIG[u.role as keyof typeof ROLE_CONFIG]
               const isSelf = u.id === currentUser?.id
               const canEditRole = !isSelf && u.role !== 'admin'
+              const isOpen = openUserIds.includes(u.id)
               return (
-                <tr key={u.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
+                <Fragment key={u.id}>
+                <tr className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => toggleUser(u.id)}
+                        aria-expanded={isOpen}
+                        aria-label={`${isOpen ? 'Hide' : 'Show'} access of ${u.full_name}`}
+                        title={isOpen ? 'Hide access' : 'Show access'}
+                        className="p-1 -ml-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                      >
+                        {isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                      </button>
                       <ProfilePicture user={u} />
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{u.full_name}</p>
@@ -300,6 +316,14 @@ export default function UsersPage() {
                     </div>
                   </td>
                 </tr>
+                {isOpen && (
+                  <tr className="border-b border-border last:border-0 bg-muted/10">
+                    <td colSpan={5} className="px-4 py-2">
+                      <UserAccessDetails userId={u.id} />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               )
             })}
           </tbody>
@@ -338,6 +362,62 @@ export default function UsersPage() {
         />
       )}
     </div>
+  )
+}
+
+/** A user's groups and the projects they can access, by name only. */
+function UserAccessDetails({ userId }: Readonly<{ userId: number }>) {
+  const summary = useQuery({
+    queryKey: ['user-access-summary', userId],
+    queryFn: () => usersApi.accessSummary(userId),
+  })
+  if (summary.isPending) {
+    return <p className="text-xs text-muted-foreground">Loading access...</p>
+  }
+  if (summary.isError) {
+    return (
+      <p role="alert" className="text-xs text-destructive">
+        Could not load access.{' '}
+        <button type="button" onClick={() => { void summary.refetch() }} className="underline">
+          Retry
+        </button>
+      </p>
+    )
+  }
+  const { every_project: everyProject, groups, projects } = summary.data
+  return (
+    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs">
+      <dt className="font-medium text-muted-foreground">Groups</dt>
+      <dd className="flex flex-wrap gap-1.5">
+        {groups.length === 0 ? (
+          <span className="text-muted-foreground">No groups</span>
+        ) : (
+          groups.map((group) => (
+            <span key={group} className="rounded-full border border-border px-2 py-0.5 text-foreground">
+              {group}
+            </span>
+          ))
+        )}
+      </dd>
+      <dt className="font-medium text-muted-foreground">Projects</dt>
+      <dd>
+        {everyProject && <span className="text-foreground">Every project (Admin)</span>}
+        {!everyProject && projects.length === 0 && <span className="text-muted-foreground">No projects</span>}
+        {!everyProject && projects.length > 0 && (
+          <ul className="space-y-0.5">
+            {projects.map((project) => (
+              <li key={project.project_id} className="text-foreground">
+                <span className="font-medium">{project.project_name}</span>
+                <span className="text-muted-foreground">
+                  {': '}
+                  {[...(project.owner ? ['Owner'] : []), ...project.groups, ...(project.direct ? ['Direct'] : [])].join(', ')}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </dd>
+    </dl>
   )
 }
 

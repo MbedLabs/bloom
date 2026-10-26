@@ -109,6 +109,7 @@ const CALLS: Array<[string, unknown[], string, string]> = [
   ['usersApi.list', [], 'get', '/users'],
   ['usersApi.listMentionable', [5], 'get', '/users/mentionable'],
   ['usersApi.get', [3], 'get', '/users/3'],
+  ['usersApi.accessSummary', [3], 'get', '/users/3/access-summary'],
   ['usersApi.applicationPolicies', [3], 'get', '/users/3/application-policies'],
   ['usersApi.setApplicationPolicies', [3, [1, 2]], 'put', '/users/3/application-policies'],
   [

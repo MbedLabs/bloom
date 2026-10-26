@@ -334,7 +334,25 @@ export interface MentionableUser extends ProfilePerson {
   full_name: string
 }
 
+/** One project a user can access, with the groups that give it. */
+export interface UserProjectAccess {
+  project_id: number
+  project_name: string
+  owner: boolean
+  groups: string[]
+  direct: boolean
+}
+
+/** A user's groups and project access by name, for the Users page. */
+export interface UserAccessSummary {
+  every_project: boolean
+  groups: string[]
+  projects: UserProjectAccess[]
+}
+
 export const usersApi = {
+  accessSummary: async (id: number): Promise<UserAccessSummary> =>
+    (await api.get<UserAccessSummary>(`/users/${id}/access-summary`)).data,
   applicationPolicies: async (id: number): Promise<{ policy_ids: number[] }> =>
     (await api.get<{ policy_ids: number[] }>(`/users/${id}/application-policies`)).data,
   setApplicationPolicies: async (id: number, policyIds: number[]): Promise<{ policy_ids: number[] }> =>
