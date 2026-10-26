@@ -103,9 +103,12 @@ def _quote(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def build_jql(setting) -> str:
+def build_jql(
+    setting, *, updated_within: Optional[int] = None, created_within: Optional[int] = None
+) -> str:
     """The backfill search: the open issues of the mapped project, the issue types, the
-    label and the JQL fragment, when set."""
+    label and the JQL fragment, when set, limited to the issues updated or created in the
+    last given minutes when those are passed."""
     clauses = [
         f"project = {_quote(setting.jira_project_key)}",
         "issuetype in (" + ", ".join(_quote(t) for t in issue_types(setting)) + ")",
@@ -115,7 +118,20 @@ def build_jql(setting) -> str:
         clauses.append(f"labels = {_quote(setting.jira_label)}")
     if setting.jira_jql:
         clauses.append(f"({setting.jira_jql})")
+    if updated_within is not None:
+        clauses.append(f"updated >= -{updated_within}m")
+    if created_within is not None:
+        clauses.append(f"created >= -{created_within}m")
     return " AND ".join(clauses) + " ORDER BY created ASC"
+
+
+def changed_jql(setting, updated_within: int) -> str:
+    """The update search: every issue of the mapped project changed in the last given
+    minutes, oldest change first."""
+    return (
+        f"project = {_quote(setting.jira_project_key)} AND updated >= -{updated_within}m"
+        " ORDER BY updated ASC"
+    )
 
 
 def search_fields(setting) -> list[str]:

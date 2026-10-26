@@ -6,9 +6,11 @@
 
 - Assign a person to several policy groups in one project. Their effective access combines the assigned groups within the existing policy scopes; removing one membership retains the others.
 - User Management shows, under each user, the groups that user belongs to and each project they can access with the groups behind it; the list stays collapsed until it is opened for that user.
+- Every project's issue tracker syncs by itself, every 15 minutes by default (`INTEGRATION_SYNC_MINUTES`, `0` turns it off), with no webhook needed. Matching Jira issues become defects, including those already open when the integration is set up; linked Jira issues carry their changes and deletions onto their defects and change requests; linked GitHub and GitLab issues carry their state. Sync now runs the whole Jira sync at once.
 
 ### Changed
 
+- A linked GitHub, GitLab or Jira issue changes its defect's status only when the issue closes, which closes the defect, or when a closed issue is open again, which sets the Closed defect back to Open. Statuses set in Bloom stay otherwise, also a defect closed or reopened in Bloom while its issue stays as it was, and the issue's state still shows on the defect.
 - Document discussions are visible beside the content in a scrolling right panel on desktop and above the content on compact screens.
 - Every email carries the product identity as its heading and one action. Access request and workflow request emails also open their plain text with the identity and give a product-specific next step in HTML and plain text. Workflow request emails are sent in HTML as well as plain text.
 - The product identity is fixed as Bloom PLM by EmbedLabs across the application, emails and API. The sidebar shows Bloom PLM with by EmbedLabs beneath it. The `BLOOM_APP_NAME` setting is removed; an existing environment variable or `.env` entry with that name is ignored.

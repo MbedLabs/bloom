@@ -136,6 +136,12 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("BLOOM_AUTO_SEED_ADMIN", "AUTO_SEED_ADMIN"),
     )
 
+    INTEGRATION_SYNC_MINUTES: int = Field(
+        default=15,
+        ge=0,
+        validation_alias=AliasChoices("BLOOM_INTEGRATION_SYNC_MINUTES", "INTEGRATION_SYNC_MINUTES"),
+    )
+
     REQIF_MAX_REQUEST_BYTES: int = Field(
         default=25 * 1024 * 1024,
         ge=1,

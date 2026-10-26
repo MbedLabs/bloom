@@ -78,6 +78,7 @@ from app.models import (
     TestSuite,
 )
 from app.models.user import User, UserRole
+from app.services import integration_sync
 from app.services.attachment_cleanup import reconcile_attachments
 
 setup_logging(level=settings.LOG_LEVEL, json_logs=bool(settings.LOG_JSON))
@@ -333,13 +334,19 @@ async def lifespan(app: FastAPI):
                 logger.exception("Attachment cleanup pass failed")
             await asyncio.sleep(24 * 60 * 60)
 
-    cleanup_task = asyncio.create_task(cleanup_loop())
+    tasks = [asyncio.create_task(cleanup_loop())]
+    if settings.INTEGRATION_SYNC_MINUTES > 0:
+        tasks.append(
+            asyncio.create_task(integration_sync.sync_loop(settings.INTEGRATION_SYNC_MINUTES))
+        )
     try:
         yield
     finally:
-        cleanup_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await cleanup_task
+        for task in tasks:
+            task.cancel()
+        for task in tasks:
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
 
 
 app = FastAPI(

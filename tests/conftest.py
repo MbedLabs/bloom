@@ -94,6 +94,7 @@ def _isolate_test_environment() -> None:
         "FRONTEND_BASE_URL": "http://localhost:8000",
         "AUTO_SEED_ADMIN": "true",
         "RUN_STARTUP_DATA_REPAIR": "false",
+        "INTEGRATION_SYNC_MINUTES": "0",
     }
     for key, value in values.items():
         for prefix in ("", "BLOOM_"):

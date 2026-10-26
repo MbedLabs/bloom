@@ -139,22 +139,23 @@ In Bloom, as an administrator, open the project settings, choose Jira under Exte
 issue tracker and fill in:
 
 - Site URL (`https://your-site.atlassian.net`).
-- Optionally, the account email and API token of a Jira account (created under
-  id.atlassian.com, Security, API tokens). They are needed only to migrate the issues
-  that are already open (Pull existing issues) and for two-way sync, and the email
-  also makes that Bloom user the reporter of the defects. Webhook deliveries need
-  neither. They are stored for this project only, encrypted. Both kinds of token work:
+- The account email and API token of a Jira account (created under
+  id.atlassian.com, Security, API tokens). The automatic sync, Sync now and two-way
+  sync need them, and the email also makes that Bloom user the reporter of the
+  defects. Webhook deliveries need neither. They are stored for this project only, encrypted. Both kinds of token work:
   a classic API token acts with the account's own Jira permissions; an API token with
   scopes needs `read:jira-work` and `read:jira-user`, plus `write:jira-work` for
   two-way sync, and Bloom calls Jira for it through Atlassian's API gateway for the
-  site. Bloom checks the credential before each pull or push and reports a token Jira
+  site. Bloom checks the credential before each sync or push and reports a token Jira
   does not accept.
 - Webhook secret: any long random string; the same value goes into Jira.
 - Jira project key, issue types (default `Bug`), and optionally a label, a custom field
-  that holds Bloom test-case ids, and extra JQL used by the pull.
+  that holds Bloom test-case ids, and extra JQL used by the sync.
 - The Jira priority to Bloom priority map.
 
-In Jira, as a site administrator, open Settings, System, WebHooks and create a webhook:
+The webhook is optional: the automatic sync below works without it. With a webhook,
+changes arrive within seconds. In Jira, as a site administrator, open Settings, System,
+WebHooks and create a webhook:
 
 - URL: `https://<bloom-host>/api/integrations/jira/webhook`
 - Secret: the webhook secret entered in Bloom. Jira signs each delivery with it and
@@ -171,16 +172,38 @@ What Bloom does with an event:
   the reference field becomes the defect's source.
   The defect's reporter is the Bloom user whose email is the integration's account
   email; with no such user it has no reporter.
-- Updated, for a linked issue: title, description, priority and state follow Jira; a
-  resolution closes the defect.
+- Updated, for a linked issue: title, description, priority and state follow Jira. A
+  resolution or a Done status closes the defect; a closed issue open again sets the
+  Closed defect to Open. Other Bloom statuses stay as set in Bloom. A change request
+  closes when its issue closes; the automatic sync closes only one still Submitted and
+  records the issue state on the others.
 - Deleted: the defect stays and its issue state reads `Removed in Jira`.
 - A delivery Jira retries with the same identifier is processed once.
 
-Pull existing issues, on the same panel, migrates the issues that were open before the
-webhook existed: it searches Jira once with the saved filter, skips the issues already
-in a Done status, and creates the defects that do not exist yet (at most 1000 issues per pull). It signs in with the account
-email and API token above, so it needs a Jira login that can browse the project, and
-it only reads from Jira.
+## Automatic tracker sync
+
+Bloom syncs every enabled tracker integration by itself, every
+`INTEGRATION_SYNC_MINUTES` minutes (default 15; `0` turns it off). It needs no
+webhook and no public URL. One replica syncs a given project at a time.
+
+- Jira, with the site URL, account email, API token and Jira project key set: the
+  first run, and the first run after each save of the integration, searches the
+  saved filter for every open matching issue (Done issues excluded) and creates the
+  defects that do not exist yet, when "Create a defect for each new matching issue"
+  is on. Later runs search only the issues changed since the last run. Linked defects
+  and change requests follow their issue as with a webhook update. Each run also
+  checks up to 50 linked issues for deletion; an issue Jira no longer returns reads
+  `Removed in Jira`.
+- GitHub and GitLab, with a token set: the state of the issues linked to defects and
+  change requests follows the tracker; a closed issue closes its defect, and a closed
+  issue open again sets the Closed defect to Open. Other Bloom statuses stay as set in Bloom. A repository
+  the token cannot read is skipped and named on the panel; a rate limit or an outage
+  fails the run, which is retried on the next interval.
+
+Searches return at most 1000 issues per run; a larger backlog continues on the next
+run. The tracker panel shows the last sync, its counts and its error. Sync now, on
+the Jira panel, runs the whole Jira sync at once and creates defects whether or not
+the inbound creation option is on. All of it only reads from the tracker.
 
 ## Object storage (S3)
 

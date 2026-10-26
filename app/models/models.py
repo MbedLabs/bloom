@@ -672,6 +672,7 @@ class Defect(Base):
     external_issue_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     external_issue_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     external_issue_state: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    external_issue_closed: Mapped[Optional[bool]] = mapped_column(nullable=True)
     external_last_event_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -691,7 +692,10 @@ class IntegrationSetting(Base):
     webhook_secret holds a Fernet envelope (Text). jira_project_key is the Jira project key this
     integration owns, unique across Jira integrations, and with create_defects_on_inbound an inbound
     Jira issue without a matching defect creates one. GitHub and GitLab leave the Jira columns
-    unused.
+    unused. The sync_* columns record the scheduled sync: last attempt and last success, the
+    last failure and the repositories the last run skipped, the counts of the last run, whether
+    a full Jira creation search is pending and where a capped one continues, and the issue
+    number the deletion check reached.
     """
 
     __tablename__ = "integration_settings"
@@ -716,6 +720,15 @@ class IntegrationSetting(Base):
     jira_priority_map: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     two_way: Mapped[bool] = mapped_column(default=False)
     enabled: Mapped[bool] = mapped_column(default=True)
+    sync_checked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    sync_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sync_warning: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sync_created: Mapped[int] = mapped_column(default=0)
+    sync_updated: Mapped[int] = mapped_column(default=0)
+    sync_full_scan: Mapped[bool] = mapped_column(default=True)
+    sync_scan_from: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    sync_removal_cursor: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
