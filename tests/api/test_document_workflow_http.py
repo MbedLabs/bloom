@@ -3,18 +3,22 @@
 import httpx
 import pytest
 import pytest_asyncio
+from fastapi import HTTPException
 from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app.api.workflow import _set_assignee, may_change_assignee
 from app.core.database import Base, get_db
 from app.core.security import get_current_user
 from app.main import app
 from app.models import (
+    ArtefactActivity,
     ArtefactLink,
     ChangeRequest,
     Defect,
     DesignItem,
     Document,
+    Notification,
     Project,
     Requirement,
     RiskItem,
@@ -23,6 +27,7 @@ from app.models import TestCampaign as CampaignModel
 from app.models import TestCase as CaseModel
 from app.models import TestConcept
 from app.models import TestSuite as SuiteModel
+from app.models.audit import AuditEvent
 from app.models.user import User, UserRole
 from app.models.workflow import ArtefactWorkflow
 
@@ -196,8 +201,11 @@ async def test_controlled_type_has_creator_bound_workflow(workflow_http, slug, m
     assert response.status_code == 200, response.text
     assert response.json()["controlled"] is True
     assert response.json()["creator"]["id"] == 1
+    assert response.json()["created_by"]["id"] == 1
+    assert response.json()["assignee"]["id"] == 1
     assert response.json()["phase"] == "Draft"
-    assert response.json()["actions"]["comment"] is False
+    assert response.json()["actions"]["comment"] is True
+    assert response.json()["actions"]["request_review"] is True
 
 
 async def test_reading_admin_cannot_comment_without_assignment(workflow_http):
@@ -883,6 +891,7 @@ async def test_approved_correction_reapproves_without_advancing_numbers(
     assert state["phase"] == "Draft"
     assert state["revision_number"] == 1
     assert state["creator"]["id"] == 4
+    assert state["assignee"]["id"] == 1
     assert state["reviewed_by"] is state["approved_by"] is None
     assert getattr(row, "version", None) == original_version
     original = await client.get(path + "/revisions/1")
@@ -891,6 +900,9 @@ async def test_approved_correction_reapproves_without_advancing_numbers(
         path + "/workflow/assignees", json={"reviewer_id": 2, "approver_id": 3}
     )
     assert response.status_code == 200, response.text
+    response = await client.post(path + "/requests", json={"kind": "review"})
+    assert response.status_code == 403, response.text
+    current[0] = users[0]
     response = await client.post(path + "/requests", json={"kind": "review"})
     assert response.status_code == 201, response.text
     current[0] = users[1]
@@ -1051,3 +1063,209 @@ async def test_controlled_version_cannot_be_changed_without_content_authorizatio
     assert response.status_code == 409, response.text
     assert row.version == "1"
     assert row.status == "Approved"
+
+
+async def test_the_assignee_is_handed_over_and_requests_review(workflow_http):
+    db, client, current, users = workflow_http
+    row = Requirement(
+        project_id=1, req_id="PRJ-REQ-901", title="Assigned", status="Draft", created_by_id=1
+    )
+    db.add(row)
+    await db.flush()
+    path = f"/api/artefacts/requirement/{row.id}"
+    state = (await client.get(path + "/workflow")).json()
+    assert state["assignee"]["id"] == 1
+    assert state["actions"]["assign_assignee"] is True
+    assert {person["id"] for person in state["options"]["assignees"]} == {1, 2, 3, 4}
+
+    handed = await client.put(path + "/workflow/assignees", json={"assignee_id": 2})
+    assert handed.status_code == 200, handed.text
+    assert handed.json()["assignee"]["id"] == 2
+    assert handed.json()["actions"]["request_review"] is False
+    notice = (await db.scalars(select(Notification).where(Notification.user_id == 2))).one()
+    assert notice.link_path == "/projects/PRJ/docs/requirements/PRJ-REQ-901"
+    assert (await client.post(path + "/requests", json={"kind": "review"})).status_code == 403
+
+    current[0] = users[1]
+    requested = await client.post(path + "/requests", json={"kind": "review"})
+    assert requested.status_code == 201, requested.text
+
+    current[0] = users[0]
+    back = await client.put(path + "/workflow/assignees", json={"assignee_id": 3})
+    assert back.status_code == 200, back.text
+    assert back.json()["assignee"]["id"] == 3
+
+
+async def test_an_assignee_must_be_a_person_who_can_edit(workflow_http):
+    db, client, _, users = workflow_http
+    users[3].is_active = False
+    row = Requirement(
+        project_id=1, req_id="PRJ-REQ-902", title="Assigned", status="Draft", created_by_id=1
+    )
+    db.add(row)
+    await db.flush()
+    path = f"/api/artefacts/requirement/{row.id}/workflow/assignees"
+    for value in (4, None, 999):
+        refused = await client.put(path, json={"assignee_id": value})
+        assert refused.status_code == 422, refused.text
+    defect = Defect(project_id=1, defect_id="PRJ-DEF-902", title="Operational", created_by_id=1)
+    db.add(defect)
+    await db.flush()
+    refused = await client.put(
+        f"/api/artefacts/defect/{defect.id}/workflow/assignees", json={"assignee_id": 2}
+    )
+    assert refused.status_code == 422, refused.text
+
+
+def test_who_may_change_the_assignee():
+    row = Requirement(created_by_id=1)
+    state = ArtefactWorkflow(assignee_id=2)
+    assert may_change_assignee(User(id=1), row, state, False)
+    assert may_change_assignee(User(id=2), row, state, False)
+    assert may_change_assignee(User(id=3), row, state, True)
+    assert not may_change_assignee(User(id=3), row, state, False)
+
+
+async def test_the_creator_assignee_and_approver_comment_until_approval(workflow_http):
+    db, client, current, users = workflow_http
+    row = Requirement(
+        project_id=1,
+        req_id="PRJ-REQ-903",
+        title="Discussed",
+        status="Draft",
+        created_by_id=1,
+        reviewer_id=2,
+        approver_id=3,
+    )
+    db.add(row)
+    await db.flush()
+    path = f"/api/artefacts/requirement/{row.id}"
+    assert (
+        await client.put(path + "/workflow/assignees", json={"assignee_id": 4})
+    ).status_code == 200
+    for author in (0, 3, 2, 1):
+        current[0] = users[author]
+        posted = await client.post(path + "/comments", json={"body": f"From {author + 1}"})
+        assert posted.status_code == 201, posted.text
+    notices = (
+        await db.scalars(select(Notification).where(Notification.event_type == "comment"))
+    ).all()
+    received = {}
+    for notice in notices:
+        received.setdefault(notice.user_id, 0)
+        received[notice.user_id] += 1
+        assert notice.link_path == "/projects/PRJ/docs/requirements/PRJ-REQ-903"
+    assert received == {1: 3, 2: 3, 3: 3, 4: 3}
+
+    approved = Requirement(
+        project_id=1,
+        req_id="PRJ-REQ-904",
+        title="Approved",
+        status="Approved",
+        created_by_id=1,
+        reviewer_id=2,
+        approver_id=3,
+    )
+    db.add(approved)
+    await db.flush()
+    approved_path = f"/api/artefacts/requirement/{approved.id}/comments"
+    for author, status in ((0, 403), (2, 403), (3, 403), (1, 201)):
+        current[0] = users[author]
+        posted = await client.post(approved_path, json={"body": "After approval"})
+        assert posted.status_code == status, posted.text
+
+
+async def test_every_new_workflow_starts_with_the_creator_as_assignee(workflow_http):
+    db, client, _, _ = workflow_http
+    legacy = ChangeRequest(
+        project_id=1, change_id="PRJ-CHG-905", title="Legacy", status="Submitted", created_by_id=1
+    )
+    reviewed = Requirement(
+        project_id=1, req_id="PRJ-REQ-905", title="In review", status="Review", created_by_id=1
+    )
+    db.add_all([legacy, reviewed])
+    await db.flush()
+    state = (await client.get(f"/api/artefacts/change/{legacy.id}/workflow")).json()
+    assert state["assignee"]["id"] == 1
+    edited = await client.patch(f"/api/requirements/{reviewed.id}", json={"title": "Changed"})
+    assert edited.status_code == 200, edited.text
+    workflow = await db.scalar(
+        select(ArtefactWorkflow).where(
+            ArtefactWorkflow.artefact_type == "requirement",
+            ArtefactWorkflow.artefact_id == reviewed.id,
+        )
+    )
+    assert workflow.assignee_id == 1
+
+
+async def test_an_assignee_change_is_refused_to_others_and_recorded(workflow_http):
+    db, client, _, _ = workflow_http
+    row = Requirement(
+        project_id=1, req_id="PRJ-REQ-906", title="Recorded", status="Draft", created_by_id=1
+    )
+    db.add(row)
+    await db.flush()
+    path = f"/api/artefacts/requirement/{row.id}"
+    assert (
+        await client.put(path + "/workflow/assignees", json={"assignee_id": 2})
+    ).status_code == 200
+    activity = (
+        await db.scalars(
+            select(ArtefactActivity).where(
+                ArtefactActivity.artefact_id == row.id, ArtefactActivity.event_type == "assigned"
+            )
+        )
+    ).all()
+    audit = (
+        await db.scalars(select(AuditEvent).where(AuditEvent.action == "workflow.assigned"))
+    ).all()
+    assert activity and audit
+    state = await db.scalar(select(ArtefactWorkflow).where(ArtefactWorkflow.artefact_id == row.id))
+    outsider = User(id=9, full_name="Outsider", role=UserRole.external, is_active=True)
+    with pytest.raises(HTTPException) as refused:
+        await _set_assignee(db, row, state, outsider, 3)
+    assert refused.value.status_code == 403
+
+
+@pytest.mark.parametrize("phase", ["Review", "Approval"])
+async def test_the_creator_comments_during_review_and_approval(workflow_http, phase):
+    db, client, _, _ = workflow_http
+    row = Requirement(
+        project_id=1, req_id="PRJ-REQ-907", title="Phase", status="Review", created_by_id=1
+    )
+    db.add(row)
+    await db.flush()
+    db.add(
+        ArtefactWorkflow(
+            project_id=1,
+            artefact_type="requirement",
+            artefact_id=row.id,
+            revision_number=1,
+            revision_creator_id=1,
+            assignee_id=1,
+            phase=phase,
+        )
+    )
+    await db.flush()
+    posted = await client.post(
+        f"/api/artefacts/requirement/{row.id}/comments", json={"body": f"In {phase}"}
+    )
+    assert posted.status_code == 201, posted.text
+
+
+async def test_a_review_edited_without_a_workflow_gets_one_for_the_creator(workflow_http):
+    db, _, _, _ = workflow_http
+    row = Requirement(
+        project_id=1, req_id="PRJ-REQ-908", title="In review", status="Review", created_by_id=1
+    )
+    db.add(row)
+    await db.flush()
+    row.title = "Changed during review"
+    await db.flush()
+    workflow = await db.scalar(
+        select(ArtefactWorkflow).where(
+            ArtefactWorkflow.artefact_type == "requirement",
+            ArtefactWorkflow.artefact_id == row.id,
+        )
+    )
+    assert (workflow.phase, workflow.assignee_id) == ("Draft", 1)

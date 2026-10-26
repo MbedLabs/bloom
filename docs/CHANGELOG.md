@@ -11,6 +11,7 @@
 
 ### Changed
 
+- A controlled document has an assignee, at first its creator; the creator, the assignee and whoever may assign the reviewer hand it to another person who can see and edit it. The assignee requests review. Besides the reviewer, the creator, the assignee and the approver comment until the document is approved, and each comment notifies the others with a link to the document.
 - A linked GitHub, GitLab or Jira issue changes its defect's status only when the issue closes, which closes the defect, or when a closed issue is open again, which sets the Closed defect back to Open. Statuses set in Bloom stay otherwise, also a defect closed or reopened in Bloom while its issue stays as it was, and the issue's state still shows on the defect.
 - Document discussions are visible beside the content in a scrolling right panel on desktop and above the content on compact screens.
 - Every email carries the product identity as its heading and one action. Access request and workflow request emails also open their plain text with the identity and give a product-specific next step in HTML and plain text. Workflow request emails are sent in HTML as well as plain text.

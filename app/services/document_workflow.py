@@ -150,6 +150,7 @@ async def get_workflow(
         artefact_id=row.id,
         revision_number=1,
         revision_creator_id=getattr(row, "created_by_id", None),
+        assignee_id=getattr(row, "created_by_id", None),
         phase=phase,
         **{field: getattr(row, field, None) for field in SIGNOFF_FIELDS},
     )
@@ -652,6 +653,7 @@ def _invalidate_review_write(session, row) -> None:
             artefact_id=row.id,
             revision_number=1,
             revision_creator_id=row.created_by_id,
+            assignee_id=row.created_by_id,
             phase="Review",
             **{field: getattr(row, field, None) for field in SIGNOFF_FIELDS},
         )

@@ -19,7 +19,13 @@ from app.api.artefact_utils import (
     log_workflow_status_transition,
     row_visible_to,
 )
-from app.api.workflow import assigned_id, can_comment, complete_step, visible_artefact
+from app.api.workflow import (
+    can_comment,
+    comment_participants,
+    complete_step,
+    document_path,
+    visible_artefact,
+)
 from app.core.database import get_db
 from app.core.permissions import transition_action
 from app.core.security import get_current_user
@@ -121,7 +127,10 @@ async def create_comment(
 ):
     artefact = await _visible_artefact(db, artefact_type, artefact_id, current_user, "view")
     if not await can_comment(db, current_user, artefact):
-        raise HTTPException(status_code=403, detail="Only the assigned reviewer may comment.")
+        raise HTTPException(
+            status_code=403,
+            detail="Only the document's creator, assignee, reviewer or approver may comment.",
+        )
     workflow = await get_workflow(db, artefact)
     from app.api.workflow import _review_request
 
@@ -159,11 +168,9 @@ async def create_comment(
         or getattr(artefact, "title", None)
         or f"{artefact_type} #{artefact_id}"
     )
-    for recipient_id in {
-        assigned_id(artefact, workflow, "review"),
-        assigned_id(artefact, workflow, "approve"),
-    }:
-        recipient = await db.get(User, recipient_id) if recipient_id else None
+    path = await document_path(db, artefact)
+    for recipient_id in comment_participants(artefact, workflow) - {current_user.id}:
+        recipient = await db.get(User, recipient_id)
         if recipient is not None and await row_visible_to(db, recipient, artefact, type_code):
             await notify(
                 db,
@@ -171,6 +178,7 @@ async def create_comment(
                 event_type="comment",
                 title=f"New comment on {label}",
                 body=f"{current_user.full_name}: {data.body[:200]}",
+                link_path=path,
                 project_id=artefact.project_id,
                 actor=current_user,
             )

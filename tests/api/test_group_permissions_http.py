@@ -1019,17 +1019,21 @@ def test_design_requests_check_creator_scope_and_external_review_authority(api_c
     assert request(hidden).status_code == 404
     refused = request(others)
     assert refused.status_code == 403, refused.text
-    assert refused.json()["detail"] == "Only the current revision's creator requests review."
+    assert refused.json()["detail"] == "Only the document's assignee requests review."
     path = f"/api/artefacts/design/{own}"
     bypass = api_client.post(path + "/transition", headers=admin, json={"status": "Review"})
     assert bypass.status_code == 409, bypass.text
     to_review = request(own)
     assert to_review.status_code == 201, to_review.text
-    denied = api_client.post(path + "/comments", headers=headers, json={"body": "Not eligible"})
-    assert denied.status_code == 403, denied.text
+    creator = api_client.post(path + "/comments", headers=headers, json={"body": "As creator"})
+    assert creator.status_code == 201, creator.text
+    unassigned_reviewer = api_client.post(
+        path + "/comments", headers=admin, json={"body": "Holds review, not assigned"}
+    )
+    assert unassigned_reviewer.status_code == 403, unassigned_reviewer.text
     _grant(api_client, admin, "Approver", user["id"], project)
     unassigned = api_client.post(path + "/comments", headers=headers, json={"body": "Unassigned"})
-    assert unassigned.status_code == 403, unassigned.text
+    assert unassigned.status_code == 201, unassigned.text
     assigned = api_client.put(
         path + "/workflow/assignees", headers=admin, json={"reviewer_id": user["id"]}
     )
@@ -1068,8 +1072,11 @@ def test_the_detail_read_names_the_changes_the_reader_may_make(api_client: TestC
         )
         return response.status_code, response.json().get("allowed_actions")
 
-    assert actions(others, admin) == (200, ["edit", "delete", "plan", "review", "approve"])
-    assert actions(own, headers) == (200, ["edit"])
+    assert actions(others, admin) == (
+        200,
+        ["edit", "delete", "plan", "review", "approve", "comment"],
+    )
+    assert actions(own, headers) == (200, ["edit", "comment"])
     assert actions(others, headers) == (200, [])
     assert actions(hidden, headers)[0] == 404
     assert actions(others, reader)[0] == 404
@@ -1765,7 +1772,9 @@ def test_commenting_requires_selected_review_visibility_and_assignment(api_clien
     for headers in (reader, external):
         refused = api_client.post(path + "/comments", headers=headers, json={"body": "Read only"})
         assert refused.status_code == 403, refused.text
-        assert refused.json()["detail"] == "Only the assigned reviewer may comment."
+        assert refused.json()["detail"] == (
+            "Only the document's creator, assignee, reviewer or approver may comment."
+        )
     reviewer, reviewer_headers = _policy_user(
         api_client,
         admin,
