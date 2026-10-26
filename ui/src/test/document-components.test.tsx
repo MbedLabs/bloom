@@ -789,21 +789,26 @@ describe('the Jira tracker of a project', () => {
       already_linked: 1,
       skipped: 1,
       new_ids: ['VCU-DEF-007', 'VCU-DEF-008'],
+      updated: 3,
+      removed: 1,
     })
     jiraPanel()
-    fireEvent.click(await screen.findByRole('button', { name: /pull existing issues/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /sync now/i }))
 
     await waitFor(() => expect(client.integrationsApi.pullJira).toHaveBeenCalledWith(142))
     expect(
-      await screen.findByText('Found 4: 2 created, 1 already linked, 1 skipped.'),
+      await screen.findByText(
+        'Found 4: 2 created, 3 updated, 1 removed, 1 already linked, 1 skipped.',
+      ),
     ).toBeTruthy()
+    expect(await screen.findByText('Synced with Jira: 2 created, 3 updated')).toBeTruthy()
   })
 
   it('reports a failed pull', async () => {
     vi.mocked(client.integrationsApi.listSettings).mockResolvedValue([jiraRow] as never)
     vi.mocked(client.integrationsApi.pullJira).mockRejectedValue(new Error('Jira answered 401'))
     jiraPanel()
-    fireEvent.click(await screen.findByRole('button', { name: /pull existing issues/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /sync now/i }))
 
     await waitFor(() => expect(client.integrationsApi.pullJira).toHaveBeenCalled())
     expect(await screen.findByText(/jira answered 401/i)).toBeTruthy()

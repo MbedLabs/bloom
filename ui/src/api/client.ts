@@ -1857,17 +1857,26 @@ export interface IntegrationSetting {
   jira_reference_field?: string | null
   jira_priority_map?: Record<string, string> | null
   two_way?: boolean
+  sync_checked_at?: string | null
+  synced_at?: string | null
+  sync_error?: string | null
+  sync_warning?: string | null
+  sync_created?: number
+  sync_updated?: number
+  auto_sync_minutes?: number
   created_at: string
   updated_at: string
 }
 
-/** Outcome of pulling existing Jira issues into defects. */
+/** Outcome of Sync now: the issues the creation search found and what the run changed. */
 export interface JiraPullResult {
   searched: number
   created: number
   already_linked: number
   skipped: number
   new_ids: string[]
+  updated: number
+  removed: number
 }
 
 /** Jira settings a create or update may carry. */
