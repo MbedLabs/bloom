@@ -178,6 +178,8 @@ export default function TestCaseDetail({
       ) : undefined}
       rightRail={
         <>
+          <WorkflowPanel artefactType="test-case" artefactId={tcId} projectPrefix={projectPrefix} projectId={testCase.project_id} />
+
           <SectionCard title="Last Execution">
             {testCase.last_execution_status ? (
               <div className="space-y-4">
@@ -204,8 +206,6 @@ export default function TestCaseDetail({
               <p className="text-sm text-muted-foreground">No synced execution has been recorded for this test case yet.</p>
             )}
           </SectionCard>
-
-          <WorkflowPanel artefactType="test-case" artefactId={tcId} projectPrefix={projectPrefix} projectId={testCase.project_id} />
 
           <SectionCard title="Metadata">
             <div className="space-y-4">

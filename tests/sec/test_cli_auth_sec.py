@@ -237,7 +237,8 @@ def test_approval_rereads_and_rejects_a_changed_account(cli_client):
 
     assert asyncio.run(approve_with_stale_account()) == "inactive_or_changed_user"
     stored = run_db(maker, lambda db: db.get(CliAuthSession, session.id))
-    assert stored.user_id is None and stored.exchange_code_hash is None
+    assert stored.user_id is None
+    assert stored.exchange_code_hash is None
 
 
 @pytest.mark.parametrize("binding", [None, True, "1", -1, 999999])
@@ -386,7 +387,8 @@ def test_code_mode_off_refuses_every_stored_code_request(cli_client, monkeypatch
     ]
     assert stored_ids(maker) == {pending, approved, expired}
     stored = run_db(maker, lambda db: db.get(CliAuthSession, UUID(pending)))
-    assert stored.user_id is None and stored.exchange_code_hash is None
+    assert stored.user_id is None
+    assert stored.exchange_code_hash is None
 
 
 def test_code_mode_off_keeps_the_answers_for_a_missing_request(cli_client, monkeypatch):

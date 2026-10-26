@@ -7,4 +7,4 @@ ${invite_link}
 
 If you didn't expect this invitation, you can safely ignore this email.
 
-© 2026 EmbedLabs Team. All rights reserved.
+(c) 2026 EmbedLabs. All rights reserved.

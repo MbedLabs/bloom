@@ -401,6 +401,25 @@ describe('deleting a project', () => {
 })
 
 describe('project policy group rosters', () => {
+  it('retains both group sections and shows all current assignments in another picker', async () => {
+    const developer = { ...projectMember, id: 201, user_id: addableMaintainer.id, email: addableMaintainer.email, full_name: addableMaintainer.full_name, inherit_policies: false, policy_group_id: 10, policy_group_name: 'Developers' }
+    const tester = { ...developer, id: 202, policy_group_id: 14, policy_group_name: 'Testers' }
+    vi.mocked(client.projectMembersApi.list).mockResolvedValue([developer, tester])
+    renderEdit()
+    const developers = within(await screen.findByRole('region', { name: 'Developers' }))
+    const testers = within(await screen.findByRole('region', { name: 'Testers' }))
+    expect(developers.getByText(addableMaintainer.full_name)).toBeTruthy()
+    expect(testers.getByText(addableMaintainer.full_name)).toBeTruthy()
+    const owners = within(await screen.findByRole('region', { name: 'Product Owners' }))
+    fireEvent.click(owners.getByRole('button', { name: 'Select members' }))
+    expect(owners.getByText('Current groups: Developers, Testers')).toBeTruthy()
+    expect(owners.queryByText(/replaces their current policy group/)).toBeNull()
+    fireEvent.click(testers.getByRole('button', { name: `Project member actions for ${addableMaintainer.full_name}` }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
+    await waitFor(() => expect(client.projectMembersApi.remove).toHaveBeenCalledWith(project.id, tester.id))
+    expect(client.projectMembersApi.remove).not.toHaveBeenCalledWith(project.id, developer.id)
+  })
+
   it('shows four default sections on every project, including empty rosters', async () => {
     vi.mocked(client.projectMembersApi.list).mockResolvedValue([])
     renderEdit()

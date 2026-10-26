@@ -142,7 +142,9 @@ async def workflow_http(monkeypatch):
         cursor.close()
 
     deliveries = []
-    monkeypatch.setattr("app.api.workflow.send_email", lambda **message: deliveries.append(message))
+    monkeypatch.setattr(
+        "app.services.mail_service.send_email", lambda **message: deliveries.append(message)
+    )
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
     async with async_sessionmaker(engine, expire_on_commit=False)() as db:
@@ -776,6 +778,11 @@ async def test_request_delivery_repeat_suppression_decline_and_actual_audit_acto
     first = await client.post(path, json={"kind": "review"})
     assert first.status_code == 201, first.text
     assert [message["to_email"] for message in db.info["workflow_deliveries"]] == [users[1].email]
+    delivered = db.info["workflow_deliveries"][0]
+    assert delivered["subject"] == "Review requested: PRJ-REQ-001"
+    assert "Review requested: PRJ-REQ-001" in delivered["text_body"]
+    assert "<title>Bloom PLM by EmbedLabs</title>" in delivered["html_body"]
+    assert "PRJ-REQ-001" in delivered["html_body"]
     repeat = await client.post(path, json={"kind": "review"})
     assert repeat.status_code == 200
     assert repeat.json()["already_requested"] is True

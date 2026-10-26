@@ -48,7 +48,10 @@ from app.services.document_workflow import (
     permit_workflow_write,
     recorded_phase,
 )
-from app.services.mail_service import MailConfigurationError, send_email
+from app.services.mail_service import (
+    MailConfigurationError,
+    send_workflow_request_email,
+)
 from app.services.notification_service import notify
 
 THIS_DOCUMENT_HAS_NO_APPROVAL_WORKFLOW = "This document has no approval workflow."
@@ -945,7 +948,13 @@ async def _deliver(db, row, request, recipient, actor, outcome=None):
         actor=actor,
     )
     try:
-        send_email(to_email=recipient.email, subject=title, text_body=text)
+        send_workflow_request_email(
+            to_email=recipient.email,
+            recipient_name=recipient.full_name,
+            actor_name=actor.full_name,
+            event_title=title,
+            document_link=f"{settings.APP_BASE_URL.rstrip('/')}{path}",
+        )
         return True
     except MailConfigurationError:
         return False

@@ -4,7 +4,7 @@ from http import HTTPStatus
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.groups import _selected_policies
@@ -31,10 +31,37 @@ router = APIRouter()
 require_admin = require_app_permission("view")
 
 
-async def _project(db: AsyncSession, project_id: int) -> None:
-    """Require an existing project before returning its administrative entries."""
-    if await db.get(Project, project_id) is None:
+async def _project(db: AsyncSession, project_id: int, lock: bool = False) -> None:
+    """Require a project and optionally serialize changes to its access entries."""
+    statement = select(Project.id).where(Project.id == project_id)
+    if lock:
+        statement = statement.with_for_update()
+    if await db.scalar(statement) is None:
         raise HTTPException(status_code=404, detail="Project not found")
+
+
+async def _check_direct_conflict(
+    db: AsyncSession,
+    project_id: int,
+    user_id: int,
+    policy_group_id: int | None,
+    entry_id: int | None = None,
+) -> None:
+    """Reject duplicate bundles and mixed individual and bundle assignments."""
+    statement = select(ProjectAccess.id).where(
+        ProjectAccess.project_id == project_id, ProjectAccess.user_id == user_id
+    )
+    if entry_id is not None:
+        statement = statement.where(ProjectAccess.id != entry_id)
+    if policy_group_id is not None:
+        statement = statement.where(
+            or_(
+                ProjectAccess.policy_group_id.is_(None),
+                ProjectAccess.policy_group_id == policy_group_id,
+            )
+        )
+    if await db.scalar(statement.limit(1)) is not None:
+        raise HTTPException(status_code=409, detail="Conflicting direct project assignment")
 
 
 async def _entry(db: AsyncSession, project_id: int, entry_id: int) -> ProjectAccess:
@@ -123,19 +150,13 @@ async def add_project_member(
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Assign Owner or explicitly selected policies to a user on this project."""
-    await _project(db, project_id)
+    await _project(db, project_id, lock=True)
     user = await db.get(User, data.user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     if user.role == UserRole.admin:
         raise HTTPException(status_code=400, detail="Admin users do not need project memberships")
-    existing = await db.scalar(
-        select(ProjectAccess.id).where(
-            ProjectAccess.project_id == project_id, ProjectAccess.user_id == data.user_id
-        )
-    )
-    if existing is not None:
-        raise HTTPException(status_code=409, detail="User already has a direct project entry")
+    await _check_direct_conflict(db, project_id, data.user_id, data.policy_group_id)
     if data.policy_group_id is not None:
         await _selected_group(db, data.policy_group_id)
     policies = await _selected_policies(db, data.policy_ids)
@@ -159,7 +180,12 @@ async def add_project_member(
         target_type="user",
         target_id=user.id,
         project_id=project_id,
-        details={"owner": entry.owner, "policy_ids": sorted(data.policy_ids)},
+        details={
+            "membership_id": entry.id,
+            "policy_group_id": entry.policy_group_id,
+            "owner": entry.owner,
+            "policy_ids": sorted(data.policy_ids),
+        },
     )
     return await _response(db, entry)
 
@@ -186,6 +212,7 @@ async def get_project_member(
         400: {"description": HTTPStatus(400).phrase},
         404: {"description": HTTPStatus(404).phrase},
         422: {"description": HTTPStatus(422).phrase},
+        409: {"description": HTTPStatus(409).phrase},
     },
 )
 async def update_project_member(
@@ -196,6 +223,7 @@ async def update_project_member(
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Update a direct entry without inheriting a role baseline."""
+    await _project(db, project_id, lock=True)
     entry = await _entry(db, project_id, membership_id)
     owner = data.owner if data.owner is not None else entry.owner
     inherit_policies = (
@@ -220,11 +248,13 @@ async def update_project_member(
         validate_entry(owner, policy_ids, inherit_policies, policy_group_id)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+    await _check_direct_conflict(db, project_id, entry.user_id, policy_group_id, entry.id)
     policies = await _selected_policies(db, policy_ids)
     if any(policy.scope == "app" for policy in policies):
         raise HTTPException(
             status_code=400, detail="Application policies cannot be assigned on a project"
         )
+    previous_policy_group_id = entry.policy_group_id
     entry.policy_group_id = policy_group_id
     entry.owner = owner
     entry.inherit_policies = inherit_policies
@@ -236,7 +266,13 @@ async def update_project_member(
         target_type="user",
         target_id=entry.user_id,
         project_id=project_id,
-        details={"owner": owner, "policy_ids": sorted(policy_ids)},
+        details={
+            "membership_id": entry.id,
+            "policy_group_id": entry.policy_group_id,
+            "previous_policy_group_id": previous_policy_group_id,
+            "owner": owner,
+            "policy_ids": sorted(policy_ids),
+        },
     )
     return await _response(db, entry)
 
@@ -253,6 +289,7 @@ async def remove_project_member(
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Revoke the project's direct user entry."""
+    await _project(db, project_id, lock=True)
     entry = await _entry(db, project_id, membership_id)
     await record_audit_event(
         db,
@@ -261,6 +298,8 @@ async def remove_project_member(
         target_id=entry.user_id,
         project_id=project_id,
         details={
+            "membership_id": entry.id,
+            "policy_group_id": entry.policy_group_id,
             "owner": entry.owner,
             "policy_ids": sorted(policy.id for policy in entry.policies),
         },
@@ -318,6 +357,9 @@ async def list_project_access(
         .scalars()
         .all()
     )
+    replaced_users = {
+        row.user_id for row in rows if row.user_id is not None and not row.inherit_policies
+    }
     for row in rows:
         if row.user_id is not None:
             users = [await db.get(User, row.user_id)]
@@ -336,8 +378,7 @@ async def list_project_access(
                 .all()
             )
         for user in users:
-            direct = next((candidate for candidate in rows if candidate.user_id == user.id), None)
-            if direct is not None and not direct.inherit_policies and row is not direct:
+            if row.user_id is None and user.id in replaced_users:
                 continue
             entry = entries.setdefault(
                 user.id,

@@ -199,11 +199,14 @@ async def _access_map(db: AsyncSession, user: User) -> dict:
     )
     groups = (await db.execute(select(Group).where(Group.id.in_(group_ids)))).scalars().all()
     inherited = {policy.id: policy for group in groups for policy in group.policies}
-    direct = {entry.project_id: entry for entry in entries if entry.user_id == user.id}
+    replaced_projects = {
+        entry.project_id
+        for entry in entries
+        if entry.user_id == user.id and not entry.inherit_policies
+    }
     by_project: dict = {}
     for entry in entries:
-        override = direct.get(entry.project_id)
-        if override is not None and not override.inherit_policies and entry is not override:
+        if entry.project_id in replaced_projects and entry.user_id != user.id:
             continue
         merged = by_project.setdefault(entry.project_id, {})
         terms = [_owner_term(external)] if entry.owner else []

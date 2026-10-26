@@ -2,6 +2,7 @@ import ReportRequestAction from '../components/ReportRequestAction'
 import SelectField from '../components/SelectField'
 import { refreshProjectViews, finishArtefactDeletion } from '../lib/refreshProjectViews'
 import WorkflowPanel from '../components/WorkflowPanel'
+import DocumentDetailColumns from '../components/DocumentDetailColumns'
 import { useState, useEffect, useRef } from 'react'
 import ArtefactTags from '../components/ArtefactTags'
 import { useParams, Link, useNavigate, useLocation } from 'react-router'
@@ -195,6 +196,7 @@ export default function CampaignDetail({
         ) : null}
       </div>
 
+      <DocumentDetailColumns rightRail={<WorkflowPanel artefactType="campaign" artefactId={campId} projectPrefix={prefix} projectId={campaign.project_id} />}>
       {canEditDocs && editOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50">
           <dialog open aria-label="Edit campaign" onKeyDown={handleEditKeyDown} className="relative m-0 bg-card text-foreground rounded-lg shadow-elegant p-6 max-w-md w-full mx-4">
@@ -379,8 +381,6 @@ export default function CampaignDetail({
         </div>
       )}
 
-      <WorkflowPanel artefactType="campaign" artefactId={campId} projectPrefix={prefix} projectId={campaign.project_id} />
-
       <div>
         <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Origin</div>
         <ArtefactTags type="campaign" id={campaign.id} projectId={campaign.project_id} canEdit={canEditDocs && rowAllows('edit')} origin={campaign.visibility === 'customer' ? 'Customer' : 'Internal'} />
@@ -397,6 +397,7 @@ export default function CampaignDetail({
       <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
         <DocumentActivityPanel artefactType="campaign" artefactId={campId} />
       </div>
+      </DocumentDetailColumns>
     </div>
   )
 }

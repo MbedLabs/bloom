@@ -264,3 +264,63 @@ async def test_write_reading_stays_within_its_resource_and_origin(session):
     assert not await row_allows(session, user, customer, "delete", "REQ")
     assert not await row_allows(session, user, internal, "view", "REQ")
     assert not await row_allows(session, user, customer, "view", "TC")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("external", [False, True])
+async def test_overlapping_bundle_operations_keep_their_own_origins_and_account_caps(
+    session, external
+):
+    user, project, other = await _setup(
+        session, UserRole.external if external else UserRole.maintainer
+    )
+    read = await _policy(session, "Read all", {"REQ": ["view"]})
+    write = await _policy(
+        session, "Customer author", {"REQ": ["edit", "approve", "delete"]}, "customer"
+    )
+    bundles = [Group(name="Readers", policies=[read]), Group(name="Authors", policies=[write])]
+    session.add_all(bundles)
+    await session.flush()
+    session.add_all(
+        [
+            ProjectAccess(user_id=user.id, project_id=project.id, policy_group=bundle)
+            for bundle in bundles
+        ]
+    )
+    customer = Requirement(
+        project_id=project.id, req_id="PRJ-REQ-001", title="Customer", visibility="customer"
+    )
+    internal = Requirement(
+        project_id=project.id, req_id="PRJ-REQ-002", title="Internal", visibility="internal"
+    )
+    session.add_all([customer, internal])
+    await session.flush()
+    assert await row_allows(session, user, customer, "view", "REQ")
+    assert await row_allows(session, user, customer, "edit", "REQ")
+    assert not await row_allows(session, user, internal, "edit", "REQ")
+    assert await row_allows(session, user, internal, "view", "REQ") is not external
+    assert await row_allows(session, user, customer, "approve", "REQ") is not external
+    assert await row_allows(session, user, customer, "delete", "REQ") is not external
+    assert not await user_can_access_project(session, user, other.id)
+
+
+@pytest.mark.asyncio
+async def test_overlapping_bundles_do_not_borrow_another_policys_tag_scope(session):
+    user, project, _ = await _setup(session)
+    read = await _policy(session, "Unrestricted read", {"REQ": ["view"]})
+    read.type_tags = {"REQ": {"all": True}}
+    write = await _policy(session, "Chosen tag write", {"REQ": ["edit"]})
+    write.type_tags = {"REQ": {"tags": [101]}}
+    bundles = [Group(name="Readers", policies=[read]), Group(name="Authors", policies=[write])]
+    session.add_all(bundles)
+    await session.flush()
+    session.add_all(
+        [
+            ProjectAccess(user_id=user.id, project_id=project.id, policy_group=bundle)
+            for bundle in bundles
+        ]
+    )
+    await session.flush()
+    assert await creation_covered(session, user, project.id, "REQ", "internal", [202], "view")
+    assert not await creation_covered(session, user, project.id, "REQ", "internal", [202], "edit")
+    assert await creation_covered(session, user, project.id, "REQ", "internal", [101], "edit")

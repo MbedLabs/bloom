@@ -2,7 +2,7 @@ import { changeControl, optionValues } from './change-control'
 import { createQueryClient } from '../lib/queryClient'
 // @vitest-environment jsdom
 import { QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -29,6 +29,7 @@ const DocumentDetail = (await import('../pages/DocumentDetail')).default
 const ArtefactDetail = (await import('../pages/ArtefactDetail')).default
 const DocCreate = (await import('../pages/DocCreate')).default
 const SuiteDetail = (await import('../pages/SuiteDetail')).default
+const CampaignDetail = (await import('../pages/CampaignDetail')).default
 
 const workflowState = {
   controlled: true, revision_number: 1, phase: 'Draft', status: 'Draft', creator: user,
@@ -359,5 +360,20 @@ describe('workflow timestamp display', () => {
     } finally {
       localStorage.removeItem('bloom-timezone')
     }
+  })
+})
+
+
+describe('visible document discussion', () => {
+  it.each(['requirement', 'test-case', 'document', 'test-suite', 'campaign'] as const)('shows the %s discussion in its side panel without opening a tab', async type => {
+    if (type === 'requirement') renderAssignedDocument('REQ', 'Review')
+    else if (type === 'test-case') renderAssignedDocument('TC', 'Review')
+    else if (type === 'document') renderAt('/projects/:prefix/docs/:kind/:docId', `/projects/VCU/docs/specifications/${docDetail.id}`, <DocumentDetail />)
+    else if (type === 'test-suite') renderAt('/projects/:prefix/suites/:suiteId', `/projects/VCU/suites/${testSuite.id}`, <SuiteDetail />)
+    else renderAt('/projects/:prefix/campaigns/:campaignId', '/projects/VCU/campaigns/51', <CampaignDetail />)
+    const discussion = await screen.findByRole('region', { name: 'Document discussion' })
+    expect(within(discussion).getByRole('heading', { name: 'Discussion' })).toBeTruthy()
+    expect(discussion.closest('aside')?.getAttribute('aria-label')).toBe('Document side panel')
+    await waitFor(() => expect(client.artefactsApi.listComments).toHaveBeenCalled())
   })
 })

@@ -281,3 +281,216 @@ def test_administrators_bundle_can_be_assigned_to_different_people_on_two_projec
     assert (
         api_client.get(f"/api/users/{account_admin['id']}", headers=admin).json()["role"] == "admin"
     )
+
+
+def _assign(client, admin, project, person, bundle):
+    """Assign one project bundle and return its direct entry."""
+    response = client.post(
+        f"/api/groups/{bundle['id']}/assignments",
+        headers=admin,
+        json={"project_id": project, "user_ids": [person["id"]]},
+    )
+    assert response.status_code == 200, response.text
+    return response.json()[0]
+
+
+def test_overlapping_bundles_keep_both_permissions_and_remove_only_one(api_client):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, unique_name("Overlap"))["id"]
+    other = create_project(api_client, admin, unique_name("Separate"))["id"]
+    person = _create_user(api_client, admin, role="maintainer")
+    headers = _headers_for(api_client, person["email"])
+    author = _group(api_client, admin, [_policy(api_client, admin, permissions={"REQ": ["edit"]})])
+    tester = _group(api_client, admin, [_policy(api_client, admin, permissions={"TC": ["edit"]})])
+    first = _assign(api_client, admin, project, person, author)
+    second = _assign(api_client, admin, project, person, tester)
+    assert first["id"] != second["id"]
+    assert _assign(api_client, admin, project, person, author)["id"] == first["id"]
+    entries = api_client.get(f"/api/projects/{project}/members", headers=admin).json()
+    assert {row["policy_group_id"] for row in entries if row["user_id"] == person["id"]} == {
+        author["id"],
+        tester["id"],
+    }
+    rights = api_client.get(f"/api/projects/{project}/permissions", headers=headers).json()
+    assert "edit" in rights["REQ"] and "edit" in rights["TC"]
+    origins = api_client.get(f"/api/projects/{project}/access", headers=admin).json()
+    shown = next(row for row in origins if row["user_id"] == person["id"])
+    assert {origin["group"] for origin in shown["origins"]} == {author["name"], tester["name"]}
+    assert api_client.get(f"/api/projects/{other}", headers=headers).status_code == 403
+    assert api_client.get("/api/groups", headers=headers).status_code == 403
+    assert (
+        api_client.delete(
+            f"/api/projects/{project}/members/{first['id']}", headers=admin
+        ).status_code
+        == 204
+    )
+    rights = api_client.get(f"/api/projects/{project}/permissions", headers=headers).json()
+    assert "REQ" not in rights and "edit" in rights["TC"]
+    assert (
+        api_client.get(f"/api/users/{person['id']}", headers=admin).json()["role"] == "maintainer"
+    )
+    assert api_client.get(f"/api/groups/{tester['id']}", headers=admin).json()["members"] == []
+
+
+def test_direct_bundle_creation_and_updates_reject_duplicate_or_mixed_entries(api_client):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, unique_name("Overlap validation"))["id"]
+    person = _create_user(api_client, admin, role="maintainer")
+    groups = [_group(api_client, admin, [_policy(api_client, admin)]) for _ in range(2)]
+    first = _assign(api_client, admin, project, person, groups[0])
+    created = api_client.post(
+        f"/api/projects/{project}/members",
+        headers=admin,
+        json={"user_id": person["id"], "policy_group_id": groups[1]["id"]},
+    )
+    assert created.status_code == 201, created.text
+    for payload in [
+        {"policy_group_id": groups[1]["id"]},
+        {"owner": True},
+        {"inherit_policies": True},
+    ]:
+        response = api_client.patch(
+            f"/api/projects/{project}/members/{first['id']}",
+            headers=admin,
+            json=payload,
+        )
+        assert response.status_code == 409, response.text
+    duplicate = api_client.post(
+        f"/api/projects/{project}/members",
+        headers=admin,
+        json={"user_id": person["id"], "policy_group_id": groups[1]["id"]},
+    )
+    assert duplicate.status_code == 409, duplicate.text
+    entries = api_client.get(f"/api/projects/{project}/members", headers=admin).json()
+    assert len([row for row in entries if row["user_id"] == person["id"]]) == 2
+
+
+def test_overlapping_assignment_preserves_other_project_and_invalid_batch_is_atomic(api_client):
+    admin = _admin_headers(api_client)
+    projects = [
+        create_project(api_client, admin, unique_name("Independent"))["id"] for _ in range(2)
+    ]
+    person = _create_user(api_client, admin, role="maintainer")
+    groups = [_group(api_client, admin, [_policy(api_client, admin)]) for _ in range(2)]
+    first = _assign(api_client, admin, projects[0], person, groups[0])
+    untouched = _assign(api_client, admin, projects[1], person, groups[0])
+    invalid = api_client.post(
+        f"/api/groups/{groups[1]['id']}/assignments",
+        headers=admin,
+        json={"project_id": projects[0], "user_ids": [person["id"], 2147483647]},
+    )
+    assert invalid.status_code == 404, invalid.text
+    assert (
+        api_client.get(f"/api/projects/{projects[0]}/members/{first['id']}", headers=admin).json()
+        == first
+    )
+    _assign(api_client, admin, projects[0], person, groups[1])
+    assert (
+        api_client.get(
+            f"/api/projects/{projects[1]}/members/{untouched['id']}", headers=admin
+        ).json()
+        == untouched
+    )
+
+
+def test_concurrent_bundle_assignments_keep_distinct_groups_without_duplicates(api_client):
+    from concurrent.futures import ThreadPoolExecutor
+
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, unique_name("Concurrent overlap"))["id"]
+    person = _create_user(api_client, admin, role="maintainer")
+    groups = [_group(api_client, admin, [_policy(api_client, admin)]) for _ in range(2)]
+    for selection in [groups, [groups[0], groups[0]]]:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            entries = list(
+                pool.map(
+                    lambda bundle: _assign(api_client, admin, project, person, bundle), selection
+                )
+            )
+        assert all(entry["user_id"] == person["id"] for entry in entries)
+    rows = api_client.get(f"/api/projects/{project}/members", headers=admin).json()
+    assert {row["policy_group_id"] for row in rows if row["user_id"] == person["id"]} == {
+        bundle["id"] for bundle in groups
+    }
+
+
+def test_first_bundle_explicitly_replaces_legacy_entry_and_later_bundles_preserve_it(api_client):
+    admin = _admin_headers(api_client)
+    project = create_project(api_client, admin, unique_name("Legacy overlap"))["id"]
+    person = _create_user(api_client, admin, role="maintainer")
+    legacy = api_client.post(
+        f"/api/projects/{project}/members",
+        headers=admin,
+        json={"user_id": person["id"], "owner": True},
+    )
+    assert legacy.status_code == 201, legacy.text
+    groups = [_group(api_client, admin, [_policy(api_client, admin)]) for _ in range(2)]
+    first = _assign(api_client, admin, project, person, groups[0])
+    assert first["id"] == legacy.json()["id"]
+    assert first["owner"] is False
+    assert first["policy_group_id"] == groups[0]["id"]
+    second = _assign(api_client, admin, project, person, groups[1])
+    assert second["id"] != first["id"]
+    assert (
+        api_client.get(f"/api/projects/{project}/members/{first['id']}", headers=admin).json()
+        == first
+    )
+
+
+def test_direct_membership_audit_identifies_each_created_changed_and_removed_bundle(api_client):
+    admin = _admin_headers(api_client)
+    actor_id = api_client.get("/api/auth/me", headers=admin).json()["id"]
+    project = create_project(api_client, admin, unique_name("Audited overlap"))["id"]
+    person = _create_user(api_client, admin, role="maintainer")
+    groups = [_group(api_client, admin, [_policy(api_client, admin)]) for _ in range(3)]
+    entries = []
+    for group in groups[:2]:
+        created = api_client.post(
+            f"/api/projects/{project}/members",
+            headers=admin,
+            json={"user_id": person["id"], "policy_group_id": group["id"]},
+        )
+        assert created.status_code == 201, created.text
+        entries.append(created.json())
+    updated = api_client.patch(
+        f"/api/projects/{project}/members/{entries[0]['id']}",
+        headers=admin,
+        json={"policy_group_id": groups[2]["id"]},
+    )
+    assert updated.status_code == 200, updated.text
+    removed = api_client.delete(
+        f"/api/projects/{project}/members/{entries[1]['id']}",
+        headers=admin,
+    )
+    assert removed.status_code == 204, removed.text
+    response = api_client.get(
+        "/api/audit",
+        headers=admin,
+        params={"action": "project_member.", "target_id": str(person["id"]), "project_id": project},
+    )
+    assert response.status_code == 200, response.text
+    events = response.json()["items"]
+    assert len(events) == 4
+    assert all(
+        event["actor_user_id"] == actor_id
+        and event["target_type"] == "user"
+        and event["target_id"] == str(person["id"])
+        and event["project_id"] == project
+        and event["outcome"] == "success"
+        for event in events
+    )
+    added = [event["details"] for event in events if event["action"] == "project_member.added"]
+    assert {(event.get("membership_id"), event.get("policy_group_id")) for event in added} == {
+        (entry["id"], group["id"]) for entry, group in zip(entries, groups[:2])
+    }
+    changed = next(
+        event["details"] for event in events if event["action"] == "project_member.updated"
+    )
+    assert changed["membership_id"] == entries[0]["id"]
+    assert changed["policy_group_id"] == groups[2]["id"]
+    assert changed["previous_policy_group_id"] == groups[0]["id"]
+    deleted = next(
+        event["details"] for event in events if event["action"] == "project_member.removed"
+    )
+    assert deleted["membership_id"] == entries[1]["id"]
+    assert deleted["policy_group_id"] == groups[1]["id"]

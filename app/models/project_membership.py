@@ -13,10 +13,12 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Table,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -82,7 +84,17 @@ class ProjectAccess(Base):
         CheckConstraint(
             "(user_id IS NULL) <> (group_id IS NULL)", name="ck_project_access_one_principal"
         ),
-        UniqueConstraint("project_id", "user_id", name="uq_project_access_project_user"),
+        UniqueConstraint(
+            "project_id", "user_id", "policy_group_id", name="uq_project_access_project_user_bundle"
+        ),
+        Index(
+            "uq_project_access_project_legacy_user",
+            "project_id",
+            "user_id",
+            unique=True,
+            sqlite_where=text("user_id IS NOT NULL AND policy_group_id IS NULL"),
+            postgresql_where=text("user_id IS NOT NULL AND policy_group_id IS NULL"),
+        ),
         UniqueConstraint("project_id", "group_id", name="uq_project_access_project_group"),
     )
 

@@ -2,11 +2,18 @@
 
 ## 1.3.0 - unreleased
 
+### Added
+
+- Assign a person to several policy groups in one project. Their effective access combines the assigned groups within the existing policy scopes; removing one membership retains the others.
+
 ### Changed
 
+- Document discussions are visible beside the content in a scrolling right panel on desktop and above the content on compact screens.
+- Every email carries the product identity as its heading and one action. Access request and workflow request emails also open their plain text with the identity and give a product-specific next step in HTML and plain text. Workflow request emails are sent in HTML as well as plain text.
 - The product identity is fixed as Bloom PLM by EmbedLabs across the application, emails and API. The sidebar shows Bloom PLM with by EmbedLabs beneath it. The `BLOOM_APP_NAME` setting is removed; an existing environment variable or `.env` entry with that name is ignored.
 - The invitation and email change dialogs close with Escape and put the focus on their first field when they open. A project card opens with the keyboard as well as with the mouse.
 - A source install needs Python 3.11 or later.
+- The container starts as root only to prepare its directories, data ownership and, on Cloudron, its secrets and migrations; supervisord, nginx and uvicorn then run as `appuser`. Kubernetes `runAsNonRoot` policies are not supported.
 
 ### Fixed
 

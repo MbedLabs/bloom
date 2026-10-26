@@ -150,13 +150,12 @@ async def assign_project_bundle(
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Assign the bundle to selected users only on the addressed project."""
-    from app.api.project_memberships import _response
+    from app.api.project_memberships import _project, _response
 
     group = await _get_group_or_404(db, group_id)
     if not group.policies:
         raise HTTPException(status_code=400, detail="Choose a group with policies")
-    if await db.get(Project, data.project_id) is None:
-        raise HTTPException(status_code=404, detail="Project not found")
+    await _project(db, data.project_id, lock=True)
     users = list(await db.scalars(select(User).where(User.id.in_(data.user_ids))))
     if len(users) != len(data.user_ids):
         raise HTTPException(status_code=404, detail="User not found")
@@ -170,10 +169,17 @@ async def assign_project_bundle(
             )
         )
     )
-    known = {row.user_id: row for row in rows}
+    known = {}
+    for row in rows:
+        known.setdefault(row.user_id, []).append(row)
     result = []
     for user_id in data.user_ids:
-        row = known.get(user_id)
+        current = known.get(user_id, [])
+        row = next((entry for entry in current if entry.policy_group_id == group.id), None)
+        if row is not None:
+            result.append(await _response(db, row))
+            continue
+        row = next((entry for entry in current if entry.policy_group_id is None), None)
         if row is None:
             row = ProjectAccess(project_id=data.project_id, user_id=user_id, policies=[])
             db.add(row)
