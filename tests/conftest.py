@@ -14,9 +14,33 @@ from urllib.parse import urlparse
 import pytest
 from fastapi.testclient import TestClient
 
+TEST_POSTGRES_PORT = 15432
+TEST_SMTP_PORT = 11025
+DEV_POSTGRES_PORTS = frozenset({5432, 5433, 5434})
+DEV_SMTP_PORTS = frozenset({25, 465, 587, 1025, 2525, 8025})
+LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def _test_smtp_port() -> int:
+    """Return the dedicated Mailpit SMTP port, refusing privileged and local development ports."""
+    raw = os.environ.get("TEST_SMTP_PORT", str(TEST_SMTP_PORT))
+    if not raw.isdigit() or not 1024 < int(raw) < 65536 or int(raw) in DEV_SMTP_PORTS:
+        raise RuntimeError(
+            "Tests require a dedicated test Mailpit port, not a local development port"
+        )
+    return int(raw)
+
+
+def _postgres_port_allowed(port: int | None) -> bool:
+    """Return True for an explicit non-development PostgreSQL port."""
+    return port is not None and 1024 < port < 65536 and port not in DEV_POSTGRES_PORTS
+
+
+SMTP_PORT = _test_smtp_port()
+
 
 def _isolate_test_environment() -> None:
-    """Configure test-only application credentials and unauthenticated local Mailpit."""
+    """Configure test-only application credentials and the unauthenticated test Mailpit."""
     from cryptography.fernet import Fernet
 
     database_url = os.environ.get("DATABASE_URL", "")
@@ -24,11 +48,11 @@ def _isolate_test_environment() -> None:
         parsed = urlparse(database_url)
         if parsed.scheme.startswith("postgres") and (
             parsed.scheme not in {"postgres", "postgresql", "postgresql+asyncpg"}
-            or parsed.hostname not in {"localhost", "127.0.0.1", "::1"}
+            or parsed.hostname not in LOOPBACK_HOSTS
             or parsed.username != "test_user"
             or parsed.password != "test_password"
             or not (parsed.path == "/test_bloom" or re.fullmatch(r"/k75_[0-9a-f]{10}", parsed.path))
-            or parsed.port not in {None, 5432}
+            or not _postgres_port_allowed(parsed.port)
             or parsed.query
             or parsed.fragment
         ):
@@ -41,7 +65,7 @@ def _isolate_test_environment() -> None:
         if not parsed.scheme.startswith(("postgres", "sqlite")):
             raise RuntimeError("Tests require an isolated PostgreSQL or SQLite database")
     else:
-        database_url = "postgresql+asyncpg://test_user:test_password@localhost:5432/test_bloom"
+        database_url = f"postgresql+asyncpg://test_user:test_password@localhost:{TEST_POSTGRES_PORT}/test_bloom"
 
     values = {
         "DOTENV_DISABLED": "1",
@@ -55,7 +79,7 @@ def _isolate_test_environment() -> None:
         "DATABASE_URL": database_url,
         "SMTP_ENABLED": "true",
         "SMTP_HOST": "127.0.0.1",
-        "SMTP_PORT": "1025",
+        "SMTP_PORT": str(SMTP_PORT),
         "SMTP_USERNAME": "",
         "SMTP_PASSWORD": "",
         "SMTP_FROM_EMAIL": "noreply@example.com",
@@ -104,8 +128,8 @@ def _guard_test_smtp(event: str, args: tuple) -> None:
             raise PermissionError("Operator dotenv files are forbidden in tests")
     if event == "smtplib.connect":
         _, host, port = args
-        if host not in {"localhost", "127.0.0.1", "::1"} or port != 1025:
-            raise PermissionError("Tests may connect only to local Mailpit on port 1025")
+        if host not in LOOPBACK_HOSTS or port != SMTP_PORT:
+            raise PermissionError(f"Tests may connect only to the test Mailpit on port {SMTP_PORT}")
     elif event == "smtplib.send":
         _, data = args
         command = data.lstrip().split(None, 1)
@@ -130,7 +154,7 @@ def _postgres_available_from_env() -> bool:
         return True
 
     host = parsed.hostname or "localhost"
-    port = parsed.port or 5432
+    port = parsed.port or TEST_POSTGRES_PORT
 
     try:
         with socket.create_connection((host, port), timeout=1.0):

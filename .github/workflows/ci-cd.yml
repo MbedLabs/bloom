@@ -30,7 +30,7 @@ jobs:
       mailpit:
         image: axllent/mailpit@sha256:98b916bd3c8d61f7633a52d3ea2f58d00620cb01ca57ab59edde68c347a95365
         ports:
-          - 1025:1025
+          - 11025:1025
         options: >-
           --health-cmd "/mailpit readyz"
           --health-interval 5s
@@ -43,7 +43,7 @@ jobs:
           POSTGRES_PASSWORD: test_password
           POSTGRES_DB: test_bloom
         ports:
-          - 5432:5432
+          - 15432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -96,7 +96,7 @@ jobs:
 
       - name: Alembic upgrade on an empty database
         env:
-          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_bloom
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
           SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
           BLOOM_DOTENV_DISABLED: "1"
         run: |
@@ -106,7 +106,7 @@ jobs:
 
       - name: Alembic downgrade and re-upgrade (deployed-database path)
         env:
-          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_bloom
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
           SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
           BLOOM_DOTENV_DISABLED: "1"
         run: |
@@ -116,7 +116,7 @@ jobs:
 
       - name: Run backend tests
         env:
-          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_bloom
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
           SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
           SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
           ENABLE_DOCS: "false"
@@ -127,7 +127,7 @@ jobs:
 
       - name: Postgres tests
         env:
-          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_bloom
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
           SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
           SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
           ENABLE_DOCS: "false"
@@ -138,7 +138,7 @@ jobs:
 
       - name: Postgres tests again on the same database
         env:
-          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_bloom
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
           SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
           SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
           ENABLE_DOCS: "false"
