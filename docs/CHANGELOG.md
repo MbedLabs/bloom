@@ -24,6 +24,7 @@
 
 ### Fixed
 
+- Line spacing in the document editor is set per paragraph and heading, list items, quotes and table cells included, and is saved with the document, so it shows the same after reopening, on the reading page and in approved revisions. The menu offers Single, 1.5 and Double as multiples of the normal spacing and marks the spacing at the cursor.
 - Administrator welcome emails confirm the account is ready and give product-specific next steps, with matching HTML and plain-text instructions. The obsolete one-time runner registration key instructions are removed.
 
 ### Security

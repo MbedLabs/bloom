@@ -8,6 +8,7 @@ import {
   ListTree, Hash, AlignVerticalSpaceAround
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
+import { currentLineSpacing } from './LineHeight'
 
 interface DocEditorToolbarProps {
   editor: Editor
@@ -28,6 +29,7 @@ export default function DocEditorToolbar({
   const [headingOpen, setHeadingOpen] = useState(false)
   const [colorOpen, setColorOpen] = useState(false)
   const [lineHeightOpen, setLineHeightOpen] = useState(false)
+  const lineSpacing = currentLineSpacing(editor)
   const headingRef = useRef<HTMLDivElement>(null)
   const colorRef = useRef<HTMLDivElement>(null)
   const lineHeightRef = useRef<HTMLDivElement>(null)
@@ -256,18 +258,18 @@ export default function DocEditorToolbar({
         {lineHeightOpen && (
           <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-lg shadow-elegant overflow-hidden z-50 min-w-[100px]">
             <HeadingOption
-              label="1.0"
-              active={!editor.storage.lineHeight || editor.storage.lineHeight === '1'}
-              onClick={() => { editor.chain().focus().setLineHeight('1').run(); setLineHeightOpen(false) }}
+              label="Single"
+              active={lineSpacing === null}
+              onClick={() => { editor.chain().focus().unsetLineHeight().run(); setLineHeightOpen(false) }}
             />
             <HeadingOption
               label="1.5"
-              active={editor.storage.lineHeight === '1.5'}
+              active={lineSpacing === '1.5'}
               onClick={() => { editor.chain().focus().setLineHeight('1.5').run(); setLineHeightOpen(false) }}
             />
             <HeadingOption
-              label="2.0"
-              active={editor.storage.lineHeight === '2'}
+              label="Double"
+              active={lineSpacing === '2'}
               onClick={() => { editor.chain().focus().setLineHeight('2').run(); setLineHeightOpen(false) }}
             />
           </div>
