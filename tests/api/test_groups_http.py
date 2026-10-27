@@ -86,7 +86,7 @@ def test_default_policies_are_listed(api_client: TestClient):
     defaults = [policy for policy in resp.json() if policy["is_default"]]
     from app.core.policy_seed import DEFAULT_POLICIES
 
-    assert len(defaults) == 23
+    assert len(defaults) == 24
     assert {policy["name"] for policy in defaults} == {spec["name"] for spec in DEFAULT_POLICIES}
     for policy in defaults:
         origin = {"Read Customer": "customer", "Review Customer": "customer"}.get(policy["name"])
@@ -150,7 +150,7 @@ async def test_review_defaults_read_through_the_actual_policy_api(workflow_http)
     response = await client.get("/api/policies")
     assert response.status_code == 200, response.text
     defaults = {policy["name"]: policy for policy in response.json() if policy["is_default"]}
-    assert len(defaults) == 23
+    assert len(defaults) == 24
     for name, origin in [("Review Internal", None), ("Review Customer", "customer")]:
         rules = defaults[name]["rules"]
         assert set(rules) == set(DOC_TYPE_RESOURCES)

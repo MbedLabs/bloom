@@ -1,5 +1,6 @@
 """The default catalogue covers Bloom resources with independently scoped permissions."""
 
+import copy
 import importlib.util
 from pathlib import Path
 
@@ -22,12 +23,13 @@ DOCUMENT_POLICIES = {
     "Defects": "DEF",
     "Protocols": "PRT",
     "Reports": "RPT",
+    "Visions": "VIS",
 }
 
 
-def test_twenty_three_defaults_have_exact_resource_scopes_and_supported_permissions():
+def test_twenty_four_defaults_have_exact_resource_scopes_and_supported_permissions():
     policies = {policy["name"]: policy for policy in DEFAULT_POLICIES}
-    assert len(DEFAULT_POLICIES) == len(policies) == 23
+    assert len(DEFAULT_POLICIES) == len(policies) == 24
     assert set(policies) == set(DOCUMENT_POLICIES) | {
         "Baselines",
         "Parameters",
@@ -107,13 +109,41 @@ def test_default_groups_are_populated_without_people_or_project_assignments():
             assert {"Read Internal", "Read Customer"} <= set(group["policy_names"])
 
 
-def test_release_migration_freezes_the_runtime_catalogue():
-    path = Path(__file__).resolve().parents[2] / "alembic/versions/c5e8a1f2b9d4_access_entries.py"
-    spec = importlib.util.spec_from_file_location("access_migration", path)
+def _migration(name: str):
+    path = Path(__file__).resolve().parents[2] / "alembic/versions" / name
+    spec = importlib.util.spec_from_file_location(path.stem, path)
     migration = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(migration)
-    assert migration.DEFAULT_POLICIES == DEFAULT_POLICIES
-    assert migration.DEFAULT_GROUPS == DEFAULT_GROUPS
+    return migration
+
+
+def test_release_and_visions_migrations_freeze_the_runtime_catalogue():
+    release = _migration("c5e8a1f2b9d4_access_entries.py")
+    visions = _migration("637f976e78e0_visions.py")
+    expected = {policy["name"]: copy.deepcopy(policy) for policy in release.DEFAULT_POLICIES}
+    for name in visions.COVERED_POLICIES:
+        expected[name]["permissions"]["VIS"] = list(expected[name]["permissions"]["SPEC"])
+        expected[name]["type_tags"]["VIS"] = dict(expected[name]["type_tags"]["SPEC"])
+    expected[visions.VISIONS] = {
+        "name": visions.VISIONS,
+        "description": "",
+        "scope": "document",
+        "permissions": {"VIS": visions.VIS_ACTIONS},
+        "type_tags": {"VIS": {"all": True, "visibility": [], "tags": []}},
+    }
+    assert {policy["name"]: policy for policy in DEFAULT_POLICIES} == expected
+    groups = {group["name"]: copy.deepcopy(group) for group in release.DEFAULT_GROUPS}
+    owners = groups[visions.PRODUCT_OWNERS]["policy_names"]
+    owners.insert(owners.index("Specifications") + 1, visions.VISIONS)
+    assert {group["name"]: group for group in DEFAULT_GROUPS} == groups
+    released_maintainer_set = {
+        policy["name"]
+        for policy in release.DEFAULT_POLICIES
+        if policy["scope"] in {"document", "project"}
+        and policy["name"]
+        not in {"Read Internal", "Read Customer", "Review Internal", "Review Customer"}
+    }
+    assert set(visions.RELEASED_MAINTAINER_SET) == released_maintainer_set
 
 
 @pytest.mark.parametrize(

@@ -844,6 +844,7 @@ ARTEFACT_FACTORY = {
     "CHG": (ChangeRequest, "change_id", "CHG", "title", {}),
     "SPEC": (Document, "doc_id", "SPEC", "title", {"doc_type": "SPEC"}),
     "STD": (Document, "doc_id", "STD", "title", {"doc_type": "STD"}),
+    "VIS": (Document, "doc_id", "VIS", "title", {"doc_type": "VIS"}),
 }
 
 ARTEFACT_SLUG_FOR_CODE = {
@@ -856,9 +857,10 @@ ARTEFACT_SLUG_FOR_CODE = {
     "CHG": "changes",
     "SPEC": "documents",
     "STD": "documents",
+    "VIS": "documents",
 }
 
-LINK_REVIEW_CODES = {"REQ", "DES", "CPT", "SPEC", "STD"}
+LINK_REVIEW_CODES = {"REQ", "DES", "CPT", "SPEC", "STD", "VIS"}
 
 ARTEFACT_TYPE_FOR_CODE = {
     "REQ": "requirement",
@@ -870,6 +872,7 @@ ARTEFACT_TYPE_FOR_CODE = {
     "CHG": "change",
     "SPEC": "document",
     "STD": "document",
+    "VIS": "document",
 }
 
 

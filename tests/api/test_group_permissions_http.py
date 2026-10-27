@@ -2092,4 +2092,4 @@ def test_a_baseline_snapshot_shows_only_sections_of_visible_types(api_client: Te
     assert set(snapshot) == {"documents"}
     listed = api_client.get("/api/baselines", headers=some, params={"project_id": project})
     assert set(listed.json()[0]["snapshot"]) == {"requirements"}
-    assert len(api_client.get(f"/api/baselines/{baseline}", headers=admin).json()["snapshot"]) == 6
+    assert len(api_client.get(f"/api/baselines/{baseline}", headers=admin).json()["snapshot"]) == 7

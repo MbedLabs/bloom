@@ -24,6 +24,7 @@ EXTERNAL_DOC_TYPES = {
     "PRT",
     "RPT",
     "STD",
+    "VIS",
 }
 
 DEFAULT_EXTERNAL_DOC_TYPES = {"REQ", "TC", "CPT", "CMP"}

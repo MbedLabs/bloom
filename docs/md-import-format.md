@@ -13,7 +13,7 @@ An artefact type is chosen, in priority order, by:
 3. the **type specified at import** time (a default applied to unmarked sections)
 
 Recognised type tokens (case-insensitive): `req`/`requirement`, `spec`,
-`std`/`standard`, `des`/`design`, `rsk`/`risk`, `chg`/`change`,
+`std`/`standard`, `vis`/`vision`, `des`/`design`, `rsk`/`risk`, `chg`/`change`,
 `cpt`/`concept`/`test-concept`, `tc`/`test-case`, `def`/`defect`.
 
 ```markdown
@@ -115,6 +115,7 @@ decides which template a section is filed under.
 |---|---|---|
 | `req` / `requirement` | Requirement | title + body |
 | `spec` / `std` | Document (SPEC/STD) | title + body; filed in the document registry |
+| `vis` / `vision` | Vision (VIS) | title + body; filed in the document registry |
 | `des` / `design` | Design | title + body |
 | `rsk` / `risk` | Risk | title + body |
 | `cpt` / `concept` / `test-concept` | Test Concept | title becomes the concept name |

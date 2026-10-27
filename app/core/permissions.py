@@ -43,6 +43,9 @@ RESOURCE_ACTIONS = {
         {"view", "comment", "create", "edit", "delete", "review", "approve", "import"}
     ),
     "STD": frozenset({"view", "comment", "create", "edit", "delete", "review", "import"}),
+    "VIS": frozenset(
+        {"view", "comment", "create", "edit", "delete", "review", "approve", "import"}
+    ),
     "DES": frozenset({"view", "comment", "create", "edit", "delete", "review", "approve"}),
     "CHG": frozenset({"view", "comment", "create", "edit", "delete", "review", "approve"}),
     "CPT": frozenset({"view", "comment", "create", "edit", "delete", "review", "approve"}),
@@ -62,7 +65,9 @@ RESOURCE_ACTIONS = {
 READ_ACTIONS = frozenset({"view", "comment"})
 WRITE_ACTIONS = frozenset({"create", "edit"})
 APPROVE_ACTIONS = frozenset({"review", "approve"})
-APPROVE_REVIEW_RESOURCES = frozenset({"REQ", "TC", "SPEC", "PRT", "DES", "CHG", "CPT", "DEF", "TS"})
+APPROVE_REVIEW_RESOURCES = frozenset(
+    {"REQ", "TC", "SPEC", "PRT", "DES", "CHG", "CPT", "DEF", "TS", "VIS"}
+)
 EXTERNAL_DENIED_ACTIONS = frozenset({"approve", "delete"})
 VISIBILITIES = ("internal", "customer")
 

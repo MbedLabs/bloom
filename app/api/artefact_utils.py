@@ -663,6 +663,7 @@ FIRST_STATUS = {
     "PRT": "Draft",
     "RPT": "Draft",
     "STD": "Draft",
+    "VIS": "Draft",
     "TS": "Draft",
     "DES": "Draft",
     "CPT": "Draft",

@@ -2,13 +2,14 @@
 
 from fastapi import HTTPException
 
-CANONICAL_DOCUMENT_KINDS = ("SPEC", "PRT", "RPT", "STD")
+CANONICAL_DOCUMENT_KINDS = ("SPEC", "PRT", "RPT", "STD", "VIS")
 
 DOCUMENT_KIND_SLUGS = {
     "SPEC": "specifications",
     "PRT": "protocols",
     "RPT": "reports",
     "STD": "standards",
+    "VIS": "visions",
 }
 
 SLUG_TO_DOCUMENT_KIND = {slug: kind for kind, slug in DOCUMENT_KIND_SLUGS.items()}
@@ -24,6 +25,7 @@ LEGACY_DOCUMENT_KIND_MAP = {
     "PRT": "PRT",
     "RPT": "RPT",
     "STD": "STD",
+    "VIS": "VIS",
 }
 
 
@@ -41,7 +43,7 @@ def require_document_kind(value: str | None) -> str:
             status_code=422,
             detail=(
                 f"Invalid document kind '{value}'. "
-                "Supported shared-document kinds: SPEC, PRT, RPT, STD. "
+                "Supported shared-document kinds: SPEC, PRT, RPT, STD, VIS. "
                 "Legacy values like DOC or human-readable labels are not accepted on the public API."
             ),
         )

@@ -458,7 +458,7 @@ class DocumentCreate(StrictModel):
     project_id: int
     tag_ids: List[int] = Field(default_factory=list)
     title: str = Field(..., min_length=1, max_length=500)
-    doc_type: str = Field(default="SPEC", pattern="^(SPEC|PRT|RPT|STD)$")
+    doc_type: str = Field(default="SPEC", pattern="^(SPEC|PRT|RPT|STD|VIS)$")
     visibility: str = Field(default="internal", pattern=ARTEFACT_VISIBILITY_PATTERN)
     status: str = Field(default="Draft", pattern="^Draft$")
     description: Optional[str] = None
@@ -468,7 +468,7 @@ class DocumentCreate(StrictModel):
 
 class DocumentUpdate(StrictModel):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
-    doc_type: Optional[str] = Field(None, pattern="^(SPEC|PRT|RPT|STD)$")
+    doc_type: Optional[str] = Field(None, pattern="^(SPEC|PRT|RPT|STD|VIS)$")
     visibility: Optional[str] = Field(default=None, pattern=ARTEFACT_VISIBILITY_PATTERN)
     status: Optional[str] = None
     version: Optional[str] = None

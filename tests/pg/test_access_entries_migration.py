@@ -177,7 +177,7 @@ def test_the_access_migration_seeds_defaults_and_converts_memberships():
         assert {n for n, row in policies.items() if row["is_default"]} == {
             spec["name"] for spec in DEFAULT_POLICIES
         }
-        assert len([row for row in policies.values() if row["is_default"]]) == 23
+        assert len([row for row in policies.values() if row["is_default"]]) == 24
         for spec in DEFAULT_POLICIES:
             stored = policies[spec["name"]]
             assert stored["scope"] == spec["scope"]
@@ -241,8 +241,8 @@ def test_the_access_migration_seeds_defaults_and_converts_memberships():
             "link",
             "project",
         }
-        assert set(json.loads(policies["Released Read (all document types)"]["type_tags"])) == set(
-            DOC_TYPE_RESOURCES
+        assert set(json.loads(policies["Released Read (all document types)"]["type_tags"])) == (
+            set(DOC_TYPE_RESOURCES) - {"VIS"}
         )
         assert all(
             rule == {"visibility": ["customer"], "tags": []}

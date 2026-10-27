@@ -32,7 +32,7 @@ from app.models.workflow import (
 )
 from app.services.audit import audit_actor_var, build_audit_event
 
-CONTROLLED_TYPES = frozenset({"REQ", "SPEC", "TC", "DES", "CPT", "PRT", "TS", "CHG"})
+CONTROLLED_TYPES = frozenset({"REQ", "SPEC", "TC", "DES", "CPT", "PRT", "TS", "CHG", "VIS"})
 WORKFLOW_PHASES = ("Draft", "Review", "Approval", "Approved")
 LEGACY_CHANGE_STATUSES = ("Submitted", "Closed")
 SIGNOFF_FIELDS = (

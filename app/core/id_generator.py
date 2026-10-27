@@ -24,6 +24,7 @@ ALLOWED_TYPE_CODES = frozenset(
         "PRT",
         "RPT",
         "STD",
+        "VIS",
         "BL",
         "TS",
         "CMP",

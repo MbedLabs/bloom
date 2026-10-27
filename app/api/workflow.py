@@ -72,6 +72,7 @@ DOC_SLUGS = {
     "PRT": "protocols",
     "RPT": "reports",
     "STD": "standards",
+    "VIS": "visions",
 }
 
 

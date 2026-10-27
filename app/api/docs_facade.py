@@ -309,6 +309,7 @@ _TYPE_LABELS = {
     "PRT": "Protocol",
     "RPT": "Report",
     "STD": "External Standard",
+    "VIS": "Vision",
 }
 
 _SORT_FIELDS = frozenset(
@@ -873,7 +874,7 @@ class NextDocIdResponse(BaseModel):
     next_id: str
 
 
-_DOCUMENT_TYPE_CODES = {"SPEC", "PRT", "RPT", "STD"}
+_DOCUMENT_TYPE_CODES = {"SPEC", "PRT", "RPT", "STD", "VIS"}
 
 
 @router.get(

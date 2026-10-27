@@ -22,6 +22,8 @@ TYPE_TOKENS = {
     "specification": "SPEC",
     "std": "STD",
     "standard": "STD",
+    "vis": "VIS",
+    "vision": "VIS",
     "des": "DES",
     "design": "DES",
     "rsk": "RSK",
