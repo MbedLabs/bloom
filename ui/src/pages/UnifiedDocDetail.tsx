@@ -52,6 +52,7 @@ export default function UnifiedDocDetail() {
     case 'PRT':
     case 'RPT':
     case 'STD':
+    case 'VIS':
       return <DocumentDetail resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     case 'DES':
       return <ArtefactDetail kind="design" resolvedId={doc.id} allowedActions={doc.allowed_actions} />

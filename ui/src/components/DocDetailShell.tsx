@@ -63,6 +63,8 @@ interface DocDetailShellProps {
   title: string
   status: string
   priority?: string | null
+  /** A label shown beside the document code. */
+  codeLabel?: ReactNode
   actions?: ReactNode
   rightRail?: ReactNode
   /** The review summary shown above the content. */
@@ -78,6 +80,7 @@ export default function DocDetailShell({
   docType,
   docCode,
   title,
+  codeLabel,
   actions,
   rightRail,
   review,
@@ -107,8 +110,9 @@ export default function DocDetailShell({
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </button>
           <div>
-            <div className="mb-1">
+            <div className="mb-1 flex items-center gap-2">
               <span className="font-mono text-sm text-primary font-semibold">{docCode}</span>
+              {codeLabel}
             </div>
             <h2 className="text-2xl font-bold text-foreground">{title}</h2>
           </div>

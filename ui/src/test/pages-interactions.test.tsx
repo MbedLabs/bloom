@@ -433,6 +433,12 @@ describe('creating a document', () => {
     expect((priorities[0] as HTMLSelectElement).value).toBe('High')
   })
 
+  it('writes a new vision in the full document editor', async () => {
+    renderAt('/projects/:prefix/docs/new', '/projects/VCU/docs/new?type=visions', <DocCreate />)
+    expect(await screen.findByTestId('doc-editor')).toBeTruthy()
+    expect(screen.queryByTitle('Select priority')).toBeNull()
+  })
+
   it('omits unsupported Specification metadata controls', async () => {
     renderAt('/projects/:prefix/docs/new', '/projects/VCU/docs/new?type=SPEC', <DocCreate />)
     await screen.findByTitle('Select status')
@@ -441,7 +447,7 @@ describe('creating a document', () => {
     expect(screen.queryByTitle('Specification Type')).toBeNull()
   })
 
-  it.each(['SPEC', 'PRT', 'RPT', 'STD'])('offers and submits only Draft when creating a %s', async (type) => {
+  it.each(['SPEC', 'PRT', 'RPT', 'STD', 'VIS'])('offers and submits only Draft when creating a %s', async (type) => {
     renderAt('/projects/:prefix/docs/new', `/projects/VCU/docs/new?type=${type}`, <DocCreate />)
     const status = await screen.findByTitle('Select status') as HTMLSelectElement
     expect(optionValues(status)).toEqual(['Draft'])

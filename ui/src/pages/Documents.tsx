@@ -52,10 +52,11 @@ const TYPE_BADGES: Record<DocType, { label: string; color: string }> = {
   PRT: { label: DOC_TYPE_LABELS.PRT, color: 'bg-violet-500/10 text-violet-700 dark:text-violet-400' },
   RPT: { label: 'Report', color: 'bg-slate-500/10 text-slate-700 dark:text-slate-400' },
   STD: { label: 'External Standard', color: 'bg-orange-500/10 text-orange-700 dark:text-orange-400' },
+  VIS: { label: 'Vision', color: 'bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400' },
 }
 
 const DOC_TYPE_OPTIONS: { code: DocType; label: string }[] = (
-  ['REQ', 'SPEC', 'TC', 'CPT', 'PRT', 'DES', 'RSK', 'CHG', 'DEF', 'CMP', 'TS', 'RPT', 'STD'] as DocType[]
+  ['VIS', 'REQ', 'SPEC', 'TC', 'CPT', 'PRT', 'DES', 'RSK', 'CHG', 'DEF', 'CMP', 'TS', 'RPT', 'STD'] as DocType[]
 ).map((code) => ({ code, label: docRegistryListLabel(code) }))
 
 const PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Critical']

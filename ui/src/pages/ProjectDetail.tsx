@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { Link, useParams, useSearchParams, useNavigate } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, BookOpen, FlaskConical, GitBranch, Map, Pencil } from 'lucide-react'
+import { ArrowLeft, BookOpen, FlaskConical, GitBranch, Lightbulb, Map, Pencil } from 'lucide-react'
 
 import { docsApi, projectsApi } from '../api/client'
 import { useProjectCapabilities } from '../hooks/useProjectCapabilities'
@@ -94,6 +94,7 @@ export default function ProjectDetail() {
   }
 
   const navItems: NavItem[] = [
+    { label: docRegistryListLabel('VIS'), icon: Lightbulb, to: docRegistryListUrl(prefix!, 'VIS') },
     { label: docRegistryListLabel('PRT'), icon: BookOpen, to: docRegistryListUrl(prefix!, 'PRT') },
     { label: docRegistryListLabel('RPT'), icon: BookOpen, to: docRegistryListUrl(prefix!, 'RPT') },
     { label: docRegistryListLabel('STD'), icon: BookOpen, to: docRegistryListUrl(prefix!, 'STD') },

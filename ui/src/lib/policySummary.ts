@@ -7,7 +7,7 @@ export const DOC_TYPES = Object.keys(DOC_TYPE_LABELS) as DocType[]
 export const PROJECT_RESOURCES = ['baseline', 'parameter', 'link', 'project']
 export const APP_RESOURCES = ['users', 'access', 'application']
 export const RESOURCES = [...DOC_TYPES, ...PROJECT_RESOURCES, ...APP_RESOURCES]
-const APPROVABLE_RESOURCES = new Set(['REQ', 'TC', 'SPEC', 'PRT', 'RPT', 'DES', 'CHG', 'CPT', 'DEF', 'TS'])
+const APPROVABLE_RESOURCES = new Set(['REQ', 'TC', 'SPEC', 'PRT', 'RPT', 'DES', 'CHG', 'CPT', 'DEF', 'TS', 'VIS'])
 export const approveIncludesReview = (resource: string) => APPROVABLE_RESOURCES.has(resource) && resource !== 'RPT'
 export const SCOPE_LABELS: Record<PolicyScope, string> = { document: 'Document', project: 'Project', app: 'App' }
 export const BUILTIN_ORIGINS: { key: PolicyVisibility; label: string }[] = [

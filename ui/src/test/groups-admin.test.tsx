@@ -295,7 +295,7 @@ describe('Groups and policies administration', () => {
   })
 
   it('shows Project without enumerating resources for a full-project reading policy', async () => {
-    const resources = ['REQ', 'SPEC', 'TC', 'DES', 'RSK', 'CHG', 'CPT', 'DEF', 'CMP', 'TS', 'PRT', 'RPT', 'STD', 'baseline', 'parameter', 'link', 'project']
+    const resources = ['REQ', 'SPEC', 'TC', 'DES', 'RSK', 'CHG', 'CPT', 'DEF', 'CMP', 'TS', 'PRT', 'RPT', 'STD', 'VIS', 'baseline', 'parameter', 'link', 'project']
     vi.mocked(api.policiesApi.list).mockResolvedValueOnce([{
       ...policies[0], name: 'Read Internal', scope: 'project',
       rules: Object.fromEntries(resources.map((resource) => [resource, {
@@ -436,8 +436,8 @@ describe('Groups and policies administration', () => {
   })
 
   it('shows All for complete application administration', async () => {
-    const documents = ['REQ', 'SPEC', 'TC', 'DES', 'CHG', 'CPT', 'DEF', 'TS', 'PRT', 'RPT', 'RSK', 'CMP', 'STD']
-    const approvable = new Set(['REQ', 'SPEC', 'TC', 'DES', 'CHG', 'CPT', 'DEF', 'TS', 'PRT', 'RPT'])
+    const documents = ['REQ', 'SPEC', 'TC', 'DES', 'CHG', 'CPT', 'DEF', 'TS', 'PRT', 'RPT', 'RSK', 'CMP', 'STD', 'VIS']
+    const approvable = new Set(['REQ', 'SPEC', 'TC', 'DES', 'CHG', 'CPT', 'DEF', 'TS', 'PRT', 'RPT', 'VIS'])
     vi.mocked(api.policiesApi.list).mockResolvedValueOnce([{
       ...policies[0], name: 'Application Administration', scope: 'app',
       rules: Object.fromEntries([...documents, 'baseline', 'parameter', 'link', 'project', 'users', 'access', 'application'].map((resource) => [resource, {

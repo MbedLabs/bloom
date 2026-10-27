@@ -17,7 +17,7 @@ import {
   LayoutDashboard, FolderKanban, FileText, CheckSquare,
   GitBranch, BarChart3, Sun, Moon, Bell,
   ExternalLink, ChevronDown, ChevronLeft, ChevronRight, Search,
-  BookOpen, Bug, Layers, FlaskConical, LogOut, Users, PenTool, AlertTriangle, GitPullRequest, Settings, SlidersHorizontal, ShieldCheck, ScrollText,
+  BookOpen, Bug, Layers, FlaskConical, LogOut, Users, PenTool, AlertTriangle, GitPullRequest, Settings, SlidersHorizontal, ShieldCheck, ScrollText, Lightbulb,
 } from 'lucide-react'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
 import { useDarkMode } from '../hooks/useDarkMode'
@@ -35,6 +35,7 @@ const mainNav = [
 
 const projectNav = [
   { name: 'Documents', icon: BookOpen, tab: '', href: 'docs' as const },
+  { name: docRegistryListLabel('VIS'), icon: Lightbulb, tab: '', href: 'docs' as const, filter: 'type:VIS' },
   { name: docRegistryListLabel('REQ'), icon: FileText, tab: '', href: 'docs' as const, filter: 'type:REQ' },
   { name: docRegistryListLabel('TC'), icon: CheckSquare, tab: '', href: 'docs' as const, filter: 'type:TC' },
   { name: docRegistryListLabel('SPEC'), icon: FileText, tab: '', href: 'docs' as const, filter: 'type:SPEC' },

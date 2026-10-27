@@ -17,11 +17,20 @@ import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import DocumentAttachmentsPanel from '../components/DocumentAttachmentsPanel'
 import { docEditUrl, docUrl, kindSlugToType, type DocType } from '../types/doc'
 import { formatDateTime } from '../test/date-utils'
+import { visionStage } from '../lib/visionStage'
 import { useToast } from '../components/useToast'
 import { useProjectPermissions, useRowActions } from '../hooks/useProjectPermissions'
 import { useParameterValues } from '../hooks/useParameterValues'
 import { useArtefactLabels } from '../hooks/useArtefactLabels'
 import ConfirmDelete from '../components/ConfirmDelete'
+
+/** The Idea or Binding badge of a vision. */
+function VisionStageBadge({ stage }: Readonly<{ stage: 'Idea' | 'Binding' }>) {
+  const tone = stage === 'Binding'
+    ? 'bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400'
+    : 'bg-slate-500/10 text-slate-700 dark:text-slate-400'
+  return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${tone}`}>{stage}</span>
+}
 
 function flattenSections(sections: DocumentSection[]): DocumentSection[] {
   const result: DocumentSection[] = []
@@ -145,6 +154,7 @@ export default function DocumentDetail({
       docCode={doc.doc_id || String(docId)}
       title={doc.title}
       status={doc.status}
+      codeLabel={docType === 'VIS' ? <VisionStageBadge stage={visionStage(workflow.data)} /> : undefined}
       actions={showEdit || showDelete ? (
         <>
           {showEdit && (

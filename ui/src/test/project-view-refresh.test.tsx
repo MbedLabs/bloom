@@ -32,7 +32,7 @@ const details: Partial<Record<DocType, string>> = { REQ: 'requirement', TC: 'tes
 const writes = {
   REQ: api.requirementsApi, TC: api.testCasesApi, DES: api.designsApi,
   RSK: api.risksApi, CHG: api.changesApi, CPT: api.testConceptsApi,
-  SPEC: api.documentsApi, PRT: api.documentsApi, RPT: api.documentsApi, STD: api.documentsApi,
+  SPEC: api.documentsApi, PRT: api.documentsApi, RPT: api.documentsApi, STD: api.documentsApi, VIS: api.documentsApi,
 }
 const allWrites = { ...writes, DEF: api.defectsApi, TS: api.testSuitesApi, CMP: api.campaignsApi }
 const allDetails = { ...details, DEF: 'defect', TS: 'testSuite', CMP: 'campaign' }

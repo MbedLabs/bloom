@@ -58,7 +58,7 @@ function saveLabel(saved: boolean, pending: boolean): string {
 function artefactActivityTypeForDocType(docType: DocType): string | null {
   if (docType === 'REQ') return 'requirement'
   if (docType === 'TC') return 'test-case'
-  if (docType === 'SPEC' || docType === 'PRT' || docType === 'RPT' || docType === 'STD') return 'document'
+  if (docType === 'SPEC' || docType === 'PRT' || docType === 'RPT' || docType === 'STD' || docType === 'VIS') return 'document'
   if (docType === 'DES') return 'design'
   if (docType === 'CPT') return 'test-concept'
   if (docType === 'CHG') return 'change'
@@ -67,7 +67,7 @@ function artefactActivityTypeForDocType(docType: DocType): string | null {
 }
 
 function isControlledSharedDocument(docType: DocType): boolean {
-  return docType === 'SPEC' || docType === 'PRT' || docType === 'RPT' || docType === 'STD'
+  return docType === 'SPEC' || docType === 'PRT' || docType === 'RPT' || docType === 'STD' || docType === 'VIS'
 }
 
 function requirementVisibilityFromOrigin(origin: string | undefined): ArtefactVisibility {
@@ -296,7 +296,7 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
     const map: Record<string, unknown> = {
       REQ: requirementsApi, TC: testCasesApi, DES: designsApi,
       RSK: risksApi, CHG: changesApi, CPT: testConceptsApi,
-      SPEC: documentsApi, PRT: documentsApi, RPT: documentsApi, STD: documentsApi,
+      SPEC: documentsApi, PRT: documentsApi, RPT: documentsApi, STD: documentsApi, VIS: documentsApi,
     }
     return map[type]
   }, [])
@@ -408,7 +408,7 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
       const docIdFieldMap: Record<string, string> = {
         REQ: 'req_id', TC: 'tc_id', DES: 'design_id',
         RSK: 'risk_id', CHG: 'change_id', CPT: 'concept_id',
-        SPEC: 'doc_id', PRT: 'doc_id', RPT: 'doc_id', STD: 'doc_id',
+        SPEC: 'doc_id', PRT: 'doc_id', RPT: 'doc_id', STD: 'doc_id', VIS: 'doc_id',
       }
       const newDocId = record[docIdFieldMap[docType]] || record.id
       const kindSlug = DOC_TYPE_SLUGS[docType]
