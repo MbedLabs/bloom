@@ -2342,6 +2342,8 @@ export interface DocumentWorkflow {
   phase: string | null
   status: string
   creator: WorkflowPerson | null
+  created_by: WorkflowPerson | null
+  assignee: WorkflowPerson | null
   reviewer: WorkflowPerson | null
   approver: WorkflowPerson | null
   reviewed_by: WorkflowPerson | null
@@ -2349,8 +2351,8 @@ export interface DocumentWorkflow {
   approved_by: WorkflowPerson | null
   approved_at: string | null
   authorizing_change: WorkflowChange | null
-  options: { reviewers: WorkflowPerson[]; approvers: WorkflowPerson[]; changes: WorkflowChange[] }
-  actions: Record<'request_review' | 'request_approval' | 'approve' | 'decline' | 'assign_reviewer' | 'assign_approver' | 'comment' | 'start_revision' | 'start_draft' | 'edit_current' | 'plan_current', boolean>
+  options: { assignees: WorkflowPerson[]; reviewers: WorkflowPerson[]; approvers: WorkflowPerson[]; changes: WorkflowChange[] }
+  actions: Record<'request_review' | 'request_approval' | 'approve' | 'decline' | 'assign_assignee' | 'assign_reviewer' | 'assign_approver' | 'comment' | 'start_revision' | 'start_draft' | 'edit_current' | 'plan_current', boolean>
   pending_request: WorkflowRequest | null
   last_request: { id: number; kind: 'review' | 'approval'; status: string; retry_at: string | null } | null
   revisions: { revision_number: number; captured_at: string; approved_by: WorkflowPerson | null; approved_at: string | null; authorizing_change_id: number | null }[]
@@ -2372,7 +2374,7 @@ export const workflowApi = {
     (await api.get<ProjectDocumentRequest[]>(`/projects/${projectId}/artefact-requests`)).data,
   get: async (type: string, id: number): Promise<DocumentWorkflow> =>
     (await api.get<DocumentWorkflow>(`/artefacts/${type}/${id}/workflow`)).data,
-  assign: async (type: string, id: number, data: { reviewer_id?: number | null; approver_id?: number | null }) =>
+  assign: async (type: string, id: number, data: { assignee_id?: number; reviewer_id?: number | null; approver_id?: number | null }) =>
     (await api.put(`/artefacts/${type}/${id}/workflow/assignees`, data)).data,
   request: async (type: string, id: number, kind: 'review' | 'approval') =>
     (await api.post(`/artefacts/${type}/${id}/requests`, { kind })).data,

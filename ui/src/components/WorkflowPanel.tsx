@@ -14,7 +14,7 @@ import { docUrl, type DocType } from '../types/doc'
 import { normalizeTcsRows } from '../utils/tcs'
 import { TcsArteTable } from './TcsArteTable'
 
-type Operation = { kind: 'review' | 'approval' | 'approve' | 'decline' | 'draft' | 'comment' | 'assign'; data?: { reviewer_id?: number | null; approver_id?: number | null } }
+type Operation = { kind: 'review' | 'approval' | 'approve' | 'decline' | 'draft' | 'comment' | 'assign'; data?: { assignee_id?: number; reviewer_id?: number | null; approver_id?: number | null } }
 const actionButtonClass = 'px-3 py-2 rounded-md border border-input text-sm hover:bg-accent/40 disabled:opacity-50'
 const reviewButtonClass = 'w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-amber-500/90 text-white text-xs font-medium hover:bg-amber-500 disabled:opacity-50'
 const approvalButtonClass = 'w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-500 disabled:opacity-50'
@@ -82,6 +82,17 @@ export default function WorkflowPanel({ artefactType, artefactId, projectPrefix,
     </section>
     <SectionCard title="Review">
       <div className="space-y-3">
+        {state.controlled && <>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Created by</div>
+            <div className="text-sm text-foreground">{state.created_by ? <UserIdentity user={state.created_by} /> : 'Not recorded'}</div>
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Assignee</div>
+            <div className="text-sm text-foreground">{state.assignee ? <UserIdentity user={state.assignee} /> : 'Unassigned'}</div>
+          </div>
+          {state.actions.assign_assignee && <fieldset disabled={busy}><UserSelect value={String(state.assignee?.id ?? '')} onChange={value => { if (value) mutation.mutate({ kind: 'assign', data: { assignee_id: Number(value) } }) }} users={state.options.assignees} label="Select assignee" /></fieldset>}
+        </>}
         {state.controlled && state.phase && state.revision_number !== null && <div className="text-sm text-muted-foreground">{state.phase} · Revision {state.revision_number}</div>}
         <div>
           <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Reviewer</div>

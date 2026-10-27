@@ -46,10 +46,10 @@ export const user = {
 }
 
 export const workflowFixture = {
-  controlled: true, revision_number: 1, phase: 'Draft', status: 'Draft', creator: user,
+  controlled: true, revision_number: 1, phase: 'Draft', status: 'Draft', creator: user, created_by: user, assignee: user,
   reviewer: user, approver: user, reviewed_by: null, reviewed_at: null, approved_by: null, approved_at: null,
-  authorizing_change: null, options: { reviewers: [user], approvers: [user], changes: [] },
-  actions: { request_review: false, request_approval: false, approve: false, decline: false, assign_reviewer: false, assign_approver: false, comment: true, start_revision: false, start_draft: false, edit_current: true, plan_current: true },
+  authorizing_change: null, options: { assignees: [user], reviewers: [user], approvers: [user], changes: [] },
+  actions: { request_review: false, request_approval: false, approve: false, decline: false, assign_assignee: false, assign_reviewer: false, assign_approver: false, comment: true, start_revision: false, start_draft: false, edit_current: true, plan_current: true },
   pending_request: null, last_request: null, revisions: [],
 }
 

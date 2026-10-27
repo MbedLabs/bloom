@@ -32,10 +32,10 @@ const SuiteDetail = (await import('../pages/SuiteDetail')).default
 const CampaignDetail = (await import('../pages/CampaignDetail')).default
 
 const workflowState = {
-  controlled: true, revision_number: 1, phase: 'Draft', status: 'Draft', creator: user,
+  controlled: true, revision_number: 1, phase: 'Draft', status: 'Draft', creator: user, created_by: user, assignee: user,
   reviewer, approver, reviewed_by: null, reviewed_at: null, approved_by: null, approved_at: null,
-  authorizing_change: null, options: { reviewers: [reviewer], approvers: [approver], changes: [] },
-  actions: { request_review: false, request_approval: false, approve: false, decline: false, assign_reviewer: false, assign_approver: false, comment: false, start_revision: false, start_draft: false, edit_current: true, plan_current: true },
+  authorizing_change: null, options: { assignees: [user, reviewer], reviewers: [reviewer], approvers: [approver], changes: [] },
+  actions: { request_review: false, request_approval: false, approve: false, decline: false, assign_assignee: false, assign_reviewer: false, assign_approver: false, comment: false, start_revision: false, start_draft: false, edit_current: true, plan_current: true },
   pending_request: null, last_request: null, revisions: [],
 }
 
@@ -91,8 +91,8 @@ afterEach(() => {
 })
 
 describe('controlled document handoffs', () => {
-  it.each(['REQ', 'TC'] as const)('lets the creator request review of an assigned Draft %s', async (type) => {
-    vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowState, actions: { ...workflowState.actions, request_review: true } })
+  it.each(['REQ', 'TC'] as const)('lets the assignee request review of an assigned Draft %s', async (type) => {
+    vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowState, created_by: approver, assignee: user, actions: { ...workflowState.actions, request_review: true } })
     renderAssignedDocument(type, 'Draft')
     const action = await screen.findByRole('button', { name: /^request review$/i })
     expect(screen.getByRole('heading', { name: 'Review' })).toBeTruthy()
@@ -125,6 +125,66 @@ describe('controlled document handoffs', () => {
     expect((await screen.findByRole('button', { name: /^mark reviewed$/i }) as HTMLButtonElement).disabled).toBe(false)
     fireEvent.click(screen.getByRole('button', { name: /^mark reviewed$/i }))
     await waitFor(() => expect(client.workflowApi.request).toHaveBeenCalledWith(type === 'REQ' ? 'requirement' : 'test-case', type === 'REQ' ? requirement.id : testCase.id, 'approval'))
+  })
+})
+
+describe('document creator and assignee', () => {
+  function reviewCard() {
+    return screen.getByRole('heading', { name: 'Review' }).parentElement!.parentElement!
+  }
+
+  it.each(['REQ', 'TC'] as const)('shows Created by and Assignee as the first lines of the %s Review card', async type => {
+    vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowState, created_by: approver, assignee: reviewer })
+    renderAssignedDocument(type, 'Draft')
+    await screen.findByText('Created by')
+    const lines = reviewCard().querySelector('.space-y-3')!.children
+    expect(lines[0].firstElementChild?.textContent).toBe('Created by')
+    expect(lines[0].textContent).toContain(approver.full_name)
+    expect(lines[1].firstElementChild?.textContent).toBe('Assignee')
+    expect(lines[1].textContent).toContain(reviewer.full_name)
+    expect(within(reviewCard()).queryByRole('combobox', { name: 'Select assignee' })).toBeNull()
+  })
+
+  it('shows an empty assignee as Unassigned', async () => {
+    vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowState, assignee: null })
+    renderAssignedDocument('REQ', 'Draft')
+    const label = await screen.findByText('Assignee')
+    expect(label.nextElementSibling?.textContent).toBe('Unassigned')
+  })
+
+  it('offers the assignee select only with assign_assignee and saves the choice as assignee_id', async () => {
+    vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowState, actions: { ...workflowState.actions, assign_assignee: true } })
+    renderAssignedDocument('REQ', 'Draft')
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Select assignee' }))
+    expect(screen.queryByRole('option', { name: approver.full_name })).toBeNull()
+    fireEvent.click(screen.getByRole('option', { name: reviewer.full_name }))
+    await waitFor(() => expect(client.workflowApi.assign).toHaveBeenCalledWith('requirement', requirement.id, { assignee_id: reviewer.id }))
+    expect(client.workflowApi.assign).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not send an empty assignee', async () => {
+    vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowState, actions: { ...workflowState.actions, assign_assignee: true } })
+    renderAssignedDocument('REQ', 'Draft')
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Select assignee' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Unassigned' }))
+    expect(client.workflowApi.assign).not.toHaveBeenCalled()
+  })
+
+  it('hides Request review from the creator when the server reserves it for the assignee', async () => {
+    vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowState, created_by: user, assignee: reviewer, actions: { ...workflowState.actions, request_review: false } })
+    renderAssignedDocument('REQ', 'Draft')
+    await screen.findByText('Created by')
+    expect(screen.queryByRole('button', { name: /^request review$/i })).toBeNull()
+  })
+
+  it('shows neither Created by, Assignee nor the assignee select on a non-controlled document', async () => {
+    vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowState, controlled: false, actions: { ...workflowState.actions, assign_assignee: true } })
+    vi.mocked(client.defectsApi.get).mockResolvedValue({ ...defect, reviewer_id: reviewer.id } as never)
+    renderAt('/projects/:prefix/defects/:itemId', `/projects/VCU/defects/${defect.id}`, <ArtefactDetail kind="defect" allowedActions={['edit']} />)
+    await screen.findByRole('heading', { name: 'Review' })
+    expect(screen.queryByText('Created by')).toBeNull()
+    expect(screen.queryByText('Assignee')).toBeNull()
+    expect(screen.queryByRole('combobox', { name: 'Select assignee' })).toBeNull()
   })
 })
 

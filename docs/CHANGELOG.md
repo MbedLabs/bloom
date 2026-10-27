@@ -8,6 +8,7 @@
 - User Management shows, under each user, the groups that user belongs to and each project they can access with the groups behind it; the list stays collapsed until it is opened for that user.
 - Every project's issue tracker syncs by itself, every 15 minutes by default (`INTEGRATION_SYNC_MINUTES`, `0` turns it off), with no webhook needed. Matching Jira issues become defects, including those already open when the integration is set up; linked Jira issues carry their changes and deletions onto their defects and change requests; linked GitHub and GitLab issues carry their state. Sync now runs the whole Jira sync at once.
 - The project's External issue tracker panel shows when the tracker last synced, what that sync created and updated, the repositories it skipped and why a sync failed, and refreshes every minute. Its Jira button, Sync now, runs the whole sync at once.
+- The review panel of a controlled document shows who created it and its assignee, and lets the creator, the assignee and whoever may assign the reviewer choose another assignee.
 
 ### Changed
 
