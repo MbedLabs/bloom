@@ -327,6 +327,8 @@ const CALLS: Array<[string, unknown[], string, string]> = [
 
   ['artefactsApi.listComments', ['requirement', 11], 'get', '/artefacts/requirement/11/comments'],
   ['artefactsApi.createComment', ['requirement', 11, 'hi'], 'post', '/artefacts/requirement/11/comments'],
+  ['artefactsApi.resolveComment', ['requirement', 11, 5], 'post', '/artefacts/requirement/11/comments/5/resolve'],
+  ['artefactsApi.reopenComment', ['requirement', 11, 5], 'post', '/artefacts/requirement/11/comments/5/reopen'],
   ['artefactsApi.listActivity', ['requirement', 11], 'get', '/artefacts/requirement/11/activity'],
   ['artefactsApi.getRelated', ['requirement', 11], 'get', '/artefacts/requirement/11/related'],
   ['artefactsApi.transition', ['requirement', 11, 'Approved'], 'post', '/artefacts/requirement/11/transition'],

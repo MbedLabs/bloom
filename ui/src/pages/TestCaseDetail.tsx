@@ -15,7 +15,6 @@ import { normalizeTcsRows } from '../utils/tcs'
 import { Pencil, Trash2 } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
 import { docEditUrl, docUrl, type DocType } from '../types/doc'
-import { DocEditor } from '../components/editor'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocDetailShell, { MetaItem, SectionCard } from '../components/DocDetailShell'
 import { useAuth } from '../contexts/AuthContext'
@@ -30,6 +29,7 @@ import { useParameterValues } from '../hooks/useParameterValues'
 import { useArtefactLabels } from '../hooks/useArtefactLabels'
 import ConfirmDelete from '../components/ConfirmDelete'
 import WorkflowPanel from '../components/WorkflowPanel'
+import { CommentableDocEditor, CommentsColumn, ReviewCommentsProvider } from '../components/comments/ReviewComments'
 import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
 import { useSignOffPeople } from '../hooks/useSignOff'
 
@@ -141,6 +141,7 @@ export default function TestCaseDetail({
   const showDelete = canEditDocs && can('delete', 'TC') && rowAllows('delete')
 
   return (
+    <ReviewCommentsProvider artefactType="test-case" artefactId={tcId} projectPrefix={projectPrefix} projectId={testCase.project_id}>
     <DocDetailShell
       projectPrefix={projectPrefix}
       docType="TC"
@@ -176,10 +177,46 @@ export default function TestCaseDetail({
           ))}
         </div>
       ) : undefined}
-      rightRail={
-        <>
-          <WorkflowPanel artefactType="test-case" artefactId={tcId} projectPrefix={projectPrefix} projectId={testCase.project_id} />
+      review={<WorkflowPanel artefactType="test-case" artefactId={tcId} projectPrefix={projectPrefix} projectId={testCase.project_id} layout="bar" />}
+      comments={<CommentsColumn />}
+    >
+      {!!testCase.content_json && (
+        <SectionCard title="Content">
+          <CommentableDocEditor
+            content={testCase.content_json as Record<string, unknown>}
+            editable={false}
+            userMentionItems={users.map(person => ({ id: person.id, label: person.full_name, user: person }))}
+            parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues} artefactLabels={artefactLabels}
+            artefactHref={(type, _id, label) => docUrl(prefix, type as DocType, label)}
+            minHeight="min-h-[120px]"
+            className="border-0"
+          />
+        </SectionCard>
+      )}
+      {!testCase.content_json && !!testCase.description && (
+        <SectionCard title="Description">
+          <p className="text-foreground whitespace-pre-wrap">{testCase.description}</p>
+        </SectionCard>
+      )}
 
+      {tcsRows.length > 0 && (
+        <TcsArteTable userMentionItems={users.map(person => ({ id: person.id, label: person.full_name, user: person }))} rows={tcsRows} onChange={() => {}} editable={false} parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues} />
+      )}
+
+      <DocumentActivityPanel artefactType="test-case" artefactId={tcId} />
+
+      {project && (
+        <DocumentLinksPanel
+          projectId={testCase.project_id}
+          projectPrefix={project.prefix}
+          sourceType="TC"
+          sourceId={testCase.id}
+          sourceDocId={testCase.tc_id}
+          derivedLinks={derivedMembershipLinks}
+        />
+      )}
+
+      <>
           <SectionCard title="Last Execution">
             {testCase.last_execution_status ? (
               <div className="space-y-4">
@@ -214,45 +251,8 @@ export default function TestCaseDetail({
               <MetaItem label="Updated" value={formatDateTime(testCase.updated_at) + ' ago'} />
             </div>
           </SectionCard>
-        </>
-      }
-    >
-      {!!testCase.content_json && (
-        <SectionCard title="Content">
-          <DocEditor
-            content={testCase.content_json as Record<string, unknown>}
-            editable={false}
-            userMentionItems={users.map(person => ({ id: person.id, label: person.full_name, user: person }))}
-            parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues} artefactLabels={artefactLabels}
-            artefactHref={(type, _id, label) => docUrl(prefix, type as DocType, label)}
-            minHeight="min-h-[120px]"
-            className="border-0"
-          />
-        </SectionCard>
-      )}
-      {!testCase.content_json && !!testCase.description && (
-        <SectionCard title="Description">
-          <p className="text-foreground whitespace-pre-wrap">{testCase.description}</p>
-        </SectionCard>
-      )}
-
-      {tcsRows.length > 0 && (
-        <TcsArteTable userMentionItems={users.map(person => ({ id: person.id, label: person.full_name, user: person }))} rows={tcsRows} onChange={() => {}} editable={false} parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues} />
-      )}
-
-      <DocumentActivityPanel artefactType="test-case" artefactId={tcId} />
-
-      {project && (
-        <DocumentLinksPanel
-          projectId={testCase.project_id}
-          projectPrefix={project.prefix}
-          sourceType="TC"
-          sourceId={testCase.id}
-          sourceDocId={testCase.tc_id}
-          derivedLinks={derivedMembershipLinks}
-        />
-      )}
-
+      </>
     </DocDetailShell>
+    </ReviewCommentsProvider>
   )
 }

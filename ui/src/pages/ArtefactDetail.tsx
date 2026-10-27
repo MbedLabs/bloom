@@ -4,6 +4,7 @@ import { DOC_TYPE_SLUGS } from '../types/doc'
 import { refreshProjectViews, finishArtefactDeletion } from '../lib/refreshProjectViews'
 import ProfilePicture from '../components/ProfilePicture'
 import WorkflowPanel from '../components/WorkflowPanel'
+import { CommentableDocEditor, CommentsColumn, ReviewCommentsProvider } from '../components/comments/ReviewComments'
 import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
 import { useSignOffPeople } from '../hooks/useSignOff'
 import { useEffect, useMemo, useState } from 'react'
@@ -14,7 +15,6 @@ import { ArrowUpDown, ExternalLink, GitBranch, History, Pencil, RefreshCw, Trash
 import { formatDateTime } from '../test/date-utils'
 import { docUrl, docEditUrl, type DocType, DOC_TYPE_COLORS } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
-import { DocEditor } from '../components/editor'
 import DocDetailShell, { MetaItem, SectionCard, StatusBadge } from '../components/DocDetailShell'
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
 import { useToast } from '../components/useToast'
@@ -370,6 +370,7 @@ export default function ArtefactDetail({
   const showDelete = canEditDocs && can('delete', SOURCE_TYPE_CODES[kind]) && rowAllows('delete')
 
   return (
+    <ReviewCommentsProvider artefactType={kind} artefactId={recordId} projectPrefix={projectPrefix} projectId={projectId}>
     <DocDetailShell
       projectPrefix={projectPrefix}
       docType={config.docType}
@@ -407,8 +408,7 @@ export default function ArtefactDetail({
           ))}
         </>
       ) : undefined}
-      rightRail={
-        <>
+      rightRail={kind === 'defect' ? <>
           <WorkflowPanel artefactType={kind} artefactId={recordId} projectPrefix={projectPrefix} projectId={projectId} />
           {workflow.data && !workflow.data.controlled && <SectionCard title="Workflow">
             <div className="space-y-3">
@@ -460,8 +460,9 @@ export default function ArtefactDetail({
               {related?.project && <Link to={`/projects/${related.project.prefix}`} className="block text-primary hover:text-primary/80">Open project workspace</Link>}
             </div>
           </SectionCard>
-        </>
-      }
+        </> : undefined}
+      review={kind === 'defect' ? undefined : <WorkflowPanel artefactType={kind} artefactId={recordId} projectPrefix={projectPrefix} projectId={projectId} layout="bar" />}
+      comments={kind === 'defect' ? undefined : <CommentsColumn />}
     >
       <div className="border-b border-border overflow-x-auto">
         <nav className="flex gap-6 min-w-max">
@@ -551,7 +552,7 @@ export default function ArtefactDetail({
             )}
             {kind !== 'defect' && !!artefactRecord.content_json && (
               <SectionCard title="Content">
-                <DocEditor
+                <CommentableDocEditor
                   content={artefactRecord.content_json as Record<string, unknown>}
                   editable={false}
                   userMentionItems={people.map(person => ({ id: person.id, label: person.full_name, user: person }))}
@@ -709,7 +710,60 @@ export default function ArtefactDetail({
           )}
         </SectionCard>
       )}
+      {kind !== 'defect' && <>
+          {workflow.data && !workflow.data.controlled && <SectionCard title="Workflow">
+            <div className="space-y-3">
+              <div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Current Status</div>
+                <StatusBadge status={String(artefact.status)} />
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Available Transitions</div>
+                {allowedTransitions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No transition actions available.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {allowedTransitions.map((status) => (
+                      <button key={status} onClick={() => transitionMutation.mutate(status)} disabled={transitionMutation.isPending} className="px-3 py-2 rounded-md border border-input text-sm hover:bg-accent/40 disabled:opacity-50">
+                        Move to {status}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </SectionCard>}
+
+          <SectionCard title="Details">
+            <div className="space-y-4">
+              {config.fields.filter((f) => f.key !== 'status' && f.key !== 'visibility').map((field) => (
+                <div key={field.key}>
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{field.label}</div>
+                  <div className="text-foreground text-sm">{String(artefactRecord[field.key] ?? '-')}</div>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Metadata">
+            <div className="space-y-4">
+              <MetaItem label="Origin" value={<ArtefactTags type={kind} id={recordId} projectId={artefact.project_id} canEdit={showEdit} origin={artefact.visibility === 'customer' ? 'Customer' : 'Internal'} />} />
+              <MetaItem label="ID" value={code} mono />
+              <MetaItem label="Project" value={related?.project ? `${related.project.prefix} · ${related.project.name}` : `#${artefact.project_id}`} />
+              <MetaItem label="Created" value={formatDateTime(artefact.created_at) + ' ago'} />
+              <MetaItem label="Updated" value={formatDateTime(artefact.updated_at) + ' ago'} />
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Quick Links">
+            <div className="space-y-3 text-sm">
+              <Link to={docRegistryListUrl(projectPrefix, config.docType)} className="block text-primary hover:text-primary/80">Back to project {config.singular.toLowerCase()} list</Link>
+              {related?.project && <Link to={`/projects/${related.project.prefix}`} className="block text-primary hover:text-primary/80">Open project workspace</Link>}
+            </div>
+          </SectionCard>
+      </>}
     </DocDetailShell>
+    </ReviewCommentsProvider>
   )
 }
 

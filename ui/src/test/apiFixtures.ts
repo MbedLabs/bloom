@@ -729,6 +729,8 @@ export const RESPONSES: Record<string, unknown> = {
 
   'artefactsApi.listComments': [artefactComment],
   'artefactsApi.createComment': artefactComment,
+  'artefactsApi.resolveComment': { ...artefactComment, resolved_at: NOW, resolved_by: { id: user.id, full_name: user.full_name } },
+  'artefactsApi.reopenComment': artefactComment,
   'artefactsApi.listActivity': [artefactActivity],
   'artefactsApi.getRelated': artefactRelated,
   'artefactsApi.transition': { status: 'Approved', allowed_transitions: ['Draft'] },

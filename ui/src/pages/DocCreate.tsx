@@ -1,4 +1,5 @@
 import SelectField from '../components/SelectField'
+import { OpenThreads } from '../components/comments/ReviewComments'
 import { refreshProjectViews, finishArtefactDeletion } from '../lib/refreshProjectViews'
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import TagPicker from '../components/TagPicker'
@@ -679,6 +680,11 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
           </div>
 
           <div className="flex-1">
+            {!sidebarOpen && editMode && resolvedDocId && artefactActivityTypeForDocType(docType) && (
+              <div className="max-w-4xl mx-auto w-full px-4 pt-4">
+                <OpenThreads artefactType={artefactActivityTypeForDocType(docType)!} artefactId={resolvedDocId} />
+              </div>
+            )}
             <div className={`${docType === 'TC' ? 'max-w-none' : 'max-w-4xl mx-auto'} w-full px-4 py-4`}>
               {docType === 'TC' ? (
                 <TcsArteTable
@@ -715,6 +721,9 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
         {sidebarOpen && (
           <div className="w-72 border-l border-border bg-card/50 overflow-y-auto themed-scrollbar shrink-0">
             <div className="p-4 space-y-4">
+              {editMode && resolvedDocId && artefactActivityTypeForDocType(docType) && (
+                <OpenThreads artefactType={artefactActivityTypeForDocType(docType)!} artefactId={resolvedDocId} />
+              )}
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Properties</h3>
 
               <MetaField label="Status">

@@ -1,9 +1,9 @@
-import { refreshProjectViews } from '../lib/refreshProjectViews'
-import { useRef, useState } from 'react'
+import { refreshArtefactViews } from '../lib/refreshArtefactViews'
+import { useState } from 'react'
 import { UserCheck, UserCog } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { artefactsApi, extractApiErrorMessage, workflowApi, type ApprovedDocumentRevision, type DocumentSection } from '../api/client'
+import { extractApiErrorMessage, workflowApi, type ApprovedDocumentRevision, type DocumentSection } from '../api/client'
 import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
 import UserIdentity from './UserIdentity'
 import UserSelect from './UserSelect'
@@ -13,23 +13,22 @@ import { useToast } from './useToast'
 import { docUrl, type DocType } from '../types/doc'
 import { normalizeTcsRows } from '../utils/tcs'
 import { TcsArteTable } from './TcsArteTable'
+import { ThreadList } from './comments/ReviewComments'
 
-type Operation = { kind: 'review' | 'approval' | 'approve' | 'decline' | 'draft' | 'comment' | 'assign'; data?: { assignee_id?: number; reviewer_id?: number | null; approver_id?: number | null } }
+type Operation = { kind: 'review' | 'approval' | 'approve' | 'decline' | 'draft' | 'assign'; data?: { assignee_id?: number; reviewer_id?: number | null; approver_id?: number | null } }
 const actionButtonClass = 'px-3 py-2 rounded-md border border-input text-sm hover:bg-accent/40 disabled:opacity-50'
 const reviewButtonClass = 'w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-amber-500/90 text-white text-xs font-medium hover:bg-amber-500 disabled:opacity-50'
 const approvalButtonClass = 'w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-500 disabled:opacity-50'
-const ENTITY_KEYS: Record<string, string> = { requirement: 'requirement', 'test-case': 'testCase', document: 'document', design: 'design', risk: 'risk', change: 'change', 'test-concept': 'testConcept', defect: 'defect', 'test-suite': 'testSuite', campaign: 'campaign' }
 
-export default function WorkflowPanel({ artefactType, artefactId, projectPrefix, projectId }: Readonly<{ artefactType: string; artefactId: number; projectPrefix?: string; projectId?: number }>) {
+/** A document's review state and actions: as cards with its discussion in a side panel, or as one summary line above the content. */
+export default function WorkflowPanel({ artefactType, artefactId, projectPrefix, projectId, layout = 'rail' }: Readonly<{ artefactType: string; artefactId: number; projectPrefix?: string; projectId?: number; layout?: 'rail' | 'bar' }>) {
   const workflow = useDocumentWorkflow(artefactType, artefactId)
   const queryClient = useQueryClient()
   const toast = useToast()
   const [tab, setTab] = useState<'workflow' | 'history'>('workflow')
-  const discussion = useRef<HTMLElement>(null)
-  const [comment, setComment] = useState('')
+  const [expanded, setExpanded] = useState(false)
   const [revision, setRevision] = useState<number | null>(null)
   const [downloadId, setDownloadId] = useState<number | null>(null)
-  const comments = useQuery({ queryKey: ['artefactComments', artefactType, artefactId], queryFn: () => artefactsApi.listComments(artefactType, artefactId), enabled: !!workflow.data, retry: false })
   const archive = useQuery({ queryKey: ['document-revision', artefactType, artefactId, revision], queryFn: () => workflowApi.getRevision(artefactType, artefactId, revision!), enabled: !!workflow.data && revision !== null, retry: false })
   const mutation = useMutation({
     mutationFn: (operation: Operation) => {
@@ -37,17 +36,10 @@ export default function WorkflowPanel({ artefactType, artefactId, projectPrefix,
       if (operation.kind === 'review' || operation.kind === 'approval') return workflowApi.request(artefactType, artefactId, operation.kind)
       if (operation.kind === 'approve') return workflowApi.approve(artefactType, artefactId)
       if (operation.kind === 'decline') return workflowApi.decline(workflow.data!.pending_request!.id)
-      if (operation.kind === 'draft') return workflowApi.startDraft(artefactType, artefactId)
-      return artefactsApi.createComment(artefactType, artefactId, comment.trim())
+      return workflowApi.startDraft(artefactType, artefactId)
     },
-    onSuccess: (result, operation) => {
-      if (operation.kind === 'comment') setComment('')
-      refreshProjectViews(queryClient, { prefix: projectPrefix, projectId })
-      void Promise.all([
-        ['document-workflow', artefactType, artefactId], [ENTITY_KEYS[artefactType], artefactId],
-        ['artefactComments', artefactType, artefactId], ['artefactActivity', artefactType, artefactId],
-        ['document-revision', artefactType, artefactId], ['doc-facade', projectPrefix],
-      ].map(queryKey => queryClient.invalidateQueries({ queryKey })))
+    onSuccess: result => {
+      void refreshArtefactViews(queryClient, artefactType, artefactId, projectPrefix, projectId)
       toast.notify(result?.already_requested ? 'Already requested' : 'Document updated', 'success')
     },
     onError: failure => toast.failed('Updating the document', failure),
@@ -70,16 +62,7 @@ export default function WorkflowPanel({ artefactType, artefactId, projectPrefix,
   if (workflow.isError || !workflow.data?.actions) return <section aria-label="Document review" className="rounded-lg border border-border p-4"><p role="alert">Could not load review details.</p><button className={actionButtonClass} type="button" onClick={() => workflow.refetch()}>Retry</button></section>
   const state = workflow.data
   const busy = mutation.isPending
-  return <section aria-label="Document review" className="space-y-4">
-    <section aria-label="Document discussion" ref={discussion} tabIndex={-1}>
-      <SectionCard title="Discussion">
-        {comments.isPending && <p>Loading comments...</p>}
-        {!comments.isPending && comments.isError && <p role="alert">Could not load comments.</p>}
-        {!comments.isPending && !comments.isError && (comments.data ?? []).length === 0 && <p className="text-sm text-muted-foreground">No comments yet.</p>}
-        {!comments.isPending && !comments.isError && (comments.data ?? []).map(item => <article key={item.id} className="mb-4 break-words"><UserIdentity user={{ id: item.author_user_id ?? undefined, full_name: item.author_name, profile_picture_url: item.author_profile_picture_url }} /><p className="whitespace-pre-wrap">{item.body}</p><time className="text-xs text-muted-foreground">{formatDateTime(item.created_at)}</time></article>)}
-        {state.actions.comment && <fieldset disabled={busy} className="mt-4 space-y-3"><label className="block">Comment<textarea aria-label="Comment" value={comment} onChange={event => setComment(event.target.value)} className="block w-full rounded-md border border-input bg-background p-3" /></label><button className={actionButtonClass} type="button" disabled={!comment.trim()} onClick={() => mutation.mutate({ kind: 'comment' })}>Post Comment</button></fieldset>}
-      </SectionCard>
-    </section>
+  const reviewCard = <>
     <SectionCard title="Review">
       <div className="space-y-3">
         {state.controlled && <>
@@ -109,9 +92,10 @@ export default function WorkflowPanel({ artefactType, artefactId, projectPrefix,
           {state.controlled && <button className={reviewButtonClass} type="button" disabled={!state.actions.request_approval} onClick={() => mutation.mutate({ kind: 'approval' })}><UserCheck className="h-3.5 w-3.5 mr-1" />Mark Reviewed</button>}
           {state.controlled && state.actions.decline && state.pending_request?.kind === 'review' && <button className={actionButtonClass} type="button" onClick={() => mutation.mutate({ kind: 'decline' })}>Decline</button>}
         </fieldset>
-        <button className={actionButtonClass} type="button" onClick={() => discussion.current?.focus()}>Comments</button>
       </div>
     </SectionCard>
+  </>
+  const approvalCard = <>
     {state.controlled && <SectionCard title="Approval">
       <div className="space-y-3">
         <div>
@@ -134,11 +118,45 @@ export default function WorkflowPanel({ artefactType, artefactId, projectPrefix,
         <button className={actionButtonClass} type="button" aria-pressed={tab === 'history'} onClick={() => setTab(tab === 'history' ? 'workflow' : 'history')}>Revision history</button>
       </div>
     </SectionCard>}
+  </>
+  const extras = <>
     {mutation.isError && <p role="alert" className="text-destructive">{extractApiErrorMessage(mutation.error)}</p>}
     {tab === 'history' && state.controlled && <SectionCard title="Approved revisions">
       {state.revisions.length === 0 ? <p>No approved revisions recorded.</p> : state.revisions.map(item => <div key={item.revision_number} className="mb-3"><button className={actionButtonClass} type="button" onClick={() => setRevision(item.revision_number)}>Open revision {item.revision_number}</button><span> · {item.approved_by ? <UserIdentity user={item.approved_by} /> : 'Approval actor not recorded'} · {formatDateTime(item.approved_at ?? item.captured_at)}</span></div>)}
     </SectionCard>}
     {revision !== null && <dialog open aria-label={`Approved revision ${revision}`} className="static m-0 w-full max-w-none text-foreground rounded-lg border border-border bg-card p-6 space-y-4"><div className="flex justify-between"><h3>Approved revision {revision}</h3><button className={actionButtonClass} type="button" onClick={() => setRevision(null)}>Close revision</button></div>{archive.isPending && <p>Loading approved content...</p>}{!archive.isPending && (archive.isError || !archive.data) && <p role="alert">Could not load this approved revision.</p>}{!archive.isPending && !archive.isError && archive.data && <ArchivedBody archive={archive.data} projectPrefix={projectPrefix} download={download} downloadId={downloadId} />}</dialog>}
+  </>
+  if (layout === 'bar') {
+    const name = (person: typeof state.reviewer) => person ? person.full_name : 'Unassigned'
+    return <section aria-label="Document review" className="rounded-lg border border-border bg-card p-3 space-y-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+        {state.controlled && state.phase && <span className="font-medium text-foreground">{state.phase}{state.revision_number !== null && ` · Revision ${state.revision_number}`}</span>}
+        {state.controlled && <span><span className="text-muted-foreground">Assignee </span>{name(state.assignee)}</span>}
+        <span><span className="text-muted-foreground">Reviewer </span>{name(state.reviewer)}</span>
+        {state.controlled && <span><span className="text-muted-foreground">Approver </span>{name(state.approver)}</span>}
+        <span className="flex-1" />
+        <fieldset disabled={busy} className="flex flex-wrap items-center gap-2">
+          {state.controlled && state.actions.request_review && <button className={actionButtonClass} type="button" onClick={() => mutation.mutate({ kind: 'review' })}>Request review</button>}
+          {state.controlled && state.actions.request_approval && <button className={actionButtonClass} type="button" onClick={() => mutation.mutate({ kind: 'approval' })}>Mark Reviewed</button>}
+          {state.actions.approve && <button className={actionButtonClass} type="button" onClick={() => mutation.mutate({ kind: 'approve' })}>Mark Approved</button>}
+          {state.actions.decline && state.pending_request && <button className={actionButtonClass} type="button" onClick={() => mutation.mutate({ kind: 'decline' })}>Decline</button>}
+          {state.actions.start_draft && <button className={actionButtonClass} type="button" onClick={() => mutation.mutate({ kind: 'draft' })}>Start working Draft</button>}
+        </fieldset>
+        <button className={actionButtonClass} type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>Details</button>
+      </div>
+      {expanded && <div className="grid gap-4 md:grid-cols-2">{reviewCard}{approvalCard}</div>}
+      {extras}
+    </section>
+  }
+  return <section aria-label="Document review" className="space-y-4">
+    <section aria-label="Document discussion" tabIndex={-1}>
+      <SectionCard title="Discussion">
+        <ThreadList artefactType={artefactType} artefactId={artefactId} projectPrefix={projectPrefix} projectId={projectId} />
+      </SectionCard>
+    </section>
+    {reviewCard}
+    {approvalCard}
+    {extras}
   </section>
 }
 

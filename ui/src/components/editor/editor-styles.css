@@ -246,3 +246,13 @@
 .tiptap.ProseMirror.line-height-2 th {
   line-height: 2 !important;
 }
+
+.ProseMirror .comment-highlight {
+  background: hsl(var(--primary) / 0.1);
+  border-bottom: 2px solid hsl(var(--primary));
+  cursor: pointer;
+}
+
+.ProseMirror .comment-highlight-selected {
+  background: hsl(var(--primary) / 0.25);
+}

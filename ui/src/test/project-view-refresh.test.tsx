@@ -214,9 +214,9 @@ describe('shared project refresh', () => {
   it('workflow comments refresh project views without cached project metadata', async () => {
     const { client, calls } = await mountedPage(<WorkflowPanel artefactType="requirement" artefactId={11} projectPrefix="VCU" projectId={1} />, '/projects/VCU/manage', '/projects/:prefix/manage')
     client.removeQueries({ queryKey: ['project-by-prefix', 'VCU'] })
-    fireEvent.click(await screen.findByRole('button', { name: /^Comments$/ }))
-    fireEvent.change(await screen.findByLabelText('Comment'), { target: { value: 'Review comment' } })
-    fireEvent.click(screen.getByRole('button', { name: /^Post Comment$/ }))
+    const discussion = await screen.findByRole('region', { name: 'Document discussion' })
+    fireEvent.change(await within(discussion).findByRole('textbox', { name: 'Comment' }), { target: { value: 'Review comment' } })
+    fireEvent.click(within(discussion).getByRole('button', { name: /^Comment$/ }))
     await waitFor(() => expect(api.artefactsApi.createComment).toHaveBeenCalled())
     await waitFor(() => calls.forEach(call => expect(call).toHaveBeenCalledTimes(2)))
   })

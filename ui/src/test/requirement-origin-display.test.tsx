@@ -39,9 +39,11 @@ vi.mock('@tanstack/react-query', async () => {
     useQuery: ({ queryKey }: { queryKey: unknown[] }) => ({
       data: queryKey[0] === 'project'
         ? { id: 7, name: 'Flight', prefix: 'FLT' }
-        : queryKey[0] === 'users' || queryKey[0] === 'mentionableUsers'
+        : queryKey[0] === 'users' || queryKey[0] === 'mentionableUsers' || queryKey[0] === 'artefactComments'
           ? []
-          : requirement,
+          : queryKey[0] === 'document-workflow'
+            ? undefined
+            : requirement,
       isLoading: false,
       error: null,
     }),

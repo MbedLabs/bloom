@@ -120,6 +120,19 @@ function renderAt(routePath: string, url: string, element: React.ReactElement) {
   )
 }
 
+/** Open the Details of the review bar above a document's content and return its Review and Approval cards. */
+async function openReviewDetails() {
+  fireEvent.click(await screen.findByRole('button', { name: 'Details' }))
+  const card = (title: string) => screen.getByRole('heading', { name: title }).parentElement!.parentElement!
+  return { review: card('Review'), approval: card('Approval') }
+}
+
+/** The review bar above a document's content, once the workflow has loaded. */
+async function reviewBar() {
+  await screen.findByRole('button', { name: 'Details' })
+  return screen.getByRole('region', { name: 'Document review' })
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   resetApiMocks(client as unknown as Record<string, unknown>, vi)
@@ -678,8 +691,8 @@ describe('a defect in detail', () => {
     renderDefect()
     await screen.findAllByText(defect.title)
 
-    fireEvent.click(screen.getByRole('button', { name: /comments/i }))
-    expect(await screen.findByText(/looks right to me/i)).toBeTruthy()
+    const discussion = await screen.findByRole('region', { name: 'Document discussion' })
+    expect(await within(discussion).findByText(/looks right to me/i)).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: /activity/i }))
     expect(await screen.findByText(/moved this from Draft to Approved/)).toBeTruthy()
@@ -1102,9 +1115,12 @@ describe('a requirement in detail', () => {
   it('disables handoff buttons when the workflow supplies no action', async () => {
     vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowFixture, reviewer: null, approver: null })
     renderRequirement()
-    await screen.findByRole('heading', { name: 'Review' })
-    expect((screen.getByRole('button', { name: /^mark reviewed$/i }) as HTMLButtonElement).disabled).toBe(true)
-    expect((screen.getByRole('button', { name: /^mark approved$/i }) as HTMLButtonElement).disabled).toBe(true)
+    const bar = await reviewBar()
+    expect(within(bar).queryByRole('button', { name: /^mark reviewed$/i })).toBeNull()
+    expect(within(bar).queryByRole('button', { name: /^mark approved$/i })).toBeNull()
+    const { review, approval } = await openReviewDetails()
+    expect((within(review).getByRole('button', { name: /^mark reviewed$/i }) as HTMLButtonElement).disabled).toBe(true)
+    expect((within(approval).getByRole('button', { name: /^mark approved$/i }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('asks before deleting', async () => {
@@ -1237,10 +1253,12 @@ describe('the changes one artefact allows', () => {
 
   it('shows no edit, delete or workflow handoff when their authority is absent', async () => {
     renderAt('/projects/:prefix/docs/:kind/:docId', '/projects/VCU/docs/requirements/VCU-REQ-001', <RequirementDetail resolvedId={requirement.id} allowedActions={[]} />)
-    await screen.findByRole('heading', { name: 'Review' })
+    const bar = await reviewBar()
     expect(screen.queryByRole('button', { name: /^edit$/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /^delete$/i })).toBeNull()
-    expect((screen.getByRole('button', { name: /^mark reviewed$/i }) as HTMLButtonElement).disabled).toBe(true)
+    expect(within(bar).queryByRole('button', { name: /^mark reviewed$/i })).toBeNull()
+    const { review } = await openReviewDetails()
+    expect((within(review).getByRole('button', { name: /^mark reviewed$/i }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('hides the suite controls the row does not allow', async () => {
@@ -1434,14 +1452,19 @@ describe('who may sign off', () => {
     renderRequirement(['review'])
     expect(await screen.findByRole('button', { name: /^mark reviewed$/i })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /^edit$/i })).toBeNull()
-    expect((screen.getByRole('button', { name: /^mark approved$/i }) as HTMLButtonElement).disabled).toBe(true)
+    expect(within(await reviewBar()).queryByRole('button', { name: /^mark approved$/i })).toBeNull()
+    const { approval } = await openReviewDetails()
+    expect((within(approval).getByRole('button', { name: /^mark approved$/i }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('does not infer a sign-off action from the edit right', async () => {
     renderRequirement(['edit'])
-    await screen.findByRole('heading', { name: 'Review' })
-    expect((screen.getByRole('button', { name: /^mark reviewed$/i }) as HTMLButtonElement).disabled).toBe(true)
-    expect((screen.getByRole('button', { name: /^mark approved$/i }) as HTMLButtonElement).disabled).toBe(true)
+    const bar = await reviewBar()
+    expect(within(bar).queryByRole('button', { name: /^mark reviewed$/i })).toBeNull()
+    expect(within(bar).queryByRole('button', { name: /^mark approved$/i })).toBeNull()
+    const { review, approval } = await openReviewDetails()
+    expect((within(review).getByRole('button', { name: /^mark reviewed$/i }) as HTMLButtonElement).disabled).toBe(true)
+    expect((within(approval).getByRole('button', { name: /^mark approved$/i }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('retains the assigned person when no eligible replacement is supplied', async () => {
@@ -1455,8 +1478,11 @@ describe('who may sign off', () => {
     currentUser = { ...user, role: 'external' }
     vi.mocked(client.projectMembersApi.permissions).mockResolvedValue({ '*': ['view', 'review', 'approve'] } as never)
     renderRequirement(['review', 'approve'])
-    await screen.findByRole('heading', { name: 'Review' })
-    expect((screen.getByRole('button', { name: /^mark reviewed$/i }) as HTMLButtonElement).disabled).toBe(true)
-    expect((screen.getByRole('button', { name: /^mark approved$/i }) as HTMLButtonElement).disabled).toBe(true)
+    const bar = await reviewBar()
+    expect(within(bar).queryByRole('button', { name: /^mark reviewed$/i })).toBeNull()
+    expect(within(bar).queryByRole('button', { name: /^mark approved$/i })).toBeNull()
+    const { review, approval } = await openReviewDetails()
+    expect((within(review).getByRole('button', { name: /^mark reviewed$/i }) as HTMLButtonElement).disabled).toBe(true)
+    expect((within(approval).getByRole('button', { name: /^mark approved$/i }) as HTMLButtonElement).disabled).toBe(true)
   })
 })

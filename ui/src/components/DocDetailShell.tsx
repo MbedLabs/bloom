@@ -65,6 +65,10 @@ interface DocDetailShellProps {
   priority?: string | null
   actions?: ReactNode
   rightRail?: ReactNode
+  /** The review summary shown above the content. */
+  review?: ReactNode
+  /** The comments column shown beside the content. */
+  comments?: ReactNode
   children: ReactNode
   backTo?: string
 }
@@ -76,6 +80,8 @@ export default function DocDetailShell({
   title,
   actions,
   rightRail,
+  review,
+  comments,
   children,
   backTo,
 }: Readonly<DocDetailShellProps>) {
@@ -114,7 +120,13 @@ export default function DocDetailShell({
         )}
       </div>
 
-      {rightRail ? (
+      {review}
+      {comments ? (
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] items-start gap-6">
+          <div className="min-w-0 space-y-6">{children}</div>
+          <aside aria-label="Document comments column" className="order-first min-w-0 lg:order-last">{comments}</aside>
+        </div>
+      ) : rightRail ? (
         <DocumentDetailColumns rightRail={rightRail}>{children}</DocumentDetailColumns>
       ) : (
         <div className="space-y-6">{children}</div>

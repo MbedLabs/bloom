@@ -1,6 +1,7 @@
 import { DOC_TYPE_SLUGS } from '../types/doc'
 import { finishArtefactDeletion } from '../lib/refreshProjectViews'
 import WorkflowPanel from '../components/WorkflowPanel'
+import { CommentableDocEditor, CommentsColumn, ReviewCommentsProvider } from '../components/comments/ReviewComments'
 import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
 import { useAuth } from '../contexts/AuthContext'
 import { useSignOffPeople } from '../hooks/useSignOff'
@@ -10,7 +11,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, Link, useNavigate } from 'react-router'
 import { documentsApi, projectsApi, DocumentSection } from '../api/client'
 import { Trash2, ChevronRight, FileText, FileEdit } from 'lucide-react'
-import { DocEditor } from '../components/editor'
 import DocDetailShell, { MetaItem, SectionCard } from '../components/DocDetailShell'
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
@@ -138,6 +138,7 @@ export default function DocumentDetail({
   const editUrl = docEditUrl(projectPrefix, resolvedDocType, doc.doc_id || String(docId))
 
   return (
+    <ReviewCommentsProvider artefactType="document" artefactId={docId} projectPrefix={projectPrefix} projectId={doc.project_id}>
     <DocDetailShell
       projectPrefix={projectPrefix}
       docType={resolvedDocType}
@@ -173,8 +174,9 @@ export default function DocumentDetail({
           ))}
         </>
       ) : undefined}
-      rightRail={
-        <>
+      review={hasRichContent ? <WorkflowPanel artefactType="document" artefactId={docId} projectPrefix={projectPrefix} projectId={doc.project_id} layout="bar" /> : undefined}
+      comments={hasRichContent ? <CommentsColumn /> : undefined}
+      rightRail={hasRichContent ? undefined : <>
         <WorkflowPanel artefactType="document" artefactId={docId} projectPrefix={projectPrefix} projectId={doc.project_id} />
         <SectionCard title="Metadata">
           <div className="space-y-4">
@@ -185,13 +187,12 @@ export default function DocumentDetail({
             <MetaItem label="Updated" value={formatDateTime(doc.updated_at) + ' ago'} />
           </div>
         </SectionCard>
-        </>
-      }
+      </>}
     >
       {hasRichContent && (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-8">
           <div className="max-w-4xl mx-auto">
-            <DocEditor
+            <CommentableDocEditor
               content={doc.content_json as Record<string, unknown>}
               editable={false}
               userMentionItems={people.map(person => ({ id: person.id, label: person.full_name, user: person }))}
@@ -254,6 +255,18 @@ export default function DocumentDetail({
         sourceId={docId}
         sourceDocId={doc.doc_id ?? undefined}
       />
+      {hasRichContent && <>
+        <SectionCard title="Metadata">
+          <div className="space-y-4">
+            <MetaItem label="Origin" value={<ArtefactTags type="document" id={docId} projectId={doc.project_id} canEdit={showEdit} origin={doc.visibility === 'customer' ? 'Customer' : 'Internal'} />} />
+            <MetaItem label="ID" value={doc.doc_id || String(docId)} mono />
+            <MetaItem label="Version" value={`v${doc.version}`} />
+            <MetaItem label="Created" value={formatDateTime(doc.created_at) + ' ago'} />
+            <MetaItem label="Updated" value={formatDateTime(doc.updated_at) + ' ago'} />
+          </div>
+        </SectionCard>
+      </>}
     </DocDetailShell>
+    </ReviewCommentsProvider>
   )
 }

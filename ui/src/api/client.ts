@@ -994,6 +994,13 @@ export interface TestConcept {
   updated_at: string
 }
 
+/** The commented passage with up to 64 characters of the text before and after it. */
+export interface CommentAnchor {
+  exact: string
+  prefix: string
+  suffix: string
+}
+
 export interface ArtefactComment {
   id: number
   artefact_type: string
@@ -1003,6 +1010,11 @@ export interface ArtefactComment {
   author_profile_picture_url?: string | null
   body: string
   created_at: string
+  parent_id?: number | null
+  anchor?: CommentAnchor | null
+  resolved_at?: string | null
+  resolved_by?: { id: number; full_name: string } | null
+  replies?: ArtefactComment[]
 }
 
 export interface ArtefactActivity {
@@ -2308,8 +2320,24 @@ export const artefactsApi = {
     const response = await api.get<ArtefactComment[]>(`/artefacts/${artefactType}/${artefactId}/comments`)
     return response.data
   },
-  createComment: async (artefactType: string, artefactId: number, body: string) => {
-    const response = await api.post<ArtefactComment>(`/artefacts/${artefactType}/${artefactId}/comments`, { body })
+  createComment: async (
+    artefactType: string,
+    artefactId: number,
+    body: string,
+    options: { parentId?: number; anchor?: CommentAnchor } = {},
+  ) => {
+    const payload: { body: string; parent_id?: number; anchor?: CommentAnchor } = { body }
+    if (options.parentId !== undefined) payload.parent_id = options.parentId
+    if (options.anchor) payload.anchor = options.anchor
+    const response = await api.post<ArtefactComment>(`/artefacts/${artefactType}/${artefactId}/comments`, payload)
+    return response.data
+  },
+  resolveComment: async (artefactType: string, artefactId: number, commentId: number) => {
+    const response = await api.post<ArtefactComment>(`/artefacts/${artefactType}/${artefactId}/comments/${commentId}/resolve`)
+    return response.data
+  },
+  reopenComment: async (artefactType: string, artefactId: number, commentId: number) => {
+    const response = await api.post<ArtefactComment>(`/artefacts/${artefactType}/${artefactId}/comments/${commentId}/reopen`)
     return response.data
   },
   listActivity: async (artefactType: string, artefactId: number) => {
