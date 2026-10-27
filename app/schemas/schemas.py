@@ -1142,8 +1142,25 @@ class TestConceptResponse(BaseModel):
         from_attributes = True
 
 
+class CommentAnchor(StrictModel):
+    """The commented passage and up to 64 characters of the text before and after it."""
+
+    exact: str = Field(..., min_length=1, max_length=2000)
+    prefix: str = Field("", max_length=64)
+    suffix: str = Field("", max_length=64)
+
+
 class ArtefactCommentCreate(StrictModel):
     body: str = Field(..., min_length=1)
+    parent_id: Optional[int] = None
+    anchor: Optional[CommentAnchor] = None
+
+
+class CommentPerson(BaseModel):
+    """A person named on a comment."""
+
+    id: int
+    full_name: str
 
 
 class ArtefactCommentResponse(BaseModel):
@@ -1155,10 +1172,15 @@ class ArtefactCommentResponse(BaseModel):
     author_profile_picture_url: Optional[str] = None
     body: str
     created_at: datetime
+    parent_id: Optional[int] = None
+    anchor: Optional[CommentAnchor] = None
+    resolved_at: Optional[datetime] = None
+    resolved_by: Optional[CommentPerson] = None
+    replies: list["ArtefactCommentResponse"] = []
 
-    @field_serializer("created_at")
-    def serialize_dt(self, dt: datetime, _info):
-        return f"{dt.isoformat()}Z"
+    @field_serializer("created_at", "resolved_at")
+    def serialize_dt(self, dt: Optional[datetime], _info):
+        return f"{dt.isoformat()}Z" if dt else None
 
     class Config:
         from_attributes = True
@@ -1245,6 +1267,7 @@ class ArtefactRelatedResponse(BaseModel):
 
 RequirementResponse.model_rebuild()
 DocumentSectionResponse.model_rebuild()
+ArtefactCommentResponse.model_rebuild()
 ImpactNode.model_rebuild()
 
 

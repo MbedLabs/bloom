@@ -808,6 +808,10 @@ class ServiceCredential(Base):
 
 
 class ArtefactComment(Base):
+    """A comment on an artefact. A reply points to the first comment of its thread; a
+    thread's first comment may quote the passage it is about (text before, the passage and
+    text after) and records when and by whom the thread was resolved."""
+
     __tablename__ = "artefact_comments"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -823,6 +827,16 @@ class ArtefactComment(Base):
         ForeignKey("artefact_requests.id", ondelete=SET_NULL), nullable=True
     )
     body: Mapped[str] = mapped_column(Text, nullable=False)
+    parent_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("artefact_comments.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    anchor_exact: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    anchor_prefix: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    anchor_suffix: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    resolved_by_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey(USERS_ID, ondelete=SET_NULL), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

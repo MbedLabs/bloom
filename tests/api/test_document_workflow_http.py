@@ -1269,3 +1269,183 @@ async def test_a_review_edited_without_a_workflow_gets_one_for_the_creator(workf
         )
     )
     assert (workflow.phase, workflow.assignee_id) == ("Draft", 1)
+
+
+async def _discussed(db, req_id, status="Draft"):
+    row = Requirement(
+        project_id=1,
+        req_id=req_id,
+        title="Discussed",
+        status=status,
+        created_by_id=1,
+        reviewer_id=2,
+        approver_id=3,
+    )
+    db.add(row)
+    await db.flush()
+    return row, f"/api/artefacts/requirement/{row.id}/comments"
+
+
+async def test_threads_quote_a_passage_and_collect_replies(workflow_http):
+    db, client, current, users = workflow_http
+    row, path = await _discussed(db, "PRJ-REQ-911")
+    anchor = {"exact": "the sensor", "prefix": "Check ", "suffix": " twice"}
+    first = await client.post(path, json={"body": "Unclear", "anchor": anchor})
+    assert first.status_code == 201, first.text
+    assert first.json()["anchor"] == anchor
+    thread = first.json()["id"]
+    current[0] = users[1]
+    reply = await client.post(path, json={"body": "Agreed", "parent_id": thread})
+    assert reply.status_code == 201, reply.text
+    nested = await client.post(path, json={"body": "Fixed", "parent_id": reply.json()["id"]})
+    assert nested.json()["parent_id"] == thread
+    general = await client.post(path, json={"body": "General note"})
+    assert general.status_code == 201
+    listed = (await client.get(path)).json()
+    assert [item["body"] for item in listed] == ["Unclear", "General note"]
+    assert [item["body"] for item in listed[0]["replies"]] == ["Agreed", "Fixed"]
+    assert listed[1]["anchor"] is None
+
+    refused = await client.post(path, json={"body": "x", "parent_id": thread, "anchor": anchor})
+    assert refused.status_code == 422
+    other, other_path = await _discussed(db, "PRJ-REQ-912")
+    elsewhere = await client.post(other_path, json={"body": "x", "parent_id": thread})
+    assert elsewhere.status_code == 422
+    suite = SuiteModel(project_id=1, suite_id="PRJ-TS-911", name="Suite", created_by_id=1)
+    db.add(suite)
+    await db.flush()
+    current[0] = users[0]
+    plain = await client.post(
+        f"/api/artefacts/test-suite/{suite.id}/comments", json={"body": "x", "anchor": anchor}
+    )
+    assert plain.status_code == 422, plain.text
+
+
+@pytest.mark.parametrize("status", ["Draft", "Approved"])
+async def test_the_four_resolve_and_reopen_a_thread(workflow_http, status):
+    db, client, current, users = workflow_http
+    row, path = await _discussed(db, f"PRJ-REQ-913-{status}")
+    current[0] = users[1]
+    thread = (await client.post(path, json={"body": "Open point"})).json()["id"]
+    reply = (await client.post(path, json={"body": "Reply", "parent_id": thread})).json()["id"]
+    for person in (0, 1, 2):
+        current[0] = users[person]
+        resolved = await client.post(f"{path}/{thread}/resolve")
+        assert resolved.status_code == 200, resolved.text
+        assert resolved.json()["resolved_by"]["id"] == person + 1
+        reopened = await client.post(f"{path}/{thread}/reopen")
+        assert reopened.status_code == 200 and reopened.json()["resolved_at"] is None
+    current[0] = users[3]
+    assert (await client.post(f"{path}/{thread}/resolve")).status_code == 403
+    current[0] = users[0]
+    assert (await client.post(f"{path}/{reply}/resolve")).status_code == 422
+    events = (
+        await db.scalars(
+            select(ArtefactActivity.event_type).where(ArtefactActivity.artefact_id == row.id)
+        )
+    ).all()
+    assert {"comment_resolved", "comment_reopened"} <= set(events)
+
+
+async def test_a_reply_notifies_earlier_writers_who_still_see_the_document(
+    workflow_http, monkeypatch
+):
+    from app.api import artefacts
+
+    db, client, current, users = workflow_http
+    row, path = await _discussed(db, "PRJ-REQ-914")
+    current[0] = users[3]
+    db.add(
+        ArtefactWorkflow(
+            project_id=1,
+            artefact_type="requirement",
+            artefact_id=row.id,
+            revision_number=1,
+            revision_creator_id=1,
+            assignee_id=4,
+            phase="Draft",
+        )
+    )
+    await db.flush()
+    thread = (await client.post(path, json={"body": "From the assignee"})).json()["id"]
+    hidden = {4}
+    original = artefacts.row_visible_to
+
+    async def visible(db_, person, artefact, type_code):
+        return person.id not in hidden and await original(db_, person, artefact, type_code)
+
+    monkeypatch.setattr(artefacts, "row_visible_to", visible)
+    current[0] = users[1]
+    await client.post(path, json={"body": "Reply", "parent_id": thread})
+    notified = set(
+        (
+            await db.scalars(
+                select(Notification.user_id).where(
+                    Notification.event_type == "comment", Notification.body.like("%: Reply")
+                )
+            )
+        ).all()
+    )
+    assert notified == {1, 3}
+
+
+async def test_a_reviewer_reply_counts_as_the_review(workflow_http):
+    db, client, current, users = workflow_http
+    row, path = await _discussed(db, "PRJ-REQ-915")
+    base = f"/api/artefacts/requirement/{row.id}"
+    assert (await client.post(base + "/requests", json={"kind": "review"})).status_code == 201
+    thread = (await client.post(path, json={"body": "Please check"})).json()["id"]
+    current[0] = users[1]
+    assert (
+        await client.post(path, json={"body": "Checked", "parent_id": thread})
+    ).status_code == 201
+    approval = await client.post(base + "/requests", json={"kind": "approval"})
+    assert approval.status_code == 201, approval.text
+
+
+@pytest.mark.parametrize("hidden", [set(), {2}])
+async def test_a_reply_reaches_a_former_reviewer_who_wrote_in_the_thread(
+    workflow_http, monkeypatch, hidden
+):
+    from app.api import artefacts
+
+    db, client, current, users = workflow_http
+    row, path = await _discussed(db, f"PRJ-REQ-916-{len(hidden)}")
+    current[0] = users[1]
+    thread = (await client.post(path, json={"body": "Reviewer point"})).json()["id"]
+    current[0] = users[0]
+    moved = await client.put(
+        f"/api/artefacts/requirement/{row.id}/workflow/assignees", json={"reviewer_id": 4}
+    )
+    assert moved.status_code == 200, moved.text
+    original = artefacts.row_visible_to
+
+    async def visible(db_, person, artefact, type_code):
+        return person.id not in hidden and await original(db_, person, artefact, type_code)
+
+    monkeypatch.setattr(artefacts, "row_visible_to", visible)
+    await client.post(path, json={"body": "Answer", "parent_id": thread})
+    notified = set(
+        (
+            await db.scalars(
+                select(Notification.user_id).where(
+                    Notification.event_type == "comment", Notification.body.like("%: Answer")
+                )
+            )
+        ).all()
+    )
+    assert notified == {2, 3, 4} - hidden
+
+
+async def test_a_separate_assignee_resolves_a_thread(workflow_http):
+    db, client, current, users = workflow_http
+    row, path = await _discussed(db, "PRJ-REQ-917")
+    handed = await client.put(
+        f"/api/artefacts/requirement/{row.id}/workflow/assignees", json={"assignee_id": 4}
+    )
+    assert handed.status_code == 200, handed.text
+    thread = (await client.post(path, json={"body": "Open point"})).json()["id"]
+    current[0] = users[3]
+    resolved = await client.post(f"{path}/{thread}/resolve")
+    assert resolved.status_code == 200, resolved.text
+    assert resolved.json()["resolved_by"]["id"] == 4
