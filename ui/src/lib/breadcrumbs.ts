@@ -9,21 +9,6 @@ export type BreadcrumbCrumb = {
   emphasize?: boolean
 }
 
-const TYPE_PAGE_TITLE: Record<string, string> = {
-  REQ: 'Requirements',
-  SPEC: 'Specifications',
-  TC: 'Test Cases',
-  DES: 'Designs',
-  RSK: 'Risks',
-  CHG: 'Changes',
-  CPT: docRegistryListLabel('CPT'),
-  PRT: docRegistryListLabel('PRT'),
-  RPT: 'Reports',
-  STD: 'Standards',
-  DEF: 'Defects',
-  CMP: docRegistryListLabel('CMP'),
-}
-
 export function getBreadcrumbs(
   pathname: string,
   search: string,
@@ -75,7 +60,7 @@ export function getBreadcrumbs(
       const docTypeFromQuery = normalizeDocTypeParam(new URLSearchParams(search).get('type'))
       const docTypeFromPath = parts[4] !== 'new' ? normalizeDocTypeParam(parts[4]) : null
       const resolvedDocType = docTypeFromQuery ?? docTypeFromPath
-      const docLabel = resolvedDocType ? (TYPE_PAGE_TITLE[resolvedDocType] || 'Documents') : 'Documents'
+      const docLabel = resolvedDocType ? docRegistryListLabel(resolvedDocType) : 'Documents'
       const docsHref = resolvedDocType
         ? docRegistryListUrl(slug, resolvedDocType)
         : docRegistryListUrl(slug)

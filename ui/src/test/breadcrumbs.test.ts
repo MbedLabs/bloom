@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { getBreadcrumbs } from '../lib/breadcrumbs'
+import { resourceLabel } from '../lib/policySummary'
 
 const projects = [{ id: 1, name: 'Vehicle Control Unit', prefix: 'VCU' }]
 
@@ -42,5 +43,27 @@ describe('getBreadcrumbs', () => {
       'Designs',
     ])
     expect(crumbs[crumbs.length - 1]?.href).toBe('/projects/VCU/docs?type=designs')
+  })
+})
+
+describe('collection labels', () => {
+  it('names the designs list Designs in the breadcrumbs', () => {
+    const crumbs = getBreadcrumbs('/projects/VCU/docs/new', '?type=designs', projects)
+    expect(crumbs.map((crumb) => crumb.label)).toContain('Designs')
+  })
+
+  it('names the test suites list Test Suites in the breadcrumbs', () => {
+    const crumbs = getBreadcrumbs('/projects/VCU/docs/new', '?type=test-suites', projects)
+    expect(crumbs[crumbs.length - 1]).toEqual({
+      label: 'Test Suites',
+      href: '/projects/VCU/docs?type=test-suites',
+      emphasize: true,
+    })
+  })
+
+  it('names a document resource in the policy editor by its collection', () => {
+    expect(resourceLabel('DES')).toBe('DES · Designs')
+    expect(resourceLabel('CHG')).toBe('CHG · Changes')
+    expect(resourceLabel('project')).toBe('Project Management')
   })
 })

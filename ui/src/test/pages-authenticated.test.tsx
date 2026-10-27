@@ -221,3 +221,22 @@ describe('signed-in routes render their data', () => {
     expect(found.length).toBeGreaterThan(0)
   })
 })
+
+describe('document collections are named in the plural', () => {
+  it('on the dashboard count tiles', async () => {
+    renderRoute('/', '/')
+    expect(await screen.findByText('Designs', {}, { timeout: 4000 })).toBeTruthy()
+    for (const label of ['Requirements', 'Changes', 'Standards', 'Test Campaigns']) {
+      expect(screen.getAllByText(label).length).toBeGreaterThan(0)
+    }
+    for (const label of ['Design', 'Change Request', 'External Standard', 'Campaign']) {
+      expect(screen.queryByText(label)).toBeNull()
+    }
+  })
+
+  it('on the project overview tiles', async () => {
+    renderRoute('/projects/:prefix', '/projects/VCU')
+    expect(await screen.findByText('Designs', {}, { timeout: 4000 })).toBeTruthy()
+    expect(screen.queryByText('Design')).toBeNull()
+  })
+})

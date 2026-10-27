@@ -14,7 +14,8 @@ import {
 } from 'lucide-react'
 
 import { dashboardApi, projectsApi, type Project } from '../api/client'
-import { DOC_TYPE_COLORS, DOC_TYPE_LABELS, type DocType } from '../types/doc'
+import { DOC_TYPE_COLORS, type DocType } from '../types/doc'
+import { docRegistryListLabel } from '../lib/docRegistryParams'
 
 const CONTROLLED_DOC_TYPES: DocType[] = ['REQ', 'SPEC', 'TC', 'CPT', 'PRT', 'DES', 'RSK', 'CHG', 'RPT', 'STD', 'CMP']
 
@@ -330,7 +331,7 @@ function DocKindPanel({ kindCounts, total }: Readonly<{ kindCounts: Record<DocTy
               <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${DOC_TYPE_COLORS[type]}`}>{type}</span>
               <span className="text-sm font-semibold text-foreground">{kindCounts[type] ?? 0}</span>
             </div>
-            <div className="mt-2 truncate text-xs text-muted-foreground">{DOC_TYPE_LABELS[type]}</div>
+            <div className="mt-2 truncate text-xs text-muted-foreground">{docRegistryListLabel(type)}</div>
           </div>
         ))}
       </div>

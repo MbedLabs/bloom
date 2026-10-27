@@ -1,5 +1,6 @@
 import SelectField from './SelectField'
 import { refreshProjectViews } from '../lib/refreshProjectViews'
+import { docRegistryListLabel } from '../lib/docRegistryParams'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -248,7 +249,7 @@ function LinkDocumentModal({
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder={targetType ? `Search ${DOC_TYPE_LABELS[targetType].toLowerCase()}s` : 'Search linkable artefacts'}
+              placeholder={targetType ? `Search ${docRegistryListLabel(targetType).toLowerCase()}` : 'Search linkable artefacts'}
               title="Filter targets by ID, title, or type"
               className="w-full pl-9 pr-3 py-2 bg-background border border-input rounded-md text-sm"
             />
@@ -264,7 +265,7 @@ function LinkDocumentModal({
               <option value="">No target kinds</option>
             ) : (
               availableTargetTypes.map((item) => (
-                <option key={item} value={item}>{DOC_TYPE_LABELS[item]}</option>
+                <option key={item} value={item}>{docRegistryListLabel(item)}</option>
               ))
             )}
           </SelectField>

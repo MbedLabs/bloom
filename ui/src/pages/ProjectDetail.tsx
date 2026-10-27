@@ -129,14 +129,14 @@ export default function ProjectDetail() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-2.5">
-        <SummaryTile label="Requirements" value={project.requirement_count} to={docRegistryListUrl(prefix!, 'REQ')} />
-        <SummaryTile label="Test Cases" value={project.test_case_count} to={docRegistryListUrl(prefix!, 'TC')} />
-        <SummaryTile label="Specifications" value={specCount} to={docRegistryListUrl(prefix!, 'SPEC')} />
-        <SummaryTile label="Design" value={project.design_count} to={docRegistryListUrl(prefix!, 'DES')} />
-        <SummaryTile label="Risks" value={project.risk_count} to={docRegistryListUrl(prefix!, 'RSK')} />
-        <SummaryTile label="Changes" value={project.change_count} to={docRegistryListUrl(prefix!, 'CHG')} />
+        <SummaryTile label={docRegistryListLabel('REQ')} value={project.requirement_count} to={docRegistryListUrl(prefix!, 'REQ')} />
+        <SummaryTile label={docRegistryListLabel('TC')} value={project.test_case_count} to={docRegistryListUrl(prefix!, 'TC')} />
+        <SummaryTile label={docRegistryListLabel('SPEC')} value={specCount} to={docRegistryListUrl(prefix!, 'SPEC')} />
+        <SummaryTile label={docRegistryListLabel('DES')} value={project.design_count} to={docRegistryListUrl(prefix!, 'DES')} />
+        <SummaryTile label={docRegistryListLabel('RSK')} value={project.risk_count} to={docRegistryListUrl(prefix!, 'RSK')} />
+        <SummaryTile label={docRegistryListLabel('CHG')} value={project.change_count} to={docRegistryListUrl(prefix!, 'CHG')} />
         <SummaryTile
-          label="Defects"
+          label={docRegistryListLabel('DEF')}
           value={project.defect_count}
           to={`/projects/${prefix}/defects`}
         />

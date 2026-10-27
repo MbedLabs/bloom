@@ -341,6 +341,19 @@ describe('the links of a document', () => {
     expect(screen.queryByText('VCU-TC-001')).toBeNull()
   })
 
+  it('names the target types in the plural', async () => {
+    linksPanel()
+
+    fireEvent.click(await screen.findByRole('button', { name: /link artefact/i }))
+    const picker = await screen.findByRole('combobox', { name: 'Target artefact kind' })
+    await waitFor(() => expect(picker.hasAttribute('disabled')).toBe(false))
+    fireEvent.click(picker)
+    const options = (await screen.findAllByRole('option')).map((option) => option.textContent?.trim())
+
+    expect(options).toEqual(['Requirements', 'Test Cases'])
+    expect(screen.getByTitle(/filter targets/i).getAttribute('placeholder')).toBe('Search requirements')
+  })
+
   it('asks for the linked documents by key, never for the project', async () => {
     linksPanel()
     await screen.findByText('Linked Documents')

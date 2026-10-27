@@ -1,5 +1,6 @@
 import type { Policy, PolicyRule, PolicyScope, PolicyVisibility, Tag } from '../api/client'
 import { DOC_TYPE_LABELS, type DocType } from '../types/doc'
+import { docRegistryListLabel } from './docRegistryParams'
 
 export const DOC_TYPES = Object.keys(DOC_TYPE_LABELS) as DocType[]
 
@@ -45,7 +46,7 @@ const RESOURCE_LABELS: Record<string, string> = {
 }
 export const resourceLabel = (resource: string) =>
   isDocType(resource)
-    ? `${resource} · ${DOC_TYPE_LABELS[resource as DocType]}`
+    ? `${resource} · ${docRegistryListLabel(resource as DocType)}`
     : RESOURCE_LABELS[resource] ?? resource.charAt(0).toUpperCase() + resource.slice(1)
 
 export function policyRules(policy: Policy) {
