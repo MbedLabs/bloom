@@ -1,4 +1,5 @@
-"""Operational instrumentation: structured logging, request IDs, Prometheus metrics."""
+"""Operational instrumentation: structured logging, request IDs, Prometheus metrics and the
+request's audit event."""
 
 from __future__ import annotations
 
@@ -7,7 +8,10 @@ import logging
 import sys
 import time
 import uuid
+import zlib
 from contextvars import ContextVar
+from dataclasses import dataclass
+from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
@@ -18,6 +22,24 @@ client_ip_var: ContextVar[str | None] = ContextVar("client_ip", default=None)
 user_agent_var: ContextVar[str | None] = ContextVar("user_agent", default=None)
 
 access_logger = logging.getLogger("bloom.access")
+logger = logging.getLogger(__name__)
+
+CREATED_BODY_LIMIT = 1024 * 1024
+
+
+@dataclass
+class RequestAudit:
+    """What handling one request learned for its audit event: the actor, the client kind of a
+    user token, the service credential and whether a 404 hid something the actor may not see."""
+
+    actor_type: Optional[str] = None
+    actor_user_id: Optional[int] = None
+    client: Optional[str] = None
+    service_credential_id: Optional[int] = None
+    refused: bool = False
+
+
+request_audit_var: ContextVar[Optional[RequestAudit]] = ContextVar("request_audit", default=None)
 
 HTTP_REQUESTS_TOTAL = Counter(
     "http_requests_total",
@@ -73,8 +95,59 @@ def setup_logging(level: str = "INFO", json_logs: bool = False) -> None:
     root.setLevel(level.upper())
 
 
+class CreatedBody:
+    """The JSON body of a 201 answer, kept up to CREATED_BODY_LIMIT bytes, gzip or plain."""
+
+    def __init__(self, gzipped: bool):
+        self.gzipped = gzipped
+        self.chunks: list[bytes] = []
+        self.size = 0
+        self.overflow = False
+
+    def feed(self, chunk: bytes) -> None:
+        """Keep the chunk while the body stays within the limit."""
+        if self.overflow or not chunk:
+            return
+        self.size += len(chunk)
+        if self.size > CREATED_BODY_LIMIT:
+            self.overflow = True
+            self.chunks = []
+            return
+        self.chunks.append(chunk)
+
+    def parsed(self) -> Any:
+        """The decoded JSON value, or None when the body is too large or not JSON."""
+        if self.overflow or not self.chunks:
+            return None
+        raw = b"".join(self.chunks)
+        try:
+            if self.gzipped:
+                inflater = zlib.decompressobj(zlib.MAX_WBITS | 16)
+                raw = inflater.decompress(raw, CREATED_BODY_LIMIT + 1)
+                if len(raw) > CREATED_BODY_LIMIT:
+                    return None
+            return json.loads(raw)
+        except (zlib.error, ValueError):
+            return None
+
+
+def _created_body(message: dict) -> Optional[CreatedBody]:
+    """A collector for a 201 JSON answer in plain or gzip encoding, else None."""
+    if message["status"] != 201:
+        return None
+    headers = {k.lower(): v for k, v in message.get("headers", [])}
+    content_type = headers.get(b"content-type", b"").split(b";")[0].strip()
+    if content_type != b"application/json":
+        return None
+    encoding = headers.get(b"content-encoding", b"").strip().lower()
+    if encoding not in (b"", b"identity", b"gzip"):
+        return None
+    return CreatedBody(gzipped=encoding == b"gzip")
+
+
 class RequestObservabilityMiddleware:
-    """Pure ASGI middleware: request id + access log + metrics."""
+    """Pure ASGI middleware: request id, access log, metrics and one audit event per request,
+    written when the response is finished."""
 
     def __init__(self, app):
         self.app = app
@@ -92,18 +165,23 @@ class RequestObservabilityMiddleware:
         ip_token = client_ip_var.set(client[0] if client else None)
         agent = headers.get("user-agent", b"").decode("latin-1")
         agent_token = user_agent_var.set(agent or None)
+        audit_token = request_audit_var.set(RequestAudit())
 
         status_code = 500
+        created: Optional[CreatedBody] = None
         start = time.perf_counter()
 
         async def send_wrapper(message):
-            nonlocal status_code
+            nonlocal status_code, created
             if message["type"] == "http.response.start":
                 status_code = message["status"]
                 message.setdefault("headers", [])
                 message["headers"] = [
                     (k, v) for k, v in message["headers"] if k.lower() != b"x-request-id"
                 ] + [(b"x-request-id", request_id.encode("latin-1"))]
+                created = _created_body(message)
+            elif message["type"] == "http.response.body" and created is not None:
+                created.feed(message.get("body", b""))
             await send(message)
 
         try:
@@ -131,9 +209,37 @@ class RequestObservabilityMiddleware:
                     }
                 },
             )
-            request_id_var.reset(token)
-            client_ip_var.reset(ip_token)
-            user_agent_var.reset(agent_token)
+            try:
+                await _record_request(
+                    scope,
+                    headers,
+                    status_code,
+                    round(duration * 1000, 1),
+                    created.parsed() if created is not None else None,
+                )
+            finally:
+                request_id_var.reset(token)
+                client_ip_var.reset(ip_token)
+                user_agent_var.reset(agent_token)
+                request_audit_var.reset(audit_token)
+
+
+async def _record_request(
+    scope, headers: dict, status_code: int, duration_ms: float, created_body: Any
+) -> None:
+    """Write the request's audit event; a failure is logged and leaves the response as sent."""
+    from app.services.audit import record_request_event
+
+    try:
+        await record_request_event(
+            scope,
+            authorization=headers.get("authorization", b"").decode("latin-1"),
+            status_code=status_code,
+            duration_ms=duration_ms,
+            created_body=created_body,
+        )
+    except Exception:
+        logger.exception("Audit event api.request could not be recorded")
 
 
 metrics_router = APIRouter()

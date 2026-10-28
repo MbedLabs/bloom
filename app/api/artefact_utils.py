@@ -57,7 +57,7 @@ from app.schemas import (
     RequirementSummary,
     TestCaseSummary,
 )
-from app.services.audit import audit_actor_var, record_audit_event
+from app.services.audit import audit_actor_var, mark_refused, record_audit_event
 
 IN_PROGRESS = "In Progress"
 
@@ -155,6 +155,8 @@ async def get_artefact_or_404(
     artefact_id: int | str,
     current_user: User | None = None,
 ):
+    """The artefact of the type by id or document ID, as the user may see it, else a 404; the
+    404 for a row the user's visibility hides is marked as a refusal for the audit log."""
     model = ARTEFACT_MODELS.get(artefact_type)
     if not model:
         raise HTTPException(status_code=404, detail="Unsupported artefact type")
@@ -167,11 +169,15 @@ async def get_artefact_or_404(
         query = select(model).where(getattr(model, public_attr) == id_text)
     else:
         raise HTTPException(status_code=404, detail="Artefact not found")
+    unfiltered = None
     if current_user is not None and hasattr(model, "visibility"):
+        unfiltered = query
         query = apply_external_visibility_filter(query, model, current_user)
 
     artefact = (await db.execute(query)).scalar_one_or_none()
     if not artefact:
+        if unfiltered is not None and (await db.execute(unfiltered)).first() is not None:
+            mark_refused()
         raise HTTPException(status_code=404, detail="Artefact not found")
     return artefact
 
@@ -622,14 +628,19 @@ async def get_visible_row(
     type is outside an external user's allowlist and, with any action, one whose document
     type the user holds no view on are a 404, checked before any 403. With ``permission=(action, resource)`` the action is checked on the resource, the
     row's own document type when the resource is None, and a missing permission is a 403;
-    an external user's changing action on a row they did not create is a 403.
+    an external user's changing action on a row they did not create is a 403. A 404 for a
+    row that exists is marked as a refusal for the audit log.
     """
     query = select(model).where(model.id == item_id)
+    unfiltered = None
     if hasattr(model, "visibility"):
+        unfiltered = query
         query = apply_external_visibility_filter(query, model, current_user)
     row = (await db.execute(query)).scalar_one_or_none()
     hidden = HTTPException(status_code=404, detail=not_found)
     if not row:
+        if unfiltered is not None and (await db.execute(unfiltered)).first() is not None:
+            mark_refused()
         raise hidden
     action, resource = permission or (None, None)
     resource = resource or getattr(row, "doc_type", None)
@@ -637,12 +648,14 @@ async def get_visible_row(
     if resource in DOC_TYPE_RESOURCES and not await doc_type_visible(
         db, current_user, row.project_id, resource
     ):
+        mark_refused()
         raise hidden
     if (
         action
         and resource in DOC_TYPE_RESOURCES
         and not await holds(db, current_user, row.project_id, "view", resource)
     ):
+        mark_refused()
         raise hidden
     if action and action != "view":
         if not await row_allows(db, current_user, row, action, resource):

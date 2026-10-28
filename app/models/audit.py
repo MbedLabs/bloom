@@ -1,4 +1,6 @@
-"""Audit log: one row per security-relevant event, written with the action it records."""
+"""Audit log: one api.request row for every HTTP request, refused attempts included, one row
+for every security-relevant event, written with the action it records, and one
+security.repeated_refusals row when one address is refused repeatedly."""
 
 from datetime import datetime
 from typing import Optional
@@ -10,7 +12,21 @@ from app.core.database import Base
 
 
 class AuditEvent(Base):
-    """Who did what to accounts, access, configuration or data, and with what outcome."""
+    """Who did what, through which request, from where, and with what outcome.
+
+    actor_type is user, service, runner or anonymous, with actor_user_id for a user. action is
+    a dotted name: api.request for every HTTP request, health probes and metrics scrapes
+    included, security.repeated_refusals, and the specific events (auth., user., project.,
+    artefact. and the others). target_type and target_id name the object; for api.request
+    the last path parameter ending in _id. project_id is the project acted in. request_id is
+    the x-request-id response header, ip the client address, user_agent the client's
+    User-Agent. outcome is success, failure, ignored or denied (401, 403, 429 and a 404 for
+    something the actor may not see). details of an api.request hold the method, route
+    template, path, status, duration_ms, query parameter names, the credential kind
+    presented (bearer or none), the client kind of a user token (cli or web), the service
+    credential id, and the id and document ID of a created object. No password, token,
+    secret, request or response body, header value or query value is ever stored.
+    """
 
     __tablename__ = "audit_events"
     __table_args__ = (
@@ -19,6 +35,8 @@ class AuditEvent(Base):
         Index("ix_audit_events_action", "action"),
         Index("ix_audit_events_target", "target_type", "target_id"),
         Index("ix_audit_events_project_id", "project_id"),
+        Index("ix_audit_events_outcome", "outcome"),
+        Index("ix_audit_events_ip", "ip"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

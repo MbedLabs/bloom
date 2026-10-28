@@ -14,6 +14,7 @@ Bloom PLM is a product lifecycle management platform for requirements, controlle
 - Inline `#` tags that turn a mention in a document body into a link a reader can follow
 - Stable human-readable identifiers for controlled project records
 - Administrator, maintainer, and external-user access controls
+- An audit log of every API call and every refused attempt, with detection of repeated refusals from one address
 - ReqIF and Markdown document import; test cases import from CSV and XML and export as CSV, XML, and Markdown
 - PDF and CSV exports, with an optional administrator company logo on PDF reports
 - GitHub, GitLab, and Jira synchronization for defects and change requests

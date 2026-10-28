@@ -125,6 +125,18 @@ class Settings(BaseSettings):
     ENABLE_METRICS: bool = Field(
         default=True, validation_alias=AliasChoices("BLOOM_ENABLE_METRICS", "ENABLE_METRICS")
     )
+    AUDIT_REFUSAL_THRESHOLD: int = Field(
+        default=20,
+        ge=1,
+        validation_alias=AliasChoices("BLOOM_AUDIT_REFUSAL_THRESHOLD", "AUDIT_REFUSAL_THRESHOLD"),
+    )
+    AUDIT_REFUSAL_WINDOW_MINUTES: int = Field(
+        default=10,
+        ge=1,
+        validation_alias=AliasChoices(
+            "BLOOM_AUDIT_REFUSAL_WINDOW_MINUTES", "AUDIT_REFUSAL_WINDOW_MINUTES"
+        ),
+    )
 
     RUN_STARTUP_DATA_REPAIR: bool | None = Field(
         default=None,

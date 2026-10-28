@@ -295,7 +295,7 @@ def test_failure_audits_carry_no_secret(cli_client):
         return (await db.scalars(select(AuditEvent))).all()
 
     events = run_db(maker, every_event)
-    assert {e.outcome for e in events} == {"success", "failure"}
+    assert {e.outcome for e in events if e.action != "api.request"} == {"success", "failure"}
     text = " ".join(f"{e.target_id} {e.details}" for e in events)
     for secret in (code, VERIFIER, "w" * 43, tokens["refresh_token"], tokens["access_token"]):
         assert secret not in text

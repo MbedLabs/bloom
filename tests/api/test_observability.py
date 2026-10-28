@@ -1,11 +1,16 @@
-"""Tests for structured logging, request IDs and the metrics endpoint."""
+"""Tests for structured logging, request IDs, the metrics endpoint and the request audit event."""
 
+import asyncio
 import json
 import logging
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 
+from app.core.database import get_db
 from app.core.observability import (
     JsonLogFormatter,
     RequestObservabilityMiddleware,
@@ -13,19 +18,67 @@ from app.core.observability import (
     request_id_var,
     setup_logging,
 )
+from app.models.audit import AuditEvent
 
 
-def _make_client() -> TestClient:
-    """A minimal app with the real middleware + metrics router mounted."""
+def _make_app():
+    """A minimal app with the real middleware + metrics router mounted, its audit events kept
+    in an in-memory database, and that database's session maker."""
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+
+    async def _create():
+        async with engine.begin() as conn:
+            await conn.run_sync(AuditEvent.__table__.create)
+
+    async def _db():
+        async with maker() as session:
+            yield session
+
+    asyncio.run(_create())
     app = FastAPI()
     app.add_middleware(RequestObservabilityMiddleware)
     app.include_router(metrics_router, prefix="/api")
+    app.dependency_overrides[get_db] = _db
 
     @app.get("/api/ping")
     async def ping():
         return {"ok": True}
 
-    return TestClient(app)
+    return app, maker
+
+
+def _make_client() -> TestClient:
+    """A test client of the minimal app."""
+    return TestClient(_make_app()[0])
+
+
+def test_each_request_leaves_one_api_request_event():
+    app, maker = _make_app()
+    client = TestClient(app)
+    ping = client.get("/api/ping", params={"q": "value"})
+    missing = client.get("/api/nowhere")
+
+    async def _events():
+        async with maker() as session:
+            return list((await session.scalars(select(AuditEvent).order_by(AuditEvent.id))).all())
+
+    first, second = asyncio.run(_events())
+    assert (first.action, first.actor_type, first.outcome) == (
+        "api.request",
+        "anonymous",
+        "success",
+    )
+    assert first.request_id == ping.headers["x-request-id"]
+    assert first.details["route"] == "/api/ping"
+    assert first.details["query"] == ["q"]
+    assert "value" not in json.dumps(first.details)
+    assert (second.details["route"], second.details["status"], second.outcome) == (
+        "unmatched",
+        404,
+        "failure",
+    )
+    assert missing.status_code == 404
 
 
 def test_response_carries_generated_request_id():

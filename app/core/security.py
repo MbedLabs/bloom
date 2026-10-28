@@ -35,7 +35,7 @@ from app.models.groups import Group, GroupMembership, Policy, user_application_p
 from app.models.project_membership import ProjectAccess
 from app.models.tags import TAG_TYPE_OF_MODEL, TYPE_CODES, ArtefactTag
 from app.models.user import User, UserRole
-from app.services.audit import set_audit_actor
+from app.services.audit import mark_refused, set_audit_actor
 from app.services.token_service import is_cli_access_token_active
 
 ALGORITHM = "HS256"
@@ -100,7 +100,7 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="User account is deactivated"
         )
-    set_audit_actor("user", user.id)
+    set_audit_actor("user", user.id, client="cli" if "cli_refresh_id" in payload else "web")
     user.access_map = await _access_map(db, user)
     user.application_permissions = as_lists(await effective_permissions(db, user, None))
     return user
@@ -613,9 +613,10 @@ async def require_project_access(
 ) -> None:
     """Admit the user to the project or raise.
 
-    A user with no access entry reaching the project gets ``outsider`` or 403 "User is
-    not assigned to this project."; with ``permission=(action, resource)`` one term must
-    grant the action on the resource, else 403 "Missing permission".
+    A user with no access entry reaching the project gets ``outsider``, marked as a refusal
+    for the audit log, or 403 "User is not assigned to this project."; with
+    ``permission=(action, resource)`` one term must grant the action on the resource, else
+    403 "Missing permission".
     """
     not_assigned = outsider or HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
@@ -628,6 +629,8 @@ async def require_project_access(
         return None
     terms = await access_terms(db, current_user, project_id)
     if not terms:
+        if outsider is not None:
+            mark_refused()
         raise not_assigned
     if permission is not None:
         action, resource = permission

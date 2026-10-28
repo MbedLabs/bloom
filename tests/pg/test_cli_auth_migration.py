@@ -24,7 +24,7 @@ from tests.api.test_cli_auth import CHALLENGE, PREFIX, VERIFIER
 
 ROOT = Path(__file__).resolve().parents[2]
 BEFORE = "d6f9b2c3a0e5"
-HEAD = "637f976e78e0"
+HEAD = "0ef8b87db4d3"
 
 
 def _dsn() -> str:

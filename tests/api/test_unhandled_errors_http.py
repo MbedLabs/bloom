@@ -12,6 +12,17 @@ from sqlalchemy.exc import IntegrityError
 from app.core import database
 from app.core.database import get_db
 from app.main import app
+from app.services import audit
+
+
+@pytest.fixture(autouse=True)
+def _no_request_audit(monkeypatch):
+    """Requests in these tests leave no request audit event."""
+
+    async def _skip(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(audit, "record_request_event", _skip)
 
 
 @pytest.fixture

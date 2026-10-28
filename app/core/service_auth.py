@@ -95,5 +95,5 @@ async def require_bud_sync_token(
         raise unauthorized
     credential.last_used_at = now
     await db.flush()
-    set_audit_actor("service")
+    set_audit_actor("service", service_credential_id=credential.id)
     return credential
