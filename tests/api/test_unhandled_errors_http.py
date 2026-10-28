@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import asyncpg
 import pytest
 from fastapi import Depends
@@ -48,6 +50,17 @@ def test_a_500_carries_a_reference_the_user_can_quote(exploding_route):
     assert reference
     assert body["request_id"] == reference
     assert reference in body["detail"]
+
+
+def test_a_500_without_a_supplied_id_quotes_the_generated_one(exploding_route):
+    client = TestClient(app, raise_server_exceptions=False)
+    response = client.get(exploding_route)
+
+    reference = response.headers["x-request-id"]
+    assert re.fullmatch(r"[0-9a-f]{32}", reference)
+    assert response.json()["request_id"] == reference
+    assert f"Quote reference {reference} when reporting this." in response.json()["detail"]
+    assert "Quote reference - " not in response.json()["detail"]
 
 
 def test_a_500_does_not_leak_the_exception(exploding_route):

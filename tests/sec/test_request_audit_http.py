@@ -463,6 +463,21 @@ def test_an_unhandled_error_leaves_a_failure_event_with_status_500(harness, expl
     assert "audit boom" not in json.dumps(event.details)
 
 
+def test_a_500_quotes_the_supplied_request_id_of_its_audit_event(harness, exploding_route):
+    _, session_maker = harness
+    client = TestClient(app, base_url="http://test", raise_server_exceptions=False)
+
+    response = client.get(exploding_route, headers={"X-Request-ID": "report-me-500"})
+
+    assert response.status_code == 500
+    body = response.json()
+    assert response.headers["x-request-id"] == "report-me-500"
+    assert body["request_id"] == "report-me-500"
+    assert "Quote reference report-me-500 when reporting this." in body["detail"]
+    [event] = _requests(session_maker, route=exploding_route, status=500)
+    assert event.request_id == "report-me-500"
+
+
 def test_a_deactivated_account_is_denied_and_named(harness):
     client, session_maker = harness
     user = _user(session_maker, "former@example.com")

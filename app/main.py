@@ -408,8 +408,14 @@ async def _integrity_error_handler(request: Request, exc: Exception) -> JSONResp
 
 
 async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    request_id = request_id_var.get()
-    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    """Answer an unhandled error with 500 and the id of the request that failed, from the
+    request state, and log the error under that id."""
+    request_id = getattr(request.state, "request_id", None) or request_id_var.get()
+    token = request_id_var.set(request_id)
+    try:
+        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    finally:
+        request_id_var.reset(token)
     return JSONResponse(
         status_code=500,
         content={

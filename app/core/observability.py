@@ -208,7 +208,8 @@ def client_address(scope) -> Optional[str]:
 
 class RequestObservabilityMiddleware:
     """Pure ASGI middleware: request id, access log, metrics and one audit event per request,
-    written when the response is finished."""
+    written when the response is finished. The request id is also kept in the request state
+    as request.state.request_id."""
 
     def __init__(self, app):
         self.app = app
@@ -222,6 +223,7 @@ class RequestObservabilityMiddleware:
         incoming = headers.get("x-request-id", b"").decode("latin-1").strip()
         request_id = incoming[:64] if incoming else uuid.uuid4().hex
         token = request_id_var.set(request_id)
+        scope.setdefault("state", {})["request_id"] = request_id
         ip_token = client_ip_var.set(client_address(scope))
         agent = headers.get("user-agent", b"").decode("latin-1")
         agent_token = user_agent_var.set(agent or None)
