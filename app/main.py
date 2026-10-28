@@ -429,7 +429,6 @@ app.add_exception_handler(Exception, _unhandled_exception_handler)
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-app.add_middleware(RequestObservabilityMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -437,6 +436,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept"],
 )
+app.add_middleware(RequestObservabilityMiddleware)
 
 app.include_router(health.router, prefix="/api", tags=["Health"])
 app.include_router(metrics_router, prefix="/api", tags=["Observability"])

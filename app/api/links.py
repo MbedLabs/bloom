@@ -29,6 +29,7 @@ from app.core.security import (
 from app.models import ArtefactLink, Project
 from app.models.user import User, UserRole
 from app.schemas import ArtefactLinkCreate, ArtefactLinkResponse
+from app.services.audit import mark_refused
 from app.services.tag_links import link_end
 
 router = APIRouter()
@@ -148,6 +149,8 @@ async def create_link(
         current_user,
     )
     if not source_visible:
+        if source is not None:
+            mark_refused()
         raise HTTPException(status_code=404, detail="Source document not found in project")
     target, target_visible = await link_end(
         db,
@@ -157,6 +160,8 @@ async def create_link(
         current_user,
     )
     if not target_visible:
+        if target is not None:
+            mark_refused()
         raise HTTPException(status_code=404, detail="Target document not found in project")
     if not (changes_allowed(current_user, source) and changes_allowed(current_user, target)):
         raise HTTPException(status_code=403, detail="External users change only what they created.")
@@ -199,6 +204,7 @@ async def delete_link(
         for kind, item in ((link.source_type, link.source_id), (link.target_type, link.target_id))
     ]
     if any(row is not None and not visible for row, visible in ends):
+        mark_refused()
         raise HTTPException(status_code=404, detail="Link not found")
     await require_project_access(db, current_user, link.project_id, permission=("delete", "link"))
     if current_user.role == UserRole.external and not all(

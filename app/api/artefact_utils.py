@@ -176,10 +176,16 @@ async def get_artefact_or_404(
 
     artefact = (await db.execute(query)).scalar_one_or_none()
     if not artefact:
-        if unfiltered is not None and (await db.execute(unfiltered)).first() is not None:
-            mark_refused()
+        if unfiltered is not None:
+            await mark_refused_if_found(db, unfiltered)
         raise HTTPException(status_code=404, detail="Artefact not found")
     return artefact
+
+
+async def mark_refused_if_found(db: AsyncSession, query) -> None:
+    """Mark the request as a refusal for the audit log when the unfiltered query finds a row."""
+    if (await db.execute(query)).first() is not None:
+        mark_refused()
 
 
 async def log_artefact_activity(
@@ -639,8 +645,8 @@ async def get_visible_row(
     row = (await db.execute(query)).scalar_one_or_none()
     hidden = HTTPException(status_code=404, detail=not_found)
     if not row:
-        if unfiltered is not None and (await db.execute(unfiltered)).first() is not None:
-            mark_refused()
+        if unfiltered is not None:
+            await mark_refused_if_found(db, unfiltered)
         raise hidden
     action, resource = permission or (None, None)
     resource = resource or getattr(row, "doc_type", None)

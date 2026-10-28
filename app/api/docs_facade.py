@@ -27,7 +27,13 @@ from sqlalchemy import (
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.api.artefact_utils import allowed_actions, holds, type_visible, visible_types
+from app.api.artefact_utils import (
+    allowed_actions,
+    holds,
+    mark_refused_if_found,
+    type_visible,
+    visible_types,
+)
 from app.core.database import get_db
 from app.core.document_kinds import (
     CANONICAL_DOCUMENT_KINDS,
@@ -64,6 +70,7 @@ from app.models.tags import TAG_TYPE_OF_MODEL
 from app.models.user import User
 from app.models.workflow import ArtefactWorkflow
 from app.schemas import PaginatedResponse
+from app.services.audit import mark_refused
 from app.services.document_workflow import (
     CONTROLLED_TYPES,
     LEGACY_CHANGE_STATUSES,
@@ -937,17 +944,21 @@ async def get_doc_by_kind_and_string_id(
     allowed_doc_types = await get_external_doc_types(db, current_user, project.id)
 
     if requested_kind in CANONICAL_DOCUMENT_KINDS:
-        if not external_doc_type_allowed(allowed_doc_types, requested_kind):
-            raise HTTPException(status_code=404, detail="Document not found")
-        document_query = select(Document).where(
+        unfiltered = select(Document).where(
             Document.project_id == project.id,
             Document.doc_type == requested_kind,
             Document.doc_id == doc_id_str,
         )
-        document_query = apply_external_visibility_filter(document_query, Document, current_user)
+        if not external_doc_type_allowed(allowed_doc_types, requested_kind):
+            await mark_refused_if_found(db, unfiltered)
+            raise HTTPException(status_code=404, detail="Document not found")
+        document_query = apply_external_visibility_filter(unfiltered, Document, current_user)
         result = await db.execute(document_query)
         row = result.scalar_one_or_none()
+        if row is None:
+            await mark_refused_if_found(db, unfiltered)
         if row and not await holds(db, current_user, project.id, "view", requested_kind):
+            mark_refused()
             raise HTTPException(status_code=404, detail="Document not found")
         if row:
             link_data = (
@@ -984,8 +995,6 @@ async def get_doc_by_kind_and_string_id(
             if slug != kind_slug:
                 continue
 
-            if not external_doc_type_allowed(allowed_doc_types, type_code):
-                continue
             id_col = getattr(model, id_col_name)
             if id_col_name == "id":
                 try:
@@ -994,16 +1003,22 @@ async def get_doc_by_kind_and_string_id(
                     continue
             else:
                 id_filter = id_col == doc_id_str
-            typed_query = select(model).where(
+            unfiltered = select(model).where(
                 model.project_id == project.id,
                 id_filter,
             )
-            typed_query = apply_external_visibility_filter(typed_query, model, current_user)
+            if not external_doc_type_allowed(allowed_doc_types, type_code):
+                await mark_refused_if_found(db, unfiltered)
+                continue
+            typed_query = apply_external_visibility_filter(unfiltered, model, current_user)
             result = await db.execute(typed_query)
             row = result.scalar_one_or_none()
+            if row is None:
+                await mark_refused_if_found(db, unfiltered)
             if row and not await holds(
                 db, current_user, project.id, "view", _resolved_doc_type(type_code, row)
             ):
+                mark_refused()
                 continue
             if row:
                 doc_id_val = getattr(row, id_col_name)

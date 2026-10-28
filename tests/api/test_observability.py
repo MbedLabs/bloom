@@ -76,7 +76,7 @@ def test_each_request_leaves_one_api_request_event():
     assert (second.details["route"], second.details["status"], second.outcome) == (
         "unmatched",
         404,
-        "failure",
+        "denied",
     )
     assert missing.status_code == 404
 

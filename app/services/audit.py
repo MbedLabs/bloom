@@ -8,6 +8,7 @@ security.repeated_refusals event.
 
 from __future__ import annotations
 
+import hashlib
 import inspect
 import logging
 import re
@@ -16,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 from urllib.parse import parse_qsl
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -157,9 +158,10 @@ async def record_audit_failure(db: AsyncSession, action: str, **fields: Any) -> 
         logger.exception("Audit event %s could not be recorded", action)
 
 
-def request_outcome(status_code: int, refused: bool = False) -> str:
-    """success below 400; denied for 401, 403, 429 and a 404 that hid something; else failure."""
-    if status_code in DENIED_STATUSES or (status_code == 404 and refused):
+def request_outcome(status_code: int, refused: bool = False, anonymous: bool = False) -> str:
+    """success below 400; denied for 401, 403, 429, a 404 that hid something and a 404 to an
+    anonymous caller; else failure."""
+    if status_code in DENIED_STATUSES or (status_code == 404 and (refused or anonymous)):
         return "denied"
     if status_code >= 400:
         return "failure"
@@ -244,9 +246,16 @@ async def _open_session(scope: dict):
     return session, _close
 
 
+def refusal_lock_key(ip: str) -> int:
+    """The signed 64-bit advisory lock key of an address's repeated refusal check."""
+    digest = hashlib.sha256(f"{REPEATED_REFUSALS_ACTION}:{ip}".encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big", signed=True)
+
+
 async def _note_repeated_refusals(session: AsyncSession, ip: str, actor: dict) -> None:
     """Add one security.repeated_refusals event when the address reached the threshold of
-    denied requests within the window and has none inside the window yet."""
+    denied requests within the window and has none inside the window yet; on PostgreSQL the
+    check and the insert hold a transaction-scoped advisory lock on the address."""
     from app.core.config import settings
 
     window = settings.AUDIT_REFUSAL_WINDOW_MINUTES
@@ -261,6 +270,10 @@ async def _note_repeated_refusals(session: AsyncSession, ip: str, actor: dict) -
     )
     if (count or 0) < settings.AUDIT_REFUSAL_THRESHOLD:
         return
+    if session.get_bind().dialect.name == "postgresql":
+        await session.execute(
+            text("SELECT pg_advisory_xact_lock(:key)"), {"key": refusal_lock_key(ip)}
+        )
     already = await session.scalar(
         select(AuditEvent.id)
         .where(
@@ -271,6 +284,7 @@ async def _note_repeated_refusals(session: AsyncSession, ip: str, actor: dict) -
         .limit(1)
     )
     if already is not None:
+        await session.rollback()
         return
     session.add(
         build_audit_event(
@@ -324,7 +338,7 @@ async def record_request_event(
             details["service_credential_id"] = request.service_credential_id
     if status_code == 201:
         details.update(_created(created_body))
-    outcome = request_outcome(status_code, refused)
+    outcome = request_outcome(status_code, refused, actor["actor_type"] == "anonymous")
     event = build_audit_event(
         REQUEST_ACTION,
         target_type=target_type,

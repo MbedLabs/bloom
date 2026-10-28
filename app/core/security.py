@@ -67,7 +67,8 @@ async def get_current_user(
     db: AsyncSession = Depends(get_db, scope="function"),
 ) -> User:
     """Return the active user of the bearer token. A token minted before the user's session_version
-    changed (password change or reset, confirmed email change) is rejected.
+    changed (password change or reset, confirmed email change) is rejected. A deactivated user's
+    valid token is refused with 403 and that user named as the request's actor.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -96,11 +97,11 @@ async def get_current_user(
     if "cli_refresh_id" in payload and not await is_cli_access_token_active(db, payload, user.id):
         raise credentials_exception
 
+    set_audit_actor("user", user.id, client="cli" if "cli_refresh_id" in payload else "web")
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="User account is deactivated"
         )
-    set_audit_actor("user", user.id, client="cli" if "cli_refresh_id" in payload else "web")
     user.access_map = await _access_map(db, user)
     user.application_permissions = as_lists(await effective_permissions(db, user, None))
     return user

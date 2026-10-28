@@ -37,7 +37,7 @@ from app.models import (
 )
 from app.models.user import User, UserRole
 from app.services import attachment_storage, object_store
-from app.services.audit import record_audit_event
+from app.services.audit import mark_refused, record_audit_event
 from app.services.document_workflow import (
     artefact_identity,
     capture_revision,
@@ -133,6 +133,7 @@ async def visible_artefact(db, slug, identifier, user, action="view", lock=False
         db, type(row), row.id, "Artefact not found", user, permission=(action, code)
     )
     if not await row_allows(db, user, row, "view", code):
+        mark_refused()
         raise HTTPException(status_code=404, detail="Artefact not found")
     if lock:
         row = await db.scalar(select(type(row)).where(type(row).id == row.id).with_for_update())
@@ -923,6 +924,8 @@ async def _visible_revision(db, slug, identifier, number, user):
         else None
     )
     if not revision or not await _revision_visible(db, row, revision, user):
+        if revision:
+            mark_refused()
         raise HTTPException(status_code=404, detail="Revision not found")
     return row, revision
 

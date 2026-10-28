@@ -20,8 +20,8 @@ class AuditEvent(Base):
     artefact. and the others). target_type and target_id name the object; for api.request
     the last path parameter ending in _id. project_id is the project acted in. request_id is
     the x-request-id response header, ip the client address, user_agent the client's
-    User-Agent. outcome is success, failure, ignored or denied (401, 403, 429 and a 404 for
-    something the actor may not see). details of an api.request hold the method, route
+    User-Agent. outcome is success, failure, ignored or denied (401, 403, 429, a 404 for
+    something the actor may not see and a 404 to an anonymous caller). details of an api.request hold the method, route
     template, path, status, duration_ms, query parameter names, the credential kind
     presented (bearer or none), the client kind of a user token (cli or web), the service
     credential id, and the id and document ID of a created object. No password, token,

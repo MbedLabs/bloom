@@ -1,19 +1,31 @@
 """Every HTTP request leaves one api.request audit event with its actor, client, route, status
 and outcome; refused attempts are denied, and repeated refusals from one address are detected."""
 
+import asyncio
 import gzip
 import json
 import re
 from datetime import datetime, timedelta
 
 import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import update
 from sqlalchemy.exc import OperationalError
 
 from app.core.config import settings
 from app.core.deps import limiter
 from app.core.observability import CREATED_BODY_LIMIT, CreatedBody
 from app.core.security import create_access_token
-from app.models import AuditEvent, DesignItem, Project, UserToken, UserTokenPurpose
+from app.main import app
+from app.models import (
+    AuditEvent,
+    DesignItem,
+    Notification,
+    Project,
+    User,
+    UserToken,
+    UserTokenPurpose,
+)
 from app.models.user import UserRole
 from app.services import audit as audit_service
 from app.services.audit import request_outcome, route_template
@@ -391,3 +403,125 @@ def test_the_actor_set_by_a_dependency_reaches_the_middleware(harness):
 
     event = _one(session_maker, response, route="/api/auth/me")
     assert (event.actor_type, event.actor_user_id) == ("user", member.id)
+
+
+def test_a_cors_preflight_is_answered_and_recorded(harness):
+    client, session_maker = harness
+    origin = settings.CORS_ORIGINS[0]
+
+    response = client.options(
+        "/api/projects",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "Authorization",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == origin
+    assert response.headers["x-request-id"]
+    event = _one(session_maker, response, method="OPTIONS", status=200)
+    assert event.outcome == "success"
+    assert event.actor_type == "anonymous"
+
+
+def test_a_cors_answer_keeps_its_headers_with_the_request_id(harness):
+    client, session_maker = harness
+    origin = settings.CORS_ORIGINS[0]
+
+    response = client.get("/api/health", headers={"Origin": origin})
+
+    assert response.headers["access-control-allow-origin"] == origin
+    assert response.headers["x-request-id"]
+    assert _one(session_maker, response, route="/api/health").outcome == "success"
+
+
+@pytest.fixture
+def exploding_route(harness):
+    """A route on the application that raises an unhandled error, on the harness database."""
+    path = "/api/__audit_boom__"
+
+    @app.get(path)
+    async def _boom():
+        raise RuntimeError("audit boom")
+
+    yield path
+    app.router.routes = [r for r in app.router.routes if getattr(r, "path", None) != path]
+
+
+def test_an_unhandled_error_leaves_a_failure_event_with_status_500(harness, exploding_route):
+    _, session_maker = harness
+    client = TestClient(app, base_url="http://test", raise_server_exceptions=False)
+
+    response = client.get(exploding_route)
+
+    assert response.status_code == 500
+    [event] = _requests(session_maker, route=exploding_route, status=500, method="GET")
+    assert event.outcome == "failure"
+    assert event.request_id
+    assert "audit boom" not in json.dumps(event.details)
+
+
+def test_a_deactivated_account_is_denied_and_named(harness):
+    client, session_maker = harness
+    user = _user(session_maker, "former@example.com")
+    token = create_access_token({"sub": str(user.id), "type": "user", "ver": user.session_version})
+
+    async def _deactivate():
+        async with session_maker() as session:
+            await session.execute(update(User).where(User.id == user.id).values(is_active=False))
+            await session.commit()
+
+    asyncio.run(_deactivate())
+    response = client.get("/api/projects", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 403
+    event = _one(session_maker, response)
+    assert (event.actor_type, event.actor_user_id, event.outcome) == ("user", user.id, "denied")
+
+
+def test_another_users_notification_is_a_denied_404(harness):
+    client, session_maker = harness
+    owner = _user(session_maker, "owner@example.com")
+    _user(session_maker, "other@example.com")
+    [notification] = _add(
+        session_maker,
+        Notification(user_id=owner.id, event_type="comment", title="For the owner only"),
+    )
+    other = _login(client, "other@example.com")
+
+    hidden = client.post(f"/api/notifications/{notification.id}/read", headers=other)
+    missing = client.post("/api/notifications/999999/read", headers=other)
+
+    assert (hidden.status_code, missing.status_code) == (404, 404)
+    assert _one(session_maker, hidden).outcome == "denied"
+    assert _one(session_maker, missing).outcome == "failure"
+
+
+def test_a_404_is_denied_to_an_anonymous_caller_and_a_failure_to_a_signed_in_user(harness):
+    client, session_maker = harness
+    _user(session_maker, "member@example.com")
+    member = _login(client, "member@example.com")
+
+    scanned = client.get("/api/.env")
+    unknown_route = client.get("/api/no-such-thing", headers=member)
+    missing_row = client.get("/api/designs/999999", headers=member)
+
+    assert [r.status_code for r in (scanned, unknown_route, missing_row)] == [404, 404, 404]
+    scan = _one(session_maker, scanned)
+    assert (scan.actor_type, scan.outcome, scan.details["route"]) == (
+        "anonymous",
+        "denied",
+        "unmatched",
+    )
+    unchecked = _one(session_maker, unknown_route)
+    assert (unchecked.actor_type, unchecked.details["auth"], unchecked.outcome) == (
+        "anonymous",
+        "bearer",
+        "denied",
+    )
+    signed_in = _one(session_maker, missing_row)
+    assert (signed_in.actor_type, signed_in.outcome) == ("user", "failure")
+    assert request_outcome(404, anonymous=True) == "denied"
+    assert request_outcome(404) == "failure"
