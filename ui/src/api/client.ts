@@ -607,11 +607,14 @@ export interface AuditFilters {
   sort?: 'occurred_at' | 'actor' | 'action' | 'target' | 'outcome' | 'ip' | 'request_id'
   dir?: 'asc' | 'desc'
   actor_user_id?: number
+  actor_type?: string
   action?: string
   target_type?: string
   target_id?: string
   project_id?: number
   outcome?: string
+  ip?: string
+  request_id?: string
   since?: string
   until?: string
   limit?: number
