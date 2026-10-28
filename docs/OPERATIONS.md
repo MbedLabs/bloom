@@ -243,7 +243,15 @@ Security-relevant events are also written as events of their own in the same tra
 
 Administrators read the log under Audit log in the sidebar, or with `GET /api/audit` (filters: `actor_user_id`, `actor_type`, `action` or an action prefix ending in `.` such as `api.`, `target_type`, `target_id`, `project_id`, `outcome`, `ip`, `request_id`, `status` (the HTTP status of an `api.request` event), `since`, `until`, `limit`, `offset`). No endpoint changes or deletes an event.
 
-The client address is the one the image's own nginx received. Behind another reverse proxy (Cloudron, a load balancer) it is that proxy's address.
+The client address is the one the image's own nginx received, unless `TRUSTED_PROXY_NETWORKS` names the reverse proxy in front of it. `TRUSTED_PROXY_NETWORKS` is a JSON array of addresses or networks in CIDR notation and is empty by default: no `X-Forwarded-For` header is read, and behind a reverse proxy (Cloudron, an ingress, a load balancer) every request has that proxy's address. When the address that reached the image's nginx lies in a listed network, the client address is the right-most `X-Forwarded-For` entry outside the listed networks, so the proxy must put the address it received as the right-most `X-Forwarded-For` entry (in nginx, `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`). A header sent from any other address is ignored, so a caller cannot choose the address recorded for it. Every audit event and the repeated refusal check use this address; the rate limits keep counting by the address that reached the image's nginx. An entry that is not an address or network stops Bloom at startup. Leave uvicorn's own `FORWARDED_ALLOW_IPS` variable unset in the image: uvicorn then trusts only the image's nginx on `127.0.0.1`.
+
+Example, a reverse proxy on a private network in front of the image:
+
+```
+TRUSTED_PROXY_NETWORKS=["10.0.0.0/8"]
+```
+
+List only networks from which nothing but your proxies reaches the image. On Cloudron the variable is set with `cloudron env set`.
 
 Access requests are emailed to every active administrator through the transactional mail settings above; without SMTP the request is still recorded and shown under Access, Requests and on the project's members page, and the user is told the email could not be sent.
 

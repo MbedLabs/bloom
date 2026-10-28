@@ -3,6 +3,7 @@ request's audit event."""
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import logging
 import sys
@@ -11,7 +12,8 @@ import uuid
 import zlib
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Any, Optional
+from functools import lru_cache
+from typing import Any, Optional, Union
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
@@ -145,6 +147,65 @@ def _created_body(message: dict) -> Optional[CreatedBody]:
     return CreatedBody(gzipped=encoding == b"gzip")
 
 
+IPAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+IPNetwork = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
+
+
+@lru_cache(maxsize=8)
+def _networks(entries: tuple[str, ...]) -> tuple[IPNetwork, ...]:
+    """The trusted proxy networks named by the setting's entries."""
+    return tuple(ipaddress.ip_network(entry.strip(), strict=False) for entry in entries)
+
+
+def _address(value: str) -> Optional[IPAddress]:
+    """The IP address of a peer or X-Forwarded-For entry, without a port; an IPv4-mapped
+    IPv6 address as IPv4; None when the value is not an address."""
+    value = value.strip()
+    if value.startswith("["):
+        value = value[1 : value.find("]")] if "]" in value else ""
+    elif value.count(":") == 1:
+        value = value.split(":", 1)[0]
+    try:
+        address = ipaddress.ip_address(value)
+    except ValueError:
+        return None
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+        return address.ipv4_mapped
+    return address
+
+
+def _trusted(address: Optional[IPAddress], networks: tuple[IPNetwork, ...]) -> bool:
+    """Whether the address lies in one of the trusted proxy networks."""
+    return address is not None and any(address in network for network in networks)
+
+
+def client_address(scope) -> Optional[str]:
+    """The client address of a request: the direct peer, or, when the peer is in
+    TRUSTED_PROXY_NETWORKS, the right-most X-Forwarded-For entry outside those networks.
+    An entry that is not an address ends the walk at the last trusted hop."""
+    from app.core.config import settings
+
+    client = scope.get("client")
+    peer = client[0] if client else None
+    networks = _networks(tuple(settings.TRUSTED_PROXY_NETWORKS))
+    if peer is None or not networks or not _trusted(_address(peer), networks):
+        return peer
+    forwarded = ",".join(
+        value.decode("latin-1")
+        for name, value in scope.get("headers", [])
+        if name.lower() == b"x-forwarded-for"
+    )
+    resolved = peer
+    for entry in reversed(forwarded.split(",") if forwarded else []):
+        address = _address(entry)
+        if address is None:
+            break
+        resolved = str(address)
+        if not _trusted(address, networks):
+            break
+    return resolved
+
+
 class RequestObservabilityMiddleware:
     """Pure ASGI middleware: request id, access log, metrics and one audit event per request,
     written when the response is finished."""
@@ -161,8 +222,7 @@ class RequestObservabilityMiddleware:
         incoming = headers.get("x-request-id", b"").decode("latin-1").strip()
         request_id = incoming[:64] if incoming else uuid.uuid4().hex
         token = request_id_var.set(request_id)
-        client = scope.get("client")
-        ip_token = client_ip_var.set(client[0] if client else None)
+        ip_token = client_ip_var.set(client_address(scope))
         agent = headers.get("user-agent", b"").decode("latin-1")
         agent_token = user_agent_var.set(agent or None)
         audit_token = request_audit_var.set(RequestAudit())

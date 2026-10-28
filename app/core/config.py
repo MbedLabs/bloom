@@ -1,5 +1,6 @@
 """Application configuration."""
 
+import ipaddress
 import os
 from functools import lru_cache
 from pathlib import Path
@@ -25,6 +26,8 @@ class Settings(BaseSettings):
     APP_BASE_URL. CORS allows the listed origins only, API docs are off unless enabled, and the
     ReqIF request and member limits stay at or below 25 MiB. ALLOWED_ATTACHMENT_MIME_TYPES admits
     SVG; attachments are served for download only (Content-Disposition: attachment).
+    TRUSTED_PROXY_NETWORKS lists the reverse proxies whose X-Forwarded-For header gives the
+    client address of audit events; empty, no header is read.
     """
 
     model_config = SettingsConfigDict(
@@ -136,6 +139,10 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices(
             "BLOOM_AUDIT_REFUSAL_WINDOW_MINUTES", "AUDIT_REFUSAL_WINDOW_MINUTES"
         ),
+    )
+    TRUSTED_PROXY_NETWORKS: List[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("BLOOM_TRUSTED_PROXY_NETWORKS", "TRUSTED_PROXY_NETWORKS"),
     )
 
     RUN_STARTUP_DATA_REPAIR: bool | None = Field(
@@ -445,6 +452,13 @@ class Settings(BaseSettings):
         if len(self.ADMIN_PASSWORD) < 16:
             raise ValueError("ADMIN_PASSWORD must be at least 16 characters long in production.")
         return self
+
+    @field_validator("TRUSTED_PROXY_NETWORKS")
+    @classmethod
+    def trusted_proxy_networks_are_networks(cls, v: List[str]) -> List[str]:
+        """Each entry is an IPv4 or IPv6 address or network in CIDR notation, kept in its
+        normalised network form."""
+        return [str(ipaddress.ip_network(entry.strip(), strict=False)) for entry in v]
 
     @field_validator("SECRET_KEY")
     @classmethod
