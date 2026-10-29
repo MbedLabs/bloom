@@ -531,7 +531,7 @@ async def list_all_docs(
     dir: str = Query("desc", pattern="^(asc|desc)$"),
     related_to: Optional[str] = Query(
         None,
-        description="Only documents sharing a relationship with this document id (e.g. FLT-REQ-001).",
+        description="Only documents sharing a relationship with this document id (e.g. PRJ-REQ-001).",
     ),
     keys: Optional[List[str]] = Query(
         None,
