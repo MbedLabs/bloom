@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     ReqIF request and member limits stay at or below 25 MiB. ALLOWED_ATTACHMENT_MIME_TYPES admits
     SVG; attachments are served for download only (Content-Disposition: attachment).
     TRUSTED_PROXY_NETWORKS lists the reverse proxies whose X-Forwarded-For header gives the
-    client address of audit events; empty, no header is read.
+    client address of audit events and rate limits; empty, no header is read.
     """
 
     model_config = SettingsConfigDict(

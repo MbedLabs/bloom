@@ -1,13 +1,16 @@
-"""The client address of audit events behind a reverse proxy: X-Forwarded-For is read only
-when the request comes from a network in TRUSTED_PROXY_NETWORKS, through the image's chain of
-an outer proxy, the image's nginx and uvicorn."""
+"""The client address of audit events and rate limits behind a reverse proxy: X-Forwarded-For
+is read only when the request comes from a network in TRUSTED_PROXY_NETWORKS, through the image's
+chain of an outer proxy, the image's nginx and uvicorn."""
 
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
+from slowapi.util import get_remote_address
+from starlette.requests import Request
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.core.config import Settings, settings
+from app.core.deps import limiter, rate_limit_key
 from app.core.observability import client_address
 from app.main import app
 from tests.sec.test_audit_log_http import _events, harness  # noqa: F401
@@ -117,6 +120,72 @@ def test_without_trusted_proxies_refusals_are_counted_by_the_proxy(harness, monk
     assert detected.details["address"] == PROXY
 
 
+LOGIN_LIMIT = 10
+WRONG_LOGIN = {"email": "nobody@example.com", "password": "Wrong-1234"}
+
+
+@pytest.fixture
+def rate_limited(monkeypatch):
+    """The rate limiter enabled with empty counters, reset again afterwards."""
+    limiter.reset()
+    monkeypatch.setattr(limiter, "enabled", True)
+    yield
+    limiter.reset()
+
+
+def _login(client, received_from, forwarded=None):
+    """The status of one failed sign-in through the image's nginx from the given address."""
+    chain = f"{forwarded}, {received_from}" if forwarded else received_from
+    return client.post(
+        "/api/auth/login", json=WRONG_LOGIN, headers={"X-Forwarded-For": chain}
+    ).status_code
+
+
+def test_callers_behind_a_trusted_proxy_each_have_their_own_login_limit(
+    harness, trusted_proxy, rate_limited
+):
+    client = _image_client()
+
+    caller = [_login(client, PROXY, CALLER) for _ in range(LOGIN_LIMIT + 1)]
+    other = [_login(client, PROXY, OTHER_CALLER) for _ in range(LOGIN_LIMIT + 1)]
+
+    assert caller == [401] * LOGIN_LIMIT + [429]
+    assert other == [401] * LOGIN_LIMIT + [429]
+
+
+def test_a_forged_header_from_an_untrusted_sender_does_not_escape_the_login_limit(
+    harness, trusted_proxy, rate_limited
+):
+    client = _image_client()
+    direct = TestClient(app, base_url="http://test", client=(OUTSIDER, 50000))
+    forged = [f"198.51.100.{n}" for n in range(LOGIN_LIMIT + 1)]
+
+    through_nginx = [_login(client, OUTSIDER, address) for address in forged[:4]]
+    posing = [_login(client, OUTSIDER, f"{address}, 10.0.0.3") for address in forged[4:8]]
+    straight = [
+        direct.post(
+            "/api/auth/login", json=WRONG_LOGIN, headers={"X-Forwarded-For": address}
+        ).status_code
+        for address in forged[8:]
+    ]
+
+    assert through_nginx + posing + straight == [401] * LOGIN_LIMIT + [429]
+
+
+def test_without_trusted_proxies_callers_behind_a_proxy_share_the_login_limit(
+    harness, rate_limited
+):
+    assert settings.TRUSTED_PROXY_NETWORKS == []
+    client = _image_client()
+
+    shared = [_login(client, PROXY, CALLER) for _ in range(LOGIN_LIMIT)]
+    shared.append(_login(client, PROXY, OTHER_CALLER))
+    elsewhere = _login(client, OUTSIDER)
+
+    assert shared == [401] * LOGIN_LIMIT + [429]
+    assert elsewhere == 401
+
+
 def _scope(peer, *forwarded):
     """An HTTP scope from the peer with one X-Forwarded-For header per value."""
     return {
@@ -147,6 +216,35 @@ def test_the_client_address_is_the_right_most_untrusted_hop(monkeypatch, scope, 
     monkeypatch.setattr(settings, "TRUSTED_PROXY_NETWORKS", [PROXY_NETWORK])
 
     assert client_address(scope) == expected
+
+
+@pytest.mark.parametrize(
+    "scope",
+    [
+        _scope(PROXY, CALLER),
+        _scope(OUTSIDER, FORGED),
+        _scope("testclient"),
+        _scope(None, CALLER),
+    ],
+)
+def test_the_empty_default_keys_rate_limits_on_the_direct_peer(scope):
+    assert settings.TRUSTED_PROXY_NETWORKS == []
+
+    assert rate_limit_key(Request(scope)) == get_remote_address(Request(scope))
+
+
+@pytest.mark.parametrize(
+    ("scope", "expected"),
+    [
+        (_scope(PROXY, f"{FORGED}, {CALLER}"), CALLER),
+        (_scope(OUTSIDER, CALLER), OUTSIDER),
+        (_scope(None, CALLER), "127.0.0.1"),
+    ],
+)
+def test_rate_limits_are_keyed_on_the_resolved_client_address(monkeypatch, scope, expected):
+    monkeypatch.setattr(settings, "TRUSTED_PROXY_NETWORKS", [PROXY_NETWORK])
+
+    assert rate_limit_key(Request(scope)) == expected
 
 
 def test_the_setting_reads_a_json_array_of_networks(monkeypatch):
