@@ -900,8 +900,6 @@ async def test_approved_correction_reapproves_without_advancing_numbers(
         path + "/workflow/assignees", json={"reviewer_id": 2, "approver_id": 3}
     )
     assert response.status_code == 200, response.text
-    response = await client.post(path + "/requests", json={"kind": "review"})
-    assert response.status_code == 403, response.text
     current[0] = users[0]
     response = await client.post(path + "/requests", json={"kind": "review"})
     assert response.status_code == 201, response.text
@@ -1081,10 +1079,9 @@ async def test_the_assignee_is_handed_over_and_requests_review(workflow_http):
     handed = await client.put(path + "/workflow/assignees", json={"assignee_id": 2})
     assert handed.status_code == 200, handed.text
     assert handed.json()["assignee"]["id"] == 2
-    assert handed.json()["actions"]["request_review"] is False
+    assert handed.json()["actions"]["request_review"] is True
     notice = (await db.scalars(select(Notification).where(Notification.user_id == 2))).one()
     assert notice.link_path == "/projects/PRJ/docs/requirements/PRJ-REQ-901"
-    assert (await client.post(path + "/requests", json={"kind": "review"})).status_code == 403
 
     current[0] = users[1]
     requested = await client.post(path + "/requests", json={"kind": "review"})
@@ -1449,3 +1446,68 @@ async def test_a_separate_assignee_resolves_a_thread(workflow_http):
     resolved = await client.post(f"{path}/{thread}/resolve")
     assert resolved.status_code == 200, resolved.text
     assert resolved.json()["resolved_by"]["id"] == 4
+
+
+async def test_an_administrator_requests_review_and_declines_under_his_own_name(workflow_http):
+    from app.models import ArtefactRequest, ArtefactRequestRecipient
+
+    db, client, current, users = workflow_http
+    row = Requirement(
+        project_id=1,
+        req_id="PRJ-REQ-950",
+        title="Handed over",
+        status="Draft",
+        created_by_id=2,
+        reviewer_id=3,
+        approver_id=4,
+    )
+    db.add(row)
+    await db.flush()
+    path = f"/api/artefacts/requirement/{row.id}"
+    state = (await client.get(path + "/workflow")).json()
+    assert state["assignee"]["id"] == 2
+    assert state["actions"]["request_review"] is True
+
+    requested = await client.post(path + "/requests", json={"kind": "review"})
+    assert requested.status_code == 201, requested.text
+    request_id = requested.json()["id"]
+    assert (await db.get(ArtefactRequest, request_id)).requester_id == 1
+    recipients = (await db.scalars(select(ArtefactRequestRecipient.user_id))).all()
+    assert recipients == [3]
+    assert (await client.get(path + "/workflow")).json()["actions"]["decline"] is True
+
+    declined = await client.post(f"/api/artefact-requests/{request_id}/decline")
+    assert declined.status_code == 200, declined.text
+    assert row.status == "Draft"
+    assert (await db.get(ArtefactRequest, request_id)).decided_by_id == 1
+    events = (
+        await db.scalars(
+            select(AuditEvent).where(AuditEvent.action.like("workflow.%")).order_by(AuditEvent.id)
+        )
+    ).all()
+    assert [(event.action, event.actor_user_id) for event in events] == [
+        ("workflow.requested", 1),
+        ("workflow.declined", 1),
+    ]
+
+    again = await client.post(path + "/requests", json={"kind": "review"})
+    assert again.status_code == 200, again.text
+    current[0] = users[1]
+    review = await client.post(path + "/requests", json={"kind": "review"})
+    assert review.status_code == 201, review.text
+    current[0] = users[2]
+    assert (await client.post(path + "/comments", json={"body": "Reviewed"})).status_code == 201
+    approval = await client.post(path + "/requests", json={"kind": "approval"})
+    assert approval.status_code == 201, approval.text
+
+    current[0] = users[0]
+    state = (await client.get(path + "/workflow")).json()
+    assert state["actions"]["approve"] is False
+    assert state["actions"]["decline"] is True
+    signed = await client.post(path + "/sign-off", json={"step": "approve"})
+    assert signed.status_code == 403, signed.text
+    current[0] = users[3]
+    approved = await client.post(path + "/sign-off", json={"step": "approve"})
+    assert approved.status_code == 200, approved.text
+    assert row.reviewed_by_id == 3
+    assert row.approved_by_id == 4

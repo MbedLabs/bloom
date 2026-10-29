@@ -921,6 +921,83 @@ async def get_next_doc_id(
     return NextDocIdResponse(next_id=next_id)
 
 
+async def _reference_query(db: AsyncSession, model, id_col, project_id: int, ref: str, *conditions):
+    """The unfiltered query for one item of a kind in a project by its document ID, or by its
+    database id when the reference is a number that no item of that kind has as document ID."""
+    base = select(model).where(model.project_id == project_id, *conditions)
+    by_doc_id = base.where(id_col == ref)
+    if ref.isdigit():
+        found = (await db.execute(by_doc_id.with_only_columns(model.id))).first()
+        if found is None:
+            return base.where(model.id == int(ref))
+    return by_doc_id
+
+
+async def find_visible_doc(
+    db: AsyncSession,
+    current_user: User,
+    project: Project,
+    kind_slug: str,
+    ref: str,
+    *,
+    record_refusals: bool = True,
+):
+    """The item of a kind slug in a project that the user may see, by document ID or database
+    id, as (model, row, resolved type code, document ID column), or None.
+
+    With record_refusals, a hidden item marks the request as a refusal for the audit log.
+    """
+    kind_slug = LEGACY_TYPE_SLUG_ALIASES.get(kind_slug, kind_slug)
+
+    async def refused_if_found(query) -> None:
+        if record_refusals:
+            await mark_refused_if_found(db, query)
+
+    allowed_doc_types = await get_external_doc_types(db, current_user, project.id)
+    if kind_slug not in {slug for _, (_, _, slug) in TYPE_MAP.items()}:
+        requested_kind = document_kind_from_slug(kind_slug)
+        if requested_kind not in CANONICAL_DOCUMENT_KINDS:
+            return None
+        unfiltered = await _reference_query(
+            db, Document, Document.doc_id, project.id, ref, Document.doc_type == requested_kind
+        )
+        if not external_doc_type_allowed(allowed_doc_types, requested_kind):
+            await refused_if_found(unfiltered)
+            return None
+        row = (
+            await db.execute(apply_external_visibility_filter(unfiltered, Document, current_user))
+        ).scalar_one_or_none()
+        if row is None:
+            await refused_if_found(unfiltered)
+            return None
+        if not await holds(db, current_user, project.id, "view", requested_kind):
+            if record_refusals:
+                mark_refused()
+            return None
+        return Document, row, requested_kind, "doc_id"
+
+    for type_code, (model, id_col_name, slug) in TYPE_MAP.items():
+        if slug != kind_slug:
+            continue
+        unfiltered = await _reference_query(db, model, getattr(model, id_col_name), project.id, ref)
+        if not external_doc_type_allowed(allowed_doc_types, type_code):
+            await refused_if_found(unfiltered)
+            continue
+        row = (
+            await db.execute(apply_external_visibility_filter(unfiltered, model, current_user))
+        ).scalar_one_or_none()
+        if row is None:
+            await refused_if_found(unfiltered)
+            continue
+        resolved_type = _resolved_doc_type(type_code, row)
+        if not await holds(db, current_user, project.id, "view", resolved_type):
+            if record_refusals:
+                mark_refused()
+            continue
+        return model, row, resolved_type, id_col_name
+    return None
+
+
 @router.get(
     "/projects/{project_ref}/docs/{kind_slug}/{doc_id_str}",
     response_model=DocDetailFacadeResponse,
@@ -933,134 +1010,45 @@ async def get_doc_by_kind_and_string_id(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    """Look up a doc by its kind-aware slug and human-readable string ID."""
+    """Look up a doc by its kind-aware slug and its document ID, or its database id."""
     project = await resolve_project(db, project_ref)
     await require_project_access(db, current_user, project.id)
-    kind_slug = LEGACY_TYPE_SLUG_ALIASES.get(kind_slug, kind_slug)
-    requested_kind = None
-    if kind_slug not in {slug for _, (_, _, slug) in TYPE_MAP.items()}:
-        requested_kind = document_kind_from_slug(kind_slug)
-
-    allowed_doc_types = await get_external_doc_types(db, current_user, project.id)
-
-    if requested_kind in CANONICAL_DOCUMENT_KINDS:
-        unfiltered = select(Document).where(
-            Document.project_id == project.id,
-            Document.doc_type == requested_kind,
-            Document.doc_id == doc_id_str,
+    found = await find_visible_doc(db, current_user, project, kind_slug, doc_id_str)
+    if found is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Document '{doc_id_str}' with kind '{kind_slug}' "
+                f"not found in project '{project.prefix}'"
+            ),
         )
-        if not external_doc_type_allowed(allowed_doc_types, requested_kind):
-            await mark_refused_if_found(db, unfiltered)
-            raise HTTPException(status_code=404, detail="Document not found")
-        document_query = apply_external_visibility_filter(unfiltered, Document, current_user)
-        result = await db.execute(document_query)
-        row = result.scalar_one_or_none()
-        if row is None:
-            await mark_refused_if_found(db, unfiltered)
-        if row and not await holds(db, current_user, project.id, "view", requested_kind):
-            mark_refused()
-            raise HTTPException(status_code=404, detail="Document not found")
-        if row:
-            link_data = (
-                await _count_links(
-                    db,
-                    project.id,
-                    requested_kind,
-                    [row.id],
-                    await visible_types(db, current_user, project.id),
-                )
-            ).get(row.id, {"incoming": 0, "outgoing": 0, "suspect": 0})
-            return DocDetailFacadeResponse(
-                id=row.id,
-                doc_id=row.doc_id,
-                doc_type=requested_kind,
-                title=row.title,
-                status=await current_status(db, row),
-                visibility=row.visibility,
-                priority=_get_priority(Document, row),
-                project_id=project.id,
-                reviewer_id=_get_reviewer_id(Document, row),
-                incoming_links=link_data["incoming"],
-                outgoing_links=link_data["outgoing"],
-                suspect_links=link_data["suspect"],
-                description=row.description,
-                content_json=row.content_json,
-                content_html=row.content_html,
-                created_at=row.created_at,
-                updated_at=row.updated_at,
-                allowed_actions=await allowed_actions(db, current_user, row, requested_kind),
-            )
-    else:
-        for type_code, (model, id_col_name, slug) in TYPE_MAP.items():
-            if slug != kind_slug:
-                continue
-
-            id_col = getattr(model, id_col_name)
-            if id_col_name == "id":
-                try:
-                    id_filter = model.id == int(doc_id_str)
-                except ValueError:
-                    continue
-            else:
-                id_filter = id_col == doc_id_str
-            unfiltered = select(model).where(
-                model.project_id == project.id,
-                id_filter,
-            )
-            if not external_doc_type_allowed(allowed_doc_types, type_code):
-                await mark_refused_if_found(db, unfiltered)
-                continue
-            typed_query = apply_external_visibility_filter(unfiltered, model, current_user)
-            result = await db.execute(typed_query)
-            row = result.scalar_one_or_none()
-            if row is None:
-                await mark_refused_if_found(db, unfiltered)
-            if row and not await holds(
-                db, current_user, project.id, "view", _resolved_doc_type(type_code, row)
-            ):
-                mark_refused()
-                continue
-            if row:
-                doc_id_val = getattr(row, id_col_name)
-                title_val = row.title if hasattr(row, "title") else row.name
-                desc_val = row.description if hasattr(row, "description") else None
-                cj = row.content_json if hasattr(row, "content_json") else None
-                ch = row.content_html if hasattr(row, "content_html") else None
-                resolved_type = _resolved_doc_type(type_code, row)
-                lc = await _count_links(
-                    db,
-                    project.id,
-                    resolved_type,
-                    [row.id],
-                    await visible_types(db, current_user, project.id),
-                )
-                link_data = lc.get(row.id, {"incoming": 0, "outgoing": 0, "suspect": 0})
-
-                return DocDetailFacadeResponse(
-                    id=row.id,
-                    doc_id=str(doc_id_val),
-                    doc_type=resolved_type,
-                    title=title_val,
-                    status=await current_status(db, row),
-                    visibility=getattr(row, "visibility", ArtefactVisibility.internal.value),
-                    priority=_get_priority(model, row),
-                    project_id=project.id,
-                    reviewer_id=_get_reviewer_id(model, row),
-                    incoming_links=link_data["incoming"],
-                    outgoing_links=link_data["outgoing"],
-                    suspect_links=link_data["suspect"],
-                    description=desc_val,
-                    content_json=cj,
-                    content_html=ch,
-                    created_at=row.created_at,
-                    updated_at=row.updated_at,
-                    allowed_actions=await allowed_actions(db, current_user, row, resolved_type),
-                )
-
-    raise HTTPException(
-        status_code=404,
-        detail=(
-            f"Document '{doc_id_str}' with kind '{kind_slug}' "
-            f"not found in project '{project.prefix}'"
-        ),
+    model, row, resolved_type, id_col_name = found
+    link_data = (
+        await _count_links(
+            db,
+            project.id,
+            resolved_type,
+            [row.id],
+            await visible_types(db, current_user, project.id),
+        )
+    ).get(row.id, {"incoming": 0, "outgoing": 0, "suspect": 0})
+    return DocDetailFacadeResponse(
+        id=row.id,
+        doc_id=str(getattr(row, id_col_name) or row.id),
+        doc_type=resolved_type,
+        title=row.title if hasattr(row, "title") else row.name,
+        status=await current_status(db, row),
+        visibility=getattr(row, "visibility", ArtefactVisibility.internal.value),
+        priority=_get_priority(model, row),
+        project_id=project.id,
+        reviewer_id=_get_reviewer_id(model, row),
+        incoming_links=link_data["incoming"],
+        outgoing_links=link_data["outgoing"],
+        suspect_links=link_data["suspect"],
+        description=getattr(row, "description", None),
+        content_json=getattr(row, "content_json", None),
+        content_html=getattr(row, "content_html", None),
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        allowed_actions=await allowed_actions(db, current_user, row, resolved_type),
     )

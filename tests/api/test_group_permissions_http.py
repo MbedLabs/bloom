@@ -1019,7 +1019,9 @@ def test_design_requests_check_creator_scope_and_external_review_authority(api_c
     assert request(hidden).status_code == 404
     refused = request(others)
     assert refused.status_code == 403, refused.text
-    assert refused.json()["detail"] == "Only the document's assignee requests review."
+    assert refused.json()["detail"] == (
+        "Only the document's assignee or an administrator requests review."
+    )
     path = f"/api/artefacts/design/{own}"
     bypass = api_client.post(path + "/transition", headers=admin, json={"status": "Review"})
     assert bypass.status_code == 409, bypass.text

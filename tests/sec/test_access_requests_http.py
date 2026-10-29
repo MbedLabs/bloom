@@ -139,7 +139,7 @@ def test_a_request_emails_every_administrator_once_a_day(harness, sent_mail):
     ]
     mail = sent_mail[0]
     assert mail["requester_email"] == "member@example.com"
-    assert mail["resource"] == "APO-REQ-001"
+    assert mail["resource"] == "APO-REQ-001 (not found)"
     assert mail["project"] == "APO"
     assert mail["review_link"].endswith("/projects/APO/edit")
     assert mail["request_id"] == first.headers["x-request-id"]
@@ -229,6 +229,7 @@ def test_nothing_about_the_resource_is_disclosed(harness, sent_mail):
         "id",
         "resource_type",
         "resource_ref",
+        "resource_label",
         "project_prefix",
         "status",
         "created_at",
@@ -304,3 +305,17 @@ def test_a_resource_reference_is_validated(harness, sent_mail):
     )
 
     assert response.status_code == 422
+
+
+def test_an_administrator_is_refused_and_nobody_is_mailed(harness, sent_mail):
+    client, session_maker = harness
+    _user(session_maker, "boss@example.com", UserRole.admin)
+    _user(session_maker, "second@example.com", UserRole.admin)
+    headers = _login(client, "boss@example.com")
+
+    response = client.post("/api/access-requests", json=REQUEST, headers=headers)
+
+    assert response.status_code == 409
+    assert "nothing to request" in response.json()["detail"]
+    assert sent_mail == []
+    assert _events(session_maker, "access.requested") == []

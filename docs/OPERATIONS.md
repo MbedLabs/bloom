@@ -253,7 +253,7 @@ TRUSTED_PROXY_NETWORKS=["10.0.0.0/8"]
 
 List only networks from which nothing but your proxies reaches the image. On Cloudron the variable is set with `cloudron env set`.
 
-Access requests are emailed to every active administrator through the transactional mail settings above; without SMTP the request is still recorded and shown under Access, Requests and on the project's members page, and the user is told the email could not be sent.
+Access requests are emailed to every active administrator other than the requester through the transactional mail settings above; without SMTP the request is still recorded and shown under Access, Requests and on the project's members page, and the user is told the email could not be sent. An administrator, or a user who can already open the resource, cannot request access: the request is refused with 409 and nothing is recorded or sent.
 
 Retention is the operator's choice. Every request adds a row: the image's own health check, every 30 seconds, adds 2880 rows a day, and every metrics scrape and CORS preflight adds one more. The application never deletes events; to remove old ones, run on a schedule:
 

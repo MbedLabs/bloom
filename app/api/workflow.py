@@ -317,9 +317,10 @@ async def request_handoff(db, row, user, kind):
     fingerprint = content_hash(await content_snapshot(db, row))
     review = None
     if kind == "review":
-        if state.assignee_id != user.id:
+        if state.assignee_id != user.id and user.role != UserRole.admin:
             raise HTTPException(
-                status_code=403, detail="Only the document's assignee requests review."
+                status_code=403,
+                detail="Only the document's assignee or an administrator requests review.",
             )
         if state.phase != "Draft" or row.status != "Draft":
             raise HTTPException(status_code=409, detail="Review starts from Draft.")
@@ -597,7 +598,9 @@ async def workflow_response(db, row, user):
         },
         "actions": {
             "request_review": bool(
-                is_controlled and state.phase == "Draft" and state.assignee_id == user.id
+                is_controlled
+                and state.phase == "Draft"
+                and (state.assignee_id == user.id or user.role == UserRole.admin)
             ),
             "assign_assignee": assign_assignee,
             "request_approval": bool(
@@ -615,7 +618,7 @@ async def workflow_response(db, row, user):
                 and delivered_actor
                 and state.review_content_hash == fingerprint
             ),
-            "decline": bool(pending and delivered_actor),
+            "decline": bool(pending and (delivered_actor or user.role == UserRole.admin)),
             "assign_reviewer": assign,
             "assign_approver": assign and is_controlled,
             "comment": await can_comment(db, user, row),
@@ -784,7 +787,7 @@ async def decline_request(
     if not state:
         raise HTTPException(status_code=404, detail="Request not found")
     row = await visible_artefact(db, state.artefact_type, state.artefact_id, user, lock=True)
-    if not await _delivered_actor(db, row, state, request, user):
+    if user.role != UserRole.admin and not await _delivered_actor(db, row, state, request, user):
         raise HTTPException(status_code=403, detail="This request was not delivered to you.")
     if request.status != "pending" or request.revision_number != state.revision_number:
         raise HTTPException(status_code=409, detail="This request is no longer pending.")

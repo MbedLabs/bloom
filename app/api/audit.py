@@ -15,6 +15,7 @@ from app.core.security import require_role
 from app.models.audit import AuditEvent
 from app.models.user import User, UserRole
 from app.schemas.audit import AuditEventPage, AuditEventResponse
+from app.services.audit_labels import actor_labels, target_labels
 
 router = APIRouter()
 
@@ -45,7 +46,8 @@ async def list_audit_events(
     _admin: User = Depends(require_admin),
 ):
     """List audit events matching every given filter; an action filter ending in "." is a prefix
-    and status matches details.status, the HTTP status of an api.request event."""
+    and status matches details.status, the HTTP status of an api.request event. Each event
+    carries its actor and target as labels."""
     conditions = []
     if actor_user_id is not None:
         conditions.append(AuditEvent.actor_user_id == actor_user_id)
@@ -109,10 +111,16 @@ async def list_audit_events(
             .offset(offset)
         )
     ).all()
+    events = [event for event, _actor in rows]
+    actors = {actor.id: actor for _event, actor in rows if actor is not None}
+    targets = await target_labels(db, events)
+    actor_names = await actor_labels(db, events, actors)
     items = []
     for event, actor in rows:
         item = AuditEventResponse.model_validate(event)
         item.actor_name = actor.full_name if actor else None
         item.actor_profile_picture_url = actor.profile_picture_url if actor else None
+        item.actor_label = actor_names.get(event.id)
+        item.target_label = targets.get(event.id)
         items.append(item)
     return AuditEventPage(items=items, total=total or 0)

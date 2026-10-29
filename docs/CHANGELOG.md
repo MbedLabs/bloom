@@ -24,9 +24,13 @@
 - The invitation and email change dialogs close with Escape and put the focus on their first field when they open. A project card opens with the keyboard as well as with the mouse.
 - A source install needs Python 3.11 or later.
 - The container starts as root only to prepare its directories, data ownership and, on Cloudron, its secrets and migrations; supervisord, nginx and uvicorn then run as `appuser`. Kubernetes `runAsNonRoot` policies are not supported.
+- An administrator may request review of any controlled document and decline any pending review or approval request; the audit log records the step under the administrator. Marking a document reviewed or approved stays with its assigned reviewer and approver.
 
 ### Fixed
 
+- A document address that names a document by its database number instead of its document ID, such as the links inside a document opened in the editor, opens the document; before, it answered not found and the page said "You don't have access" to everyone, administrators included.
+- An administrator could request access, even from himself. An administrator, or anyone who can already open what they ask for, is now told so and no request is recorded or emailed, and nobody is emailed about their own request.
+- Access requests, their emails and the audit log showed database numbers instead of document IDs and names. They now name projects by prefix, documents, suites, campaigns and defects by document ID, users by name and service credentials by name; only something that no longer exists keeps its number, marked deleted.
 - Line spacing in the document editor is set per paragraph and heading, list items, quotes and table cells included, and is saved with the document, so it shows the same after reopening, on the reading page and in approved revisions. The menu offers Single, 1.5 and Double as multiples of the normal spacing and marks the spacing at the cursor.
 - A 500 answer quotes the id of the request that failed, in its message, its `request_id` and its `x-request-id` header, the same id as the access log and the audit log; before, it quoted `-`.
 - Administrator welcome emails confirm the account is ready and give product-specific next steps, with matching HTML and plain-text instructions. The obsolete one-time runner registration key instructions are removed.

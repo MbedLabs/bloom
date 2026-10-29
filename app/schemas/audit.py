@@ -7,7 +7,8 @@ from pydantic import BaseModel, ConfigDict, field_serializer
 
 
 class AuditEventResponse(BaseModel):
-    """One audit event, with the acting user's name when the user still exists."""
+    """One audit event, with the acting user's name when the user still exists, and the actor
+    and target as labels: names, project prefixes and document IDs."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -16,10 +17,12 @@ class AuditEventResponse(BaseModel):
     actor_user_id: Optional[int] = None
     actor_name: Optional[str] = None
     actor_profile_picture_url: Optional[str] = None
+    actor_label: Optional[str] = None
     actor_type: str
     action: str
     target_type: Optional[str] = None
     target_id: Optional[str] = None
+    target_label: Optional[str] = None
     project_id: Optional[int] = None
     request_id: Optional[str] = None
     ip: Optional[str] = None
