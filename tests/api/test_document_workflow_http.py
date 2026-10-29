@@ -1216,7 +1216,8 @@ async def test_an_assignee_change_is_refused_to_others_and_recorded(workflow_htt
     audit = (
         await db.scalars(select(AuditEvent).where(AuditEvent.action == "workflow.assigned"))
     ).all()
-    assert activity and audit
+    assert activity
+    assert audit
     state = await db.scalar(select(ArtefactWorkflow).where(ArtefactWorkflow.artefact_id == row.id))
     outsider = User(id=9, full_name="Outsider", role=UserRole.external, is_active=True)
     with pytest.raises(HTTPException) as refused:
@@ -1331,7 +1332,8 @@ async def test_the_four_resolve_and_reopen_a_thread(workflow_http, status):
         assert resolved.status_code == 200, resolved.text
         assert resolved.json()["resolved_by"]["id"] == person + 1
         reopened = await client.post(f"{path}/{thread}/reopen")
-        assert reopened.status_code == 200 and reopened.json()["resolved_at"] is None
+        assert reopened.status_code == 200
+        assert reopened.json()["resolved_at"] is None
     current[0] = users[3]
     assert (await client.post(f"{path}/{thread}/resolve")).status_code == 403
     current[0] = users[0]

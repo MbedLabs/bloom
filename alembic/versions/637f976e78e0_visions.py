@@ -138,7 +138,7 @@ def _default_policy_ids(bind, names) -> dict:
             policies.c.name.in_(list(names)), policies.c.is_default.is_(True)
         )
     ).all()
-    return {name: policy_id for name, policy_id in rows}
+    return dict(rows)
 
 
 def _set_vis_entry(bind, policy_id: int, copy_spec: bool) -> None:

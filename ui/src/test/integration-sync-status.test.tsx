@@ -176,6 +176,6 @@ describe('the automatic sync status of a tracker', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000)
     })
-    expect(vi.mocked(client.integrationsApi.listSettings).mock.calls.length).toBe(before + 1)
+    expect(vi.mocked(client.integrationsApi.listSettings).mock.calls).toHaveLength(before + 1)
   })
 })

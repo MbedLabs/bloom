@@ -55,7 +55,8 @@ function actorFilters(actor: string): Pick<AuditFilters, 'actor_type' | 'actor_u
 /** One detail of an event as text, or undefined when the event does not hold it. */
 function detail(event: AuditEvent, key: string): string | undefined {
   const value = event.details?.[key]
-  return value == null || value === '' ? undefined : String(value)
+  if (value == null || value === '') return undefined
+  return typeof value === 'object' ? JSON.stringify(value) : String(value)
 }
 
 /** The Actor cell: a user (marked MCP or CLI for a CLI sign-in token, with the User-Agent on hover), a service credential by name, or the actor type; the label of a deleted actor says so. */
@@ -204,7 +205,7 @@ export default function AuditPage() {
           </div>
         </div>
         <label className="text-sm text-muted-foreground">
-          Address
+          <span>Address</span>
           <input
             type="text"
             value={ip}
@@ -215,7 +216,7 @@ export default function AuditPage() {
           />
         </label>
         <label className="text-sm text-muted-foreground">
-          Request
+          <span>Request</span>
           <input
             type="text"
             value={requestId}

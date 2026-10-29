@@ -102,6 +102,18 @@ export default function DocDetailShell({
     }
   }
 
+  let body = <div className="space-y-6">{children}</div>
+  if (comments) {
+    body = (
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] items-start gap-6">
+        <div className="min-w-0 space-y-6">{children}</div>
+        <aside aria-label="Document comments column" className="order-first min-w-0 lg:order-last">{comments}</aside>
+      </div>
+    )
+  } else if (rightRail) {
+    body = <DocumentDetailColumns rightRail={rightRail}>{children}</DocumentDetailColumns>
+  }
+
   return (
     <div className="animate-fade-in space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -125,16 +137,7 @@ export default function DocDetailShell({
       </div>
 
       {review}
-      {comments ? (
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] items-start gap-6">
-          <div className="min-w-0 space-y-6">{children}</div>
-          <aside aria-label="Document comments column" className="order-first min-w-0 lg:order-last">{comments}</aside>
-        </div>
-      ) : rightRail ? (
-        <DocumentDetailColumns rightRail={rightRail}>{children}</DocumentDetailColumns>
-      ) : (
-        <div className="space-y-6">{children}</div>
-      )}
+      {body}
     </div>
   )
 }

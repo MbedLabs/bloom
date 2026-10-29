@@ -346,7 +346,8 @@ async def test_capped_searches_continue_on_the_next_run(maker, monkeypatch):
 
     await integration_sync.run_due(15, maker=maker, now=LATER)
     creation_jql = [q for q in jira.jql if "statusCategory != Done" in q]
-    assert "created >= -" in creation_jql[1] and "updated >=" not in creation_jql[1]
+    assert "created >= -" in creation_jql[1]
+    assert "updated >=" not in creation_jql[1]
 
 
 async def _github(maker, **fields):

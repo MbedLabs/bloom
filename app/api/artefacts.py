@@ -197,11 +197,6 @@ async def create_comment(
 
     request = await _review_request(db, workflow)
     artefact_id = artefact.id
-    type_code = (
-        ARTEFACT_LINK_TYPES.get(artefact_type)
-        or SIGN_OFF_TYPES.get(artefact_type)
-        or getattr(artefact, "doc_type", None)
-    )
     comment = ArtefactComment(
         artefact_type=artefact_type,
         artefact_id=artefact_id,
@@ -225,6 +220,19 @@ async def create_comment(
         artefact_id,
         "comment_added",
         f"{current_user.full_name} added a comment",
+    )
+    await _notify_comment(db, artefact, artefact_type, workflow, thread, data.body, current_user)
+    return _comment_response(comment, {current_user.id: current_user})
+
+
+async def _notify_comment(db, artefact, artefact_type, workflow, thread, text, current_user):
+    """Notify the document's participants, and on a reply the thread's authors, who may see
+    the document; the author is left out."""
+    artefact_id = artefact.id
+    type_code = (
+        ARTEFACT_LINK_TYPES.get(artefact_type)
+        or SIGN_OFF_TYPES.get(artefact_type)
+        or getattr(artefact, "doc_type", None)
     )
     label = (
         getattr(artefact, "req_id", None)
@@ -253,12 +261,11 @@ async def create_comment(
                 user_id=recipient_id,
                 event_type="comment",
                 title=f"New comment on {label}",
-                body=f"{current_user.full_name}: {data.body[:200]}",
+                body=f"{current_user.full_name}: {text[:200]}",
                 link_path=path,
                 project_id=artefact.project_id,
                 actor=current_user,
             )
-    return _comment_response(comment, {current_user.id: current_user})
 
 
 async def may_resolve(db: AsyncSession, user: User, artefact) -> bool:

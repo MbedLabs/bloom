@@ -673,6 +673,7 @@ async def read_workflow(
 @router.put(
     "/artefacts/{slug}/{identifier}/workflow/assignees",
     responses={
+        403: {"description": HTTPStatus(403).phrase},
         404: {"description": HTTPStatus(404).phrase},
         422: {"description": HTTPStatus(422).phrase},
     },

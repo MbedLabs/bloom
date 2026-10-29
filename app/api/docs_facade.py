@@ -933,6 +933,30 @@ async def _reference_query(db: AsyncSession, model, id_col, project_id: int, ref
     return by_doc_id
 
 
+async def _visible_row(
+    db, user, project_id, unfiltered, model, type_code, view_type, *, allowed, record
+):
+    """The row of the unfiltered query and its document type when the user may see it, else
+    None; with record, a hidden row marks the request as a refusal."""
+    if not external_doc_type_allowed(allowed, type_code):
+        if record:
+            await mark_refused_if_found(db, unfiltered)
+        return None
+    row = (
+        await db.execute(apply_external_visibility_filter(unfiltered, model, user))
+    ).scalar_one_or_none()
+    if row is None:
+        if record:
+            await mark_refused_if_found(db, unfiltered)
+        return None
+    resolved_type = view_type(row)
+    if not await holds(db, user, project_id, "view", resolved_type):
+        if record:
+            mark_refused()
+        return None
+    return row, resolved_type
+
+
 async def find_visible_doc(
     db: AsyncSession,
     current_user: User,
@@ -948,12 +972,8 @@ async def find_visible_doc(
     With record_refusals, a hidden item marks the request as a refusal for the audit log.
     """
     kind_slug = LEGACY_TYPE_SLUG_ALIASES.get(kind_slug, kind_slug)
-
-    async def refused_if_found(query) -> None:
-        if record_refusals:
-            await mark_refused_if_found(db, query)
-
     allowed_doc_types = await get_external_doc_types(db, current_user, project.id)
+    checks = {"allowed": allowed_doc_types, "record": record_refusals}
     if kind_slug not in {slug for _, (_, _, slug) in TYPE_MAP.items()}:
         requested_kind = document_kind_from_slug(kind_slug)
         if requested_kind not in CANONICAL_DOCUMENT_KINDS:
@@ -961,40 +981,34 @@ async def find_visible_doc(
         unfiltered = await _reference_query(
             db, Document, Document.doc_id, project.id, ref, Document.doc_type == requested_kind
         )
-        if not external_doc_type_allowed(allowed_doc_types, requested_kind):
-            await refused_if_found(unfiltered)
-            return None
-        row = (
-            await db.execute(apply_external_visibility_filter(unfiltered, Document, current_user))
-        ).scalar_one_or_none()
-        if row is None:
-            await refused_if_found(unfiltered)
-            return None
-        if not await holds(db, current_user, project.id, "view", requested_kind):
-            if record_refusals:
-                mark_refused()
-            return None
-        return Document, row, requested_kind, "doc_id"
+        found = await _visible_row(
+            db,
+            current_user,
+            project.id,
+            unfiltered,
+            Document,
+            requested_kind,
+            lambda _row: requested_kind,
+            **checks,
+        )
+        return (Document, found[0], requested_kind, "doc_id") if found else None
 
     for type_code, (model, id_col_name, slug) in TYPE_MAP.items():
         if slug != kind_slug:
             continue
         unfiltered = await _reference_query(db, model, getattr(model, id_col_name), project.id, ref)
-        if not external_doc_type_allowed(allowed_doc_types, type_code):
-            await refused_if_found(unfiltered)
-            continue
-        row = (
-            await db.execute(apply_external_visibility_filter(unfiltered, model, current_user))
-        ).scalar_one_or_none()
-        if row is None:
-            await refused_if_found(unfiltered)
-            continue
-        resolved_type = _resolved_doc_type(type_code, row)
-        if not await holds(db, current_user, project.id, "view", resolved_type):
-            if record_refusals:
-                mark_refused()
-            continue
-        return model, row, resolved_type, id_col_name
+        found = await _visible_row(
+            db,
+            current_user,
+            project.id,
+            unfiltered,
+            model,
+            type_code,
+            lambda row, code=type_code: _resolved_doc_type(code, row),
+            **checks,
+        )
+        if found:
+            return model, found[0], found[1], id_col_name
     return None
 
 

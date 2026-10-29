@@ -212,10 +212,10 @@ def test_refused_attempts_are_denied_with_the_address(harness):
     assert _one(session_maker, missing).outcome == "failure"
 
 
-def test_a_rate_limited_request_is_denied(harness):
+def test_a_rate_limited_request_is_denied(harness, monkeypatch):
     client, session_maker = harness
     limiter.reset()
-    limiter.enabled = True
+    monkeypatch.setattr(limiter, "enabled", True)
     try:
         answers = [
             client.post(
@@ -224,7 +224,6 @@ def test_a_rate_limited_request_is_denied(harness):
             for _ in range(11)
         ]
     finally:
-        limiter.enabled = False
         limiter.reset()
 
     assert answers[-1].status_code == 429

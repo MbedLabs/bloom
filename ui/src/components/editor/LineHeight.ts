@@ -30,7 +30,7 @@ export const LineHeight = Extension.create({
         attributes: {
           lineSpacing: {
             default: null,
-            parseHTML: (element) => knownSpacing(element.getAttribute('data-line-spacing')),
+            parseHTML: (element) => knownSpacing(element.dataset.lineSpacing),
             renderHTML: (attributes) =>
               attributes.lineSpacing ? { 'data-line-spacing': attributes.lineSpacing } : {},
           },

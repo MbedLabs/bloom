@@ -96,6 +96,36 @@ async def list_links(
     return [_link_response(row) for row in rows]
 
 
+def _require_allowed_role(data: ArtefactLinkCreate) -> None:
+    """422 for a role outside the allowed link roles between the two kinds."""
+    if is_allowed_link_role(data.source_type, data.target_type, data.role):
+        return
+    allowed_roles = get_allowed_link_roles(data.source_type, data.target_type)
+    if not allowed_roles:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Relationships from {data.source_type} to {data.target_type} are not allowed",
+        )
+    raise HTTPException(
+        status_code=422,
+        detail=(
+            f"Role '{data.role}' is not allowed for "
+            f"{data.source_type} -> {data.target_type}. Allowed roles: {', '.join(allowed_roles)}"
+        ),
+    )
+
+
+async def _visible_end(db, project_id, artefact_type, artefact_id, user, side: str):
+    """One end of a new link when it is visible to the user, else 404, recorded as refused
+    when the end exists."""
+    row, visible = await link_end(db, project_id, artefact_type, artefact_id, user)
+    if not visible:
+        if row is not None:
+            mark_refused()
+        raise HTTPException(status_code=404, detail=f"{side} document not found in project")
+    return row
+
+
 @router.post(
     "",
     response_model=ArtefactLinkResponse,
@@ -126,43 +156,14 @@ async def create_link(
         raise HTTPException(status_code=422, detail="Unsupported relationship document kind")
     if data.source_type == data.target_type and data.source_id == data.target_id:
         raise HTTPException(status_code=400, detail="A document cannot link to itself")
-    if not is_allowed_link_role(data.source_type, data.target_type, data.role):
-        allowed_roles = get_allowed_link_roles(data.source_type, data.target_type)
-        if not allowed_roles:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Relationships from {data.source_type} to {data.target_type} are not allowed",
-            )
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                f"Role '{data.role}' is not allowed for "
-                f"{data.source_type} -> {data.target_type}. Allowed roles: {', '.join(allowed_roles)}"
-            ),
-        )
+    _require_allowed_role(data)
     await get_external_doc_types(db, current_user, data.project_id)
-    source, source_visible = await link_end(
-        db,
-        data.project_id,
-        data.source_type,
-        data.source_id,
-        current_user,
+    source = await _visible_end(
+        db, data.project_id, data.source_type, data.source_id, current_user, "Source"
     )
-    if not source_visible:
-        if source is not None:
-            mark_refused()
-        raise HTTPException(status_code=404, detail="Source document not found in project")
-    target, target_visible = await link_end(
-        db,
-        data.project_id,
-        data.target_type,
-        data.target_id,
-        current_user,
+    target = await _visible_end(
+        db, data.project_id, data.target_type, data.target_id, current_user, "Target"
     )
-    if not target_visible:
-        if target is not None:
-            mark_refused()
-        raise HTTPException(status_code=404, detail="Target document not found in project")
     if not (changes_allowed(current_user, source) and changes_allowed(current_user, target)):
         raise HTTPException(status_code=403, detail="External users change only what they created.")
     existing = (

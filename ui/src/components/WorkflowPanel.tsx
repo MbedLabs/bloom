@@ -62,7 +62,7 @@ export default function WorkflowPanel({ artefactType, artefactId, projectPrefix,
   if (workflow.isError || !workflow.data?.actions) return <section aria-label="Document review" className="rounded-lg border border-border p-4"><p role="alert">Could not load review details.</p><button className={actionButtonClass} type="button" onClick={() => workflow.refetch()}>Retry</button></section>
   const state = workflow.data
   const busy = mutation.isPending
-  const reviewCard = <>
+  const reviewCard = (
     <SectionCard title="Review">
       <div className="space-y-3">
         {state.controlled && <>
@@ -94,7 +94,7 @@ export default function WorkflowPanel({ artefactType, artefactId, projectPrefix,
         </fieldset>
       </div>
     </SectionCard>
-  </>
+  )
   const approvalCard = <>
     {state.controlled && <SectionCard title="Approval">
       <div className="space-y-3">

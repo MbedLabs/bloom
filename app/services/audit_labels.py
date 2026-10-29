@@ -105,6 +105,67 @@ def _user_name(user: User) -> str:
     return user.full_name or user.email
 
 
+async def _artefact_request_names(db: AsyncSession, ids: list[int]) -> dict[int, str]:
+    """Each workflow request as its kind and the document ID of its item, by request id."""
+    requests = await _rows(db, ArtefactRequest, ids)
+    workflows = await _rows(db, ArtefactWorkflow, (r.workflow_id for r in requests.values()))
+    by_slug: dict[str, list[int]] = defaultdict(list)
+    for workflow in workflows.values():
+        by_slug[workflow.artefact_type].append(workflow.artefact_id)
+    items = {
+        slug: await _rows(db, TAGGED_MODELS[slug], item_ids)
+        for slug, item_ids in by_slug.items()
+        if slug in TAGGED_MODELS
+    }
+    names = {}
+    for key, request in requests.items():
+        workflow = workflows.get(request.workflow_id)
+        item = items.get(workflow.artefact_type, {}).get(workflow.artefact_id) if workflow else None
+        if item is not None:
+            names[key] = f"{request.kind} of {_public_id(workflow.artefact_type, item)}"
+    return names
+
+
+def _access_request_name(row: AccessRequest) -> str:
+    """An access request as its resource, with the project when it names one."""
+    project = f" in project {row.project_prefix}" if row.project_prefix else ""
+    return f"{_words(row.resource_type)} {row.resource_ref}{project}"
+
+
+async def _names(db: AsyncSession, kind: str, ids: list[int]) -> Optional[dict[int, str]]:
+    """The name of each target of a kind, by id, or None for a kind without names."""
+    if kind in TAGGED_MODELS:
+        rows = await _rows(db, TAGGED_MODELS[kind], ids)
+        return {key: _public_id(kind, row) for key, row in rows.items()}
+    if kind in NAMED_TARGETS:
+        model, attr = NAMED_TARGETS[kind]
+        rows = await _rows(db, model, ids)
+        return {
+            key: str(getattr(row, attr, None) or getattr(row, "name", None) or key)
+            for key, row in rows.items()
+        }
+    if kind == "user":
+        return {key: _user_name(row) for key, row in (await _rows(db, User, ids)).items()}
+    if kind == "access_request":
+        rows = await _rows(db, AccessRequest, ids)
+        return {key: _access_request_name(row) for key, row in rows.items()}
+    if kind == "artefact_request":
+        return await _artefact_request_names(db, ids)
+    return None
+
+
+def _event_label(event: AuditEvent, kind: Optional[str], found: dict[str, dict[int, str]]) -> str:
+    """An event's target as its type and name, its id when it has no name, or its id marked
+    deleted when the target is gone."""
+    target_id = event.target_id or ""
+    request_kind = kind in {"access_request", "artefact_request"}
+    shown_type = _words(kind if kind and not request_kind else event.target_type)
+    if kind not in found or not target_id.isdigit():
+        return f"{shown_type} {target_id}".strip()
+    name = found[kind].get(int(target_id))
+    return f"{shown_type} {name}" if name is not None else f"{shown_type} {target_id} (deleted)"
+
+
 async def target_labels(db: AsyncSession, events: list[AuditEvent]) -> dict[int, str]:
     """The target label of each event that has a target, by event id."""
     wanted: dict[str, list[int]] = defaultdict(list)
@@ -114,74 +175,16 @@ async def target_labels(db: AsyncSession, events: list[AuditEvent]) -> dict[int,
         kinds[event.id] = kind
         if kind and event.target_id and event.target_id.isdigit():
             wanted[kind].append(int(event.target_id))
-
     found: dict[str, dict[int, str]] = {}
     for kind, ids in wanted.items():
-        if kind in TAGGED_MODELS:
-            found[kind] = {
-                key: _public_id(kind, row)
-                for key, row in (await _rows(db, TAGGED_MODELS[kind], ids)).items()
-            }
-        elif kind in NAMED_TARGETS:
-            model, attr = NAMED_TARGETS[kind]
-            found[kind] = {
-                key: str(getattr(row, attr, None) or getattr(row, "name", None) or key)
-                for key, row in (await _rows(db, model, ids)).items()
-            }
-        elif kind == "user":
-            found[kind] = {
-                key: _user_name(row) for key, row in (await _rows(db, User, ids)).items()
-            }
-        elif kind == "access_request":
-            found[kind] = {
-                key: f"{_words(row.resource_type)} {row.resource_ref}"
-                + (f" in project {row.project_prefix}" if row.project_prefix else "")
-                for key, row in (await _rows(db, AccessRequest, ids)).items()
-            }
-        elif kind == "artefact_request":
-            requests = await _rows(db, ArtefactRequest, ids)
-            workflows = await _rows(
-                db, ArtefactWorkflow, (r.workflow_id for r in requests.values())
-            )
-            by_slug: dict[str, list[int]] = defaultdict(list)
-            for workflow in workflows.values():
-                by_slug[workflow.artefact_type].append(workflow.artefact_id)
-            items = {
-                slug: await _rows(db, TAGGED_MODELS[slug], item_ids)
-                for slug, item_ids in by_slug.items()
-                if slug in TAGGED_MODELS
-            }
-            labels = {}
-            for key, request in requests.items():
-                workflow = workflows.get(request.workflow_id)
-                item = (
-                    items.get(workflow.artefact_type, {}).get(workflow.artefact_id)
-                    if workflow
-                    else None
-                )
-                if item is not None:
-                    labels[key] = f"{request.kind} of {_public_id(workflow.artefact_type, item)}"
-            found[kind] = labels
-
-    labels: dict[int, str] = {}
-    for event in events:
-        if not event.target_type:
-            continue
-        kind = kinds[event.id]
-        target_id = event.target_id or ""
-        shown_type = _words(
-            kind
-            if kind and kind not in {"access_request", "artefact_request"}
-            else event.target_type
-        )
-        if kind is None or kind not in found or not target_id.isdigit():
-            labels[event.id] = f"{shown_type} {target_id}".strip()
-            continue
-        human = found[kind].get(int(target_id))
-        labels[event.id] = (
-            f"{shown_type} {human}" if human is not None else f"{shown_type} {target_id} (deleted)"
-        )
-    return labels
+        names = await _names(db, kind, ids)
+        if names is not None:
+            found[kind] = names
+    return {
+        event.id: _event_label(event, kinds[event.id], found)
+        for event in events
+        if event.target_type
+    }
 
 
 async def actor_labels(

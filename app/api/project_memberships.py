@@ -348,40 +348,82 @@ async def list_project_access(
     return await project_access_entries(db, project_id)
 
 
+def _policy_names(policies) -> list[str]:
+    """Policy names in the order the policies were created."""
+    return [policy.name for policy in sorted(policies, key=lambda policy: policy.id)]
+
+
+async def _row_users(db: AsyncSession, row: ProjectAccess) -> tuple[list[User], Group | None]:
+    """The users an access row covers, and its group when it is a group row."""
+    if row.user_id is not None:
+        return [await db.get(User, row.user_id)], None
+    group = await db.get(Group, row.group_id)
+    users = (
+        await db.scalars(
+            select(User)
+            .join(GroupMembership, GroupMembership.user_id == User.id)
+            .where(GroupMembership.group_id == row.group_id)
+        )
+    ).all()
+    return list(users), group
+
+
+async def _inherited_origins(db: AsyncSession, user: User) -> list[AccessOrigin]:
+    """The origins of a row that inherits the user's policies: one per group of the user, or
+    a direct origin without policies when the user is in no group."""
+    groups = (
+        await db.scalars(
+            select(Group)
+            .join(GroupMembership, GroupMembership.group_id == Group.id)
+            .where(GroupMembership.user_id == user.id)
+            .order_by(Group.name)
+        )
+    ).all()
+    if not groups:
+        return [AccessOrigin(kind="direct", inherit_policies=True, policies=[])]
+    return [
+        AccessOrigin(
+            kind="group",
+            owner=False,
+            inherit_policies=True,
+            group=group.name,
+            policies=_policy_names(group.policies),
+        )
+        for group in groups
+    ]
+
+
+def _row_origin(row: ProjectAccess, group: Group | None) -> AccessOrigin:
+    """The origin of a row with its own policies or a policy group."""
+    if row.policy_group_id:
+        origin_group, policies = row.policy_group.name, row.policy_group.policies
+    else:
+        origin_group, policies = (group.name if group else None), row.policies
+    return AccessOrigin(
+        kind="direct" if row.user_id is not None else "group",
+        owner=row.owner,
+        inherit_policies=False,
+        group=origin_group,
+        policies=_policy_names(policies),
+    )
+
+
 async def project_access_entries(db: AsyncSession, project_id: int) -> list[ProjectAccessEntry]:
     """One entry per user with access to the project, with every origin of that access."""
     entries = {}
     rows = (
-        (
-            await db.execute(
-                select(ProjectAccess)
-                .where(ProjectAccess.project_id == project_id)
-                .order_by(ProjectAccess.id)
-            )
+        await db.scalars(
+            select(ProjectAccess)
+            .where(ProjectAccess.project_id == project_id)
+            .order_by(ProjectAccess.id)
         )
-        .scalars()
-        .all()
-    )
+    ).all()
     replaced_users = {
         row.user_id for row in rows if row.user_id is not None and not row.inherit_policies
     }
     for row in rows:
-        if row.user_id is not None:
-            users = [await db.get(User, row.user_id)]
-            group = None
-        else:
-            group = await db.get(Group, row.group_id)
-            users = (
-                (
-                    await db.execute(
-                        select(User)
-                        .join(GroupMembership, GroupMembership.user_id == User.id)
-                        .where(GroupMembership.group_id == row.group_id)
-                    )
-                )
-                .scalars()
-                .all()
-            )
+        users, group = await _row_users(db, row)
+        inherits = row.inherit_policies and row.policy_group_id is None
         for user in users:
             if row.user_id is None and user.id in replaced_users:
                 continue
@@ -395,56 +437,10 @@ async def project_access_entries(db: AsyncSession, project_id: int) -> list[Proj
                     origins=[],
                 ),
             )
-            if row.inherit_policies and row.policy_group_id is None:
-                inherited_groups = (
-                    (
-                        await db.execute(
-                            select(Group)
-                            .join(GroupMembership, GroupMembership.group_id == Group.id)
-                            .where(GroupMembership.user_id == user.id)
-                            .order_by(Group.name)
-                        )
-                    )
-                    .scalars()
-                    .all()
-                )
-                for source_group in inherited_groups:
-                    source = AccessOrigin(
-                        kind="group",
-                        owner=False,
-                        inherit_policies=True,
-                        group=source_group.name,
-                        policies=[
-                            policy.name
-                            for policy in sorted(
-                                source_group.policies, key=lambda policy: policy.id
-                            )
-                        ],
-                    )
-                    if source not in entry.origins:
-                        entry.origins.append(source)
-                if not inherited_groups:
-                    source = AccessOrigin(kind="direct", inherit_policies=True, policies=[])
-                    if source not in entry.origins:
-                        entry.origins.append(source)
+            if not inherits:
+                entry.origins.append(_row_origin(row, group))
                 continue
-            if row.policy_group_id:
-                origin_group = row.policy_group.name
-            else:
-                origin_group = group.name if group else None
-            entry.origins.append(
-                AccessOrigin(
-                    kind="direct" if row.user_id is not None else "group",
-                    owner=row.owner,
-                    inherit_policies=False,
-                    group=origin_group,
-                    policies=[
-                        policy.name
-                        for policy in sorted(
-                            row.policy_group.policies if row.policy_group_id else row.policies,
-                            key=lambda policy: policy.id,
-                        )
-                    ],
-                )
-            )
+            for origin in await _inherited_origins(db, user):
+                if origin not in entry.origins:
+                    entry.origins.append(origin)
     return sorted(entries.values(), key=lambda entry: entry.full_name.lower())

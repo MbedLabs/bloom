@@ -410,8 +410,8 @@ export default function DocEditor({
     if (!editor || (!onThreadClick && !onCommentSelection)) return
     const root = editor.view.dom
     const handleClick = (event: MouseEvent) => {
-      const marked = (event.target as HTMLElement | null)?.closest('[data-comment-id]')
-      if (marked && onThreadClick) onThreadClick(Number(marked.getAttribute('data-comment-id')))
+      const marked = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-comment-id]')
+      if (marked && onThreadClick) onThreadClick(Number(marked.dataset.commentId))
     }
     const handleSelection = () => {
       if (!onCommentSelection) return

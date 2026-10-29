@@ -15,7 +15,7 @@ export interface PlainText {
 function leafLabel(node: ProseMirrorNode): string {
   const attrs = node.attrs as { label?: unknown; id?: unknown }
   if (typeof attrs.label === 'string' && attrs.label) return attrs.label
-  if (attrs.id !== undefined && attrs.id !== null) return String(attrs.id)
+  if (typeof attrs.id === 'string' || typeof attrs.id === 'number') return String(attrs.id)
   return ''
 }
 

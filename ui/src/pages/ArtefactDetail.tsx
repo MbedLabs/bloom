@@ -162,6 +162,12 @@ const workflowTransitions: Record<ArtefactKind, Record<string, string[]>> = {
   defect: { Open: ['Triaged', 'Rejected', 'Duplicate'], Triaged: ['In Progress', 'Rejected', 'Duplicate'], 'In Progress': ['Resolved', 'Triaged'], Resolved: ['Verified', 'In Progress'], Verified: ['Closed', 'In Progress'], Closed: ['Open'], Rejected: ['Open'], Duplicate: ['Open'] },
 }
 
+/** A field value as text: "-" when it is missing and JSON when it is structured. */
+function fieldText(value: unknown): string {
+  if (value === null || value === undefined) return '-'
+  return typeof value === 'object' ? JSON.stringify(value) : String(value)
+}
+
 export default function ArtefactDetail({
   kind,
   resolvedId,
@@ -438,7 +444,7 @@ export default function ArtefactDetail({
               {config.fields.filter((f) => f.key !== 'status' && f.key !== 'visibility').map((field) => (
                 <div key={field.key}>
                   <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{field.label}</div>
-                  <div className="text-foreground text-sm">{String(artefactRecord[field.key] ?? '-')}</div>
+                  <div className="text-foreground text-sm">{fieldText(artefactRecord[field.key])}</div>
                 </div>
               ))}
             </div>
@@ -739,7 +745,7 @@ export default function ArtefactDetail({
               {config.fields.filter((f) => f.key !== 'status' && f.key !== 'visibility').map((field) => (
                 <div key={field.key}>
                   <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{field.label}</div>
-                  <div className="text-foreground text-sm">{String(artefactRecord[field.key] ?? '-')}</div>
+                  <div className="text-foreground text-sm">{fieldText(artefactRecord[field.key])}</div>
                 </div>
               ))}
             </div>

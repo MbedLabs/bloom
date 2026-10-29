@@ -651,26 +651,31 @@ async def get_visible_row(
     action, resource = permission or (None, None)
     resource = resource or getattr(row, "doc_type", None)
     await require_project_access(db, current_user, row.project_id, outsider=hidden)
-    if resource in DOC_TYPE_RESOURCES and not await doc_type_visible(
-        db, current_user, row.project_id, resource
-    ):
-        mark_refused()
-        raise hidden
-    if (
-        action
-        and resource in DOC_TYPE_RESOURCES
-        and not await holds(db, current_user, row.project_id, "view", resource)
-    ):
+    if await _doc_type_hidden(db, current_user, row, action, resource):
         mark_refused()
         raise hidden
     if action and action != "view":
-        if not await row_allows(db, current_user, row, action, resource):
-            raise HTTPException(
-                status_code=403, detail=f"Missing permission: {action} on {resource}."
-            )
-        if action in OWN_ONLY_ACTIONS and not changes_allowed(current_user, row):
-            raise HTTPException(status_code=403, detail=CHANGES_OWN_ONLY)
+        await _require_action(db, current_user, row, action, resource)
     return row
+
+
+async def _doc_type_hidden(db: AsyncSession, user: User, row, action, resource) -> bool:
+    """True when the row's document type is hidden from the user, or, for an action, when the
+    user holds no view on it."""
+    if resource not in DOC_TYPE_RESOURCES:
+        return False
+    if not await doc_type_visible(db, user, row.project_id, resource):
+        return True
+    return bool(action) and not await holds(db, user, row.project_id, "view", resource)
+
+
+async def _require_action(db: AsyncSession, user: User, row, action: str, resource) -> None:
+    """403 without the permission for the action, or for an external user's change of a row
+    they did not create."""
+    if not await row_allows(db, user, row, action, resource):
+        raise HTTPException(status_code=403, detail=f"Missing permission: {action} on {resource}.")
+    if action in OWN_ONLY_ACTIONS and not changes_allowed(user, row):
+        raise HTTPException(status_code=403, detail=CHANGES_OWN_ONLY)
 
 
 OWN_ONLY_ACTIONS = ("edit", "delete", "plan", "review", "approve")

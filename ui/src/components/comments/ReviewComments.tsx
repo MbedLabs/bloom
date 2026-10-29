@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { MessageSquarePlus } from 'lucide-react'
 
@@ -104,18 +104,22 @@ function CommentBox({ label, placeholder, busy, onPost, onCancel, autoFocus }: R
   autoFocus?: boolean
 }>) {
   const [body, setBody] = useState('')
+  const box = useRef<HTMLTextAreaElement>(null)
   const rows = Math.min(15, Math.max(5, body.split('\n').length + 1))
   const post = () => {
     if (!body.trim() || busy) return
     void onPost(body.trim()).then(() => setBody(''), () => undefined)
   }
-  return <div role="presentation" className="space-y-2" onClick={event => event.stopPropagation()}>
+  useEffect(() => {
+    if (autoFocus) box.current?.focus()
+  }, [autoFocus])
+  return <div className="space-y-2">
     <textarea
+      ref={box}
       aria-label={label}
       placeholder={placeholder}
       rows={rows}
       value={body}
-      autoFocus={autoFocus}
       onChange={event => setBody(event.target.value)}
       onKeyDown={event => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); post() } }}
       className={boxClass}
@@ -263,7 +267,8 @@ export function CommentsColumn() {
       const placedItems = wide && composing
         ? [...items, { id: COMPOSER_ID, desired: composing.pageTop - (origin + window.scrollY), height: composerBox.current?.offsetHeight ?? 220 }]
         : items
-      const tops = wide ? stackThreads(placedItems, composing ? COMPOSER_ID : selectedId, 0) : {}
+      const anchorId = composing ? COMPOSER_ID : selectedId
+      const tops = wide ? stackThreads(placedItems, anchorId, 0) : {}
       const composerTop = wide && composing ? tops[COMPOSER_ID] ?? 0 : null
       const height = wide ? Math.max(0, ...placedItems.map(item => (tops[item.id] ?? 0) + item.height)) : 0
       const next = { tops, order, detached, composerTop, height }
