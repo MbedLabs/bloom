@@ -44,7 +44,7 @@ def require_document_kind(value: str | None) -> str:
             detail=(
                 f"Invalid document kind '{value}'. "
                 "Supported shared-document kinds: SPEC, PRT, RPT, STD, VIS. "
-                "Legacy values like DOC or human-readable labels are not accepted on the public API."
+                "Older values such as DOC and display names such as Specification are not accepted on the public API."
             ),
         )
     return value

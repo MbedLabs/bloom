@@ -7,14 +7,14 @@ import {
 
 describe('projectDeleteConfirmationPhrase', () => {
   it('uses the project prefix, not a generic PRJ example', () => {
-    expect(projectDeleteConfirmationPhrase('vcu')).toBe('Delete VCU')
-    expect(projectDeleteConfirmationPhrase('FLT')).toBe('Delete FLT')
+    expect(projectDeleteConfirmationPhrase('abc')).toBe('Delete ABC')
+    expect(projectDeleteConfirmationPhrase('XYZ')).toBe('Delete XYZ')
   })
 
   it('matches only the exact expected phrase', () => {
-    const expected = projectDeleteConfirmationPhrase('VCU')
-    expect(projectDeleteConfirmationMatches('Delete VCU', expected)).toBe(true)
+    const expected = projectDeleteConfirmationPhrase('ABC')
+    expect(projectDeleteConfirmationMatches('Delete ABC', expected)).toBe(true)
     expect(projectDeleteConfirmationMatches('Delete PRJ', expected)).toBe(false)
-    expect(projectDeleteConfirmationMatches(' Delete VCU ', expected)).toBe(true)
+    expect(projectDeleteConfirmationMatches(' Delete ABC ', expected)).toBe(true)
   })
 })

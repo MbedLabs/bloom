@@ -102,7 +102,7 @@ async def _seed_artefact_activity_data(session_maker: async_sessionmaker[AsyncSe
         session.add(external)
         await session.flush()
 
-        project = Project(name="Artefact Activity", prefix="AAC", description="Activity")
+        project = Project(name="Demo", prefix="PRJ", description="Activity")
         session.add(project)
         await session.flush()
 
@@ -120,7 +120,7 @@ async def _seed_artefact_activity_data(session_maker: async_sessionmaker[AsyncSe
 
         customer_requirement = Requirement(
             project_id=project.id,
-            req_id="AAC-REQ-001",
+            req_id="PRJ-REQ-001",
             title="Customer requirement",
             status="Draft",
             visibility="customer",
@@ -130,7 +130,7 @@ async def _seed_artefact_activity_data(session_maker: async_sessionmaker[AsyncSe
         )
         internal_requirement = Requirement(
             project_id=project.id,
-            req_id="AAC-REQ-002",
+            req_id="PRJ-REQ-002",
             title="Internal requirement",
             status="Draft",
             visibility="internal",

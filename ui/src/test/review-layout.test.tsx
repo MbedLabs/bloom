@@ -49,38 +49,38 @@ function renderAt(path: string, url: string, element: ReactElement) {
 const richPages: Record<string, () => void> = {
   requirement: () => {
     vi.mocked(client.requirementsApi.get).mockResolvedValue({ ...requirement, content_json: richContent } as never)
-    renderAt('/projects/:prefix/requirements/:itemId', `/projects/VCU/requirements/${requirement.id}`, <RequirementDetail />)
+    renderAt('/projects/:prefix/requirements/:itemId', `/projects/PRJ/requirements/${requirement.id}`, <RequirementDetail />)
   },
   'test case': () => {
     vi.mocked(client.testCasesApi.get).mockResolvedValue({ ...testCase, content_json: richContent } as never)
-    renderAt('/projects/:prefix/test-cases/:itemId', `/projects/VCU/test-cases/${testCase.id}`, <TestCaseDetail />)
+    renderAt('/projects/:prefix/test-cases/:itemId', `/projects/PRJ/test-cases/${testCase.id}`, <TestCaseDetail />)
   },
   document: () => {
     vi.mocked(client.documentsApi.get).mockResolvedValue({ ...docDetail, content_json: richContent } as never)
-    renderAt('/projects/:prefix/docs/:kind/:docId', `/projects/VCU/docs/specifications/${docDetail.id}`, <DocumentDetail />)
+    renderAt('/projects/:prefix/docs/:kind/:docId', `/projects/PRJ/docs/specifications/${docDetail.id}`, <DocumentDetail />)
   },
   design: () => {
     vi.mocked(client.designsApi.get).mockResolvedValue({ ...design, content_json: richContent } as never)
-    renderAt('/projects/:prefix/designs/:itemId', `/projects/VCU/designs/${design.id}`, <ArtefactDetail kind="design" />)
+    renderAt('/projects/:prefix/designs/:itemId', `/projects/PRJ/designs/${design.id}`, <ArtefactDetail kind="design" />)
   },
   risk: () => {
     vi.mocked(client.risksApi.get).mockResolvedValue({ ...risk, content_json: richContent } as never)
-    renderAt('/projects/:prefix/risks/:itemId', `/projects/VCU/risks/${risk.id}`, <ArtefactDetail kind="risk" />)
+    renderAt('/projects/:prefix/risks/:itemId', `/projects/PRJ/risks/${risk.id}`, <ArtefactDetail kind="risk" />)
   },
   change: () => {
     vi.mocked(client.changesApi.get).mockResolvedValue({ ...change, content_json: richContent } as never)
-    renderAt('/projects/:prefix/changes/:itemId', `/projects/VCU/changes/${change.id}`, <ArtefactDetail kind="change" />)
+    renderAt('/projects/:prefix/changes/:itemId', `/projects/PRJ/changes/${change.id}`, <ArtefactDetail kind="change" />)
   },
   'test concept': () => {
     vi.mocked(client.testConceptsApi.get).mockResolvedValue({ ...testConcept, content_json: richContent } as never)
-    renderAt('/projects/:prefix/test-concepts/:itemId', `/projects/VCU/test-concepts/${testConcept.id}`, <ArtefactDetail kind="test-concept" />)
+    renderAt('/projects/:prefix/test-concepts/:itemId', `/projects/PRJ/test-concepts/${testConcept.id}`, <ArtefactDetail kind="test-concept" />)
   },
 }
 
 const sidePanelPages: Record<string, () => void> = {
-  suite: () => { renderAt('/projects/:prefix/suites/:suiteId', `/projects/VCU/suites/${testSuite.id}`, <SuiteDetail />) },
-  campaign: () => { renderAt('/projects/:prefix/campaigns/:campaignId', '/projects/VCU/campaigns/51', <CampaignDetail />) },
-  defect: () => { renderAt('/projects/:prefix/defects/:itemId', `/projects/VCU/defects/${defect.id}`, <ArtefactDetail kind="defect" />) },
+  suite: () => { renderAt('/projects/:prefix/suites/:suiteId', `/projects/PRJ/suites/${testSuite.id}`, <SuiteDetail />) },
+  campaign: () => { renderAt('/projects/:prefix/campaigns/:campaignId', '/projects/PRJ/campaigns/51', <CampaignDetail />) },
+  defect: () => { renderAt('/projects/:prefix/defects/:itemId', `/projects/PRJ/defects/${defect.id}`, <ArtefactDetail kind="defect" />) },
 }
 
 beforeEach(() => {

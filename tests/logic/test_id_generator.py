@@ -65,7 +65,7 @@ def test_ignores_malformed_ids():
 def test_ignores_wrong_project_or_type_prefixes():
     """Only exact PROJECT-TYPE matches can advance the sequence."""
     result = compute_next_id(
-        ["PRJ-REQ-001", "OTHER-REQ-099", "PRJ-TC-050", "PRJ-REQ-002-extra"],
+        ["PRJ-REQ-001", "XYZ-REQ-099", "PRJ-TC-050", "PRJ-REQ-002-extra"],
         "PRJ",
         "REQ",
     )
@@ -74,8 +74,8 @@ def test_ignores_wrong_project_or_type_prefixes():
 
 def test_different_project_prefix():
     """Works with another three-letter project prefix."""
-    result = compute_next_id(["VCU-TC-005", "VCU-TC-012"], "VCU", "TC")
-    assert result == "VCU-TC-013"
+    result = compute_next_id(["PRJ-TC-005", "PRJ-TC-012"], "PRJ", "TC")
+    assert result == "PRJ-TC-013"
 
 
 def test_sequence_continues_past_999():
@@ -99,7 +99,7 @@ def test_existing_ids_widen_when_the_boundary_is_crossed():
 
 
 def test_widening_leaves_other_projects_and_types_alone():
-    existing = ["PRJ-REQ-001", "PRJ-TC-001", "OTH-REQ-001"]
+    existing = ["PRJ-REQ-001", "PRJ-TC-001", "ABC-REQ-001"]
 
     assert widened_ids(existing, "PRJ", "REQ", 4) == {"PRJ-REQ-001": "PRJ-REQ-0001"}
 
@@ -158,5 +158,5 @@ def test_normalizes_creator_supplied_doc_id():
 
 
 def test_rejects_creator_supplied_doc_id_with_wrong_project_prefix():
-    with pytest.raises(ValueError, match="ID project prefix must be VCU"):
-        normalize_doc_id("PRJ-REQ-001", expected_type_code="REQ", expected_project_prefix="VCU")
+    with pytest.raises(ValueError, match="ID project prefix must be PRJ"):
+        normalize_doc_id("ABC-REQ-001", expected_type_code="REQ", expected_project_prefix="PRJ")

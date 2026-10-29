@@ -61,7 +61,7 @@ const passed = {
   id: 61,
   status: 'Executed',
   result: 'Passed',
-  test_case: { ...testCase, tc_id: 'VCU-TC-001', title: 'Cold boot timing' },
+  test_case: { ...testCase, tc_id: 'PRJ-TC-001', title: 'Cold boot timing' },
 }
 const failed = {
   ...campaignItem,
@@ -69,7 +69,7 @@ const failed = {
   test_case_id: 22,
   status: 'Executed',
   result: 'Failed',
-  test_case: { ...testCase, id: 22, tc_id: 'VCU-TC-002', title: 'Brownout recovery' },
+  test_case: { ...testCase, id: 22, tc_id: 'PRJ-TC-002', title: 'Brownout recovery' },
 }
 /** Scoped but never resolved to a test case, which the row has to survive. */
 const unresolved = {
@@ -82,7 +82,7 @@ const unresolved = {
   test_case: null,
 }
 
-const secondSuite = { ...testSuite, id: 42, suite_id: 'VCU-TS-002', name: 'Regression suite' }
+const secondSuite = { ...testSuite, id: 42, suite_id: 'PRJ-TS-002', name: 'Regression suite' }
 
 const withScopes = {
   ...campaignDetail,
@@ -100,7 +100,7 @@ function renderCampaign() {
   return render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <MemoryRouter initialEntries={['/projects/VCU/campaigns/31']}>
+        <MemoryRouter initialEntries={['/projects/PRJ/campaigns/31']}>
           <Routes>
             <Route path="/projects/:prefix/campaigns/:campaignId" element={<CampaignDetail />} />
             <Route path={`/projects/:prefix/docs/test-suites/${testSuite.suite_id}`} element={<div>suite detail</div>} />
@@ -197,8 +197,8 @@ describe('the scope of a campaign', () => {
     await screen.findByText(testSuite.name)
     fireEvent.click(suiteHeader(testSuite.name))
 
-    const link = (await screen.findByText('VCU-TC-001')).closest('a') as HTMLAnchorElement
-    expect(link.getAttribute('href')).toContain('VCU-TC-001')
+    const link = (await screen.findByText('PRJ-TC-001')).closest('a') as HTMLAnchorElement
+    expect(link.getAttribute('href')).toContain('PRJ-TC-001')
   })
 
   it('opens the suite itself without expanding the row', async () => {

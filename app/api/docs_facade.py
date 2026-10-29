@@ -230,7 +230,7 @@ async def _count_links(
 async def _resolve_doc_by_public_id(
     db: AsyncSession, project_id: int, public_id: str
 ) -> tuple[str, int] | None:
-    """Resolve a human-readable id such as ``FLT-REQ-001`` to (type_code, row id)."""
+    """Resolve a document ID such as ``PRJ-REQ-001`` to its type code and row id."""
     for type_code, (model, id_col_name, _slug) in TYPE_MAP.items():
         row_id = (
             await db.execute(

@@ -23,7 +23,7 @@ async def session():
         await conn.run_sync(Base.metadata.create_all)
     maker = async_sessionmaker(engine, expire_on_commit=False)
     async with maker() as db:
-        project = Project(name="Alpha", prefix="ALP")
+        project = Project(name="Demo", prefix="PRJ")
         db.add(project)
         db.add(
             User(
@@ -37,7 +37,7 @@ async def session():
         db.add(
             TestCase(
                 project_id=project.id,
-                tc_id="ALP-TC-001",
+                tc_id="PRJ-TC-001",
                 title="Verify login",
                 status="Approved",
                 preconditions="User exists",
@@ -52,7 +52,7 @@ async def session():
         db.add(
             TestCase(
                 project_id=project.id,
-                tc_id="ALP-TC-002",
+                tc_id="PRJ-TC-002",
                 title="Verify logout",
                 status="Draft",
             )
@@ -70,22 +70,22 @@ async def test_test_cases_csv(session):
     admin = await _admin(session)
     response = await export_test_cases(project_id=1, format="csv", db=session, current_user=admin)
     assert response.media_type.startswith("text/csv")
-    assert 'filename="ALP-test-cases.csv"' in response.headers["content-disposition"]
+    assert 'filename="PRJ-test-cases.csv"' in response.headers["content-disposition"]
     rows = list(csv.reader(io.StringIO(response.body.decode("utf-8"))))
     assert rows[0][:3] == ["tc_id", "title", "status"]
     by_id = {r[0]: r for r in rows[1:]}
-    assert by_id["ALP-TC-001"][1] == "Verify login"
+    assert by_id["PRJ-TC-001"][1] == "Verify login"
     steps_col = rows[0].index("steps")
-    assert "Open login => Form shown" in by_id["ALP-TC-001"][steps_col]
+    assert "Open login => Form shown" in by_id["PRJ-TC-001"][steps_col]
 
 
 async def test_test_cases_markdown(session):
     admin = await _admin(session)
     response = await export_test_cases(project_id=1, format="md", db=session, current_user=admin)
     assert response.media_type.startswith("text/markdown")
-    assert 'filename="ALP-test-cases.md"' in response.headers["content-disposition"]
+    assert 'filename="PRJ-test-cases.md"' in response.headers["content-disposition"]
     body = response.body.decode("utf-8")
-    assert body.startswith("Test cases of Alpha (ALP)")
+    assert body.startswith("Test cases of Demo (PRJ)")
     assert "## [TC] Verify login" in body
     assert "- Pre-Condition: User exists" in body
     assert "- Step: Open login => Form shown" in body
@@ -98,7 +98,7 @@ async def test_test_cases_xml_is_wellformed(session):
     root = ET.fromstring(response.body)
     assert root.tag == "test-cases"
     ids = [tc.get("id") for tc in root.findall("test-case")]
-    assert ids == ["ALP-TC-001", "ALP-TC-002"]
+    assert ids == ["PRJ-TC-001", "PRJ-TC-002"]
     assert root.find("test-case").findtext("title") == "Verify login"
 
 

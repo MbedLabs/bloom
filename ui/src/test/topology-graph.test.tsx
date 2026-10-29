@@ -43,7 +43,7 @@ function renderTopology() {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
-        <ProjectDocTopology projectId={1} prefix="VCU" />
+        <ProjectDocTopology projectId={1} prefix="PRJ" />
       </MemoryRouter>
     </QueryClientProvider>,
   )
@@ -109,7 +109,7 @@ describe('loading', () => {
     renderTopology()
     await settled()
 
-    expect(docsApi.typeSummary).toHaveBeenCalledWith('VCU')
+    expect(docsApi.typeSummary).toHaveBeenCalledWith('PRJ')
     expect(docsApi.list).not.toHaveBeenCalled()
     expect(await screen.findByText('2')).toBeTruthy()
   })

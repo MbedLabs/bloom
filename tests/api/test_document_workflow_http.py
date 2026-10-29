@@ -154,7 +154,7 @@ async def workflow_http(monkeypatch):
         await connection.run_sync(Base.metadata.create_all)
     async with async_sessionmaker(engine, expire_on_commit=False)() as db:
         db.info["workflow_deliveries"] = deliveries
-        db.add(Project(id=1, name="Workflow", prefix="PRJ"))
+        db.add(Project(id=1, name="Demo", prefix="PRJ"))
         users = [
             User(
                 id=i,
@@ -654,7 +654,7 @@ async def test_project_notification_dependency_is_scoped_to_deleted_project(work
     from app.models import Notification
 
     db, client, current, users = workflow_http
-    db.add(Project(id=2, name="Retained", prefix="RET"))
+    db.add(Project(id=2, name="ABC", prefix="ABC"))
     await db.flush()
     removed = Notification(
         user_id=1, project_id=1, event_type="review", title="Pending project review"
@@ -749,7 +749,7 @@ async def test_project_pending_requests_filter_origin_membership_and_current_rev
         created_by_id=1,
         reviewer_id=2,
     )
-    db.add_all([entry, customer, internal, Project(id=2, name="Other", prefix="OTH")])
+    db.add_all([entry, customer, internal, Project(id=2, name="ABC", prefix="ABC")])
     await db.flush()
     for row in (customer, internal):
         request = await client.post(

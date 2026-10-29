@@ -6,7 +6,7 @@ const requirement = {
   id: 1064,
   project_id: 7,
   parent_id: null,
-  req_id: 'FLT-REQ-1064',
+  req_id: 'PRJ-REQ-1064',
   title: 'Audit Stats Top-User Count Consistency',
   description: 'Keep audit statistics consistent.',
   status: 'Draft',
@@ -38,7 +38,7 @@ vi.mock('@tanstack/react-query', async () => {
     ...actual,
     useQuery: ({ queryKey }: { queryKey: unknown[] }) => ({
       data: queryKey[0] === 'project'
-        ? { id: 7, name: 'Flight', prefix: 'FLT' }
+        ? { id: 7, name: 'Demo', prefix: 'PRJ' }
         : queryKey[0] === 'users' || queryKey[0] === 'mentionableUsers' || queryKey[0] === 'artefactComments'
           ? []
           : queryKey[0] === 'document-workflow'
@@ -59,7 +59,7 @@ vi.mock('react-router', async () => {
   const actual = await vi.importActual<typeof import('react-router')>('react-router')
   return {
     ...actual,
-    useParams: () => ({ prefix: 'FLT', itemId: '1064' }),
+    useParams: () => ({ prefix: 'PRJ', itemId: '1064' }),
     useNavigate: () => vi.fn(),
     useLocation: () => ({ state: null }),
     Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,

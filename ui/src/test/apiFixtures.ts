@@ -15,8 +15,8 @@ function timestamps() {
 
 export const project = {
   id: 1,
-  name: 'Vehicle Control Unit',
-  prefix: 'VCU',
+  name: 'Demo',
+  prefix: 'PRJ',
   description: 'The primary controller',
   status: 'Active',
   requirement_count: 3,
@@ -56,7 +56,7 @@ export const workflowFixture = {
 export const requirement = {
   id: 11,
   project_id: 1,
-  req_id: 'VCU-REQ-001',
+  req_id: 'PRJ-REQ-001',
   title: 'The system shall boot within 2 seconds',
   description: 'Cold start to ready state.',
   content_json: null,
@@ -79,7 +79,7 @@ export const requirement = {
 export const testCase = {
   id: 21,
   project_id: 1,
-  tc_id: 'VCU-TC-001',
+  tc_id: 'PRJ-TC-001',
   title: 'Cold boot timing',
   description: 'Measure time to ready.',
   content_json: null,
@@ -113,7 +113,7 @@ export const testCase = {
 
 export const docShell = {
   id: 11,
-  doc_id: 'VCU-REQ-001',
+  doc_id: 'PRJ-REQ-001',
   doc_type: 'REQ',
   title: 'The system shall boot within 2 seconds',
   status: 'Approved',
@@ -136,7 +136,7 @@ export const docShell = {
 export const testCaseDocShell = {
   ...docShell,
   id: 21,
-  doc_id: 'VCU-TC-001',
+  doc_id: 'PRJ-TC-001',
   doc_type: 'TC',
   title: 'Cold boot timing',
   req_type: null,
@@ -161,7 +161,7 @@ export const docDetail = {
 export const campaign = {
   id: 31,
   project_id: 1,
-  campaign_id: 'VCU-CMP-001',
+  campaign_id: 'PRJ-CMP-001',
   name: 'Release candidate sweep',
   description: 'Full regression before release.',
   status: 'In Progress',
@@ -219,7 +219,7 @@ export const testSuite = {
   total_items: 1,
   id: 41,
   project_id: 1,
-  suite_id: 'VCU-TS-001',
+  suite_id: 'PRJ-TS-001',
   name: 'Smoke suite',
   description: 'Runs on every build.',
   status: 'Active',
@@ -231,7 +231,7 @@ export const testSuite = {
 export const defect = {
   id: 51,
   project_id: 1,
-  defect_id: 'VCU-DEF-001',
+  defect_id: 'PRJ-DEF-001',
   title: 'Screen flickers on wake',
   description: 'Observed on cold mornings.',
   severity: 'High',
@@ -251,7 +251,7 @@ export const defect = {
 export const design = {
   id: 61,
   project_id: 1,
-  design_id: 'VCU-DES-001',
+  design_id: 'PRJ-DES-001',
   title: 'Boot sequence',
   description: 'How the controller starts.',
   content_json: null,
@@ -267,7 +267,7 @@ export const design = {
 export const risk = {
   id: 71,
   project_id: 1,
-  risk_id: 'VCU-RSK-001',
+  risk_id: 'PRJ-RSK-001',
   title: 'Brown-out during boot',
   description: 'Low battery may interrupt startup.',
   content_json: null,
@@ -283,7 +283,7 @@ export const risk = {
 export const change = {
   id: 81,
   project_id: 1,
-  change_id: 'VCU-CHG-001',
+  change_id: 'PRJ-CHG-001',
   title: 'Raise the boot budget to 3s',
   description: 'Hardware revision is slower.',
   content_json: null,
@@ -302,7 +302,7 @@ export const change = {
 export const testConcept = {
   id: 91,
   project_id: 1,
-  concept_id: 'VCU-CPT-001',
+  concept_id: 'PRJ-CPT-001',
   name: 'Environmental testing concept',
   description: 'How we verify temperature range.',
   content_json: null,
@@ -363,7 +363,7 @@ export const integrationSetting = {
   id: 141,
   project_id: 1,
   tracker: 'github',
-  base_url: 'https://github.com/embedlabs/vcu',
+  base_url: 'https://github.com/example/demo',
   has_token: true,
   has_webhook_secret: true,
   enabled: true,
@@ -397,8 +397,8 @@ export const notification = {
   id: 161,
   event_type: 'defect.created',
   title: 'A defect was raised',
-  body: 'VCU-DEF-001',
-  link_path: '/projects/VCU/defects/51',
+  body: 'PRJ-DEF-001',
+  link_path: '/projects/PRJ/defects/51',
   project_id: 1,
   read_at: null,
   created_at: NOW,
@@ -565,7 +565,7 @@ export const RESPONSES: Record<string, unknown> = {
   'projectMembersApi.update': projectMember,
   'projectMembersApi.remove': undefined,
 
-  'docsApi.nextDocId': 'VCU-REQ-004',
+  'docsApi.nextDocId': 'PRJ-REQ-004',
   'docsApi.list': { items: [docShell, testCaseDocShell], total: 2, skip: 0, limit: 50 },
   'docsApi.typeSummary': {
     types: [
@@ -679,20 +679,20 @@ export const RESPONSES: Record<string, unknown> = {
   'testConceptsApi.update': testConcept,
   'testConceptsApi.delete': undefined,
 
-  'importApi.import': { imported: 1, skipped: 0, new_ids: ['VCU-REQ-004'], errors: [] },
+  'importApi.import': { imported: 1, skipped: 0, new_ids: ['PRJ-REQ-004'], errors: [] },
   'importApi.importReqif': {
     imported: 1,
     skipped: 0,
     links_created: 1,
     specifications: 1,
-    new_ids: ['VCU-REQ-004'],
+    new_ids: ['PRJ-REQ-004'],
     errors: [],
   },
   'importApi.importTestCases': {
     created: 1,
     updated: 0,
     skipped: 0,
-    new_ids: ['VCU-TC-004'],
+    new_ids: ['PRJ-TC-004'],
     errors: [],
   },
   'importApi.importMarkdown': {

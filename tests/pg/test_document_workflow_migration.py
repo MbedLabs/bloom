@@ -127,7 +127,7 @@ async def test_workflow_migration_does_not_rewrite_legacy_status_actors_or_basel
     await connection.execute(
         text(
             "INSERT INTO change_requests (project_id, change_id, title, status, visibility, priority, "
-            "change_type, created_at, updated_at) VALUES (:project, 'WFL-CHG-001', 'Legacy', "
+            "change_type, created_at, updated_at) VALUES (:project, 'PRJ-CHG-001', 'Legacy', "
             "'Implemented', 'internal', 'Medium', 'Enhancement', now(), now())"
         ),
         {"project": project},

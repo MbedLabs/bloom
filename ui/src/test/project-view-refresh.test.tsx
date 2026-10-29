@@ -38,7 +38,7 @@ const allWrites = { ...writes, DEF: api.defectsApi, TS: api.testSuitesApi, CMP: 
 const allDetails = { ...details, DEF: 'defect', TS: 'testSuite', CMP: 'campaign' }
 
 /** Observe real cached project views while a mutation page is mounted. */
-function Views({ calls, prefix = 'VCU', projectId = 1 }: { calls: ReturnType<typeof vi.fn<() => Promise<unknown>>>[]; prefix?: string; projectId?: number }) {
+function Views({ calls, prefix = 'PRJ', projectId = 1 }: { calls: ReturnType<typeof vi.fn<() => Promise<unknown>>>[]; prefix?: string; projectId?: number }) {
   useQuery({ queryKey: ['all-docs', prefix, 'requirements', 'filter'], queryFn: calls[0] })
   useQuery({ queryKey: ['project-doc-type-summary', prefix], queryFn: calls[1] })
   useQuery({ queryKey: ['traceability', projectId, 'page'], queryFn: calls[2] })
@@ -58,14 +58,14 @@ async function editor(type: DocType, mode: 'create' | 'edit') {
   const other = Array.from({ length: 3 }, () => vi.fn(async () => []))
   const detailKey = details[type] || 'document'
   const detailFetch = vi.fn(async () => { throw new Error('Deleted detail fetched again') })
-  client.setQueryData(['project-by-prefix', 'VCU'], project)
+  client.setQueryData(['project-by-prefix', 'PRJ'], project)
   client.setQueryData([detailKey, 11], docDetail)
-  const docId = `VCU-${type}-001`
+  const docId = `PRJ-${type}-001`
   vi.mocked(api.docsApi.get).mockResolvedValue({ ...docDetail, doc_type: type, doc_id: docId } as never)
   vi.mocked(writes[type as keyof typeof writes].get).mockResolvedValue({ ...docDetail, name: docDetail.title, req_id: docId, tc_id: docId, design_id: docId, risk_id: docId, change_id: docId, concept_id: docId, doc_id: docId } as never)
-  const path = mode === 'create' ? `/projects/VCU/docs/new?type=${type}` : `/projects/VCU/docs/${DOC_TYPE_SLUGS[type]}/${docId}/edit`
+  const path = mode === 'create' ? `/projects/PRJ/docs/new?type=${type}` : `/projects/PRJ/docs/${DOC_TYPE_SLUGS[type]}/${docId}/edit`
   render(<QueryClientProvider client={client}><ToastProvider><MemoryRouter initialEntries={[path]}>
-    <Views calls={calls} /><Views calls={other} prefix="OTHER" projectId={42} />
+    <Views calls={calls} /><Views calls={other} prefix="ABC" projectId={42} />
     <Routes>
       <Route path="/projects/:prefix/docs/new" element={<DocCreate />} />
       <Route path="/projects/:prefix/docs/:kind/:docId/edit" element={<><DocCreate editMode /><Detail detailKey={detailKey} fetch={detailFetch} /></>} />
@@ -93,7 +93,7 @@ afterEach(cleanup)
 async function mountedPage(element: React.ReactElement, path: string, route: string, prepare?: (client: ReturnType<typeof createQueryClient>) => void) {
   const client = createQueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   const calls = Array.from({ length: 3 }, () => vi.fn(async () => []))
-  client.setQueryData(['project-by-prefix', 'VCU'], project)
+  client.setQueryData(['project-by-prefix', 'PRJ'], project)
   prepare?.(client)
   render(<QueryClientProvider client={client}><ToastProvider><MemoryRouter initialEntries={[path]}>
     <Views calls={calls} />
@@ -108,12 +108,12 @@ describe('native document detail deletion', () => {
     const endpoint = allWrites[type]
     const record = await endpoint.get(0) as unknown as { id: number; project_id: number }
     const detailKey = allDetails[type] || 'document'
-    const docId = `VCU-${type}-001`
+    const docId = `PRJ-${type}-001`
     const shell = { ...docDetail, id: record.id, doc_type: type, doc_id: docId }
     vi.mocked(api.docsApi.get).mockResolvedValue(shell as never)
-    const { client, calls } = await mountedPage(<UnifiedDocDetail />, `/projects/VCU/docs/${DOC_TYPE_SLUGS[type]}/${docId}`, '/projects/:prefix/docs/:kind/:docId', client => {
+    const { client, calls } = await mountedPage(<UnifiedDocDetail />, `/projects/PRJ/docs/${DOC_TYPE_SLUGS[type]}/${docId}`, '/projects/:prefix/docs/:kind/:docId', client => {
       client.setQueryData([detailKey, record.id], record)
-      client.setQueryData(['doc-facade', 'VCU', DOC_TYPE_SLUGS[type], docId], shell)
+      client.setQueryData(['doc-facade', 'PRJ', DOC_TYPE_SLUGS[type], docId], shell)
     })
     fireEvent.click(await screen.findByRole('button', { name: /^Delete$/ }))
     const buttons = screen.getAllByRole('button', { name: /^Delete$/ })
@@ -128,7 +128,7 @@ describe('native document detail deletion', () => {
 
 describe('dedicated create and update pages', () => {
   it.each(['DEF', 'TS', 'CMP'] as const)('%s create refreshes cached project views', async type => {
-    const { calls } = await mountedPage(type === 'DEF' ? <Defects /> : <TestCampaigns />, '/projects/VCU/manage', '/projects/:prefix/manage')
+    const { calls } = await mountedPage(type === 'DEF' ? <Defects /> : <TestCampaigns />, '/projects/PRJ/manage', '/projects/:prefix/manage')
     fireEvent.click(await screen.findByRole('button', { name: type === 'DEF' ? /new defect/i : type === 'TS' ? /new suite/i : /new campaign/i }))
     if (type === 'DEF') {
       fireEvent.change(await screen.findByTitle('Title'), { target: { value: 'Example defect' } })
@@ -147,11 +147,11 @@ describe('dedicated create and update pages', () => {
 
   it.each(['DEF', 'TS', 'CMP'] as const)('%s update refreshes cached project views', async type => {
     const record = await allWrites[type].get(0) as unknown as { id: number }
-    const shell = { ...docDetail, id: record.id, doc_type: type, doc_id: `VCU-${type}-001` }
+    const shell = { ...docDetail, id: record.id, doc_type: type, doc_id: `PRJ-${type}-001` }
     vi.mocked(api.docsApi.get).mockResolvedValue(shell as never)
-    const { calls } = await mountedPage(<UnifiedDocDetail />, `/projects/VCU/docs/${DOC_TYPE_SLUGS[type]}/${shell.doc_id}`, '/projects/:prefix/docs/:kind/:docId', client => {
+    const { calls } = await mountedPage(<UnifiedDocDetail />, `/projects/PRJ/docs/${DOC_TYPE_SLUGS[type]}/${shell.doc_id}`, '/projects/:prefix/docs/:kind/:docId', client => {
       client.setQueryData([allDetails[type], record.id], record)
-      client.setQueryData(['doc-facade', 'VCU', DOC_TYPE_SLUGS[type], shell.doc_id], shell)
+      client.setQueryData(['doc-facade', 'PRJ', DOC_TYPE_SLUGS[type], shell.doc_id], shell)
     })
     fireEvent.click(await screen.findByRole('button', { name: /^edit$/i }))
     const save = await screen.findByRole('button', { name: type === 'DEF' ? /^save changes$/i : /^save$/i })
@@ -203,17 +203,17 @@ describe('project views after real editor changes', () => {
 describe('shared project refresh', () => {
   it('attachment uploads refresh project views while project metadata is unavailable', async () => {
     vi.mocked(api.projectsApi.getByPrefix).mockImplementation(() => new Promise(() => {}))
-    const { client, calls } = await mountedPage(<DocumentAttachmentsPanel documentId={31} docType="SPEC" projectId={1} />, '/projects/VCU/manage', '/projects/:prefix/manage', client => client.removeQueries({ queryKey: ['project-by-prefix', 'VCU'] }))
+    const { client, calls } = await mountedPage(<DocumentAttachmentsPanel documentId={31} docType="SPEC" projectId={1} />, '/projects/PRJ/manage', '/projects/:prefix/manage', client => client.removeQueries({ queryKey: ['project-by-prefix', 'PRJ'] }))
     const input = document.querySelector('input[type="file"]')!
     fireEvent.change(input, { target: { files: [new File(['sample'], 'example.txt', { type: 'text/plain' })] } })
     await waitFor(() => expect(api.attachmentsApi.upload).toHaveBeenCalled())
     await waitFor(() => calls.forEach(call => expect(call).toHaveBeenCalledTimes(2)))
-    expect(client.getQueryData(['project-by-prefix', 'VCU'])).toBeUndefined()
+    expect(client.getQueryData(['project-by-prefix', 'PRJ'])).toBeUndefined()
     client.clear()
   })
   it('workflow comments refresh project views without cached project metadata', async () => {
-    const { client, calls } = await mountedPage(<WorkflowPanel artefactType="requirement" artefactId={11} projectPrefix="VCU" projectId={1} />, '/projects/VCU/manage', '/projects/:prefix/manage')
-    client.removeQueries({ queryKey: ['project-by-prefix', 'VCU'] })
+    const { client, calls } = await mountedPage(<WorkflowPanel artefactType="requirement" artefactId={11} projectPrefix="PRJ" projectId={1} />, '/projects/PRJ/manage', '/projects/:prefix/manage')
+    client.removeQueries({ queryKey: ['project-by-prefix', 'PRJ'] })
     const discussion = await screen.findByRole('region', { name: 'Document discussion' })
     fireEvent.change(await within(discussion).findByRole('textbox', { name: 'Comment' }), { target: { value: 'Review comment' } })
     fireEvent.click(within(discussion).getByRole('button', { name: /^Comment$/ }))
@@ -221,14 +221,14 @@ describe('shared project refresh', () => {
     await waitFor(() => calls.forEach(call => expect(call).toHaveBeenCalledTimes(2)))
   })
   it('marks a retired project prefix stale without refetching its old URL', async () => {
-    const { client, calls } = await mountedPage(<p>Renamed project</p>, '/projects/VCU/manage', '/projects/:prefix/manage')
-    refreshProjectViews(client, { prefix: 'VCU', projectId: 1 }, 'none')
+    const { client, calls } = await mountedPage(<p>Renamed project</p>, '/projects/PRJ/manage', '/projects/:prefix/manage')
+    refreshProjectViews(client, { prefix: 'PRJ', projectId: 1 }, 'none')
     calls.forEach(call => expect(call).toHaveBeenCalledTimes(1))
-    expect(client.getQueryState(['all-docs', 'VCU', 'requirements', 'filter'])?.isInvalidated).toBe(true)
+    expect(client.getQueryState(['all-docs', 'PRJ', 'requirements', 'filter'])?.isInvalidated).toBe(true)
   })
   it('marking notifications read does not refetch project views', async () => {
     vi.mocked(api.notificationsApi.unreadCount).mockResolvedValue(1)
-    const { calls } = await mountedPage(<Layout />, '/projects/VCU/manage', '/projects/:prefix/manage')
+    const { calls } = await mountedPage(<Layout />, '/projects/PRJ/manage', '/projects/:prefix/manage')
     fireEvent.click(await screen.findByRole('button', { name: /^Notifications/ }))
     fireEvent.click(await screen.findByRole('button', { name: /mark all read/i }))
     await waitFor(() => expect(api.notificationsApi.unreadCount).toHaveBeenCalledTimes(2))
@@ -236,17 +236,17 @@ describe('shared project refresh', () => {
     calls.forEach(call => expect(call).toHaveBeenCalledTimes(1))
   })
   it('a different project save does not refetch mounted project views', async () => {
-    const { client, calls } = await mountedPage(<p>Another project</p>, '/projects/VCU/manage', '/projects/:prefix/manage')
-    refreshProjectViews(client, { prefix: 'OTHER', projectId: 42 })
+    const { client, calls } = await mountedPage(<p>Another project</p>, '/projects/PRJ/manage', '/projects/:prefix/manage')
+    refreshProjectViews(client, { prefix: 'ABC', projectId: 42 })
     calls.forEach(call => expect(call).toHaveBeenCalledTimes(1))
   })
   it('marks hidden filtered views stale without fetching until they mount', async () => {
     const client = createQueryClient()
     const calls = Array.from({ length: 3 }, () => vi.fn(async () => []))
-    await client.prefetchQuery({ queryKey: ['all-docs', 'VCU', 'requirements', 'filter'], queryFn: calls[0] })
-    await client.prefetchQuery({ queryKey: ['project-doc-type-summary', 'VCU'], queryFn: calls[1] })
+    await client.prefetchQuery({ queryKey: ['all-docs', 'PRJ', 'requirements', 'filter'], queryFn: calls[0] })
+    await client.prefetchQuery({ queryKey: ['project-doc-type-summary', 'PRJ'], queryFn: calls[1] })
     await client.prefetchQuery({ queryKey: ['traceability', 1, 'page'], queryFn: calls[2] })
-    refreshProjectViews(client, { prefix: 'VCU', projectId: 1 })
+    refreshProjectViews(client, { prefix: 'PRJ', projectId: 1 })
     calls.forEach(call => expect(call).toHaveBeenCalledTimes(1))
     render(<QueryClientProvider client={client}><Views calls={calls} /></QueryClientProvider>)
     await waitFor(() => calls.forEach(call => expect(call).toHaveBeenCalledTimes(2)))
@@ -255,11 +255,11 @@ describe('shared project refresh', () => {
   it('does not wait for active refetches', async () => {
     const client = createQueryClient()
     const calls = Array.from({ length: 3 }, () => vi.fn(async () => []))
-    client.setQueryData(['project-by-prefix', 'VCU'], project)
+    client.setQueryData(['project-by-prefix', 'PRJ'], project)
     render(<QueryClientProvider client={client}><Views calls={calls} /></QueryClientProvider>)
     await waitFor(() => calls.forEach(call => expect(call).toHaveBeenCalledTimes(1)))
     calls.forEach(call => call.mockImplementation(() => new Promise(() => {})))
-    expect(refreshProjectViews(client, { prefix: 'VCU' })).toBeUndefined()
+    expect(refreshProjectViews(client, { prefix: 'PRJ' })).toBeUndefined()
     await waitFor(() => calls.forEach(call => expect(call).toHaveBeenCalledTimes(2)))
     client.clear()
   })

@@ -104,7 +104,7 @@ async def _seed_traceability_visibility_data(session_maker: async_sessionmaker[A
         session.add(external)
         await session.flush()
 
-        project = Project(name="Traceability Visibility", prefix="TRV", description="Visibility")
+        project = Project(name="Demo", prefix="PRJ", description="Visibility")
         session.add(project)
         await session.flush()
 
@@ -122,7 +122,7 @@ async def _seed_traceability_visibility_data(session_maker: async_sessionmaker[A
 
         customer_requirement = Requirement(
             project_id=project.id,
-            req_id="TRV-REQ-001",
+            req_id="PRJ-REQ-001",
             title="Customer requirement",
             status="Draft",
             visibility="customer",
@@ -132,7 +132,7 @@ async def _seed_traceability_visibility_data(session_maker: async_sessionmaker[A
         )
         internal_requirement = Requirement(
             project_id=project.id,
-            req_id="TRV-REQ-002",
+            req_id="PRJ-REQ-002",
             title="Internal requirement",
             status="Draft",
             visibility="internal",
@@ -142,14 +142,14 @@ async def _seed_traceability_visibility_data(session_maker: async_sessionmaker[A
         )
         customer_test_case = TestCase(
             project_id=project.id,
-            tc_id="TRV-TC-001",
+            tc_id="PRJ-TC-001",
             title="Customer test case",
             status="Approved",
             visibility="customer",
         )
         internal_test_case = TestCase(
             project_id=project.id,
-            tc_id="TRV-TC-002",
+            tc_id="PRJ-TC-002",
             title="Internal test case",
             status="Approved",
             visibility="internal",
@@ -208,7 +208,7 @@ def test_external_traceability_hides_internal_artefacts():
         items = response.json()["items"]
         assert len(items) == 1
         assert items[0]["requirement"]["req_id"] == seeded["customer_requirement"].req_id
-        assert [tc["tc_id"] for tc in items[0]["linked_test_cases"]] == ["TRV-TC-001"]
+        assert [tc["tc_id"] for tc in items[0]["linked_test_cases"]] == ["PRJ-TC-001"]
 
         coverage = harness.client.get(f"/api/traceability/coverage-gaps/{seeded['project'].id}")
         assert coverage.status_code == 200, coverage.text

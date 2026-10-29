@@ -64,7 +64,7 @@ async def _seed(dsn: str) -> dict:
         ids = dict(await conn.fetch("SELECT name, id FROM policies"))
         project = await conn.fetchval(
             "INSERT INTO projects (name, prefix, status, created_at, updated_at) "
-            "VALUES ('Visions', 'VSN', 'Active', now(), now()) RETURNING id"
+            "VALUES ('Visions', 'PRJ', 'Active', now(), now()) RETURNING id"
         )
         seeded = {"project": project}
         for key, names in (
@@ -214,7 +214,7 @@ def test_visions_reach_only_their_holders_and_downgrade_waits_for_no_visions():
             _value(
                 target,
                 "INSERT INTO documents (project_id, doc_id, doc_type, title, status, version, "
-                "visibility, created_at, updated_at) VALUES ($1, 'VSN-VIS-001', 'VIS', 'Vision', "
+                "visibility, created_at, updated_at) VALUES ($1, 'PRJ-VIS-001', 'VIS', 'Vision', "
                 "'Draft', '1', 'internal', now(), now()) RETURNING id",
                 seeded["project"],
             )

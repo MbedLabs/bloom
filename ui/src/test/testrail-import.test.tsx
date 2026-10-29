@@ -29,9 +29,9 @@ const result = {
   created: 2,
   updated: 1,
   skipped: 1,
-  suites_created: ['VCU-TS-001'],
+  suites_created: ['PRJ-TS-001'],
   links_created: 3,
-  new_ids: ['VCU-TC-004', 'VCU-TC-005'],
+  new_ids: ['PRJ-TC-004', 'PRJ-TC-005'],
   errors: ['case C9: missing title'],
 }
 
@@ -42,9 +42,9 @@ function renderImport() {
   return render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-      <MemoryRouter initialEntries={['/projects/VCU/import']}>
+      <MemoryRouter initialEntries={['/projects/PRJ/import']}>
         <Routes>
-          <Route path="/projects/:prefix/import" element={<TestRailImport projectId={1} prefix="VCU" />} />
+          <Route path="/projects/:prefix/import" element={<TestRailImport projectId={1} prefix="PRJ" />} />
           <Route path="/projects/:prefix/docs" element={<div>document registry</div>} />
         </Routes>
       </MemoryRouter>
@@ -85,7 +85,7 @@ describe('TestRail import', () => {
     expect(client.importApi.testRailColumns).not.toHaveBeenCalled()
     expect(screen.getByText(/1 skipped/)).toBeTruthy()
     expect(screen.getByText(/1 suite\(s\) created/)).toBeTruthy()
-    expect(screen.getByText('New IDs: VCU-TC-004, VCU-TC-005')).toBeTruthy()
+    expect(screen.getByText('New IDs: PRJ-TC-004, PRJ-TC-005')).toBeTruthy()
     expect(screen.getByText('case C9: missing title')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'View test cases' }))

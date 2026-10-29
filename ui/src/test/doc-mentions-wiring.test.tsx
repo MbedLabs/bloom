@@ -67,7 +67,7 @@ function renderCreate(type = 'requirements') {
   return render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <MemoryRouter initialEntries={[`/projects/VCU/docs/requirements/new?type=${type}`]}>
+        <MemoryRouter initialEntries={[`/projects/PRJ/docs/requirements/new?type=${type}`]}>
           <Routes>
             <Route path="/projects/:prefix/docs/:kind/new" element={<DocCreate />} />
           </Routes>
@@ -152,8 +152,8 @@ describe('what each mention trigger offers', () => {
 
 describe('what # offers', () => {
   const found = [
-    { id: 42, type: 'REQ', doc_id: 'VCU-REQ-0042', title: 'Brake pressure' },
-    { id: 7, type: 'DES', doc_id: 'VCU-DES-0007', title: 'Hydraulic loop' },
+    { id: 42, type: 'REQ', doc_id: 'PRJ-REQ-0042', title: 'Brake pressure' },
+    { id: 7, type: 'DES', doc_id: 'PRJ-DES-0007', title: 'Hydraulic loop' },
   ]
 
   async function searchFrom(type: string) {
@@ -173,8 +173,8 @@ describe('what # offers', () => {
     const offered = await (await searchFrom('requirements'))('brake')
 
     expect(offered).toEqual([
-      { id: 42, label: 'VCU-REQ-0042', hint: 'Brake pressure', docType: 'REQ' },
-      { id: 7, label: 'VCU-DES-0007', hint: 'Hydraulic loop', docType: 'DES' },
+      { id: 42, label: 'PRJ-REQ-0042', hint: 'Brake pressure', docType: 'REQ' },
+      { id: 7, label: 'PRJ-DES-0007', hint: 'Hydraulic loop', docType: 'DES' },
     ])
   })
 
@@ -202,7 +202,7 @@ describe('what # offers', () => {
 
     const offered = await (await searchFrom('specifications'))('brake')
 
-    expect(offered.map((item) => item.label)).toEqual(['VCU-REQ-0042'])
+    expect(offered.map((item) => item.label)).toEqual(['PRJ-REQ-0042'])
   })
 
   it('falls back to type and id when an artefact has no public id yet', async () => {
@@ -221,12 +221,12 @@ describe('what # offers', () => {
     vi.mocked(client.searchApi.global).mockResolvedValue({
       query: 'brake',
       total: 2,
-      items: [found[0], { id: 3, type: 'NOPE', doc_id: 'VCU-XXX-003', title: 'Unknown' }],
+      items: [found[0], { id: 3, type: 'NOPE', doc_id: 'PRJ-XXX-003', title: 'Unknown' }],
     } as never)
 
     const offered = await (await searchFrom('requirements'))('brake')
 
-    expect(offered.map((item) => item.label)).toEqual(['VCU-REQ-0042'])
+    expect(offered.map((item) => item.label)).toEqual(['PRJ-REQ-0042'])
   })
 
   it('gives a test case no picker at all, because a container hosts no tags', async () => {
@@ -242,6 +242,6 @@ describe('what # offers', () => {
     await waitFor(() => expect(lastEditorProps.artefactHref).toBeTypeOf('function'))
 
     const href = lastEditorProps.artefactHref as (docType: string, id: number, label: string) => string
-    expect(href('REQ', 42, 'VCU-REQ-007')).toBe('/projects/VCU/docs/requirements/VCU-REQ-007')
+    expect(href('REQ', 42, 'PRJ-REQ-007')).toBe('/projects/PRJ/docs/requirements/PRJ-REQ-007')
   })
 })

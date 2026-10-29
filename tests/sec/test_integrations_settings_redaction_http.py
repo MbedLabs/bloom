@@ -95,7 +95,7 @@ async def _seed_integration_settings_data(session_maker: async_sessionmaker[Asyn
         session.add(external)
         await session.flush()
 
-        project = Project(name="Integration Visibility", prefix="IGV", description="Visibility")
+        project = Project(name="Demo", prefix="PRJ", description="Visibility")
         session.add(project)
         await session.flush()
 

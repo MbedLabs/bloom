@@ -110,7 +110,7 @@ async def _seed_requirement_visibility_data(session_maker: async_sessionmaker[As
         session.add_all([admin, external])
         await session.flush()
 
-        project = Project(name="Requirement Visibility", prefix="RQV", description="Visibility")
+        project = Project(name="Demo", prefix="PRJ", description="Visibility")
         session.add(project)
         await session.flush()
 
@@ -128,7 +128,7 @@ async def _seed_requirement_visibility_data(session_maker: async_sessionmaker[As
 
         customer_requirement = Requirement(
             project_id=project.id,
-            req_id="RQV-REQ-001",
+            req_id="PRJ-REQ-001",
             title="Customer requirement",
             status="Draft",
             visibility="customer",
@@ -138,7 +138,7 @@ async def _seed_requirement_visibility_data(session_maker: async_sessionmaker[As
         )
         internal_requirement = Requirement(
             project_id=project.id,
-            req_id="RQV-REQ-002",
+            req_id="PRJ-REQ-002",
             title="Internal requirement",
             status="Draft",
             visibility="internal",

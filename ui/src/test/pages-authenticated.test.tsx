@@ -178,43 +178,43 @@ afterEach(() => {
 
 describe('signed-in routes render their data', () => {
   it.each([
-    ['/', '/', 'Vehicle Control Unit'],
-    ['/projects', '/projects', 'Vehicle Control Unit'],
-    ['/projects/:prefix', '/projects/VCU', 'Vehicle Control Unit'],
-    ['/projects/:prefix/docs', '/projects/VCU/docs', 'VCU-REQ-001'],
-    ['/projects/:prefix/defects', '/projects/VCU/defects', 'Screen flickers on wake'],
-    ['/projects/:prefix/campaigns', '/projects/VCU/campaigns', 'Release candidate sweep'],
-    ['/projects/:prefix/traceability', '/projects/VCU/traceability', 'VCU-REQ-001'],
-    ['/projects/:prefix/baselines', '/projects/VCU/baselines', 'Release 1.0'],
-    ['/projects/:prefix/parameters', '/projects/VCU/parameters', 'BOOT_BUDGET_MS'],
+    ['/', '/', 'Demo'],
+    ['/projects', '/projects', 'Demo'],
+    ['/projects/:prefix', '/projects/PRJ', 'Demo'],
+    ['/projects/:prefix/docs', '/projects/PRJ/docs', 'PRJ-REQ-001'],
+    ['/projects/:prefix/defects', '/projects/PRJ/defects', 'Screen flickers on wake'],
+    ['/projects/:prefix/campaigns', '/projects/PRJ/campaigns', 'Release candidate sweep'],
+    ['/projects/:prefix/traceability', '/projects/PRJ/traceability', 'PRJ-REQ-001'],
+    ['/projects/:prefix/baselines', '/projects/PRJ/baselines', 'Release 1.0'],
+    ['/projects/:prefix/parameters', '/projects/PRJ/parameters', 'BOOT_BUDGET_MS'],
     [
       '/projects/:prefix/impact-analysis/:requirementId',
-      '/projects/VCU/impact-analysis/11',
-      'VCU-REQ-001',
+      '/projects/PRJ/impact-analysis/11',
+      'PRJ-REQ-001',
     ],
-    ['/projects/:prefix/suites/:suiteId', '/projects/VCU/suites/41', 'Smoke suite'],
+    ['/projects/:prefix/suites/:suiteId', '/projects/PRJ/suites/41', 'Smoke suite'],
     [
       '/projects/:prefix/campaigns/:campaignId',
-      '/projects/VCU/campaigns/31',
+      '/projects/PRJ/campaigns/31',
       'Release candidate sweep',
     ],
-    ['/projects/:prefix/defects/:itemId', '/projects/VCU/defects/51', 'Screen flickers on wake'],
+    ['/projects/:prefix/defects/:itemId', '/projects/PRJ/defects/51', 'Screen flickers on wake'],
     ['/users', '/users', 'Ada Lovelace'],
     ['/settings', '/settings', 'Settings'],
     ['/reports', '/reports', 'Reports'],
-    ['/projects/:prefix/docs/new', '/projects/VCU/docs/new?type=REQ', 'VCU-REQ-004'],
+    ['/projects/:prefix/docs/new', '/projects/PRJ/docs/new?type=REQ', 'PRJ-REQ-004'],
     [
       '/projects/:prefix/docs/:kind/:docId/edit',
-      '/projects/VCU/docs/requirements/VCU-REQ-001/edit',
-      'VCU-REQ-001',
+      '/projects/PRJ/docs/requirements/PRJ-REQ-001/edit',
+      'PRJ-REQ-001',
     ],
     [
       '/projects/:prefix/docs/:kind/:docId',
-      '/projects/VCU/docs/requirements/VCU-REQ-001',
+      '/projects/PRJ/docs/requirements/PRJ-REQ-001',
       'The system shall boot within 2 seconds',
     ],
-    ['/projects/:prefix/import', '/projects/VCU/import', 'Import'],
-    ['/projects/:prefix/edit', '/projects/VCU/edit', 'Vehicle Control Unit'],
+    ['/projects/:prefix/import', '/projects/PRJ/import', 'Import'],
+    ['/projects/:prefix/edit', '/projects/PRJ/edit', 'Demo'],
   ])('%s shows its content', async (routePath, url, expected) => {
     renderRoute(routePath, url)
     const found = await screen.findAllByText(new RegExp(expected, 'i'), {}, { timeout: 4000 })
@@ -235,7 +235,7 @@ describe('document collections are named in the plural', () => {
   })
 
   it('on the project overview tiles', async () => {
-    renderRoute('/projects/:prefix', '/projects/VCU')
+    renderRoute('/projects/:prefix', '/projects/PRJ')
     expect(await screen.findByText('Designs', {}, { timeout: 4000 })).toBeTruthy()
     expect(screen.queryByText('Design')).toBeNull()
   })

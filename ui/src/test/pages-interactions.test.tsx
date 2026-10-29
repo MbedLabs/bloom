@@ -163,8 +163,8 @@ function lastCall(fn: unknown): unknown[] {
 
 describe('the document registry', () => {
   it('sends the search term to the server rather than filtering what it holds', async () => {
-    renderAt('/projects/:prefix/docs', '/projects/VCU/docs', <Documents />)
-    await screen.findAllByText('VCU-REQ-001')
+    renderAt('/projects/:prefix/docs', '/projects/PRJ/docs', <Documents />)
+    await screen.findAllByText('PRJ-REQ-001')
 
     fireEvent.change(screen.getByPlaceholderText(/search/i), { target: { value: 'brownout' } })
 
@@ -175,8 +175,8 @@ describe('the document registry', () => {
   })
 
   it('asks the server again when a document type is picked', async () => {
-    renderAt('/projects/:prefix/docs', '/projects/VCU/docs', <Documents />)
-    await screen.findAllByText('VCU-REQ-001')
+    renderAt('/projects/:prefix/docs', '/projects/PRJ/docs', <Documents />)
+    await screen.findAllByText('PRJ-REQ-001')
 
     fireEvent.click(screen.getAllByRole('button', { name: /^Filters/ })[0])
     fireEvent.click(await screen.findByRole('button', { name: 'TC' }))
@@ -188,8 +188,8 @@ describe('the document registry', () => {
   })
 
   it('carries the priority, reviewer and link filters to the server', async () => {
-    renderAt('/projects/:prefix/docs', '/projects/VCU/docs', <Documents />)
-    await screen.findAllByText('VCU-REQ-001')
+    renderAt('/projects/:prefix/docs', '/projects/PRJ/docs', <Documents />)
+    await screen.findAllByText('PRJ-REQ-001')
     fireEvent.click(screen.getAllByRole('button', { name: /^Filters/ })[0])
 
     changeControl(await screen.findByLabelText(/Priority/i), { target: { value: 'Low' } })
@@ -211,8 +211,8 @@ describe('the document registry', () => {
   })
 
   it('keeps the filters in the URL so a filtered view can be shared', async () => {
-    renderAt('/projects/:prefix/docs', '/projects/VCU/docs', <Documents />)
-    await screen.findAllByText('VCU-REQ-001')
+    renderAt('/projects/:prefix/docs', '/projects/PRJ/docs', <Documents />)
+    await screen.findAllByText('PRJ-REQ-001')
 
     fireEvent.change(screen.getByPlaceholderText(/search/i), { target: { value: 'boot' } })
 
@@ -222,8 +222,8 @@ describe('the document registry', () => {
   })
 
   it('asks the server to sort by the column whose header is clicked', async () => {
-    renderAt('/projects/:prefix/docs', '/projects/VCU/docs', <Documents />)
-    await screen.findAllByText('VCU-REQ-001')
+    renderAt('/projects/:prefix/docs', '/projects/PRJ/docs', <Documents />)
+    await screen.findAllByText('PRJ-REQ-001')
 
     fireEvent.click(screen.getByText('Name / Title').closest('th') as HTMLElement)
 
@@ -234,8 +234,8 @@ describe('the document registry', () => {
   })
 
   it('clears every filter at once', async () => {
-    renderAt('/projects/:prefix/docs', '/projects/VCU/docs', <Documents />)
-    await screen.findAllByText('VCU-REQ-001')
+    renderAt('/projects/:prefix/docs', '/projects/PRJ/docs', <Documents />)
+    await screen.findAllByText('PRJ-REQ-001')
 
     fireEvent.change(screen.getByPlaceholderText(/search/i), { target: { value: 'nothing' } })
     await waitFor(() => {
@@ -252,15 +252,15 @@ describe('the document registry', () => {
   })
 
   it('scopes the request to the project in the URL', async () => {
-    renderAt('/projects/:prefix/docs', '/projects/VCU/docs', <Documents />)
-    await screen.findAllByText('VCU-REQ-001')
-    expect(lastCall(client.docsApi.list)[0]).toBe('VCU')
+    renderAt('/projects/:prefix/docs', '/projects/PRJ/docs', <Documents />)
+    await screen.findAllByText('PRJ-REQ-001')
+    expect(lastCall(client.docsApi.list)[0]).toBe('PRJ')
   })
 })
 
 describe('raising a defect', () => {
   it('sends the form and reports success', async () => {
-    renderAt('/projects/:prefix/defects', '/projects/VCU/defects', <Defects />)
+    renderAt('/projects/:prefix/defects', '/projects/PRJ/defects', <Defects />)
     await screen.findAllByText(defect.title)
 
     fireEvent.click(screen.getByRole('button', { name: /new defect/i }))
@@ -281,7 +281,7 @@ describe('raising a defect', () => {
         response: { data: { detail: 'A defect with that title already exists' } },
       }),
     )
-    renderAt('/projects/:prefix/defects', '/projects/VCU/defects', <Defects />)
+    renderAt('/projects/:prefix/defects', '/projects/PRJ/defects', <Defects />)
     await screen.findAllByText(defect.title)
 
     fireEvent.click(screen.getByRole('button', { name: /new defect/i }))
@@ -292,7 +292,7 @@ describe('raising a defect', () => {
   })
 
   it('filters the list without going back to the server', async () => {
-    renderAt('/projects/:prefix/defects', '/projects/VCU/defects', <Defects />)
+    renderAt('/projects/:prefix/defects', '/projects/PRJ/defects', <Defects />)
     await screen.findAllByText(defect.title)
 
     fireEvent.change(screen.getByPlaceholderText(/search id, title, status/i), { target: { value: 'nothing matches' } })
@@ -320,7 +320,7 @@ describe('inviting a user', () => {
 
 describe('project parameters', () => {
   it('creates a parameter', async () => {
-    renderAt('/projects/:prefix/parameters', '/projects/VCU/parameters', <ProjectParameters />)
+    renderAt('/projects/:prefix/parameters', '/projects/PRJ/parameters', <ProjectParameters />)
     await screen.findAllByText('BOOT_BUDGET_MS')
 
     fireEvent.click(screen.getByRole('button', { name: /add item/i }))
@@ -341,7 +341,7 @@ describe('project parameters', () => {
 
 describe('baselines', () => {
   it('creates one for the project', async () => {
-    renderAt('/projects/:prefix/baselines', '/projects/VCU/baselines', <Baselines />)
+    renderAt('/projects/:prefix/baselines', '/projects/PRJ/baselines', <Baselines />)
     await screen.findAllByText(/Release 1\.0/i)
 
     fireEvent.click(screen.getAllByRole('button', { name: /new baseline/i })[0])
@@ -361,8 +361,8 @@ describe('baselines', () => {
 
 describe('the traceability matrix', () => {
   it('re-requests when a coverage filter is chosen', async () => {
-    renderAt('/projects/:prefix/traceability', '/projects/VCU/traceability', <TraceabilityMatrix />)
-    await screen.findAllByText(/VCU-REQ-001/i)
+    renderAt('/projects/:prefix/traceability', '/projects/PRJ/traceability', <TraceabilityMatrix />)
+    await screen.findAllByText(/PRJ-REQ-001/i)
 
     fireEvent.click(screen.getByRole('button', { name: /Filters/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Partial' }))
@@ -377,7 +377,7 @@ describe('the traceability matrix', () => {
   })
 
   it('shows total and partial coverage as percentages', async () => {
-    renderAt('/projects/:prefix/traceability', '/projects/VCU/traceability', <TraceabilityMatrix />)
+    renderAt('/projects/:prefix/traceability', '/projects/PRJ/traceability', <TraceabilityMatrix />)
     expect(await screen.findByText('Total Coverage')).toBeTruthy()
     expect(screen.getByText('66.7%')).toBeTruthy()
     expect(screen.getByText('Partial Coverage')).toBeTruthy()
@@ -387,31 +387,31 @@ describe('the traceability matrix', () => {
 
 describe('the registry table', () => {
   it('links each row to the document it represents', async () => {
-    renderAt('/projects/:prefix/docs', '/projects/VCU/docs', <Documents />)
-    const cells = await screen.findAllByText('VCU-REQ-001')
+    renderAt('/projects/:prefix/docs', '/projects/PRJ/docs', <Documents />)
+    const cells = await screen.findAllByText('PRJ-REQ-001')
     const link = cells.map((cell) => cell.closest('a')).find(Boolean)
-    expect(link?.getAttribute('href')).toContain('/projects/VCU/docs/requirements/VCU-REQ-001')
+    expect(link?.getAttribute('href')).toContain('/projects/PRJ/docs/requirements/PRJ-REQ-001')
   })
 
   it('shows the last execution for test cases only', async () => {
-    renderAt('/projects/:prefix/docs', '/projects/VCU/docs', <Documents />)
-    await screen.findByText('VCU-TC-001')
+    renderAt('/projects/:prefix/docs', '/projects/PRJ/docs', <Documents />)
+    await screen.findByText('PRJ-TC-001')
 
     const table = screen.getByRole('table')
     expect(within(table).getAllByText('Passed')).toHaveLength(1)
   })
 
   it('links the execution to Bud only once a Bud URL is configured', async () => {
-    renderAt('/projects/:prefix/docs', '/projects/VCU/docs', <Documents />)
-    await screen.findByText('VCU-TC-001')
+    renderAt('/projects/:prefix/docs', '/projects/PRJ/docs', <Documents />)
+    await screen.findByText('PRJ-TC-001')
     expect(screen.getByText('Bud run #77').closest('a')).toBeNull()
     cleanup()
 
     ;(window as Window & { runtimeConfig?: { BUD_APP_URL?: string } }).runtimeConfig = {
       BUD_APP_URL: 'https://bud.example.com/api/',
     }
-    renderAt('/projects/:prefix/docs', '/projects/VCU/docs', <Documents />)
-    await screen.findByText('VCU-TC-001')
+    renderAt('/projects/:prefix/docs', '/projects/PRJ/docs', <Documents />)
+    await screen.findByText('PRJ-TC-001')
 
     expect(screen.getByText('Bud run #77').closest('a')?.getAttribute('href')).toBe(
       'https://bud.example.com/runs/77',
@@ -423,7 +423,7 @@ describe('the registry table', () => {
 
 describe('creating a document', () => {
   it.each(['REQ', 'DES', 'CHG'])('offers one working Priority selector when creating a %s', async (type) => {
-    renderAt('/projects/:prefix/docs/new', `/projects/VCU/docs/new?type=${type}`, <DocCreate />)
+    renderAt('/projects/:prefix/docs/new', `/projects/PRJ/docs/new?type=${type}`, <DocCreate />)
     await screen.findByTitle('Select priority')
     const priorities = screen.getAllByRole('combobox').filter((element) =>
       ['Select priority', 'Priority'].includes(element.getAttribute('title') ?? '')
@@ -434,13 +434,13 @@ describe('creating a document', () => {
   })
 
   it('writes a new vision in the full document editor', async () => {
-    renderAt('/projects/:prefix/docs/new', '/projects/VCU/docs/new?type=visions', <DocCreate />)
+    renderAt('/projects/:prefix/docs/new', '/projects/PRJ/docs/new?type=visions', <DocCreate />)
     expect(await screen.findByTestId('doc-editor')).toBeTruthy()
     expect(screen.queryByTitle('Select priority')).toBeNull()
   })
 
   it('omits unsupported Specification metadata controls', async () => {
-    renderAt('/projects/:prefix/docs/new', '/projects/VCU/docs/new?type=SPEC', <DocCreate />)
+    renderAt('/projects/:prefix/docs/new', '/projects/PRJ/docs/new?type=SPEC', <DocCreate />)
     await screen.findByTitle('Select status')
     expect(screen.queryByTitle('Select priority')).toBeNull()
     expect(screen.queryByTitle('Priority')).toBeNull()
@@ -448,7 +448,7 @@ describe('creating a document', () => {
   })
 
   it.each(['SPEC', 'PRT', 'RPT', 'STD', 'VIS'])('offers and submits only Draft when creating a %s', async (type) => {
-    renderAt('/projects/:prefix/docs/new', `/projects/VCU/docs/new?type=${type}`, <DocCreate />)
+    renderAt('/projects/:prefix/docs/new', `/projects/PRJ/docs/new?type=${type}`, <DocCreate />)
     const status = await screen.findByTitle('Select status') as HTMLSelectElement
     expect(optionValues(status)).toEqual(['Draft'])
     expect(status.value).toBe('Draft')
@@ -465,15 +465,15 @@ describe('creating a document', () => {
   })
 
   it('shows the identifier the server would actually assign', async () => {
-    renderAt('/projects/:prefix/docs/new', '/projects/VCU/docs/new?type=REQ', <DocCreate />)
+    renderAt('/projects/:prefix/docs/new', '/projects/PRJ/docs/new?type=REQ', <DocCreate />)
 
-    expect(await screen.findByText(/VCU-REQ-004/)).toBeTruthy()
-    expect(lastCall(client.docsApi.nextDocId)).toEqual(['VCU', 'REQ'])
+    expect(await screen.findByText(/PRJ-REQ-004/)).toBeTruthy()
+    expect(lastCall(client.docsApi.nextDocId)).toEqual(['PRJ', 'REQ'])
   })
 
   it('will not save an untitled document', async () => {
-    renderAt('/projects/:prefix/docs/new', '/projects/VCU/docs/new?type=REQ', <DocCreate />)
-    await screen.findByText(/VCU-REQ-004/)
+    renderAt('/projects/:prefix/docs/new', '/projects/PRJ/docs/new?type=REQ', <DocCreate />)
+    await screen.findByText(/PRJ-REQ-004/)
 
     const save = screen.getByRole('button', { name: /^save$/i }) as HTMLButtonElement
     expect(save.disabled).toBe(true)
@@ -487,8 +487,8 @@ describe('creating a document', () => {
   })
 
   it('sends the title and the project it belongs to', async () => {
-    renderAt('/projects/:prefix/docs/new', '/projects/VCU/docs/new?type=REQ', <DocCreate />)
-    await screen.findByText(/VCU-REQ-004/)
+    renderAt('/projects/:prefix/docs/new', '/projects/PRJ/docs/new?type=REQ', <DocCreate />)
+    await screen.findByText(/PRJ-REQ-004/)
 
     fireEvent.change(screen.getByPlaceholderText('Untitled'), {
       target: { value: 'The system shall boot' },
@@ -511,8 +511,8 @@ describe('creating a document', () => {
         response: { data: { detail: 'A requirement with that title already exists' } },
       }),
     )
-    renderAt('/projects/:prefix/docs/new', '/projects/VCU/docs/new?type=REQ', <DocCreate />)
-    await screen.findByText(/VCU-REQ-004/)
+    renderAt('/projects/:prefix/docs/new', '/projects/PRJ/docs/new?type=REQ', <DocCreate />)
+    await screen.findByText(/PRJ-REQ-004/)
 
     fireEvent.change(screen.getByPlaceholderText('Untitled'), { target: { value: 'Duplicate' } })
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
@@ -521,8 +521,8 @@ describe('creating a document', () => {
   })
 
   it('shows the metadata sidebar, and lets it be put away', async () => {
-    renderAt('/projects/:prefix/docs/new', '/projects/VCU/docs/new?type=REQ', <DocCreate />)
-    await screen.findByText(/VCU-REQ-004/)
+    renderAt('/projects/:prefix/docs/new', '/projects/PRJ/docs/new?type=REQ', <DocCreate />)
+    await screen.findByText(/PRJ-REQ-004/)
 
     expect(screen.getByTitle('Select status')).toBeTruthy()
 
@@ -534,8 +534,8 @@ describe('creating a document', () => {
   })
 
   it('sends the metadata alongside the title', async () => {
-    renderAt('/projects/:prefix/docs/new', '/projects/VCU/docs/new?type=REQ', <DocCreate />)
-    await screen.findByText(/VCU-REQ-004/)
+    renderAt('/projects/:prefix/docs/new', '/projects/PRJ/docs/new?type=REQ', <DocCreate />)
+    await screen.findByText(/PRJ-REQ-004/)
 
     fireEvent.change(screen.getByPlaceholderText('Untitled'), { target: { value: 'A requirement' } })
     fireEvent.change(screen.getByPlaceholderText(/brief description/i), {
@@ -551,7 +551,7 @@ describe('creating a document', () => {
   })
 
   it('creates a test case through the test-case endpoint, not the generic one', async () => {
-    renderAt('/projects/:prefix/docs/new', '/projects/VCU/docs/new?type=TC', <DocCreate />)
+    renderAt('/projects/:prefix/docs/new', '/projects/PRJ/docs/new?type=TC', <DocCreate />)
     await screen.findByPlaceholderText('Untitled')
 
     fireEvent.change(screen.getByPlaceholderText('Untitled'), { target: { value: 'Cold boot' } })
@@ -571,7 +571,7 @@ describe('editing an existing document', () => {
     vi.mocked(client.docsApi.get).mockResolvedValueOnce({ ...docShell, doc_type: type, status: 'Draft' } as never)
     renderAt(
       '/projects/:prefix/docs/:kind/:docId/edit',
-      `/projects/VCU/docs/documents/VCU-${type}-001/edit`,
+      `/projects/PRJ/docs/documents/PRJ-${type}-001/edit`,
       <DocCreate editMode />,
     )
 
@@ -583,7 +583,7 @@ describe('editing an existing document', () => {
   function renderEdit() {
     return renderAt(
       '/projects/:prefix/docs/:kind/:docId/edit',
-      '/projects/VCU/docs/requirements/VCU-REQ-001/edit',
+      '/projects/PRJ/docs/requirements/PRJ-REQ-001/edit',
       <DocCreate editMode />,
     )
   }
@@ -592,9 +592,9 @@ describe('editing an existing document', () => {
     renderEdit()
     await waitFor(() => expect(client.docsApi.get).toHaveBeenCalled())
     const [prefix, kind, docId] = lastCall(client.docsApi.get) as [string, string, string]
-    expect(prefix).toBe('VCU')
+    expect(prefix).toBe('PRJ')
     expect(kind).toBe('requirements')
-    expect(docId).toBe('VCU-REQ-001')
+    expect(docId).toBe('PRJ-REQ-001')
 
     const title = (await screen.findByPlaceholderText('Untitled')) as HTMLInputElement
     await waitFor(() => expect(title.value).toBe(docShell.title))
@@ -637,8 +637,8 @@ describe('editing an existing document', () => {
   })
 
   it('offers no delete on a document that does not exist yet', async () => {
-    renderAt('/projects/:prefix/docs/new', '/projects/VCU/docs/new?type=REQ', <DocCreate />)
-    await screen.findByText(/VCU-REQ-004/)
+    renderAt('/projects/:prefix/docs/new', '/projects/PRJ/docs/new?type=REQ', <DocCreate />)
+    await screen.findByText(/PRJ-REQ-004/)
 
     expect(screen.queryByRole('button', { name: /^delete$/i })).toBeNull()
   })
@@ -648,7 +648,7 @@ describe('a defect in detail', () => {
   function renderDefect() {
     return renderAt(
       '/projects/:prefix/defects/:itemId',
-      '/projects/VCU/defects/51',
+      '/projects/PRJ/defects/51',
       <ArtefactDetail kind="defect" />,
     )
   }
@@ -726,13 +726,13 @@ describe('a defect in detail', () => {
 
 describe('campaigns', () => {
   it('lists the campaigns of the project', async () => {
-    renderAt('/projects/:prefix/campaigns', '/projects/VCU/campaigns', <TestCampaigns />)
+    renderAt('/projects/:prefix/campaigns', '/projects/PRJ/campaigns', <TestCampaigns />)
     expect(await screen.findAllByText(/Release candidate sweep/)).toBeTruthy()
     expect(lastCall(client.campaignsApi.list)[0]).toBe(project.id)
   })
 
   it('scopes a new campaign from the suites that were picked', async () => {
-    renderAt('/projects/:prefix/campaigns', '/projects/VCU/campaigns', <TestCampaigns />)
+    renderAt('/projects/:prefix/campaigns', '/projects/PRJ/campaigns', <TestCampaigns />)
     await screen.findAllByText(/Release candidate sweep/)
 
     fireEvent.click(screen.getByRole('button', { name: /new campaign/i }))
@@ -753,7 +753,7 @@ describe('campaigns', () => {
   })
 
   it('refuses to create a campaign with no suite behind it', async () => {
-    renderAt('/projects/:prefix/campaigns', '/projects/VCU/campaigns', <TestCampaigns />)
+    renderAt('/projects/:prefix/campaigns', '/projects/PRJ/campaigns', <TestCampaigns />)
     await screen.findAllByText(/Release candidate sweep/)
 
     fireEvent.click(screen.getByRole('button', { name: /new campaign/i }))
@@ -767,7 +767,7 @@ describe('campaigns', () => {
   })
 
   it('narrows the list to a search term', async () => {
-    renderAt('/projects/:prefix/campaigns', '/projects/VCU/campaigns', <TestCampaigns />)
+    renderAt('/projects/:prefix/campaigns', '/projects/PRJ/campaigns', <TestCampaigns />)
     await screen.findAllByText(/Release candidate sweep/)
 
     fireEvent.change(screen.getByPlaceholderText('Search campaigns...'), {
@@ -781,7 +781,7 @@ describe('campaigns', () => {
 describe('importing requirements', () => {
   /** Opens the wizard on its ReqIF tab; it starts on project-to-project. */
   async function renderImport() {
-    const rendered = renderAt('/projects/:prefix/import', '/projects/VCU/import', <ImportWizard />)
+    const rendered = renderAt('/projects/:prefix/import', '/projects/PRJ/import', <ImportWizard />)
     fireEvent.click(await screen.findByRole('button', { name: /from reqif file/i }))
     return rendered
   }
@@ -835,7 +835,7 @@ describe('importing requirements', () => {
 
 describe('a test suite in detail', () => {
   function renderSuite() {
-    return renderAt('/projects/:prefix/suites/:suiteId', '/projects/VCU/suites/41', <SuiteDetail />)
+    return renderAt('/projects/:prefix/suites/:suiteId', '/projects/PRJ/suites/41', <SuiteDetail />)
   }
 
   it('shows the suite the URL names', async () => {
@@ -882,7 +882,7 @@ describe('a test suite in detail', () => {
     await rowAnswered()
 
     fireEvent.click(screen.getByRole('button', { name: /add test case/i }))
-    const candidate = await screen.findByText('VCU-TC-001')
+    const candidate = await screen.findByText('PRJ-TC-001')
     fireEvent.click(candidate.closest('button') as HTMLElement)
 
     await waitFor(() => expect(client.testSuitesApi.addItem).toHaveBeenCalled())
@@ -907,7 +907,7 @@ describe('a test suite in detail', () => {
 
 describe('project settings', () => {
   function renderProjectEdit() {
-    return renderAt('/projects/:prefix/edit', '/projects/VCU/edit', <ProjectEdit />)
+    return renderAt('/projects/:prefix/edit', '/projects/PRJ/edit', <ProjectEdit />)
   }
 
   it('loads the project by its prefix and saves a rename', async () => {
@@ -915,13 +915,13 @@ describe('project settings', () => {
     const name = (await screen.findByTitle('Project name')) as HTMLInputElement
     expect(name.value).toBe(project.name)
 
-    fireEvent.change(name, { target: { value: 'Vehicle Control Unit II' } })
+    fireEvent.change(name, { target: { value: 'Demo II' } })
     fireEvent.click(screen.getByRole('button', { name: /save project/i }))
 
     await waitFor(() => {
       const [id, payload] = lastCall(client.projectsApi.update) as [number, { name?: string }]
       expect(id).toBe(project.id)
-      expect(payload.name).toBe('Vehicle Control Unit II')
+      expect(payload.name).toBe('Demo II')
     })
   })
 
@@ -996,7 +996,7 @@ describe('a campaign in detail', () => {
   function renderCampaign() {
     return renderAt(
       '/projects/:prefix/campaigns/:campaignId',
-      '/projects/VCU/campaigns/31',
+      '/projects/PRJ/campaigns/31',
       <CampaignDetail />,
     )
   }
@@ -1091,7 +1091,7 @@ describe('a requirement in detail', () => {
   function renderRequirement() {
     return renderAt(
       '/projects/:prefix/docs/:kind/:docId',
-      '/projects/VCU/docs/requirements/VCU-REQ-001',
+      '/projects/PRJ/docs/requirements/PRJ-REQ-001',
       <RequirementDetail resolvedId={requirement.id} />,
     )
   }
@@ -1149,7 +1149,7 @@ describe('a test case in detail', () => {
   function renderTestCase() {
     return renderAt(
       '/projects/:prefix/docs/:kind/:docId',
-      '/projects/VCU/docs/test-cases/VCU-TC-001',
+      '/projects/PRJ/docs/test-cases/PRJ-TC-001',
       <TestCaseDetail resolvedId={testCase.id} />,
     )
   }
@@ -1199,7 +1199,7 @@ describe('a controlled document in detail', () => {
   function renderDocument() {
     return renderAt(
       '/projects/:prefix/docs/:kind/:docId',
-      '/projects/VCU/docs/reports/VCU-RPT-001',
+      '/projects/PRJ/docs/reports/PRJ-RPT-001',
       <DocumentDetail resolvedId={docShell.id} />,
     )
   }
@@ -1228,7 +1228,7 @@ describe('a controlled document in detail', () => {
 describe('project exports', () => {
   it('offers every report from one Export menu', async () => {
     const { exportApi } = await import('../api/client')
-    renderAt('/projects/:prefix/traceability', '/projects/VCU/traceability', <TraceabilityMatrix />)
+    renderAt('/projects/:prefix/traceability', '/projects/PRJ/traceability', <TraceabilityMatrix />)
     await settle()
     fireEvent.click(await screen.findByRole('button', { name: /Export/ }))
     const menu = screen.getByRole('menu')
@@ -1248,7 +1248,7 @@ describe('the changes one artefact allows', () => {
   it('shows Edit without Delete when the row allows edit only', async () => {
     renderAt(
       '/projects/:prefix/docs/:kind/:docId',
-      '/projects/VCU/docs/requirements/VCU-REQ-001',
+      '/projects/PRJ/docs/requirements/PRJ-REQ-001',
       <RequirementDetail resolvedId={requirement.id} allowedActions={['edit']} />,
     )
     await screen.findAllByText(new RegExp(requirement.title))
@@ -1258,7 +1258,7 @@ describe('the changes one artefact allows', () => {
   })
 
   it('shows no edit, delete or workflow handoff when their authority is absent', async () => {
-    renderAt('/projects/:prefix/docs/:kind/:docId', '/projects/VCU/docs/requirements/VCU-REQ-001', <RequirementDetail resolvedId={requirement.id} allowedActions={[]} />)
+    renderAt('/projects/:prefix/docs/:kind/:docId', '/projects/PRJ/docs/requirements/PRJ-REQ-001', <RequirementDetail resolvedId={requirement.id} allowedActions={[]} />)
     const bar = await reviewBar()
     expect(screen.queryByRole('button', { name: /^edit$/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /^delete$/i })).toBeNull()
@@ -1270,7 +1270,7 @@ describe('the changes one artefact allows', () => {
   it('hides the suite controls the row does not allow', async () => {
     renderAt(
       '/projects/:prefix/suites/:suiteId',
-      '/projects/VCU/suites/41',
+      '/projects/PRJ/suites/41',
       <SuiteDetail allowedActions={['edit']} />,
     )
     await screen.findAllByText(new RegExp(testSuite.name))
@@ -1284,7 +1284,7 @@ describe('the changes one artefact allows', () => {
     currentUser = external
     vi.mocked(client.designsApi.get).mockResolvedValue({ ...design, status: 'Review' } as never)
     vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowFixture, actions: { ...workflowFixture.actions, start_draft: true } })
-    renderAt('/projects/:prefix/docs/:kind/:docId', '/projects/VCU/docs/designs/VCU-DES-001', <ArtefactDetail kind="design" resolvedId={design.id} allowedActions={['edit', 'review']} />)
+    renderAt('/projects/:prefix/docs/:kind/:docId', '/projects/PRJ/docs/designs/PRJ-DES-001', <ArtefactDetail kind="design" resolvedId={design.id} allowedActions={['edit', 'review']} />)
     fireEvent.click(await screen.findByRole('button', { name: /^start working draft$/i }))
     await waitFor(() => expect(client.workflowApi.startDraft).toHaveBeenCalledWith('design', design.id))
     expect(client.artefactsApi.transition).not.toHaveBeenCalled()
@@ -1293,8 +1293,8 @@ describe('the changes one artefact allows', () => {
   it('creates as an external user with customer and Customer, offering no other choice', async () => {
     currentUser = external
     vi.mocked(client.projectMembersApi.permissions).mockResolvedValue(writes as never)
-    renderAt('/projects/:prefix/docs/new', '/projects/VCU/docs/new?type=REQ', <DocCreate />)
-    await screen.findByText(/VCU-REQ-004/)
+    renderAt('/projects/:prefix/docs/new', '/projects/PRJ/docs/new?type=REQ', <DocCreate />)
+    await screen.findByText(/PRJ-REQ-004/)
     await waitFor(() => expect(client.projectMembersApi.permissions).toHaveBeenCalled())
     await settle()
 
@@ -1316,7 +1316,7 @@ describe('the changes one artefact allows', () => {
     vi.mocked(client.projectMembersApi.permissions).mockResolvedValue(writes as never)
     renderAt(
       '/projects/:prefix/campaigns/:campaignId',
-      `/projects/VCU/campaigns/${campaignDetail.id}`,
+      `/projects/PRJ/campaigns/${campaignDetail.id}`,
       <CampaignDetail allowedActions={['edit']} />,
     )
     fireEvent.click(await screen.findByRole('button', { name: /^edit$/i }))
@@ -1334,7 +1334,7 @@ describe('the changes one artefact allows, on every control', () => {
   function renderEdit() {
     return renderAt(
       '/projects/:prefix/docs/:kind/:docId/edit',
-      '/projects/VCU/docs/requirements/VCU-REQ-001/edit',
+      '/projects/PRJ/docs/requirements/PRJ-REQ-001/edit',
       <DocCreate editMode />,
     )
   }
@@ -1357,7 +1357,7 @@ describe('the changes one artefact allows, on every control', () => {
     vi.mocked(client.docsApi.get).mockReturnValue(new Promise(() => {}) as never)
     renderAt(
       '/projects/:prefix/docs/:kind/:docId',
-      '/projects/VCU/docs/requirements/VCU-REQ-001',
+      '/projects/PRJ/docs/requirements/PRJ-REQ-001',
       <RequirementDetail resolvedId={requirement.id} />,
     )
     await screen.findAllByText(new RegExp(requirement.title))
@@ -1373,7 +1373,7 @@ describe('the changes one artefact allows, on every control', () => {
     } as never)
     const view = renderAt(
       '/projects/:prefix/suites/:suiteId',
-      '/projects/VCU/suites/41',
+      '/projects/PRJ/suites/41',
       <SuiteDetail allowedActions={['edit']} />,
     )
     await screen.findAllByText(new RegExp(testCase.title))
@@ -1383,7 +1383,7 @@ describe('the changes one artefact allows, on every control', () => {
 
     renderAt(
       '/projects/:prefix/suites/:suiteId',
-      '/projects/VCU/suites/41',
+      '/projects/PRJ/suites/41',
       <SuiteDetail allowedActions={['edit', 'plan']} />,
     )
     const actions = await screen.findByTitle('Row actions')
@@ -1397,7 +1397,7 @@ describe('the changes one artefact allows, on every control', () => {
   it('keeps controlled status and visibility out of an external suite editor', async () => {
     currentUser = external
     vi.mocked(client.projectMembersApi.permissions).mockResolvedValue(writes as never)
-    renderAt('/projects/:prefix/suites/:suiteId', '/projects/VCU/suites/41', <SuiteDetail allowedActions={['edit']} />)
+    renderAt('/projects/:prefix/suites/:suiteId', '/projects/PRJ/suites/41', <SuiteDetail allowedActions={['edit']} />)
     fireEvent.click(await screen.findByRole('button', { name: /^edit$/i }))
     expect(await screen.findByText('Edit Suite')).toBeTruthy()
     expect(screen.queryByText('Visibility', { selector: 'label' })).toBeNull()
@@ -1409,7 +1409,7 @@ describe('the changes one artefact allows, on every control', () => {
     vi.mocked(client.projectMembersApi.permissions).mockResolvedValue(writes as never)
     renderAt(
       '/projects/:prefix/defects/:itemId',
-      `/projects/VCU/defects/${defect.id}`,
+      `/projects/PRJ/defects/${defect.id}`,
       <ArtefactDetail kind="defect" resolvedId={defect.id} allowedActions={['edit']} />,
     )
     fireEvent.click(await screen.findByRole('button', { name: /^edit$/i }))
@@ -1422,7 +1422,7 @@ describe('the changes one artefact allows, on every control', () => {
   it("creates an external user's campaign as customer without a visibility choice", async () => {
     currentUser = external
     vi.mocked(client.projectMembersApi.permissions).mockResolvedValue(writes as never)
-    renderAt('/projects/:prefix/campaigns', '/projects/VCU/campaigns', <TestCampaigns />)
+    renderAt('/projects/:prefix/campaigns', '/projects/PRJ/campaigns', <TestCampaigns />)
     await screen.findAllByText(/Release candidate sweep/)
 
     fireEvent.click(await screen.findByRole('button', { name: /new campaign/i }))
@@ -1448,7 +1448,7 @@ describe('who may sign off', () => {
   function renderRequirement(allowedActions: string[]) {
     return renderAt(
       '/projects/:prefix/docs/:kind/:docId',
-      '/projects/VCU/docs/requirements/VCU-REQ-001',
+      '/projects/PRJ/docs/requirements/PRJ-REQ-001',
       <RequirementDetail resolvedId={requirement.id} allowedActions={allowedActions} />,
     )
   }

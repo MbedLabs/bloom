@@ -109,11 +109,11 @@ function renderPage(element: ReactNode) {
 describe('Bloom Bud run links', () => {
   beforeEach(() => {
     mockParams = {}
-    mockProject = { id: 7, name: 'Vehicle Controls', prefix: 'VCU' }
+    mockProject = { id: 7, name: 'Demo', prefix: 'PRJ' }
     mockQueryData = {}
     const storage = { getItem: vi.fn(() => null), setItem: vi.fn() }
     vi.stubGlobal('window', {
-      runtimeConfig: { BUD_APP_URL: 'https://bud.embedlabs.net/api' },
+      runtimeConfig: { BUD_APP_URL: 'https://bud.example.com/api' },
       localStorage: storage,
     })
     vi.stubGlobal('localStorage', storage)
@@ -124,12 +124,12 @@ describe('Bloom Bud run links', () => {
   })
 
   it('renders the TC last Bud run as a clickable Bud link', async () => {
-    mockParams = { prefix: 'VCU', itemId: '42' }
+    mockParams = { prefix: 'PRJ', itemId: '42' }
     mockQueryData = {
       testCase: {
         id: 42,
         project_id: 7,
-        tc_id: 'VCU-TC-001',
+        tc_id: 'PRJ-TC-001',
         title: 'Clickable TC',
         description: '',
         preconditions: '',
@@ -156,16 +156,16 @@ describe('Bloom Bud run links', () => {
     const html = renderPage(<TestCaseDetail />)
 
     expect(html).toContain('Bud run #987')
-    expect(html).toContain('href="https://bud.embedlabs.net/runs/987"')
+    expect(html).toContain('href="https://bud.example.com/runs/987"')
   })
 
   it('renders the suite latest Bud run as a clickable Bud link', async () => {
-    mockParams = { prefix: 'VCU', suiteId: '12' }
+    mockParams = { prefix: 'PRJ', suiteId: '12' }
     mockQueryData = {
       testSuite: {
         id: 12,
         project_id: 7,
-        suite_id: 'VCU-TS-001',
+        suite_id: 'PRJ-TS-001',
         name: 'Nightly Suite',
         description: '',
         status: 'Active',
@@ -188,6 +188,6 @@ describe('Bloom Bud run links', () => {
     const html = renderPage(<SuiteDetail />)
 
     expect(html).toContain('Bud run #987')
-    expect(html).toContain('href="https://bud.embedlabs.net/runs/987"')
+    expect(html).toContain('href="https://bud.example.com/runs/987"')
   })
 })

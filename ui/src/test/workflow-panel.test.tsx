@@ -68,10 +68,10 @@ function renderAssignedDocument(type: 'REQ' | 'TC', status: 'Draft' | 'Review' |
   }
   if (type === 'REQ') {
     vi.mocked(client.requirementsApi.get).mockResolvedValue(record as never)
-    return renderAt('/projects/:prefix/requirements/:itemId', `/projects/VCU/requirements/${requirement.id}`, <RequirementDetail allowedActions={['edit', 'review', 'approve']} />)
+    return renderAt('/projects/:prefix/requirements/:itemId', `/projects/PRJ/requirements/${requirement.id}`, <RequirementDetail allowedActions={['edit', 'review', 'approve']} />)
   }
   vi.mocked(client.testCasesApi.get).mockResolvedValue(record as never)
-  return renderAt('/projects/:prefix/test-cases/:itemId', `/projects/VCU/test-cases/${testCase.id}`, <TestCaseDetail allowedActions={['edit', 'review', 'approve']} />)
+  return renderAt('/projects/:prefix/test-cases/:itemId', `/projects/PRJ/test-cases/${testCase.id}`, <TestCaseDetail allowedActions={['edit', 'review', 'approve']} />)
 }
 
 /** Open the Details of the review bar above the content and return the bar. */
@@ -204,7 +204,7 @@ describe('document creator and assignee', () => {
   it('shows neither Created by, Assignee nor the assignee select on a non-controlled document', async () => {
     vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowState, controlled: false, actions: { ...workflowState.actions, assign_assignee: true } })
     vi.mocked(client.defectsApi.get).mockResolvedValue({ ...defect, reviewer_id: reviewer.id } as never)
-    renderAt('/projects/:prefix/defects/:itemId', `/projects/VCU/defects/${defect.id}`, <ArtefactDetail kind="defect" allowedActions={['edit']} />)
+    renderAt('/projects/:prefix/defects/:itemId', `/projects/PRJ/defects/${defect.id}`, <ArtefactDetail kind="defect" allowedActions={['edit']} />)
     await screen.findByRole('heading', { name: 'Review' })
     expect(screen.queryByText('Created by')).toBeNull()
     expect(screen.queryByText('Assignee')).toBeNull()
@@ -217,7 +217,7 @@ describe('assigned reviewer comment authority', () => {
     currentUser = { ...user, role: 'admin' }
     vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowState, controlled: false })
     vi.mocked(client.defectsApi.get).mockResolvedValue({ ...defect, reviewer_id: reviewer.id } as never)
-    renderAt('/projects/:prefix/defects/:itemId', `/projects/VCU/defects/${defect.id}`, <ArtefactDetail kind="defect" allowedActions={['edit']} />)
+    renderAt('/projects/:prefix/defects/:itemId', `/projects/PRJ/defects/${defect.id}`, <ArtefactDetail kind="defect" allowedActions={['edit']} />)
     const discussion = await screen.findByRole('region', { name: 'Document discussion' })
     await within(discussion).findByText(/looks right to me/i)
     expect(screen.queryByRole('textbox')).toBeNull()
@@ -237,8 +237,8 @@ describe('approved revision preservation', () => {
   })
 
   it('offers revision history for an Approved specification', async () => {
-    vi.mocked(client.documentsApi.get).mockResolvedValue({ ...docDetail, doc_type: 'SPEC', doc_id: 'VCU-SPEC-001', status: 'Approved', version: '1.0', sections: [] } as never)
-    renderAt('/projects/:prefix/docs/:kind/:docId', `/projects/VCU/docs/specifications/${docDetail.id}`, <DocumentDetail allowedActions={['edit']} />)
+    vi.mocked(client.documentsApi.get).mockResolvedValue({ ...docDetail, doc_type: 'SPEC', doc_id: 'PRJ-SPEC-001', status: 'Approved', version: '1.0', sections: [] } as never)
+    renderAt('/projects/:prefix/docs/:kind/:docId', `/projects/PRJ/docs/specifications/${docDetail.id}`, <DocumentDetail allowedActions={['edit']} />)
     expect(await screen.findByRole('button', { name: /^revision history$/i })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Details' })).toBeNull()
   })
@@ -246,14 +246,14 @@ describe('approved revision preservation', () => {
   it('does not expose Edit for an Approved change request', async () => {
     vi.mocked(client.changesApi.get).mockResolvedValue({ ...change, status: 'Approved' } as never)
     vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowState, phase: 'Approved', status: 'Approved', actions: { ...workflowState.actions, edit_current: false } })
-    renderAt('/projects/:prefix/changes/:itemId', `/projects/VCU/changes/${change.id}`, <ArtefactDetail kind="change" allowedActions={['edit', 'review', 'approve']} />)
+    renderAt('/projects/:prefix/changes/:itemId', `/projects/PRJ/changes/${change.id}`, <ArtefactDetail kind="change" allowedActions={['edit', 'review', 'approve']} />)
     await screen.findByRole('heading', { name: change.title })
     expect(screen.queryByRole('button', { name: /^edit$/i })).toBeNull()
   })
 
   it('does not expose lifecycle transitions for an Approved change request', async () => {
     vi.mocked(client.changesApi.get).mockResolvedValue({ ...change, status: 'Approved' } as never)
-    renderAt('/projects/:prefix/changes/:itemId', `/projects/VCU/changes/${change.id}`, <ArtefactDetail kind="change" allowedActions={['edit', 'review', 'approve']} />)
+    renderAt('/projects/:prefix/changes/:itemId', `/projects/PRJ/changes/${change.id}`, <ArtefactDetail kind="change" allowedActions={['edit', 'review', 'approve']} />)
     await screen.findByRole('heading', { name: change.title })
     expect(screen.queryAllByRole('button', { name: /^move to /i })).toHaveLength(0)
     expect(client.artefactsApi.transition).not.toHaveBeenCalled()
@@ -263,7 +263,7 @@ describe('approved revision preservation', () => {
 describe('controlled creation metadata', () => {
   it.each(['REQ', 'SPEC', 'TC', 'DES', 'CPT', 'PRT', 'CHG'])('offers only Draft for a new %s', async type => {
     vi.mocked(client.tagsApi.scope).mockResolvedValue({ limited: true, tags: [{ id: 4, name: 'Field', created_at: '' }] })
-    renderAt('/projects/:prefix/docs/new', `/projects/VCU/docs/new?type=${type}`, <DocCreate />)
+    renderAt('/projects/:prefix/docs/new', `/projects/PRJ/docs/new?type=${type}`, <DocCreate />)
     const status = await screen.findByTitle('Select status') as HTMLSelectElement
     expect(optionValues(status)).toEqual(['Draft'])
     await screen.findByRole('button', { name: 'Field' })
@@ -279,7 +279,7 @@ describe('controlled creation metadata', () => {
 
   it('removes direct status and assignment editing from a controlled writer', async () => {
     vi.mocked(client.docsApi.get).mockResolvedValue({ ...docDetail, doc_type: 'SPEC', status: 'Mitigated', content_json: null, content_html: '' } as never)
-    renderAt('/projects/:prefix/docs/:kind/:docId/edit', '/projects/VCU/docs/specifications/VCU-SPEC-001/edit', <DocCreate editMode />)
+    renderAt('/projects/:prefix/docs/:kind/:docId/edit', '/projects/PRJ/docs/specifications/PRJ-SPEC-001/edit', <DocCreate editMode />)
     await screen.findByDisplayValue(docDetail.title)
     expect(screen.getAllByText('Draft', { exact: true })).toHaveLength(2)
     expect(screen.queryByText('Mitigated')).toBeNull()
@@ -294,7 +294,7 @@ describe('controlled creation metadata', () => {
   it('keeps the writer read-only when the server denies editing', async () => {
     vi.mocked(client.docsApi.get).mockResolvedValue({ ...docDetail, doc_type: 'SPEC', status: 'Approved' } as never)
     vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowState, phase: 'Approved', status: 'Approved', actions: { ...workflowState.actions, edit_current: false } })
-    renderAt('/projects/:prefix/docs/:kind/:docId/edit', '/projects/VCU/docs/specifications/VCU-SPEC-001/edit', <DocCreate editMode />)
+    renderAt('/projects/:prefix/docs/:kind/:docId/edit', '/projects/PRJ/docs/specifications/PRJ-SPEC-001/edit', <DocCreate editMode />)
     expect(await screen.findByText('This document is read-only.')).toBeTruthy()
     expect(screen.queryByPlaceholderText('Untitled')).toBeNull()
     expect(screen.queryByRole('button', { name: /^save$/i })).toBeNull()
@@ -305,7 +305,7 @@ describe('approved document corrections use the existing editor', () => {
   it('saves an approved specification through the normal update API', async () => {
     vi.mocked(client.docsApi.get).mockResolvedValue({ ...docDetail, doc_type: 'SPEC', status: 'Approved', version: '1' } as never)
     vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowState, phase: 'Approved', status: 'Approved', actions: { ...workflowState.actions, edit_current: true } })
-    renderAt('/projects/:prefix/docs/:kind/:docId/edit', '/projects/VCU/docs/specifications/VCU-SPEC-001/edit', <DocCreate editMode />)
+    renderAt('/projects/:prefix/docs/:kind/:docId/edit', '/projects/PRJ/docs/specifications/PRJ-SPEC-001/edit', <DocCreate editMode />)
     const title = await screen.findByPlaceholderText('Untitled')
     fireEvent.change(title, { target: { value: 'Corrected specification' } })
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
@@ -320,7 +320,7 @@ describe('approved document corrections use the existing editor', () => {
   it('discards an approved-document edit without changing content or revision', async () => {
     vi.mocked(client.docsApi.get).mockResolvedValue({ ...docDetail, doc_type: 'SPEC', status: 'Approved' } as never)
     vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowState, phase: 'Approved', status: 'Approved', actions: { ...workflowState.actions, edit_current: true } })
-    renderAt('/projects/:prefix/docs/:kind/:docId/edit', '/projects/VCU/docs/specifications/VCU-SPEC-001/edit', <DocCreate editMode />)
+    renderAt('/projects/:prefix/docs/:kind/:docId/edit', '/projects/PRJ/docs/specifications/PRJ-SPEC-001/edit', <DocCreate editMode />)
     const title = await screen.findByPlaceholderText('Untitled')
     fireEvent.change(title, { target: { value: 'Discarded correction' } })
     fireEvent.click(screen.getByRole('button', { name: /^discard$/i }))
@@ -333,7 +333,7 @@ describe('suite planning authority', () => {
   it('allows mutable suite membership with Plan and without Edit', async () => {
     vi.mocked(client.projectMembersApi.permissions).mockResolvedValue({ TS: ['view', 'plan'] })
     vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowState, actions: { ...workflowState.actions, edit_current: false, plan_current: true } })
-    renderAt('/projects/:prefix/suites/:suiteId', `/projects/VCU/suites/${testSuite.id}`, <SuiteDetail allowedActions={['plan']} />)
+    renderAt('/projects/:prefix/suites/:suiteId', `/projects/PRJ/suites/${testSuite.id}`, <SuiteDetail allowedActions={['plan']} />)
     fireEvent.click(await screen.findByRole('button', { name: /^add test case$/i }))
     fireEvent.click(await screen.findByRole('button', { name: new RegExp(testCase.tc_id) }))
     await waitFor(() => expect(client.testSuitesApi.addItem).toHaveBeenCalledWith(testSuite.id, testCase.id))
@@ -344,7 +344,7 @@ describe('suite planning authority', () => {
 describe('workflow capability boundaries', () => {
   it.each(['REQ', 'TC', 'DES', 'CPT', 'CHG'] as const)('keeps the %s writer payload free of lifecycle and assignment fields', async type => {
     vi.mocked(client.docsApi.get).mockResolvedValue({ ...docDetail, doc_type: type, status: 'Draft' } as never)
-    renderAt('/projects/:prefix/docs/:kind/:docId/edit', `/projects/VCU/docs/documents/VCU-${type}-001/edit`, <DocCreate editMode />)
+    renderAt('/projects/:prefix/docs/:kind/:docId/edit', `/projects/PRJ/docs/documents/PRJ-${type}-001/edit`, <DocCreate editMode />)
     await screen.findByPlaceholderText('Untitled')
     expect(screen.queryByTitle('Select status')).toBeNull()
     expect(screen.queryByRole('combobox', { name: 'Select reviewer' })).toBeNull()
@@ -460,7 +460,7 @@ describe('visible document discussion', () => {
     else if (type === 'test-case') renderAssignedDocument('TC', 'Review')
     else {
       vi.mocked(client.documentsApi.get).mockResolvedValue({ ...docDetail, content_json: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Body' }] }] } } as never)
-      renderAt('/projects/:prefix/docs/:kind/:docId', `/projects/VCU/docs/specifications/${docDetail.id}`, <DocumentDetail />)
+      renderAt('/projects/:prefix/docs/:kind/:docId', `/projects/PRJ/docs/specifications/${docDetail.id}`, <DocumentDetail />)
     }
     const discussion = await screen.findByRole('region', { name: 'Document comments' })
     expect(within(discussion).getByRole('heading', { name: 'Comments' })).toBeTruthy()
@@ -470,15 +470,15 @@ describe('visible document discussion', () => {
   })
 
   it('keeps the side panel discussion of a document without rich text', async () => {
-    renderAt('/projects/:prefix/docs/:kind/:docId', `/projects/VCU/docs/specifications/${docDetail.id}`, <DocumentDetail />)
+    renderAt('/projects/:prefix/docs/:kind/:docId', `/projects/PRJ/docs/specifications/${docDetail.id}`, <DocumentDetail />)
     const discussion = await screen.findByRole('region', { name: 'Document discussion' })
     expect(discussion.closest('aside')?.getAttribute('aria-label')).toBe('Document side panel')
     expect(screen.queryByRole('region', { name: 'Document comments' })).toBeNull()
   })
 
   it.each(['test-suite', 'campaign'] as const)('shows the %s discussion in its side panel without opening a tab', async type => {
-    if (type === 'test-suite') renderAt('/projects/:prefix/suites/:suiteId', `/projects/VCU/suites/${testSuite.id}`, <SuiteDetail />)
-    else renderAt('/projects/:prefix/campaigns/:campaignId', '/projects/VCU/campaigns/51', <CampaignDetail />)
+    if (type === 'test-suite') renderAt('/projects/:prefix/suites/:suiteId', `/projects/PRJ/suites/${testSuite.id}`, <SuiteDetail />)
+    else renderAt('/projects/:prefix/campaigns/:campaignId', '/projects/PRJ/campaigns/51', <CampaignDetail />)
     const discussion = await screen.findByRole('region', { name: 'Document discussion' })
     expect(within(discussion).getByRole('heading', { name: 'Discussion' })).toBeTruthy()
     expect(discussion.closest('aside')?.getAttribute('aria-label')).toBe('Document side panel')

@@ -26,7 +26,7 @@ async def import_db():
             role=UserRole.admin,
             is_active=True,
         )
-        project = Project(name="Import Project", prefix="IMP")
+        project = Project(name="Demo", prefix="PRJ")
         session.add_all([user, project])
         await session.commit()
         await session.refresh(user)

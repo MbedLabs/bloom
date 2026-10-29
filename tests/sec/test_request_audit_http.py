@@ -88,7 +88,7 @@ def _cli_headers(session_maker, user):
 def test_each_call_of_a_user_records_actor_client_route_status_and_created_id(harness, client_kind):
     client, session_maker = harness
     admin = _user(session_maker, "admin@example.com", UserRole.admin)
-    [project] = _add(session_maker, Project(name="Audit project", prefix="AUD"))
+    [project] = _add(session_maker, Project(name="Demo", prefix="PRJ"))
     headers = (
         _login(client, admin.email) if client_kind == "web" else _cli_headers(session_maker, admin)
     )
@@ -153,7 +153,7 @@ def test_a_service_credential_call_names_the_credential(harness, monkeypatch):
     monkeypatch.setattr(settings, "SERVICE_TOKEN_PEPPER", "p" * 40)
     client, session_maker = harness
     _user(session_maker, "admin@example.com", UserRole.admin)
-    _add(session_maker, Project(name="Report project", prefix="RPT"))
+    _add(session_maker, Project(name="Demo", prefix="PRJ"))
     admin_headers = _login(client, "admin@example.com")
     issued = client.post(
         "/api/service-credentials", json={"name": "Bud sync"}, headers=admin_headers
@@ -165,7 +165,7 @@ def test_a_service_credential_call_names_the_credential(harness, monkeypatch):
     mailbox = client.get("/api/bud/report-requests", params={"after_id": 0}, headers=service)
     published = client.post(
         "/api/bud/test-reports",
-        json={"project_prefix": "RPT", "bud_run_id": 7, "run_name": "Nightly"},
+        json={"project_prefix": "PRJ", "bud_run_id": 7, "run_name": "Nightly"},
         headers=service,
     )
 
@@ -189,10 +189,10 @@ def test_refused_attempts_are_denied_with_the_address(harness):
     client, session_maker = harness
     _user(session_maker, "admin@example.com", UserRole.admin)
     _user(session_maker, "member@example.com")
-    [project] = _add(session_maker, Project(name="Closed project", prefix="CLO"))
+    [project] = _add(session_maker, Project(name="Demo", prefix="PRJ"))
     [design] = _add(
         session_maker,
-        DesignItem(project_id=project.id, design_id="CLO-DES-001", title="Hidden design"),
+        DesignItem(project_id=project.id, design_id="PRJ-DES-001", title="Hidden design"),
     )
     member = _login(client, "member@example.com")
 

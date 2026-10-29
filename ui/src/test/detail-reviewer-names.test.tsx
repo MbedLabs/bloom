@@ -23,7 +23,7 @@ const requirement = {
   id: 2001,
   project_id: 7,
   parent_id: null,
-  req_id: 'FLT-REQ-2001',
+  req_id: 'PRJ-REQ-2001',
   title: 'Brake actuator response time',
   description: 'Stop within budget.',
   status: 'Approved',
@@ -63,7 +63,7 @@ vi.mock('@tanstack/react-query', async () => {
     ...actual,
     useQuery: ({ queryKey, enabled = true }: { queryKey: unknown[]; enabled?: boolean }) => {
       let data: unknown = requirement
-      if (queryKey[0] === 'project') data = { id: 7, name: 'Flight', prefix: 'FLT' }
+      if (queryKey[0] === 'project') data = { id: 7, name: 'Demo', prefix: 'PRJ' }
       else if (queryKey[0] === 'mentionableUsers') data = ON_THE_PROJECT
       else if (queryKey[0] === 'artefactComments') data = []
       else if (queryKey[0] === 'users') data = DIRECTORY
@@ -86,7 +86,7 @@ vi.mock('react-router', async () => {
   const actual = await vi.importActual<typeof import('react-router')>('react-router')
   return {
     ...actual,
-    useParams: () => ({ prefix: 'FLT', itemId: '2001' }),
+    useParams: () => ({ prefix: 'PRJ', itemId: '2001' }),
     useNavigate: () => vi.fn(),
     useLocation: () => ({ state: null }),
     Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,

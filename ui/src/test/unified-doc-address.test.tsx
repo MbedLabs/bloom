@@ -7,12 +7,12 @@ import { createQueryClient } from '../lib/queryClient'
 
 vi.mock('../api/client', () => ({
   docsApi: {
-    get: vi.fn().mockResolvedValue({ id: 4711, doc_id: 'ABC-REQ-0005', doc_type: 'REQ', allowed_actions: [] }),
+    get: vi.fn().mockResolvedValue({ id: 4711, doc_id: 'PRJ-REQ-0005', doc_type: 'REQ', allowed_actions: [] }),
   },
 }))
 
 vi.mock('../hooks/useProjectByPrefix', () => ({
-  useProjectByPrefix: () => ({ data: { id: 2, prefix: 'ABC' }, error: null }),
+  useProjectByPrefix: () => ({ data: { id: 2, prefix: 'PRJ' }, error: null }),
 }))
 
 vi.mock('../pages/RequirementDetail', () => ({
@@ -39,7 +39,7 @@ describe('a document address with a database id', () => {
     const client = createQueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <QueryClientProvider client={client}>
-        <MemoryRouter initialEntries={['/projects/ABC/docs/requirements/4711']}>
+        <MemoryRouter initialEntries={['/projects/PRJ/docs/requirements/4711']}>
           <Routes>
             <Route path="/projects/:prefix/docs/:kind/:docId" element={<><UnifiedDocDetail /><Address /></>} />
           </Routes>
@@ -47,6 +47,6 @@ describe('a document address with a database id', () => {
       </QueryClientProvider>,
     )
     expect(await screen.findByText('requirement 4711')).toBeTruthy()
-    expect(await screen.findByText('/projects/ABC/docs/requirements/ABC-REQ-0005')).toBeTruthy()
+    expect(await screen.findByText('/projects/PRJ/docs/requirements/PRJ-REQ-0005')).toBeTruthy()
   })
 })

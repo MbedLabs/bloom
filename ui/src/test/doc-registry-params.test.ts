@@ -77,68 +77,68 @@ describe('isRegistrySortDir', () => {
 
 describe('session read/write (per type)', () => {
   it('returns null when nothing stored', () => {
-    syncRegistryProjectContext('VCU')
-    expect(readStoredSort('VCU', 'REQ')).toBeNull()
+    syncRegistryProjectContext('PRJ')
+    expect(readStoredSort('PRJ', 'REQ')).toBeNull()
   })
 
   it('round-trips per scope', () => {
-    syncRegistryProjectContext('VCU')
-    writeStoredSort('VCU', 'REQ', { field: 'doc_id', dir: 'asc' })
-    expect(readStoredSort('VCU', 'REQ')).toEqual({ field: 'doc_id', dir: 'asc' })
+    syncRegistryProjectContext('PRJ')
+    writeStoredSort('PRJ', 'REQ', { field: 'doc_id', dir: 'asc' })
+    expect(readStoredSort('PRJ', 'REQ')).toEqual({ field: 'doc_id', dir: 'asc' })
   })
 
   it('REQ and DEF are independent in one project', () => {
-    syncRegistryProjectContext('VCU')
-    writeStoredSort('VCU', 'REQ', { field: 'doc_id', dir: 'asc' })
-    writeStoredSort('VCU', 'DEF', { field: 'title', dir: 'desc' })
-    expect(readStoredSort('VCU', 'REQ')).toEqual({ field: 'doc_id', dir: 'asc' })
-    expect(readStoredSort('VCU', 'DEF')).toEqual({ field: 'title', dir: 'desc' })
+    syncRegistryProjectContext('PRJ')
+    writeStoredSort('PRJ', 'REQ', { field: 'doc_id', dir: 'asc' })
+    writeStoredSort('PRJ', 'DEF', { field: 'title', dir: 'desc' })
+    expect(readStoredSort('PRJ', 'REQ')).toEqual({ field: 'doc_id', dir: 'asc' })
+    expect(readStoredSort('PRJ', 'DEF')).toEqual({ field: 'title', dir: 'desc' })
   })
 
   it('all bucket is independent from REQ', () => {
-    syncRegistryProjectContext('VCU')
-    writeStoredSort('VCU', 'all', { field: 'created_at', dir: 'asc' })
-    writeStoredSort('VCU', 'REQ', { field: 'doc_id', dir: 'desc' })
-    expect(readStoredSort('VCU', 'all')).toEqual({ field: 'created_at', dir: 'asc' })
-    expect(readStoredSort('VCU', 'REQ')).toEqual({ field: 'doc_id', dir: 'desc' })
+    syncRegistryProjectContext('PRJ')
+    writeStoredSort('PRJ', 'all', { field: 'created_at', dir: 'asc' })
+    writeStoredSort('PRJ', 'REQ', { field: 'doc_id', dir: 'desc' })
+    expect(readStoredSort('PRJ', 'all')).toEqual({ field: 'created_at', dir: 'asc' })
+    expect(readStoredSort('PRJ', 'REQ')).toEqual({ field: 'doc_id', dir: 'desc' })
   })
 
   it('different projects are independent', () => {
-    syncRegistryProjectContext('VCU')
-    writeStoredSort('VCU', 'REQ', { field: 'doc_id', dir: 'asc' })
+    syncRegistryProjectContext('PRJ')
+    writeStoredSort('PRJ', 'REQ', { field: 'doc_id', dir: 'asc' })
     syncRegistryProjectContext('ECU')
     writeStoredSort('ECU', 'REQ', { field: 'title', dir: 'desc' })
     expect(readStoredSort('ECU', 'REQ')).toEqual({ field: 'title', dir: 'desc' })
-    syncRegistryProjectContext('VCU')
-    expect(readStoredSort('VCU', 'REQ')).toBeNull()
+    syncRegistryProjectContext('PRJ')
+    expect(readStoredSort('PRJ', 'REQ')).toBeNull()
   })
 })
 
 describe('reset on project switch / leave', () => {
   it('switching project clears previous project session', () => {
-    syncRegistryProjectContext('VCU')
-    writeStoredSort('VCU', 'REQ', { field: 'doc_id', dir: 'asc' })
+    syncRegistryProjectContext('PRJ')
+    writeStoredSort('PRJ', 'REQ', { field: 'doc_id', dir: 'asc' })
     syncRegistryProjectContext('ECU')
-    expect(readStoredSort('VCU', 'REQ')).toBeNull()
-    syncRegistryProjectContext('VCU')
-    expect(readStoredSort('VCU', 'REQ')).toBeNull()
+    expect(readStoredSort('PRJ', 'REQ')).toBeNull()
+    syncRegistryProjectContext('PRJ')
+    expect(readStoredSort('PRJ', 'REQ')).toBeNull()
   })
 
   it('leaving project (null context) clears that project session', () => {
-    syncRegistryProjectContext('VCU')
-    writeStoredSort('VCU', 'REQ', { field: 'doc_id', dir: 'asc' })
+    syncRegistryProjectContext('PRJ')
+    writeStoredSort('PRJ', 'REQ', { field: 'doc_id', dir: 'asc' })
     syncRegistryProjectContext(null)
-    syncRegistryProjectContext('VCU')
-    expect(readStoredSort('VCU', 'REQ')).toBeNull()
+    syncRegistryProjectContext('PRJ')
+    expect(readStoredSort('PRJ', 'REQ')).toBeNull()
   })
 
   it('clearRegistrySortSession removes all scopes for a prefix', () => {
-    syncRegistryProjectContext('VCU')
-    writeStoredSort('VCU', 'REQ', { field: 'doc_id', dir: 'asc' })
-    writeStoredSort('VCU', 'DEF', { field: 'title', dir: 'asc' })
-    clearRegistrySortSession('VCU')
-    expect(readStoredSort('VCU', 'REQ')).toBeNull()
-    expect(readStoredSort('VCU', 'DEF')).toBeNull()
+    syncRegistryProjectContext('PRJ')
+    writeStoredSort('PRJ', 'REQ', { field: 'doc_id', dir: 'asc' })
+    writeStoredSort('PRJ', 'DEF', { field: 'title', dir: 'asc' })
+    clearRegistrySortSession('PRJ')
+    expect(readStoredSort('PRJ', 'REQ')).toBeNull()
+    expect(readStoredSort('PRJ', 'DEF')).toBeNull()
   })
 })
 
@@ -164,35 +164,35 @@ describe('sortSearchString', () => {
 
 describe('docRegistryListUrl', () => {
   it('returns base docs URL with no stored sort', () => {
-    syncRegistryProjectContext('VCU')
-    expect(docRegistryListUrl('VCU')).toBe('/projects/VCU/docs')
+    syncRegistryProjectContext('PRJ')
+    expect(docRegistryListUrl('PRJ')).toBe('/projects/PRJ/docs')
   })
 
   it('returns typed URL with no stored sort', () => {
-    syncRegistryProjectContext('VCU')
-    expect(docRegistryListUrl('VCU', 'REQ')).toBe('/projects/VCU/docs?type=requirements')
+    syncRegistryProjectContext('PRJ')
+    expect(docRegistryListUrl('PRJ', 'REQ')).toBe('/projects/PRJ/docs?type=requirements')
   })
 
   it('includes remembered sort only for active project', () => {
-    syncRegistryProjectContext('VCU')
-    writeStoredSort('VCU', 'REQ', { field: 'doc_id', dir: 'asc' })
-    const url = docRegistryListUrl('VCU', 'REQ')
+    syncRegistryProjectContext('PRJ')
+    writeStoredSort('PRJ', 'REQ', { field: 'doc_id', dir: 'asc' })
+    const url = docRegistryListUrl('PRJ', 'REQ')
     expect(url).toContain('type=requirements')
     expect(url).toContain('sort=doc_id')
     expect(url).toContain('dir=asc')
   })
 
   it('does not apply another project sort when viewing a different active project', () => {
-    syncRegistryProjectContext('VCU')
-    writeStoredSort('VCU', 'REQ', { field: 'doc_id', dir: 'asc' })
+    syncRegistryProjectContext('PRJ')
+    writeStoredSort('PRJ', 'REQ', { field: 'doc_id', dir: 'asc' })
     syncRegistryProjectContext('ECU')
-    expect(docRegistryListUrl('VCU', 'REQ')).toBe('/projects/VCU/docs?type=requirements')
+    expect(docRegistryListUrl('PRJ', 'REQ')).toBe('/projects/PRJ/docs?type=requirements')
   })
 
   it('omits default sort params from URL', () => {
-    syncRegistryProjectContext('VCU')
-    writeStoredSort('VCU', 'REQ', { field: 'updated_at', dir: 'desc' })
-    expect(docRegistryListUrl('VCU', 'REQ')).toBe('/projects/VCU/docs?type=requirements')
+    syncRegistryProjectContext('PRJ')
+    writeStoredSort('PRJ', 'REQ', { field: 'updated_at', dir: 'desc' })
+    expect(docRegistryListUrl('PRJ', 'REQ')).toBe('/projects/PRJ/docs?type=requirements')
   })
 })
 
@@ -212,20 +212,20 @@ describe('docRegistryListLabel', () => {
 
 describe('docRegistryBackUrl', () => {
   it('uses returnTo when provided', () => {
-    expect(docRegistryBackUrl('VCU', 'REQ', '/projects/VCU/docs?type=requirements&sort=doc_id')).toBe(
-      '/projects/VCU/docs?type=requirements&sort=doc_id',
+    expect(docRegistryBackUrl('PRJ', 'REQ', '/projects/PRJ/docs?type=requirements&sort=doc_id')).toBe(
+      '/projects/PRJ/docs?type=requirements&sort=doc_id',
     )
   })
 
   it('ignores whitespace-only returnTo', () => {
-    syncRegistryProjectContext('VCU')
-    expect(docRegistryBackUrl('VCU', 'REQ', '   ')).toBe('/projects/VCU/docs?type=requirements')
+    syncRegistryProjectContext('PRJ')
+    expect(docRegistryBackUrl('PRJ', 'REQ', '   ')).toBe('/projects/PRJ/docs?type=requirements')
   })
 
   it('falls back to sort-aware docRegistryListUrl', () => {
-    syncRegistryProjectContext('VCU')
-    writeStoredSort('VCU', 'REQ', { field: 'doc_id', dir: 'asc' })
-    expect(docRegistryBackUrl('VCU', 'REQ')).toContain('type=requirements')
-    expect(docRegistryBackUrl('VCU', 'REQ')).toContain('sort=doc_id')
+    syncRegistryProjectContext('PRJ')
+    writeStoredSort('PRJ', 'REQ', { field: 'doc_id', dir: 'asc' })
+    expect(docRegistryBackUrl('PRJ', 'REQ')).toContain('type=requirements')
+    expect(docRegistryBackUrl('PRJ', 'REQ')).toContain('sort=doc_id')
   })
 })

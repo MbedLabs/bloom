@@ -38,7 +38,7 @@ async function renderBar(workflow: Record<string, unknown>) {
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <MemoryRouter>
-          <WorkflowPanel artefactType="requirement" artefactId={requirement.id} projectPrefix="VCU" projectId={1} layout="bar" />
+          <WorkflowPanel artefactType="requirement" artefactId={requirement.id} projectPrefix="PRJ" projectId={1} layout="bar" />
         </MemoryRouter>
       </ToastProvider>
     </QueryClientProvider>,

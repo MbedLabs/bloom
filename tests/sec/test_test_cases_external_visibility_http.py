@@ -110,7 +110,7 @@ async def _seed_test_case_visibility_data(session_maker: async_sessionmaker[Asyn
         session.add_all([admin, external])
         await session.flush()
 
-        project = Project(name="Test Case Visibility", prefix="TCV", description="Visibility")
+        project = Project(name="Demo", prefix="PRJ", description="Visibility")
         session.add(project)
         await session.flush()
 
@@ -128,14 +128,14 @@ async def _seed_test_case_visibility_data(session_maker: async_sessionmaker[Asyn
 
         customer_test_case = TestCase(
             project_id=project.id,
-            tc_id="TCV-TC-001",
+            tc_id="PRJ-TC-001",
             title="Customer test case",
             status="Draft",
             visibility="customer",
         )
         internal_test_case = TestCase(
             project_id=project.id,
-            tc_id="TCV-TC-002",
+            tc_id="PRJ-TC-002",
             title="Internal test case",
             status="Draft",
             visibility="internal",

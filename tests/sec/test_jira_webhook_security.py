@@ -37,13 +37,13 @@ async def env(request):
     maker = async_sessionmaker(engine, expire_on_commit=False)
 
     async with maker() as setup:
-        project = Project(name="Alpha", prefix="ALP")
+        project = Project(name="Demo", prefix="PRJ")
         setup.add(project)
         await setup.flush()
         setup.add(
             Defect(
                 project_id=project.id,
-                defect_id="ALP-DEF-001",
+                defect_id="PRJ-DEF-001",
                 title="Broken login",
                 status="Open",
                 external_tracker="jira",
@@ -54,7 +54,7 @@ async def env(request):
         setup.add(
             ChangeRequest(
                 project_id=project.id,
-                change_id="ALP-CR-001",
+                change_id="PRJ-CR-001",
                 title="Swap the sensor",
                 status=getattr(request, "param", "Submitted"),
                 external_tracker="jira",
@@ -131,7 +131,7 @@ def _post(client, body: bytes, *, signature=None, delivery="d-1"):
 async def _defect_status(maker) -> str:
     async with maker() as session:
         row = (
-            await session.execute(select(Defect).where(Defect.defect_id == "ALP-DEF-001"))
+            await session.execute(select(Defect).where(Defect.defect_id == "PRJ-DEF-001"))
         ).scalar_one()
         return row.status
 
@@ -140,7 +140,7 @@ async def _change_status(maker) -> str:
     async with maker() as session:
         row = (
             await session.execute(
-                select(ChangeRequest).where(ChangeRequest.change_id == "ALP-CR-001")
+                select(ChangeRequest).where(ChangeRequest.change_id == "PRJ-CR-001")
             )
         ).scalar_one()
         return row.status
@@ -226,7 +226,7 @@ async def test_only_closing_and_reopening_change_the_bloom_status(env):
     client, maker = env
     async with maker() as session:
         row = (
-            await session.execute(select(Defect).where(Defect.defect_id == "ALP-DEF-001"))
+            await session.execute(select(Defect).where(Defect.defect_id == "PRJ-DEF-001"))
         ).scalar_one()
         row.status = "Verified"
         await session.commit()
@@ -245,7 +245,7 @@ async def test_only_closing_and_reopening_change_the_bloom_status(env):
 
     async with maker() as session:
         row = (
-            await session.execute(select(Defect).where(Defect.defect_id == "ALP-DEF-001"))
+            await session.execute(select(Defect).where(Defect.defect_id == "PRJ-DEF-001"))
         ).scalar_one()
         row.status = "Closed"
         await session.commit()
@@ -263,7 +263,7 @@ async def test_replayed_delivery_is_ignored(env):
 
     async with maker() as session:
         row = (
-            await session.execute(select(Defect).where(Defect.defect_id == "ALP-DEF-001"))
+            await session.execute(select(Defect).where(Defect.defect_id == "PRJ-DEF-001"))
         ).scalar_one()
         row.status = "Open"
         await session.commit()
@@ -411,7 +411,7 @@ async def test_created_defect_copies_the_issue(env):
     client, maker = env
     await _map_project_for_creation(maker, create=True)
     async with maker() as session:
-        session.add(TestCaseModel(project_id=1, tc_id="ALP-TC-004", title="Boot"))
+        session.add(TestCaseModel(project_id=1, tc_id="PRJ-TC-004", title="Boot"))
         bot = User(
             email="Bot@Acme.test",
             full_name="Jira bot",
@@ -422,7 +422,7 @@ async def test_created_defect_copies_the_issue(env):
         await session.commit()
     description = {
         "type": "doc",
-        "content": [{"type": "paragraph", "content": [{"type": "text", "text": "See ALP-TC-004"}]}],
+        "content": [{"type": "paragraph", "content": [{"type": "text", "text": "See PRJ-TC-004"}]}],
     }
     body = _issue_payload("PROJ-600", description=description, priority={"name": "Highest"})
     assert (
@@ -433,7 +433,7 @@ async def test_created_defect_copies_the_issue(env):
             await session.execute(select(Defect).where(Defect.external_issue_number == 600))
         ).scalar_one()
         test_case = (await session.execute(select(TestCaseModel))).scalar_one()
-    assert defect.description == "See ALP-TC-004"
+    assert defect.description == "See PRJ-TC-004"
     assert (defect.priority, defect.severity) == ("Critical", "Critical")
     assert defect.external_issue_url == "https://acme.atlassian.net/browse/PROJ-600"
     assert (defect.source_type, defect.source_id) == ("TC", test_case.id)
@@ -608,7 +608,7 @@ async def test_pull_creates_the_missing_defects(env, monkeypatch):
         await session.commit()
     assert (result.searched, result.created, result.already_linked, result.skipped) == (4, 1, 1, 2)
     assert (result.updated, result.removed) == (0, 0)
-    assert result.new_ids == ["ALP-DEF-002"]
+    assert result.new_ids == ["PRJ-DEF-002"]
     assert seen[0]["jql"] == (
         'project = "PROJ" AND issuetype in ("Bug") AND statusCategory != Done ORDER BY created ASC'
     )
@@ -744,7 +744,7 @@ async def test_inbound_follows_a_defect_linked_while_it_waited_for_the_lock(env,
             other.add(
                 Defect(
                     project_id=setting.project_id,
-                    defect_id="ALP-DEF-900",
+                    defect_id="PRJ-DEF-900",
                     title="Synced first",
                     status="Open",
                     external_tracker="jira",

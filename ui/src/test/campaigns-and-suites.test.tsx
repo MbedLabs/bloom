@@ -46,7 +46,7 @@ const TestCampaigns = (await import('../pages/TestCampaigns')).default
 const running = {
   ...campaign,
   id: 31,
-  campaign_id: 'VCU-CMP-001',
+  campaign_id: 'PRJ-CMP-001',
   name: 'Alpha regression',
   description: 'Full regression before release.',
   status: 'In Progress',
@@ -55,7 +55,7 @@ const running = {
 const planned = {
   ...campaign,
   id: 32,
-  campaign_id: 'VCU-CMP-002',
+  campaign_id: 'PRJ-CMP-002',
   name: 'Bravo smoke',
   description: 'Quick pass on every build.',
   status: 'Planned',
@@ -64,7 +64,7 @@ const planned = {
 const done = {
   ...campaign,
   id: 33,
-  campaign_id: 'VCU-CMP-003',
+  campaign_id: 'PRJ-CMP-003',
   name: 'Charlie soak',
   description: null,
   status: 'Completed',
@@ -74,7 +74,7 @@ const done = {
 const secondSuite = {
   ...testSuite,
   id: 42,
-  suite_id: 'VCU-TS-002',
+  suite_id: 'PRJ-TS-002',
   name: 'Regression suite',
   total_items: 12,
 }
@@ -90,7 +90,7 @@ function renderCampaigns() {
   return render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <MemoryRouter initialEntries={['/projects/VCU/campaigns']}>
+        <MemoryRouter initialEntries={['/projects/PRJ/campaigns']}>
           <Routes>
             <Route path="/projects/:prefix/campaigns" element={<TestCampaigns />} />
           </Routes>
@@ -229,7 +229,7 @@ describe('the suites of a project', () => {
     renderCampaigns()
     await screen.findByText('Smoke suite')
 
-    expect(screen.getByText('VCU-TS-001')).toBeTruthy()
+    expect(screen.getByText('PRJ-TS-001')).toBeTruthy()
     expect(screen.getByText('Regression suite')).toBeTruthy()
     expect(screen.getByText('12 TCs')).toBeTruthy()
     expect(screen.getByText('1 TC')).toBeTruthy()

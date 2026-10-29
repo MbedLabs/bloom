@@ -36,7 +36,7 @@ async def session():
         await conn.run_sync(Base.metadata.create_all)
     maker = async_sessionmaker(engine, expire_on_commit=False)
     async with maker() as db:
-        project = Project(name="Alpha", prefix="ALP")
+        project = Project(name="Demo", prefix="PRJ")
         db.add(project)
         db.add(
             User(
@@ -116,7 +116,7 @@ async def test_keeping_the_existing_value(session):
     req = (
         await session.execute(select(Requirement).where(Requirement.title == "Fast boot"))
     ).scalar_one()
-    assert req.req_id.startswith("ALP-REQ-")
+    assert req.req_id.startswith("PRJ-REQ-")
     assert req.description == "Boot within {{BOOT_MS}} ms"
     des = (
         await session.execute(select(DesignItem).where(DesignItem.title == "Boot design"))
@@ -207,7 +207,7 @@ async def test_test_case_imports_with_step_rows(session):
     tc = (
         await session.execute(select(TestCaseModel).where(TestCaseModel.title == "Relay boot"))
     ).scalar_one()
-    assert tc.tc_id.startswith("ALP-TC-")
+    assert tc.tc_id.startswith("PRJ-TC-")
     assert tc.description == "Checks the relay-driven boot."
     assert [(r["row_type"], r["description"], r["expected_result"]) for r in tc.steps] == [
         ("precondition", "relay open", ""),

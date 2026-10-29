@@ -10,7 +10,7 @@ import Dashboard from '../pages/Dashboard'
 const project: Project = {
   id: 1,
   name: 'Dashboard Project',
-  prefix: 'DSH',
+  prefix: 'PRJ',
   description: null,
   status: 'Active',
   requirement_count: 1,

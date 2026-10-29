@@ -56,7 +56,7 @@ describe('access labels', () => {
     const client = createQueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <QueryClientProvider client={client}>
-        <MemoryRouter initialEntries={['/projects/VCU']}>
+        <MemoryRouter initialEntries={['/projects/PRJ']}>
           <Layout />
         </MemoryRouter>
       </QueryClientProvider>,

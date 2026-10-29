@@ -70,12 +70,12 @@ describe('detail visibility presentation', () => {
   })
 
   it('does not repeat visibility on shared-document details', async () => {
-    mockParams = { prefix: 'FLT', docId: '41', kind: 'specifications' }
+    mockParams = { prefix: 'PRJ', docId: '41', kind: 'specifications' }
     mockQueryData = {
       document: {
         id: 41,
         project_id: 7,
-        doc_id: 'FLT-SPEC-041',
+        doc_id: 'PRJ-SPEC-041',
         title: 'Flight specification',
         status: 'Draft',
         visibility: 'internal',
@@ -85,7 +85,7 @@ describe('detail visibility presentation', () => {
         sections: [],
         content_json: null,
       },
-      project: { id: 7, name: 'Flight', prefix: 'FLT' },
+      project: { id: 7, name: 'Demo', prefix: 'PRJ' },
     }
 
     const { default: DocumentDetail } = await import('../pages/DocumentDetail')
@@ -96,12 +96,12 @@ describe('detail visibility presentation', () => {
   })
 
   it('does not repeat visibility on test-case details', async () => {
-    mockParams = { prefix: 'FLT', itemId: '42' }
+    mockParams = { prefix: 'PRJ', itemId: '42' }
     mockQueryData = {
       testCase: {
         id: 42,
         project_id: 7,
-        tc_id: 'FLT-TC-042',
+        tc_id: 'PRJ-TC-042',
         title: 'Audit test case',
         description: '',
         status: 'Draft',
@@ -120,7 +120,7 @@ describe('detail visibility presentation', () => {
         linked_requirements: [],
         verifies: [],
       },
-      project: { id: 7, name: 'Flight', prefix: 'FLT' },
+      project: { id: 7, name: 'Demo', prefix: 'PRJ' },
       users: [],
     }
 
@@ -132,12 +132,12 @@ describe('detail visibility presentation', () => {
   })
 
   it('does not repeat visibility on controlled-artefact details', async () => {
-    mockParams = { prefix: 'FLT', itemId: '43' }
+    mockParams = { prefix: 'PRJ', itemId: '43' }
     mockQueryData = {
       design: {
         id: 43,
         project_id: 7,
-        design_id: 'FLT-DES-043',
+        design_id: 'PRJ-DES-043',
         title: 'Audit design',
         description: '',
         status: 'Draft',
@@ -148,11 +148,11 @@ describe('detail visibility presentation', () => {
         created_at: '2026-07-01T00:00:00Z',
         updated_at: '2026-07-01T00:00:00Z',
       },
-      project: { id: 7, name: 'Flight', prefix: 'FLT' },
+      project: { id: 7, name: 'Demo', prefix: 'PRJ' },
       artefactComments: [],
       artefactActivity: [],
       artefactRelated: {
-        project: { id: 7, name: 'Flight', prefix: 'FLT' },
+        project: { id: 7, name: 'Demo', prefix: 'PRJ' },
         linked_requirements: [],
         related_test_cases: [],
         related_documents: [],

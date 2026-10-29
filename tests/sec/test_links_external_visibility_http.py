@@ -102,7 +102,7 @@ async def _seed_links_visibility_data(session_maker: async_sessionmaker[AsyncSes
         session.add(external)
         await session.flush()
 
-        project = Project(name="Links Visibility", prefix="LKV", description="Visibility")
+        project = Project(name="Demo", prefix="PRJ", description="Visibility")
         session.add(project)
         await session.flush()
 
@@ -120,7 +120,7 @@ async def _seed_links_visibility_data(session_maker: async_sessionmaker[AsyncSes
 
         customer_requirement = Requirement(
             project_id=project.id,
-            req_id="LKV-REQ-001",
+            req_id="PRJ-REQ-001",
             title="Customer requirement",
             status="Draft",
             visibility="customer",
@@ -130,7 +130,7 @@ async def _seed_links_visibility_data(session_maker: async_sessionmaker[AsyncSes
         )
         internal_requirement = Requirement(
             project_id=project.id,
-            req_id="LKV-REQ-002",
+            req_id="PRJ-REQ-002",
             title="Internal requirement",
             status="Draft",
             visibility="internal",
@@ -140,14 +140,14 @@ async def _seed_links_visibility_data(session_maker: async_sessionmaker[AsyncSes
         )
         customer_test_case = TestCase(
             project_id=project.id,
-            tc_id="LKV-TC-001",
+            tc_id="PRJ-TC-001",
             title="Customer test case",
             status="Approved",
             visibility="customer",
         )
         internal_test_case = TestCase(
             project_id=project.id,
-            tc_id="LKV-TC-002",
+            tc_id="PRJ-TC-002",
             title="Internal test case",
             status="Approved",
             visibility="internal",

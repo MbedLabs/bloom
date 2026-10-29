@@ -22,7 +22,7 @@ async def session():
         await conn.run_sync(Base.metadata.create_all)
     maker = async_sessionmaker(engine, expire_on_commit=False)
     async with maker() as db:
-        project = Project(name="Alpha", prefix="ALP")
+        project = Project(name="Demo", prefix="PRJ")
         db.add(project)
         db.add(
             User(
@@ -36,7 +36,7 @@ async def session():
 
         parent = Requirement(
             project_id=project.id,
-            req_id="ALP-REQ-001",
+            req_id="PRJ-REQ-001",
             title="Login shall be possible",
             description="Users must be able to log in.",
             status="Approved",
@@ -46,14 +46,14 @@ async def session():
         db.add(
             Requirement(
                 project_id=project.id,
-                req_id="ALP-REQ-002",
+                req_id="PRJ-REQ-002",
                 title="Uncovered requirement",
                 parent_id=parent.id,
             )
         )
         tc = TestCase(
             project_id=project.id,
-            tc_id="ALP-TC-001",
+            tc_id="PRJ-TC-001",
             title="Verify login",
             last_execution_status="passed",
         )
@@ -86,15 +86,15 @@ async def test_requirements_csv_contains_rows_and_parent_ref(session):
     admin = await _admin(session)
     response = await export_requirements(project_id=1, format="csv", db=session, current_user=admin)
     assert response.media_type.startswith("text/csv")
-    assert 'filename="ALP-requirements.csv"' in response.headers["content-disposition"]
+    assert 'filename="PRJ-requirements.csv"' in response.headers["content-disposition"]
 
     rows = _parse_csv(response)
     assert rows[0][:4] == ["req_id", "title", "status", "priority"]
     by_id = {r[0]: r for r in rows[1:]}
-    assert by_id["ALP-REQ-001"][1] == "Login shall be possible"
-    assert by_id["ALP-REQ-001"][2] == "Approved"
+    assert by_id["PRJ-REQ-001"][1] == "Login shall be possible"
+    assert by_id["PRJ-REQ-001"][2] == "Approved"
     parent_col = rows[0].index("parent_req_id")
-    assert by_id["ALP-REQ-002"][parent_col] == "ALP-REQ-001"
+    assert by_id["PRJ-REQ-002"][parent_col] == "PRJ-REQ-001"
 
 
 async def test_requirements_pdf_is_valid_pdf(session):
@@ -119,10 +119,10 @@ async def test_traceability_csv_marks_coverage(session):
         "tc_last_execution",
     ]
     data = {(r[0], r[3]): r for r in rows[1:]}
-    covered = data[("ALP-REQ-001", "yes")]
-    assert covered[4] == "ALP-TC-001"
+    covered = data[("PRJ-REQ-001", "yes")]
+    assert covered[4] == "PRJ-TC-001"
     assert covered[6] == "passed"
-    uncovered = data[("ALP-REQ-002", "no")]
+    uncovered = data[("PRJ-REQ-002", "no")]
     assert uncovered[4] == ""
 
 

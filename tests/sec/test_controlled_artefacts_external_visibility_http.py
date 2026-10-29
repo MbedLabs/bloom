@@ -108,7 +108,7 @@ async def _seed_controlled_artefact_visibility_data(
         session.add(external)
         await session.flush()
 
-        project = Project(name="Controlled Visibility", prefix="CTV", description="Visibility")
+        project = Project(name="Demo", prefix="PRJ", description="Visibility")
         session.add(project)
         await session.flush()
 
@@ -127,7 +127,7 @@ async def _seed_controlled_artefact_visibility_data(
 
         visible_design = DesignItem(
             project_id=project.id,
-            design_id="CTV-DES-001",
+            design_id="PRJ-DES-001",
             title="Visible design",
             status="Draft",
             priority="Medium",
@@ -136,7 +136,7 @@ async def _seed_controlled_artefact_visibility_data(
         )
         hidden_design = DesignItem(
             project_id=project.id,
-            design_id="CTV-DES-002",
+            design_id="PRJ-DES-002",
             title="Hidden design",
             status="Draft",
             priority="Medium",
@@ -146,7 +146,7 @@ async def _seed_controlled_artefact_visibility_data(
 
         visible_risk = RiskItem(
             project_id=project.id,
-            risk_id="CTV-RSK-001",
+            risk_id="PRJ-RSK-001",
             title="Visible risk",
             status="Open",
             severity="Medium",
@@ -156,7 +156,7 @@ async def _seed_controlled_artefact_visibility_data(
         )
         hidden_risk = RiskItem(
             project_id=project.id,
-            risk_id="CTV-RSK-002",
+            risk_id="PRJ-RSK-002",
             title="Hidden risk",
             status="Open",
             severity="Medium",
@@ -167,7 +167,7 @@ async def _seed_controlled_artefact_visibility_data(
 
         visible_change = ChangeRequest(
             project_id=project.id,
-            change_id="CTV-CHG-001",
+            change_id="PRJ-CHG-001",
             title="Visible change",
             status="Submitted",
             priority="Medium",
@@ -176,7 +176,7 @@ async def _seed_controlled_artefact_visibility_data(
         )
         hidden_change = ChangeRequest(
             project_id=project.id,
-            change_id="CTV-CHG-002",
+            change_id="PRJ-CHG-002",
             title="Hidden change",
             status="Submitted",
             priority="Medium",
@@ -186,7 +186,7 @@ async def _seed_controlled_artefact_visibility_data(
 
         visible_concept = TestConcept(
             project_id=project.id,
-            concept_id="CTV-CPT-001",
+            concept_id="PRJ-CPT-001",
             name="Visible concept",
             status="Draft",
             coverage=0,
@@ -194,7 +194,7 @@ async def _seed_controlled_artefact_visibility_data(
         )
         hidden_concept = TestConcept(
             project_id=project.id,
-            concept_id="CTV-CPT-002",
+            concept_id="PRJ-CPT-002",
             name="Hidden concept",
             status="Draft",
             coverage=0,
@@ -203,7 +203,7 @@ async def _seed_controlled_artefact_visibility_data(
 
         visible_defect = Defect(
             project_id=project.id,
-            defect_id="CTV-DEF-001",
+            defect_id="PRJ-DEF-001",
             title="Visible defect",
             status="Open",
             severity="Medium",
@@ -212,7 +212,7 @@ async def _seed_controlled_artefact_visibility_data(
         )
         hidden_defect = Defect(
             project_id=project.id,
-            defect_id="CTV-DEF-002",
+            defect_id="PRJ-DEF-002",
             title="Hidden defect",
             status="Open",
             severity="Medium",
@@ -255,11 +255,11 @@ def test_external_controlled_artefacts_hide_internal_rows_and_return_visibility(
         project_id = seeded["project"].id
 
         cases = [
-            ("design", "/api/designs", "design_id", "CTV-DES-001", seeded["design"]),
-            ("risk", "/api/risks", "risk_id", "CTV-RSK-001", seeded["risk"]),
-            ("change", "/api/changes", "change_id", "CTV-CHG-001", seeded["change"]),
-            ("concept", "/api/test-concepts", "concept_id", "CTV-CPT-001", seeded["concept"]),
-            ("defect", "/api/defects", "defect_id", "CTV-DEF-001", seeded["defect"]),
+            ("design", "/api/designs", "design_id", "PRJ-DES-001", seeded["design"]),
+            ("risk", "/api/risks", "risk_id", "PRJ-RSK-001", seeded["risk"]),
+            ("change", "/api/changes", "change_id", "PRJ-CHG-001", seeded["change"]),
+            ("concept", "/api/test-concepts", "concept_id", "PRJ-CPT-001", seeded["concept"]),
+            ("defect", "/api/defects", "defect_id", "PRJ-DEF-001", seeded["defect"]),
         ]
 
         for _label, base_path, public_id_field, expected_visible_public_id, pair in cases:

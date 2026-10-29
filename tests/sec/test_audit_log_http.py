@@ -150,10 +150,10 @@ def test_membership_visibility_and_deletion_carry_the_project(harness):
     client, session_maker = harness
     _user(session_maker, "admin@example.com", UserRole.admin)
     member = _user(session_maker, "member@example.com")
-    [project] = _add(session_maker, Project(name="Audit project", prefix="AUD"))
+    [project] = _add(session_maker, Project(name="Demo", prefix="PRJ"))
     [design] = _add(
         session_maker,
-        DesignItem(project_id=project.id, design_id="AUD-DES-001", title="A design"),
+        DesignItem(project_id=project.id, design_id="PRJ-DES-001", title="A design"),
     )
     headers = _login(client, "admin@example.com")
 
@@ -175,7 +175,7 @@ def test_membership_visibility_and_deletion_carry_the_project(harness):
     [delete_event] = _events(session_maker, "artefact.deleted")
     assert member_event.project_id == project.id
     assert member_event.target_id == str(member.id)
-    assert visibility_event.target_id == "AUD-DES-001"
+    assert visibility_event.target_id == "PRJ-DES-001"
     assert visibility_event.details["to"] == "customer"
     assert delete_event.project_id == project.id
     assert delete_event.target_type == "design"
@@ -184,7 +184,7 @@ def test_membership_visibility_and_deletion_carry_the_project(harness):
 def test_a_rotated_secret_is_named_but_never_stored(harness):
     client, session_maker = harness
     _user(session_maker, "admin@example.com", UserRole.admin)
-    [project] = _add(session_maker, Project(name="Tracker project", prefix="TRK"))
+    [project] = _add(session_maker, Project(name="Demo", prefix="PRJ"))
     [setting] = _add(session_maker, IntegrationSetting(project_id=project.id, tracker="jira"))
     headers = _login(client, "admin@example.com")
 

@@ -35,8 +35,8 @@ async def retention_http():
     async with async_sessionmaker(engine, expire_on_commit=False)() as db:
         db.add_all(
             [
-                Project(id=1, name="Contributions", prefix="PRJ"),
-                Project(id=2, name="Other project", prefix="OTH"),
+                Project(id=1, name="Demo", prefix="PRJ"),
+                Project(id=2, name="ABC", prefix="ABC"),
                 User(
                     id=1,
                     email="admin@example.com",

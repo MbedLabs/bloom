@@ -71,10 +71,10 @@ function linksPanel() {
   return renderPanel(
     <DocumentLinksPanel
       projectId={1}
-      projectPrefix="VCU"
+      projectPrefix="PRJ"
       sourceType="TC"
       sourceId={21}
-      sourceDocId="VCU-TC-001"
+      sourceDocId="PRJ-TC-001"
     />,
   )
 }
@@ -253,10 +253,10 @@ describe('the links of a document', () => {
     renderPanel(
       <DocumentLinksPanel
         projectId={1}
-        projectPrefix="VCU"
+        projectPrefix="PRJ"
         sourceType="CMP"
         sourceId={5}
-        sourceDocId="VCU-CMP-001"
+        sourceDocId="PRJ-CMP-001"
         derivedLinks={[{ ...link, suspect: false }]}
       />,
     )
@@ -269,10 +269,10 @@ describe('the links of a document', () => {
     renderPanel(
       <DocumentLinksPanel
         projectId={1}
-        projectPrefix="VCU"
+        projectPrefix="PRJ"
         sourceType="TC"
         sourceId={21}
-        sourceDocId="VCU-TC-001"
+        sourceDocId="PRJ-TC-001"
         derivedLinks={[{ ...link, suspect: false, target_type: 'CMP', target_id: 5, role: 'verifies' }]}
       />,
     )
@@ -284,10 +284,10 @@ describe('the links of a document', () => {
     renderPanel(
       <DocumentLinksPanel
         projectId={1}
-        projectPrefix="VCU"
+        projectPrefix="PRJ"
         sourceType="TC"
         sourceId={21}
-        sourceDocId="VCU-TC-001"
+        sourceDocId="PRJ-TC-001"
         derivedLinks={[
           {
             ...link,
@@ -337,8 +337,8 @@ describe('the links of a document', () => {
     fireEvent.click(await screen.findByRole('button', { name: /link artefact/i }))
     await screen.findByTitle(/filter targets/i)
 
-    expect(await screen.findByText(/VCU-REQ-001/)).toBeTruthy()
-    expect(screen.queryByText('VCU-TC-001')).toBeNull()
+    expect(await screen.findByText(/PRJ-REQ-001/)).toBeTruthy()
+    expect(screen.queryByText('PRJ-TC-001')).toBeNull()
   })
 
   it('names the target types in the plural', async () => {
@@ -371,7 +371,7 @@ describe('the links of a document', () => {
     linksPanel()
     await screen.findByText('Linked Documents')
 
-    expect(await screen.findByText('VCU-REQ-001')).toBeTruthy()
+    expect(await screen.findByText('PRJ-REQ-001')).toBeTruthy()
   })
 
   it('asks for nothing at all when the document has no links', async () => {
@@ -387,7 +387,7 @@ describe('the links of a document', () => {
     linksPanel()
     fireEvent.click(await screen.findByRole('button', { name: /link artefact/i }))
 
-    await waitFor(() => expect(client.docsApi.typeSummary).toHaveBeenCalledWith('VCU'))
+    await waitFor(() => expect(client.docsApi.typeSummary).toHaveBeenCalledWith('PRJ'))
   })
 
   it('searches for link targets on the server, a page at a time', async () => {
@@ -801,7 +801,7 @@ describe('the Jira tracker of a project', () => {
       created: 2,
       already_linked: 1,
       skipped: 1,
-      new_ids: ['VCU-DEF-007', 'VCU-DEF-008'],
+      new_ids: ['PRJ-DEF-007', 'PRJ-DEF-008'],
       updated: 3,
       removed: 1,
     })

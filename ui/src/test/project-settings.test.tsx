@@ -50,7 +50,7 @@ const client = await import('../api/client')
 const ProjectEdit = (await import('../pages/ProjectEdit')).default
 const ProjectDetail = (await import('../pages/ProjectDetail')).default
 
-const otherProject = { ...project, id: 2, name: 'Battery Management', prefix: 'BMS' }
+const otherProject = { ...project, id: 2, name: 'ABC', prefix: 'ABC' }
 /** A maintainer and an external, neither of them already a member. */
 const addableMaintainer = {
   ...user,
@@ -74,7 +74,7 @@ const addableAdmin = {
   role: 'admin' as const,
 }
 
-function renderEdit(prefix = 'VCU', overview = false) {
+function renderEdit(prefix = 'PRJ', overview = false) {
   const queryClient = createQueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   })
@@ -183,7 +183,7 @@ describe('project ownership capabilities', () => {
     vi.mocked(client.projectsApi.capabilities).mockResolvedValue({
       can_edit: true, can_delete: false, can_manage_access: false,
     })
-    renderEdit('VCU', true)
+    renderEdit('PRJ', true)
     expect(await screen.findByRole('link', { name: 'Edit project' })).toBeTruthy()
   })
 
@@ -192,7 +192,7 @@ describe('project ownership capabilities', () => {
     vi.mocked(client.projectsApi.capabilities).mockResolvedValue({
       can_edit: false, can_delete: false, can_manage_access: false,
     })
-    renderEdit('VCU', true)
+    renderEdit('PRJ', true)
     await waitFor(() => expect(client.projectsApi.capabilities).toHaveBeenCalledWith(project.id))
     await settle()
     expect(screen.queryByRole('link', { name: 'Edit project' })).toBeNull()
@@ -203,13 +203,13 @@ describe('pending document requests on the project', () => {
   it('shows the server-filtered review and approval requests with document links', async () => {
     vi.mocked(client.workflowApi.listProjectRequests).mockResolvedValue([
       { id: 71, kind: 'review', status: 'pending', created_at: '2026-10-11T10:00:00Z',
-        artefact_type: 'document', artefact_id: 11, doc_type: 'SPEC', public_id: 'VCU-SPEC-001', revision_number: 2 },
+        artefact_type: 'document', artefact_id: 11, doc_type: 'SPEC', public_id: 'PRJ-SPEC-001', revision_number: 2 },
       { id: 72, kind: 'approval', status: 'pending', created_at: '2026-10-11T11:00:00Z',
-        artefact_type: 'test-suite', artefact_id: 12, doc_type: 'TS', public_id: 'VCU-TS-001', revision_number: 1 },
+        artefact_type: 'test-suite', artefact_id: 12, doc_type: 'TS', public_id: 'PRJ-TS-001', revision_number: 1 },
     ])
-    renderEdit('VCU', true)
-    expect((await screen.findByRole('link', { name: 'VCU-SPEC-001' })).getAttribute('href')).toBe('/projects/VCU/docs/specifications/VCU-SPEC-001')
-    expect(screen.getByRole('link', { name: 'VCU-TS-001' }).getAttribute('href')).toBe('/projects/VCU/docs/test-suites/VCU-TS-001')
+    renderEdit('PRJ', true)
+    expect((await screen.findByRole('link', { name: 'PRJ-SPEC-001' })).getAttribute('href')).toBe('/projects/PRJ/docs/specifications/PRJ-SPEC-001')
+    expect(screen.getByRole('link', { name: 'PRJ-TS-001' }).getAttribute('href')).toBe('/projects/PRJ/docs/test-suites/PRJ-TS-001')
     expect(screen.getByText('Review')).toBeTruthy()
     expect(screen.getByText('Approval')).toBeTruthy()
     expect(screen.getByText('Revision 2')).toBeTruthy()
@@ -218,13 +218,13 @@ describe('pending document requests on the project', () => {
   })
 
   it('shows an explicit empty state for no pending requests', async () => {
-    renderEdit('VCU', true)
+    renderEdit('PRJ', true)
     expect(await screen.findByText('No pending document requests.')).toBeTruthy()
   })
 
   it('shows a read failure instead of claiming there are no pending requests', async () => {
     vi.mocked(client.workflowApi.listProjectRequests).mockRejectedValue(apiError('Unavailable'))
-    renderEdit('VCU', true)
+    renderEdit('PRJ', true)
     expect(await screen.findByText('Could not load document requests.')).toBeTruthy()
     expect(screen.queryByText('No pending document requests.')).toBeNull()
   })
@@ -236,17 +236,17 @@ describe('changing a project’s prefix', () => {
     const prefix = (await screen.findByTitle('Project prefix')) as HTMLInputElement
 
     expect(prefix.maxLength).toBe(3)
-    fireEvent.change(prefix, { target: { value: 'bms' } })
-    expect(prefix.value).toBe('BMS')
+    fireEvent.change(prefix, { target: { value: 'abc' } })
+    expect(prefix.value).toBe('ABC')
   })
 
   it('refuses a prefix another project already uses', async () => {
     renderEdit()
     const prefix = await screen.findByTitle('Project prefix')
 
-    fireEvent.change(prefix, { target: { value: 'BMS' } })
+    fireEvent.change(prefix, { target: { value: 'ABC' } })
 
-    expect(await screen.findByText(/already uses prefix BMS/i)).toBeTruthy()
+    expect(await screen.findByText(/already uses prefix ABC/i)).toBeTruthy()
     await waitFor(() => expect(saveButton().disabled).toBe(true))
   })
 
@@ -269,14 +269,14 @@ describe('changing a project’s prefix', () => {
   it('follows the project to its new address once the prefix changes', async () => {
     vi.mocked(client.projectsApi.update).mockResolvedValue({
       ...project,
-      prefix: 'VCX',
+      prefix: 'XYZ',
     } as never)
     renderEdit()
-    fireEvent.change(await screen.findByTitle('Project prefix'), { target: { value: 'VCX' } })
+    fireEvent.change(await screen.findByTitle('Project prefix'), { target: { value: 'XYZ' } })
     fireEvent.click(saveButton())
 
     await waitFor(() =>
-      expect((lastCall(client.projectsApi.update)[1] as { prefix: string }).prefix).toBe('VCX'),
+      expect((lastCall(client.projectsApi.update)[1] as { prefix: string }).prefix).toBe('XYZ'),
     )
     await waitFor(() => expect(screen.getByTitle('Project prefix')).toBeTruthy())
   })
@@ -339,7 +339,7 @@ describe('deleting a project', () => {
   it('stays locked for a phrase that is close but wrong', async () => {
     const dialog = await openDialog()
 
-    fireEvent.change(dialog.field, { target: { value: 'delete vcu' } })
+    fireEvent.change(dialog.field, { target: { value: 'delete prj' } })
 
     await waitFor(() => expect(dialog.confirm.disabled).toBe(true))
     fireEvent.click(dialog.confirm)
@@ -446,7 +446,7 @@ describe('project policy group rosters', () => {
 
   it('uses the same Administrators bundle on a different project', async () => {
     vi.mocked(client.projectsApi.getByPrefix).mockResolvedValue(otherProject as never)
-    renderEdit('BMS')
+    renderEdit('ABC')
     const roster = within(await screen.findByRole('region', { name: 'Administrators' }))
     fireEvent.click(roster.getByRole('button', { name: 'Select members' }))
     fireEvent.click(roster.getByRole('checkbox', { name: `Select ${addableAdmin.full_name}` }))

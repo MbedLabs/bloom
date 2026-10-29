@@ -114,7 +114,7 @@ async def _seed_campaign_visibility_data(session_maker: async_sessionmaker[Async
         session.add(external)
         await session.flush()
 
-        project = Project(name="Campaign Visibility", prefix="CPV", description="Visibility")
+        project = Project(name="Demo", prefix="PRJ", description="Visibility")
         session.add(project)
         await session.flush()
 
@@ -132,21 +132,21 @@ async def _seed_campaign_visibility_data(session_maker: async_sessionmaker[Async
 
         visible_tc = TestCase(
             project_id=project.id,
-            tc_id="CPV-TC-001",
+            tc_id="PRJ-TC-001",
             title="Visible test case",
             status="Draft",
             visibility="customer",
         )
         hidden_tc = TestCase(
             project_id=project.id,
-            tc_id="CPV-TC-002",
+            tc_id="PRJ-TC-002",
             title="Hidden test case",
             status="Draft",
             visibility="internal",
         )
         visible_req = Requirement(
             project_id=project.id,
-            req_id="CPV-REQ-001",
+            req_id="PRJ-REQ-001",
             title="Visible requirement",
             status="Draft",
             visibility="customer",
@@ -156,7 +156,7 @@ async def _seed_campaign_visibility_data(session_maker: async_sessionmaker[Async
         )
         hidden_req = Requirement(
             project_id=project.id,
-            req_id="CPV-REQ-002",
+            req_id="PRJ-REQ-002",
             title="Hidden requirement",
             status="Draft",
             visibility="internal",
@@ -166,14 +166,14 @@ async def _seed_campaign_visibility_data(session_maker: async_sessionmaker[Async
         )
         visible_suite = TestSuite(
             project_id=project.id,
-            suite_id="CPV-TS-001",
+            suite_id="PRJ-TS-001",
             name="Visible suite",
             status="Draft",
             visibility="customer",
         )
         hidden_suite = TestSuite(
             project_id=project.id,
-            suite_id="CPV-TS-002",
+            suite_id="PRJ-TS-002",
             name="Hidden suite",
             status="Draft",
             visibility="internal",
@@ -185,14 +185,14 @@ async def _seed_campaign_visibility_data(session_maker: async_sessionmaker[Async
 
         visible_campaign = TestCampaign(
             project_id=project.id,
-            campaign_id="CPV-CMP-001",
+            campaign_id="PRJ-CMP-001",
             name="Visible campaign",
             status="Planned",
             visibility="customer",
         )
         hidden_campaign = TestCampaign(
             project_id=project.id,
-            campaign_id="CPV-CMP-002",
+            campaign_id="PRJ-CMP-002",
             name="Hidden campaign",
             status="Planned",
             visibility="internal",
@@ -238,7 +238,7 @@ def test_external_campaign_list_and_detail_hide_internal_campaign_and_items():
         listed = harness.client.get(f"/api/campaigns?project_id={seeded['project'].id}")
         assert listed.status_code == 200, listed.text
         campaign_ids = {item["campaign_id"] for item in listed.json()["items"]}
-        assert campaign_ids == {"CPV-CMP-001"}
+        assert campaign_ids == {"PRJ-CMP-001"}
 
         hidden = harness.client.get(f"/api/campaigns/{seeded['hidden_campaign'].id}")
         assert hidden.status_code == 404, hidden.text
@@ -250,8 +250,8 @@ def test_external_campaign_list_and_detail_hide_internal_campaign_and_items():
         assert body["total_items"] == 1
         assert body["last_execution_status"] == "Passed"
         assert body["last_executed_at"].startswith("2026-07-02T11:15:00")
-        assert [item["test_case"]["tc_id"] for item in body["items"]] == ["CPV-TC-001"]
-        assert [suite["suite"]["suite_id"] for suite in body["suite_scopes"]] == ["CPV-TS-001"]
+        assert [item["test_case"]["tc_id"] for item in body["items"]] == ["PRJ-TC-001"]
+        assert [suite["suite"]["suite_id"] for suite in body["suite_scopes"]] == ["PRJ-TS-001"]
     finally:
         harness.client.close()
         app.dependency_overrides.clear()
@@ -269,7 +269,7 @@ def test_campaign_list_includes_latest_execution_timestamp():
         assert listed.status_code == 200, listed.text
         items = listed.json()["items"]
         assert len(items) == 1
-        assert items[0]["campaign_id"] == "CPV-CMP-001"
+        assert items[0]["campaign_id"] == "PRJ-CMP-001"
         assert items[0]["total_items"] == 1
         assert items[0]["last_execution_status"] == "Passed"
         assert items[0]["last_executed_at"].startswith("2026-07-02T11:15:00")
@@ -320,7 +320,7 @@ def test_sync_results_updates_items_without_inventing_campaign_run_id():
             json={
                 "results": [
                     {
-                        "tc_id": "CPV-TC-001",
+                        "tc_id": "PRJ-TC-001",
                         "status": "Passed",
                         "comment": "Last result from Bud run 123",
                         "executed_at": "2026-07-04T10:45:00",

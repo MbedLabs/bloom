@@ -121,7 +121,7 @@ describe('external user mutation gating smoke', () => {
     mockUser = { role: 'external' }
     mockParams = {}
     mockLocationState = null
-    mockProject = { id: 7, name: 'Vehicle Controls', prefix: 'VCU' }
+    mockProject = { id: 7, name: 'Demo', prefix: 'PRJ' }
     mockQueryData = {}
     const storage = { getItem: vi.fn(() => null) }
     vi.stubGlobal('window', {
@@ -136,12 +136,12 @@ describe('external user mutation gating smoke', () => {
   })
 
   it('hides document edit/delete actions for external users', async () => {
-    mockParams = { prefix: 'VCU', docId: '42', kind: 'specifications' }
+    mockParams = { prefix: 'PRJ', docId: '42', kind: 'specifications' }
     mockQueryData = {
       document: {
         id: 42,
         project_id: 7,
-        doc_id: 'VCU-SPEC-001',
+        doc_id: 'PRJ-SPEC-001',
         title: 'System Specification',
         status: 'Draft',
         visibility: 'customer',
@@ -162,11 +162,11 @@ describe('external user mutation gating smoke', () => {
   })
 
   it('hides suite mutation actions for external users', async () => {
-    mockParams = { prefix: 'VCU', suiteId: '12' }
+    mockParams = { prefix: 'PRJ', suiteId: '12' }
     mockQueryData = {
       testSuite: {
         id: 12,
-        suite_id: 'VCU-TS-001',
+        suite_id: 'PRJ-TS-001',
         name: 'Nightly Suite',
         description: 'Regression',
         status: 'Active',
@@ -187,11 +187,11 @@ describe('external user mutation gating smoke', () => {
   })
 
   it('hides campaign edit/delete actions for external users', async () => {
-    mockParams = { prefix: 'VCU', campaignId: '22' }
+    mockParams = { prefix: 'PRJ', campaignId: '22' }
     mockQueryData = {
       campaign: {
         id: 22,
-        campaign_id: 'VCU-CMP-001',
+        campaign_id: 'PRJ-CMP-001',
         name: 'Scope Campaign',
         description: 'Visible to customer',
         status: 'Scope',
@@ -211,7 +211,7 @@ describe('external user mutation gating smoke', () => {
   })
 
   it('shows project parameters as read-only denied for external users', async () => {
-    mockParams = { prefix: 'VCU' }
+    mockParams = { prefix: 'PRJ' }
 
     const { default: ProjectParameters } = await import('../pages/ProjectParameters')
     const html = renderPage(<ProjectParameters />)

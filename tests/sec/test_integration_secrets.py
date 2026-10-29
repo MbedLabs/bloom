@@ -114,7 +114,7 @@ def _seed_admin_and_project(session_maker):
                 role=UserRole.admin,
                 is_active=True,
             )
-            project = Project(name="Crypto Project", prefix="CRY")
+            project = Project(name="Demo", prefix="PRJ")
             session.add_all([admin, project])
             await session.commit()
             await session.refresh(admin)

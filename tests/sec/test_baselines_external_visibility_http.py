@@ -95,7 +95,7 @@ async def _seed_baseline_visibility_data(session_maker: async_sessionmaker[Async
         session.add(external)
         await session.flush()
 
-        project = Project(name="Baseline Visibility", prefix="BLV", description="Visibility")
+        project = Project(name="Demo", prefix="PRJ", description="Visibility")
         session.add(project)
         await session.flush()
 
@@ -111,12 +111,12 @@ async def _seed_baseline_visibility_data(session_maker: async_sessionmaker[Async
 
         baseline = Baseline(
             project_id=project.id,
-            baseline_id="BLV-BL-001",
+            baseline_id="PRJ-BL-001",
             name="Launch baseline",
             baseline_type="Milestone",
             snapshot={
-                "requirements": {"count": 2, "ids": ["BLV-REQ-001", "BLV-REQ-002"]},
-                "test_cases": {"count": 2, "ids": ["BLV-TC-001", "BLV-TC-002"]},
+                "requirements": {"count": 2, "ids": ["PRJ-REQ-001", "PRJ-REQ-002"]},
+                "test_cases": {"count": 2, "ids": ["PRJ-TC-001", "PRJ-TC-002"]},
             },
         )
         session.add(baseline)

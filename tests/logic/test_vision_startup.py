@@ -14,12 +14,12 @@ async def test_a_restart_keeps_a_vision_and_still_repairs_an_unknown_kind(monkey
         await connection.run_sync(Base.metadata.create_all)
     maker = async_sessionmaker(engine, expire_on_commit=False)
     async with maker() as db:
-        db.add(Project(id=1, name="Restart", prefix="RST"))
+        db.add(Project(id=1, name="Demo", prefix="PRJ"))
         await db.flush()
         db.add_all(
             [
-                Document(project_id=1, doc_id="RST-VIS-001", doc_type="VIS", title="Vision"),
-                Document(project_id=1, doc_id="RST-XYZ-001", doc_type="XYZ", title="Unknown"),
+                Document(project_id=1, doc_id="PRJ-VIS-001", doc_type="VIS", title="Vision"),
+                Document(project_id=1, doc_id="PRJ-XYZ-001", doc_type="XYZ", title="Unknown"),
             ]
         )
         await db.commit()
@@ -30,7 +30,7 @@ async def test_a_restart_keeps_a_vision_and_still_repairs_an_unknown_kind(monkey
     async with maker() as db:
         rows = (await db.execute(select(Document).order_by(Document.id))).scalars().all()
         assert [(row.doc_type, row.doc_id) for row in rows] == [
-            ("VIS", "RST-VIS-001"),
-            ("SPEC", "RST-SPEC-001"),
+            ("VIS", "PRJ-VIS-001"),
+            ("SPEC", "PRJ-SPEC-001"),
         ]
     await engine.dispose()

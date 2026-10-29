@@ -40,7 +40,7 @@ vi.mock('../api/client', () => ({
   },
   groupsApi: {
     list: vi.fn().mockResolvedValue(groups),
-    assignmentOptions: vi.fn().mockResolvedValue({ projects: [{ id: 7, name: 'Apollo', prefix: 'APO' }, { id: 8, name: 'Other', prefix: 'OTH' }], users: [
+    assignmentOptions: vi.fn().mockResolvedValue({ projects: [{ id: 7, name: 'Demo', prefix: 'PRJ' }, { id: 8, name: 'ABC', prefix: 'ABC' }], users: [
       { id: 5, email: 'q@x.io', full_name: 'Quinn' },
       { id: 6, email: 'dev@x.io', full_name: 'Dev Eloper' },
       { id: 7, email: 'iris@x.io', full_name: 'Iris Reviewer' },
@@ -65,7 +65,7 @@ vi.mock('../api/client', () => ({
     ]),
   },
   projectMembersApi: { list: vi.fn().mockResolvedValue([{ id: 3, user_id: 5, policy_group_id: 10, full_name: 'Quinn' }]) },
-  projectsApi: { list: vi.fn().mockResolvedValue([{ id: 7, name: 'Apollo', prefix: 'APO' }]) },
+  projectsApi: { list: vi.fn().mockResolvedValue([{ id: 7, name: 'Demo', prefix: 'PRJ' }]) },
   tagsApi: {
     list: vi.fn().mockResolvedValue([{ id: 4, name: 'Field', created_at: '' }]),
     create: vi.fn().mockResolvedValue({ id: 5, name: 'Lab', created_at: '' }),

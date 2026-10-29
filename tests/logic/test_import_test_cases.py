@@ -20,7 +20,7 @@ async def session():
         await conn.run_sync(Base.metadata.create_all)
     maker = async_sessionmaker(engine, expire_on_commit=False)
     async with maker() as db:
-        project = Project(name="Alpha", prefix="ALP")
+        project = Project(name="Demo", prefix="PRJ")
         db.add(project)
         db.add(
             User(
@@ -33,7 +33,7 @@ async def session():
         await db.flush()
         db.add(
             TestCase(
-                project_id=project.id, tc_id="ALP-TC-001", title="Verify login", status="Draft"
+                project_id=project.id, tc_id="PRJ-TC-001", title="Verify login", status="Draft"
             )
         )
         await db.commit()
@@ -53,7 +53,7 @@ async def test_csv_import_updates_existing_and_creates_new(session):
     admin = await _admin(session)
     content = (
         "tc_id,title,status,visibility,preconditions,steps,description\n"
-        "ALP-TC-001,Updated login,Draft,internal,User exists,1. Open => Form,Round-trip\n"
+        "PRJ-TC-001,Updated login,Draft,internal,User exists,1. Open => Form,Round-trip\n"
         ",Brand new case,Draft,internal,,1. Do X => Y,New one\n"
     ).encode()
     result = await import_test_cases_file(
@@ -62,7 +62,7 @@ async def test_csv_import_updates_existing_and_creates_new(session):
     assert result.updated == 1
     assert result.created == 1
     tc = (
-        await session.execute(select(TestCase).where(TestCase.tc_id == "ALP-TC-001"))
+        await session.execute(select(TestCase).where(TestCase.tc_id == "PRJ-TC-001"))
     ).scalar_one()
     assert tc.title == "Updated login"
     assert tc.status == "Draft"
@@ -76,7 +76,7 @@ async def test_csv_import_cannot_approve_existing_or_new_test_cases(session):
     admin = await _admin(session)
     content = (
         "tc_id,title,status\n"
-        "ALP-TC-001,Unreviewed change,Approved\n"
+        "PRJ-TC-001,Unreviewed change,Approved\n"
         ",Unreviewed new case,Approved\n"
     ).encode()
     result = await import_test_cases_file(
@@ -85,7 +85,7 @@ async def test_csv_import_cannot_approve_existing_or_new_test_cases(session):
     assert (result.updated, result.created, result.skipped) == (0, 0, 2)
     cases = (await session.execute(select(TestCase))).scalars().all()
     assert [(case.tc_id, case.title, case.status) for case in cases] == [
-        ("ALP-TC-001", "Verify login", "Draft")
+        ("PRJ-TC-001", "Verify login", "Draft")
     ]
 
 
@@ -104,7 +104,7 @@ async def test_xml_import_creates(session):
     assert [(s["row_type"], s["description"], s["expected_result"]) for s in tc.steps] == [
         ("step", "Click", "Opens")
     ]
-    assert tc.tc_id.startswith("ALP-TC-")
+    assert tc.tc_id.startswith("PRJ-TC-")
 
 
 async def test_missing_title_is_skipped(session):

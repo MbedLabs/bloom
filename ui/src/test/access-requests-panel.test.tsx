@@ -28,10 +28,10 @@ afterEach(cleanup)
 describe('Access request decisions', () => {
   it('names the resource by the label the API resolved', async () => {
     vi.mocked(api.accessRequestsApi.list).mockResolvedValue([
-      { ...request, resource_type: 'requirement', resource_ref: '4711', resource_label: 'ABC-REQ-0005', project_prefix: 'ABC' },
+      { ...request, resource_type: 'requirement', resource_ref: '4711', resource_label: 'PRJ-REQ-0005', project_prefix: 'PRJ' },
     ] as never)
     renderPanel()
-    expect(await screen.findByText(/asks for ABC-REQ-0005 in project ABC/)).toBeTruthy()
+    expect(await screen.findByText(/asks for PRJ-REQ-0005 in project PRJ/)).toBeTruthy()
     expect(screen.queryByText(/asks for 4711/)).toBeNull()
   })
 

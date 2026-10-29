@@ -67,7 +67,7 @@ async def test_sync_now_and_a_scheduled_run_create_one_defect(monkeypatch):
                 role=UserRole.admin,
                 is_active=True,
             )
-            project = Project(name="Sync", prefix="SYN")
+            project = Project(name="Demo", prefix="PRJ")
             db.add_all([admin, project])
             await db.flush()
             setting = IntegrationSetting(

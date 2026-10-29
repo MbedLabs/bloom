@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { getBreadcrumbs } from '../lib/breadcrumbs'
 import { resourceLabel } from '../lib/policySummary'
 
-const projects = [{ id: 1, name: 'Vehicle Control Unit', prefix: 'VCU' }]
+const projects = [{ id: 1, name: 'Demo', prefix: 'PRJ' }]
 
 describe('getBreadcrumbs', () => {
   it.each([['/access', 'Access'], ['/users', 'Users']])('shows Home and %s', (path, label) => {
@@ -11,52 +11,52 @@ describe('getBreadcrumbs', () => {
   })
   it('shows doc list label for new doc create, no New X crumb', () => {
     const crumbs = getBreadcrumbs(
-      '/projects/VCU/docs/new',
+      '/projects/PRJ/docs/new',
       '?type=requirements',
       projects,
     )
     expect(crumbs.map((crumb) => crumb.label)).toEqual([
       'Home',
       'Projects',
-      'Vehicle Control Unit',
+      'Demo',
       'Requirements',
     ])
-    expect(crumbs[crumbs.length - 1]?.href).toBe('/projects/VCU/docs?type=requirements')
+    expect(crumbs[crumbs.length - 1]?.href).toBe('/projects/PRJ/docs?type=requirements')
     expect(crumbs[crumbs.length - 1]?.emphasize).toBe(true)
   })
 
   it('shows doc list label for untyped doc create', () => {
-    const crumbs = getBreadcrumbs('/projects/VCU/docs/new', '', projects)
+    const crumbs = getBreadcrumbs('/projects/PRJ/docs/new', '', projects)
     expect(crumbs[crumbs.length - 1]?.label).toBe('Documents')
   })
 
   it('does not show Edit crumb (sticks to doc list)', () => {
     const crumbs = getBreadcrumbs(
-      '/projects/VCU/docs/des/VCU-DES-001/edit',
+      '/projects/PRJ/docs/des/PRJ-DES-001/edit',
       '?type=des',
       projects,
     )
     expect(crumbs.map((crumb) => crumb.label)).toEqual([
       'Home',
       'Projects',
-      'Vehicle Control Unit',
+      'Demo',
       'Designs',
     ])
-    expect(crumbs[crumbs.length - 1]?.href).toBe('/projects/VCU/docs?type=designs')
+    expect(crumbs[crumbs.length - 1]?.href).toBe('/projects/PRJ/docs?type=designs')
   })
 })
 
 describe('collection labels', () => {
   it('names the designs list Designs in the breadcrumbs', () => {
-    const crumbs = getBreadcrumbs('/projects/VCU/docs/new', '?type=designs', projects)
+    const crumbs = getBreadcrumbs('/projects/PRJ/docs/new', '?type=designs', projects)
     expect(crumbs.map((crumb) => crumb.label)).toContain('Designs')
   })
 
   it('names the test suites list Test Suites in the breadcrumbs', () => {
-    const crumbs = getBreadcrumbs('/projects/VCU/docs/new', '?type=test-suites', projects)
+    const crumbs = getBreadcrumbs('/projects/PRJ/docs/new', '?type=test-suites', projects)
     expect(crumbs[crumbs.length - 1]).toEqual({
       label: 'Test Suites',
-      href: '/projects/VCU/docs?type=test-suites',
+      href: '/projects/PRJ/docs?type=test-suites',
       emphasize: true,
     })
   })

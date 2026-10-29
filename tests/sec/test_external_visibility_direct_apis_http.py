@@ -109,7 +109,7 @@ async def _seed_direct_visibility_data(session_maker: async_sessionmaker[AsyncSe
         session.add(external)
         await session.flush()
 
-        project = Project(name="Direct Visibility", prefix="DVH", description="Visibility")
+        project = Project(name="Demo", prefix="PRJ", description="Visibility")
         session.add(project)
         await session.flush()
 
@@ -127,7 +127,7 @@ async def _seed_direct_visibility_data(session_maker: async_sessionmaker[AsyncSe
 
         root_requirement = Requirement(
             project_id=project.id,
-            req_id="DVH-REQ-001",
+            req_id="PRJ-REQ-001",
             title="Visible root requirement",
             status="Draft",
             visibility="customer",
@@ -141,7 +141,7 @@ async def _seed_direct_visibility_data(session_maker: async_sessionmaker[AsyncSe
         visible_child_requirement = Requirement(
             project_id=project.id,
             parent_id=root_requirement.id,
-            req_id="DVH-REQ-002",
+            req_id="PRJ-REQ-002",
             title="Visible child requirement",
             status="Draft",
             visibility="customer",
@@ -152,7 +152,7 @@ async def _seed_direct_visibility_data(session_maker: async_sessionmaker[AsyncSe
         hidden_child_requirement = Requirement(
             project_id=project.id,
             parent_id=root_requirement.id,
-            req_id="DVH-REQ-003",
+            req_id="PRJ-REQ-003",
             title="Hidden child requirement",
             status="Draft",
             visibility="internal",
@@ -162,7 +162,7 @@ async def _seed_direct_visibility_data(session_maker: async_sessionmaker[AsyncSe
         )
         hidden_requirement = Requirement(
             project_id=project.id,
-            req_id="DVH-REQ-004",
+            req_id="PRJ-REQ-004",
             title="Hidden linked requirement",
             status="Draft",
             visibility="internal",
@@ -181,14 +181,14 @@ async def _seed_direct_visibility_data(session_maker: async_sessionmaker[AsyncSe
 
         visible_test_case = TestCaseModel(
             project_id=project.id,
-            tc_id="DVH-TC-001",
+            tc_id="PRJ-TC-001",
             title="Visible test case",
             status="Approved",
             visibility="customer",
         )
         hidden_test_case = TestCaseModel(
             project_id=project.id,
-            tc_id="DVH-TC-002",
+            tc_id="PRJ-TC-002",
             title="Hidden test case",
             status="Approved",
             visibility="internal",
@@ -198,14 +198,14 @@ async def _seed_direct_visibility_data(session_maker: async_sessionmaker[AsyncSe
 
         visible_suite = TestSuiteModel(
             project_id=project.id,
-            suite_id="DVH-TS-001",
+            suite_id="PRJ-TS-001",
             name="Visible suite",
             status="Draft",
             visibility="customer",
         )
         hidden_suite = TestSuiteModel(
             project_id=project.id,
-            suite_id="DVH-TS-002",
+            suite_id="PRJ-TS-002",
             name="Hidden suite",
             status="Draft",
             visibility="internal",
@@ -215,14 +215,14 @@ async def _seed_direct_visibility_data(session_maker: async_sessionmaker[AsyncSe
 
         visible_campaign = CampaignModel(
             project_id=project.id,
-            campaign_id="DVH-CMP-001",
+            campaign_id="PRJ-CMP-001",
             name="Visible campaign",
             status="Planned",
             visibility="customer",
         )
         hidden_campaign = CampaignModel(
             project_id=project.id,
-            campaign_id="DVH-CMP-002",
+            campaign_id="PRJ-CMP-002",
             name="Hidden campaign",
             status="Planned",
             visibility="internal",
@@ -303,12 +303,12 @@ def test_external_requirement_detail_hides_hidden_children_and_linked_objects():
         assert response.status_code == 200, response.text
         body = response.json()
 
-        assert [child["req_id"] for child in body["children"]] == ["DVH-REQ-002"]
-        assert [tc["tc_id"] for tc in body["linked_test_cases"]] == ["DVH-TC-001"]
-        assert [link["test_case"]["tc_id"] for link in body["verified_by"]] == ["DVH-TC-001"]
-        assert [suite["suite_id"] for suite in body["suite_backlinks"]] == ["DVH-TS-001"]
+        assert [child["req_id"] for child in body["children"]] == ["PRJ-REQ-002"]
+        assert [tc["tc_id"] for tc in body["linked_test_cases"]] == ["PRJ-TC-001"]
+        assert [link["test_case"]["tc_id"] for link in body["verified_by"]] == ["PRJ-TC-001"]
+        assert [suite["suite_id"] for suite in body["suite_backlinks"]] == ["PRJ-TS-001"]
         assert [campaign["campaign_id"] for campaign in body["campaign_backlinks"]] == [
-            "DVH-CMP-001"
+            "PRJ-CMP-001"
         ]
     finally:
         harness.client.close()
@@ -326,11 +326,11 @@ def test_external_test_case_detail_hides_hidden_requirements_and_memberships():
         assert response.status_code == 200, response.text
         body = response.json()
 
-        assert [req["req_id"] for req in body["linked_requirements"]] == ["DVH-REQ-001"]
-        assert [link["requirement"]["req_id"] for link in body["verifies"]] == ["DVH-REQ-001"]
-        assert [suite["suite_id"] for suite in body["suite_memberships"]] == ["DVH-TS-001"]
+        assert [req["req_id"] for req in body["linked_requirements"]] == ["PRJ-REQ-001"]
+        assert [link["requirement"]["req_id"] for link in body["verifies"]] == ["PRJ-REQ-001"]
+        assert [suite["suite_id"] for suite in body["suite_memberships"]] == ["PRJ-TS-001"]
         assert [campaign["campaign_id"] for campaign in body["campaign_memberships"]] == [
-            "DVH-CMP-001"
+            "PRJ-CMP-001"
         ]
     finally:
         harness.client.close()
@@ -348,11 +348,11 @@ def test_external_campaign_detail_hides_hidden_nested_requirements():
         assert response.status_code == 200, response.text
         body = response.json()
 
-        assert [item["test_case"]["tc_id"] for item in body["items"]] == ["DVH-TC-001"]
+        assert [item["test_case"]["tc_id"] for item in body["items"]] == ["PRJ-TC-001"]
         assert [req["req_id"] for req in body["items"][0]["test_case"]["linked_requirements"]] == [
-            "DVH-REQ-001"
+            "PRJ-REQ-001"
         ]
-        assert [req["req_id"] for req in body["related_requirements"]] == ["DVH-REQ-001"]
+        assert [req["req_id"] for req in body["related_requirements"]] == ["PRJ-REQ-001"]
     finally:
         harness.client.close()
         app.dependency_overrides.clear()

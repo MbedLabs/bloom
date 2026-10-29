@@ -92,7 +92,7 @@ def test_an_unmatched_tc_id_names_no_campaign(api_client: TestClient):
     headers = _admin_headers(api_client)
     _campaign_with_one_case(api_client, headers, "Unmatched")
 
-    body = _sync(api_client, [{"tc_id": f"NOPE-TC-{unique_suffix()}", "status": "Passed"}])
+    body = _sync(api_client, [{"tc_id": f"XYZ-TC-{unique_suffix()}", "status": "Passed"}])
 
     assert body["updated"] == 0
     assert body["campaigns"] == []

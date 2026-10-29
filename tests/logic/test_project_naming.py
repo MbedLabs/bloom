@@ -19,17 +19,17 @@ from app.schemas import (
 
 
 def test_project_prefix_is_normalized_for_id_convention():
-    project = ProjectCreate(name="Controller", prefix=" vcu ")
+    project = ProjectCreate(name="Demo", prefix=" prj ")
 
-    assert project.prefix == "VCU"
+    assert project.prefix == "PRJ"
 
 
 @pytest.mark.parametrize(
-    "prefix", ["BLOOM", "VC1", "VCU-1", "VCU REQ", "1VCU", "VCU_REQ", "VCU.REQ"]
+    "prefix", ["BLOOM", "PR1", "PRJ-1", "PRJ REQ", "1VCU", "VCU_REQ", "PRJ.REQ"]
 )
 def test_project_prefix_rejects_values_that_break_generated_ids(prefix):
     with pytest.raises(ValidationError):
-        ProjectCreate(name="Controller", prefix=prefix)
+        ProjectCreate(name="Demo", prefix=prefix)
 
 
 def test_project_update_rejects_invalid_prefix():

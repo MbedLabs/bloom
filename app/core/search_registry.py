@@ -21,7 +21,7 @@ from app.models import (
 class SearchTarget:
     """One searchable artefact type.
 
-    type_code is the canonical code shown to the client, id_attr the human-readable id column,
+    type_code is the canonical code shown to the client, id_attr the document ID column,
     title_attr the display title column, and doc_type_attr is set for documents, which carry their
     own doc_type.
     """

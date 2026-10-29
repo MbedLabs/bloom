@@ -58,7 +58,7 @@ const reviewer = { ...user, id: 7, full_name: 'Grace Hopper', role: 'maintainer'
 const alpha: DocShell = {
   ...docShell,
   id: 101,
-  doc_id: 'VCU-REQ-001',
+  doc_id: 'PRJ-REQ-001',
   doc_type: 'REQ',
   title: 'Alpha boot timing',
   status: 'Approved',
@@ -75,7 +75,7 @@ const alpha: DocShell = {
 const bravo: DocShell = {
   ...docShell,
   id: 102,
-  doc_id: 'VCU-REQ-002',
+  doc_id: 'PRJ-REQ-002',
   doc_type: 'REQ',
   title: 'Bravo shutdown sequence',
   status: 'Draft',
@@ -92,7 +92,7 @@ const bravo: DocShell = {
 const charlie: DocShell = {
   ...docShell,
   id: 103,
-  doc_id: 'VCU-TC-001',
+  doc_id: 'PRJ-TC-001',
   doc_type: 'TC',
   title: 'Charlie cold start',
   status: 'Review',
@@ -109,7 +109,7 @@ const charlie: DocShell = {
 const delta: DocShell = {
   ...docShell,
   id: 104,
-  doc_id: 'VCU-TC-002',
+  doc_id: 'PRJ-TC-002',
   doc_type: 'TC',
   title: 'Delta brownout',
   status: 'Draft',
@@ -217,7 +217,7 @@ function fakeRegistry(rows: Shell[]) {
   }
 }
 
-function renderRegistry(url = '/projects/VCU/docs') {
+function renderRegistry(url = '/projects/PRJ/docs') {
   const queryClient = createQueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   })
@@ -241,7 +241,7 @@ function rows(): string[] {
   return within(table)
     .getAllByRole('row')
     .slice(1)
-    .map((row) => /VCU-[A-Z]+-\d+/.exec(row.textContent ?? '')?.[0] ?? '')
+    .map((row) => /PRJ-[A-Z]+-\d+/.exec(row.textContent ?? '')?.[0] ?? '')
 }
 
 async function openFilters() {
@@ -262,14 +262,14 @@ beforeEach(() => {
   vi.mocked(client.docsApi.list).mockImplementation(fakeRegistry(ALL) as never)
   vi.mocked(client.usersApi.list).mockResolvedValue([user, reviewer] as never)
   window.localStorage.clear()
-  clearRegistrySortSession('VCU')
+  clearRegistrySortSession('PRJ')
 })
 
 afterEach(cleanup)
 
 describe('narrowing the registry', () => {
   it('offers approval phases for Requirements without operational states', async () => {
-    renderRegistry('/projects/VCU/docs?type=requirements')
+    renderRegistry('/projects/PRJ/docs?type=requirements')
     await screen.findByText('Alpha boot timing')
     await openFilters()
     for (const phase of ['Draft', 'Review', 'Approval', 'Approved']) {
@@ -282,10 +282,10 @@ describe('narrowing the registry', () => {
 
   it('offers and applies Accepted and Mitigated Risk filters', async () => {
     vi.mocked(client.docsApi.list).mockImplementation(fakeRegistry([
-      { ...alpha, doc_type: 'RSK', doc_id: 'VCU-RSK-001', title: 'Accepted risk', status: 'Accepted' },
-      { ...bravo, doc_type: 'RSK', doc_id: 'VCU-RSK-002', title: 'Mitigated risk', status: 'Mitigated' },
+      { ...alpha, doc_type: 'RSK', doc_id: 'PRJ-RSK-001', title: 'Accepted risk', status: 'Accepted' },
+      { ...bravo, doc_type: 'RSK', doc_id: 'PRJ-RSK-002', title: 'Mitigated risk', status: 'Mitigated' },
     ]) as never)
-    renderRegistry('/projects/VCU/docs?type=risks')
+    renderRegistry('/projects/PRJ/docs?type=risks')
     await screen.findByText('Accepted risk')
     await openFilters()
     for (const status of ['Open', 'Monitoring', 'Mitigated', 'Accepted', 'Closed']) {
@@ -293,7 +293,7 @@ describe('narrowing the registry', () => {
     }
     expect(screen.queryByRole('button', { name: 'Draft' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Accepted' }))
-    await waitFor(() => expect(rows()).toEqual(['VCU-RSK-001']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-RSK-001']))
     expect(lastQuery().type).toEqual(['RSK'])
     expect(lastQuery().status).toEqual(['Accepted'])
     fireEvent.click(screen.getByRole('button', { name: 'Mitigated' }))
@@ -303,10 +303,10 @@ describe('narrowing the registry', () => {
 
   it('preserves existing Campaign operational filters', async () => {
     vi.mocked(client.docsApi.list).mockImplementation(fakeRegistry([
-      { ...alpha, doc_type: 'CMP', doc_id: 'VCU-CMP-001', title: 'Aborted campaign', status: 'Aborted' },
-      { ...bravo, doc_type: 'CMP', doc_id: 'VCU-CMP-002', title: 'Scoped campaign', status: 'Scope' },
+      { ...alpha, doc_type: 'CMP', doc_id: 'PRJ-CMP-001', title: 'Aborted campaign', status: 'Aborted' },
+      { ...bravo, doc_type: 'CMP', doc_id: 'PRJ-CMP-002', title: 'Scoped campaign', status: 'Scope' },
     ]) as never)
-    renderRegistry('/projects/VCU/docs?type=campaigns')
+    renderRegistry('/projects/PRJ/docs?type=campaigns')
     await screen.findByText('Aborted campaign')
     await openFilters()
     for (const status of ['Planned', 'Scope', 'In Progress', 'Running', 'Completed', 'Aborted']) {
@@ -314,14 +314,14 @@ describe('narrowing the registry', () => {
     }
     expect(screen.queryByRole('button', { name: 'Approved' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Aborted' }))
-    await waitFor(() => expect(rows()).toEqual(['VCU-CMP-001']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-CMP-001']))
     expect(lastQuery().type).toEqual(['CMP'])
     expect(lastQuery().status).toEqual(['Aborted'])
   })
 
   it('does not label an unrecorded approval phase as Draft', async () => {
     vi.mocked(client.docsApi.list).mockImplementation(fakeRegistry([{ ...alpha, status: null }]) as never)
-    renderRegistry('/projects/VCU/docs?type=requirements')
+    renderRegistry('/projects/PRJ/docs?type=requirements')
     await screen.findByText('Alpha boot timing')
     const row = screen.getByText('Alpha boot timing').closest('tr')!
     expect(within(row).queryByText('Draft')).toBeNull()
@@ -349,13 +349,13 @@ describe('narrowing the registry', () => {
     const search = screen.getByPlaceholderText(/^Search name, ID, kind/)
 
     fireEvent.change(search, { target: { value: 'brownout' } })
-    await waitFor(() => expect(rows()).toEqual(['VCU-TC-002']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-TC-002']))
 
     fireEvent.change(search, { target: { value: 'REQ-002' } })
-    await waitFor(() => expect(rows()).toEqual(['VCU-REQ-002']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-REQ-002']))
 
     fireEvent.change(search, { target: { value: 'test case' } })
-    await waitFor(() => expect(rows()).toEqual(['VCU-TC-001', 'VCU-TC-002']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-TC-001', 'PRJ-TC-002']))
   })
 
   it('waits for typing to pause before asking again', async () => {
@@ -368,7 +368,7 @@ describe('narrowing the registry', () => {
       fireEvent.change(search, { target: { value } })
     }
 
-    await waitFor(() => expect(rows()).toEqual(['VCU-TC-002']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-TC-002']))
     expect(vi.mocked(client.docsApi.list).mock.calls.length - before).toBe(1)
   })
 
@@ -380,7 +380,7 @@ describe('narrowing the registry', () => {
       target: { value: 'grace hopper' },
     })
 
-    await waitFor(() => expect(rows()).toEqual(['VCU-REQ-001', 'VCU-TC-002']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-REQ-001', 'PRJ-TC-002']))
   })
 
   it('keeps every document whose status is ticked', async () => {
@@ -389,14 +389,14 @@ describe('narrowing the registry', () => {
     await openFilters()
 
     fireEvent.click(screen.getByRole('button', { name: 'Draft' }))
-    await waitFor(() => expect(rows()).toEqual(['VCU-REQ-002', 'VCU-TC-002']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-REQ-002', 'PRJ-TC-002']))
 
     fireEvent.click(screen.getByRole('button', { name: 'Review' }))
     await waitFor(() => expect(rows()).toHaveLength(3))
     expect(lastQuery().status).toEqual(['Draft', 'Review'])
 
     fireEvent.click(screen.getByRole('button', { name: 'Draft' }))
-    await waitFor(() => expect(rows()).toEqual(['VCU-TC-001']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-TC-001']))
   })
 
   it('narrows to one priority', async () => {
@@ -406,7 +406,7 @@ describe('narrowing the registry', () => {
 
     changeControl(screen.getByLabelText(/Priority/i), { target: { value: 'High' } })
 
-    await waitFor(() => expect(rows()).toEqual(['VCU-REQ-001', 'VCU-TC-002']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-REQ-001', 'PRJ-TC-002']))
   })
 
   it('separates assigned from unassigned, and picks out one reviewer', async () => {
@@ -417,15 +417,15 @@ describe('narrowing the registry', () => {
 
     fireEvent.click(picker)
     fireEvent.click(screen.getByRole('option', { name: 'Unassigned' }))
-    await waitFor(() => expect(rows()).toEqual(['VCU-TC-001', 'VCU-REQ-002']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-TC-001', 'PRJ-REQ-002']))
 
     fireEvent.click(picker)
     fireEvent.click(screen.getByRole('option', { name: 'Any assigned' }))
-    await waitFor(() => expect(rows()).toEqual(['VCU-REQ-001', 'VCU-TC-002']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-REQ-001', 'PRJ-TC-002']))
 
     fireEvent.click(picker)
     fireEvent.click(screen.getByRole('option', { name: reviewer.full_name }))
-    await waitFor(() => expect(rows()).toEqual(['VCU-REQ-001', 'VCU-TC-002']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-REQ-001', 'PRJ-TC-002']))
 
     fireEvent.click(picker)
     fireEvent.click(screen.getByRole('option', { name: user.full_name }))
@@ -439,12 +439,12 @@ describe('narrowing the registry', () => {
     const picker = screen.getByLabelText(/Links/i)
 
     const cases: [string, string[]][] = [
-      ['linked', ['VCU-TC-001', 'VCU-REQ-001', 'VCU-TC-002']],
-      ['unlinked', ['VCU-REQ-002']],
-      ['incoming', ['VCU-TC-001', 'VCU-REQ-001', 'VCU-TC-002']],
-      ['outgoing', ['VCU-TC-001', 'VCU-TC-002']],
-      ['suspect', ['VCU-REQ-001', 'VCU-TC-002']],
-      ['clean', ['VCU-TC-001', 'VCU-REQ-002']],
+      ['linked', ['PRJ-TC-001', 'PRJ-REQ-001', 'PRJ-TC-002']],
+      ['unlinked', ['PRJ-REQ-002']],
+      ['incoming', ['PRJ-TC-001', 'PRJ-REQ-001', 'PRJ-TC-002']],
+      ['outgoing', ['PRJ-TC-001', 'PRJ-TC-002']],
+      ['suspect', ['PRJ-REQ-001', 'PRJ-TC-002']],
+      ['clean', ['PRJ-TC-001', 'PRJ-REQ-002']],
     ]
     for (const [value, expected] of cases) {
       changeControl(picker, { target: { value } })
@@ -458,10 +458,10 @@ describe('narrowing the registry', () => {
     await openFilters()
 
     fireEvent.change(screen.getByLabelText('Created From'), { target: { value: '2026-03-01' } })
-    await waitFor(() => expect(rows()).toEqual(['VCU-TC-001', 'VCU-TC-002']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-TC-001', 'PRJ-TC-002']))
 
     fireEvent.change(screen.getByLabelText('Created To'), { target: { value: '2026-03-31' } })
-    await waitFor(() => expect(rows()).toEqual(['VCU-TC-001']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-TC-001']))
   })
 
   it('bounds the updated range independently of the created one', async () => {
@@ -470,11 +470,11 @@ describe('narrowing the registry', () => {
     await openFilters()
 
     fireEvent.change(screen.getByLabelText('Updated To'), { target: { value: '2026-01-31' } })
-    await waitFor(() => expect(rows()).toEqual(['VCU-TC-002']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-TC-002']))
 
     fireEvent.change(screen.getByLabelText('Updated To'), { target: { value: '' } })
     fireEvent.change(screen.getByLabelText('Updated From'), { target: { value: '2026-03-15' } })
-    await waitFor(() => expect(rows()).toEqual(['VCU-TC-001']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-TC-001']))
   })
 
   it('applies every filter at once rather than the last one set', async () => {
@@ -485,7 +485,7 @@ describe('narrowing the registry', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Draft' }))
     changeControl(screen.getByLabelText(/Priority/i), { target: { value: 'High' } })
 
-    await waitFor(() => expect(rows()).toEqual(['VCU-TC-002']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-TC-002']))
   })
 
   it('says a filter matched nothing instead of showing an empty table', async () => {
@@ -557,7 +557,7 @@ describe('ordering the registry', () => {
     renderRegistry()
     await screen.findByText('Alpha boot timing')
 
-    expect(rows()).toEqual(['VCU-TC-001', 'VCU-REQ-001', 'VCU-REQ-002', 'VCU-TC-002'])
+    expect(rows()).toEqual(['PRJ-TC-001', 'PRJ-REQ-001', 'PRJ-REQ-002', 'PRJ-TC-002'])
     expect(lastQuery()).toMatchObject({ sort: 'updated_at', dir: 'desc' })
   })
 
@@ -567,12 +567,12 @@ describe('ordering the registry', () => {
 
     fireEvent.click(screen.getByText('ID').closest('th') as HTMLElement)
     await waitFor(() =>
-      expect(rows()).toEqual(['VCU-REQ-001', 'VCU-REQ-002', 'VCU-TC-001', 'VCU-TC-002']),
+      expect(rows()).toEqual(['PRJ-REQ-001', 'PRJ-REQ-002', 'PRJ-TC-001', 'PRJ-TC-002']),
     )
 
     fireEvent.click(screen.getByText('ID').closest('th') as HTMLElement)
     await waitFor(() =>
-      expect(rows()).toEqual(['VCU-TC-002', 'VCU-TC-001', 'VCU-REQ-002', 'VCU-REQ-001']),
+      expect(rows()).toEqual(['PRJ-TC-002', 'PRJ-TC-001', 'PRJ-REQ-002', 'PRJ-REQ-001']),
     )
   })
 
@@ -582,12 +582,12 @@ describe('ordering the registry', () => {
 
     fireEvent.click(screen.getByText('Created').closest('th') as HTMLElement)
     await waitFor(() =>
-      expect(rows()).toEqual(['VCU-TC-002', 'VCU-TC-001', 'VCU-REQ-002', 'VCU-REQ-001']),
+      expect(rows()).toEqual(['PRJ-TC-002', 'PRJ-TC-001', 'PRJ-REQ-002', 'PRJ-REQ-001']),
     )
 
     fireEvent.click(screen.getByText('Name / Title').closest('th') as HTMLElement)
     await waitFor(() =>
-      expect(rows()).toEqual(['VCU-REQ-001', 'VCU-REQ-002', 'VCU-TC-001', 'VCU-TC-002']),
+      expect(rows()).toEqual(['PRJ-REQ-001', 'PRJ-REQ-002', 'PRJ-TC-001', 'PRJ-TC-002']),
     )
   })
 
@@ -596,13 +596,13 @@ describe('ordering the registry', () => {
     await screen.findByText('Alpha boot timing')
 
     fireEvent.click(screen.getByText('Status').closest('th') as HTMLElement)
-    await waitFor(() => expect(rows()[0]).toBe('VCU-REQ-001'))
+    await waitFor(() => expect(rows()[0]).toBe('PRJ-REQ-001'))
 
     fireEvent.click(screen.getByText('Priority').closest('th') as HTMLElement)
-    await waitFor(() => expect(rows().slice(0, 2).sort()).toEqual(['VCU-REQ-001', 'VCU-TC-002']))
+    await waitFor(() => expect(rows().slice(0, 2).sort()).toEqual(['PRJ-REQ-001', 'PRJ-TC-002']))
 
     fireEvent.click(screen.getByText('Kind').closest('th') as HTMLElement)
-    await waitFor(() => expect(rows().slice(0, 2).sort()).toEqual(['VCU-REQ-001', 'VCU-REQ-002']))
+    await waitFor(() => expect(rows().slice(0, 2).sort()).toEqual(['PRJ-REQ-001', 'PRJ-REQ-002']))
   })
 
   it('sorts by reviewer name, putting the unassigned together', async () => {
@@ -611,7 +611,7 @@ describe('ordering the registry', () => {
 
     fireEvent.click(screen.getByText('Reviewer').closest('th') as HTMLElement)
 
-    await waitFor(() => expect(rows().slice(0, 2).sort()).toEqual(['VCU-REQ-002', 'VCU-TC-001']))
+    await waitFor(() => expect(rows().slice(0, 2).sort()).toEqual(['PRJ-REQ-002', 'PRJ-TC-001']))
   })
 
   it('takes the sort from the drop-down as well as the headers', async () => {
@@ -624,26 +624,26 @@ describe('ordering the registry', () => {
     changeControl(picker, { target: { value: 'updated_at' } })
 
     await waitFor(() =>
-      expect(rows()).toEqual(['VCU-TC-001', 'VCU-REQ-001', 'VCU-REQ-002', 'VCU-TC-002']),
+      expect(rows()).toEqual(['PRJ-TC-001', 'PRJ-REQ-001', 'PRJ-REQ-002', 'PRJ-TC-002']),
     )
   })
 
   it('reads a sort out of the URL so a sorted view can be shared', async () => {
-    renderRegistry('/projects/VCU/docs?sort=title&dir=desc')
+    renderRegistry('/projects/PRJ/docs?sort=title&dir=desc')
     await screen.findByText('Alpha boot timing')
 
     await waitFor(() =>
-      expect(rows()).toEqual(['VCU-TC-002', 'VCU-TC-001', 'VCU-REQ-002', 'VCU-REQ-001']),
+      expect(rows()).toEqual(['PRJ-TC-002', 'PRJ-TC-001', 'PRJ-REQ-002', 'PRJ-REQ-001']),
     )
   })
 
   it('ignores a sort field the registry does not have', async () => {
-    renderRegistry('/projects/VCU/docs?sort=whatever&dir=asc')
+    renderRegistry('/projects/PRJ/docs?sort=whatever&dir=asc')
     await screen.findByText('Alpha boot timing')
 
     expect(lastQuery().sort).toBe('updated_at')
     await waitFor(() =>
-      expect(rows()).toEqual(['VCU-TC-001', 'VCU-REQ-001', 'VCU-REQ-002', 'VCU-TC-002']),
+      expect(rows()).toEqual(['PRJ-TC-001', 'PRJ-REQ-001', 'PRJ-REQ-002', 'PRJ-TC-002']),
     )
   })
 })
@@ -652,7 +652,7 @@ describe('paging the registry', () => {
   const many: Shell[] = Array.from({ length: 25 }, (_, index) => ({
     ...alpha,
     id: 200 + index,
-    doc_id: `VCU-REQ-${String(index + 1).padStart(3, '0')}`,
+    doc_id: `PRJ-REQ-${String(index + 1).padStart(3, '0')}`,
     title: `Requirement ${index + 1}`,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
@@ -687,7 +687,7 @@ describe('paging the registry', () => {
     await waitFor(() => expect(rows()).toHaveLength(10))
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
-    await waitFor(() => expect(rows()[0]).toBe('VCU-REQ-011'))
+    await waitFor(() => expect(rows()[0]).toBe('PRJ-REQ-011'))
     expect(screen.getByText('2 / 3')).toBeTruthy()
     expect(lastQuery()).toMatchObject({ skip: 10, limit: 10 })
 
@@ -697,7 +697,7 @@ describe('paging the registry', () => {
     expect((screen.getByRole('button', { name: 'Next' }) as HTMLButtonElement).disabled).toBe(true)
 
     fireEvent.click(screen.getByRole('button', { name: 'Prev' }))
-    await waitFor(() => expect(rows()[0]).toBe('VCU-REQ-011'))
+    await waitFor(() => expect(rows()[0]).toBe('PRJ-REQ-011'))
   })
 
   it('shows no row twice while walking the pages', async () => {
@@ -707,7 +707,7 @@ describe('paging the registry', () => {
     await waitFor(() => expect(rows()).toHaveLength(10))
 
     const seen: string[] = [...rows()]
-    for (const first of ['VCU-REQ-011', 'VCU-REQ-021']) {
+    for (const first of ['PRJ-REQ-011', 'PRJ-REQ-021']) {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
       await waitFor(() => expect(rows()[0]).toBe(first))
       seen.push(...rows())
@@ -729,6 +729,6 @@ describe('paging the registry', () => {
     })
 
     await waitFor(() => expect(screen.getByText('1 / 2')).toBeTruthy())
-    expect(rows()[0]).toBe('VCU-REQ-001')
+    expect(rows()[0]).toBe('PRJ-REQ-001')
   })
 })

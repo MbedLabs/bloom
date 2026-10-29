@@ -110,7 +110,7 @@ async def _seed_document_visibility_data(session_maker: async_sessionmaker[Async
         session.add_all([admin, external])
         await session.flush()
 
-        project = Project(name="Document Visibility", prefix="DCV", description="Visibility")
+        project = Project(name="Demo", prefix="PRJ", description="Visibility")
         session.add(project)
         await session.flush()
 
@@ -128,7 +128,7 @@ async def _seed_document_visibility_data(session_maker: async_sessionmaker[Async
 
         customer_document = Document(
             project_id=project.id,
-            doc_id="DCV-SPEC-001",
+            doc_id="PRJ-SPEC-001",
             title="Customer document",
             doc_type="SPEC",
             visibility="customer",
@@ -137,7 +137,7 @@ async def _seed_document_visibility_data(session_maker: async_sessionmaker[Async
         )
         internal_document = Document(
             project_id=project.id,
-            doc_id="DCV-SPEC-002",
+            doc_id="PRJ-SPEC-002",
             title="Internal document",
             doc_type="SPEC",
             visibility="internal",

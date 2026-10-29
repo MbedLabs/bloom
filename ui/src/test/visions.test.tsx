@@ -67,10 +67,10 @@ function renderAt(path: string, url: string, element: ReactElement) {
 
 /** Open a shared document of the given type with the given workflow. */
 async function openDocument(docType: string, slug: string, workflow: object) {
-  vi.mocked(client.documentsApi.get).mockResolvedValue({ ...docDetail, doc_type: docType, doc_id: `VCU-${docType}-001` } as never)
+  vi.mocked(client.documentsApi.get).mockResolvedValue({ ...docDetail, doc_type: docType, doc_id: `PRJ-${docType}-001` } as never)
   vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowFixture, ...workflow } as never)
-  renderAt('/projects/:prefix/docs/:kind/:docId', `/projects/VCU/docs/${slug}/${docDetail.id}`, <DocumentDetail />)
-  await screen.findAllByText(`VCU-${docType}-001`)
+  renderAt('/projects/:prefix/docs/:kind/:docId', `/projects/PRJ/docs/${slug}/${docDetail.id}`, <DocumentDetail />)
+  await screen.findAllByText(`PRJ-${docType}-001`)
 }
 
 /** The outgoing link roles the picker offers from one type to another. */
@@ -88,10 +88,10 @@ describe('the Visions type', () => {
     expect(isWorkflowControlledDocType('VIS')).toBe(true)
     expect(isServerAssignedDocIdOnCreate('VIS')).toBe(true)
     expect(resourceLabel('VIS')).toBe('VIS · Visions')
-    const crumbs = getBreadcrumbs('/projects/VCU/docs/new', '?type=visions', [{ id: 1, name: 'Vehicle Control Unit', prefix: 'VCU' }])
+    const crumbs = getBreadcrumbs('/projects/PRJ/docs/new', '?type=visions', [{ id: 1, name: 'Demo', prefix: 'PRJ' }])
     expect(crumbs[crumbs.length - 1]).toEqual({
       label: 'Visions',
-      href: '/projects/VCU/docs?type=visions',
+      href: '/projects/PRJ/docs?type=visions',
       emphasize: true,
     })
   })
@@ -100,7 +100,7 @@ describe('the Visions type', () => {
     const queryClient = createQueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={['/projects/VCU']}>
+        <MemoryRouter initialEntries={['/projects/PRJ']}>
           <Layout />
         </MemoryRouter>
       </QueryClientProvider>,
@@ -159,15 +159,15 @@ describe('Idea or Binding', () => {
 
 describe('Visions in the project pages', () => {
   it('links to Visions first on the project overview', async () => {
-    renderAt('/projects/:prefix', '/projects/VCU', <ProjectDetail />)
+    renderAt('/projects/:prefix', '/projects/PRJ', <ProjectDetail />)
     const visions = await screen.findByRole('link', { name: /Visions/ }, { timeout: 4000 })
-    expect(visions.getAttribute('href')).toBe('/projects/VCU/docs?type=visions')
+    expect(visions.getAttribute('href')).toBe('/projects/PRJ/docs?type=visions')
     const protocols = screen.getByRole('link', { name: /Protocols/ })
     expect(visions.compareDocumentPosition(protocols) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('offers VIS first in the registry Kind filter', async () => {
-    renderAt('/projects/:prefix/docs', '/projects/VCU/docs', <Documents />)
+    renderAt('/projects/:prefix/docs', '/projects/PRJ/docs', <Documents />)
     fireEvent.click(await screen.findByRole('button', { name: /Filters/ }))
     const kinds = await screen.findAllByRole('button', { name: /^(VIS|REQ|SPEC|STD)$/ })
     expect(kinds.map((button) => button.textContent)).toEqual(['VIS', 'REQ', 'SPEC', 'STD'])
@@ -186,7 +186,7 @@ describe('Visions in the project pages', () => {
       total: 3,
       membership_edges: [],
     } as never)
-    renderAt('/', '/', <DocumentLinksPanel projectId={1} projectPrefix="VCU" sourceType={sourceType} sourceId={21} sourceDocId={`VCU-${sourceType}-001`} />)
+    renderAt('/', '/', <DocumentLinksPanel projectId={1} projectPrefix="PRJ" sourceType={sourceType} sourceId={21} sourceDocId={`PRJ-${sourceType}-001`} />)
     fireEvent.click(await screen.findByRole('button', { name: /link artefact/i }))
     const picker = await screen.findByRole('combobox', { name: 'Target artefact kind' })
     await waitFor(() => expect(picker.hasAttribute('disabled')).toBe(false))

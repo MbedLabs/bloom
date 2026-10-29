@@ -103,15 +103,15 @@ def _login(client, email):
 
 def _project_with_artefacts(session_maker):
     """A project with one customer-visible and one internal requirement, each verified."""
-    [project] = _add(session_maker, Project(name="Export project", prefix="EXP"))
+    [project] = _add(session_maker, Project(name="Demo", prefix="PRJ"))
     reqs = _add(
         session_maker,
         Requirement(
-            project_id=project.id, req_id="EXP-REQ-001", title="Shown", visibility="customer"
+            project_id=project.id, req_id="PRJ-REQ-001", title="Shown", visibility="customer"
         ),
         Requirement(
             project_id=project.id,
-            req_id="EXP-REQ-002",
+            req_id="PRJ-REQ-002",
             title="Hidden requirement",
             visibility="internal",
         ),
@@ -120,13 +120,13 @@ def _project_with_artefacts(session_maker):
         session_maker,
         TestCase(
             project_id=project.id,
-            tc_id="EXP-TC-001",
+            tc_id="PRJ-TC-001",
             title="Shown test",
             visibility="customer",
             last_execution_status="Passed",
         ),
         TestCase(
-            project_id=project.id, tc_id="EXP-TC-002", title="Hidden test", visibility="internal"
+            project_id=project.id, tc_id="PRJ-TC-002", title="Hidden test", visibility="internal"
         ),
     )
     _add(
@@ -199,11 +199,11 @@ def test_an_external_exporter_gets_only_what_they_may_see(harness):
 
     assert requirements.status_code == 200, requirements.text
     assert [row["req_id"] for row in csv.DictReader(io.StringIO(requirements.text))] == [
-        "EXP-REQ-001"
+        "PRJ-REQ-001"
     ]
     matrix_rows = list(csv.DictReader(io.StringIO(matrix.text)))
-    assert [(row["req_id"], row["tc_id"]) for row in matrix_rows] == [("EXP-REQ-001", "EXP-TC-001")]
-    assert [row["tc_id"] for row in csv.DictReader(io.StringIO(tests.text))] == ["EXP-TC-001"]
+    assert [(row["req_id"], row["tc_id"]) for row in matrix_rows] == [("PRJ-REQ-001", "PRJ-TC-001")]
+    assert [row["tc_id"] for row in csv.DictReader(io.StringIO(tests.text))] == ["PRJ-TC-001"]
     assert "Hidden" not in requirements.text + matrix.text + tests.text
 
 

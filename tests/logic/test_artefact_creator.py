@@ -50,7 +50,7 @@ async def session():
         await conn.run_sync(Base.metadata.create_all)
     maker = async_sessionmaker(engine, expire_on_commit=False)
     async with maker() as db:
-        db.add_all([Project(name="Alpha", prefix="ALP"), Project(name="Beta", prefix="BET")])
+        db.add_all([Project(name="Demo", prefix="PRJ"), Project(name="ABC", prefix="ABC")])
         for email, name in (("admin@test.local", "Ada Admin"), ("ann@test.local", "Ann Author")):
             db.add(User(email=email, full_name=name, hashed_password="x", role=UserRole.admin))
         await db.commit()
@@ -72,7 +72,7 @@ def _upload(content: bytes) -> UploadFile:
 
 async def test_every_create_route_records_the_actor(session):
     ann = await _user(session, "ann@test.local")
-    session.add(Requirement(project_id=1, req_id="ALP-REQ-900", title="Older"))
+    session.add(Requirement(project_id=1, req_id="PRJ-REQ-900", title="Older"))
     await session.flush()
 
     await create_requirement(
@@ -116,7 +116,7 @@ async def test_every_create_route_records_the_actor(session):
 
 async def test_every_import_records_the_importer(session):
     ann = await _user(session, "ann@test.local")
-    session.add(Requirement(project_id=2, req_id="BET-REQ-001", title="Source"))
+    session.add(Requirement(project_id=2, req_id="ABC-REQ-001", title="Source"))
     await session.flush()
     alpha, beta = (await session.execute(select(Project).order_by(Project.id))).scalars().all()
 
@@ -176,7 +176,7 @@ async def test_a_bud_report_records_the_credential_owner(session):
     for run_id, owner in ((41, ann.id), (42, None)):
         await publish_test_report(
             data=schemas.TestReportPublish(
-                project_prefix="ALP",
+                project_prefix="PRJ",
                 bud_run_id=run_id,
                 run_name="Nightly",
                 total_tests=1,

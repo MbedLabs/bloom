@@ -297,7 +297,7 @@ class TestPublishingABudReport:
                 "passed_tests": 2,
                 "failed_tests": 1,
                 "run_url": "https://bud.test/test-runs/41",
-                "tc_ids": ["VCU-TC-001"],
+                "tc_ids": ["PRJ-TC-001"],
                 "files": (
                     files
                     if files is not None
@@ -356,7 +356,7 @@ class TestPublishingABudReport:
         ).json()
 
         assert "2 passed, 1 failed" in document["description"]
-        assert "VCU-TC-001" in document["description"]
+        assert "PRJ-TC-001" in document["description"]
         assert "https://bud.test/test-runs/41" in document["description"]
 
     def test_publishing_the_same_run_again_updates_it(
@@ -418,7 +418,7 @@ class TestPublishingABudReport:
             "/api/bud/test-reports",
             headers={"Authorization": f"Bearer {bud_token}"},
             json={
-                "project_prefix": "NOPE",
+                "project_prefix": "XYZ",
                 "bud_run_id": 1,
                 "run_name": "x",
                 "files": [],

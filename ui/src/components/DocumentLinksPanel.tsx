@@ -341,7 +341,7 @@ export function DocumentLinksPanel({
   projectPrefix: string
   sourceType: string
   sourceId: number
-  /** Human-readable id of the document this panel belongs to (e.g. FLT-REQ-001). */
+  /** ID of the document this panel belongs to, such as PRJ-REQ-001. */
   sourceDocId?: string
   derivedLinks?: ArtefactLink[]
 }>) {

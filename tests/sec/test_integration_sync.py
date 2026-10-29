@@ -49,7 +49,7 @@ def _serve(monkeypatch, handler):
     )
 
 
-async def _project(maker, prefix: str = "ALP") -> int:
+async def _project(maker, prefix: str = "PRJ") -> int:
     async with maker() as db:
         project = Project(name=f"Project {prefix}", prefix=prefix)
         db.add(project)
@@ -85,7 +85,7 @@ async def _defect(maker, project_id, tracker, repo, number, **fields) -> int:
         count = await db.scalar(select(func.count(Defect.id)))
         defect = Defect(
             project_id=project_id,
-            defect_id=f"ALP-DEF-{count + 101:03d}",
+            defect_id=f"PRJ-DEF-{count + 101:03d}",
             title=fields.pop("title", "Linked"),
             status=fields.pop("status", "Open"),
             external_tracker=tracker,
@@ -103,7 +103,7 @@ async def _change(maker, project_id, tracker, repo, number, status="Submitted") 
         count = await db.scalar(select(func.count(ChangeRequest.id)))
         change = ChangeRequest(
             project_id=project_id,
-            change_id=f"ALP-CR-{count + 101:03d}",
+            change_id=f"PRJ-CR-{count + 101:03d}",
             title="Change",
             status=status,
             external_tracker=tracker,

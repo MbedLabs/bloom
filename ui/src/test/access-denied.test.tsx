@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AccessRequestInfo } from '../api/client'
 
 const pending: AccessRequestInfo = {
-  id: 3, resource_type: 'requirement', resource_ref: 'APO-REQ-001', project_prefix: 'APO',
+  id: 3, resource_type: 'requirement', resource_ref: 'PRJ-REQ-001', project_prefix: 'PRJ',
   status: 'pending', created_at: '2026-09-24T10:00:00', decided_at: null,
   requester_name: null, requester_email: null, already_requested: true, mail_sent: null,
 }
@@ -39,7 +39,7 @@ function renderPage(error?: unknown) {
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
-        <AccessDenied resourceType="requirement" resourceRef="APO-REQ-001" projectPrefix="APO" error={error} />
+        <AccessDenied resourceType="requirement" resourceRef="PRJ-REQ-001" projectPrefix="PRJ" error={error} />
       </MemoryRouter>
     </QueryClientProvider>,
   )
@@ -57,11 +57,11 @@ describe('Access denied page', () => {
     vi.mocked(api.accessRequestsApi.create).mockResolvedValue({ ...pending, already_requested: false, mail_sent: true })
     renderPage()
     expect(screen.getByText("You don't have access to this resource")).toBeTruthy()
-    expect(screen.getByText('APO-REQ-001 in project APO')).toBeTruthy()
+    expect(screen.getByText('PRJ-REQ-001 in project PRJ')).toBeTruthy()
     fireEvent.click(await screen.findByText('Request access'))
     expect(await screen.findByText('Access requested on 2026-09-24 10:00 UTC.')).toBeTruthy()
     expect(api.accessRequestsApi.create).toHaveBeenCalledWith({
-      resource_type: 'requirement', resource_ref: 'APO-REQ-001', project_prefix: 'APO',
+      resource_type: 'requirement', resource_ref: 'PRJ-REQ-001', project_prefix: 'PRJ',
     })
     expect(screen.queryByText('Request access')).toBeNull()
   })
@@ -85,7 +85,7 @@ describe('Access denied page', () => {
     auth.role = 'admin'
     renderPage({ isAxiosError: true, response: { status: 404 } })
     expect(screen.getByText('Not found')).toBeTruthy()
-    expect(screen.getByText('Nothing named APO-REQ-001 in project APO exists.')).toBeTruthy()
+    expect(screen.getByText('Nothing named PRJ-REQ-001 in project PRJ exists.')).toBeTruthy()
     expect(screen.queryByText("You don't have access to this resource")).toBeNull()
     expect(screen.queryByText('Request access')).toBeNull()
     expect(api.accessRequestsApi.mine).not.toHaveBeenCalled()
