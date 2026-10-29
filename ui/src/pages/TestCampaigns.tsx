@@ -12,6 +12,7 @@ import { formatDateTime } from '../test/date-utils'
 import BudRunLink from '../components/BudRunLink'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
 import { useAuth } from '../contexts/AuthContext'
+import { docUrl } from '../types/doc'
 
 type CampaignSortField = 'name' | 'status' | 'updated_at'
 type SortDir = 'asc' | 'desc'
@@ -237,7 +238,7 @@ export default function TestCampaigns() {
           ) : (
             <div className="divide-y divide-border">
               {suiteItems.map((suite) => (
-                <Link key={suite.id} to={`/projects/${prefix}/suites/${suite.id}`} className="block px-6 py-4 hover:bg-accent/40">
+                <Link key={suite.id} to={docUrl(prefix, 'TS', suite.suite_id)} className="block px-6 py-4 hover:bg-accent/40">
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <div className="font-mono text-xs text-primary">{suite.suite_id}</div>
@@ -549,7 +550,7 @@ function CampaignCard({ campaign, prefix }: Readonly<{ campaign: import('../api/
 
   return (
     <Link
-      to={`/projects/${prefix}/campaigns/${campaign.id}`}
+      to={docUrl(prefix, 'CMP', campaign.campaign_id ?? String(campaign.id))}
       className="bg-card rounded-lg shadow-elegant p-5 hover:shadow-glow hover:border-primary/20 border border-transparent transition-all duration-200 group"
     >
       <div className="flex items-start justify-between mb-3">

@@ -28,7 +28,7 @@ export default function CampaignDetail({
   resolvedId,
   allowedActions,
 }: { resolvedId?: number; allowedActions?: string[] } = {}) {
-  const { prefix, campaignId } = useParams<{ prefix: string; campaignId: string }>()
+  const { prefix, campaignId, docId } = useParams<{ prefix: string; campaignId: string; docId: string }>()
   const { can } = useProjectPermissions(prefix)
   const campId = resolvedId || Number.parseInt(campaignId || '0')
   const navigate = useNavigate()
@@ -146,7 +146,7 @@ export default function CampaignDetail({
   }
 
   if (isAccessDenied(campaignError)) {
-    return <AccessDenied resourceType="campaign" resourceRef={campaignId ?? ''} projectPrefix={prefix} />
+    return <AccessDenied resourceType="campaign" resourceRef={docId ?? campaignId ?? ''} projectPrefix={prefix} error={campaignError} />
   }
 
   if (!campaign) {
@@ -298,7 +298,7 @@ export default function CampaignDetail({
                         <span className="text-xs text-muted-foreground">{scope.items.length} TC{scope.items.length !== 1 ? 's' : ''}</span>
                         <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">{scope.suite.status}</span>
                         <Link
-                          to={`/projects/${prefix}/suites/${scope.suite.id}`}
+                          to={docUrl(prefix, 'TS', scope.suite.suite_id)}
                           onClick={(e) => e.stopPropagation()}
                           className="p-1 rounded hover:bg-accent/50 text-muted-foreground hover:text-primary"
                           title="Open suite detail"

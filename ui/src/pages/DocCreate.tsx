@@ -288,7 +288,7 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
   }, [projectId, docType])
 
   const artefactHref = useCallback(
-    (type: string, id: number) => docUrl(prefix, type as DocType, id),
+    (type: string, _id: number, label: string) => docUrl(prefix, type as DocType, label),
     [prefix],
   )
 

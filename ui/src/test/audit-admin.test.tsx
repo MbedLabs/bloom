@@ -41,18 +41,18 @@ const requestPage = {
     },
     {
       id: 14, occurred_at: '2026-10-28T10:04:00', actor_user_id: 1, actor_name: 'Ada Admin',
-      actor_type: 'user', action: 'api.request', target_type: 'requirement', target_id: '42',
+      actor_type: 'user', action: 'api.request', target_type: 'requirement', target_id: '42', target_label: 'requirement PRJ-REQ-001',
       project_id: null, request_id: 'req-14', ip: '10.0.0.1', user_agent: 'Mozilla/5.0', outcome: 'success',
       details: { method: 'GET', route: '/api/requirements/{requirement_id}', path: '/api/requirements/42', status: 200, client: 'web' },
     },
     {
-      id: 13, occurred_at: '2026-10-28T10:03:00', actor_user_id: null, actor_name: null,
+      id: 13, occurred_at: '2026-10-28T10:03:00', actor_user_id: null, actor_name: null, actor_label: 'Bud result sync',
       actor_type: 'service', action: 'api.request', target_type: null, target_id: null,
       project_id: null, request_id: 'req-13', ip: '10.0.0.3', user_agent: 'bud', outcome: 'success',
       details: { method: 'POST', route: '/api/bud/results', path: '/api/bud/results', status: 200, service_credential_id: 7 },
     },
     {
-      id: 12, occurred_at: '2026-10-28T10:02:00', actor_user_id: null, actor_name: null,
+      id: 12, occurred_at: '2026-10-28T10:02:00', actor_user_id: null, actor_name: null, actor_label: 'Service credential #9 (deleted)',
       actor_type: 'service', action: 'api.request', target_type: null, target_id: null,
       project_id: null, request_id: 'req-12', ip: '10.0.0.3', user_agent: 'bud', outcome: 'denied',
       details: { method: 'POST', route: '/api/bud/results', path: '/api/bud/results', status: 403, service_credential_id: 9 },
@@ -69,7 +69,6 @@ const requestPage = {
 vi.mock('../api/client', () => ({
   auditApi: { list: vi.fn().mockResolvedValue(page) },
   usersApi: { list: vi.fn().mockResolvedValue([]) },
-  serviceCredentialsApi: { list: vi.fn().mockResolvedValue([]) },
 }))
 
 const api = await import('../api/client')
@@ -88,7 +87,6 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(api.auditApi.list).mockResolvedValue(page)
   vi.mocked(api.usersApi.list).mockResolvedValue([{ id: 5, full_name: 'Grace Hopper', email: 'grace@example.com' }] as never)
-  vi.mocked(api.serviceCredentialsApi.list).mockResolvedValue([{ id: 7, name: 'Bud result sync' }] as never)
 })
 afterEach(cleanup)
 
@@ -222,13 +220,12 @@ describe('Audit log admin screen', () => {
     expect(screen.getByText('201')).toBeTruthy()
     expect(screen.getByText('created PRJ-REQ-001')).toBeTruthy()
     expect(screen.getByText('GET /api/requirements/{requirement_id}')).toBeTruthy()
-    expect(screen.getAllByText('200').some((status) => status.parentElement?.textContent === '200requirement 42')).toBe(true)
+    expect(screen.getAllByText('200').some((status) => status.parentElement?.textContent === '200requirement PRJ-REQ-001')).toBe(true)
     const cli = screen.getAllByText('MCP or CLI')
     expect(cli).toHaveLength(1)
     expect(cli[0].getAttribute('title')).toBe('bloom-mcp/1.3.0')
-    const named = screen.getByText('Bud result sync')
-    expect(named.getAttribute('title')).toBe('Service credential #7')
-    expect(screen.getByText('Service credential #9')).toBeTruthy()
+    expect(screen.getByText('Bud result sync')).toBeTruthy()
+    expect(screen.getByText('Service credential #9 (deleted)')).toBeTruthy()
     expect(screen.getByText('403')).toBeTruthy()
     expect(screen.getByText('security.repeated_refusals')).toBeTruthy()
     expect(screen.getByText('anonymous')).toBeTruthy()
@@ -238,12 +235,14 @@ describe('Audit log admin screen', () => {
     expect(screen.getAllByText('success')[0].className).not.toContain('text-red-600')
   })
 
-  it('names a service credential by id when the credential list is unavailable', async () => {
-    vi.mocked(api.auditApi.list).mockResolvedValue(requestPage)
-    vi.mocked(api.serviceCredentialsApi.list).mockRejectedValue(new Error('denied'))
+  it('marks an actor without a label as deleted and keeps a target without a label as stored', async () => {
+    vi.mocked(api.auditApi.list).mockResolvedValue({
+      total: 1,
+      items: [{ ...requestPage.items[1], actor_name: null, actor_user_id: 8, target_label: undefined }],
+    })
     renderPage()
-    expect(await screen.findByText('Service credential #7')).toBeTruthy()
-    expect(screen.queryByText('Bud result sync')).toBeNull()
+    expect(await screen.findByText('User 8 (deleted)')).toBeTruthy()
+    expect(screen.getAllByText('200').some((status) => status.parentElement?.textContent === '200requirement 42')).toBe(true)
   })
 
 })

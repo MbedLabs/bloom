@@ -103,7 +103,7 @@ function renderCampaign() {
         <MemoryRouter initialEntries={['/projects/VCU/campaigns/31']}>
           <Routes>
             <Route path="/projects/:prefix/campaigns/:campaignId" element={<CampaignDetail />} />
-            <Route path="/projects/:prefix/suites/:suiteId" element={<div>suite detail</div>} />
+            <Route path={`/projects/:prefix/docs/test-suites/${testSuite.suite_id}`} element={<div>suite detail</div>} />
           </Routes>
         </MemoryRouter>
       </ToastProvider>

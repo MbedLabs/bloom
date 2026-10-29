@@ -26,6 +26,15 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('Access request decisions', () => {
+  it('names the resource by the label the API resolved', async () => {
+    vi.mocked(api.accessRequestsApi.list).mockResolvedValue([
+      { ...request, resource_type: 'requirement', resource_ref: '4711', resource_label: 'ABC-REQ-0005', project_prefix: 'ABC' },
+    ] as never)
+    renderPanel()
+    expect(await screen.findByText(/asks for ABC-REQ-0005 in project ABC/)).toBeTruthy()
+    expect(screen.queryByText(/asks for 4711/)).toBeNull()
+  })
+
   it.each(['granted', 'refused'] as const)('records %s and refreshes the global and project panels', async (decision) => {
     const invalidate = renderPanel()
     fireEvent.click(await screen.findByRole('button', { name: decision === 'granted' ? 'Mark granted' : 'Refuse' }))

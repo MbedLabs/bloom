@@ -171,7 +171,7 @@ export default function ArtefactDetail({
   resolvedId?: number
   allowedActions?: string[]
 }>) {
-  const { itemId, prefix } = useParams<{ prefix: string; itemId: string }>()
+  const { itemId, docId, prefix } = useParams<{ prefix: string; itemId: string; docId: string }>()
   const recordId = resolvedId || Number(itemId)
   const workflow = useDocumentWorkflow(kind, recordId)
   const config = configs[kind]
@@ -357,7 +357,7 @@ export default function ArtefactDetail({
 
   if (isLoading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>
   if (isAccessDenied(loadError)) {
-    return <AccessDenied resourceType={kind} resourceRef={itemId ?? String(recordId)} projectPrefix={prefix} />
+    return <AccessDenied resourceType={kind} resourceRef={docId ?? itemId ?? String(recordId)} projectPrefix={prefix} error={loadError} />
   }
   if (!artefact || !artefactRecord) return <div className="text-center text-destructive">{config.singular} not found.</div>
 

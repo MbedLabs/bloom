@@ -79,7 +79,7 @@ export default function ProjectDetail() {
   }
 
   if (isAccessDenied(projectError)) {
-    return <AccessDenied resourceType="project" resourceRef={prefix ?? ''} projectPrefix={prefix} />
+    return <AccessDenied resourceType="project" resourceRef={prefix ?? ''} projectPrefix={prefix} error={projectError} />
   }
 
   if (!project) {

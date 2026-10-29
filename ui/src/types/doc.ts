@@ -443,12 +443,14 @@ export const DOC_LINK_ROLE_LABELS: Record<DocLinkRole, [string, string]> = {
   contains: ['contains', 'contained by'],
 }
 
-export function docUrl(prefix: string | undefined, docType: DocType, docId: string | number): string {
+/** The address of a document by its document ID. */
+export function docUrl(prefix: string | undefined, docType: DocType, docId: string): string {
   const slug = DOC_TYPE_SLUGS[docType]
   return `/projects/${prefix}/docs/${slug}/${docId}`
 }
 
-export function docEditUrl(prefix: string | undefined, docType: DocType, docId: string | number): string {
+/** The editing address of a document by its document ID. */
+export function docEditUrl(prefix: string | undefined, docType: DocType, docId: string): string {
   const slug = DOC_TYPE_SLUGS[docType]
   return `/projects/${prefix}/docs/${slug}/${docId}/edit`
 }

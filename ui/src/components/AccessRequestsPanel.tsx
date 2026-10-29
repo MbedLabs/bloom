@@ -34,7 +34,7 @@ export default function AccessRequestsPanel({ projectPrefix, showEmpty = false }
         {requests?.map((request) => (
           <li key={request.id} className="py-2 flex items-center justify-between gap-3 text-sm">
             <span className="text-foreground">
-              <UserIdentity user={{ full_name: request.requester_name ?? request.requester_email ?? 'Unknown user', profile_picture_url: request.requester_profile_picture_url }} /> ({request.requester_email}) asks for {request.resource_ref}
+              <UserIdentity user={{ full_name: request.requester_name ?? request.requester_email ?? 'Unknown user', profile_picture_url: request.requester_profile_picture_url }} /> ({request.requester_email}) asks for {request.resource_label ?? request.resource_ref}{request.project_prefix && request.resource_type !== 'project' ? ` in project ${request.project_prefix}` : ''}
             </span>
             <span className="flex gap-2">
               <button

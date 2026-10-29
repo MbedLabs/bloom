@@ -552,6 +552,7 @@ export interface AccessRequestInfo {
   id: number
   resource_type: string
   resource_ref: string
+  resource_label?: string | null
   project_prefix: string | null
   status: 'pending' | 'granted' | 'refused'
   created_at: string
@@ -586,10 +587,12 @@ export interface AuditEvent {
   actor_user_id: number | null
   actor_name: string | null
   actor_profile_picture_url?: string | null
+  actor_label?: string | null
   actor_type: string
   action: string
   target_type: string | null
   target_id: string | null
+  target_label?: string | null
   project_id: number | null
   request_id: string | null
   ip: string | null

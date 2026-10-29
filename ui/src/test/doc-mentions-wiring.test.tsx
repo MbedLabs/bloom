@@ -241,8 +241,7 @@ describe('what # offers', () => {
     await screen.findByTestId('doc-editor')
     await waitFor(() => expect(lastEditorProps.artefactHref).toBeTypeOf('function'))
 
-    const href = lastEditorProps.artefactHref as (docType: string, id: number) => string
-    expect(href('REQ', 42)).toContain('/projects/VCU/')
-    expect(href('REQ', 42)).toContain('42')
+    const href = lastEditorProps.artefactHref as (docType: string, id: number, label: string) => string
+    expect(href('REQ', 42, 'VCU-REQ-007')).toBe('/projects/VCU/docs/requirements/VCU-REQ-007')
   })
 })

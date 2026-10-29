@@ -4,7 +4,7 @@ import UserIdentity from '../components/UserIdentity'
 import UserSelect from '../components/UserSelect'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { auditApi, serviceCredentialsApi, usersApi, type AuditEvent, type AuditFilters } from '../api/client'
+import { auditApi, usersApi, type AuditEvent, type AuditFilters } from '../api/client'
 import { formatDateTime } from '../test/date-utils'
 import { SortableHeader } from '../components/ListControls'
 import { useDebounced } from '../hooks/useDebounced'
@@ -58,10 +58,10 @@ function detail(event: AuditEvent, key: string): string | undefined {
   return value == null || value === '' ? undefined : String(value)
 }
 
-/** The Actor cell: a user (marked MCP or CLI for a CLI sign-in token, with the User-Agent on hover), a service credential by name or id, or the actor type. */
-function AuditActor({ event, credentialNames }: Readonly<{ event: AuditEvent; credentialNames: Map<number, string> }>) {
+/** The Actor cell: a user (marked MCP or CLI for a CLI sign-in token, with the User-Agent on hover), a service credential by name, or the actor type; the label of a deleted actor says so. */
+function AuditActor({ event }: Readonly<{ event: AuditEvent }>) {
   if (event.actor_user_id != null) {
-    const identity = <UserIdentity user={{ id: event.actor_user_id, full_name: event.actor_name ?? `User ${event.actor_user_id}`, profile_picture_url: event.actor_profile_picture_url }} />
+    const identity = <UserIdentity user={{ id: event.actor_user_id, full_name: event.actor_label ?? event.actor_name ?? `User ${event.actor_user_id} (deleted)`, profile_picture_url: event.actor_profile_picture_url }} />
     if (detail(event, 'client') !== 'cli') return identity
     return (
       <span className="inline-flex flex-wrap items-center gap-2">
@@ -72,9 +72,7 @@ function AuditActor({ event, credentialNames }: Readonly<{ event: AuditEvent; cr
   }
   const credentialId = event.actor_type === 'service' ? detail(event, 'service_credential_id') : undefined
   if (credentialId) {
-    const label = `Service credential #${credentialId}`
-    const name = credentialNames.get(Number(credentialId))
-    return <span title={name ? label : undefined}>{name ?? label}</span>
+    return <>{event.actor_label ?? `Service credential #${credentialId} (deleted)`}</>
   }
   return <>{event.actor_type}</>
 }
@@ -88,9 +86,9 @@ function AuditEventName({ event }: Readonly<{ event: AuditEvent }>) {
   return <span title={detail(event, 'path')}>{request}</span>
 }
 
-/** The Target cell: the target, and for an API request its status first and the document ID or id of what it created. */
+/** The Target cell: the target by its label, and for an API request its status first and the document ID or id of what it created. */
 function AuditTarget({ event }: Readonly<{ event: AuditEvent }>) {
-  const target = event.target_type ? `${event.target_type} ${event.target_id ?? ''}`.trim() : ''
+  const target = event.target_label ?? (event.target_type ? `${event.target_type} ${event.target_id ?? ''}`.trim() : '')
   if (event.action !== REQUEST_ACTION) return <>{target}</>
   const status = detail(event, 'status')
   const created = detail(event, 'created_doc_id') ?? detail(event, 'created_id')
@@ -147,11 +145,6 @@ export default function AuditPage() {
     queryKey: ['users'],
     queryFn: usersApi.list,
   })
-  const { data: credentials } = useQuery({
-    queryKey: ['service-credentials'],
-    queryFn: serviceCredentialsApi.list,
-  })
-  const credentialNames = new Map((credentials ?? []).map((credential) => [credential.id, credential.name]))
   const total = data?.total ?? 0
   const lastPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1)
   const resetPage = () => setPage(0)
@@ -273,7 +266,7 @@ export default function AuditPage() {
                   {formatDateTime(event.occurred_at)}
                 </td>
                 <td className="px-4 py-2 text-foreground">
-                  <AuditActor event={event} credentialNames={credentialNames} />
+                  <AuditActor event={event} />
                 </td>
                 <td className="px-4 py-2 text-foreground font-mono text-xs"><AuditEventName event={event} /></td>
                 <td className="px-4 py-2 text-muted-foreground">

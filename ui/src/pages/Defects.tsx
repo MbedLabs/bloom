@@ -10,6 +10,7 @@ import { useToast } from '../components/useToast'
 import { formatDateTime } from '../test/date-utils'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
 import { Pager, SortableHeader } from '../components/ListControls'
+import { docUrl } from '../types/doc'
 
 const SEVERITY_COLORS: Record<string, string> = {
   Critical: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
@@ -418,7 +419,7 @@ export default function Defects() {
                 {paginated.map((defect: Defect) => (
                   <tr
                     key={defect.id}
-                    onClick={() => navigate(`/projects/${prefix}/defects/${defect.id}`)}
+                    onClick={() => navigate(docUrl(prefix, 'DEF', defect.defect_id))}
                     className="hover:bg-accent/40 cursor-pointer transition-colors"
                   >
                     <td className="px-6 py-4 font-mono text-xs text-primary whitespace-nowrap">{defect.defect_id}</td>

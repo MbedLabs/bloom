@@ -29,10 +29,10 @@ describe('searchResultUrl', () => {
     )
   })
 
-  it('routes defects, suites and campaigns to their dedicated pages by numeric id', () => {
-    expect(searchResultUrl(item({ type: 'DEF', id: 42 }))).toBe('/projects/ALP/defects/42')
-    expect(searchResultUrl(item({ type: 'TS', id: 9 }))).toBe('/projects/ALP/suites/9')
-    expect(searchResultUrl(item({ type: 'CMP', id: 3 }))).toBe('/projects/ALP/campaigns/3')
+  it('routes defects, suites and campaigns to their document pages by document ID', () => {
+    expect(searchResultUrl(item({ type: 'DEF', id: 42, doc_id: 'ALP-DEF-001' }))).toBe('/projects/ALP/docs/defects/ALP-DEF-001')
+    expect(searchResultUrl(item({ type: 'TS', id: 9, doc_id: 'ALP-TS-002' }))).toBe('/projects/ALP/docs/test-suites/ALP-TS-002')
+    expect(searchResultUrl(item({ type: 'CMP', id: 3, doc_id: 'ALP-CMP-003' }))).toBe('/projects/ALP/docs/campaigns/ALP-CMP-003')
   })
 
   it('falls back to the project page for unknown types or missing doc ids', () => {

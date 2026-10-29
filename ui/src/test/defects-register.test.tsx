@@ -97,7 +97,7 @@ function renderDefects() {
         <MemoryRouter initialEntries={['/projects/VCU/defects']}>
           <Routes>
             <Route path="/projects/:prefix/defects" element={<Defects />} />
-            <Route path="/projects/:prefix/defects/:itemId" element={<div>defect detail</div>} />
+            <Route path={`/projects/:prefix/docs/defects/${brownout.defect_id}`} element={<div>defect detail</div>} />
           </Routes>
         </MemoryRouter>
       </ToastProvider>
