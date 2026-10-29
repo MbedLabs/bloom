@@ -33,7 +33,6 @@ TARGET_ALIASES = {
     "concept": "test-concept",
     "suite": "test-suite",
     "test_suite": "test-suite",
-    "credential": "service_credential",
     **{code: slug for slug, code in TYPE_CODES.items() if code},
 }
 

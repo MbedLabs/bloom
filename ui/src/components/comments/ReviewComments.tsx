@@ -109,7 +109,7 @@ function CommentBox({ label, placeholder, busy, onPost, onCancel, autoFocus }: R
     if (!body.trim() || busy) return
     void onPost(body.trim()).then(() => setBody(''), () => undefined)
   }
-  return <div className="space-y-2" onClick={event => event.stopPropagation()}>
+  return <div role="presentation" className="space-y-2" onClick={event => event.stopPropagation()}>
     <textarea
       aria-label={label}
       placeholder={placeholder}

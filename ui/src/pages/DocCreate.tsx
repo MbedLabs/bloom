@@ -318,6 +318,12 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
   }, [docIdStr, docType, editMode, navigate, prefix])
 
   useEffect(() => {
+    if (!saveSuccess) return
+    const timer = setTimeout(() => setSaveSuccess(false), 2000)
+    return () => clearTimeout(timer)
+  }, [saveSuccess])
+
+  useEffect(() => {
     if (editMode || !prefix || !usesDocumentEditor(docType)) return
     if (!isServerAssignedDocIdOnCreate(docType)) {
       void navigate(docRegistryBackUrl(prefix, docType, returnTo ?? null), { replace: true })
@@ -479,8 +485,6 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
       setSaveError(null)
       setSaveSuccess(true)
       toast.saved(DOC_TYPE_LABELS[docType])
-      const timer = setTimeout(() => setSaveSuccess(false), 2000)
-      return () => clearTimeout(timer)
     },
     onError: (error) => {
       setSaveError(extractApiErrorMessage(error, 'Could not save document'))
