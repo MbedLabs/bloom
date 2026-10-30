@@ -20,7 +20,7 @@ from app.models import User
 from app.models.cli_auth_session import CliAuthSession
 from app.services import cli_auth
 from app.services.token_service import hash_token, invalidate_all_refresh_tokens
-from tests.api.test_cli_auth import CHALLENGE, PREFIX, VERIFIER
+from tests.api.test_cli_auth import CHALLENGE, PREFIX, VERIFIER, approve_body
 
 ROOT = Path(__file__).resolve().parents[2]
 BEFORE = "d6f9b2c3a0e5"
@@ -262,9 +262,7 @@ def test_cli_approval_exchange_and_refresh_succeed_once_on_postgresql(api_client
     headers = _admin_headers(api_client)
     session_id = _start_code_session(api_client, "race-state")
     approved = _race(
-        lambda: api_client.post(
-            PREFIX + "/approve", headers=headers, json={"session_id": session_id}
-        )
+        lambda: api_client.post(PREFIX + "/approve", headers=headers, json=approve_body(session_id))
     )
     assert [r.status_code for r in approved].count(200) == 1
     assert all(r.status_code in (200, 400) for r in approved)
@@ -293,9 +291,8 @@ def test_cli_deny_and_approve_end_a_request_once_on_postgresql(api_client, monke
     session_id = _start_code_session(api_client, "deny-race-state")
 
     def send(path):
-        return path, api_client.post(
-            f"{PREFIX}/{path}", headers=headers, json={"session_id": session_id}
-        )
+        body = approve_body(session_id) if path == "approve" else {"session_id": session_id}
+        return path, api_client.post(f"{PREFIX}/{path}", headers=headers, json=body)
 
     with ThreadPoolExecutor(max_workers=4) as pool:
         results = list(pool.map(send, ["deny", "approve", "deny", "approve"]))

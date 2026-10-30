@@ -17,8 +17,10 @@ from app.services import cli_auth
 from tests.api.test_cli_auth import (
     CHALLENGE,
     PREFIX,
+    REQUEST_CODE,
     VERIFIER,
     approve,
+    approve_body,
     audit_rows,
     bearer,
     cli_client,
@@ -177,7 +179,7 @@ def test_expired_session_cannot_approve_or_exchange(cli_client, approved):
     )
     assert (
         client.post(
-            PREFIX + "/approve", headers=headers, json={"session_id": session["session_id"]}
+            PREFIX + "/approve", headers=headers, json=approve_body(session["session_id"])
         ).status_code
         == 400
     )
@@ -195,7 +197,7 @@ def test_disabled_account_rejects_approval_exchange_and_refresh(cli_client):
     )
     assert (
         client.post(
-            PREFIX + "/approve", headers=headers, json={"session_id": pending["session_id"]}
+            PREFIX + "/approve", headers=headers, json=approve_body(pending["session_id"])
         ).status_code
         == 403
     )
@@ -232,7 +234,7 @@ def test_approval_rereads_and_rejects_a_changed_account(cli_client):
                 )
                 await other.commit()
             with pytest.raises(cli_auth.CliAuthorizationError) as refused:
-                await cli_auth.approve_session(db, session.id, account)
+                await cli_auth.approve_session(db, session.id, account, REQUEST_CODE)
             return refused.value.reason
 
     assert asyncio.run(approve_with_stale_account()) == "inactive_or_changed_user"
@@ -371,7 +373,7 @@ def test_code_mode_off_refuses_every_stored_code_request(cli_client, monkeypatch
     for session_id in (pending, approved, expired):
         lookup = client.get(PREFIX + "/sessions/" + session_id, headers=headers)
         assert (lookup.status_code, lookup.json()) == (403, {"detail": CODE_MODE_OFF})
-        refused = client.post(PREFIX + "/approve", headers=headers, json={"session_id": session_id})
+        refused = client.post(PREFIX + "/approve", headers=headers, json=approve_body(session_id))
         assert (refused.status_code, refused.json()) == (403, {"detail": CODE_MODE_OFF})
     blocked = exchange(client, approved, code)
     assert (blocked.status_code, blocked.json()) == (400, {"detail": INVALID_AUTHORIZATION})
@@ -397,7 +399,7 @@ def test_code_mode_off_keeps_the_answers_for_a_missing_request(cli_client, monke
     unknown = str(uuid4())
     lookup = client.get(PREFIX + "/sessions/" + unknown, headers=headers)
     assert (lookup.status_code, lookup.json()) == (400, {"detail": INVALID_AUTHORIZATION})
-    refused = client.post(PREFIX + "/approve", headers=headers, json={"session_id": unknown})
+    refused = client.post(PREFIX + "/approve", headers=headers, json=approve_body(unknown))
     assert (refused.status_code, refused.json()) == (400, {"detail": INVALID_AUTHORIZATION})
     assert exchange(client, unknown, "code").status_code == 400
     assert audit_rows(maker, "auth.cli_approve")[-1].details == {"reason": "not_pending"}
@@ -488,15 +490,72 @@ def test_deny_refuses_a_stored_callback_that_is_no_longer_valid(cli_client):
     assert audit_rows(maker, "auth.cli_deny")[-1].details == {"reason": "not_pending"}
 
 
-def test_consent_endpoints_have_no_rate_limit(cli_client, monkeypatch):
+def test_deny_has_no_rate_limit(cli_client, monkeypatch):
     from app.core.deps import limiter
 
     client, _, headers, _, _ = cli_client
     limiter.reset()
     monkeypatch.setattr(limiter, "enabled", True)
     unknown = {"session_id": str(uuid4())}
-    for path in ("deny", "approve"):
-        responses = [
-            client.post(f"{PREFIX}/{path}", headers=headers, json=unknown) for _ in range(12)
-        ]
-        assert {response.status_code for response in responses} == {400}
+    responses = [client.post(f"{PREFIX}/deny", headers=headers, json=unknown) for _ in range(12)]
+    assert {response.status_code for response in responses} == {400}
+
+
+@pytest.mark.parametrize("path,limit", [("check", 30), ("approve", 10)])
+def test_check_and_approve_enforce_their_rate_limit(cli_client, monkeypatch, path, limit):
+    from app.core.deps import limiter
+
+    client, _, headers, _, _ = cli_client
+    limiter.reset()
+    monkeypatch.setattr(limiter, "enabled", True)
+    body = approve_body(str(uuid4()))
+    responses = [
+        client.post(f"{PREFIX}/{path}", headers=headers, json=body) for _ in range(limit + 1)
+    ]
+    assert {response.status_code for response in responses[:-1]} == {400}
+    assert responses[-1].status_code == 429
+
+
+def test_a_typed_code_mismatch_is_audited_on_check_and_approve(cli_client):
+    client, maker, headers, user_id, _ = cli_client
+    session_id = start(client)["session_id"]
+    wrong = approve_body(session_id, "AAAA-AAAA")
+    assert client.post(PREFIX + "/check", headers=headers, json=wrong).status_code == 400
+    assert client.post(PREFIX + "/approve", headers=headers, json=wrong).status_code == 400
+    assert (
+        client.post(PREFIX + "/check", headers=headers, json=approve_body(session_id)).status_code
+        == 204
+    )
+    unknown = approve_body(str(uuid4()), "AAAA-AAAA")
+    assert client.post(PREFIX + "/check", headers=headers, json=unknown).status_code == 400
+    mismatches = audit_rows(maker, "auth.cli_code_mismatch")
+    assert [
+        (e.outcome, e.actor_user_id, e.target_type, e.target_id, e.details) for e in mismatches
+    ] == [
+        ("failure", user_id, "cli_auth_session", session_id, {"reason": "request_code_mismatch"})
+    ] * 2
+    assert audit_rows(maker, "auth.cli_approve") == []
+    approve(client, headers, session_id)
+    assert [e.outcome for e in audit_rows(maker, "auth.cli_approve")] == ["success"]
+
+
+def test_approval_refuses_a_request_approved_after_its_code_check(cli_client, monkeypatch):
+    client, maker, headers, user_id, _ = cli_client
+    session_id = start(client)["session_id"]
+    original = cli_auth.check_request_code
+
+    async def approved_elsewhere_after_check(db, checked_id, typed):
+        checked = await original(db, checked_id, typed)
+        async with maker() as other:
+            await other.execute(
+                update(CliAuthSession)
+                .where(CliAuthSession.id == checked_id)
+                .values(user_id=user_id, exchange_code_hash="approved-elsewhere")
+            )
+            await other.commit()
+        return checked
+
+    monkeypatch.setattr(cli_auth, "check_request_code", approved_elsewhere_after_check)
+    refused = client.post(PREFIX + "/approve", headers=headers, json=approve_body(session_id))
+    assert (refused.status_code, refused.json()) == (400, {"detail": INVALID_AUTHORIZATION})
+    assert audit_rows(maker, "auth.cli_approve")[-1].details == {"reason": "not_pending"}

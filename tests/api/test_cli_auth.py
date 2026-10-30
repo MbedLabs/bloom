@@ -34,6 +34,9 @@ RFC7636_VERIFIER = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
 RFC7636_CHALLENGE = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
 RFC7636_REQUEST_CODE = "BUUZ-WHVV"
 PREFIX = "/api/auth/cli"
+INVALID_AUTHORIZATION = (
+    "Invalid or expired authorization. Request a new sign-in link from your client."
+)
 REFRESH_COOKIE = "bloom_refresh_token"
 SESSION_FIELDS = {
     "session_id",
@@ -43,7 +46,6 @@ SESSION_FIELDS = {
     "expires_at",
     "consumed",
     "created_at",
-    "request_code",
 }
 
 
@@ -128,9 +130,23 @@ def start(client, **overrides):
     return response.json()
 
 
+def code_for(challenge):
+    """Return the XXXX-XXXX request code of a challenge, computed independently of the app."""
+    letters = base64.b32encode(hashlib.sha256(challenge.encode()).digest()[:5]).decode()
+    return f"{letters[:4]}-{letters[4:]}"
+
+
+REQUEST_CODE = code_for(CHALLENGE)
+
+
+def approve_body(session_id, request_code=REQUEST_CODE):
+    """Return an approve body carrying the request code the client shows."""
+    return {"session_id": session_id, "request_code": request_code}
+
+
 def approve(client, headers, session_id):
     """Approve a session as the signed-in user and return the approval body."""
-    response = client.post(PREFIX + "/approve", headers=headers, json={"session_id": session_id})
+    response = client.post(PREFIX + "/approve", headers=headers, json=approve_body(session_id))
     assert response.status_code == 200, response.text
     return response.json()
 
@@ -365,9 +381,9 @@ def test_approval_is_once_and_authenticated(cli_client):
     session = start(client)
     session_id = session["session_id"]
     assert client.get(PREFIX + "/sessions/" + session_id).status_code == 401
-    assert client.post(PREFIX + "/approve", json={"session_id": session_id}).status_code == 401
+    assert client.post(PREFIX + "/approve", json=approve_body(session_id)).status_code == 401
     approve(client, headers, session_id)
-    again = client.post(PREFIX + "/approve", headers=headers, json={"session_id": session_id})
+    again = client.post(PREFIX + "/approve", headers=headers, json=approve_body(session_id))
     assert again.status_code == 400
     events = audit_rows(maker, "auth.cli_approve")
     assert [(e.outcome, e.actor_user_id, e.target_id) for e in events] == [
@@ -430,7 +446,7 @@ def test_request_code_matches_the_shared_vector():
 @pytest.mark.parametrize(
     "mode,redirect_uri", [("code", None), ("callback", "http://127.0.0.1:8123/callback")]
 )
-def test_session_shows_request_time_and_request_code(cli_client, mode, redirect_uri):
+def test_session_shows_request_time_without_the_request_code(cli_client, mode, redirect_uri):
     client, _, headers, _, _ = cli_client
     before = datetime.utcnow().replace(microsecond=0)
     created = start(client, mode=mode, redirect_uri=redirect_uri, code_challenge=RFC7636_CHALLENGE)
@@ -438,7 +454,7 @@ def test_session_shows_request_time_and_request_code(cli_client, mode, redirect_
     assert response.status_code == 200, response.text
     data = response.json()
     assert set(data) == SESSION_FIELDS
-    assert data["request_code"] == RFC7636_REQUEST_CODE
+    assert RFC7636_REQUEST_CODE not in response.text
     assert data["created_at"].endswith("Z")
     assert data["expires_at"].endswith("Z")
     requested = datetime.fromisoformat(data["created_at"][:-1])
@@ -502,7 +518,88 @@ def test_a_denied_request_answers_as_a_missing_one(cli_client, mode):
     session_id = start(client, mode=mode, redirect_uri=redirect_uri)["session_id"]
     assert deny(client, headers, session_id).status_code == 200
     assert client.get(PREFIX + "/sessions/" + session_id, headers=headers).status_code == 400
-    again = client.post(PREFIX + "/approve", headers=headers, json={"session_id": session_id})
+    again = client.post(PREFIX + "/approve", headers=headers, json=approve_body(session_id))
     assert again.status_code == 400
     assert exchange(client, session_id, "any-code").status_code == 400
     assert deny(client, headers, session_id).status_code == 400
+
+
+def check(client, headers, session_id, request_code):
+    """Post one request code check as the signed-in user."""
+    return client.post(
+        PREFIX + "/check",
+        headers=headers,
+        json={"session_id": session_id, "request_code": request_code},
+    )
+
+
+@pytest.mark.parametrize("typed", ["BUUZ-WHVV", "buuz-whvv", "BUUZWHVV", "BUUZ WHVV"])
+def test_check_accepts_the_typed_code_in_any_case_and_spacing(cli_client, typed):
+    client, maker, headers, _, _ = cli_client
+    session_id = start(client, code_challenge=RFC7636_CHALLENGE)["session_id"]
+    response = check(client, headers, session_id, typed)
+    assert response.status_code == 204, response.text
+    assert response.headers["Cache-Control"] == "no-store"
+    stored = run_db(maker, lambda db: db.get(CliAuthSession, UUID(session_id)))
+    assert stored.user_id is None
+    assert stored.exchange_code_hash is None
+
+
+@pytest.mark.parametrize("typed", ["BUUZ-WHVW", "BUUZ-WHV", "BUUZ-WHVVA", "BUUZ-WHV1", ""])
+def test_check_refuses_a_wrong_or_malformed_code_and_keeps_the_request(cli_client, typed):
+    client, _, headers, _, _ = cli_client
+    session_id = start(client, code_challenge=RFC7636_CHALLENGE)["session_id"]
+    response = check(client, headers, session_id, typed)
+    assert (response.status_code, response.json()) == (400, {"detail": INVALID_AUTHORIZATION})
+    assert client.get(PREFIX + "/sessions/" + session_id, headers=headers).status_code == 200
+
+
+def test_check_refuses_a_request_that_is_not_pending(cli_client):
+    client, maker, headers, _, _ = cli_client
+    expired = start(client)["session_id"]
+    approved = start(client)["session_id"]
+    consumed = start(client)["session_id"]
+    approve(client, headers, approved)
+    signed_in(client, consumed, headers)
+    run_db(
+        maker,
+        lambda db: db.execute(
+            update(CliAuthSession)
+            .where(CliAuthSession.id == UUID(expired))
+            .values(expires_at=datetime.utcnow() - timedelta(seconds=1))
+        ),
+    )
+    for session_id in (str(UUID(int=1)), expired, approved, consumed):
+        response = check(client, headers, session_id, REQUEST_CODE)
+        assert (response.status_code, response.json()) == (400, {"detail": INVALID_AUTHORIZATION})
+
+
+def test_check_requires_sign_in_and_code_mode(cli_client, monkeypatch):
+    client, _, headers, _, _ = cli_client
+    session_id = start(client)["session_id"]
+    assert check(client, {}, session_id, REQUEST_CODE).status_code == 401
+    monkeypatch.setattr(settings, "CLI_CODE_MODE_ENABLED", False)
+    response = check(client, headers, session_id, REQUEST_CODE)
+    assert response.status_code == 403
+
+
+def test_approve_requires_the_matching_request_code(cli_client):
+    client, _, headers, _, _ = cli_client
+    session_id = start(client)["session_id"]
+    missing = client.post(PREFIX + "/approve", headers=headers, json={"session_id": session_id})
+    assert missing.status_code == 422
+    wrong = client.post(
+        PREFIX + "/approve", headers=headers, json=approve_body(session_id, "AAAA-AAAA")
+    )
+    assert (wrong.status_code, wrong.json()) == (400, {"detail": INVALID_AUTHORIZATION})
+    assert client.get(PREFIX + "/sessions/" + session_id, headers=headers).status_code == 200
+    code = approve(client, headers, session_id)["exchange_code"]
+    assert exchange(client, session_id, code).status_code == 200
+
+
+def test_deny_takes_no_request_code(cli_client):
+    client, _, headers, _, _ = cli_client
+    session_id = start(client)["session_id"]
+    refused = client.post(PREFIX + "/deny", headers=headers, json=approve_body(session_id))
+    assert refused.status_code == 422
+    assert deny(client, headers, session_id).status_code == 200
