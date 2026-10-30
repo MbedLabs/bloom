@@ -408,6 +408,19 @@ def _row_origin(row: ProjectAccess, group: Group | None) -> AccessOrigin:
     )
 
 
+async def _add_origins(
+    db: AsyncSession, entry: ProjectAccessEntry, row: ProjectAccess, group, user: User
+) -> None:
+    """Add the origins an access row gives a user to the user's entry; an inherited origin is
+    listed once."""
+    if not (row.inherit_policies and row.policy_group_id is None):
+        entry.origins.append(_row_origin(row, group))
+        return
+    for origin in await _inherited_origins(db, user):
+        if origin not in entry.origins:
+            entry.origins.append(origin)
+
+
 async def project_access_entries(db: AsyncSession, project_id: int) -> list[ProjectAccessEntry]:
     """One entry per user with access to the project, with every origin of that access."""
     entries = {}
@@ -423,7 +436,6 @@ async def project_access_entries(db: AsyncSession, project_id: int) -> list[Proj
     }
     for row in rows:
         users, group = await _row_users(db, row)
-        inherits = row.inherit_policies and row.policy_group_id is None
         for user in users:
             if row.user_id is None and user.id in replaced_users:
                 continue
@@ -437,10 +449,5 @@ async def project_access_entries(db: AsyncSession, project_id: int) -> list[Proj
                     origins=[],
                 ),
             )
-            if not inherits:
-                entry.origins.append(_row_origin(row, group))
-                continue
-            for origin in await _inherited_origins(db, user):
-                if origin not in entry.origins:
-                    entry.origins.append(origin)
+            await _add_origins(db, entry, row, group, user)
     return sorted(entries.values(), key=lambda entry: entry.full_name.lower())

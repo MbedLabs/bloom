@@ -56,7 +56,9 @@ function actorFilters(actor: string): Pick<AuditFilters, 'actor_type' | 'actor_u
 function detail(event: AuditEvent, key: string): string | undefined {
   const value = event.details?.[key]
   if (value == null || value === '') return undefined
-  return typeof value === 'object' ? JSON.stringify(value) : String(value)
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return `${value}`
+  return JSON.stringify(value)
 }
 
 /** The Actor cell: a user (marked MCP or CLI for a CLI sign-in token, with the User-Agent on hover), a service credential by name, or the actor type; the label of a deleted actor says so. */

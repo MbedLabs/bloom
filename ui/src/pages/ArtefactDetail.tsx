@@ -162,10 +162,17 @@ const workflowTransitions: Record<ArtefactKind, Record<string, string[]>> = {
   defect: { Open: ['Triaged', 'Rejected', 'Duplicate'], Triaged: ['In Progress', 'Rejected', 'Duplicate'], 'In Progress': ['Resolved', 'Triaged'], Resolved: ['Verified', 'In Progress'], Verified: ['Closed', 'In Progress'], Closed: ['Open'], Rejected: ['Open'], Duplicate: ['Open'] },
 }
 
+/** A string as it is, a number or boolean as text, anything else as JSON. */
+function valueText(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return `${value}`
+  return JSON.stringify(value) ?? ''
+}
+
 /** A field value as text: "-" when it is missing and JSON when it is structured. */
 function fieldText(value: unknown): string {
   if (value === null || value === undefined) return '-'
-  return typeof value === 'object' ? JSON.stringify(value) : String(value)
+  return valueText(value)
 }
 
 export default function ArtefactDetail({
