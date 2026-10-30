@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { api, extractApiErrorMessage, type User } from '../api/client'
 import { PRODUCT_NAME } from '../brandAssets'
@@ -14,7 +14,6 @@ interface CliSession {
   expires_at: string
   consumed: boolean
   created_at: string
-  request_code: string
 }
 
 interface CliApproval {
@@ -30,6 +29,10 @@ interface CliDenial {
 const NEW_LINK = 'This sign-in request is invalid, expired or already approved. Request a new sign-in link from your client.'
 const INVALID_CALLBACK = 'The callback destination is invalid. Request a new sign-in link from your client.'
 const DENIED = 'This sign-in request was denied. The link no longer works.'
+const TOO_MANY = 'Too many attempts. Wait a minute and try again.'
+const CODE_MATCHES = 'The code matches.'
+const CODE_MISMATCH = 'This code does not match. Check the code in your terminal, or deny this request.'
+const CODE_LETTERS = 8
 const WARNING = 'rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200'
 const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const LOOPBACK_TARGET = /^http:\/\/(?:127\.0\.0\.1|localhost|\[::1\]):(\d+)(?:[/?]|$)/i
@@ -78,6 +81,21 @@ function isCodeModeOff(error: unknown): boolean {
   return axios.isAxiosError(error) && error.response?.status === 403
 }
 
+/** The HTTP status of a failed request, when it has one. */
+function answerStatus(error: unknown): number | undefined {
+  return axios.isAxiosError(error) ? error.response?.status : undefined
+}
+
+/** A typed or pasted request code in upper case without spaces, at most eight code characters, with a hyphen after the fourth. */
+function formatRequestCode(raw: string): string {
+  const letters = raw.toUpperCase().replace(/[\s-]/g, '').slice(0, CODE_LETTERS)
+  return letters.length > 4 ? `${letters.slice(0, 4)}-${letters.slice(4)}` : letters
+}
+
+type CodeCheck = 'empty' | 'match' | 'mismatch' | 'limited'
+
+const CHECK_TEXT: Record<CodeCheck, string> = { empty: '', match: CODE_MATCHES, mismatch: CODE_MISMATCH, limited: TOO_MANY }
+
 /** A UTC timestamp from the API shown in the browser's local date and time. */
 function localTime(value: string): string {
   return new Date(value).toLocaleString()
@@ -111,12 +129,15 @@ function DenyButton({ busy, onDeny }: Readonly<{ busy: boolean; onDeny: () => vo
   return <button type="button" disabled={busy} onClick={onDeny} className="flex-1 rounded-lg border border-input px-4 py-2 text-foreground disabled:opacity-50">Deny</button>
 }
 
-/** The request code, the requesting client, the account, the request time and expiry, with Approve and Deny. */
-function Consent({ session, account, busy, approving, onApprove, onDeny }: Readonly<{
+/** The request code field, the requesting client, the account, the request time and expiry, with Approve and Deny. */
+function Consent({ session, account, busy, approving, typedCode, codeCheck, onCodeChange, onApprove, onDeny }: Readonly<{
   session: CliSession
   account: User | null
   busy: boolean
   approving: boolean
+  typedCode: string
+  codeCheck: CodeCheck
+  onCodeChange: (value: string) => void
   onApprove: () => void
   onDeny: () => void
 }>) {
@@ -126,10 +147,20 @@ function Consent({ session, account, busy, approving, onApprove, onDeny }: Reado
   const signedIn = account ? `${account.full_name} (${account.email})` : 'your account'
   return (
     <div className="space-y-4">
-      <div>
-        <p className="text-sm text-muted-foreground">Request code</p>
-        <p className="font-mono text-2xl font-semibold tracking-widest text-foreground">{session.request_code}</p>
-        <p className="text-sm text-muted-foreground">It must match the code your client shows. If it does not, deny this request.</p>
+      <div className="space-y-1">
+        <label htmlFor="cli-request-code" className="block text-sm font-medium text-foreground">Request code</label>
+        <input
+          id="cli-request-code"
+          value={typedCode}
+          onChange={(event) => onCodeChange(event.target.value)}
+          autoComplete="off"
+          spellCheck={false}
+          autoCapitalize="characters"
+          aria-describedby="cli-request-code-help"
+          className="w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-2xl font-semibold tracking-widest text-foreground"
+        />
+        <p id="cli-request-code-help" className="text-sm text-muted-foreground">Type the code your terminal or AI client shows next to the link.</p>
+        <output className={`block text-sm ${codeCheck === 'match' ? 'text-foreground' : 'text-destructive'}`}>{CHECK_TEXT[codeCheck]}</output>
       </div>
       <div>
         <p className="font-semibold text-foreground">{session.client_name}</p>
@@ -143,7 +174,7 @@ function Consent({ session, account, busy, approving, onApprove, onDeny }: Reado
         <p className={WARNING}>This request asks for a one-time code instead of returning to a client on this computer. If someone else sent you this link or asks you for the code, deny it: the code signs their client in to your account.</p>
       )}
       <div className="flex gap-3">
-        <button type="button" disabled={busy} onClick={onApprove} className="flex-1 rounded-lg bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">{approving ? 'Approving...' : 'Approve'}</button>
+        <button type="button" disabled={busy || codeCheck !== 'match'} onClick={onApprove} className="flex-1 rounded-lg bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">{approving ? 'Approving...' : 'Approve'}</button>
         <DenyButton busy={busy} onDeny={onDeny} />
       </div>
     </div>
@@ -163,6 +194,9 @@ export default function CliAuthApprovePage() {
   const [busy, setBusy] = useState(false)
   const [approving, setApproving] = useState(false)
   const [denied, setDenied] = useState(false)
+  const [typedCode, setTypedCode] = useState('')
+  const [codeCheck, setCodeCheck] = useState<CodeCheck>('empty')
+  const currentCode = useRef('')
 
   useEffect(() => {
     if (isLoading || !sessionId) return
@@ -193,12 +227,48 @@ export default function CliAuthApprovePage() {
     return () => window.clearTimeout(timer)
   }, [session])
 
+  /** A refused check or approval: 429 asks to wait, 400 reloads the request to tell a wrong code from an ended request. */
+  const codeRefused = async (value: string, err: unknown) => {
+    const status = answerStatus(err)
+    if (status === 429) {
+      if (currentCode.current === value) setCodeCheck('limited')
+      return
+    }
+    if (status !== 400) {
+      setError(extractApiErrorMessage(err, NEW_LINK))
+      return
+    }
+    try {
+      await api.get<CliSession>(`/auth/cli/sessions/${sessionId}`)
+      if (currentCode.current === value) setCodeCheck('mismatch')
+    } catch {
+      setError(NEW_LINK)
+    }
+  }
+
+  const changeCode = (raw: string) => {
+    const value = formatRequestCode(raw)
+    if (value === currentCode.current) return
+    currentCode.current = value
+    setTypedCode(value)
+    setCodeCheck('empty')
+    if (!session || value.replace('-', '').length < CODE_LETTERS) return
+    api.post('/auth/cli/check', { session_id: session.session_id, request_code: value })
+      .then(() => {
+        if (currentCode.current === value) setCodeCheck('match')
+      })
+      .catch((err: unknown) => {
+        if (currentCode.current === value) void codeRefused(value, err)
+      })
+  }
+
   const approve = async () => {
-    if (!session || busy) return
+    if (!session || busy || codeCheck !== 'match') return
+    const value = typedCode
     setBusy(true)
     setApproving(true)
     try {
-      const { data } = await api.post<CliApproval>('/auth/cli/approve', { session_id: session.session_id })
+      const { data } = await api.post<CliApproval>('/auth/cli/approve', { session_id: session.session_id, request_code: value })
       if (session.mode === 'callback') {
         window.location.assign(callbackDestination(data.redirect_to ?? '', session.redirect_uri))
       } else if (data.exchange_code) {
@@ -207,7 +277,9 @@ export default function CliAuthApprovePage() {
         throw new Error(NEW_LINK)
       }
     } catch (err: unknown) {
-      setError(extractApiErrorMessage(err, NEW_LINK))
+      const status = answerStatus(err)
+      if (status === 400 || status === 429) await codeRefused(value, err)
+      else setError(extractApiErrorMessage(err, NEW_LINK))
     } finally {
       setBusy(false)
       setApproving(false)
@@ -256,6 +328,9 @@ export default function CliAuthApprovePage() {
         account={user}
         busy={busy}
         approving={approving}
+        typedCode={typedCode}
+        codeCheck={codeCheck}
+        onCodeChange={changeCode}
         onApprove={() => { void approve() }}
         onDeny={() => { void deny() }}
       />

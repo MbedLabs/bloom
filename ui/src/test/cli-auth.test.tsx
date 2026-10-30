@@ -37,7 +37,7 @@ function session(overrides: Record<string, unknown> = {}) {
   return { data: {
     session_id: sessionId, client_name: 'Example client', mode: 'code', redirect_uri: null,
     expires_at: inTenMinutes(), consumed: false, created_at: new Date(Date.now() - 60_000).toISOString(),
-    request_code: 'BUUZ-WHVV', ...overrides,
+    ...overrides,
   } }
 }
 
@@ -69,6 +69,21 @@ function renderApproval(path = approvalPath) {
   return render(<MemoryRouter initialEntries={[path]}><CliAuthApprovePage /></MemoryRouter>)
 }
 
+/** Types the code the client shows and waits for the server to confirm it. */
+async function enterMatchingCode() {
+  fireEvent.change(await screen.findByLabelText('Request code'), { target: { value: 'BUUZ-WHVV' } })
+  expect(await screen.findByText('The code matches.')).toBeInTheDocument()
+}
+
+/** Answers /auth/cli/check with the given result and every other post with the approval answer. */
+function answerCheck(check: () => Promise<unknown>, other: () => Promise<unknown> = () => Promise.resolve({ data: {} })) {
+  mocks.post.mockImplementation((url: string) => url === '/auth/cli/check' ? check() : other())
+}
+
+function checkCalls() {
+  return mocks.post.mock.calls.filter(([url]) => url === '/auth/cli/check')
+}
+
 describe('CLI browser approval', () => {
   it('waits for browser authentication to initialize', () => {
     mocks.auth.isLoading = true
@@ -93,9 +108,10 @@ describe('CLI browser approval', () => {
     expect(screen.getByText(/with your full permissions/i)).toBeInTheDocument()
     expect(screen.getByText(/one-time code to paste/i)).toBeInTheDocument()
     expect(mocks.get).toHaveBeenCalledWith(`/auth/cli/sessions/${sessionId}`)
+    await enterMatchingCode()
     fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
     expect(await screen.findByLabelText('One-time sign-in code')).toHaveValue('one-time-code')
-    expect(mocks.post).toHaveBeenCalledWith('/auth/cli/approve', { session_id: sessionId })
+    expect(mocks.post).toHaveBeenCalledWith('/auth/cli/approve', { session_id: sessionId, request_code: 'BUUZ-WHVV' })
     fireEvent.click(screen.getByRole('button', { name: 'Copy code' }))
     await waitFor(() => expect(copy).toHaveBeenCalledWith('one-time-code'))
     expect(await screen.findByText('Code copied.')).toBeInTheDocument()
@@ -108,13 +124,13 @@ describe('CLI browser approval', () => {
     expect(await screen.findByText(/returns to your local client at http:\/\/127\.0\.0\.1:8123\/callback/i)).toBeInTheDocument()
   })
 
-  it('shows the request code, the unverified client name, the account, the request time and the expiry', async () => {
+  it('asks for the request code and shows the unverified client name, the account, the request time and the expiry', async () => {
     const created = '2026-10-22T08:00:00Z'
     const expires = '2026-10-22T08:10:00Z'
     mocks.get.mockResolvedValue(session({ created_at: created, expires_at: expires }))
     renderApproval()
-    expect(await screen.findByText('BUUZ-WHVV')).toBeInTheDocument()
-    expect(screen.getByText('It must match the code your client shows. If it does not, deny this request.')).toBeInTheDocument()
+    expect(await screen.findByLabelText('Request code')).toHaveValue('')
+    expect(screen.getByText('Type the code your terminal or AI client shows next to the link.')).toBeInTheDocument()
     expect(screen.getByText('Name given by the requesting client, not verified.')).toBeInTheDocument()
     expect(screen.getByText(/as Dana Reader \(dana@example\.com\), with your full permissions\./)).toBeInTheDocument()
     expect(screen.getByText(`Requested ${new Date(created).toLocaleString()}. Expires ${new Date(expires).toLocaleString()}.`)).toBeInTheDocument()
@@ -125,6 +141,7 @@ describe('CLI browser approval', () => {
   it('warns before approving a code request and repeats the warning with the one-time code', async () => {
     renderApproval()
     expect(await screen.findByText(/If someone else sent you this link or asks you for the code, deny it/)).toBeInTheDocument()
+    await enterMatchingCode()
     fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
     expect(await screen.findByText('Paste this code only into the client where you started this sign-in. Never send it to anyone.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Deny' })).not.toBeInTheDocument()
@@ -133,7 +150,7 @@ describe('CLI browser approval', () => {
   it('shows no code warning for a callback request', async () => {
     mocks.get.mockResolvedValue(session({ mode: 'callback', redirect_uri: callbackUri }))
     renderApproval()
-    expect(await screen.findByText('BUUZ-WHVV')).toBeInTheDocument()
+    expect(await screen.findByLabelText('Request code')).toBeInTheDocument()
     expect(screen.queryByText(/asks you for the code/)).not.toBeInTheDocument()
   })
 
@@ -185,7 +202,8 @@ describe('CLI browser approval', () => {
     mocks.get.mockResolvedValue(session({ mode: 'callback', redirect_uri: callbackUri }))
     mocks.post.mockResolvedValue({ data: { redirect_to: `${callbackUri}?error=access_denied&state=s` } })
     renderApproval()
-    fireEvent.click(await screen.findByRole('button', { name: 'Approve' }))
+    await enterMatchingCode()
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/callback/i)
     expect(assign).not.toHaveBeenCalled()
   })
@@ -250,9 +268,10 @@ describe('CLI browser approval', () => {
   })
 
   it('handles approval failure without displaying credentials', async () => {
-    mocks.post.mockRejectedValue(new Error('Already approved. Request a new sign-in link.'))
+    answerCheck(() => Promise.resolve({}), () => Promise.reject(new Error('Already approved. Request a new sign-in link.')))
     renderApproval()
-    fireEvent.click(await screen.findByRole('button', { name: 'Approve' }))
+    await enterMatchingCode()
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/new sign-in link/i)
     expect(screen.queryByLabelText('One-time sign-in code')).not.toBeInTheDocument()
   })
@@ -260,14 +279,16 @@ describe('CLI browser approval', () => {
   it('reports a manual approval that returns no code', async () => {
     mocks.post.mockResolvedValue({ data: { expires_at: inTenMinutes() } })
     renderApproval()
-    fireEvent.click(await screen.findByRole('button', { name: 'Approve' }))
+    await enterMatchingCode()
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/new sign-in link/i)
   })
 
   it('shows a manual copy instruction when clipboard access fails', async () => {
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) } })
     renderApproval()
-    fireEvent.click(await screen.findByRole('button', { name: 'Approve' }))
+    await enterMatchingCode()
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Copy code' }))
     expect(await screen.findByText(/select and copy the code/i)).toBeInTheDocument()
   })
@@ -276,7 +297,8 @@ describe('CLI browser approval', () => {
     mocks.get.mockResolvedValue(session({ mode: 'callback', redirect_uri: 'http://127.0.0.1:8123/callback' }))
     mocks.post.mockResolvedValue({ data: { redirect_to: 'https://evil.test/callback?code=c&state=s' } })
     renderApproval()
-    fireEvent.click(await screen.findByRole('button', { name: 'Approve' }))
+    await enterMatchingCode()
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/callback/i)
   })
 
@@ -288,7 +310,8 @@ describe('CLI browser approval', () => {
     const target = `${redirectUri}?code=approved&state=expected`
     mocks.post.mockResolvedValue({ data: { redirect_to: target } })
     renderApproval()
-    fireEvent.click(await screen.findByRole('button', { name: 'Approve' }))
+    await enterMatchingCode()
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
     await waitFor(() => expect(assign).toHaveBeenCalledWith(target))
   })
 
@@ -302,14 +325,120 @@ describe('CLI browser approval', () => {
     mocks.get.mockResolvedValue(session({ mode: 'callback', redirect_uri: 'http://127.0.0.1:8123/callback' }))
     mocks.post.mockResolvedValue({ data: { redirect_to: target } })
     renderApproval()
-    fireEvent.click(await screen.findByRole('button', { name: 'Approve' }))
+    await enterMatchingCode()
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/callback/i)
+  })
+
+  it('renders no request code from the session answer', async () => {
+    mocks.get.mockResolvedValue(session({ request_code: 'BUUZ-WHVV' }))
+    renderApproval()
+    expect(await screen.findByLabelText('Request code')).toHaveValue('')
+    expect(screen.queryByText('BUUZ-WHVV')).not.toBeInTheDocument()
+  })
+
+  it('formats a typed code and checks it once at eight characters', async () => {
+    renderApproval()
+    const field = await screen.findByLabelText('Request code')
+    for (const letter of 'buuzwhvv') fireEvent.change(field, { target: { value: `${(field as HTMLInputElement).value}${letter}` } })
+    expect(field).toHaveValue('BUUZ-WHVV')
+    fireEvent.change(field, { target: { value: 'BUUZ-WHVVX' } })
+    expect(field).toHaveValue('BUUZ-WHVV')
+    await screen.findByText('The code matches.')
+    expect(checkCalls()).toEqual([['/auth/cli/check', { session_id: sessionId, request_code: 'BUUZ-WHVV' }]])
+  })
+
+  it('formats a pasted code with a space and checks it', async () => {
+    renderApproval()
+    const field = await screen.findByLabelText('Request code')
+    fireEvent.change(field, { target: { value: 'buuz whvv' } })
+    expect(field).toHaveValue('BUUZ-WHVV')
+    await screen.findByText('The code matches.')
+    expect(checkCalls()).toHaveLength(1)
+  })
+
+  it('enables Approve only while the checked code matches', async () => {
+    renderApproval()
+    const field = await screen.findByLabelText('Request code')
+    const approveButton = screen.getByRole('button', { name: 'Approve' })
+    expect(approveButton).toBeDisabled()
+    fireEvent.change(field, { target: { value: 'BUUZ-WHV' } })
+    expect(approveButton).toBeDisabled()
+    await enterMatchingCode()
+    expect(approveButton).toBeEnabled()
+    fireEvent.change(field, { target: { value: 'BUUZ-WHV' } })
+    expect(approveButton).toBeDisabled()
+    expect(screen.queryByText('The code matches.')).not.toBeInTheDocument()
+  })
+
+  it('shows a mismatch without the server text and keeps Approve disabled while the request is pending', async () => {
+    answerCheck(() => Promise.reject(refused(400, 'Invalid or expired authorization. Request a new sign-in link from your client.')))
+    renderApproval()
+    fireEvent.change(await screen.findByLabelText('Request code'), { target: { value: 'AAAA-AAAA' } })
+    expect(await screen.findByText('This code does not match. Check the code in your terminal, or deny this request.')).toBeInTheDocument()
+    expect(screen.queryByText(/new sign-in link/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeDisabled()
+    expect(mocks.get).toHaveBeenCalledTimes(2)
+  })
+
+  it('shows the ended request when a refused check finds the request gone', async () => {
+    answerCheck(() => Promise.reject(refused(400, 'Invalid or expired authorization. Request a new sign-in link from your client.')))
+    renderApproval()
+    const field = await screen.findByLabelText('Request code')
+    mocks.get.mockRejectedValue(refused(400, 'Invalid or expired authorization. Request a new sign-in link from your client.'))
+    fireEvent.change(field, { target: { value: 'AAAA-AAAA' } })
+    expect(await screen.findByRole('alert')).toHaveTextContent(/new sign-in link/i)
+    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument()
+  })
+
+  it.each(['/auth/cli/check', '/auth/cli/approve'])('asks to wait after a 429 on %s', async (limited) => {
+    mocks.post.mockImplementation((url: string) => url === limited ? Promise.reject(refused(429, 'Rate limit exceeded')) : Promise.resolve({}))
+    renderApproval()
+    fireEvent.change(await screen.findByLabelText('Request code'), { target: { value: 'BUUZ-WHVV' } })
+    if (limited === '/auth/cli/approve') {
+      await screen.findByText('The code matches.')
+      fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    }
+    expect(await screen.findByText('Too many attempts. Wait a minute and try again.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeDisabled()
+  })
+
+  it('shows a mismatch when approval answers 400 for a request that is still pending', async () => {
+    answerCheck(() => Promise.resolve({}), () => Promise.reject(refused(400, 'Invalid or expired authorization. Request a new sign-in link from your client.')))
+    renderApproval()
+    await enterMatchingCode()
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    expect(await screen.findByText('This code does not match. Check the code in your terminal, or deny this request.')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('ignores a check answer for a code that was edited since', async () => {
+    let answer: (value: unknown) => void = () => {}
+    answerCheck(() => new Promise((resolve) => { answer = resolve }))
+    renderApproval()
+    const field = await screen.findByLabelText('Request code')
+    fireEvent.change(field, { target: { value: 'BUUZ-WHVV' } })
+    fireEvent.change(field, { target: { value: 'BUUZ-WHV' } })
+    answer({})
+    await waitFor(() => expect(checkCalls()).toHaveLength(1))
+    expect(screen.queryByText('The code matches.')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeDisabled()
+  })
+
+  it('denies with an empty code field', async () => {
+    mocks.post.mockResolvedValue({ data: {} })
+    renderApproval()
+    expect(await screen.findByLabelText('Request code')).toHaveValue('')
+    fireEvent.click(screen.getByRole('button', { name: 'Deny' }))
+    expect(await screen.findByText('This sign-in request was denied. The link no longer works.')).toBeInTheDocument()
+    expect(mocks.post).toHaveBeenCalledWith('/auth/cli/deny', { session_id: sessionId })
   })
 
   it('clears an approved manual code when the request expires', async () => {
     mocks.get.mockResolvedValue(session({ expires_at: new Date(Date.now() + 1000).toISOString() }))
     renderApproval()
-    fireEvent.click(await screen.findByRole('button', { name: 'Approve' }))
+    await enterMatchingCode()
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
     expect(await screen.findByLabelText('One-time sign-in code')).toHaveValue('one-time-code')
     expect(await screen.findByRole('alert')).toHaveTextContent(/new sign-in link/i)
     expect(screen.queryByLabelText('One-time sign-in code')).not.toBeInTheDocument()
