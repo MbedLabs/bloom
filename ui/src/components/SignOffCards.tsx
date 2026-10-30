@@ -1,6 +1,6 @@
 import UserIdentity from './UserIdentity'
 import { UserCheck, UserCog, type LucideIcon } from 'lucide-react'
-import { formatDateTime } from '../test/date-utils'
+import { formatDateTime } from '../lib/dateTime'
 import { SectionCard } from './DocDetailShell'
 import type { SignOffPerson } from '../hooks/useSignOff'
 

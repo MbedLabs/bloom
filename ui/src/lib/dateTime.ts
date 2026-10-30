@@ -20,7 +20,7 @@ export function formatDateTime(
   
   try {
     const date = new Date(dateString)
-    if (isNaN(date.getTime())) return dateString
+    if (Number.isNaN(date.getTime())) return dateString
 
     const preferredTz = localStorage.getItem('bloom-timezone') || 'auto'
     

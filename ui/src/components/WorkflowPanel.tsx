@@ -1,7 +1,7 @@
 import { refreshArtefactViews } from '../lib/refreshArtefactViews'
 import { useState } from 'react'
 import { UserCheck, UserCog } from 'lucide-react'
-import { formatDateTime } from '../test/date-utils'
+import { formatDateTime } from '../lib/dateTime'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { extractApiErrorMessage, workflowApi, type ApprovedDocumentRevision, type DocumentSection } from '../api/client'
 import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'

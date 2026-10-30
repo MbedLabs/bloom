@@ -9,7 +9,7 @@ import { baselinesApi, projectsApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
-import { formatDateTime } from '../test/date-utils'
+import { formatDateTime } from '../lib/dateTime'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
 
 export default function Baselines() {

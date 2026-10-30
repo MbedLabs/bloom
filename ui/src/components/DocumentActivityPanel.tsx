@@ -2,7 +2,7 @@ import ProfilePicture from './ProfilePicture'
 import { useQuery } from '@tanstack/react-query'
 
 import { artefactsApi } from '../api/client'
-import { formatDateTime } from '../test/date-utils'
+import { formatDateTime } from '../lib/dateTime'
 import { SectionCard } from './DocDetailShell'
 
 export default function DocumentActivityPanel({

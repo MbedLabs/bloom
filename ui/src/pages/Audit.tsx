@@ -5,7 +5,7 @@ import UserSelect from '../components/UserSelect'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { auditApi, usersApi, type AuditEvent, type AuditFilters } from '../api/client'
-import { formatDateTime } from '../test/date-utils'
+import { formatDateTime } from '../lib/dateTime'
 import { SortableHeader } from '../components/ListControls'
 import { useDebounced } from '../hooks/useDebounced'
 

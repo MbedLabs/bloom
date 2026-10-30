@@ -12,7 +12,7 @@ import {
   type JiraPullResult,
 } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
-import { formatDateTime } from '../test/date-utils'
+import { formatDateTime } from '../lib/dateTime'
 import { useToast } from './useToast'
 
 export type TrackerChoice = 'none' | 'github' | 'gitlab' | 'jira'

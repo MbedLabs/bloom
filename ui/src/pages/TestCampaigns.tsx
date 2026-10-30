@@ -8,7 +8,7 @@ import { campaignsApi, extractApiErrorMessage, testCasesApi, testSuitesApi } fro
 import { ArrowLeft, Plus, Clock, FlaskConical, Layers3, Search, ChevronUp, ChevronDown } from 'lucide-react'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { useToast } from '../components/useToast'
-import { formatDateTime } from '../test/date-utils'
+import { formatDateTime } from '../lib/dateTime'
 import BudRunLink from '../components/BudRunLink'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
 import { useAuth } from '../contexts/AuthContext'
