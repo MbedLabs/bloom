@@ -13,11 +13,14 @@ import zlib
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import lru_cache
+from http import HTTPStatus
 from typing import Any, Optional, Union
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from starlette.datastructures import Headers
+from starlette.middleware.cors import CORSMiddleware
 
 request_id_var: ContextVar[str] = ContextVar("request_id", default="-")
 client_ip_var: ContextVar[str | None] = ContextVar("client_ip", default=None)
@@ -284,6 +287,24 @@ class RequestObservabilityMiddleware:
                 client_ip_var.reset(ip_token)
                 user_agent_var.reset(agent_token)
                 request_audit_var.reset(audit_token)
+
+
+class AuditedCORSMiddleware(CORSMiddleware):
+    """CORS in front of the application. An allowed preflight is answered here; a refused
+    preflight is answered 403 through RequestObservabilityMiddleware, with a request id and a
+    denied api.request event."""
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope["method"] == "OPTIONS":
+            headers = Headers(scope=scope)
+            if "origin" in headers and "access-control-request-method" in headers:
+                response = self.preflight_response(request_headers=headers)
+                if response.status_code != HTTPStatus.OK:
+                    response.status_code = HTTPStatus.FORBIDDEN
+                    response = RequestObservabilityMiddleware(response)
+                await response(scope, receive, send)
+                return
+        await super().__call__(scope, receive, send)
 
 
 async def _record_request(

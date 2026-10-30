@@ -423,6 +423,26 @@ def test_a_cors_preflight_is_answered_by_the_cors_layer_alone(harness):
     assert _requests(session_maker, method="OPTIONS") == []
 
 
+def test_a_refused_cors_preflight_is_answered_403_and_recorded_as_denied(harness):
+    client, session_maker = harness
+
+    response = client.options(
+        "/api/projects",
+        headers={
+            "Origin": "https://foreign.example.com",
+            "Access-Control-Request-Method": "DELETE",
+        },
+    )
+
+    assert response.status_code == 403
+    assert "access-control-allow-origin" not in response.headers
+    event = _one(session_maker, response, method="OPTIONS", status=403)
+    assert event.outcome == "denied"
+    assert event.actor_type == "anonymous"
+    assert event.details["path"] == "/api/projects"
+    assert event.ip
+
+
 def test_a_request_from_a_foreign_origin_is_recorded_without_cors_permission(harness):
     client, session_maker = harness
 
