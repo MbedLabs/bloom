@@ -27,13 +27,13 @@ async def env():
     maker = async_sessionmaker(engine, expire_on_commit=False)
 
     async with maker() as setup:
-        project = Project(name="Alpha", prefix="ALP")
+        project = Project(name="Demo", prefix="PRJ")
         setup.add(project)
         await setup.flush()
         setup.add(
             Defect(
                 project_id=project.id,
-                defect_id="ALP-DEF-001",
+                defect_id="PRJ-DEF-001",
                 title="Broken login",
                 status="Open",
                 external_tracker="github",
@@ -44,7 +44,7 @@ async def env():
         setup.add(
             Defect(
                 project_id=project.id,
-                defect_id="ALP-DEF-002",
+                defect_id="PRJ-DEF-002",
                 title="GitLab defect",
                 status="Open",
                 external_tracker="gitlab",
@@ -184,7 +184,7 @@ async def test_github_webhook_accepts_valid_signature_and_syncs(env):
     )
     assert response.status_code == 200
     assert response.json()["status"] == "processed"
-    assert await _defect_status(maker, "ALP-DEF-001") == "Closed"
+    assert await _defect_status(maker, "PRJ-DEF-001") == "Closed"
 
     replay = client.post(
         "/api/integrations/github/webhook",
@@ -211,7 +211,7 @@ async def test_gitlab_webhook_rejects_missing_token(env):
         headers={"X-Gitlab-Event": "Issue Hook"},
     )
     assert response.status_code == 403
-    assert await _defect_status(maker, "ALP-DEF-002") == "Open"
+    assert await _defect_status(maker, "PRJ-DEF-002") == "Open"
 
 
 def test_gitlab_webhook_accepts_valid_token(env):
@@ -242,7 +242,7 @@ async def test_rejected_github_attempt_does_not_mutate_defect(env):
         headers={"X-GitHub-Event": "issues", "Content-Type": "application/json"},
     )
     assert response.status_code == 403
-    assert await _defect_status(maker, "ALP-DEF-001") == "Open"
+    assert await _defect_status(maker, "PRJ-DEF-001") == "Open"
 
     async with maker() as session:
         events = (await session.execute(select(DefectSyncEvent))).scalars().all()

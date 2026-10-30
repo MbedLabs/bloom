@@ -108,13 +108,13 @@ async def db():
         await conn.run_sync(Base.metadata.create_all)
     maker = async_sessionmaker(engine, expire_on_commit=False)
     async with maker() as session:
-        project = Project(name="Alpha", prefix="ALP")
+        project = Project(name="Demo", prefix="PRJ")
         session.add(project)
         admin = User(email="a@x.test", full_name="Ada", hashed_password="x", role=UserRole.admin)
         session.add(admin)
         await session.flush()
         document = Document(
-            project_id=project.id, doc_id="ALP-SPEC-001", title="Spec", doc_type="SPEC"
+            project_id=project.id, doc_id="PRJ-SPEC-001", title="Spec", doc_type="SPEC"
         )
         session.add(document)
         await session.flush()

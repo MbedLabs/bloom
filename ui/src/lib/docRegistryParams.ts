@@ -112,6 +112,7 @@ const TYPE_LIST_LABELS: Record<DocType, string> = {
   PRT: 'Protocols',
   RPT: 'Reports',
   STD: 'Standards',
+  VIS: 'Visions',
 }
 
 export function docRegistryListLabel(docType?: DocType): string {

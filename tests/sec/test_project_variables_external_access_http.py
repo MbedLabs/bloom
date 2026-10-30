@@ -100,7 +100,7 @@ async def _seed_project_variables_data(session_maker: async_sessionmaker[AsyncSe
         session.add_all([external, maintainer])
         await session.flush()
 
-        project = Project(name="Project Variables", prefix="PRV", description="Variables")
+        project = Project(name="Demo", prefix="PRJ", description="Variables")
         session.add(project)
         await session.flush()
 

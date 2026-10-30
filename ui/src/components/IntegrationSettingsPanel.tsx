@@ -1,12 +1,18 @@
 import { PRODUCT_NAME } from '../brandAssets'
 import SelectField from './SelectField'
 import { refreshProjectViews } from '../lib/refreshProjectViews'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { GitBranch } from 'lucide-react'
 
-import { extractApiErrorMessage, integrationsApi, type JiraPullResult } from '../api/client'
+import {
+  extractApiErrorMessage,
+  integrationsApi,
+  type IntegrationSetting,
+  type JiraPullResult,
+} from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
+import { formatDateTime } from '../test/date-utils'
 import { useToast } from './useToast'
 
 export type TrackerChoice = 'none' | 'github' | 'gitlab' | 'jira'
@@ -51,12 +57,65 @@ function settingFor<T>(kind: TrackerChoice, rows: Readonly<Record<TrackerKind, T
   return kind === 'none' ? null : rows[kind]
 }
 
-/** The text next to the Jira pull button. */
+/** The text next to the Jira Sync now button. */
 function pullHint(dirty: boolean, pulled: JiraPullResult | null): string {
   if (dirty) return 'Save first; the pull uses the saved filter.'
   return pulled
-    ? `Found ${pulled.searched}: ${pulled.created} created, ${pulled.already_linked} already linked, ${pulled.skipped} skipped.`
-    : 'Creates the defects for issues that match the filter. Reads from Jira only.'
+    ? `Found ${pulled.searched}: ${pulled.created} created, ${pulled.updated} updated, ${pulled.removed} removed, ${pulled.already_linked} already linked, ${pulled.skipped} skipped.`
+    : 'Syncs with Jira now instead of waiting for the next automatic sync.'
+}
+
+/** True when a saved setting has what its tracker needs for the automatic sync. */
+function canSync(row: IntegrationSetting): boolean {
+  if (row.tracker === 'jira') {
+    return Boolean(row.base_url && row.account_email && row.has_token && row.jira_project_key)
+  }
+  return row.has_token
+}
+
+type SyncStatusKind = 'info' | 'failed' | 'synced'
+
+/** The automatic sync status of a saved setting: the first rule that matches decides. */
+function syncStatus(row: IntegrationSetting): { text: string; kind: SyncStatusKind } {
+  const minutes = row.auto_sync_minutes ?? 0
+  const every = `Syncs automatically every ${minutes} minutes.`
+  if (minutes === 0) return { text: 'Automatic sync is off on this server.', kind: 'info' }
+  if (!row.enabled) return { text: 'Enable the integration to sync it automatically.', kind: 'info' }
+  if (!canSync(row)) {
+    return {
+      text:
+        row.tracker === 'jira'
+          ? 'Automatic sync needs the site URL, account email, API token and Jira project key.'
+          : 'Automatic sync needs a token.',
+      kind: 'info',
+    }
+  }
+  if (row.sync_error) {
+    return {
+      text: `Last automatic sync failed ${formatDateTime(row.sync_checked_at)}: ${row.sync_error}`,
+      kind: 'failed',
+    }
+  }
+  if (!row.synced_at) return { text: `${every} Not synced yet.`, kind: 'info' }
+  return {
+    text: `${every} Last sync ${formatDateTime(row.sync_checked_at)}: ${row.sync_created ?? 0} created, ${row.sync_updated ?? 0} updated.`,
+    kind: 'synced',
+  }
+}
+
+/** The automatic sync status line of a saved setting, with the repositories it skipped. */
+function SyncStatus({ row }: Readonly<{ row: IntegrationSetting }>) {
+  const status = syncStatus(row)
+  return (
+    <div className="text-xs space-y-1" data-testid="sync-status">
+      <div className={status.kind === 'failed' ? 'text-destructive' : 'text-muted-foreground'}>
+        {status.text}
+      </div>
+      {status.kind === 'synced' && row.sync_warning && (
+        <div className="text-amber-700 dark:text-amber-400">Skipped: {row.sync_warning}</div>
+      )}
+    </div>
+  )
 }
 
 const inputClass = 'w-full px-3 py-1.5 text-sm bg-background border border-input rounded-md'
@@ -73,6 +132,7 @@ export default function IntegrationSettingsPanel({ projectId }: Readonly<{ proje
     queryKey: ['integrationSettings', projectId],
     queryFn: () => integrationsApi.listSettings(projectId),
     enabled: !!projectId,
+    refetchInterval: 60_000,
   })
 
   const githubSetting = useMemo(
@@ -142,8 +202,15 @@ export default function IntegrationSettingsPanel({ projectId }: Readonly<{ proje
     setDirty(true)
   }
 
+  const savedKey = useMemo(
+    () => (settings ? JSON.stringify(settings.map((s) => [s.id, s.tracker, s.updated_at])) : null),
+    [settings],
+  )
+  const loadedKey = useRef<string | null>(null)
+
   useEffect(() => {
-    if (!settings) return
+    if (!settings || savedKey === loadedKey.current) return
+    loadedKey.current = savedKey
     setChoice(activeFromServer)
     const cur = settingFor(activeFromServer, { github: githubSetting, gitlab: gitlabSetting, jira: jiraSetting })
     setBaseUrl(cur?.base_url ?? '')
@@ -153,7 +220,7 @@ export default function IntegrationSettingsPanel({ projectId }: Readonly<{ proje
     setEnabled(cur?.enabled ?? true)
     setError(null)
     setDirty(false)
-  }, [settings, activeFromServer, githubSetting, gitlabSetting, jiraSetting, loadJira])
+  }, [settings, savedKey, activeFromServer, githubSetting, gitlabSetting, jiraSetting, loadJira])
 
   const confirmRemove = (row: { has_token: boolean; has_webhook_secret: boolean; base_url: string | null }) => {
     const hasData = row.has_token || row.has_webhook_secret || (row.base_url && row.base_url.length > 0)
@@ -256,9 +323,9 @@ export default function IntegrationSettingsPanel({ projectId }: Readonly<{ proje
     onSuccess: (result) => {
       setPulled(result)
       refreshProjectViews(queryClient, { projectId })
-      toast.notify(`Pulled from Jira: ${result.created} defect(s) created`, 'success')
+      toast.notify(`Synced with Jira: ${result.created} created, ${result.updated} updated`, 'success')
     },
-    onError: (err: unknown) => toast.failed('Pulling from Jira', err),
+    onError: (err: unknown) => toast.failed('Syncing with Jira', err),
   })
 
   const webhookPath = choice === 'none' ? null : WEBHOOK_PATHS[choice]
@@ -414,6 +481,7 @@ export default function IntegrationSettingsPanel({ projectId }: Readonly<{ proje
                   Inbound webhook: <code className="font-mono text-foreground">{webhookPath}</code>
                 </div>
               )}
+              {currentRow && <SyncStatus row={currentRow} />}
               {choice === 'jira' && jiraSetting && (
                 <div className="flex flex-wrap items-center gap-3">
                   <button
@@ -422,7 +490,7 @@ export default function IntegrationSettingsPanel({ projectId }: Readonly<{ proje
                     disabled={pullMutation.isPending || dirty}
                     className="text-sm px-3 py-1.5 rounded-md border border-border hover:bg-accent disabled:opacity-50"
                   >
-                    {pullMutation.isPending ? 'Pulling...' : 'Pull existing issues'}
+                    {pullMutation.isPending ? 'Syncing...' : 'Sync now'}
                   </button>
                   <span className="text-xs text-muted-foreground">
                     {pullHint(dirty, pulled)}

@@ -32,8 +32,8 @@ async def session():
 
 async def _setup(db, role=UserRole.maintainer):
     user = User(email="user@example.com", full_name="User", hashed_password="x", role=role)
-    project = Project(name="Project", prefix="PRJ")
-    other = Project(name="Other", prefix="OTH")
+    project = Project(name="Demo", prefix="PRJ")
+    other = Project(name="ABC", prefix="ABC")
     db.add_all([user, project, other])
     await db.flush()
     return user, project, other

@@ -83,7 +83,7 @@ def test_text_before_the_first_row_becomes_a_step():
 
 def _case(**overrides):
     base = dict(
-        tc_id="ALP-TC-001",
+        tc_id="PRJ-TC-001",
         title="Boot within budget",
         status="Approved",
         visibility="internal",
@@ -98,12 +98,12 @@ def _case(**overrides):
     return SimpleNamespace(**base)
 
 
-PROJECT = SimpleNamespace(name="Alpha", prefix="ALP")
+PROJECT = SimpleNamespace(name="Demo", prefix="PRJ")
 
 
 def test_xml_export_reimports_the_same_rows():
     rows = _import_rows_from_xml(_test_cases_xml(PROJECT, [_case()]))
-    assert rows[0]["tc_id"] == "ALP-TC-001"
+    assert rows[0]["tc_id"] == "PRJ-TC-001"
     assert _fields(text_to_rows(rows[0]["steps"])) == _fields(EDITOR_ROWS)
 
 

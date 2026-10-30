@@ -102,7 +102,7 @@ async def _seed_artefact_visibility_data(session_maker: async_sessionmaker[Async
         session.add(external)
         await session.flush()
 
-        project = Project(name="Artefact Visibility", prefix="ARV", description="Visibility")
+        project = Project(name="Demo", prefix="PRJ", description="Visibility")
         session.add(project)
         await session.flush()
 
@@ -120,7 +120,7 @@ async def _seed_artefact_visibility_data(session_maker: async_sessionmaker[Async
 
         customer_requirement = Requirement(
             project_id=project.id,
-            req_id="ARV-REQ-001",
+            req_id="PRJ-REQ-001",
             title="Customer requirement",
             status="Draft",
             visibility="customer",
@@ -130,7 +130,7 @@ async def _seed_artefact_visibility_data(session_maker: async_sessionmaker[Async
         )
         internal_requirement = Requirement(
             project_id=project.id,
-            req_id="ARV-REQ-002",
+            req_id="PRJ-REQ-002",
             title="Internal requirement",
             status="Draft",
             visibility="internal",

@@ -1,4 +1,5 @@
-import { Link, useParams } from 'react-router'
+import { useEffect } from 'react'
+import { Link, useNavigate, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { docsApi } from '../api/client'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
@@ -10,9 +11,12 @@ import CampaignDetail from './CampaignDetail'
 import SuiteDetail from './SuiteDetail'
 import AccessDenied from '../components/AccessDenied'
 import { docResourceType, isAccessDenied } from '../lib/accessDenied'
+import { docUrl, type DocType } from '../types/doc'
 
+/** One document of any kind by its address; an address that names it by its database id is replaced by the one with its document ID. */
 export default function UnifiedDocDetail() {
   const { prefix, kind, docId } = useParams<{ prefix: string; kind: string; docId: string }>()
+  const navigate = useNavigate()
   const { data: project, error: projectError } = useProjectByPrefix(prefix)
 
   const { data: doc, isLoading, error: docError } = useQuery({
@@ -21,8 +25,14 @@ export default function UnifiedDocDetail() {
     enabled: !!prefix && !!kind && !!docId,
   })
 
+  useEffect(() => {
+    if (doc && prefix && doc.doc_id && doc.doc_id !== docId) {
+      void navigate(docUrl(prefix, doc.doc_type as DocType, doc.doc_id), { replace: true })
+    }
+  }, [doc, docId, prefix, navigate])
+
   if (isAccessDenied(docError) || isAccessDenied(projectError)) {
-    return <AccessDenied resourceType={docResourceType(kind)} resourceRef={docId ?? ''} projectPrefix={prefix} />
+    return <AccessDenied resourceType={docResourceType(kind)} resourceRef={docId ?? ''} projectPrefix={prefix} error={projectError ?? docError} />
   }
 
   if (isLoading || !project) {
@@ -52,6 +62,7 @@ export default function UnifiedDocDetail() {
     case 'PRT':
     case 'RPT':
     case 'STD':
+    case 'VIS':
       return <DocumentDetail resolvedId={doc.id} allowedActions={doc.allowed_actions} />
     case 'DES':
       return <ArtefactDetail kind="design" resolvedId={doc.id} allowedActions={doc.allowed_actions} />

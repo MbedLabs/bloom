@@ -29,7 +29,7 @@ export default function SuiteDetail({
   resolvedId,
   allowedActions,
 }: { resolvedId?: number; allowedActions?: string[] } = {}) {
-  const { prefix, suiteId } = useParams<{ prefix: string; suiteId: string }>()
+  const { prefix, suiteId, docId } = useParams<{ prefix: string; suiteId: string; docId: string }>()
   const { can } = useProjectPermissions(prefix)
   const canEditDocs = can('edit', 'TS')
   const { user } = useAuth()
@@ -116,8 +116,8 @@ export default function SuiteDetail({
       refreshProjectViews(queryClient, { prefix, projectId })
       void queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
       toast.notify('Campaign scope created', 'success')
-      void navigate(`/projects/${prefix}/campaigns/${campaign.id}`, {
-        state: { returnTo: `/projects/${prefix}/suites/${suiteId}` },
+      void navigate(docUrl(prefix, 'CMP', campaign.campaign_id ?? String(campaign.id)), {
+        state: { returnTo: location.pathname },
       })
     },
     onError: (err: unknown) => {
@@ -188,7 +188,7 @@ export default function SuiteDetail({
   }
 
   if (isAccessDenied(suiteError)) {
-    return <AccessDenied resourceType="test-suite" resourceRef={suiteId ?? ''} projectPrefix={prefix} />
+    return <AccessDenied resourceType="test-suite" resourceRef={docId ?? suiteId ?? ''} projectPrefix={prefix} error={suiteError} />
   }
 
   if (!suite) {

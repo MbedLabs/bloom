@@ -12,6 +12,7 @@ const SERVER_ASSIGNED_CREATE_TYPES = new Set<DocType>([
   'PRT',
   'RPT',
   'STD',
+  'VIS',
 ])
 
 export function isServerAssignedDocIdOnCreate(docType: DocType): boolean {

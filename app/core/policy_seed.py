@@ -24,6 +24,7 @@ DOCUMENT_POLICIES = (
     ("Defects", "DEF"),
     ("Protocols", "PRT"),
     ("Reports", "RPT"),
+    ("Visions", "VIS"),
 )
 
 
@@ -89,6 +90,7 @@ DEFAULT_GROUPS = [
             READ_CUSTOMER,
             "Requirements",
             "Specifications",
+            "Visions",
             "Standards",
             "Risks",
             "Change Requests",

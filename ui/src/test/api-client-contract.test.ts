@@ -56,7 +56,7 @@ const BODY = {
   id: 1,
   items: [],
   total: 0,
-  next_id: 'VCU-REQ-007',
+  next_id: 'PRJ-REQ-007',
   unread: 3,
   access_token: 'new-access-token',
   user: { id: 1, email: 'u@example.com' },
@@ -109,6 +109,7 @@ const CALLS: Array<[string, unknown[], string, string]> = [
   ['usersApi.list', [], 'get', '/users'],
   ['usersApi.listMentionable', [5], 'get', '/users/mentionable'],
   ['usersApi.get', [3], 'get', '/users/3'],
+  ['usersApi.accessSummary', [3], 'get', '/users/3/access-summary'],
   ['usersApi.applicationPolicies', [3], 'get', '/users/3/application-policies'],
   ['usersApi.setApplicationPolicies', [3, [1, 2]], 'put', '/users/3/application-policies'],
   [
@@ -128,8 +129,8 @@ const CALLS: Array<[string, unknown[], string, string]> = [
 
   ['projectsApi.list', [], 'get', '/projects'],
   ['projectsApi.get', [5], 'get', '/projects/5'],
-  ['projectsApi.getByPrefix', ['VCU'], 'get', '/projects/by-prefix/VCU'],
-  ['projectsApi.create', [{ name: 'P', prefix: 'VCU' }], 'post', '/projects'],
+  ['projectsApi.getByPrefix', ['PRJ'], 'get', '/projects/by-prefix/PRJ'],
+  ['projectsApi.create', [{ name: 'Demo', prefix: 'PRJ' }], 'post', '/projects'],
   ['projectsApi.update', [5, { name: 'P2' }], 'patch', '/projects/5'],
   ['projectsApi.delete', [5], 'delete', '/projects/5'],
 
@@ -151,10 +152,10 @@ const CALLS: Array<[string, unknown[], string, string]> = [
   ['attachmentsApi.download', [3, 'r.pdf'], 'get', '/attachments/3/download'],
   ['attachmentsApi.remove', [3], 'delete', '/attachments/3'],
 
-  ['docsApi.nextDocId', ['VCU', 'REQ'], 'get', '/projects/VCU/next-doc-id/REQ'],
-  ['docsApi.list', ['VCU'], 'get', '/projects/VCU/docs'],
-  ['docsApi.typeSummary', ['VCU'], 'get', '/projects/VCU/doc-type-summary'],
-  ['docsApi.get', ['VCU', 'REQ', 'VCU-REQ-001'], 'get', '/projects/VCU/docs/requirements/VCU-REQ-001'],
+  ['docsApi.nextDocId', ['PRJ', 'REQ'], 'get', '/projects/PRJ/next-doc-id/REQ'],
+  ['docsApi.list', ['PRJ'], 'get', '/projects/PRJ/docs'],
+  ['docsApi.typeSummary', ['PRJ'], 'get', '/projects/PRJ/doc-type-summary'],
+  ['docsApi.get', ['PRJ', 'REQ', 'PRJ-REQ-001'], 'get', '/projects/PRJ/docs/requirements/PRJ-REQ-001'],
 
   ['requirementsApi.list', [5], 'get', '/requirements'],
   ['requirementsApi.get', [11], 'get', '/requirements/11'],
@@ -326,6 +327,8 @@ const CALLS: Array<[string, unknown[], string, string]> = [
 
   ['artefactsApi.listComments', ['requirement', 11], 'get', '/artefacts/requirement/11/comments'],
   ['artefactsApi.createComment', ['requirement', 11, 'hi'], 'post', '/artefacts/requirement/11/comments'],
+  ['artefactsApi.resolveComment', ['requirement', 11, 5], 'post', '/artefacts/requirement/11/comments/5/resolve'],
+  ['artefactsApi.reopenComment', ['requirement', 11, 5], 'post', '/artefacts/requirement/11/comments/5/reopen'],
   ['artefactsApi.listActivity', ['requirement', 11], 'get', '/artefacts/requirement/11/activity'],
   ['artefactsApi.getRelated', ['requirement', 11], 'get', '/artefacts/requirement/11/related'],
   ['artefactsApi.transition', ['requirement', 11, 'Approved'], 'post', '/artefacts/requirement/11/transition'],
@@ -343,8 +346,8 @@ const CALLS: Array<[string, unknown[], string, string]> = [
   ['artefactTagsApi.set', ['requirement', 9, [4]], 'put', '/artefacts/requirement/9/tags'],
 
   ['auditApi.list', [{ action: 'auth.' }], 'get', '/audit'],
-  ['accessRequestsApi.create', [{ resource_type: 'requirement', resource_ref: 'APO-REQ-001' }], 'post', '/access-requests'],
-  ['accessRequestsApi.mine', [{ resource_type: 'requirement', resource_ref: 'APO-REQ-001' }], 'get', '/access-requests/mine'],
+  ['accessRequestsApi.create', [{ resource_type: 'requirement', resource_ref: 'ABC-REQ-001' }], 'post', '/access-requests'],
+  ['accessRequestsApi.mine', [{ resource_type: 'requirement', resource_ref: 'ABC-REQ-001' }], 'get', '/access-requests/mine'],
   ['accessRequestsApi.list', [], 'get', '/access-requests'],
   ['accessRequestsApi.decide', [3, 'granted'], 'post', '/access-requests/3/decision'],
   ['groupsApi.list', [], 'get', '/groups'],
@@ -417,8 +420,8 @@ describe('responses are unwrapped', () => {
   })
 
   it('nextDocId returns the identifier itself', async () => {
-    nextResponse = { status: 200, data: { next_id: 'VCU-REQ-007' }, headers: {} }
-    await expect(client.docsApi.nextDocId('VCU', 'REQ')).resolves.toBe('VCU-REQ-007')
+    nextResponse = { status: 200, data: { next_id: 'PRJ-REQ-007' }, headers: {} }
+    await expect(client.docsApi.nextDocId('PRJ', 'REQ')).resolves.toBe('PRJ-REQ-007')
   })
 
   it('unreadCount returns the count itself', async () => {
@@ -461,7 +464,7 @@ describe('query parameters', () => {
   })
 
   it('builds the document registry filter into the path', async () => {
-    await client.docsApi.list('VCU', {
+    await client.docsApi.list('PRJ', {
       type: ['requirements', 'test-cases'],
       status: ['Approved', 'Released'],
       q: 'boot',
@@ -474,7 +477,7 @@ describe('query parameters', () => {
       updatedTo: '2026-07-31',
       sort: 'doc_id',
       dir: 'asc',
-      relatedTo: 'VCU-REQ-001',
+      relatedTo: 'PRJ-REQ-001',
       role: 'verifies',
       direction: 'incoming',
       includeLinkCounts: true,
@@ -494,7 +497,7 @@ describe('query parameters', () => {
     expect(url).toContain('updated_to=2026-07-31')
     expect(url).toContain('sort=doc_id')
     expect(url).toContain('dir=asc')
-    expect(url).toContain('related_to=VCU-REQ-001')
+    expect(url).toContain('related_to=PRJ-REQ-001')
     expect(url).toContain('role=verifies')
     expect(url).toContain('direction=incoming')
     expect(url).toContain('include_link_counts=true')
@@ -504,13 +507,13 @@ describe('query parameters', () => {
 
   it('asks for the type summary rather than every document', async () => {
     nextResponse = { status: 200, data: { types: [], total: 0 }, headers: {} }
-    await client.docsApi.typeSummary('VCU')
-    expect(requests[0].url).toBe('/projects/VCU/doc-type-summary')
+    await client.docsApi.typeSummary('PRJ')
+    expect(requests[0].url).toBe('/projects/PRJ/doc-type-summary')
   })
 
   it('omits the registry query string when there is nothing to filter', async () => {
-    await client.docsApi.list('VCU')
-    expect(requests[0].url).toBe('/projects/VCU/docs')
+    await client.docsApi.list('PRJ')
+    expect(requests[0].url).toBe('/projects/PRJ/docs')
   })
 
   it('carries traceability filters', async () => {
@@ -601,12 +604,12 @@ describe('workflow command payloads', () => {
 
 describe('resolving a document kind', () => {
   it('accepts a type code and converts it to the registry slug', async () => {
-    await client.docsApi.get('VCU', 'TC', 'VCU-TC-001')
-    expect(requests[0].url).toBe('/projects/VCU/docs/test-cases/VCU-TC-001')
+    await client.docsApi.get('PRJ', 'TC', 'PRJ-TC-001')
+    expect(requests[0].url).toBe('/projects/PRJ/docs/test-cases/PRJ-TC-001')
   })
 
   it('passes an already-slugged kind through unchanged', async () => {
-    await client.docsApi.get('VCU', 'test-cases', 'VCU-TC-001')
-    expect(requests[0].url).toBe('/projects/VCU/docs/test-cases/VCU-TC-001')
+    await client.docsApi.get('PRJ', 'test-cases', 'PRJ-TC-001')
+    expect(requests[0].url).toBe('/projects/PRJ/docs/test-cases/PRJ-TC-001')
   })
 })

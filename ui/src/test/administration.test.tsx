@@ -597,8 +597,8 @@ describe('the project list', () => {
   const other = {
     ...project,
     id: 2,
-    name: 'Battery Management',
-    prefix: 'BMS',
+    name: 'Second Demo',
+    prefix: 'ABC',
     description: null,
     coverage_percent: 91,
   }
@@ -621,7 +621,7 @@ describe('the project list', () => {
     await screen.findByText(project.name)
 
     fireEvent.change(screen.getByPlaceholderText('Search projects...'), {
-      target: { value: 'battery' },
+      target: { value: 'second' },
     })
 
     expect(screen.getByText(other.name)).toBeTruthy()
@@ -633,7 +633,7 @@ describe('the project list', () => {
     await screen.findByText(project.name)
 
     fireEvent.change(screen.getByPlaceholderText('Search projects...'), {
-      target: { value: 'vcu' },
+      target: { value: 'prj' },
     })
 
     expect(screen.getByText(project.name)).toBeTruthy()
@@ -743,14 +743,14 @@ describe('creating a project', () => {
 
   it('upper-cases the prefix as it is typed', async () => {
     const form = await openForm()
-    fireEvent.change(form.prefix, { target: { value: 'bms' } })
+    fireEvent.change(form.prefix, { target: { value: 'abc' } })
 
-    expect((form.prefix as HTMLInputElement).value).toBe('BMS')
+    expect((form.prefix as HTMLInputElement).value).toBe('ABC')
   })
 
   it('will not send a prefix that is not three letters', async () => {
     const form = await openForm()
-    fireEvent.change(form.name, { target: { value: 'Battery Management' } })
+    fireEvent.change(form.name, { target: { value: 'ABC' } })
 
     for (const bad of ['BM', 'B1']) {
       fireEvent.change(form.prefix, { target: { value: bad } })
@@ -765,8 +765,8 @@ describe('creating a project', () => {
 
   it('sends the name, prefix and description', async () => {
     const form = await openForm()
-    fireEvent.change(form.name, { target: { value: 'Battery Management' } })
-    fireEvent.change(form.prefix, { target: { value: 'bms' } })
+    fireEvent.change(form.name, { target: { value: 'ABC' } })
+    fireEvent.change(form.prefix, { target: { value: 'abc' } })
     fireEvent.change(screen.getByPlaceholderText('Project description...'), {
       target: { value: 'Cells and contactors' },
     })
@@ -774,8 +774,8 @@ describe('creating a project', () => {
 
     await waitFor(() =>
       expect(lastCall(client.projectsApi.create)[0]).toEqual({
-        name: 'Battery Management',
-        prefix: 'BMS',
+        name: 'ABC',
+        prefix: 'ABC',
         description: 'Cells and contactors',
       }),
     )
@@ -783,8 +783,8 @@ describe('creating a project', () => {
 
   it('omits an empty description rather than sending a blank one', async () => {
     const form = await openForm()
-    fireEvent.change(form.name, { target: { value: 'Battery Management' } })
-    fireEvent.change(form.prefix, { target: { value: 'BMS' } })
+    fireEvent.change(form.name, { target: { value: 'ABC' } })
+    fireEvent.change(form.prefix, { target: { value: 'ABC' } })
     fireEvent.click(form.submit)
 
     await waitFor(() =>
@@ -794,11 +794,11 @@ describe('creating a project', () => {
 
   it('shows the server’s refusal in the form', async () => {
     vi.mocked(client.projectsApi.create).mockRejectedValueOnce(
-      apiError('A project with prefix BMS already exists'),
+      apiError('A project with prefix ABC already exists'),
     )
     const form = await openForm()
-    fireEvent.change(form.name, { target: { value: 'Battery Management' } })
-    fireEvent.change(form.prefix, { target: { value: 'BMS' } })
+    fireEvent.change(form.name, { target: { value: 'ABC' } })
+    fireEvent.change(form.prefix, { target: { value: 'ABC' } })
     fireEvent.click(form.submit)
 
     expect((await screen.findAllByText(/already exists/i)).length).toBeGreaterThan(0)
@@ -807,7 +807,7 @@ describe('creating a project', () => {
 
   it('forgets what was typed when the form is cancelled', async () => {
     const form = await openForm()
-    fireEvent.change(form.name, { target: { value: 'Battery Management' } })
+    fireEvent.change(form.name, { target: { value: 'ABC' } })
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
 
     await waitFor(() => expect(screen.queryByPlaceholderText('My Project')).toBeNull())
@@ -819,7 +819,7 @@ describe('creating a project', () => {
 })
 
 describe('project parameters', () => {
-  function renderParameters(prefix = 'VCU') {
+  function renderParameters(prefix = 'PRJ') {
     return renderAt(
       '/projects/:prefix/parameters',
       `/projects/${prefix}/parameters`,

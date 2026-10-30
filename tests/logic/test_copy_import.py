@@ -18,14 +18,14 @@ async def projects():
         await conn.run_sync(Base.metadata.create_all)
     maker = async_sessionmaker(engine, expire_on_commit=False)
     async with maker() as db:
-        source = Project(name="Source", prefix="SRC")
-        target = Project(name="Target", prefix="DST")
+        source = Project(name="Demo", prefix="PRJ")
+        target = Project(name="ABC", prefix="ABC")
         db.add_all([source, target])
         await db.flush()
         db.add(
             Requirement(
                 project_id=source.id,
-                req_id="SRC-REQ-001",
+                req_id="PRJ-REQ-001",
                 title="Boot",
                 description="Boots fast",
                 content_json={"k": 1},
@@ -39,14 +39,14 @@ async def projects():
         db.add(
             TestCaseModel(
                 project_id=source.id,
-                tc_id="SRC-TC-001",
+                tc_id="PRJ-TC-001",
                 title="Boot test",
                 status="Approved",
                 preconditions="Powered",
                 steps=[{"action": "Power on"}],
             )
         )
-        db.add(Requirement(project_id=target.id, req_id="DST-REQ-007", title="Existing"))
+        db.add(Requirement(project_id=target.id, req_id="ABC-REQ-007", title="Existing"))
         await db.commit()
         yield db, source, target
     await engine.dispose()
@@ -72,10 +72,10 @@ async def test_requirements_are_copied_as_drafts_after_the_highest_id(projects):
 
     await _import_docs(db, _admin(), "REQ", source_ids + [99999], source, target, result)
 
-    assert (result.imported, result.skipped, result.new_ids) == (1, 1, ["DST-REQ-008"])
+    assert (result.imported, result.skipped, result.new_ids) == (1, 1, ["ABC-REQ-008"])
     assert result.errors == ["Requirement 99999 not found in source project"]
     copy = (
-        await db.execute(select(Requirement).where(Requirement.req_id == "DST-REQ-008"))
+        await db.execute(select(Requirement).where(Requirement.req_id == "ABC-REQ-008"))
     ).scalar_one()
     assert (copy.title, copy.description, copy.priority, copy.req_type, copy.req_origin) == (
         "Boot",
@@ -86,7 +86,7 @@ async def test_requirements_are_copied_as_drafts_after_the_highest_id(projects):
     )
     assert (copy.status, copy.source_ref, copy.source_project_id) == (
         "Draft",
-        "SRC-REQ-001",
+        "PRJ-REQ-001",
         source.id,
     )
     assert await _next_number(db, target.id, target.prefix, "REQ") == 9
@@ -104,13 +104,13 @@ async def test_test_cases_keep_their_steps_and_preconditions(projects):
 
     await _import_docs(db, _admin(), "TC", source_ids, source, target, result)
 
-    assert result.new_ids == ["DST-TC-001"]
+    assert result.new_ids == ["ABC-TC-001"]
     copy = (
-        await db.execute(select(TestCaseModel).where(TestCaseModel.tc_id == "DST-TC-001"))
+        await db.execute(select(TestCaseModel).where(TestCaseModel.tc_id == "ABC-TC-001"))
     ).scalar_one()
     assert (copy.preconditions, copy.steps, copy.status, copy.source_ref) == (
         "Powered",
         [{"action": "Power on"}],
         "Draft",
-        "SRC-TC-001",
+        "PRJ-TC-001",
     )

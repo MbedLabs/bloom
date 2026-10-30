@@ -3,7 +3,7 @@ import { Suspense, useState, useEffect, useMemo, useRef } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { APP_VERSION, notificationsApi, projectsApi, searchApi } from '../api/client'
-import { docRegistryListUrl, syncRegistryProjectContext } from '../lib/docRegistryParams'
+import { docRegistryListLabel, docRegistryListUrl, syncRegistryProjectContext } from '../lib/docRegistryParams'
 import { searchResultUrl } from '../lib/searchLinks'
 import { getBudAppBaseUrl } from '../lib/budLinks'
 import { getBreadcrumbs } from '../lib/breadcrumbs'
@@ -17,7 +17,7 @@ import {
   LayoutDashboard, FolderKanban, FileText, CheckSquare,
   GitBranch, BarChart3, Sun, Moon, Bell,
   ExternalLink, ChevronDown, ChevronLeft, ChevronRight, Search,
-  BookOpen, Bug, Layers, FlaskConical, LogOut, Users, PenTool, AlertTriangle, GitPullRequest, Settings, SlidersHorizontal, ShieldCheck, ScrollText,
+  BookOpen, Bug, Layers, FlaskConical, LogOut, Users, PenTool, AlertTriangle, GitPullRequest, Settings, SlidersHorizontal, ShieldCheck, ScrollText, Lightbulb,
 } from 'lucide-react'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
 import { useDarkMode } from '../hooks/useDarkMode'
@@ -35,18 +35,19 @@ const mainNav = [
 
 const projectNav = [
   { name: 'Documents', icon: BookOpen, tab: '', href: 'docs' as const },
-  { name: 'Requirements', icon: FileText, tab: '', href: 'docs' as const, filter: 'type:REQ' },
-  { name: 'Test Cases', icon: CheckSquare, tab: '', href: 'docs' as const, filter: 'type:TC' },
-  { name: 'Specifications', icon: FileText, tab: '', href: 'docs' as const, filter: 'type:SPEC' },
-  { name: 'Protocols', icon: BookOpen, tab: '', href: 'docs' as const, filter: 'type:PRT' },
-  { name: 'Reports', icon: Layers, tab: '', href: 'docs' as const, filter: 'type:RPT' },
-  { name: 'Standards', icon: BookOpen, tab: '', href: 'docs' as const, filter: 'type:STD' },
-  { name: 'Design', icon: PenTool, tab: '', href: 'docs' as const, filter: 'type:DES' },
-  { name: 'Risks', icon: AlertTriangle, tab: '', href: 'docs' as const, filter: 'type:RSK' },
-  { name: 'Changes', icon: GitPullRequest, tab: '', href: 'docs' as const, filter: 'type:CHG' },
-  { name: 'Test Concepts', icon: Beaker, tab: '', href: 'docs' as const, filter: 'type:CPT' },
-  { name: 'Defects', icon: Bug, tab: '', href: 'docs' as const, filter: 'type:DEF' },
-  { name: 'Test Campaigns', icon: FlaskConical, tab: '', href: 'docs' as const, filter: 'type:CMP' },
+  { name: docRegistryListLabel('VIS'), icon: Lightbulb, tab: '', href: 'docs' as const, filter: 'type:VIS' },
+  { name: docRegistryListLabel('REQ'), icon: FileText, tab: '', href: 'docs' as const, filter: 'type:REQ' },
+  { name: docRegistryListLabel('TC'), icon: CheckSquare, tab: '', href: 'docs' as const, filter: 'type:TC' },
+  { name: docRegistryListLabel('SPEC'), icon: FileText, tab: '', href: 'docs' as const, filter: 'type:SPEC' },
+  { name: docRegistryListLabel('PRT'), icon: BookOpen, tab: '', href: 'docs' as const, filter: 'type:PRT' },
+  { name: docRegistryListLabel('RPT'), icon: Layers, tab: '', href: 'docs' as const, filter: 'type:RPT' },
+  { name: docRegistryListLabel('STD'), icon: BookOpen, tab: '', href: 'docs' as const, filter: 'type:STD' },
+  { name: docRegistryListLabel('DES'), icon: PenTool, tab: '', href: 'docs' as const, filter: 'type:DES' },
+  { name: docRegistryListLabel('RSK'), icon: AlertTriangle, tab: '', href: 'docs' as const, filter: 'type:RSK' },
+  { name: docRegistryListLabel('CHG'), icon: GitPullRequest, tab: '', href: 'docs' as const, filter: 'type:CHG' },
+  { name: docRegistryListLabel('CPT'), icon: Beaker, tab: '', href: 'docs' as const, filter: 'type:CPT' },
+  { name: docRegistryListLabel('DEF'), icon: Bug, tab: '', href: 'docs' as const, filter: 'type:DEF' },
+  { name: docRegistryListLabel('CMP'), icon: FlaskConical, tab: '', href: 'docs' as const, filter: 'type:CMP' },
   { name: 'Traceability', icon: GitBranch, tab: '', href: 'traceability' as const },
   { name: 'Parameters', icon: SlidersHorizontal, tab: '', href: 'parameters' as const },
 ]

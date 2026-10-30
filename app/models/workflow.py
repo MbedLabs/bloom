@@ -24,7 +24,8 @@ USERS_ID = "users.id"
 
 
 class ArtefactWorkflow(Base):
-    """Current controlled revision and equivalent reviewer assignments for an artefact."""
+    """Current controlled revision, its assignee and equivalent reviewer assignments for an
+    artefact."""
 
     __tablename__ = "artefact_workflows"
     __table_args__ = (
@@ -43,6 +44,9 @@ class ArtefactWorkflow(Base):
     artefact_id: Mapped[int] = mapped_column(Integer, nullable=False)
     revision_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     revision_creator_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey(USERS_ID, ondelete=SET_NULL), nullable=True
+    )
+    assignee_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey(USERS_ID, ondelete=SET_NULL), nullable=True
     )
     phase: Mapped[str] = mapped_column(String(20), nullable=False, default="Draft")

@@ -60,7 +60,7 @@ async def test_concurrent_first_reads_share_one_workflow(monkeypatch):
                 role=UserRole.admin,
                 is_active=True,
             )
-            project = Project(name="Concurrency", prefix="PRJ")
+            project = Project(name="Demo", prefix="PRJ")
             db.add_all([user, project])
             await db.flush()
             row = Requirement(

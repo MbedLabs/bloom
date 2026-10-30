@@ -37,13 +37,13 @@ async def env(request):
     maker = async_sessionmaker(engine, expire_on_commit=False)
 
     async with maker() as setup:
-        project = Project(name="Alpha", prefix="ALP")
+        project = Project(name="Demo", prefix="PRJ")
         setup.add(project)
         await setup.flush()
         setup.add(
             Defect(
                 project_id=project.id,
-                defect_id="ALP-DEF-001",
+                defect_id="PRJ-DEF-001",
                 title="Broken login",
                 status="Open",
                 external_tracker="jira",
@@ -54,7 +54,7 @@ async def env(request):
         setup.add(
             ChangeRequest(
                 project_id=project.id,
-                change_id="ALP-CR-001",
+                change_id="PRJ-CR-001",
                 title="Swap the sensor",
                 status=getattr(request, "param", "Submitted"),
                 external_tracker="jira",
@@ -131,7 +131,7 @@ def _post(client, body: bytes, *, signature=None, delivery="d-1"):
 async def _defect_status(maker) -> str:
     async with maker() as session:
         row = (
-            await session.execute(select(Defect).where(Defect.defect_id == "ALP-DEF-001"))
+            await session.execute(select(Defect).where(Defect.defect_id == "PRJ-DEF-001"))
         ).scalar_one()
         return row.status
 
@@ -140,7 +140,7 @@ async def _change_status(maker) -> str:
     async with maker() as session:
         row = (
             await session.execute(
-                select(ChangeRequest).where(ChangeRequest.change_id == "ALP-CR-001")
+                select(ChangeRequest).where(ChangeRequest.change_id == "PRJ-CR-001")
             )
         ).scalar_one()
         return row.status
@@ -221,12 +221,37 @@ async def test_invalid_tracker_signature_cannot_close_legacy_change(env):
 
 
 @pytest.mark.asyncio
-async def test_status_category_maps_to_bloom_status(env):
+async def test_only_closing_and_reopening_change_the_bloom_status(env):
+    """Jira closes and reopens a defect; other Jira statuses leave the Bloom status."""
     client, maker = env
-    body = _payload("PROJ-42", category="indeterminate", status_name="In Review")
+    async with maker() as session:
+        row = (
+            await session.execute(select(Defect).where(Defect.defect_id == "PRJ-DEF-001"))
+        ).scalar_one()
+        row.status = "Verified"
+        await session.commit()
 
-    assert _post(client, body, signature=_sign(body)).status_code == 200
-    assert await _defect_status(maker) == "In Progress"
+    body = _payload("PROJ-42", category="indeterminate", status_name="In Review")
+    assert _post(client, body, signature=_sign(body), delivery="d-1").status_code == 200
+    assert await _defect_status(maker) == "Verified"
+
+    body = _payload("PROJ-42", category="done", status_name="Done")
+    assert _post(client, body, signature=_sign(body), delivery="d-2").status_code == 200
+    assert await _defect_status(maker) == "Closed"
+
+    body = _payload("PROJ-42", category="indeterminate", status_name="In Review")
+    assert _post(client, body, signature=_sign(body), delivery="d-3").status_code == 200
+    assert await _defect_status(maker) == "Open"
+
+    async with maker() as session:
+        row = (
+            await session.execute(select(Defect).where(Defect.defect_id == "PRJ-DEF-001"))
+        ).scalar_one()
+        row.status = "Closed"
+        await session.commit()
+    body = _payload("PROJ-42", category="indeterminate", status_name="In Review", summary="x")
+    assert _post(client, body, signature=_sign(body), delivery="d-4").status_code == 200
+    assert await _defect_status(maker) == "Closed"
 
 
 @pytest.mark.asyncio
@@ -238,7 +263,7 @@ async def test_replayed_delivery_is_ignored(env):
 
     async with maker() as session:
         row = (
-            await session.execute(select(Defect).where(Defect.defect_id == "ALP-DEF-001"))
+            await session.execute(select(Defect).where(Defect.defect_id == "PRJ-DEF-001"))
         ).scalar_one()
         row.status = "Open"
         await session.commit()
@@ -386,7 +411,7 @@ async def test_created_defect_copies_the_issue(env):
     client, maker = env
     await _map_project_for_creation(maker, create=True)
     async with maker() as session:
-        session.add(TestCaseModel(project_id=1, tc_id="ALP-TC-004", title="Boot"))
+        session.add(TestCaseModel(project_id=1, tc_id="PRJ-TC-004", title="Boot"))
         bot = User(
             email="Bot@Acme.test",
             full_name="Jira bot",
@@ -397,7 +422,7 @@ async def test_created_defect_copies_the_issue(env):
         await session.commit()
     description = {
         "type": "doc",
-        "content": [{"type": "paragraph", "content": [{"type": "text", "text": "See ALP-TC-004"}]}],
+        "content": [{"type": "paragraph", "content": [{"type": "text", "text": "See PRJ-TC-004"}]}],
     }
     body = _issue_payload("PROJ-600", description=description, priority={"name": "Highest"})
     assert (
@@ -408,7 +433,7 @@ async def test_created_defect_copies_the_issue(env):
             await session.execute(select(Defect).where(Defect.external_issue_number == 600))
         ).scalar_one()
         test_case = (await session.execute(select(TestCaseModel))).scalar_one()
-    assert defect.description == "See ALP-TC-004"
+    assert defect.description == "See PRJ-TC-004"
     assert (defect.priority, defect.severity) == ("Critical", "Critical")
     assert defect.external_issue_url == "https://acme.atlassian.net/browse/PROJ-600"
     assert (defect.source_type, defect.source_id) == ("TC", test_case.id)
@@ -533,9 +558,13 @@ def _search_transport(pages, seen, hosts=None):
     def handler(request):
         if request.url.path.endswith("/rest/api/3/myself"):
             return httpx.Response(200, json={"accountId": "acc"})
+        if request.method == "GET":
+            return httpx.Response(200, json={"fields": {}})
         if hosts is not None:
             hosts.append(str(request.url))
         seen.append(json.loads(request.content))
+        if len(seen) > len(pages):
+            return httpx.Response(200, json={"issues": [], "isLast": True})
         return httpx.Response(200, json=pages[len(seen) - 1])
 
     return httpx.MockTransport(handler)
@@ -578,7 +607,8 @@ async def test_pull_creates_the_missing_defects(env, monkeypatch):
         result = await integrations.pull_jira_issues(setting.id, db=session, current_user=admin)
         await session.commit()
     assert (result.searched, result.created, result.already_linked, result.skipped) == (4, 1, 1, 2)
-    assert result.new_ids == ["ALP-DEF-002"]
+    assert (result.updated, result.removed) == (0, 0)
+    assert result.new_ids == ["PRJ-DEF-002"]
     assert seen[0]["jql"] == (
         'project = "PROJ" AND issuetype in ("Bug") AND statusCategory != Done ORDER BY created ASC'
     )
@@ -694,9 +724,47 @@ async def test_a_scoped_token_is_used_through_the_atlassian_gateway(env, monkeyp
         site = setting.base_url.rstrip("/")
     assert result.created == 1
     search = [c for c in calls if c.endswith("/rest/api/3/search/jql")]
-    assert search == ["https://api.atlassian.com/ex/jira/cloud-1/rest/api/3/search/jql"]
+    assert search == ["https://api.atlassian.com/ex/jira/cloud-1/rest/api/3/search/jql"] * 2
     async with maker() as session:
         pulled = (
             await session.execute(select(Defect).where(Defect.external_issue_number == 800))
         ).scalar_one()
     assert pulled.external_issue_url == f"{site}/browse/PROJ-800"
+
+
+@pytest.mark.asyncio
+async def test_inbound_follows_a_defect_linked_while_it_waited_for_the_lock(env, monkeypatch):
+    """A defect created for the issue between the lookup and the lock is followed, not doubled."""
+    client, maker = env
+    await _map_project_for_creation(maker, create=True)
+    original = integrations._reserve_webhook_delivery
+
+    async def reserve_after_a_sync(db, setting, tracker, delivery_id):
+        async with maker() as other:
+            other.add(
+                Defect(
+                    project_id=setting.project_id,
+                    defect_id="PRJ-DEF-900",
+                    title="Synced first",
+                    status="Open",
+                    external_tracker="jira",
+                    external_repo_full_name="PROJ",
+                    external_issue_number=500,
+                )
+            )
+            await other.commit()
+        return await original(db, setting, tracker, delivery_id)
+
+    monkeypatch.setattr(integrations, "_reserve_webhook_delivery", reserve_after_a_sync)
+    body = _payload("PROJ-500", category="new", status_name="To Do", summary="Sensor fails")
+    response = _post(client, body, signature=_sign(body), delivery="race-1")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "processed"
+    async with maker() as session:
+        rows = (
+            (await session.execute(select(Defect).where(Defect.external_issue_number == 500)))
+            .scalars()
+            .all()
+        )
+    assert [row.title for row in rows] == ["Sensor fails"]

@@ -139,22 +139,23 @@ In Bloom, as an administrator, open the project settings, choose Jira under Exte
 issue tracker and fill in:
 
 - Site URL (`https://your-site.atlassian.net`).
-- Optionally, the account email and API token of a Jira account (created under
-  id.atlassian.com, Security, API tokens). They are needed only to migrate the issues
-  that are already open (Pull existing issues) and for two-way sync, and the email
-  also makes that Bloom user the reporter of the defects. Webhook deliveries need
-  neither. They are stored for this project only, encrypted. Both kinds of token work:
+- The account email and API token of a Jira account (created under
+  id.atlassian.com, Security, API tokens). The automatic sync, Sync now and two-way
+  sync need them, and the email also makes that Bloom user the reporter of the
+  defects. Webhook deliveries need neither. They are stored for this project only, encrypted. Both kinds of token work:
   a classic API token acts with the account's own Jira permissions; an API token with
   scopes needs `read:jira-work` and `read:jira-user`, plus `write:jira-work` for
   two-way sync, and Bloom calls Jira for it through Atlassian's API gateway for the
-  site. Bloom checks the credential before each pull or push and reports a token Jira
+  site. Bloom checks the credential before each sync or push and reports a token Jira
   does not accept.
 - Webhook secret: any long random string; the same value goes into Jira.
 - Jira project key, issue types (default `Bug`), and optionally a label, a custom field
-  that holds Bloom test-case ids, and extra JQL used by the pull.
+  that holds Bloom test-case ids, and extra JQL used by the sync.
 - The Jira priority to Bloom priority map.
 
-In Jira, as a site administrator, open Settings, System, WebHooks and create a webhook:
+The webhook is optional: the automatic sync below works without it. With a webhook,
+changes arrive within seconds. In Jira, as a site administrator, open Settings, System,
+WebHooks and create a webhook:
 
 - URL: `https://<bloom-host>/api/integrations/jira/webhook`
 - Secret: the webhook secret entered in Bloom. Jira signs each delivery with it and
@@ -171,16 +172,38 @@ What Bloom does with an event:
   the reference field becomes the defect's source.
   The defect's reporter is the Bloom user whose email is the integration's account
   email; with no such user it has no reporter.
-- Updated, for a linked issue: title, description, priority and state follow Jira; a
-  resolution closes the defect.
+- Updated, for a linked issue: title, description, priority and state follow Jira. A
+  resolution or a Done status closes the defect; a closed issue open again sets the
+  Closed defect to Open. Other Bloom statuses stay as set in Bloom. A change request
+  closes when its issue closes; the automatic sync closes only one still Submitted and
+  records the issue state on the others.
 - Deleted: the defect stays and its issue state reads `Removed in Jira`.
 - A delivery Jira retries with the same identifier is processed once.
 
-Pull existing issues, on the same panel, migrates the issues that were open before the
-webhook existed: it searches Jira once with the saved filter, skips the issues already
-in a Done status, and creates the defects that do not exist yet (at most 1000 issues per pull). It signs in with the account
-email and API token above, so it needs a Jira login that can browse the project, and
-it only reads from Jira.
+## Automatic tracker sync
+
+Bloom syncs every enabled tracker integration by itself, every
+`INTEGRATION_SYNC_MINUTES` minutes (default 15; `0` turns it off). It needs no
+webhook and no public URL. One replica syncs a given project at a time.
+
+- Jira, with the site URL, account email, API token and Jira project key set: the
+  first run, and the first run after each save of the integration, searches the
+  saved filter for every open matching issue (Done issues excluded) and creates the
+  defects that do not exist yet, when "Create a defect for each new matching issue"
+  is on. Later runs search only the issues changed since the last run. Linked defects
+  and change requests follow their issue as with a webhook update. Each run also
+  checks up to 50 linked issues for deletion; an issue Jira no longer returns reads
+  `Removed in Jira`.
+- GitHub and GitLab, with a token set: the state of the issues linked to defects and
+  change requests follows the tracker; a closed issue closes its defect, and a closed
+  issue open again sets the Closed defect to Open. Other Bloom statuses stay as set in Bloom. A repository
+  the token cannot read is skipped and named on the panel; a rate limit or an outage
+  fails the run, which is retried on the next interval.
+
+Searches return at most 1000 issues per run; a larger backlog continues on the next
+run. The tracker panel shows the last sync, its counts and its error. Sync now, on
+the Jira panel, runs the whole Jira sync at once and creates defects whether or not
+the inbound creation option is on. All of it only reads from the tracker.
 
 ## Object storage (S3)
 
@@ -212,15 +235,27 @@ Cloudron's backup.
 
 ## Audit log
 
-Security-relevant events are written to the `audit_events` table in the same transaction as the action: sign-in, sign-out, session refresh, password change and reset, email verification and email change; user creation, invitation, role change, activation, deletion; project members, external document types, groups, policies and artefact visibility; configuration changes; deletions, exports, imports and attachments. A failed sign-in or password reset is recorded even though the request itself fails. Each event carries the acting user or `anonymous`/`service`/`runner`, the action, the target, the request id (the `x-request-id` response header), the client address and user agent, the outcome and details without secrets.
+Every HTTP request is recorded in the `audit_events` table as one `api.request` event, written when the response is finished: every call from the browser, the CLI and MCP sign-in, service credentials and scripts, health probes and metrics scrapes included, and every refused attempt. A CORS preflight (`OPTIONS` with `Access-Control-Request-Method`) that the CORS settings allow is answered by the CORS layer in front of the audit and leaves no event; the request it precedes is recorded. A preflight the CORS settings refuse, from a foreign origin or asking for a method or header outside the allowed ones, is answered `403` and recorded as a `denied` event, which counts toward repeated refusals. The event names the actor (a user, `service` or `anonymous`; a deactivated user's refused request names that user), the request id, the client address and user agent, and holds in its details: `method`, `route` (the template, such as `/api/requirements/{requirement_id}`), `path`, `status`, `duration_ms`, `query` (the names of the query parameters, never their values), `auth` (`bearer` when a bearer token was presented, else `none`), `client` (`cli` for a CLI or MCP sign-in token, `web` for any other user session), `service_credential_id` for a service credential, and for a `201` answer `created_id` (the `id` of the answer, or its `document_id`) and `created_doc_id` (such as `PRJ-REQ-001`) of the created object. The target is the last path parameter ending in `_id` and the project the `project_id` path parameter. The outcome is `success` below `400`; `denied` for `401`, `403`, `429`, a `404` for something that exists but the caller may not see (an artefact, document, revision, link end or another user's notification), and any `404` answered to an anonymous caller, which counts toward repeated refusals (a path that matches no route checks no token and its caller is anonymous); a `404` to a signed-in user is otherwise `failure`; `failure` for any other status from `400`. No body, header value, query value, password or token is ever stored. A failure to write the event is logged and never changes the response.
 
-Administrators read the log under Audit log in the sidebar, or with `GET /api/audit` (filters: `actor_user_id`, `action` or an action prefix ending in `.`, `target_type`, `target_id`, `project_id`, `outcome`, `since`, `until`, `limit`, `offset`). No endpoint changes or deletes an event.
+When one client address has `AUDIT_REFUSAL_THRESHOLD` (default `20`) denied requests within `AUDIT_REFUSAL_WINDOW_MINUTES` (default `10`), one `security.repeated_refusals` event is written with the address, the count and the window, at most once per address per window.
 
-The client address is the one the image's own nginx received. Behind another reverse proxy (Cloudron, a load balancer) it is that proxy's address.
+Security-relevant events are also written as events of their own in the same transaction as the action: sign-in, sign-out, session refresh, password change and reset, email verification and email change; user creation, invitation, role change, activation, deletion; project members, external document types, groups, policies and artefact visibility; configuration changes; deletions, exports, imports and attachments. A failed sign-in or password reset is recorded even though the request itself fails. Each event carries the acting user or `anonymous`/`service`/`runner`, the action, the target, the request id (the `x-request-id` response header), the client address and user agent, the outcome and details without secrets.
 
-Access requests are emailed to every active administrator through the transactional mail settings above; without SMTP the request is still recorded and shown under Access, Requests and on the project's members page, and the user is told the email could not be sent.
+Administrators read the log under Audit log in the sidebar, or with `GET /api/audit` (filters: `actor_user_id`, `actor_type`, `action` or an action prefix ending in `.` such as `api.`, `target_type`, `target_id`, `project_id`, `outcome`, `ip`, `request_id`, `status` (the HTTP status of an `api.request` event), `since`, `until`, `limit`, `offset`). No endpoint changes or deletes an event.
 
-Retention is the operator's choice. The application never deletes events; to remove old ones, run on a schedule:
+The client address is the one the image's own nginx received, unless `TRUSTED_PROXY_NETWORKS` names the reverse proxy in front of it. `TRUSTED_PROXY_NETWORKS` is a JSON array of addresses or networks in CIDR notation and is empty by default: no `X-Forwarded-For` header is read, and behind a reverse proxy (Cloudron, an ingress, a load balancer) every request has that proxy's address. When the address that reached the image's nginx lies in a listed network, the client address is the right-most `X-Forwarded-For` entry outside the listed networks, so the proxy must put the address it received as the right-most `X-Forwarded-For` entry (in nginx, `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`). A header sent from any other address is ignored, so a caller cannot choose the address recorded for it. Every audit event, the repeated refusal check and the per-address rate limits (sign-in, session refresh, resending the verification email, password reset requests, the CLI and MCP sign-in endpoints and first-run setup) use this address, so behind a listed proxy each caller has limits of its own. An entry that is not an address or network stops Bloom at startup. Leave uvicorn's own `FORWARDED_ALLOW_IPS` variable unset in the image: uvicorn then trusts only the image's nginx on `127.0.0.1`.
+
+Example, a reverse proxy on a private network in front of the image:
+
+```
+TRUSTED_PROXY_NETWORKS=["10.0.0.0/8"]
+```
+
+List only networks from which nothing but your proxies reaches the image. On Cloudron the variable is set with `cloudron env set`.
+
+Access requests are emailed to every active administrator other than the requester through the transactional mail settings above; without SMTP the request is still recorded and shown under Access, Requests and on the project's members page, and the user is told the email could not be sent. An administrator, or a user who can already open the resource, cannot request access: the request is refused with 409 and nothing is recorded or sent.
+
+Retention is the operator's choice. Every request adds a row: the image's own health check, every 30 seconds, adds 2880 rows a day, and every metrics scrape adds one more. The application never deletes events; to remove old ones, run on a schedule:
 
 ```
 python -m app.audit prune --older-than-days 365

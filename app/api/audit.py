@@ -15,6 +15,7 @@ from app.core.security import require_role
 from app.models.audit import AuditEvent
 from app.models.user import User, UserRole
 from app.schemas.audit import AuditEventPage, AuditEventResponse
+from app.services.audit_labels import actor_labels, target_labels
 
 router = APIRouter()
 
@@ -24,11 +25,15 @@ require_admin = require_role(UserRole.admin)
 @router.get("", response_model=AuditEventPage)
 async def list_audit_events(
     actor_user_id: Optional[int] = None,
+    actor_type: Optional[str] = None,
     action: Optional[str] = None,
     target_type: Optional[str] = None,
     target_id: Optional[str] = None,
     project_id: Optional[int] = None,
     outcome: Optional[str] = None,
+    ip: Optional[str] = None,
+    request_id: Optional[str] = None,
+    status: Optional[int] = None,
     since: Optional[datetime] = None,
     until: Optional[datetime] = None,
     limit: int = Query(50, ge=1, le=500),
@@ -40,10 +45,14 @@ async def list_audit_events(
     db: AsyncSession = Depends(get_db, scope="function"),
     _admin: User = Depends(require_admin),
 ):
-    """List audit events matching every given filter; an action filter ending in "." is a prefix."""
+    """List audit events matching every given filter; an action filter ending in "." is a prefix
+    and status matches details.status, the HTTP status of an api.request event. Each event
+    carries its actor and target as labels."""
     conditions = []
     if actor_user_id is not None:
         conditions.append(AuditEvent.actor_user_id == actor_user_id)
+    if actor_type:
+        conditions.append(AuditEvent.actor_type == actor_type)
     if action:
         if action.endswith("."):
             conditions.append(AuditEvent.action.startswith(action))
@@ -57,6 +66,12 @@ async def list_audit_events(
         conditions.append(AuditEvent.project_id == project_id)
     if outcome:
         conditions.append(AuditEvent.outcome == outcome)
+    if ip:
+        conditions.append(AuditEvent.ip == ip)
+    if request_id:
+        conditions.append(AuditEvent.request_id == request_id)
+    if status is not None:
+        conditions.append(cast(AuditEvent.details["status"].as_string(), String) == str(status))
     if since is not None:
         conditions.append(AuditEvent.occurred_at >= since)
     if until is not None:
@@ -96,10 +111,16 @@ async def list_audit_events(
             .offset(offset)
         )
     ).all()
+    events = [event for event, _actor in rows]
+    actors = {actor.id: actor for _event, actor in rows if actor is not None}
+    targets = await target_labels(db, events)
+    actor_names = await actor_labels(db, events, actors)
     items = []
     for event, actor in rows:
         item = AuditEventResponse.model_validate(event)
         item.actor_name = actor.full_name if actor else None
         item.actor_profile_picture_url = actor.profile_picture_url if actor else None
+        item.actor_label = actor_names.get(event.id)
+        item.target_label = targets.get(event.id)
         items.append(item)
     return AuditEventPage(items=items, total=total or 0)

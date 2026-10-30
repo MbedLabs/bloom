@@ -32,7 +32,7 @@ async def session():
     async with async_sessionmaker(engine, expire_on_commit=False)() as db:
         db.add_all(
             [
-                Project(name="Workflow", prefix="WFL"),
+                Project(name="Demo", prefix="PRJ"),
                 User(
                     email="workflow@example.com",
                     full_name="Workflow Author",
@@ -50,18 +50,18 @@ def _row(kind, status="Approved"):
     """Create one controlled fixture document."""
     values = dict(project_id=1, status=status, created_by_id=1)
     if kind == "REQ":
-        return Requirement(req_id="WFL-REQ-001", title="Original", **values)
+        return Requirement(req_id="PRJ-REQ-001", title="Original", **values)
     if kind == "TC":
-        return Case(tc_id="WFL-TC-001", title="Original", **values)
+        return Case(tc_id="PRJ-TC-001", title="Original", **values)
     if kind in {"SPEC", "PRT"}:
-        return Document(doc_id=f"WFL-{kind}-001", doc_type=kind, title="Original", **values)
+        return Document(doc_id=f"PRJ-{kind}-001", doc_type=kind, title="Original", **values)
     if kind == "DES":
-        return DesignItem(design_id="WFL-DES-001", title="Original", **values)
+        return DesignItem(design_id="PRJ-DES-001", title="Original", **values)
     if kind == "CPT":
-        return Concept(concept_id="WFL-CPT-001", name="Original", **values)
+        return Concept(concept_id="PRJ-CPT-001", name="Original", **values)
     if kind == "TS":
-        return Suite(suite_id="WFL-TS-001", name="Original", **values)
-    return ChangeRequest(change_id="WFL-CHG-001", title="Original", **values)
+        return Suite(suite_id="PRJ-TS-001", name="Original", **values)
+    return ChangeRequest(change_id="PRJ-CHG-001", title="Original", **values)
 
 
 async def _saved(db, kind, status="Approved"):
@@ -90,7 +90,7 @@ async def test_unguarded_direct_approval_transition_is_refused(session):
 
 
 async def test_change_default_is_draft(session):
-    row = ChangeRequest(project_id=1, change_id="WFL-CHG-001", title="Draft proposal")
+    row = ChangeRequest(project_id=1, change_id="PRJ-CHG-001", title="Draft proposal")
     session.add(row)
     await session.flush()
     assert row.status == "Draft"
@@ -306,7 +306,7 @@ async def test_unsupported_status_does_not_fabricate_a_workflow(session, kind, s
 
 
 async def test_exception_operational_status_and_authored_writes_remain_legal(session):
-    row = RiskItem(project_id=1, risk_id="WFL-RSK-001", title="Operational", status="Closed")
+    row = RiskItem(project_id=1, risk_id="PRJ-RSK-001", title="Operational", status="Closed")
     session.add(row)
     await session.commit()
     row.status = "Open"
@@ -378,9 +378,9 @@ async def test_approved_scope_and_tracker_transport_remain_legal_with_archive_sc
 async def test_controlled_identity_accepts_legacy_concept_and_protocol_aliases(session):
     from app.services.document_workflow import artefact_identity, controlled
 
-    concept = Concept(project_id=1, concept_id="WFL-TCO-001", name="Legacy concept")
+    concept = Concept(project_id=1, concept_id="PRJ-TCO-001", name="Legacy concept")
     protocol = Document(
-        project_id=1, doc_id="WFL-PROT-001", doc_type="PROT", title="Legacy protocol"
+        project_id=1, doc_id="PRJ-PROT-001", doc_type="PROT", title="Legacy protocol"
     )
     assert artefact_identity(concept) == ("test-concept", "CPT")
     assert artefact_identity(protocol) == ("document", "PRT")

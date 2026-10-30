@@ -43,14 +43,14 @@ const ImportWizard = (await import('../pages/ImportWizard')).default
 const source = {
   ...project,
   id: 2,
-  name: 'Battery Management',
-  prefix: 'BMS',
+  name: 'Second Demo',
+  prefix: 'ABC',
   requirement_count: 12,
   test_case_count: 4,
 }
 /** Documents as they exist in the *source* project, under its own prefix. */
-const first = { ...docShell, id: 11, doc_id: 'BMS-REQ-001', title: 'Pack isolation' }
-const second = { ...docShell, id: 12, doc_id: 'BMS-REQ-002', title: 'Cell balancing' }
+const first = { ...docShell, id: 11, doc_id: 'ABC-REQ-001', title: 'Pack isolation' }
+const second = { ...docShell, id: 12, doc_id: 'ABC-REQ-002', title: 'Cell balancing' }
 
 function envelope(items: unknown[]) {
   return { items, total: items.length, skip: 0, limit: 50 }
@@ -63,7 +63,7 @@ function renderWizard() {
   return render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <MemoryRouter initialEntries={['/projects/VCU/import']}>
+        <MemoryRouter initialEntries={['/projects/PRJ/import']}>
           <Routes>
             <Route path="/projects/:prefix/import" element={<ImportWizard />} />
             <Route path="/projects/:prefix/docs" element={<div>document registry</div>} />
@@ -112,7 +112,7 @@ describe('choosing where to import from', () => {
     renderWizard()
     await screen.findByText(source.name)
 
-    expect(screen.getByText(/BMS · 12 REQs · 4 TCs/)).toBeTruthy()
+    expect(screen.getByText(/ABC · 12 REQs · 4 TCs/)).toBeTruthy()
   })
 
   it('says so when there is nowhere to import from', async () => {
@@ -346,7 +346,7 @@ describe('reviewing and running the import', () => {
     vi.mocked(client.importApi.import).mockResolvedValue({
       imported: 2,
       skipped: 1,
-      new_ids: ['VCU-REQ-004', 'VCU-REQ-005'],
+      new_ids: ['PRJ-REQ-004', 'PRJ-REQ-005'],
       errors: [],
     } as never)
     await reachReview()
@@ -356,14 +356,14 @@ describe('reviewing and running the import', () => {
     expect(await screen.findByText('Import Complete')).toBeTruthy()
     expect(screen.getByText('2 docs imported successfully')).toBeTruthy()
     expect(screen.getByText('1 skipped')).toBeTruthy()
-    expect(screen.getByText(/VCU-REQ-004, VCU-REQ-005/)).toBeTruthy()
+    expect(screen.getByText(/PRJ-REQ-004, PRJ-REQ-005/)).toBeTruthy()
   })
 
   it('says "1 doc" rather than "1 docs"', async () => {
     vi.mocked(client.importApi.import).mockResolvedValue({
       imported: 1,
       skipped: 0,
-      new_ids: ['VCU-REQ-004'],
+      new_ids: ['PRJ-REQ-004'],
       errors: [],
     } as never)
     await reachReview()
@@ -377,8 +377,8 @@ describe('reviewing and running the import', () => {
     vi.mocked(client.importApi.import).mockResolvedValue({
       imported: 1,
       skipped: 1,
-      new_ids: ['VCU-REQ-004'],
-      errors: ['BMS-REQ-002: a document with that title already exists'],
+      new_ids: ['PRJ-REQ-004'],
+      errors: ['ABC-REQ-002: a document with that title already exists'],
     } as never)
     await reachReview()
 
@@ -415,7 +415,7 @@ describe('the two import routes', () => {
       imported: 3,
       skipped: 0,
       links_created: 2,
-      new_ids: ['VCU-REQ-004'],
+      new_ids: ['PRJ-REQ-004'],
       errors: [],
       specifications: [],
     } as never)
@@ -439,7 +439,7 @@ describe('the two import routes', () => {
       imported: 2,
       skipped: 1,
       links_created: 0,
-      new_ids: ['VCU-REQ-004', 'VCU-REQ-005'],
+      new_ids: ['PRJ-REQ-004', 'PRJ-REQ-005'],
       errors: ['SPEC-OBJECT 7 has no identifier'],
       specifications: [],
     } as never)

@@ -11,11 +11,10 @@ import VerifyEmail from './pages/VerifyEmail'
 import AcceptInvite from './pages/AcceptInvite'
 import CliAuthApprovePage from './pages/CliAuthApprovePage'
 import ErrorBoundary from './components/ErrorBoundary'
+import LegacyDocRedirect from './pages/LegacyDocRedirect'
 
 /* v8 ignore start */
-const ArtefactDetail = lazy(() => import('./pages/ArtefactDetail'))
 const Baselines = lazy(() => import('./pages/Baselines'))
-const CampaignDetail = lazy(() => import('./pages/CampaignDetail'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Defects = lazy(() => import('./pages/Defects'))
 const DocCreate = lazy(() => import('./pages/DocCreate'))
@@ -28,7 +27,6 @@ const ProjectParameters = lazy(() => import('./pages/ProjectParameters'))
 const Projects = lazy(() => import('./pages/Projects'))
 const Reports = lazy(() => import('./pages/Reports'))
 const Settings = lazy(() => import('./pages/Settings'))
-const SuiteDetail = lazy(() => import('./pages/SuiteDetail'))
 const TestCampaigns = lazy(() => import('./pages/TestCampaigns'))
 const TraceabilityMatrix = lazy(() => import('./pages/TraceabilityMatrix'))
 const UnifiedDocDetail = lazy(() => import('./pages/UnifiedDocDetail'))
@@ -74,10 +72,10 @@ function App() {
         <Route path="projects/:prefix/docs/:kind/:docId" element={<ErrorBoundary><UnifiedDocDetail /></ErrorBoundary>} />
         <Route path="projects/:prefix/parameters" element={<ProjectParameters />} />
         <Route path="projects/:prefix/defects" element={<Defects />} />
-        <Route path="projects/:prefix/defects/:itemId" element={<ArtefactDetail kind="defect" />} />
+        <Route path="projects/:prefix/defects/:itemId" element={<LegacyDocRedirect slug="defects" param="itemId" />} />
         <Route path="projects/:prefix/campaigns" element={<TestCampaigns />} />
-        <Route path="projects/:prefix/suites/:suiteId" element={<SuiteDetail />} />
-        <Route path="projects/:prefix/campaigns/:campaignId" element={<ErrorBoundary><CampaignDetail /></ErrorBoundary>} />
+        <Route path="projects/:prefix/suites/:suiteId" element={<LegacyDocRedirect slug="test-suites" param="suiteId" />} />
+        <Route path="projects/:prefix/campaigns/:campaignId" element={<LegacyDocRedirect slug="campaigns" param="campaignId" />} />
         <Route path="projects/:prefix/traceability" element={<TraceabilityMatrix />} />
         <Route path="projects/:prefix/impact-analysis/:requirementId" element={<ImpactAnalysis />} />
         <Route path="projects/:prefix/baselines" element={<Baselines />} />

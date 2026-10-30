@@ -291,20 +291,93 @@ describe('the toolbar menus', () => {
     await waitFor(() => expect(surface.querySelector('[style*="color"]')).toBeNull())
   })
 
-  it('sets the line spacing on the whole document', async () => {
-    const { container } = render(<DocEditor content={doc(paragraph('Spaced'))} />)
+  it('stores the line spacing on the paragraph at the cursor and leaves the others', async () => {
+    const onChange = vi.fn()
+    const { container } = render(
+      <DocEditor content={doc(paragraph('Plain'), paragraph('Spaced'))} onChange={onChange} />,
+    )
     const surface = await editorSurface(container)
 
     fireEvent.click(screen.getByTitle('Line spacing'))
     fireEvent.click(await screen.findByText('1.5'))
 
-    await waitFor(() => expect(surface.classList.contains('line-height-1_5')).toBe(true))
+    await waitFor(() => expect(surface.querySelector('p[data-line-spacing="1.5"]')?.textContent).toBe('Spaced'))
+    expect(surface.querySelectorAll('[data-line-spacing]')).toHaveLength(1)
+    const [json, html] = onChange.mock.calls[onChange.mock.calls.length - 1]
+    expect(json.content[0].attrs.lineSpacing).toBeNull()
+    expect(json.content[1].attrs.lineSpacing).toBe('1.5')
+    expect(html).toContain('data-line-spacing="1.5"')
+  })
+
+  it('switches to Double and back to Single, which removes the stored spacing', async () => {
+    const onChange = vi.fn()
+    const { container } = render(<DocEditor content={doc(paragraph('Spaced'))} onChange={onChange} />)
+    const surface = await editorSurface(container)
 
     fireEvent.click(screen.getByTitle('Line spacing'))
-    fireEvent.click(await screen.findByText('2.0'))
+    fireEvent.click(await screen.findByText('Double'))
+    await waitFor(() => expect(surface.querySelector('p[data-line-spacing="2"]')).toBeTruthy())
 
-    await waitFor(() => expect(surface.classList.contains('line-height-2')).toBe(true))
-    expect(surface.classList.contains('line-height-1_5')).toBe(false)
+    fireEvent.click(screen.getByTitle('Line spacing'))
+    fireEvent.click(await screen.findByText('Single'))
+    await waitFor(() => expect(surface.querySelector('[data-line-spacing]')).toBeNull())
+    const [json] = onChange.mock.calls[onChange.mock.calls.length - 1]
+    expect(json.content[0].attrs.lineSpacing).toBeNull()
+  })
+
+  it('shows stored spacing when the document is opened again and marks it in the menu', async () => {
+    const stored = { ...paragraph('Saved'), attrs: { lineSpacing: '2' } }
+    const { container } = render(<DocEditor content={doc(stored)} />)
+    const surface = await editorSurface(container)
+
+    expect(surface.querySelector('p[data-line-spacing="2"]')?.textContent).toBe('Saved')
+    fireEvent.click(screen.getByTitle('Line spacing'))
+    expect((await screen.findByText('Double')).className).toContain('bg-primary/10')
+    expect(screen.getByText('Single').className).not.toContain('bg-primary/10')
+  })
+
+  it('marks Single for a paragraph without spacing', async () => {
+    render(<DocEditor content={doc(paragraph('Plain'))} />)
+
+    fireEvent.click(await screen.findByTitle('Line spacing'))
+    expect((await screen.findByText('Single')).className).toContain('bg-primary/10')
+  })
+
+  it('shows stored spacing in a read-only editor', async () => {
+    const stored = { ...paragraph('Read'), attrs: { lineSpacing: '1.5' } }
+    const { container } = render(<DocEditor content={doc(stored)} editable={false} />)
+    const surface = await editorSurface(container)
+
+    expect(surface.querySelector('p[data-line-spacing="1.5"]')?.textContent).toBe('Read')
+  })
+
+  it('sets the spacing of a list item through its paragraph', async () => {
+    const list = { type: 'bulletList', content: [{ type: 'listItem', content: [paragraph('Item')] }] }
+    const { container } = render(<DocEditor content={doc(list)} />)
+    const surface = await editorSurface(container)
+
+    fireEvent.click(screen.getByTitle('Line spacing'))
+    fireEvent.click(await screen.findByText('1.5'))
+
+    await waitFor(() => expect(surface.querySelector('li p[data-line-spacing="1.5"]')?.textContent).toBe('Item'))
+  })
+
+  it('sets the spacing of a heading', async () => {
+    const { container } = render(<DocEditor content={doc(heading(2, 'Title'))} />)
+    const surface = await editorSurface(container)
+
+    fireEvent.click(screen.getByTitle('Line spacing'))
+    fireEvent.click(await screen.findByText('Double'))
+
+    await waitFor(() => expect(surface.querySelector('h2[data-line-spacing="2"]')?.textContent).toContain('Title'))
+  })
+
+  it('marks Single for a stored spacing the editor does not offer', async () => {
+    const stored = { ...paragraph('Odd'), attrs: { lineSpacing: '7' } }
+    render(<DocEditor content={doc(stored)} />)
+
+    fireEvent.click(await screen.findByTitle('Line spacing'))
+    expect((await screen.findByText('Single')).className).toContain('bg-primary/10')
   })
 
   it('aligns the paragraph', async () => {

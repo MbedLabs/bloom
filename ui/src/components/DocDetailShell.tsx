@@ -63,8 +63,14 @@ interface DocDetailShellProps {
   title: string
   status: string
   priority?: string | null
+  /** A label shown beside the document code. */
+  codeLabel?: ReactNode
   actions?: ReactNode
   rightRail?: ReactNode
+  /** The review summary shown above the content. */
+  review?: ReactNode
+  /** The comments column shown beside the content. */
+  comments?: ReactNode
   children: ReactNode
   backTo?: string
 }
@@ -74,8 +80,11 @@ export default function DocDetailShell({
   docType,
   docCode,
   title,
+  codeLabel,
   actions,
   rightRail,
+  review,
+  comments,
   children,
   backTo,
 }: Readonly<DocDetailShellProps>) {
@@ -93,6 +102,18 @@ export default function DocDetailShell({
     }
   }
 
+  let body = <div className="space-y-6">{children}</div>
+  if (comments) {
+    body = (
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] items-start gap-6">
+        <div className="min-w-0 space-y-6">{children}</div>
+        <aside aria-label="Document comments column" className="order-first min-w-0 lg:order-last">{comments}</aside>
+      </div>
+    )
+  } else if (rightRail) {
+    body = <DocumentDetailColumns rightRail={rightRail}>{children}</DocumentDetailColumns>
+  }
+
   return (
     <div className="animate-fade-in space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -101,8 +122,9 @@ export default function DocDetailShell({
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </button>
           <div>
-            <div className="mb-1">
+            <div className="mb-1 flex items-center gap-2">
               <span className="font-mono text-sm text-primary font-semibold">{docCode}</span>
+              {codeLabel}
             </div>
             <h2 className="text-2xl font-bold text-foreground">{title}</h2>
           </div>
@@ -114,11 +136,8 @@ export default function DocDetailShell({
         )}
       </div>
 
-      {rightRail ? (
-        <DocumentDetailColumns rightRail={rightRail}>{children}</DocumentDetailColumns>
-      ) : (
-        <div className="space-y-6">{children}</div>
-      )}
+      {review}
+      {body}
     </div>
   )
 }

@@ -43,7 +43,7 @@ function renderTopology() {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
-        <ProjectDocTopology projectId={1} prefix="VCU" />
+        <ProjectDocTopology projectId={1} prefix="PRJ" />
       </MemoryRouter>
     </QueryClientProvider>,
   )
@@ -109,7 +109,7 @@ describe('loading', () => {
     renderTopology()
     await settled()
 
-    expect(docsApi.typeSummary).toHaveBeenCalledWith('VCU')
+    expect(docsApi.typeSummary).toHaveBeenCalledWith('PRJ')
     expect(docsApi.list).not.toHaveBeenCalled()
     expect(await screen.findByText('2')).toBeTruthy()
   })
@@ -151,10 +151,11 @@ describe('the roll-up', () => {
     renderTopology()
     await settled()
 
-    expect(screen.getAllByText(/Requirement/).length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/Test Case/).length).toBeGreaterThan(0)
-    expect(screen.queryByText('Risk')).toBeNull()
-    expect(screen.queryByText('Change Request')).toBeNull()
+    expect(screen.getAllByText('Requirements').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Test Cases').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Requirement')).toBeNull()
+    expect(screen.queryByText('Risks')).toBeNull()
+    expect(screen.queryByText('Changes')).toBeNull()
   })
 
   it('says so when nothing is linked yet', async () => {
@@ -211,7 +212,7 @@ describe('the roll-up', () => {
     await settled()
 
     expect(screen.queryByText(/link documents to see them here/i)).toBeNull()
-    expect(screen.queryByText('Risk')).toBeNull()
+    expect(screen.queryByText('Risks')).toBeNull()
   })
 })
 

@@ -3,31 +3,31 @@ import { relatedDocsUrl } from '../types/doc'
 
 describe('relatedDocsUrl', () => {
   it('points at the documents registry for the project', () => {
-    const url = relatedDocsUrl('FLT', 'FLT-REQ-001')
+    const url = relatedDocsUrl('PRJ', 'PRJ-REQ-001')
 
-    expect(url.startsWith('/projects/FLT/docs?')).toBe(true)
+    expect(url.startsWith('/projects/PRJ/docs?')).toBe(true)
   })
 
   it('carries the anchor document so the registry can filter by relationship', () => {
-    const params = new URLSearchParams(relatedDocsUrl('FLT', 'FLT-REQ-001').split('?')[1])
+    const params = new URLSearchParams(relatedDocsUrl('PRJ', 'PRJ-REQ-001').split('?')[1])
 
-    expect(params.get('related_to')).toBe('FLT-REQ-001')
+    expect(params.get('related_to')).toBe('PRJ-REQ-001')
     expect(params.get('role')).toBeNull()
     expect(params.get('direction')).toBeNull()
   })
 
   it('narrows to a single relationship role and direction when given', () => {
     const params = new URLSearchParams(
-      relatedDocsUrl('FLT', 'FLT-REQ-001', { role: 'verifies', direction: 'incoming' }).split('?')[1],
+      relatedDocsUrl('PRJ', 'PRJ-REQ-001', { role: 'verifies', direction: 'incoming' }).split('?')[1],
     )
 
-    expect(params.get('related_to')).toBe('FLT-REQ-001')
+    expect(params.get('related_to')).toBe('PRJ-REQ-001')
     expect(params.get('role')).toBe('verifies')
     expect(params.get('direction')).toBe('incoming')
   })
 
   it('encodes values so ids and roles survive the query string', () => {
-    const url = relatedDocsUrl('FLT', 'FLT-REQ-001', { role: 'is verified by' })
+    const url = relatedDocsUrl('PRJ', 'PRJ-REQ-001', { role: 'is verified by' })
 
     expect(url).toContain('role=is+verified+by')
   })

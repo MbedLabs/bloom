@@ -119,8 +119,8 @@ async def _seed_iam_fixture_data(session_maker: async_sessionmaker[AsyncSession]
         session.add_all([admin, maintainer, external])
         await session.flush()
 
-        allowed = Project(name="Allowed Project", prefix="ALW", description="Visible")
-        blocked = Project(name="Blocked Project", prefix="BLK", description="Hidden")
+        allowed = Project(name="ABC", prefix="ABC", description="Visible")
+        blocked = Project(name="Demo", prefix="PRJ", description="Hidden")
         session.add_all([allowed, blocked])
         await session.flush()
 
@@ -141,7 +141,7 @@ async def _seed_iam_fixture_data(session_maker: async_sessionmaker[AsyncSession]
 
         blocked_requirement = Requirement(
             project_id=blocked.id,
-            req_id="BLK-REQ-001",
+            req_id="PRJ-REQ-001",
             title="Blocked requirement",
             description="Should not leak across projects",
             status="Draft",

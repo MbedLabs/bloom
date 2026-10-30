@@ -29,7 +29,7 @@ async def session():
 
 
 async def _project_with(session, req_ids):
-    project = Project(name="Widen", prefix="FLT", status="Active")
+    project = Project(name="Demo", prefix="PRJ", status="Active")
     session.add(project)
     await session.flush()
     for req_id in req_ids:
@@ -42,11 +42,11 @@ async def _project_with(session, req_ids):
 
 @pytest.mark.asyncio
 async def test_crossing_999_widens_the_ids_already_stored(session):
-    project = await _project_with(session, ["FLT-REQ-001", "FLT-REQ-042", "FLT-REQ-999"])
+    project = await _project_with(session, ["PRJ-REQ-001", "PRJ-REQ-042", "PRJ-REQ-999"])
 
-    new_id = await next_doc_id(session, Requirement, Requirement.req_id, project.id, "FLT", "REQ")
+    new_id = await next_doc_id(session, Requirement, Requirement.req_id, project.id, "PRJ", "REQ")
 
-    assert new_id == "FLT-REQ-1000"
+    assert new_id == "PRJ-REQ-1000"
 
     stored = sorted(
         (
@@ -57,17 +57,17 @@ async def test_crossing_999_widens_the_ids_already_stored(session):
         .scalars()
         .all()
     )
-    assert stored == ["FLT-REQ-0001", "FLT-REQ-0042", "FLT-REQ-0999"]
+    assert stored == ["PRJ-REQ-0001", "PRJ-REQ-0042", "PRJ-REQ-0999"]
     assert len({s.rsplit("-", 1)[1].__len__() for s in stored}) == 1
 
 
 @pytest.mark.asyncio
 async def test_below_the_boundary_nothing_is_rewritten(session):
-    project = await _project_with(session, ["FLT-REQ-001", "FLT-REQ-002"])
+    project = await _project_with(session, ["PRJ-REQ-001", "PRJ-REQ-002"])
 
-    new_id = await next_doc_id(session, Requirement, Requirement.req_id, project.id, "FLT", "REQ")
+    new_id = await next_doc_id(session, Requirement, Requirement.req_id, project.id, "PRJ", "REQ")
 
-    assert new_id == "FLT-REQ-003"
+    assert new_id == "PRJ-REQ-003"
     stored = sorted(
         (
             await session.execute(
@@ -77,18 +77,18 @@ async def test_below_the_boundary_nothing_is_rewritten(session):
         .scalars()
         .all()
     )
-    assert stored == ["FLT-REQ-001", "FLT-REQ-002"]
+    assert stored == ["PRJ-REQ-001", "PRJ-REQ-002"]
 
 
 @pytest.mark.asyncio
 async def test_widening_does_not_touch_another_type_in_the_same_project(session):
-    project = await _project_with(session, ["FLT-REQ-999"])
+    project = await _project_with(session, ["PRJ-REQ-999"])
     from app.models.models import TestCase
 
-    session.add(TestCase(project_id=project.id, tc_id="FLT-TC-001", title="t", status="Draft"))
+    session.add(TestCase(project_id=project.id, tc_id="PRJ-TC-001", title="t", status="Draft"))
     await session.flush()
 
-    await next_doc_id(session, Requirement, Requirement.req_id, project.id, "FLT", "REQ")
+    await next_doc_id(session, Requirement, Requirement.req_id, project.id, "PRJ", "REQ")
 
     tc_ids = (await session.execute(select(TestCase.tc_id))).scalars().all()
-    assert tc_ids == ["FLT-TC-001"]
+    assert tc_ids == ["PRJ-TC-001"]

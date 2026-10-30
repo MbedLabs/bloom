@@ -23,7 +23,7 @@ SUITE_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
         <case>
           <id>C7</id><title>Cold boot</title><template>Test Case (Steps)</template>
           <type>Functional</type><priority>High</priority><estimate>5m</estimate>
-          <references>ALP-REQ-001, JIRA-9</references>
+          <references>PRJ-REQ-001, JIRA-9</references>
           <custom>
             <preconds>Relay open
 
@@ -59,7 +59,7 @@ def test_xml_separated_steps_and_preconditions():
     cold, warm = parse_testrail_xml(SUITE_XML)
     assert (cold.case_id, cold.title, cold.sections) == ("C7", "Cold boot", ["Boot"])
     assert (cold.case_type, cold.priority, cold.estimate) == ("Functional", "High", "5m")
-    assert cold.references == ["ALP-REQ-001", "JIRA-9"]
+    assert cold.references == ["PRJ-REQ-001", "JIRA-9"]
     assert _rows(cold) == [
         ("precondition", "Relay open", ""),
         ("precondition", "Serial console attached", ""),
@@ -109,7 +109,7 @@ def test_case_id_normalisation():
 SEPARATED_CSV = (
     "﻿ID,Title,Section Hierarchy,Type,Priority,Estimate,References,Preconditions,"
     "Steps (Step),Steps (Expected Result)\n"
-    'C7,Cold boot,Firmware > Boot,Functional,High,5m,"ALP-REQ-001, JIRA-9",Relay open,'
+    'C7,Cold boot,Firmware > Boot,Functional,High,5m,"PRJ-REQ-001, JIRA-9",Relay open,'
     "Close the relay,Relay closed\n"
     "C7,,,,,,,,Read the serial port,Boot banner\n"
     'C9,Soak,Firmware > Soak,,,,,,"1. Start the soak\n2. Wait\nstill waiting","1. Running\n2. Done"\n'
@@ -119,7 +119,7 @@ SEPARATED_CSV = (
 def test_csv_one_row_per_step_groups_by_id():
     cold, soak = parse_testrail_csv(SEPARATED_CSV)
     assert (cold.case_id, cold.title, cold.sections) == ("C7", "Cold boot", ["Firmware", "Boot"])
-    assert cold.references == ["ALP-REQ-001", "JIRA-9"]
+    assert cold.references == ["PRJ-REQ-001", "JIRA-9"]
     assert _rows(cold) == [
         ("precondition", "Relay open", ""),
         ("step", "Close the relay", "Relay closed"),

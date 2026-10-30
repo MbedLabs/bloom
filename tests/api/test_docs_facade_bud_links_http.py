@@ -91,7 +91,7 @@ async def _seed_tc_doc(session_maker: async_sessionmaker[AsyncSession]):
         session.add(maintainer)
         await session.flush()
 
-        project = Project(name="Docs Bud Links", prefix="DBL", description="Bud links")
+        project = Project(name="Demo", prefix="PRJ", description="Bud links")
         session.add(project)
         await session.flush()
 
@@ -103,7 +103,7 @@ async def _seed_tc_doc(session_maker: async_sessionmaker[AsyncSession]):
 
         tc = TestCase(
             project_id=project.id,
-            tc_id="DBL-TC-001",
+            tc_id="PRJ-TC-001",
             title="Clickable Bud run",
             status="Draft",
             visibility="customer",
@@ -127,7 +127,7 @@ def test_docs_facade_exposes_last_bud_run_id_for_tc_rows():
         assert response.status_code == 200, response.text
         items = response.json()["items"]
         assert len(items) == 1
-        assert items[0]["doc_id"] == "DBL-TC-001"
+        assert items[0]["doc_id"] == "PRJ-TC-001"
         assert items[0]["last_bud_run_id"] == 987
     finally:
         harness.client.close()

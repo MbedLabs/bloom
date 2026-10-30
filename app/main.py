@@ -7,7 +7,6 @@ import re
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
@@ -59,6 +58,7 @@ from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS, normalize_document
 from app.core.id_generator import compute_next_id, id_width, next_doc_id
 from app.core.identity import PRODUCT_IDENTITY
 from app.core.observability import (
+    AuditedCORSMiddleware,
     RequestObservabilityMiddleware,
     metrics_router,
     request_id_var,
@@ -78,6 +78,7 @@ from app.models import (
     TestSuite,
 )
 from app.models.user import User, UserRole
+from app.services import integration_sync
 from app.services.attachment_cleanup import reconcile_attachments
 
 setup_logging(level=settings.LOG_LEVEL, json_logs=bool(settings.LOG_JSON))
@@ -333,13 +334,19 @@ async def lifespan(app: FastAPI):
                 logger.exception("Attachment cleanup pass failed")
             await asyncio.sleep(24 * 60 * 60)
 
-    cleanup_task = asyncio.create_task(cleanup_loop())
+    tasks = [asyncio.create_task(cleanup_loop())]
+    if settings.INTEGRATION_SYNC_MINUTES > 0:
+        tasks.append(
+            asyncio.create_task(integration_sync.sync_loop(settings.INTEGRATION_SYNC_MINUTES))
+        )
     try:
         yield
     finally:
-        cleanup_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await cleanup_task
+        for task in tasks:
+            task.cancel()
+        for task in tasks:
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
 
 
 app = FastAPI(
@@ -401,8 +408,14 @@ async def _integrity_error_handler(request: Request, exc: Exception) -> JSONResp
 
 
 async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    request_id = request_id_var.get()
-    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    """Answer an unhandled error with 500 and the id of the request that failed, from the
+    request state, and log the error under that id."""
+    request_id = getattr(request.state, "request_id", None) or request_id_var.get()
+    token = request_id_var.set(request_id)
+    try:
+        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    finally:
+        request_id_var.reset(token)
     return JSONResponse(
         status_code=500,
         content={
@@ -421,10 +434,9 @@ app.add_exception_handler(IntegrityError, _integrity_error_handler)
 app.add_exception_handler(Exception, _unhandled_exception_handler)
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
-
 app.add_middleware(RequestObservabilityMiddleware)
 app.add_middleware(
-    CORSMiddleware,
+    AuditedCORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],

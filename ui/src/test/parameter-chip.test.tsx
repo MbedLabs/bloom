@@ -15,7 +15,7 @@ vi.mock('../api/client', async (importOriginal) => {
   return {
     ...actual,
     projectVariablesApi: { list: vi.fn() },
-    projectsApi: { getByPrefix: vi.fn(async () => ({ id: 5, prefix: 'VCU' })) },
+    projectsApi: { getByPrefix: vi.fn(async () => ({ id: 5, prefix: 'PRJ' })) },
   }
 })
 
@@ -65,15 +65,15 @@ describe('the parameter chip', () => {
   it('shows the name while editing, the value on hover, and the value while reading', async () => {
     const values = { BOOT_BUDGET_MS: '500' }
     const { container, rerender } = render(
-      <DocEditor content={doc('BOOT_BUDGET_MS')} parameterValues={values} parameterHref="/projects/VCU/parameters" />,
+      <DocEditor content={doc('BOOT_BUDGET_MS')} parameterValues={values} parameterHref="/projects/PRJ/parameters" />,
     )
     await waitFor(() => expect(chips(container)).toHaveLength(1))
     expect(chips(container)[0].textContent).toBe('{{BOOT_BUDGET_MS}}')
     expect(chips(container)[0].getAttribute('title')).toBe('500')
-    expect(chips(container)[0].getAttribute('href')).toBe('/projects/VCU/parameters?key=BOOT_BUDGET_MS')
+    expect(chips(container)[0].getAttribute('href')).toBe('/projects/PRJ/parameters?key=BOOT_BUDGET_MS')
 
     rerender(
-      <DocEditor content={doc('BOOT_BUDGET_MS')} parameterValues={values} parameterHref="/projects/VCU/parameters" editable={false} />,
+      <DocEditor content={doc('BOOT_BUDGET_MS')} parameterValues={values} parameterHref="/projects/PRJ/parameters" editable={false} />,
     )
     await waitFor(() => expect(chips(container)[0].textContent).toBe('500'))
     expect(chips(container)[0].getAttribute('title')).toBe('{{BOOT_BUDGET_MS}}')
@@ -148,7 +148,7 @@ describe('useParameterValues', () => {
       { id: 1, project_id: 5, kind: 'parameter', key: 'BOOT_BUDGET_MS', value: '500', description: null, created_at: '', updated_at: '' },
       { id: 2, project_id: 5, kind: 'variable', key: 'BOARD_REV', value: 'C', description: null, created_at: '', updated_at: '' },
     ] as never)
-    const { result } = renderHook(() => useParameterValues('VCU'), { wrapper })
+    const { result } = renderHook(() => useParameterValues('PRJ'), { wrapper })
     await waitFor(() => expect(result.current).toEqual({ BOOT_BUDGET_MS: '500', BOARD_REV: 'C' }))
     expect(client.projectVariablesApi.list).toHaveBeenCalledWith(5)
   })

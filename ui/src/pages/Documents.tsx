@@ -52,39 +52,12 @@ const TYPE_BADGES: Record<DocType, { label: string; color: string }> = {
   PRT: { label: DOC_TYPE_LABELS.PRT, color: 'bg-violet-500/10 text-violet-700 dark:text-violet-400' },
   RPT: { label: 'Report', color: 'bg-slate-500/10 text-slate-700 dark:text-slate-400' },
   STD: { label: 'External Standard', color: 'bg-orange-500/10 text-orange-700 dark:text-orange-400' },
+  VIS: { label: 'Vision', color: 'bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400' },
 }
 
-const DOC_TYPE_OPTIONS: { code: DocType; label: string }[] = [
-  { code: 'REQ', label: 'Requirements' },
-  { code: 'SPEC', label: 'Specifications' },
-  { code: 'TC', label: 'Test Cases' },
-  { code: 'CPT', label: docRegistryListLabel('CPT') },
-  { code: 'PRT', label: docRegistryListLabel('PRT') },
-  { code: 'DES', label: 'Design' },
-  { code: 'RSK', label: 'Risks' },
-  { code: 'CHG', label: 'Changes' },
-  { code: 'DEF', label: 'Defects' },
-  { code: 'CMP', label: 'Campaigns' },
-  { code: 'TS', label: 'Test Suites' },
-  { code: 'RPT', label: 'Reports' },
-  { code: 'STD', label: 'Standards' },
-]
-
-const TYPE_PAGE_TITLE: Record<DocType, string> = {
-  REQ: 'Requirements',
-  SPEC: 'Specifications',
-  TC: 'Test Cases',
-  CPT: docRegistryListLabel('CPT'),
-  DEF: 'Defects',
-  CMP: docRegistryListLabel('CMP'),
-  TS: 'Test Suites',
-  PRT: docRegistryListLabel('PRT'),
-  DES: 'Designs',
-  RSK: 'Risks',
-  CHG: 'Changes',
-  RPT: 'Reports',
-  STD: 'Standards',
-}
+const DOC_TYPE_OPTIONS: { code: DocType; label: string }[] = (
+  ['VIS', 'REQ', 'SPEC', 'TC', 'CPT', 'PRT', 'DES', 'RSK', 'CHG', 'DEF', 'CMP', 'TS', 'RPT', 'STD'] as DocType[]
+).map((code) => ({ code, label: docRegistryListLabel(code) }))
 
 const PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Critical']
 
@@ -127,7 +100,7 @@ const SORT_OPTIONS: { field: SortField; label: string }[] = [
 
 /** Heading of the empty document list. */
 function emptyListHeading(hasActiveFilters: boolean, soleDocType: DocType | null): string {
-  if (soleDocType) return hasActiveFilters ? `No ${TYPE_PAGE_TITLE[soleDocType]} match your filters` : `No ${TYPE_PAGE_TITLE[soleDocType]} yet`
+  if (soleDocType) return hasActiveFilters ? `No ${docRegistryListLabel(soleDocType)} match your filters` : `No ${docRegistryListLabel(soleDocType)} yet`
   return hasActiveFilters ? 'No documents found' : 'No documents yet'
 }
 
@@ -307,7 +280,7 @@ export default function Documents() {
   const updatedTo = searchParams.get('updated_to') || ''
   const sortParam = searchParams.get('sort')
   const sortField: SortField = isSortField(sortParam) ? sortParam : 'updated_at'
-  const pageTitle = typeFilters.length === 1 ? TYPE_PAGE_TITLE[typeFilters[0]] : 'Documents'
+  const pageTitle = typeFilters.length === 1 ? docRegistryListLabel(typeFilters[0]) : 'Documents'
   const statusOptions = [...new Set(
     (typeFilters.length ? typeFilters : DOC_TYPE_OPTIONS.map(type => type.code))
       .flatMap(type => [...documentStatusOptions(type)])

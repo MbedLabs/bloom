@@ -141,7 +141,7 @@ async def _seed_dashboard_visibility_data(
         session.add(external)
         await session.flush()
 
-        project = Project(name="Dashboard Visibility", prefix="DSV", description="Visibility")
+        project = Project(name="Demo", prefix="PRJ", description="Visibility")
         session.add(project)
         await session.flush()
 
@@ -160,7 +160,7 @@ async def _seed_dashboard_visibility_data(
             [
                 Requirement(
                     project_id=project.id,
-                    req_id="DSV-REQ-001",
+                    req_id="PRJ-REQ-001",
                     title="Customer requirement",
                     status="Draft",
                     visibility="customer",
@@ -170,7 +170,7 @@ async def _seed_dashboard_visibility_data(
                 ),
                 Requirement(
                     project_id=project.id,
-                    req_id="DSV-REQ-002",
+                    req_id="PRJ-REQ-002",
                     title="Internal requirement",
                     status="Draft",
                     visibility="internal",
@@ -180,28 +180,28 @@ async def _seed_dashboard_visibility_data(
                 ),
                 TestCase(
                     project_id=project.id,
-                    tc_id="DSV-TC-001",
+                    tc_id="PRJ-TC-001",
                     title="Customer test case",
                     status="Draft",
                     visibility="customer",
                 ),
                 TestCase(
                     project_id=project.id,
-                    tc_id="DSV-TC-002",
+                    tc_id="PRJ-TC-002",
                     title="Internal test case",
                     status="Draft",
                     visibility="internal",
                 ),
                 TestCampaign(
                     project_id=project.id,
-                    campaign_id="DSV-CMP-001",
+                    campaign_id="PRJ-CMP-001",
                     name="Customer campaign",
                     status="Planned",
                     visibility="customer",
                 ),
                 TestCampaign(
                     project_id=project.id,
-                    campaign_id="DSV-CMP-002",
+                    campaign_id="PRJ-CMP-002",
                     name="Internal campaign",
                     status="Planned",
                     visibility="internal",

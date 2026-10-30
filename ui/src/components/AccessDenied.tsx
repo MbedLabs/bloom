@@ -1,16 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ShieldAlert } from 'lucide-react'
+import { SearchX, ShieldAlert } from 'lucide-react'
+import { Link } from 'react-router'
 import {
   accessRequestsApi,
   type AccessRequestInfo,
   type AccessResourceType,
 } from '../api/client'
 import { useToast } from './useToast'
+import { useAuth } from '../contexts/AuthContext'
+import { errorStatus } from '../lib/accessDenied'
 
 interface AccessDeniedProps {
   resourceType: AccessResourceType
   resourceRef: string
   projectPrefix?: string
+  error?: unknown
 }
 
 function formatDate(value: string): string {
@@ -20,21 +24,42 @@ function formatDate(value: string): string {
 /**
  * The page shown when a resource is refused (403) or not visible (404): it names the
  * resource only by what the address already says, and lets the user ask the
- * administrators for access once per day.
+ * administrators for access once per day. For an administrator it says the resource was
+ * not found, or could not be opened, and offers no request.
  */
-export default function AccessDenied({ resourceType, resourceRef, projectPrefix }: Readonly<AccessDeniedProps>) {
+export default function AccessDenied({ resourceType, resourceRef, projectPrefix, error }: Readonly<AccessDeniedProps>) {
   const queryClient = useQueryClient()
   const toast = useToast()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const params = { resource_type: resourceType, resource_ref: resourceRef, project_prefix: projectPrefix }
   const queryKey = ['access-request', resourceType, resourceRef, projectPrefix ?? null]
-  const { data: existing } = useQuery({ queryKey, queryFn: () => accessRequestsApi.mine(params) })
+  const { data: existing } = useQuery({ queryKey, queryFn: () => accessRequestsApi.mine(params), enabled: !isAdmin })
   const create = useMutation({
     mutationFn: () => accessRequestsApi.create(params),
     onSuccess: (created) => queryClient.setQueryData<AccessRequestInfo | null>(queryKey, created),
     onError: (error) => toast.failed('Requesting access', error),
   })
   const request = create.data ?? existing ?? null
-  const label = projectPrefix ? `${resourceRef} in project ${projectPrefix}` : resourceRef
+  const label = projectPrefix && resourceType !== 'project' ? `${resourceRef} in project ${projectPrefix}` : resourceRef
+
+  if (isAdmin) {
+    const missing = errorStatus(error) !== 403
+    return (
+      <div className="max-w-lg mx-auto mt-16 bg-card border border-border rounded-xl p-8 text-center">
+        <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-muted flex items-center justify-center">
+          <SearchX className="h-6 w-6 text-muted-foreground" />
+        </div>
+        <h2 className="text-lg font-semibold text-foreground">{missing ? 'Not found' : 'This could not be opened'}</h2>
+        <p className="text-sm text-muted-foreground mt-2">
+          {missing ? `Nothing named ${label} exists.` : `${label} could not be opened.`}
+        </p>
+        <Link to={projectPrefix && resourceType !== 'project' ? `/projects/${projectPrefix}` : '/projects'} className="mt-6 inline-block text-sm text-primary hover:text-primary/80">
+          &larr; {projectPrefix && resourceType !== 'project' ? `Back to project ${projectPrefix}` : 'Back to Projects'}
+        </Link>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-lg mx-auto mt-16 bg-card border border-border rounded-xl p-8 text-center">

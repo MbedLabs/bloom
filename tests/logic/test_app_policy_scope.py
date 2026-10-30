@@ -24,7 +24,7 @@ async def session():
 
 async def _setup(db, role=UserRole.maintainer, scope="app"):
     user = User(email="scope@example.com", full_name="Scope", hashed_password="x", role=role)
-    project = Project(name="Scope", prefix="SCP")
+    project = Project(name="Demo", prefix="PRJ")
     policy = Policy(
         name="Application rules",
         scope=scope,

@@ -3,7 +3,7 @@ Safe ID generation using MAX(numeric_suffix)+1 instead of COUNT()+1.
 Handles gaps from deletions correctly.
 
 Ids have at least three digits. When a project and type passes 999, every id of that project and
-type widens to the new width: FLT-REQ-001 becomes FLT-REQ-0001 when FLT-REQ-1000 is issued.
+type widens to the new width: PRJ-REQ-001 becomes PRJ-REQ-0001 when PRJ-REQ-1000 is issued.
 """
 
 import re
@@ -24,6 +24,7 @@ ALLOWED_TYPE_CODES = frozenset(
         "PRT",
         "RPT",
         "STD",
+        "VIS",
         "BL",
         "TS",
         "CMP",
@@ -130,7 +131,7 @@ async def next_doc_id(
     type_code: str,
 ) -> str:
     """
-    Generate the next human-readable ID for a doc type.
+    Generate the next document ID for a document type.
 
     Args:
         model: SQLAlchemy model class (e.g. Requirement)

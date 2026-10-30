@@ -37,7 +37,7 @@ from app.models import (
 )
 from app.models.user import User, UserRole
 from app.services import attachment_storage, object_store
-from app.services.audit import record_audit_event
+from app.services.audit import mark_refused, record_audit_event
 from app.services.document_workflow import (
     artefact_identity,
     capture_revision,
@@ -52,18 +52,35 @@ from app.services.mail_service import (
     MailConfigurationError,
     send_workflow_request_email,
 )
-from app.services.notification_service import notify
+from app.services.notification_service import notify, notify_assignment
 
 THIS_DOCUMENT_HAS_NO_APPROVAL_WORKFLOW = "This document has no approval workflow."
 
 router = APIRouter()
 REQUEST_WINDOW = timedelta(hours=24)
+DOC_SLUGS = {
+    "REQ": "requirements",
+    "SPEC": "specifications",
+    "TC": "test-cases",
+    "DES": "designs",
+    "RSK": "risks",
+    "CHG": "changes",
+    "CPT": "test-concepts",
+    "DEF": "defects",
+    "CMP": "campaigns",
+    "TS": "test-suites",
+    "PRT": "protocols",
+    "RPT": "reports",
+    "STD": "standards",
+    "VIS": "visions",
+}
 
 
 class Assignees(BaseModel):
-    """Explicit reviewer and approver selections for one document."""
+    """Explicit assignee, reviewer and approver selections for one document."""
 
     model_config = ConfigDict(extra="forbid")
+    assignee_id: int | None = None
     reviewer_id: int | None = None
     approver_id: int | None = None
 
@@ -116,10 +133,28 @@ async def visible_artefact(db, slug, identifier, user, action="view", lock=False
         db, type(row), row.id, "Artefact not found", user, permission=(action, code)
     )
     if not await row_allows(db, user, row, "view", code):
+        mark_refused()
         raise HTTPException(status_code=404, detail="Artefact not found")
     if lock:
         row = await db.scalar(select(type(row)).where(type(row).id == row.id).with_for_update())
     return row
+
+
+def may_change_assignee(user, row, state, assign) -> bool:
+    """The creator, the current assignee and whoever may assign the reviewer change the
+    assignee."""
+    return assign or user.id in {getattr(row, "created_by_id", None), state.assignee_id}
+
+
+async def _may_take_document(db, person, row) -> bool:
+    """An assignee sees the document and may change it."""
+    code = artefact_identity(row)[1]
+    return (
+        person.is_active
+        and changes_allowed(person, row)
+        and await row_allows(db, person, row, "view", code)
+        and await row_allows(db, person, row, "edit", code)
+    )
 
 
 async def _may_sign(db, user, row, step):
@@ -129,18 +164,48 @@ async def _may_sign(db, user, row, step):
     )
 
 
-async def can_comment(db, user, row):
-    """Allow only the visible document's assigned reviewer to comment."""
-    workflow = await get_workflow(db, row, create=False)
-    reviewer = getattr(row, "reviewer_id", None)
-    if not hasattr(row, "reviewer_id") and workflow:
-        reviewer = workflow.reviewer_id
-    return (
-        user.is_active
-        and reviewer == user.id
-        and await row_allows(db, user, row, "view")
-        and await row_allows(db, user, row, "review")
+def _co_authors(row, workflow) -> set[int]:
+    """A controlled document's creator, assignee and approver; empty for other types."""
+    if not controlled(row):
+        return set()
+    assignee = workflow.assignee_id if workflow else getattr(row, "created_by_id", None)
+    approver = (
+        assigned_id(row, workflow, "approve") if workflow or hasattr(row, "approver_id") else None
     )
+    return {
+        person for person in (getattr(row, "created_by_id", None), assignee, approver) if person
+    }
+
+
+def comment_participants(row, workflow) -> set[int]:
+    """The people who take part in a document's discussion: its reviewer, and for a
+    controlled document also its creator, assignee and approver."""
+    reviewer = (
+        assigned_id(row, workflow, "review") if workflow or hasattr(row, "reviewer_id") else None
+    )
+    return _co_authors(row, workflow) | ({reviewer} if reviewer else set())
+
+
+async def can_comment(db, user, row):
+    """Allow the visible document's assigned reviewer to comment, and on a controlled
+    document not yet Approved also its creator, assignee and approver."""
+    if not user.is_active or not await row_allows(db, user, row, "view"):
+        return False
+    workflow = await get_workflow(db, row, create=False)
+    reviewer = (
+        assigned_id(row, workflow, "review") if workflow or hasattr(row, "reviewer_id") else None
+    )
+    if reviewer == user.id and await row_allows(db, user, row, "review"):
+        return True
+    phase = workflow.phase if workflow else recorded_phase(row.status)
+    return phase != "Approved" and user.id in _co_authors(row, workflow)
+
+
+async def document_path(db, row) -> str:
+    """The application path of a document's page."""
+    slug, code = artefact_identity(row)
+    project = await db.get(Project, row.project_id)
+    return f"/projects/{project.prefix}/docs/{DOC_SLUGS[code]}/{artefact_public_id(slug, row)}"
 
 
 async def _pending(db, state, kind=None):
@@ -252,9 +317,10 @@ async def request_handoff(db, row, user, kind):
     fingerprint = content_hash(await content_snapshot(db, row))
     review = None
     if kind == "review":
-        if state.revision_creator_id != user.id:
+        if state.assignee_id != user.id and user.role != UserRole.admin:
             raise HTTPException(
-                status_code=403, detail="Only the current revision's creator requests review."
+                status_code=403,
+                detail="Only the document's assignee or an administrator requests review.",
             )
         if state.phase != "Draft" or row.status != "Draft":
             raise HTTPException(status_code=409, detail="Review starts from Draft.")
@@ -416,6 +482,7 @@ async def workflow_response(db, row, user):
                 phase=None,
                 revision_number=None,
                 revision_creator_id=getattr(row, "created_by_id", None),
+                assignee_id=getattr(row, "created_by_id", None),
                 **{
                     field: getattr(row, field, None)
                     for field in (
@@ -457,6 +524,19 @@ async def workflow_response(db, row, user):
     )
     eligible_reviewers, eligible_approvers = [], []
     assign = edit and user.role != UserRole.external and state.id is not None
+    assign_assignee = bool(
+        is_controlled
+        and edit
+        and state.id is not None
+        and may_change_assignee(user, row, state, assign)
+    )
+    eligible_assignees = []
+    if assign_assignee:
+        for person in (
+            await db.scalars(select(User).where(User.is_active.is_(True)).order_by(User.full_name))
+        ).all():
+            if await _may_take_document(db, person, row):
+                eligible_assignees.append(await _person(db, person.id))
     if assign:
         for person in (
             await db.scalars(select(User).where(User.is_active.is_(True)).order_by(User.full_name))
@@ -501,6 +581,8 @@ async def workflow_response(db, row, user):
         "phase": state.phase,
         "status": row.status,
         "creator": await _person(db, state.revision_creator_id),
+        "created_by": await _person(db, getattr(row, "created_by_id", None)),
+        "assignee": await _person(db, state.assignee_id if is_controlled else None),
         "reviewer": await _person(db, reviewer_id),
         "approver": await _person(db, approver_id),
         "reviewed_by": await _person(db, state.reviewed_by_id),
@@ -509,14 +591,18 @@ async def workflow_response(db, row, user):
         "approved_at": _time(state.approved_at),
         "authorizing_change": await _change(db, state.authorizing_change_id, user),
         "options": {
+            "assignees": eligible_assignees,
             "reviewers": eligible_reviewers,
             "approvers": eligible_approvers,
             "changes": changes,
         },
         "actions": {
             "request_review": bool(
-                is_controlled and state.phase == "Draft" and state.revision_creator_id == user.id
+                is_controlled
+                and state.phase == "Draft"
+                and (state.assignee_id == user.id or user.role == UserRole.admin)
             ),
+            "assign_assignee": assign_assignee,
             "request_approval": bool(
                 is_controlled
                 and state.phase == "Review"
@@ -532,7 +618,7 @@ async def workflow_response(db, row, user):
                 and delivered_actor
                 and state.review_content_hash == fingerprint
             ),
-            "decline": bool(pending and delivered_actor),
+            "decline": bool(pending and (delivered_actor or user.role == UserRole.admin)),
             "assign_reviewer": assign,
             "assign_approver": assign and is_controlled,
             "comment": await can_comment(db, user, row),
@@ -587,6 +673,7 @@ async def read_workflow(
 @router.put(
     "/artefacts/{slug}/{identifier}/workflow/assignees",
     responses={
+        403: {"description": HTTPStatus(403).phrase},
         404: {"description": HTTPStatus(404).phrase},
         422: {"description": HTTPStatus(422).phrase},
     },
@@ -602,6 +689,8 @@ async def set_assignees(
     state = await get_workflow(db, row)
     values = data.model_dump(exclude_unset=True)
     check_external_change(user, artefact_identity(row)[1], row, values)
+    if "assignee_id" in values:
+        await _set_assignee(db, row, state, user, values.pop("assignee_id"))
     for field, person_id in values.items():
         step = "review" if field == "reviewer_id" else "approve"
         if step == "approve" and not controlled(row):
@@ -626,8 +715,37 @@ async def set_assignees(
             db.add(ArtefactRequestRecipient(request_id=pending.id, user_id=person.id))
             await _deliver(db, row, pending, person, user)
     await db.flush()
-    await _event(db, state, user, "assigned", **values)
+    await _event(db, state, user, "assigned", **data.model_dump(exclude_unset=True))
     return await workflow_response(db, row, user)
+
+
+async def _set_assignee(db, row, state, user, person_id) -> None:
+    """Hand a controlled document to another assignee and notify them."""
+    if not controlled(row):
+        raise HTTPException(status_code=422, detail=THIS_DOCUMENT_HAS_NO_APPROVAL_WORKFLOW)
+    assign = user.role != UserRole.external
+    if not may_change_assignee(user, row, state, assign):
+        raise HTTPException(
+            status_code=403,
+            detail="Only the creator, the assignee or a reviewer assigner changes the assignee.",
+        )
+    person = await db.get(User, person_id) if person_id else None
+    if person is None or not await _may_take_document(db, person, row):
+        raise HTTPException(
+            status_code=422, detail="The assignee cannot see or edit this document."
+        )
+    previous = state.assignee_id
+    state.assignee_id = person.id
+    await notify_assignment(
+        db,
+        assignee_id=person.id,
+        previous_assignee_id=previous,
+        role_label="assignee",
+        artefact_label=artefact_public_id(artefact_identity(row)[0], row),
+        project_id=row.project_id,
+        link_path=await document_path(db, row),
+        actor=user,
+    )
 
 
 @router.post(
@@ -670,7 +788,7 @@ async def decline_request(
     if not state:
         raise HTTPException(status_code=404, detail="Request not found")
     row = await visible_artefact(db, state.artefact_type, state.artefact_id, user, lock=True)
-    if not await _delivered_actor(db, row, state, request, user):
+    if user.role != UserRole.admin and not await _delivered_actor(db, row, state, request, user):
         raise HTTPException(status_code=403, detail="This request was not delivered to you.")
     if request.status != "pending" or request.revision_number != state.revision_number:
         raise HTTPException(status_code=409, detail="This request is no longer pending.")
@@ -810,6 +928,8 @@ async def _visible_revision(db, slug, identifier, number, user):
         else None
     )
     if not revision or not await _revision_visible(db, row, revision, user):
+        if revision:
+            mark_refused()
         raise HTTPException(status_code=404, detail="Revision not found")
     return row, revision
 
@@ -914,25 +1034,8 @@ async def _deliver(db, row, request, recipient, actor, outcome=None):
     """Notify and email only a recipient that can currently read the document."""
     if not await row_allows(db, recipient, row, "view"):
         return False
-    slug, code = artefact_identity(row)
-    project = await db.get(Project, row.project_id)
-    public_id = artefact_public_id(slug, row)
-    slugs = {
-        "REQ": "requirements",
-        "SPEC": "specifications",
-        "TC": "test-cases",
-        "DES": "designs",
-        "RSK": "risks",
-        "CHG": "changes",
-        "CPT": "test-concepts",
-        "DEF": "defects",
-        "CMP": "campaigns",
-        "TS": "test-suites",
-        "PRT": "protocols",
-        "RPT": "reports",
-        "STD": "standards",
-    }
-    path = f"/projects/{project.prefix}/docs/{slugs[code]}/{public_id}"
+    public_id = artefact_public_id(artefact_identity(row)[0], row)
+    path = await document_path(db, row)
     title = (
         f"{request.kind.capitalize()} {'requested' if outcome is None else outcome}: {public_id}"
     )

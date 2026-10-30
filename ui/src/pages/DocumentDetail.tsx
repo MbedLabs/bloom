@@ -1,6 +1,7 @@
 import { DOC_TYPE_SLUGS } from '../types/doc'
 import { finishArtefactDeletion } from '../lib/refreshProjectViews'
 import WorkflowPanel from '../components/WorkflowPanel'
+import { CommentableDocEditor, CommentsColumn, ReviewCommentsProvider } from '../components/comments/ReviewComments'
 import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
 import { useAuth } from '../contexts/AuthContext'
 import { useSignOffPeople } from '../hooks/useSignOff'
@@ -8,20 +9,28 @@ import { useMemo, useState } from 'react'
 import ArtefactTags from '../components/ArtefactTags'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, Link, useNavigate } from 'react-router'
-import { documentsApi, projectsApi, DocumentSection } from '../api/client'
+import { documentsApi, projectsApi, DocumentSection, type DocumentDetail as DocumentRecord } from '../api/client'
 import { Trash2, ChevronRight, FileText, FileEdit } from 'lucide-react'
-import { DocEditor } from '../components/editor'
 import DocDetailShell, { MetaItem, SectionCard } from '../components/DocDetailShell'
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import DocumentAttachmentsPanel from '../components/DocumentAttachmentsPanel'
 import { docEditUrl, docUrl, kindSlugToType, type DocType } from '../types/doc'
 import { formatDateTime } from '../test/date-utils'
+import { visionStage } from '../lib/visionStage'
 import { useToast } from '../components/useToast'
 import { useProjectPermissions, useRowActions } from '../hooks/useProjectPermissions'
 import { useParameterValues } from '../hooks/useParameterValues'
 import { useArtefactLabels } from '../hooks/useArtefactLabels'
 import ConfirmDelete from '../components/ConfirmDelete'
+
+/** The Idea or Binding badge of a vision. */
+function VisionStageBadge({ stage }: Readonly<{ stage: 'Idea' | 'Binding' }>) {
+  const tone = stage === 'Binding'
+    ? 'bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400'
+    : 'bg-slate-500/10 text-slate-700 dark:text-slate-400'
+  return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${tone}`}>{stage}</span>
+}
 
 function flattenSections(sections: DocumentSection[]): DocumentSection[] {
   const result: DocumentSection[] = []
@@ -49,6 +58,82 @@ function TocItem({ section, depth }: Readonly<{ section: DocumentSection; depth:
         <TocItem key={child.id} section={child} depth={depth + 1} />
       ))}
     </>
+  )
+}
+
+/** The Metadata card: origin, ID, version and the creation and update times. */
+function DocumentMetadata({ doc, docId, canEdit }: Readonly<{ doc: DocumentRecord; docId: number; canEdit: boolean }>) {
+  const origin = doc.visibility === 'customer' ? 'Customer' : 'Internal'
+  return (
+    <SectionCard title="Metadata">
+      <div className="space-y-4">
+        <MetaItem label="Origin" value={<ArtefactTags type="document" id={docId} projectId={doc.project_id} canEdit={canEdit} origin={origin} />} />
+        <MetaItem label="ID" value={doc.doc_id || String(docId)} mono />
+        <MetaItem label="Version" value={`v${doc.version}`} />
+        <MetaItem label="Created" value={formatDateTime(doc.created_at) + ' ago'} />
+        <MetaItem label="Updated" value={formatDateTime(doc.updated_at) + ' ago'} />
+      </div>
+    </SectionCard>
+  )
+}
+
+/** The Edit button and the Delete button, which asks for confirmation first. */
+function DocumentActions({ showEdit, showDelete, confirming, pending, onEdit, onConfirming, onDelete }: Readonly<{
+  showEdit: boolean
+  showDelete: boolean
+  confirming: boolean
+  pending: boolean
+  onEdit: () => void
+  onConfirming: (confirming: boolean) => void
+  onDelete: () => void
+}>) {
+  return (
+    <>
+      {showEdit && (
+      <button
+        onClick={onEdit}
+        className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm font-medium"
+      >
+        <FileEdit className="h-4 w-4 mr-2" />
+        Edit
+      </button>
+      )}
+      {showDelete && !confirming && (
+        <button
+          onClick={() => onConfirming(true)}
+          disabled={pending}
+          className="inline-flex items-center gap-2 px-3 py-2 border border-red-300 text-red-600 rounded-md text-sm hover:bg-red-50 disabled:opacity-50"
+        >
+          <Trash2 className="h-4 w-4" />
+          Delete
+        </button>
+      )}
+      {showDelete && confirming && (
+        <ConfirmDelete pending={pending} onConfirm={onDelete} onCancel={() => onConfirming(false)} />
+      )}
+    </>
+  )
+}
+
+/** The placeholder of a document without content, with the way into the editor. */
+function EmptyDocument({ showEdit, onEdit }: Readonly<{ showEdit: boolean; onEdit: () => void }>) {
+  return (
+    <div className="bg-card rounded-lg border border-border shadow-elegant p-16 text-center">
+      <div className="w-16 h-16 rounded-2xl bg-linear-to-br/srgb from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-4">
+        <FileText className="h-8 w-8 text-primary/40" />
+      </div>
+      <h3 className="text-lg font-semibold text-foreground mb-2">Empty Document</h3>
+      <p className="text-sm text-muted-foreground max-w-md mx-auto mb-4">This document has no content yet. Open the editor to start writing.</p>
+      {showEdit && (
+        <button
+          onClick={onEdit}
+          className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm font-medium"
+        >
+          <FileEdit className="h-4 w-4 mr-2" />
+          Open Editor
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -136,62 +221,39 @@ export default function DocumentDetail({
   }
 
   const editUrl = docEditUrl(projectPrefix, resolvedDocType, doc.doc_id || String(docId))
+  const openEditor = () => navigate(`${editUrl}?type=${resolvedDocType}`)
 
   return (
+    <ReviewCommentsProvider artefactType="document" artefactId={docId} projectPrefix={projectPrefix} projectId={doc.project_id}>
     <DocDetailShell
       projectPrefix={projectPrefix}
       docType={resolvedDocType}
       docCode={doc.doc_id || String(docId)}
       title={doc.title}
       status={doc.status}
+      codeLabel={docType === 'VIS' ? <VisionStageBadge stage={visionStage(workflow.data)} /> : undefined}
       actions={showEdit || showDelete ? (
-        <>
-          {showEdit && (
-          <button
-            onClick={() => navigate(`${editUrl}?type=${resolvedDocType}`)}
-            className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm font-medium"
-          >
-            <FileEdit className="h-4 w-4 mr-2" />
-            Edit
-          </button>
-          )}
-          {showDelete && (!deleteConfirm ? (
-            <button
-              onClick={() => setDeleteConfirm(true)}
-              disabled={deleteDocumentMutation.isPending}
-              className="inline-flex items-center gap-2 px-3 py-2 border border-red-300 text-red-600 rounded-md text-sm hover:bg-red-50 disabled:opacity-50"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </button>
-          ) : (
-            <ConfirmDelete
-              pending={deleteDocumentMutation.isPending}
-              onConfirm={() => { setDeleteConfirm(false); deleteDocumentMutation.mutate(); }}
-              onCancel={() => setDeleteConfirm(false)}
-            />
-          ))}
-        </>
+        <DocumentActions
+          showEdit={showEdit}
+          showDelete={showDelete}
+          confirming={deleteConfirm}
+          pending={deleteDocumentMutation.isPending}
+          onEdit={openEditor}
+          onConfirming={setDeleteConfirm}
+          onDelete={() => { setDeleteConfirm(false); deleteDocumentMutation.mutate(); }}
+        />
       ) : undefined}
-      rightRail={
-        <>
+      review={hasRichContent ? <WorkflowPanel artefactType="document" artefactId={docId} projectPrefix={projectPrefix} projectId={doc.project_id} layout="bar" /> : undefined}
+      comments={hasRichContent ? <CommentsColumn /> : undefined}
+      rightRail={hasRichContent ? undefined : <>
         <WorkflowPanel artefactType="document" artefactId={docId} projectPrefix={projectPrefix} projectId={doc.project_id} />
-        <SectionCard title="Metadata">
-          <div className="space-y-4">
-            <MetaItem label="Origin" value={<ArtefactTags type="document" id={docId} projectId={doc.project_id} canEdit={showEdit} origin={doc.visibility === 'customer' ? 'Customer' : 'Internal'} />} />
-            <MetaItem label="ID" value={doc.doc_id || String(docId)} mono />
-            <MetaItem label="Version" value={`v${doc.version}`} />
-            <MetaItem label="Created" value={formatDateTime(doc.created_at) + ' ago'} />
-            <MetaItem label="Updated" value={formatDateTime(doc.updated_at) + ' ago'} />
-          </div>
-        </SectionCard>
-        </>
-      }
+        <DocumentMetadata doc={doc} docId={docId} canEdit={showEdit} />
+      </>}
     >
       {hasRichContent && (
         <div className="bg-card rounded-lg border border-border shadow-elegant p-8">
           <div className="max-w-4xl mx-auto">
-            <DocEditor
+            <CommentableDocEditor
               content={doc.content_json as Record<string, unknown>}
               editable={false}
               userMentionItems={people.map(person => ({ id: person.id, label: person.full_name, user: person }))}
@@ -224,24 +286,7 @@ export default function DocumentDetail({
         </div>
       )}
 
-      {!hasRichContent && !hasLegacySections && (
-        <div className="bg-card rounded-lg border border-border shadow-elegant p-16 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-linear-to-br/srgb from-primary/10 to-violet-500/10 flex items-center justify-center mx-auto mb-4">
-            <FileText className="h-8 w-8 text-primary/40" />
-          </div>
-          <h3 className="text-lg font-semibold text-foreground mb-2">Empty Document</h3>
-          <p className="text-sm text-muted-foreground max-w-md mx-auto mb-4">This document has no content yet. Open the editor to start writing.</p>
-          {showEdit && (
-            <button
-              onClick={() => navigate(`${editUrl}?type=${resolvedDocType}`)}
-              className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm font-medium"
-            >
-              <FileEdit className="h-4 w-4 mr-2" />
-              Open Editor
-            </button>
-          )}
-        </div>
-      )}
+      {!hasRichContent && !hasLegacySections && <EmptyDocument showEdit={showEdit} onEdit={openEditor} />}
 
       <DocumentAttachmentsPanel documentId={docId} docType={docType} rowAllowsEdit={showEdit} projectId={doc.project_id} />
 
@@ -254,6 +299,8 @@ export default function DocumentDetail({
         sourceId={docId}
         sourceDocId={doc.doc_id ?? undefined}
       />
+      {hasRichContent && <DocumentMetadata doc={doc} docId={docId} canEdit={showEdit} />}
     </DocDetailShell>
+    </ReviewCommentsProvider>
   )
 }

@@ -4,8 +4,8 @@ import { docCreateUrl, docListUrl, getAllowedDocLinkRoles, getDocLinkOptions, ge
 
 describe('docCreateUrl', () => {
   it('uses normalized kind slugs in create routes', () => {
-    expect(docCreateUrl('VCU', 'SPEC')).toBe('/projects/VCU/docs/new?type=specifications')
-    expect(docCreateUrl('VCU', 'TC')).toBe('/projects/VCU/docs/new?type=test-cases')
+    expect(docCreateUrl('PRJ', 'SPEC')).toBe('/projects/PRJ/docs/new?type=specifications')
+    expect(docCreateUrl('PRJ', 'TC')).toBe('/projects/PRJ/docs/new?type=test-cases')
   })
 })
 
@@ -74,13 +74,13 @@ describe('getAllowedDocLinkRoles', () => {
 
 describe('docListUrl', () => {
   it('builds typed list URLs with slugs', () => {
-    expect(docListUrl('VCU', 'REQ')).toBe('/projects/VCU/docs?type=requirements')
-    expect(docListUrl('VCU', 'CMP')).toBe('/projects/VCU/docs?type=campaigns')
-    expect(docListUrl('VCU', 'TS')).toBe('/projects/VCU/docs?type=test-suites')
+    expect(docListUrl('PRJ', 'REQ')).toBe('/projects/PRJ/docs?type=requirements')
+    expect(docListUrl('PRJ', 'CMP')).toBe('/projects/PRJ/docs?type=campaigns')
+    expect(docListUrl('PRJ', 'TS')).toBe('/projects/PRJ/docs?type=test-suites')
   })
 
   it('appends extra search params', () => {
-    expect(docListUrl('VCU', 'REQ', 'sort=doc_id&dir=asc')).toBe('/projects/VCU/docs?type=requirements&sort=doc_id&dir=asc')
+    expect(docListUrl('PRJ', 'REQ', 'sort=doc_id&dir=asc')).toBe('/projects/PRJ/docs?type=requirements&sort=doc_id&dir=asc')
   })
 })
 

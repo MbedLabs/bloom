@@ -100,8 +100,8 @@ def _login(client, email):
 
 REQUEST = {
     "resource_type": "requirement",
-    "resource_ref": "APO-REQ-001",
-    "project_prefix": "APO",
+    "resource_ref": "PRJ-REQ-001",
+    "project_prefix": "PRJ",
 }
 
 
@@ -139,13 +139,13 @@ def test_a_request_emails_every_administrator_once_a_day(harness, sent_mail):
     ]
     mail = sent_mail[0]
     assert mail["requester_email"] == "member@example.com"
-    assert mail["resource"] == "APO-REQ-001"
-    assert mail["project"] == "APO"
-    assert mail["review_link"].endswith("/projects/APO/edit")
+    assert mail["resource"] == "PRJ-REQ-001 (not found)"
+    assert mail["project"] == "PRJ"
+    assert mail["review_link"].endswith("/projects/PRJ/edit")
     assert mail["request_id"] == first.headers["x-request-id"]
     [event] = _events(session_maker, "access.requested")
     assert event.target_type == "requirement"
-    assert event.target_id == "APO-REQ-001"
+    assert event.target_id == "PRJ-REQ-001"
 
 
 def test_the_page_learns_a_request_is_pending(harness, sent_mail):
@@ -190,7 +190,7 @@ def test_an_administrator_decision_is_recorded_once(harness, sent_mail):
     created = client.post("/api/access-requests", json=REQUEST, headers=member_headers).json()
 
     listed = client.get(
-        "/api/access-requests", params={"project_prefix": "APO"}, headers=admin_headers
+        "/api/access-requests", params={"project_prefix": "PRJ"}, headers=admin_headers
     )
     refused_for_member = client.post(
         f"/api/access-requests/{created['id']}/decision",
@@ -229,6 +229,7 @@ def test_nothing_about_the_resource_is_disclosed(harness, sent_mail):
         "id",
         "resource_type",
         "resource_ref",
+        "resource_label",
         "project_prefix",
         "status",
         "created_at",
@@ -252,7 +253,7 @@ def test_global_request_listing_preserves_admin_guard_and_refusal_lifecycle(harn
     created = client.post("/api/access-requests", json=REQUEST, headers=member_headers).json()
     other = client.post(
         "/api/access-requests",
-        json={**REQUEST, "resource_ref": "OTH-REQ-001", "project_prefix": "OTH"},
+        json={**REQUEST, "resource_ref": "ABC-REQ-001", "project_prefix": "ABC"},
         headers=member_headers,
     ).json()
     denied = client.get("/api/access-requests", headers=member_headers)
@@ -304,3 +305,17 @@ def test_a_resource_reference_is_validated(harness, sent_mail):
     )
 
     assert response.status_code == 422
+
+
+def test_an_administrator_is_refused_and_nobody_is_mailed(harness, sent_mail):
+    client, session_maker = harness
+    _user(session_maker, "boss@example.com", UserRole.admin)
+    _user(session_maker, "second@example.com", UserRole.admin)
+    headers = _login(client, "boss@example.com")
+
+    response = client.post("/api/access-requests", json=REQUEST, headers=headers)
+
+    assert response.status_code == 409
+    assert "nothing to request" in response.json()["detail"]
+    assert sent_mail == []
+    assert _events(session_maker, "access.requested") == []

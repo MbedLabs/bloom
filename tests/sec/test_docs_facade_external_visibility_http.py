@@ -116,7 +116,7 @@ async def _seed_docs_visibility_data(session_maker: async_sessionmaker[AsyncSess
         session.add_all([admin, external])
         await session.flush()
 
-        project = Project(name="Visible Project", prefix="VIS", description="Visibility checks")
+        project = Project(name="Demo", prefix="PRJ", description="Visibility checks")
         session.add(project)
         await session.flush()
 
@@ -133,7 +133,7 @@ async def _seed_docs_visibility_data(session_maker: async_sessionmaker[AsyncSess
 
         customer_requirement = Requirement(
             project_id=project.id,
-            req_id="VIS-REQ-001",
+            req_id="PRJ-REQ-001",
             title="Customer requirement",
             status="Draft",
             visibility="customer",
@@ -143,7 +143,7 @@ async def _seed_docs_visibility_data(session_maker: async_sessionmaker[AsyncSess
         )
         internal_requirement = Requirement(
             project_id=project.id,
-            req_id="VIS-REQ-002",
+            req_id="PRJ-REQ-002",
             title="Internal requirement",
             status="Draft",
             visibility="internal",
@@ -153,7 +153,7 @@ async def _seed_docs_visibility_data(session_maker: async_sessionmaker[AsyncSess
         )
         customer_spec = Document(
             project_id=project.id,
-            doc_id="VIS-SPEC-001",
+            doc_id="PRJ-SPEC-001",
             title="Customer specification",
             doc_type="SPEC",
             visibility="customer",
@@ -162,7 +162,7 @@ async def _seed_docs_visibility_data(session_maker: async_sessionmaker[AsyncSess
         )
         internal_spec = Document(
             project_id=project.id,
-            doc_id="VIS-SPEC-002",
+            doc_id="PRJ-SPEC-002",
             title="Internal specification",
             doc_type="SPEC",
             visibility="internal",

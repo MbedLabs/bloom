@@ -334,7 +334,25 @@ export interface MentionableUser extends ProfilePerson {
   full_name: string
 }
 
+/** One project a user can access, with the groups that give it. */
+export interface UserProjectAccess {
+  project_id: number
+  project_name: string
+  owner: boolean
+  groups: string[]
+  direct: boolean
+}
+
+/** A user's groups and project access by name, for the Users page. */
+export interface UserAccessSummary {
+  every_project: boolean
+  groups: string[]
+  projects: UserProjectAccess[]
+}
+
 export const usersApi = {
+  accessSummary: async (id: number): Promise<UserAccessSummary> =>
+    (await api.get<UserAccessSummary>(`/users/${id}/access-summary`)).data,
   applicationPolicies: async (id: number): Promise<{ policy_ids: number[] }> =>
     (await api.get<{ policy_ids: number[] }>(`/users/${id}/application-policies`)).data,
   setApplicationPolicies: async (id: number, policyIds: number[]): Promise<{ policy_ids: number[] }> =>
@@ -534,6 +552,7 @@ export interface AccessRequestInfo {
   id: number
   resource_type: string
   resource_ref: string
+  resource_label?: string | null
   project_prefix: string | null
   status: 'pending' | 'granted' | 'refused'
   created_at: string
@@ -568,10 +587,12 @@ export interface AuditEvent {
   actor_user_id: number | null
   actor_name: string | null
   actor_profile_picture_url?: string | null
+  actor_label?: string | null
   actor_type: string
   action: string
   target_type: string | null
   target_id: string | null
+  target_label?: string | null
   project_id: number | null
   request_id: string | null
   ip: string | null
@@ -589,11 +610,14 @@ export interface AuditFilters {
   sort?: 'occurred_at' | 'actor' | 'action' | 'target' | 'outcome' | 'ip' | 'request_id'
   dir?: 'asc' | 'desc'
   actor_user_id?: number
+  actor_type?: string
   action?: string
   target_type?: string
   target_id?: string
   project_id?: number
   outcome?: string
+  ip?: string
+  request_id?: string
   since?: string
   until?: string
   limit?: number
@@ -976,6 +1000,13 @@ export interface TestConcept {
   updated_at: string
 }
 
+/** The commented passage with up to 64 characters of the text before and after it. */
+export interface CommentAnchor {
+  exact: string
+  prefix: string
+  suffix: string
+}
+
 export interface ArtefactComment {
   id: number
   artefact_type: string
@@ -985,6 +1016,11 @@ export interface ArtefactComment {
   author_profile_picture_url?: string | null
   body: string
   created_at: string
+  parent_id?: number | null
+  anchor?: CommentAnchor | null
+  resolved_at?: string | null
+  resolved_by?: { id: number; full_name: string } | null
+  replies?: ArtefactComment[]
 }
 
 export interface ArtefactActivity {
@@ -1839,17 +1875,26 @@ export interface IntegrationSetting {
   jira_reference_field?: string | null
   jira_priority_map?: Record<string, string> | null
   two_way?: boolean
+  sync_checked_at?: string | null
+  synced_at?: string | null
+  sync_error?: string | null
+  sync_warning?: string | null
+  sync_created?: number
+  sync_updated?: number
+  auto_sync_minutes?: number
   created_at: string
   updated_at: string
 }
 
-/** Outcome of pulling existing Jira issues into defects. */
+/** Outcome of Sync now: the issues the creation search found and what the run changed. */
 export interface JiraPullResult {
   searched: number
   created: number
   already_linked: number
   skipped: number
   new_ids: string[]
+  updated: number
+  removed: number
 }
 
 /** Jira settings a create or update may carry. */
@@ -2281,8 +2326,24 @@ export const artefactsApi = {
     const response = await api.get<ArtefactComment[]>(`/artefacts/${artefactType}/${artefactId}/comments`)
     return response.data
   },
-  createComment: async (artefactType: string, artefactId: number, body: string) => {
-    const response = await api.post<ArtefactComment>(`/artefacts/${artefactType}/${artefactId}/comments`, { body })
+  createComment: async (
+    artefactType: string,
+    artefactId: number,
+    body: string,
+    options: { parentId?: number; anchor?: CommentAnchor } = {},
+  ) => {
+    const payload: { body: string; parent_id?: number; anchor?: CommentAnchor } = { body }
+    if (options.parentId !== undefined) payload.parent_id = options.parentId
+    if (options.anchor) payload.anchor = options.anchor
+    const response = await api.post<ArtefactComment>(`/artefacts/${artefactType}/${artefactId}/comments`, payload)
+    return response.data
+  },
+  resolveComment: async (artefactType: string, artefactId: number, commentId: number) => {
+    const response = await api.post<ArtefactComment>(`/artefacts/${artefactType}/${artefactId}/comments/${commentId}/resolve`)
+    return response.data
+  },
+  reopenComment: async (artefactType: string, artefactId: number, commentId: number) => {
+    const response = await api.post<ArtefactComment>(`/artefacts/${artefactType}/${artefactId}/comments/${commentId}/reopen`)
     return response.data
   },
   listActivity: async (artefactType: string, artefactId: number) => {
@@ -2315,6 +2376,8 @@ export interface DocumentWorkflow {
   phase: string | null
   status: string
   creator: WorkflowPerson | null
+  created_by: WorkflowPerson | null
+  assignee: WorkflowPerson | null
   reviewer: WorkflowPerson | null
   approver: WorkflowPerson | null
   reviewed_by: WorkflowPerson | null
@@ -2322,8 +2385,8 @@ export interface DocumentWorkflow {
   approved_by: WorkflowPerson | null
   approved_at: string | null
   authorizing_change: WorkflowChange | null
-  options: { reviewers: WorkflowPerson[]; approvers: WorkflowPerson[]; changes: WorkflowChange[] }
-  actions: Record<'request_review' | 'request_approval' | 'approve' | 'decline' | 'assign_reviewer' | 'assign_approver' | 'comment' | 'start_revision' | 'start_draft' | 'edit_current' | 'plan_current', boolean>
+  options: { assignees: WorkflowPerson[]; reviewers: WorkflowPerson[]; approvers: WorkflowPerson[]; changes: WorkflowChange[] }
+  actions: Record<'request_review' | 'request_approval' | 'approve' | 'decline' | 'assign_assignee' | 'assign_reviewer' | 'assign_approver' | 'comment' | 'start_revision' | 'start_draft' | 'edit_current' | 'plan_current', boolean>
   pending_request: WorkflowRequest | null
   last_request: { id: number; kind: 'review' | 'approval'; status: string; retry_at: string | null } | null
   revisions: { revision_number: number; captured_at: string; approved_by: WorkflowPerson | null; approved_at: string | null; authorizing_change_id: number | null }[]
@@ -2345,7 +2408,7 @@ export const workflowApi = {
     (await api.get<ProjectDocumentRequest[]>(`/projects/${projectId}/artefact-requests`)).data,
   get: async (type: string, id: number): Promise<DocumentWorkflow> =>
     (await api.get<DocumentWorkflow>(`/artefacts/${type}/${id}/workflow`)).data,
-  assign: async (type: string, id: number, data: { reviewer_id?: number | null; approver_id?: number | null }) =>
+  assign: async (type: string, id: number, data: { assignee_id?: number; reviewer_id?: number | null; approver_id?: number | null }) =>
     (await api.put(`/artefacts/${type}/${id}/workflow/assignees`, data)).data,
   request: async (type: string, id: number, kind: 'review' | 'approval') =>
     (await api.post(`/artefacts/${type}/${id}/requests`, { kind })).data,

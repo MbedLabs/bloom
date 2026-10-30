@@ -27,6 +27,9 @@ import { LineHeight } from './LineHeight'
 import DocEditorToolbar from './DocEditorToolbar'
 import OutlineSidebar from './OutlineSidebar'
 import MentionList, { type MentionListRef, type MentionSuggestion } from './MentionList'
+import { CommentHighlights, setHighlightedThreads, type HighlightedThread } from './CommentHighlights'
+import { quoteFor } from '../../lib/textQuote'
+import type { CommentAnchor } from '../../api/client'
 
 const lowlight = createLowlight(common)
 const PARAMETER_MENTION_TRIGGER = '{{'
@@ -59,6 +62,12 @@ interface DocEditorProps {
    * is gone. A tag shows the current id and reads as plain text once its target is gone.
    */
   artefactLabels?: Record<string, string | null>
+  /** Comment threads whose quoted passages are highlighted. */
+  commentThreads?: HighlightedThread[]
+  /** Called with a thread's id when its highlighted passage is clicked. */
+  onThreadClick?: (id: number) => void
+  /** Called with the quote and screen box of a text selection, or null when it ends. */
+  onCommentSelection?: (selection: { anchor: CommentAnchor; rect: DOMRect } | null) => void
 }
 
 type MentionSpec = [string, Record<string, string>, string]
@@ -82,6 +91,9 @@ export default function DocEditor({
   parameterHref,
   parameterValues,
   artefactLabels,
+  commentThreads,
+  onThreadClick,
+  onCommentSelection,
 }: Readonly<DocEditorProps>) {
   const mentionItemsRef = useRef(mentionItems)
   const userMentionItemsRef = useRef(userMentionItems)
@@ -366,6 +378,7 @@ export default function DocEditor({
       Superscript,
       Subscript,
       LineHeight,
+      CommentHighlights,
     ],
     content: content as Record<string, unknown> | undefined,
     editable,
@@ -388,6 +401,44 @@ export default function DocEditor({
       }
     }
   }, [content, editor])
+
+  useEffect(() => {
+    if (editor && commentThreads) setHighlightedThreads(editor, commentThreads)
+  }, [editor, commentThreads])
+
+  useEffect(() => {
+    if (!editor || (!onThreadClick && !onCommentSelection)) return
+    const root = editor.view.dom
+    const handleClick = (event: MouseEvent) => {
+      const marked = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-comment-id]')
+      if (marked && onThreadClick) onThreadClick(Number(marked.dataset.commentId))
+    }
+    const handleSelection = () => {
+      if (!onCommentSelection) return
+      const selection = window.getSelection()
+      if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+        onCommentSelection(null)
+        return
+      }
+      const range = selection.getRangeAt(0)
+      if (!root.contains(range.startContainer) || !root.contains(range.endContainer)) {
+        onCommentSelection(null)
+        return
+      }
+      const from = editor.view.posAtDOM(range.startContainer, range.startOffset)
+      const to = editor.view.posAtDOM(range.endContainer, range.endOffset)
+      const anchor = quoteFor(editor.state.doc, Math.min(from, to), Math.max(from, to))
+      onCommentSelection(anchor ? { anchor, rect: range.getBoundingClientRect() } : null)
+    }
+    root.addEventListener('click', handleClick)
+    root.addEventListener('mouseup', handleSelection)
+    root.addEventListener('keyup', handleSelection)
+    return () => {
+      root.removeEventListener('click', handleClick)
+      root.removeEventListener('mouseup', handleSelection)
+      root.removeEventListener('keyup', handleSelection)
+    }
+  }, [editor, onThreadClick, onCommentSelection])
 
   useEffect(() => {
     editor?.setEditable(editable)

@@ -32,7 +32,7 @@ def _setting(**overrides):
 ADF = {
     "type": "doc",
     "content": [
-        {"type": "paragraph", "content": [{"type": "text", "text": "Found by ALP-TC-004"}]},
+        {"type": "paragraph", "content": [{"type": "text", "text": "Found by PRJ-TC-004"}]},
         {
             "type": "bulletList",
             "content": [
@@ -58,7 +58,7 @@ ADF = {
 def test_adf_to_text():
     assert adf_to_text(None) == ""
     assert adf_to_text("  plain  ") == "plain"
-    assert adf_to_text(ADF) == "Found by ALP-TC-004\nline one\n@Ada"
+    assert adf_to_text(ADF) == "Found by PRJ-TC-004\nline one\n@Ada"
     assert adf_to_text({"type": "text", "text": "loose"}) == "loose"
 
 
@@ -87,15 +87,15 @@ def test_priority_map_and_resolution():
 
 def test_referenced_test_cases():
     fields = {
-        "summary": "alp-tc-002 fails",
+        "summary": "prj-tc-002 fails",
         "description": ADF,
-        "customfield_1": "ALP-TC-002, ALP-TC-009, BMS-TC-001",
+        "customfield_1": "PRJ-TC-002, PRJ-TC-009, ABC-TC-001",
     }
-    assert referenced_tc_ids("ALP", _setting(), fields) == ["ALP-TC-002", "ALP-TC-004"]
-    assert referenced_tc_ids("ALP", _setting(jira_reference_field="customfield_1"), fields) == [
-        "ALP-TC-002",
-        "ALP-TC-004",
-        "ALP-TC-009",
+    assert referenced_tc_ids("PRJ", _setting(), fields) == ["PRJ-TC-002", "PRJ-TC-004"]
+    assert referenced_tc_ids("PRJ", _setting(jira_reference_field="customfield_1"), fields) == [
+        "PRJ-TC-002",
+        "PRJ-TC-004",
+        "PRJ-TC-009",
     ]
 
 

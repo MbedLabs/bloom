@@ -44,7 +44,7 @@ function renderWizard() {
   return render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <MemoryRouter initialEntries={['/projects/VCU/import']}>
+        <MemoryRouter initialEntries={['/projects/PRJ/import']}>
           <Routes>
             <Route path="/projects/:prefix/import" element={<ImportWizard />} />
           </Routes>

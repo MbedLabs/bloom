@@ -52,8 +52,9 @@ vi.mock('@tanstack/react-query', async () => {
     ...actual,
     useQuery: ({ queryKey }: { queryKey: unknown[] }) => {
       let data: unknown = requirement
-      if (queryKey[0] === 'project') data = { id: 7, name: 'Project', prefix: 'PRJ' }
-      else if (queryKey[0] === 'mentionableUsers' || queryKey[0] === 'users') data = []
+      if (queryKey[0] === 'project') data = { id: 7, name: 'Demo', prefix: 'PRJ' }
+      else if (queryKey[0] === 'mentionableUsers' || queryKey[0] === 'users' || queryKey[0] === 'artefactComments') data = []
+      else if (queryKey[0] === 'document-workflow') data = undefined
       return { data, isLoading: false, error: null }
     },
     useMutation: () => ({ mutate: vi.fn(), isPending: false }),

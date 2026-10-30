@@ -29,7 +29,7 @@ async def session():
         await conn.run_sync(Base.metadata.create_all)
     maker = async_sessionmaker(engine, expire_on_commit=False)
     async with maker() as db:
-        project = Project(name="Alpha", prefix="ALP")
+        project = Project(name="Demo", prefix="PRJ")
         reviewer = User(
             email="rev@test.local",
             full_name="Rita Reviewer",
@@ -88,7 +88,7 @@ async def test_notify_assignment_only_fires_on_change(session):
         assignee_id=reviewer.id,
         previous_assignee_id=reviewer.id,
         role_label="reviewer",
-        artefact_label="requirement ALP-REQ-001",
+        artefact_label="requirement PRJ-REQ-001",
         project_id=1,
         link_path="/x",
         actor=admin,
@@ -110,7 +110,7 @@ async def test_requirement_create_notifies_reviewer(session):
     assert n.event_type == "assignment"
     assert "reviewer" in n.title
     assert n.link_path
-    assert "/docs/requirements/ALP-REQ-001" in n.link_path
+    assert "/docs/requirements/PRJ-REQ-001" in n.link_path
 
 
 async def test_requirement_update_notifies_new_approver_once(session):
@@ -215,7 +215,7 @@ async def _external_assignee_requirement(session, origin: str):
     visibility = "customer" if origin == "Customer" else "internal"
     requirement = Requirement(
         project_id=1,
-        req_id="ALP-REQ-009",
+        req_id="PRJ-REQ-009",
         title="Kept assignment",
         req_origin=origin,
         visibility=visibility,
@@ -270,7 +270,7 @@ async def test_a_change_that_hides_a_requirement_from_its_reviewer_is_refused(se
             current_user=admin,
         )
     assert refused.value.status_code == 409
-    assert refused.value.detail == "The reviewer could no longer see ALP-REQ-009."
+    assert refused.value.detail == "The reviewer could no longer see PRJ-REQ-009."
 
 
 async def test_a_kept_external_reviewer_is_shown_as_unable_to_sign(session):

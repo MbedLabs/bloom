@@ -56,14 +56,14 @@ async def database():
             project = await connection.scalar(
                 text(
                     "INSERT INTO projects (name, prefix, status, created_at, updated_at) "
-                    "VALUES ('Link rules', 'LNK', 'Active', now(), now()) RETURNING id"
+                    "VALUES ('Link rules', 'PRJ', 'Active', now(), now()) RETURNING id"
                 )
             )
             await connection.execute(
                 text(
                     "INSERT INTO requirements (project_id, req_id, title, status, priority, req_type, req_origin, visibility, created_at, "
-                    "updated_at) VALUES (:project, 'LNK-REQ-001', 'First', 'Draft', 'Medium', 'Functional', 'Internal', 'internal', now(), now()), "
-                    "(:project, 'LNK-REQ-002', 'Second', 'Draft', 'Medium', 'Functional', 'Internal', 'internal', now(), now())"
+                    "updated_at) VALUES (:project, 'PRJ-REQ-001', 'First', 'Draft', 'Medium', 'Functional', 'Internal', 'internal', now(), now()), "
+                    "(:project, 'PRJ-REQ-002', 'Second', 'Draft', 'Medium', 'Functional', 'Internal', 'internal', now(), now())"
                 ),
                 {"project": project},
             )

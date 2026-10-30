@@ -12,7 +12,7 @@ vi.mock('../contexts/AuthContext', () => ({
 
 vi.mock('../api/client', () => ({
   projectMembersApi: { permissions: vi.fn() },
-  projectsApi: { getByPrefix: vi.fn(async () => ({ id: 5, prefix: 'VCU' })) },
+  projectsApi: { getByPrefix: vi.fn(async () => ({ id: 5, prefix: 'PRJ' })) },
 }))
 
 const client = await import('../api/client')
@@ -51,7 +51,7 @@ describe('useProjectPermissions', () => {
       '*': ['view', 'comment'],
       TC: ['create', 'edit'],
     })
-    renderProbe({ prefix: 'VCU' })
+    renderProbe({ prefix: 'PRJ' })
     await screen.findByText('test case create: true')
     expect(client.projectMembersApi.permissions).toHaveBeenCalledWith(5)
     expect(screen.getByText('requirement create: false')).toBeTruthy()

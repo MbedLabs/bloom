@@ -60,7 +60,7 @@ if args and args[0] == "run" and "--name" in args:
 
 def test_project_payload_matches_current_create_contract():
     script = SCRIPT.read_text(encoding="utf-8")
-    match = re.search(r"-d '(\{\"name\":\"E2E Project\",\"prefix\":\"[^\"]+\"\})'", script)
+    match = re.search(r"-d '(\{\"name\":\"Demo\",\"prefix\":\"[^\"]+\"\})'", script)
 
     assert match is not None
     payload = json.loads(match.group(1))

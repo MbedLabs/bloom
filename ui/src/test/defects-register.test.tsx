@@ -45,7 +45,7 @@ const Defects = (await import('../pages/Defects')).default
 const flicker = {
   ...defect,
   id: 51,
-  defect_id: 'VCU-DEF-001',
+  defect_id: 'PRJ-DEF-001',
   title: 'Alpha screen flickers on wake',
   status: 'Open',
   severity: 'High',
@@ -57,21 +57,21 @@ const flicker = {
 const brownout = {
   ...defect,
   id: 52,
-  defect_id: 'VCU-DEF-002',
+  defect_id: 'PRJ-DEF-002',
   title: 'Bravo brownout resets the clock',
   status: 'Triaged',
   severity: 'Critical',
   priority: 'Critical',
   external_tracker: 'github',
-  external_repo_full_name: 'embedlabs/vcu',
+  external_repo_full_name: 'example/demo',
   external_issue_number: 42,
-  external_issue_url: 'https://github.com/embedlabs/vcu/issues/42',
+  external_issue_url: 'https://github.com/example/demo/issues/42',
   updated_at: '2026-04-01T09:00:00Z',
 }
 const cosmetic = {
   ...defect,
   id: 53,
-  defect_id: 'VCU-DEF-003',
+  defect_id: 'PRJ-DEF-003',
   title: 'Charlie label is misaligned',
   status: 'Resolved',
   severity: 'Low',
@@ -94,10 +94,10 @@ function renderDefects() {
   return render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <MemoryRouter initialEntries={['/projects/VCU/defects']}>
+        <MemoryRouter initialEntries={['/projects/PRJ/defects']}>
           <Routes>
             <Route path="/projects/:prefix/defects" element={<Defects />} />
-            <Route path="/projects/:prefix/defects/:itemId" element={<div>defect detail</div>} />
+            <Route path={`/projects/:prefix/docs/defects/${brownout.defect_id}`} element={<div>defect detail</div>} />
           </Routes>
         </MemoryRouter>
       </ToastProvider>
@@ -112,7 +112,7 @@ function rows(): string[] {
   return within(table)
     .getAllByRole('row')
     .slice(1)
-    .map((row) => /VCU-DEF-\d+/.exec(row.textContent ?? '')?.[0] ?? '')
+    .map((row) => /PRJ-DEF-\d+/.exec(row.textContent ?? '')?.[0] ?? '')
 }
 
 /** The arguments of the most recent call to a mocked endpoint. */
@@ -191,7 +191,7 @@ describe('finding a defect', () => {
       target: { value: 'brownout' },
     })
 
-    await waitFor(() => expect(rows()).toEqual(['VCU-DEF-002']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-DEF-002']))
     expect(vi.mocked(client.defectsApi.list).mock.calls).toHaveLength(before)
   })
 
@@ -201,10 +201,10 @@ describe('finding a defect', () => {
     const search = screen.getByTitle(/filter defects in the current list/i)
 
     fireEvent.change(search, { target: { value: 'DEF-003' } })
-    await waitFor(() => expect(rows()).toEqual(['VCU-DEF-003']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-DEF-003']))
 
     fireEvent.change(search, { target: { value: 'resolved' } })
-    await waitFor(() => expect(rows()).toEqual(['VCU-DEF-003']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-DEF-003']))
   })
 })
 
@@ -213,7 +213,7 @@ describe('ordering the defect register', () => {
     renderDefects()
     await screen.findByText(flicker.title)
 
-    expect(rows()).toEqual(['VCU-DEF-002', 'VCU-DEF-001', 'VCU-DEF-003'])
+    expect(rows()).toEqual(['PRJ-DEF-002', 'PRJ-DEF-001', 'PRJ-DEF-003'])
   })
 
   it('sorts by title ascending, then reverses on a second click', async () => {
@@ -221,10 +221,10 @@ describe('ordering the defect register', () => {
     await screen.findByText(flicker.title)
 
     fireEvent.click(screen.getByText('Title').closest('th') as HTMLElement)
-    await waitFor(() => expect(rows()).toEqual(['VCU-DEF-001', 'VCU-DEF-002', 'VCU-DEF-003']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-DEF-001', 'PRJ-DEF-002', 'PRJ-DEF-003']))
 
     fireEvent.click(screen.getByText('Title').closest('th') as HTMLElement)
-    await waitFor(() => expect(rows()).toEqual(['VCU-DEF-003', 'VCU-DEF-002', 'VCU-DEF-001']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-DEF-003', 'PRJ-DEF-002', 'PRJ-DEF-001']))
   })
 
   it('sorts by identifier, status and severity', async () => {
@@ -232,13 +232,13 @@ describe('ordering the defect register', () => {
     await screen.findByText(flicker.title)
 
     fireEvent.click(screen.getByText('ID').closest('th') as HTMLElement)
-    await waitFor(() => expect(rows()).toEqual(['VCU-DEF-001', 'VCU-DEF-002', 'VCU-DEF-003']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-DEF-001', 'PRJ-DEF-002', 'PRJ-DEF-003']))
 
     fireEvent.click(screen.getByText('Status').closest('th') as HTMLElement)
-    await waitFor(() => expect(rows()).toEqual(['VCU-DEF-001', 'VCU-DEF-003', 'VCU-DEF-002']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-DEF-001', 'PRJ-DEF-003', 'PRJ-DEF-002']))
 
     fireEvent.click(screen.getByText('Severity').closest('th') as HTMLElement)
-    await waitFor(() => expect(rows()).toEqual(['VCU-DEF-002', 'VCU-DEF-001', 'VCU-DEF-003']))
+    await waitFor(() => expect(rows()).toEqual(['PRJ-DEF-002', 'PRJ-DEF-001', 'PRJ-DEF-003']))
   })
 })
 
@@ -278,7 +278,7 @@ describe('the defect rows', () => {
     renderDefects()
 
     await waitFor(() => expect(screen.queryByRole('table')).toBeNull())
-    expect(screen.queryByText('VCU-DEF-001')).toBeNull()
+    expect(screen.queryByText('PRJ-DEF-001')).toBeNull()
   })
 })
 
@@ -335,19 +335,19 @@ describe('raising a defect', () => {
     const form = await openForm()
     fireEvent.change(form.title, { target: { value: 'Fan stalls above 60C' } })
     changeControl(screen.getByTitle('External tracker'), { target: { value: 'github' } })
-    fireEvent.change(screen.getByTitle('Repository'), { target: { value: 'embedlabs/vcu' } })
+    fireEvent.change(screen.getByTitle('Repository'), { target: { value: 'example/demo' } })
     fireEvent.change(screen.getByTitle('Issue number'), { target: { value: '99' } })
     fireEvent.change(screen.getByTitle('Issue URL'), {
-      target: { value: 'https://github.com/embedlabs/vcu/issues/99' },
+      target: { value: 'https://github.com/example/demo/issues/99' },
     })
     fireEvent.click(screen.getByRole('button', { name: /^create defect$/i }))
 
     await waitFor(() =>
       expect(lastCall(client.defectsApi.create)[0]).toMatchObject({
         external_tracker: 'github',
-        external_repo_full_name: 'embedlabs/vcu',
+        external_repo_full_name: 'example/demo',
         external_issue_number: 99,
-        external_issue_url: 'https://github.com/embedlabs/vcu/issues/99',
+        external_issue_url: 'https://github.com/example/demo/issues/99',
       }),
     )
   })

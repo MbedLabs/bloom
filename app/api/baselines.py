@@ -13,7 +13,6 @@ from app.api.artefact_utils import (
     type_visible,
 )
 from app.core.database import get_db
-from app.core.document_kinds import CANONICAL_DOCUMENT_KINDS
 from app.core.id_generator import next_doc_id
 from app.core.security import get_current_user, require_project_access
 from app.models import (
@@ -37,10 +36,11 @@ router = APIRouter()
 SNAPSHOT_SECTION_TYPES = {
     "requirements": ("REQ",),
     "test_cases": ("TC",),
-    "documents": CANONICAL_DOCUMENT_KINDS,
+    "documents": ("SPEC", "PRT", "RPT", "STD"),
     "designs": ("DES",),
     "risks": ("RSK",),
     "changes": ("CHG",),
+    "visions": ("VIS",),
 }
 
 
@@ -73,11 +73,13 @@ async def _build_snapshot(db: AsyncSession, project_id: int) -> dict:
         .scalars()
         .all()
     )
-    documents = (
+    shared = (
         (await db.execute(select(Document).where(Document.project_id == project_id)))
         .scalars()
         .all()
     )
+    documents = [item for item in shared if item.doc_type != "VIS"]
+    visions = [item for item in shared if item.doc_type == "VIS"]
     designs = (
         (await db.execute(select(DesignItem).where(DesignItem.project_id == project_id)))
         .scalars()
@@ -110,6 +112,7 @@ async def _build_snapshot(db: AsyncSession, project_id: int) -> dict:
         "designs": {"count": len(designs), "ids": [item.design_id for item in designs]},
         "risks": {"count": len(risks), "ids": [item.risk_id for item in risks]},
         "changes": {"count": len(changes), "ids": [item.change_id for item in changes]},
+        "visions": {"count": len(visions), "ids": [item.doc_id for item in visions]},
     }
 
 

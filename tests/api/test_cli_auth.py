@@ -73,7 +73,7 @@ def cli_client(monkeypatch):
                 role=UserRole.external,
                 is_active=True,
             )
-            project = Project(name="CLI Project", prefix="CLI")
+            project = Project(name="Demo", prefix="PRJ")
             policy = Policy(name="App reader", scope="app", permissions={"application": ["view"]})
             db.add_all([user, other, project, policy])
             await db.flush()

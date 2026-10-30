@@ -199,16 +199,16 @@ describe('reading a parameter back out of a step', () => {
   }
 
   it('links each reference to the screen that owns the value', () => {
-    render(<TcsArteTable rows={[STEP]} onChange={() => {}} parameterHref="/projects/FLT/parameters" />)
+    render(<TcsArteTable rows={[STEP]} onChange={() => {}} parameterHref="/projects/PRJ/parameters" />)
 
     const links = Array.from(document.querySelectorAll('a')) as HTMLAnchorElement[]
     expect(links.map((a) => a.textContent)).toEqual(['{{BOOT_BUDGET_MS}}', '{{BOOT_BUDGET_MS}}'])
-    expect(links[0].getAttribute('href')).toBe('/projects/FLT/parameters?key=BOOT_BUDGET_MS')
+    expect(links[0].getAttribute('href')).toBe('/projects/PRJ/parameters?key=BOOT_BUDGET_MS')
   })
 
   it('keeps the surrounding words intact', () => {
     const { container } = render(
-      <TcsArteTable rows={[STEP]} onChange={() => {}} parameterHref="/projects/FLT/parameters" />,
+      <TcsArteTable rows={[STEP]} onChange={() => {}} parameterHref="/projects/PRJ/parameters" />,
     )
 
     expect(container.textContent).toContain('ramp to {{BOOT_BUDGET_MS}} then hold')
@@ -222,7 +222,7 @@ describe('reading a parameter back out of a step', () => {
 
   it('does not invent links for ordinary braces', () => {
     const plain = { ...createDefaultTcsRow('step'), description: 'set {x} to 3', expected_result: 'ok' }
-    render(<TcsArteTable rows={[plain]} onChange={() => {}} parameterHref="/projects/FLT/parameters" />)
+    render(<TcsArteTable rows={[plain]} onChange={() => {}} parameterHref="/projects/PRJ/parameters" />)
 
     expect(document.querySelector('a')).toBeNull()
   })

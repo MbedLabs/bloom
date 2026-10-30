@@ -27,17 +27,18 @@ import {
   GitBranch,
   GitPullRequest,
   Layers,
+  Lightbulb,
   PenTool,
   RotateCcw,
   type LucideIcon,
 } from 'lucide-react'
 
 import { docsApi, linksApi } from '../api/client'
-import { docRegistryListUrl } from '../lib/docRegistryParams'
-import { DOC_TYPE_LABELS, type DocType } from '../types/doc'
+import { docRegistryListLabel, docRegistryListUrl } from '../lib/docRegistryParams'
+import type { DocType } from '../types/doc'
 import TopologyLinkEdge, { type RoleEntry, type TopologyLinkData } from './TopologyLinkEdge'
 
-const TYPE_ORDER: DocType[] = ['REQ', 'SPEC', 'STD', 'DES', 'RSK', 'CHG', 'CPT', 'TC', 'TS', 'CMP', 'DEF', 'PRT', 'RPT']
+const TYPE_ORDER: DocType[] = ['VIS', 'REQ', 'SPEC', 'STD', 'DES', 'RSK', 'CHG', 'CPT', 'TC', 'TS', 'CMP', 'DEF', 'PRT', 'RPT']
 
 interface TypeStyle {
   icon: LucideIcon
@@ -120,6 +121,14 @@ const TYPE_STYLE: Record<DocType, TypeStyle> = {
     iconChip: 'bg-slate-500/15 text-slate-800 dark:text-slate-200',
     countText: 'text-slate-800 dark:text-slate-200',
     accent: '#64748b',
+  },
+  VIS: {
+    icon: Lightbulb,
+    borderTop: 'border-t-fuchsia-600',
+    surface: 'bg-linear-to-br/srgb from-fuchsia-500/10 to-card ring-1 ring-fuchsia-500/10',
+    iconChip: 'bg-fuchsia-500/15 text-fuchsia-800 dark:text-fuchsia-200',
+    countText: 'text-fuchsia-800 dark:text-fuchsia-200',
+    accent: '#c026d3',
   },
   STD: {
     icon: BookOpen,
@@ -239,7 +248,7 @@ function TypeNode({ data }: Readonly<{ data: TypeNodeData }>) {
                 {data.docType}
               </div>
               <div className="text-xs font-medium text-foreground leading-tight truncate">
-                {DOC_TYPE_LABELS[data.docType]}
+                {docRegistryListLabel(data.docType)}
               </div>
             </div>
           </div>
@@ -655,11 +664,11 @@ export default function ProjectDocTopology({ projectId, prefix }: Readonly<Props
             <div className="rounded-lg border border-border bg-card/95 backdrop-blur-xs shadow-md px-3 py-2 max-w-sm">
               <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
                 <span style={{ color: TYPE_STYLE[hoveredEdge.source].accent }}>
-                  {DOC_TYPE_LABELS[hoveredEdge.source]}
+                  {docRegistryListLabel(hoveredEdge.source)}
                 </span>
                 <span className="text-muted-foreground">→</span>
                 <span style={{ color: TYPE_STYLE[hoveredEdge.target].accent }}>
-                  {DOC_TYPE_LABELS[hoveredEdge.target]}
+                  {docRegistryListLabel(hoveredEdge.target)}
                 </span>
                 {hoveredEdge.isSyntheticInverse && (
                   <span className="text-[10px] text-muted-foreground/70 italic font-normal"></span>

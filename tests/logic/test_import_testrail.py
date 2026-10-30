@@ -27,7 +27,7 @@ async def session():
         await conn.run_sync(Base.metadata.create_all)
     maker = async_sessionmaker(engine, expire_on_commit=False)
     async with maker() as db:
-        project = Project(name="Alpha", prefix="ALP")
+        project = Project(name="Demo", prefix="PRJ")
         db.add(project)
         db.add(
             User(
@@ -38,7 +38,7 @@ async def session():
             )
         )
         await db.flush()
-        db.add(Requirement(project_id=project.id, req_id="ALP-REQ-001", title="Boot fast"))
+        db.add(Requirement(project_id=project.id, req_id="PRJ-REQ-001", title="Boot fast"))
         await db.commit()
         yield db
     await engine.dispose()
@@ -156,7 +156,7 @@ async def test_csv_columns_preview(session):
 
 def _export(suite, first, count):
     cases = "".join(
-        f"<case><id>C{n}</id><title>Case {n}</title><references>ALP-REQ-001</references></case>"
+        f"<case><id>C{n}</id><title>Case {n}</title><references>PRJ-REQ-001</references></case>"
         for n in range(first, first + count)
     )
     return (

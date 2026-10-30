@@ -19,7 +19,7 @@ async def session():
     async with async_sessionmaker(engine, expire_on_commit=False)() as db:
         db.add_all(
             [
-                Project(name="Tags", prefix="TAG"),
+                Project(name="Demo", prefix="PRJ"),
                 User(
                     email="tags@example.com",
                     full_name="Tags Admin",
@@ -31,8 +31,8 @@ async def session():
         await db.flush()
         db.add_all(
             [
-                Requirement(project_id=1, req_id="TAG-REQ-001", title="Source"),
-                Requirement(project_id=1, req_id="TAG-REQ-002", title="Target"),
+                Requirement(project_id=1, req_id="PRJ-REQ-001", title="Source"),
+                Requirement(project_id=1, req_id="PRJ-REQ-002", title="Target"),
             ]
         )
         await db.flush()

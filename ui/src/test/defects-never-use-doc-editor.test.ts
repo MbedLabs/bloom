@@ -28,13 +28,13 @@ describe('document editor ownership', () => {
   })
 
   it('sends defects and campaigns to their own list route', () => {
-    expect(dedicatedListUrl('VCU', 'DEF')).toBe('/projects/VCU/defects')
-    expect(dedicatedListUrl('VCU', 'CMP')).toBe('/projects/VCU/campaigns')
+    expect(dedicatedListUrl('PRJ', 'DEF')).toBe('/projects/PRJ/defects')
+    expect(dedicatedListUrl('PRJ', 'CMP')).toBe('/projects/PRJ/campaigns')
   })
 
   it('leaves types without a bespoke list route to the registry', () => {
-    expect(dedicatedListUrl('VCU', 'TS')).toBeNull()
-    expect(dedicatedListUrl('VCU', 'REQ')).toBeNull()
+    expect(dedicatedListUrl('PRJ', 'TS')).toBeNull()
+    expect(dedicatedListUrl('PRJ', 'REQ')).toBeNull()
   })
 })
 

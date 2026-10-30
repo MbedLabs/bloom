@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { Link, useParams, useSearchParams, useNavigate } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, BookOpen, FlaskConical, GitBranch, Map, Pencil } from 'lucide-react'
+import { ArrowLeft, BookOpen, FlaskConical, GitBranch, Lightbulb, Map, Pencil } from 'lucide-react'
 
 import { docsApi, projectsApi } from '../api/client'
 import { useProjectCapabilities } from '../hooks/useProjectCapabilities'
@@ -79,7 +79,7 @@ export default function ProjectDetail() {
   }
 
   if (isAccessDenied(projectError)) {
-    return <AccessDenied resourceType="project" resourceRef={prefix ?? ''} projectPrefix={prefix} />
+    return <AccessDenied resourceType="project" resourceRef={prefix ?? ''} projectPrefix={prefix} error={projectError} />
   }
 
   if (!project) {
@@ -94,6 +94,7 @@ export default function ProjectDetail() {
   }
 
   const navItems: NavItem[] = [
+    { label: docRegistryListLabel('VIS'), icon: Lightbulb, to: docRegistryListUrl(prefix!, 'VIS') },
     { label: docRegistryListLabel('PRT'), icon: BookOpen, to: docRegistryListUrl(prefix!, 'PRT') },
     { label: docRegistryListLabel('RPT'), icon: BookOpen, to: docRegistryListUrl(prefix!, 'RPT') },
     { label: docRegistryListLabel('STD'), icon: BookOpen, to: docRegistryListUrl(prefix!, 'STD') },
@@ -129,14 +130,14 @@ export default function ProjectDetail() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-2.5">
-        <SummaryTile label="Requirements" value={project.requirement_count} to={docRegistryListUrl(prefix!, 'REQ')} />
-        <SummaryTile label="Test Cases" value={project.test_case_count} to={docRegistryListUrl(prefix!, 'TC')} />
-        <SummaryTile label="Specifications" value={specCount} to={docRegistryListUrl(prefix!, 'SPEC')} />
-        <SummaryTile label="Design" value={project.design_count} to={docRegistryListUrl(prefix!, 'DES')} />
-        <SummaryTile label="Risks" value={project.risk_count} to={docRegistryListUrl(prefix!, 'RSK')} />
-        <SummaryTile label="Changes" value={project.change_count} to={docRegistryListUrl(prefix!, 'CHG')} />
+        <SummaryTile label={docRegistryListLabel('REQ')} value={project.requirement_count} to={docRegistryListUrl(prefix!, 'REQ')} />
+        <SummaryTile label={docRegistryListLabel('TC')} value={project.test_case_count} to={docRegistryListUrl(prefix!, 'TC')} />
+        <SummaryTile label={docRegistryListLabel('SPEC')} value={specCount} to={docRegistryListUrl(prefix!, 'SPEC')} />
+        <SummaryTile label={docRegistryListLabel('DES')} value={project.design_count} to={docRegistryListUrl(prefix!, 'DES')} />
+        <SummaryTile label={docRegistryListLabel('RSK')} value={project.risk_count} to={docRegistryListUrl(prefix!, 'RSK')} />
+        <SummaryTile label={docRegistryListLabel('CHG')} value={project.change_count} to={docRegistryListUrl(prefix!, 'CHG')} />
         <SummaryTile
-          label="Defects"
+          label={docRegistryListLabel('DEF')}
           value={project.defect_count}
           to={`/projects/${prefix}/defects`}
         />

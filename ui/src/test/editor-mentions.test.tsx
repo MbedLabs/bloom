@@ -97,8 +97,8 @@ afterEach(() => {
 
 describe('the # trigger', () => {
   const artefacts = [
-    { id: 42, label: 'FLT-REQ-0042', hint: 'Brake pressure', docType: 'REQ' },
-    { id: 43, label: 'FLT-DES-0007', hint: 'Hydraulic loop', docType: 'DES' },
+    { id: 42, label: 'PRJ-REQ-0042', hint: 'Brake pressure', docType: 'REQ' },
+    { id: 43, label: 'PRJ-DES-0007', hint: 'Hydraulic loop', docType: 'DES' },
   ]
 
   it('searches on the query rather than filtering a fixed list', async () => {
@@ -110,7 +110,7 @@ describe('the # trigger', () => {
 
     await waitFor(() => expect(search).toHaveBeenCalledWith('brake'))
     await waitFor(() => expect(popover()).toBeTruthy())
-    expect(popover()?.textContent).toContain('FLT-REQ-0042')
+    expect(popover()?.textContent).toContain('PRJ-REQ-0042')
   })
 
   it('stays quiet until the query is worth a request', async () => {
@@ -129,7 +129,7 @@ describe('the # trigger', () => {
 
     await type(surface, '#brake')
 
-    expect(popover()?.textContent ?? '').not.toContain('FLT-REQ-0042')
+    expect(popover()?.textContent ?? '').not.toContain('PRJ-REQ-0042')
   })
 
   it('stores the type and id the server parses a tag from', async () => {
@@ -164,7 +164,7 @@ describe('the # trigger', () => {
     const search = vi.fn().mockResolvedValue(artefacts)
     const { container } = renderEditor({
       artefactSearch: search,
-      artefactHref: (type: string, id: number) => `/projects/FLT/${type}/${id}`,
+      artefactHref: (type: string, id: number) => `/projects/PRJ/${type}/${id}`,
     })
     const surface = await editorSurface(container)
 
@@ -177,8 +177,8 @@ describe('the # trigger', () => {
     await waitFor(() => {
       const anchor = surface.querySelector('a.mention-artefact') as HTMLAnchorElement
       expect(anchor).toBeTruthy()
-      expect(anchor.getAttribute('href')).toBe('/projects/FLT/REQ/42')
-      expect(anchor.textContent).toBe('FLT-REQ-0042')
+      expect(anchor.getAttribute('href')).toBe('/projects/PRJ/REQ/42')
+      expect(anchor.textContent).toBe('PRJ-REQ-0042')
     })
   })
 })

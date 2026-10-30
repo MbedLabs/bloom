@@ -1,4 +1,5 @@
 import SelectField from '../components/SelectField'
+import { OpenThreads } from '../components/comments/ReviewComments'
 import { refreshProjectViews, finishArtefactDeletion } from '../lib/refreshProjectViews'
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import TagPicker from '../components/TagPicker'
@@ -57,7 +58,7 @@ function saveLabel(saved: boolean, pending: boolean): string {
 function artefactActivityTypeForDocType(docType: DocType): string | null {
   if (docType === 'REQ') return 'requirement'
   if (docType === 'TC') return 'test-case'
-  if (docType === 'SPEC' || docType === 'PRT' || docType === 'RPT' || docType === 'STD') return 'document'
+  if (docType === 'SPEC' || docType === 'PRT' || docType === 'RPT' || docType === 'STD' || docType === 'VIS') return 'document'
   if (docType === 'DES') return 'design'
   if (docType === 'CPT') return 'test-concept'
   if (docType === 'CHG') return 'change'
@@ -66,7 +67,7 @@ function artefactActivityTypeForDocType(docType: DocType): string | null {
 }
 
 function isControlledSharedDocument(docType: DocType): boolean {
-  return docType === 'SPEC' || docType === 'PRT' || docType === 'RPT' || docType === 'STD'
+  return docType === 'SPEC' || docType === 'PRT' || docType === 'RPT' || docType === 'STD' || docType === 'VIS'
 }
 
 function requirementVisibilityFromOrigin(origin: string | undefined): ArtefactVisibility {
@@ -287,7 +288,7 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
   }, [projectId, docType])
 
   const artefactHref = useCallback(
-    (type: string, id: number) => docUrl(prefix, type as DocType, id),
+    (type: string, _id: number, label: string) => docUrl(prefix, type as DocType, label),
     [prefix],
   )
 
@@ -295,7 +296,7 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
     const map: Record<string, unknown> = {
       REQ: requirementsApi, TC: testCasesApi, DES: designsApi,
       RSK: risksApi, CHG: changesApi, CPT: testConceptsApi,
-      SPEC: documentsApi, PRT: documentsApi, RPT: documentsApi, STD: documentsApi,
+      SPEC: documentsApi, PRT: documentsApi, RPT: documentsApi, STD: documentsApi, VIS: documentsApi,
     }
     return map[type]
   }, [])
@@ -315,6 +316,12 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
       replace: true,
     })
   }, [docIdStr, docType, editMode, navigate, prefix])
+
+  useEffect(() => {
+    if (!saveSuccess) return
+    const timer = setTimeout(() => setSaveSuccess(false), 2000)
+    return () => clearTimeout(timer)
+  }, [saveSuccess])
 
   useEffect(() => {
     if (editMode || !prefix || !usesDocumentEditor(docType)) return
@@ -407,7 +414,7 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
       const docIdFieldMap: Record<string, string> = {
         REQ: 'req_id', TC: 'tc_id', DES: 'design_id',
         RSK: 'risk_id', CHG: 'change_id', CPT: 'concept_id',
-        SPEC: 'doc_id', PRT: 'doc_id', RPT: 'doc_id', STD: 'doc_id',
+        SPEC: 'doc_id', PRT: 'doc_id', RPT: 'doc_id', STD: 'doc_id', VIS: 'doc_id',
       }
       const newDocId = record[docIdFieldMap[docType]] || record.id
       const kindSlug = DOC_TYPE_SLUGS[docType]
@@ -478,8 +485,6 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
       setSaveError(null)
       setSaveSuccess(true)
       toast.saved(DOC_TYPE_LABELS[docType])
-      const timer = setTimeout(() => setSaveSuccess(false), 2000)
-      return () => clearTimeout(timer)
     },
     onError: (error) => {
       setSaveError(extractApiErrorMessage(error, 'Could not save document'))
@@ -679,6 +684,11 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
           </div>
 
           <div className="flex-1">
+            {!sidebarOpen && editMode && resolvedDocId && artefactActivityTypeForDocType(docType) && (
+              <div className="max-w-4xl mx-auto w-full px-4 pt-4">
+                <OpenThreads artefactType={artefactActivityTypeForDocType(docType)!} artefactId={resolvedDocId} />
+              </div>
+            )}
             <div className={`${docType === 'TC' ? 'max-w-none' : 'max-w-4xl mx-auto'} w-full px-4 py-4`}>
               {docType === 'TC' ? (
                 <TcsArteTable
@@ -715,6 +725,9 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
         {sidebarOpen && (
           <div className="w-72 border-l border-border bg-card/50 overflow-y-auto themed-scrollbar shrink-0">
             <div className="p-4 space-y-4">
+              {editMode && resolvedDocId && artefactActivityTypeForDocType(docType) && (
+                <OpenThreads artefactType={artefactActivityTypeForDocType(docType)!} artefactId={resolvedDocId} />
+              )}
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Properties</h3>
 
               <MetaField label="Status">

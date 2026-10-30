@@ -205,44 +205,44 @@
   color: hsl(var(--primary));
 }
 
-.tiptap.ProseMirror.line-height-1 p,
-.tiptap.ProseMirror.line-height-1 h1,
-.tiptap.ProseMirror.line-height-1 h2,
-.tiptap.ProseMirror.line-height-1 h3,
-.tiptap.ProseMirror.line-height-1 h4,
-.tiptap.ProseMirror.line-height-1 h5,
-.tiptap.ProseMirror.line-height-1 h6,
-.tiptap.ProseMirror.line-height-1 li,
-.tiptap.ProseMirror.line-height-1 blockquote,
-.tiptap.ProseMirror.line-height-1 td,
-.tiptap.ProseMirror.line-height-1 th {
-  line-height: 1 !important;
+.tiptap.ProseMirror {
+  --line-normal: 1.7142857;
 }
 
-.tiptap.ProseMirror.line-height-1_5 p,
-.tiptap.ProseMirror.line-height-1_5 h1,
-.tiptap.ProseMirror.line-height-1_5 h2,
-.tiptap.ProseMirror.line-height-1_5 h3,
-.tiptap.ProseMirror.line-height-1_5 h4,
-.tiptap.ProseMirror.line-height-1_5 h5,
-.tiptap.ProseMirror.line-height-1_5 h6,
-.tiptap.ProseMirror.line-height-1_5 li,
-.tiptap.ProseMirror.line-height-1_5 blockquote,
-.tiptap.ProseMirror.line-height-1_5 td,
-.tiptap.ProseMirror.line-height-1_5 th {
-  line-height: 1.5 !important;
+.tiptap.ProseMirror table {
+  --line-normal: 1.5;
 }
 
-.tiptap.ProseMirror.line-height-2 p,
-.tiptap.ProseMirror.line-height-2 h1,
-.tiptap.ProseMirror.line-height-2 h2,
-.tiptap.ProseMirror.line-height-2 h3,
-.tiptap.ProseMirror.line-height-2 h4,
-.tiptap.ProseMirror.line-height-2 h5,
-.tiptap.ProseMirror.line-height-2 h6,
-.tiptap.ProseMirror.line-height-2 li,
-.tiptap.ProseMirror.line-height-2 blockquote,
-.tiptap.ProseMirror.line-height-2 td,
-.tiptap.ProseMirror.line-height-2 th {
-  line-height: 2 !important;
+.tiptap.ProseMirror h1 {
+  --line-normal: 1.2;
+}
+
+.tiptap.ProseMirror h2 {
+  --line-normal: 1.4;
+}
+
+.tiptap.ProseMirror h3 {
+  --line-normal: 1.5555556;
+}
+
+.tiptap.ProseMirror h4 {
+  --line-normal: 1.4285714;
+}
+
+.tiptap.ProseMirror [data-line-spacing="1.5"] {
+  line-height: calc(var(--line-normal) * 1.5);
+}
+
+.tiptap.ProseMirror [data-line-spacing="2"] {
+  line-height: calc(var(--line-normal) * 2);
+}
+
+.ProseMirror .comment-highlight {
+  background: hsl(var(--primary) / 0.1);
+  border-bottom: 2px solid hsl(var(--primary));
+  cursor: pointer;
+}
+
+.ProseMirror .comment-highlight-selected {
+  background: hsl(var(--primary) / 0.25);
 }

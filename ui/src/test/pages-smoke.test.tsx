@@ -49,8 +49,8 @@ describe('source-available readiness smoke', () => {
   })
 
   it('doc registry list URL encodes requirement type', () => {
-    const url = docRegistryListUrl('VCU', 'REQ')
-    expect(url).toContain('/projects/VCU/docs')
+    const url = docRegistryListUrl('PRJ', 'REQ')
+    expect(url).toContain('/projects/PRJ/docs')
     expect(url).toContain('type=requirements')
   })
 

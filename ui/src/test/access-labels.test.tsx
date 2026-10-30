@@ -52,6 +52,21 @@ describe('access labels', () => {
     expect(['admin', 'maintainer', 'external'].map(roleLabel)).toEqual(['Admin', 'Maintainer', 'Viewer'])
   })
 
+  it('names every document collection in the project sidebar in the plural', async () => {
+    const client = createQueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={['/projects/PRJ']}>
+          <Layout />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    expect(await screen.findByRole('link', { name: 'Designs' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Changes' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Test Campaigns' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Design' })).toBeNull()
+  })
+
   it('calls the administrators sidebar entry Access', () => {
     auth.user = { ...auth.user, role: 'admin' }
     renderLayout()

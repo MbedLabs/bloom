@@ -12,6 +12,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models import Notification
 from app.models.user import User
+from app.services.audit import mark_refused
 
 router = APIRouter()
 
@@ -133,6 +134,8 @@ async def mark_read(
         )
     ).scalar_one_or_none()
     if notification is None:
+        if await db.get(Notification, notification_id) is not None:
+            mark_refused()
         raise HTTPException(status_code=404, detail="Notification not found")
     if notification.read_at is None:
         notification.read_at = datetime.now(timezone.utc).replace(tzinfo=None)

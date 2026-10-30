@@ -7,7 +7,6 @@ import { requirementsApi, projectsApi } from '../api/client'
 import { ExternalLink, ChevronRight, Trash2 } from 'lucide-react'
 import { formatDateTime } from '../test/date-utils'
 import { docEditUrl, docUrl, type DocType } from '../types/doc'
-import { DocEditor } from '../components/editor'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import DocDetailShell, { StatusBadge, MetaItem, SectionCard } from '../components/DocDetailShell'
@@ -24,6 +23,7 @@ import { useArtefactLabels } from '../hooks/useArtefactLabels'
 import BudRunLink from '../components/BudRunLink'
 import ConfirmDelete from '../components/ConfirmDelete'
 import WorkflowPanel from '../components/WorkflowPanel'
+import { CommentableDocEditor, CommentsColumn, ReviewCommentsProvider } from '../components/comments/ReviewComments'
 import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
 import { useSignOffPeople } from '../hooks/useSignOff'
 
@@ -162,6 +162,7 @@ export default function RequirementDetail({
   const showDelete = canEditDocs && can('delete', 'REQ') && rowAllows('delete')
 
   return (
+    <ReviewCommentsProvider artefactType="requirement" artefactId={reqId} projectPrefix={projectPrefix} projectId={requirement.project_id}>
     <DocDetailShell
       projectPrefix={projectPrefix}
       docType="REQ"
@@ -197,45 +198,8 @@ export default function RequirementDetail({
           ))}
         </div>
       ) : undefined}
-      rightRail={
-        <>
-          <WorkflowPanel artefactType="requirement" artefactId={reqId} projectPrefix={projectPrefix} projectId={requirement.project_id} />
-
-          <SectionCard title="Metadata">
-            <div className="space-y-4">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Type</div>
-                <TypeBadge reqType={requirement.req_type} />
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Origin</div>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <OriginBadge origin={requirement.req_origin} />
-                  <ArtefactTags type="requirement" id={reqId} projectId={requirement.project_id} canEdit={showEdit} />
-                </div>
-              </div>
-              <MetaItem label="Created" value={formatDateTime(requirement.created_at) + ' ago'} />
-              <MetaItem label="Updated" value={formatDateTime(requirement.updated_at) + ' ago'} />
-            </div>
-          </SectionCard>
-
-          {requirement.linked_test_runs?.length > 0 && (
-            <SectionCard title="Test runs">
-              <ul className="space-y-2">
-                {requirement.linked_test_runs.map((run) => (
-                  <li key={run.id} className="text-sm">
-                    <BudRunLink runId={run.test_run_id} source={{ source_kind: 'requirement', source_id: requirement.id }} label={run.test_run_name || undefined} />
-                    <div className="text-xs text-muted-foreground">{run.status || 'Status not recorded'}</div>
-                  </li>
-                ))}
-              </ul>
-              <p className="text-xs text-muted-foreground mt-3">
-                A run opens in Bud, where its report can be downloaded.
-              </p>
-            </SectionCard>
-          )}
-        </>
-      }
+      review={<WorkflowPanel artefactType="requirement" artefactId={reqId} projectPrefix={projectPrefix} projectId={requirement.project_id} layout="bar" />}
+      comments={<CommentsColumn />}
     >
       {requirement.parent_id && parentReq && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -248,7 +212,7 @@ export default function RequirementDetail({
 
       {(requirement.content_json as Record<string, unknown> | null) ? (
         <SectionCard title="Content">
-          <DocEditor
+          <CommentableDocEditor
             content={requirement.content_json as Record<string, unknown>}
             editable={false}
             userMentionItems={users.map(person => ({ id: person.id, label: person.full_name, user: person }))}
@@ -347,6 +311,42 @@ export default function RequirementDetail({
         sourceDocId={requirement.req_id}
         derivedLinks={derivedMembershipLinks}
       />
+      <>
+          <SectionCard title="Metadata">
+            <div className="space-y-4">
+              <div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Type</div>
+                <TypeBadge reqType={requirement.req_type} />
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Origin</div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <OriginBadge origin={requirement.req_origin} />
+                  <ArtefactTags type="requirement" id={reqId} projectId={requirement.project_id} canEdit={showEdit} />
+                </div>
+              </div>
+              <MetaItem label="Created" value={formatDateTime(requirement.created_at) + ' ago'} />
+              <MetaItem label="Updated" value={formatDateTime(requirement.updated_at) + ' ago'} />
+            </div>
+          </SectionCard>
+
+          {requirement.linked_test_runs?.length > 0 && (
+            <SectionCard title="Test runs">
+              <ul className="space-y-2">
+                {requirement.linked_test_runs.map((run) => (
+                  <li key={run.id} className="text-sm">
+                    <BudRunLink runId={run.test_run_id} source={{ source_kind: 'requirement', source_id: requirement.id }} label={run.test_run_name || undefined} />
+                    <div className="text-xs text-muted-foreground">{run.status || 'Status not recorded'}</div>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-muted-foreground mt-3">
+                A run opens in Bud, where its report can be downloaded.
+              </p>
+            </SectionCard>
+          )}
+      </>
     </DocDetailShell>
+    </ReviewCommentsProvider>
   )
 }

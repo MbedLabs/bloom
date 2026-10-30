@@ -18,14 +18,14 @@ async def env():
     maker = async_sessionmaker(engine, expire_on_commit=False)
 
     async with maker() as session:
-        project = Project(name="Flight", prefix="FLT")
+        project = Project(name="Demo", prefix="PRJ")
         session.add(project)
         await session.flush()
 
-        req = Requirement(project_id=project.id, req_id="FLT-REQ-001", title="Anchor")
-        other_req = Requirement(project_id=project.id, req_id="FLT-REQ-002", title="Unrelated")
-        verifying = TestCase(project_id=project.id, tc_id="FLT-TC-001", title="Verifies anchor")
-        covering = TestCase(project_id=project.id, tc_id="FLT-TC-002", title="Covers anchor")
+        req = Requirement(project_id=project.id, req_id="PRJ-REQ-001", title="Anchor")
+        other_req = Requirement(project_id=project.id, req_id="PRJ-REQ-002", title="Unrelated")
+        verifying = TestCase(project_id=project.id, tc_id="PRJ-TC-001", title="Verifies anchor")
+        covering = TestCase(project_id=project.id, tc_id="PRJ-TC-002", title="Covers anchor")
         session.add_all([req, other_req, verifying, covering])
         await session.flush()
 
@@ -68,7 +68,7 @@ async def env():
 async def test_resolves_a_human_readable_id_to_its_type_and_row(env):
     maker, ids = env
     async with maker() as session:
-        assert await _resolve_doc_by_public_id(session, ids["project"], "FLT-REQ-001") == (
+        assert await _resolve_doc_by_public_id(session, ids["project"], "PRJ-REQ-001") == (
             "REQ",
             ids["req"],
         )
@@ -78,7 +78,7 @@ async def test_resolves_a_human_readable_id_to_its_type_and_row(env):
 async def test_unknown_document_id_resolves_to_nothing(env):
     maker, ids = env
     async with maker() as session:
-        assert await _resolve_doc_by_public_id(session, ids["project"], "FLT-REQ-999") is None
+        assert await _resolve_doc_by_public_id(session, ids["project"], "PRJ-REQ-999") is None
 
 
 @pytest.mark.asyncio
@@ -133,7 +133,7 @@ async def test_relationships_do_not_leak_across_projects(env):
     """A link is scoped to its project, so another project must match nothing."""
     maker, ids = env
     async with maker() as session:
-        other_project = Project(name="Ground", prefix="GND")
+        other_project = Project(name="ABC", prefix="ABC")
         session.add(other_project)
         await session.flush()
         related = await _related_doc_keys(

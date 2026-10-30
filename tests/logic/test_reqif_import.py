@@ -65,7 +65,7 @@ SAMPLE_REQIF = """<?xml version="1.0" encoding="UTF-8"?>
               </DEFINITION>
               <THE-VALUE><xhtml:div>The system <xhtml:b>shall</xhtml:b> allow login.</xhtml:div></THE-VALUE>
             </ATTRIBUTE-VALUE-XHTML>
-            <ATTRIBUTE-VALUE-STRING THE-VALUE="SYS-042">
+            <ATTRIBUTE-VALUE-STRING THE-VALUE="PRJ-042">
               <DEFINITION>
                 <ATTRIBUTE-DEFINITION-STRING-REF>AD-FID</ATTRIBUTE-DEFINITION-STRING-REF>
               </DEFINITION>
@@ -135,7 +135,7 @@ def test_enumeration_value_resolves_to_long_name():
 
 def test_foreign_id_attribute_captured():
     obj = parse_reqif(SAMPLE_REQIF).objects["OBJ-2"]
-    assert obj.first_attr(FOREIGN_ID_HINTS) == "SYS-042"
+    assert obj.first_attr(FOREIGN_ID_HINTS) == "PRJ-042"
 
 
 def test_hierarchy_orders_parent_before_child():
@@ -217,7 +217,7 @@ async def session():
         await conn.run_sync(Base.metadata.create_all)
     maker = async_sessionmaker(engine, expire_on_commit=False)
     async with maker() as db:
-        db.add(Project(name="System Project", prefix="SYS"))
+        db.add(Project(name="Demo", prefix="PRJ"))
         db.add(
             User(
                 email="admin@test.local",
@@ -244,11 +244,11 @@ async def test_import_creates_requirements_with_hierarchy_and_links(session):
     assert result.imported == 2
     assert result.links_created == 1
     assert result.specifications == 1
-    assert result.new_ids == ["SYS-REQ-001", "SYS-REQ-002"]
+    assert result.new_ids == ["PRJ-REQ-001", "PRJ-REQ-002"]
 
     reqs = {r.req_id: r for r in (await session.execute(select(Requirement))).scalars().all()}
-    parent = reqs["SYS-REQ-001"]
-    child = reqs["SYS-REQ-002"]
+    parent = reqs["PRJ-REQ-001"]
+    child = reqs["PRJ-REQ-002"]
     assert parent.title == "System Requirements"
     assert child.title == "Login"
     assert child.parent_id == parent.id
@@ -367,8 +367,8 @@ async def test_reqif_disallowed_mapped_role_fails_with_relation(session, monkeyp
 async def test_reqif_preserves_and_deduplicates_legacy_equivalents(session):
     session.add_all(
         [
-            Requirement(project_id=1, req_id="SYS-REQ-001", title="Parent", source_ref="OBJ-1"),
-            Requirement(project_id=1, req_id="SYS-REQ-002", title="Child", source_ref="OBJ-2"),
+            Requirement(project_id=1, req_id="PRJ-REQ-001", title="Parent", source_ref="OBJ-1"),
+            Requirement(project_id=1, req_id="PRJ-REQ-002", title="Child", source_ref="OBJ-2"),
         ]
     )
     await session.flush()

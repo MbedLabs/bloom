@@ -106,7 +106,7 @@ async def _seed_suite_visibility_data(session_maker: async_sessionmaker[AsyncSes
         session.add(external)
         await session.flush()
 
-        project = Project(name="Suite Visibility", prefix="TSV", description="Visibility")
+        project = Project(name="Demo", prefix="PRJ", description="Visibility")
         session.add(project)
         await session.flush()
 
@@ -124,7 +124,7 @@ async def _seed_suite_visibility_data(session_maker: async_sessionmaker[AsyncSes
 
         visible_tc = TestCase(
             project_id=project.id,
-            tc_id="TSV-TC-001",
+            tc_id="PRJ-TC-001",
             title="Visible test case",
             status="Draft",
             visibility="customer",
@@ -134,14 +134,14 @@ async def _seed_suite_visibility_data(session_maker: async_sessionmaker[AsyncSes
         )
         hidden_tc = TestCase(
             project_id=project.id,
-            tc_id="TSV-TC-002",
+            tc_id="PRJ-TC-002",
             title="Hidden test case",
             status="Draft",
             visibility="internal",
         )
         visible_req = Requirement(
             project_id=project.id,
-            req_id="TSV-REQ-001",
+            req_id="PRJ-REQ-001",
             title="Visible requirement",
             status="Draft",
             visibility="customer",
@@ -154,14 +154,14 @@ async def _seed_suite_visibility_data(session_maker: async_sessionmaker[AsyncSes
 
         visible_suite = TestSuite(
             project_id=project.id,
-            suite_id="TSV-TS-001",
+            suite_id="PRJ-TS-001",
             name="Visible suite",
             status="Draft",
             visibility="customer",
         )
         hidden_suite = TestSuite(
             project_id=project.id,
-            suite_id="TSV-TS-002",
+            suite_id="PRJ-TS-002",
             name="Hidden suite",
             status="Draft",
             visibility="internal",
@@ -195,7 +195,7 @@ def test_external_suite_list_and_detail_hide_internal_suite_and_items():
         listed = harness.client.get(f"/api/test-suites?project_id={seeded['project'].id}")
         assert listed.status_code == 200, listed.text
         suite_ids = {item["suite_id"] for item in listed.json()["items"]}
-        assert suite_ids == {"TSV-TS-001"}
+        assert suite_ids == {"PRJ-TS-001"}
 
         hidden = harness.client.get(f"/api/test-suites/{seeded['hidden_suite'].id}")
         assert hidden.status_code == 404, hidden.text
@@ -208,7 +208,7 @@ def test_external_suite_list_and_detail_hide_internal_suite_and_items():
         assert body["last_execution_status"] == "Passed"
         assert body["last_executed_at"].startswith("2026-07-02T10:30:00")
         assert body["last_bud_run_id"] == 456
-        assert [item["test_case"]["tc_id"] for item in body["items"]] == ["TSV-TC-001"]
+        assert [item["test_case"]["tc_id"] for item in body["items"]] == ["PRJ-TC-001"]
     finally:
         harness.client.close()
         app.dependency_overrides.clear()
@@ -226,7 +226,7 @@ def test_suite_list_includes_latest_execution_timestamp():
         assert listed.status_code == 200, listed.text
         items = listed.json()["items"]
         assert len(items) == 1
-        assert items[0]["suite_id"] == "TSV-TS-001"
+        assert items[0]["suite_id"] == "PRJ-TS-001"
         assert items[0]["total_items"] == 1
         assert items[0]["last_execution_status"] == "Passed"
         assert items[0]["last_executed_at"].startswith("2026-07-02T10:30:00")

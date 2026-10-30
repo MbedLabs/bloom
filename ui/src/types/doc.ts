@@ -1,7 +1,7 @@
-export type DocType = 'REQ' | 'SPEC' | 'TC' | 'DES' | 'RSK' | 'CHG' | 'CPT' | 'DEF' | 'CMP' | 'TS' | 'PRT' | 'RPT' | 'STD'
+export type DocType = 'REQ' | 'SPEC' | 'TC' | 'DES' | 'RSK' | 'CHG' | 'CPT' | 'DEF' | 'CMP' | 'TS' | 'PRT' | 'RPT' | 'STD' | 'VIS'
 
 export function isWorkflowControlledDocType(type: DocType): boolean {
-  return ['REQ', 'SPEC', 'TC', 'DES', 'CPT', 'PRT', 'TS', 'CHG'].includes(type)
+  return ['REQ', 'SPEC', 'TC', 'DES', 'CPT', 'PRT', 'TS', 'CHG', 'VIS'].includes(type)
 }
 
 export function documentStatusOptions(type: DocType): readonly string[] {
@@ -251,6 +251,19 @@ export const DOC_CONFIGS: Record<DocType, DocConfig> = {
       { key: 'standard_type', label: 'Standard Type', type: 'select', options: ['Customer Standard', 'Regulatory Standard', 'Industry Standard', 'Supplier Standard', 'Internal Standard'] },
     ],
   },
+  VIS: {
+    label: 'Vision',
+    typeCode: 'VIS',
+    apiBase: 'documents',
+    idField: 'doc_id',
+    titleField: 'title',
+    descriptionField: 'description',
+    statusOptions: ['Draft', 'Review', 'Approved', 'Rejected', 'Obsolete'],
+    fields: [
+      { key: 'title', label: 'Title', type: 'text', required: true },
+      { key: 'description', label: 'Description', type: 'textarea' },
+    ],
+  },
 }
 
 export const DOC_TYPE_LABELS: Record<DocType, string> = {
@@ -267,6 +280,7 @@ export const DOC_TYPE_LABELS: Record<DocType, string> = {
   PRT: 'Protocol',
   RPT: 'Report',
   STD: 'External Standard',
+  VIS: 'Vision',
 }
 
 export const DOC_TYPE_COLORS: Record<DocType, string> = {
@@ -283,6 +297,7 @@ export const DOC_TYPE_COLORS: Record<DocType, string> = {
   PRT: 'bg-violet-500/10 text-violet-700 dark:text-violet-400',
   RPT: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
   STD: 'bg-orange-500/10 text-orange-700 dark:text-orange-400',
+  VIS: 'bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400',
 }
 
 export const DOC_TYPE_SLUGS: Record<DocType, string> = {
@@ -299,6 +314,7 @@ export const DOC_TYPE_SLUGS: Record<DocType, string> = {
   PRT: 'protocols',
   RPT: 'reports',
   STD: 'standards',
+  VIS: 'visions',
 }
 
 const DOC_TYPE_CODES = Object.keys(DOC_TYPE_SLUGS) as DocType[]
@@ -315,11 +331,14 @@ type DocLinkRuleRow = {
 const DOC_LINK_RULE_ROWS: DocLinkRuleRow[] = [
   { sourceType: 'REQ', targetType: 'REQ', roles: ['derives_from', 'refines', 'depends_on', 'duplicates', 'relates_to'] },
   { sourceType: 'REQ', targetType: 'SPEC', roles: ['derives_from', 'refines', 'references'] },
+  { sourceType: 'REQ', targetType: 'VIS', roles: ['derives_from', 'refines', 'references'] },
   { sourceType: 'REQ', targetType: 'STD', roles: ['references'] },
   { sourceType: 'REQ', targetType: 'TS', roles: ['references'] },
   { sourceType: 'REQ', targetType: 'CMP', roles: ['references'] },
   { sourceType: 'SPEC', targetType: 'SPEC', roles: ['derives_from', 'refines', 'depends_on', 'duplicates', 'relates_to'] },
   { sourceType: 'SPEC', targetType: 'STD', roles: ['references'] },
+  { sourceType: 'SPEC', targetType: 'VIS', roles: ['derives_from', 'refines', 'references'] },
+  { sourceType: 'VIS', targetType: 'STD', roles: ['references'] },
   { sourceType: 'STD', targetType: 'STD', roles: ['duplicates', 'relates_to', 'references'] },
   { sourceType: 'CPT', targetType: 'SPEC', roles: ['covers', 'verifies', 'references'] },
   { sourceType: 'CPT', targetType: 'REQ', roles: ['covers', 'verifies', 'references'] },
@@ -371,6 +390,7 @@ const DOC_LINK_RULE_ROWS: DocLinkRuleRow[] = [
   { sourceType: 'DES', targetType: 'STD', roles: ['references'] },
   { sourceType: 'RSK', targetType: 'REQ', roles: ['impacts', 'mitigates', 'references'] },
   { sourceType: 'RSK', targetType: 'SPEC', roles: ['impacts', 'references'] },
+  { sourceType: 'RSK', targetType: 'VIS', roles: ['impacts', 'references'] },
   { sourceType: 'RSK', targetType: 'DES', roles: ['impacts', 'references'] },
   { sourceType: 'RSK', targetType: 'TC', roles: ['impacts', 'references'] },
   { sourceType: 'RSK', targetType: 'CPT', roles: ['impacts', 'references'] },
@@ -381,6 +401,7 @@ const DOC_LINK_RULE_ROWS: DocLinkRuleRow[] = [
   { sourceType: 'RSK', targetType: 'DEF', roles: ['impacts', 'references'] },
   { sourceType: 'CHG', targetType: 'REQ', roles: ['impacts', 'implements', 'blocks', 'references'] },
   { sourceType: 'CHG', targetType: 'SPEC', roles: ['impacts', 'implements', 'blocks', 'references'] },
+  { sourceType: 'CHG', targetType: 'VIS', roles: ['impacts', 'implements', 'blocks', 'references'] },
   { sourceType: 'CHG', targetType: 'DES', roles: ['impacts', 'implements', 'blocks', 'references'] },
   { sourceType: 'CHG', targetType: 'TC', roles: ['impacts', 'blocks', 'references'] },
   { sourceType: 'CHG', targetType: 'CPT', roles: ['impacts', 'blocks', 'references'] },
@@ -422,12 +443,14 @@ export const DOC_LINK_ROLE_LABELS: Record<DocLinkRole, [string, string]> = {
   contains: ['contains', 'contained by'],
 }
 
-export function docUrl(prefix: string | undefined, docType: DocType, docId: string | number): string {
+/** The address of a document by its document ID. */
+export function docUrl(prefix: string | undefined, docType: DocType, docId: string): string {
   const slug = DOC_TYPE_SLUGS[docType]
   return `/projects/${prefix}/docs/${slug}/${docId}`
 }
 
-export function docEditUrl(prefix: string | undefined, docType: DocType, docId: string | number): string {
+/** The editing address of a document by its document ID. */
+export function docEditUrl(prefix: string | undefined, docType: DocType, docId: string): string {
   const slug = DOC_TYPE_SLUGS[docType]
   return `/projects/${prefix}/docs/${slug}/${docId}/edit`
 }
@@ -541,7 +564,7 @@ export function isDocLinkRoleAllowed(sourceType: string, targetType: string, rol
 export const DOC_TAG_ROLE: DocLinkRole = 'references'
 
 export const DOC_TAG_HOST_TYPES = new Set<DocType>([
-  'REQ', 'DES', 'RSK', 'CHG', 'CPT', 'SPEC', 'PRT', 'RPT', 'STD',
+  'REQ', 'DES', 'RSK', 'CHG', 'CPT', 'SPEC', 'PRT', 'RPT', 'STD', 'VIS',
 ])
 
 export function isDocTagHostType(sourceType: string): boolean {

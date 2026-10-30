@@ -53,8 +53,8 @@ def identity_client():
                 )
                 people.append(person)
             db.add_all(people)
-            project = Project(name="Project", prefix="PRJ")
-            hidden = Project(name="Separate project", prefix="OTH")
+            project = Project(name="Demo", prefix="PRJ")
+            hidden = Project(name="ABC", prefix="ABC")
             db.add_all([project, hidden])
             await db.flush()
             db.add(

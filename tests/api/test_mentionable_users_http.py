@@ -113,8 +113,8 @@ async def _seed(session_maker: async_sessionmaker[AsyncSession]) -> dict[str, in
         session.add_all([admin, grace, alan, elsewhere, outsider, retired, customer])
         await session.flush()
 
-        project = Project(name="Flight Controller", prefix="FLT", description="The project")
-        other = Project(name="Ground Station", prefix="GND", description="A different project")
+        project = Project(name="Demo", prefix="PRJ", description="The project")
+        other = Project(name="ABC", prefix="ABC", description="A different project")
         session.add_all([project, other])
         await session.flush()
 
