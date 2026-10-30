@@ -404,7 +404,7 @@ def test_the_actor_set_by_a_dependency_reaches_the_middleware(harness):
     assert (event.actor_type, event.actor_user_id) == ("user", member.id)
 
 
-def test_a_cors_preflight_is_answered_and_recorded(harness):
+def test_a_cors_preflight_is_answered_by_the_cors_layer_alone(harness):
     client, session_maker = harness
     origin = settings.CORS_ORIGINS[0]
 
@@ -419,10 +419,21 @@ def test_a_cors_preflight_is_answered_and_recorded(harness):
 
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == origin
-    assert response.headers["x-request-id"]
-    event = _one(session_maker, response, method="OPTIONS", status=200)
-    assert event.outcome == "success"
+    assert "x-request-id" not in response.headers
+    assert _requests(session_maker, method="OPTIONS") == []
+
+
+def test_a_request_from_a_foreign_origin_is_recorded_without_cors_permission(harness):
+    client, session_maker = harness
+
+    response = client.get("/api/projects", headers={"Origin": "https://foreign.example.com"})
+
+    assert response.status_code == 401
+    assert "access-control-allow-origin" not in response.headers
+    event = _one(session_maker, response, route="/api/projects")
+    assert event.outcome == "denied"
     assert event.actor_type == "anonymous"
+    assert event.ip
 
 
 def test_a_cors_answer_keeps_its_headers_with_the_request_id(harness):
