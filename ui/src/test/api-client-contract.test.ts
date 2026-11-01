@@ -200,13 +200,13 @@ const CALLS: Array<[string, unknown[], string, string]> = [
   ['projectVariablesApi.delete', [31], 'delete', '/project-variables/31'],
 
   ['campaignsApi.list', [5], 'get', '/campaigns?project_id=5'],
-  ['campaignsApi.get', [41], 'get', '/campaigns/41'],
+  ['campaignsApi.get', ['PRJ-CMP-001'], 'get', '/campaigns/PRJ-CMP-001'],
   ['campaignsApi.create', [{ project_id: 5, name: 'C' }], 'post', '/campaigns'],
-  ['campaignsApi.update', [41, { name: 'C2' }], 'patch', '/campaigns/41'],
-  ['campaignsApi.delete', [41], 'delete', '/campaigns/41'],
-  ['campaignsApi.addItem', [41, 12], 'post', '/campaigns/41/items?test_case_id=12'],
-  ['campaignsApi.updateItem', [41, 51, { comment: 'c' }], 'patch', '/campaigns/41/items/51'],
-  ['campaignsApi.removeItem', [41, 51], 'delete', '/campaigns/41/items/51'],
+  ['campaignsApi.update', ['PRJ-CMP-001', { name: 'C2' }], 'patch', '/campaigns/PRJ-CMP-001'],
+  ['campaignsApi.delete', ['PRJ-CMP-001'], 'delete', '/campaigns/PRJ-CMP-001'],
+  ['campaignsApi.addItem', ['PRJ-CMP-001', 'PRJ-TC-001'], 'post', '/campaigns/PRJ-CMP-001/items?test_case_id=PRJ-TC-001'],
+  ['campaignsApi.updateItem', ['PRJ-CMP-001', 'PRJ-TC-001', { comment: 'c' }], 'patch', '/campaigns/PRJ-CMP-001/items/PRJ-TC-001'],
+  ['campaignsApi.removeItem', ['PRJ-CMP-001', 'PRJ-TC-001'], 'delete', '/campaigns/PRJ-CMP-001/items/PRJ-TC-001'],
   ['campaignsApi.listConfigurations', [5], 'get', '/campaigns/configurations?project_id=5'],
   [
     'campaignsApi.createConfiguration',
@@ -216,12 +216,12 @@ const CALLS: Array<[string, unknown[], string, string]> = [
   ],
 
   ['testSuitesApi.list', [5], 'get', '/test-suites'],
-  ['testSuitesApi.get', [61], 'get', '/test-suites/61'],
+  ['testSuitesApi.get', ['PRJ-TS-001'], 'get', '/test-suites/PRJ-TS-001'],
   ['testSuitesApi.create', [{ project_id: 5, name: 'S' }], 'post', '/test-suites'],
-  ['testSuitesApi.update', [61, { name: 'S2' }], 'patch', '/test-suites/61'],
-  ['testSuitesApi.delete', [61], 'delete', '/test-suites/61'],
-  ['testSuitesApi.addItem', [61, 12], 'post', '/test-suites/61/items?test_case_id=12'],
-  ['testSuitesApi.removeItem', [61, 71], 'delete', '/test-suites/61/items/71'],
+  ['testSuitesApi.update', ['PRJ-TS-001', { name: 'S2' }], 'patch', '/test-suites/PRJ-TS-001'],
+  ['testSuitesApi.delete', ['PRJ-TS-001'], 'delete', '/test-suites/PRJ-TS-001'],
+  ['testSuitesApi.addItem', ['PRJ-TS-001', 'PRJ-TC-001'], 'post', '/test-suites/PRJ-TS-001/items?test_case_id=PRJ-TC-001'],
+  ['testSuitesApi.removeItem', ['PRJ-TS-001', 'PRJ-TC-001'], 'delete', '/test-suites/PRJ-TS-001/items/PRJ-TC-001'],
 
   ['linksApi.list', [{ project_id: 5 }], 'get', '/links'],
   [

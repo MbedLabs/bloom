@@ -1585,7 +1585,7 @@ export interface TestCampaignItem {
 export interface TestCampaign {
   id: number
   project_id: number
-  campaign_id?: string
+  campaign_id: string
   configuration_id: number | null
   suite_id: number | null
   bud_run_id: number | null
@@ -1646,7 +1646,7 @@ export const campaignsApi = {
     return response.data
   },
 
-  get: async (campaignId: number) => {
+  get: async (campaignId: string) => {
     const response = await api.get<TestCampaignDetail>(`/campaigns/${campaignId}`)
     return response.data
   },
@@ -1656,27 +1656,27 @@ export const campaignsApi = {
     return response.data
   },
 
-  update: async (campaignId: number, data: Partial<Pick<TestCampaign, 'name' | 'description' | 'status' | 'visibility' | 'bud_run_id' | 'bud_run_url' | 'bud_run_status'>> & { configuration_id?: number; suite_id?: number | null; suite_ids?: number[] }) => {
+  update: async (campaignId: string, data: Partial<Pick<TestCampaign, 'name' | 'description' | 'status' | 'visibility' | 'bud_run_id' | 'bud_run_url' | 'bud_run_status'>> & { configuration_id?: number; suite_id?: number | null; suite_ids?: number[] }) => {
     const response = await api.patch<TestCampaign>(`/campaigns/${campaignId}`, data)
     return response.data
   },
 
-  delete: async (campaignId: number) => {
+  delete: async (campaignId: string) => {
     await api.delete(`/campaigns/${campaignId}`)
   },
 
-  addItem: async (campaignId: number, testCaseId: number) => {
+  addItem: async (campaignId: string, testCaseId: string) => {
     const response = await api.post<TestCampaignItem>(`/campaigns/${campaignId}/items?test_case_id=${testCaseId}`)
     return response.data
   },
 
-  updateItem: async (campaignId: number, itemId: number, data: { comment?: string }) => {
-    const response = await api.patch<TestCampaignItem>(`/campaigns/${campaignId}/items/${itemId}`, data)
+  updateItem: async (campaignId: string, testCaseId: string, data: { comment?: string }) => {
+    const response = await api.patch<TestCampaignItem>(`/campaigns/${campaignId}/items/${testCaseId}`, data)
     return response.data
   },
 
-  removeItem: async (campaignId: number, itemId: number) => {
-    await api.delete(`/campaigns/${campaignId}/items/${itemId}`)
+  removeItem: async (campaignId: string, testCaseId: string) => {
+    await api.delete(`/campaigns/${campaignId}/items/${testCaseId}`)
   },
 
   listConfigurations: async (projectId: number) => {
@@ -1695,7 +1695,7 @@ export const testSuitesApi = {
     const response = await api.get<PaginatedResponse<TestSuite>>('/test-suites', { params: { project_id: projectId, ...params } })
     return response.data
   },
-  get: async (suiteId: number) => {
+  get: async (suiteId: string) => {
     const response = await api.get<TestSuiteDetail>(`/test-suites/${suiteId}`)
     return response.data
   },
@@ -1703,19 +1703,19 @@ export const testSuitesApi = {
     const response = await api.post<TestSuiteDetail>('/test-suites', data)
     return response.data
   },
-  update: async (suiteId: number, data: { name?: string; description?: string; status?: string; visibility?: ArtefactVisibility }) => {
+  update: async (suiteId: string, data: { name?: string; description?: string; status?: string; visibility?: ArtefactVisibility }) => {
     const response = await api.patch<TestSuiteDetail>(`/test-suites/${suiteId}`, data)
     return response.data
   },
-  delete: async (suiteId: number) => {
+  delete: async (suiteId: string) => {
     await api.delete(`/test-suites/${suiteId}`)
   },
-  addItem: async (suiteId: number, testCaseId: number) => {
+  addItem: async (suiteId: string, testCaseId: string) => {
     const response = await api.post<TestSuiteItem>(`/test-suites/${suiteId}/items?test_case_id=${testCaseId}`)
     return response.data
   },
-  removeItem: async (suiteId: number, itemId: number) => {
-    await api.delete(`/test-suites/${suiteId}/items/${itemId}`)
+  removeItem: async (suiteId: string, testCaseId: string) => {
+    await api.delete(`/test-suites/${suiteId}/items/${testCaseId}`)
   },
 }
 

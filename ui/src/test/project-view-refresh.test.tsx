@@ -37,6 +37,11 @@ const writes = {
 const allWrites = { ...writes, DEF: api.defectsApi, TS: api.testSuitesApi, CMP: api.campaignsApi }
 const allDetails = { ...details, DEF: 'defect', TS: 'testSuite', CMP: 'campaign' }
 
+/** The fixture record the mocked read of a document type returns, whatever its argument. */
+function fixtureOf(type: keyof typeof allWrites): Promise<unknown> {
+  return (allWrites[type].get as () => Promise<unknown>)()
+}
+
 /** Observe real cached project views while a mutation page is mounted. */
 function Views({ calls, prefix = 'PRJ', projectId = 1 }: { calls: ReturnType<typeof vi.fn<() => Promise<unknown>>>[]; prefix?: string; projectId?: number }) {
   useQuery({ queryKey: ['all-docs', prefix, 'requirements', 'filter'], queryFn: calls[0] })
@@ -106,7 +111,7 @@ async function mountedPage(element: React.ReactElement, path: string, route: str
 describe('native document detail deletion', () => {
   it.each(Object.keys(allWrites) as DocType[])('%s refreshes views without refetching deleted detail', async type => {
     const endpoint = allWrites[type]
-    const record = await endpoint.get(0) as unknown as { id: number; project_id: number }
+    const record = await fixtureOf(type) as { id: number; project_id: number }
     const detailKey = allDetails[type] || 'document'
     const docId = `PRJ-${type}-001`
     const shell = { ...docDetail, id: record.id, doc_type: type, doc_id: docId }
@@ -146,7 +151,7 @@ describe('dedicated create and update pages', () => {
   })
 
   it.each(['DEF', 'TS', 'CMP'] as const)('%s update refreshes cached project views', async type => {
-    const record = await allWrites[type].get(0) as unknown as { id: number }
+    const record = await fixtureOf(type) as { id: number }
     const shell = { ...docDetail, id: record.id, doc_type: type, doc_id: `PRJ-${type}-001` }
     vi.mocked(api.docsApi.get).mockResolvedValue(shell as never)
     const { calls } = await mountedPage(<UnifiedDocDetail />, `/projects/PRJ/docs/${DOC_TYPE_SLUGS[type]}/${shell.doc_id}`, '/projects/:prefix/docs/:kind/:docId', client => {
