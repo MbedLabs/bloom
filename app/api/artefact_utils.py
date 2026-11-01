@@ -637,7 +637,37 @@ async def get_visible_row(
     an external user's changing action on a row they did not create is a 403. A 404 for a
     row that exists is marked as a refusal for the audit log.
     """
-    query = select(model).where(model.id == item_id)
+    return await _checked_row(
+        db,
+        select(model).where(model.id == item_id),
+        model,
+        not_found,
+        current_user,
+        permission,
+    )
+
+
+async def get_visible_row_by_public_id(
+    db: AsyncSession,
+    public_id_column,
+    public_id: str,
+    not_found: str,
+    current_user: User,
+    *,
+    permission: tuple[str, str | None] | None = None,
+    project_id: int | None = None,
+):
+    """The row whose public ID column holds the public ID, within the project when one is
+    given, under the checks of get_visible_row; a database id matches no row and is a 404."""
+    model = public_id_column.class_
+    query = select(model).where(public_id_column == public_id)
+    if project_id is not None:
+        query = query.where(model.project_id == project_id)
+    return await _checked_row(db, query, model, not_found, current_user, permission)
+
+
+async def _checked_row(db: AsyncSession, query, model, not_found: str, current_user, permission):
+    """The single row of the query when the user may see it and act on it, else 404 or 403."""
     unfiltered = None
     if hasattr(model, "visibility"):
         unfiltered = query

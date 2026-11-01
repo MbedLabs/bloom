@@ -68,7 +68,7 @@ def test_sync_names_the_campaign_the_results_reached(api_client: TestClient):
     assert body["campaigns"][0]["id"] == campaign["id"]
     assert body["campaigns"][0]["name"] == campaign["name"]
     assert body["campaigns"][0]["url"].endswith(
-        f"/projects/{project['prefix']}/campaigns/{campaign['id']}"
+        f"/projects/{project['prefix']}/docs/campaigns/{campaign['campaign_id']}"
     )
 
 

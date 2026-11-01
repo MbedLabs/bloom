@@ -921,12 +921,18 @@ async def get_next_doc_id(
     return NextDocIdResponse(next_id=next_id)
 
 
-async def _reference_query(db: AsyncSession, model, id_col, project_id: int, ref: str, *conditions):
-    """The unfiltered query for one item of a kind in a project by its document ID, or by its
-    database id when the reference is a number that no item of that kind has as document ID."""
+PUBLIC_ID_ONLY_TYPES = frozenset({"TS", "CMP"})
+
+
+async def _reference_query(
+    db: AsyncSession, model, id_col, project_id: int, ref: str, *conditions, by_number=True
+):
+    """The unfiltered query for one item of a kind in a project by its document ID, or, with
+    by_number, by its database id when the reference is a number that no item of that kind has
+    as document ID."""
     base = select(model).where(model.project_id == project_id, *conditions)
     by_doc_id = base.where(id_col == ref)
-    if ref.isdigit():
+    if by_number and ref.isdigit():
         found = (await db.execute(by_doc_id.with_only_columns(model.id))).first()
         if found is None:
             return base.where(model.id == int(ref))
@@ -965,9 +971,11 @@ async def find_visible_doc(
     ref: str,
     *,
     record_refusals: bool = True,
+    any_database_id: bool = False,
 ):
     """The item of a kind slug in a project that the user may see, by document ID or database
-    id, as (model, row, resolved type code, document ID column), or None.
+    id, as (model, row, resolved type code, document ID column), or None. A suite or campaign is
+    found by database id only with any_database_id.
 
     With record_refusals, a hidden item marks the request as a refusal for the audit log.
     """
@@ -996,7 +1004,14 @@ async def find_visible_doc(
     for type_code, (model, id_col_name, slug) in TYPE_MAP.items():
         if slug != kind_slug:
             continue
-        unfiltered = await _reference_query(db, model, getattr(model, id_col_name), project.id, ref)
+        unfiltered = await _reference_query(
+            db,
+            model,
+            getattr(model, id_col_name),
+            project.id,
+            ref,
+            by_number=any_database_id or type_code not in PUBLIC_ID_ONLY_TYPES,
+        )
         found = await _visible_row(
             db,
             current_user,
@@ -1024,7 +1039,8 @@ async def get_doc_by_kind_and_string_id(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    """Look up a doc by its kind-aware slug and its document ID, or its database id."""
+    """Look up a doc by its kind-aware slug and its document ID, or its database id except for
+    suites and campaigns."""
     project = await resolve_project(db, project_ref)
     await require_project_access(db, current_user, project.id)
     found = await find_visible_doc(db, current_user, project, kind_slug, doc_id_str)

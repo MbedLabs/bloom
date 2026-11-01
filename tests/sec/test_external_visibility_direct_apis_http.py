@@ -344,7 +344,7 @@ def test_external_campaign_detail_hides_hidden_nested_requirements():
         seeded = harness.run(_seed_direct_visibility_data(harness.session_maker))
         harness.act_as(seeded["external"])
 
-        response = harness.client.get(f"/api/campaigns/{seeded['visible_campaign'].id}")
+        response = harness.client.get(f"/api/campaigns/{seeded['visible_campaign'].campaign_id}")
         assert response.status_code == 200, response.text
         body = response.json()
 

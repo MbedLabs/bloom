@@ -128,7 +128,7 @@ async def open_label(
     for slug in ITEM_KIND_SLUGS.get(resource_type, ()):
         try:
             found = await find_visible_doc(
-                db, viewer, project, slug, resource_ref, record_refusals=False
+                db, viewer, project, slug, resource_ref, record_refusals=False, any_database_id=True
             )
         except HTTPException:
             found = None

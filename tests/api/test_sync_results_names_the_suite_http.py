@@ -47,7 +47,9 @@ def test_sync_names_the_suite_holding_the_synced_case(api_client: TestClient):
     named = body["suites"][0]
     assert named["id"] == suite["id"]
     assert named["name"] == suite["name"]
-    assert named["url"].endswith(f"/projects/{project['prefix']}/suites/{suite['id']}")
+    assert named["url"].endswith(
+        f"/projects/{project['prefix']}/docs/test-suites/{suite['suite_id']}"
+    )
     assert named["matched"] == 1
     assert named["size"] == 1
 

@@ -197,10 +197,10 @@ def test_external_suite_list_and_detail_hide_internal_suite_and_items():
         suite_ids = {item["suite_id"] for item in listed.json()["items"]}
         assert suite_ids == {"PRJ-TS-001"}
 
-        hidden = harness.client.get(f"/api/test-suites/{seeded['hidden_suite'].id}")
+        hidden = harness.client.get(f"/api/test-suites/{seeded['hidden_suite'].suite_id}")
         assert hidden.status_code == 404, hidden.text
 
-        visible = harness.client.get(f"/api/test-suites/{seeded['visible_suite'].id}")
+        visible = harness.client.get(f"/api/test-suites/{seeded['visible_suite'].suite_id}")
         assert visible.status_code == 200, visible.text
         body = visible.json()
         assert body["visibility"] == "customer"

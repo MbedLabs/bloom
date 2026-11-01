@@ -240,10 +240,10 @@ def test_external_campaign_list_and_detail_hide_internal_campaign_and_items():
         campaign_ids = {item["campaign_id"] for item in listed.json()["items"]}
         assert campaign_ids == {"PRJ-CMP-001"}
 
-        hidden = harness.client.get(f"/api/campaigns/{seeded['hidden_campaign'].id}")
+        hidden = harness.client.get(f"/api/campaigns/{seeded['hidden_campaign'].campaign_id}")
         assert hidden.status_code == 404, hidden.text
 
-        visible = harness.client.get(f"/api/campaigns/{seeded['visible_campaign'].id}")
+        visible = harness.client.get(f"/api/campaigns/{seeded['visible_campaign'].campaign_id}")
         assert visible.status_code == 200, visible.text
         body = visible.json()
         assert body["visibility"] == "customer"
@@ -331,7 +331,7 @@ def test_sync_results_updates_items_without_inventing_campaign_run_id():
         )
 
         assert response.status_code == 200, response.text
-        visible = harness.client.get(f"/api/campaigns/{seeded['visible_campaign'].id}")
+        visible = harness.client.get(f"/api/campaigns/{seeded['visible_campaign'].campaign_id}")
         assert visible.status_code == 200, visible.text
         body = visible.json()
         assert body["bud_run_id"] is None
