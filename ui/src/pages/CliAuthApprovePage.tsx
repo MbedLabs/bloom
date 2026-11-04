@@ -160,7 +160,7 @@ function RequestCodeBoxes({ onChange }: Readonly<{ onChange: (value: string) => 
     const previous = slots[index]
     if (raw === '') {
       setSlot(index, '')
-    } else if (typed === previous) {
+    } else if (typed !== '' && typed === previous) {
       if (raw.length === 1) focusBox(index + 1)
     } else if (typed.length === 1) {
       setSlot(index, typed)
