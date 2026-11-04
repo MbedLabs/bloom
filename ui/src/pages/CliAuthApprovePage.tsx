@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { api, extractApiErrorMessage, type User } from '../api/client'
 import { PRODUCT_NAME } from '../brandAssets'
@@ -86,9 +86,14 @@ function answerStatus(error: unknown): number | undefined {
   return axios.isAxiosError(error) ? error.response?.status : undefined
 }
 
-/** A typed or pasted request code in upper case without spaces, at most eight code characters, with a hyphen after the fourth. */
+/** A typed or pasted text in upper case with every character that is not a letter or digit removed. */
+function codeCharacters(raw: string): string {
+  return raw.toUpperCase().replace(/[^A-Z0-9]/g, '')
+}
+
+/** A typed or pasted request code in upper case, letters and digits only, at most eight characters, with a hyphen after the fourth. */
 function formatRequestCode(raw: string): string {
-  const letters = raw.toUpperCase().replace(/[\s-]/g, '').slice(0, CODE_LETTERS)
+  const letters = codeCharacters(raw).slice(0, CODE_LETTERS)
   return letters.length > 4 ? `${letters.slice(0, 4)}-${letters.slice(4)}` : letters
 }
 
@@ -124,18 +129,105 @@ function ManualCode({ code }: Readonly<{ code: string }>) {
   )
 }
 
+const CODE_SLOTS = Array.from({ length: CODE_LETTERS }, (_, index) => index)
+
+/** The request code as eight one-character boxes with a hyphen after the fourth, reporting the characters entered so far. */
+function RequestCodeBoxes({ onChange }: Readonly<{ onChange: (value: string) => void }>) {
+  const [slots, setSlots] = useState<string[]>(() => CODE_SLOTS.map(() => ''))
+  const boxes = useRef<(HTMLInputElement | null)[]>([])
+
+  const focusBox = (index: number) => {
+    boxes.current[Math.min(Math.max(index, 0), CODE_LETTERS - 1)]?.focus()
+  }
+
+  const update = (next: string[]) => {
+    setSlots(next)
+    onChange(next.join(''))
+  }
+
+  const setSlot = (index: number, character: string) => {
+    update(slots.map((slot, position) => (position === index ? character : slot)))
+  }
+
+  const fill = (characters: string) => {
+    const code = characters.slice(0, CODE_LETTERS)
+    update(CODE_SLOTS.map((index) => code[index] ?? ''))
+    focusBox(code.length)
+  }
+
+  const enter = (index: number, raw: string) => {
+    const typed = codeCharacters(raw)
+    const previous = slots[index]
+    if (raw === '') {
+      setSlot(index, '')
+    } else if (typed === previous) {
+      if (raw.length === 1) focusBox(index + 1)
+    } else if (typed.length === 1) {
+      setSlot(index, typed)
+      focusBox(index + 1)
+    } else if (typed.length === 2 && previous !== '' && typed.includes(previous)) {
+      setSlot(index, typed[0] === previous ? typed[1] : typed[0])
+      focusBox(index + 1)
+    } else if (typed !== '') {
+      fill(typed)
+    }
+  }
+
+  const paste = (event: ClipboardEvent<HTMLInputElement>) => {
+    event.preventDefault()
+    const typed = codeCharacters(event.clipboardData.getData('text'))
+    if (typed !== '') fill(typed)
+  }
+
+  const move = (index: number, event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Backspace' && slots[index] === '' && index > 0) {
+      event.preventDefault()
+      setSlot(index - 1, '')
+      focusBox(index - 1)
+    } else if (event.key === 'ArrowLeft') {
+      event.preventDefault()
+      focusBox(index - 1)
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault()
+      focusBox(index + 1)
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      {CODE_SLOTS.map((index) => (
+        <Fragment key={index}>
+          {index === CODE_LETTERS / 2 && <span aria-hidden="true" className="shrink-0 font-mono text-xl font-semibold text-muted-foreground">-</span>}
+          <input
+            ref={(element) => { boxes.current[index] = element }}
+            value={slots[index]}
+            onChange={(event) => enter(index, event.target.value)}
+            onKeyDown={(event) => move(index, event)}
+            onPaste={paste}
+            onFocus={(event) => event.target.select()}
+            aria-label={`Request code character ${index + 1} of ${CODE_LETTERS}`}
+            autoComplete="off"
+            spellCheck={false}
+            autoCapitalize="characters"
+            className="h-12 w-full min-w-0 flex-1 rounded-lg border border-input bg-background px-0 text-center font-mono text-xl font-semibold text-foreground"
+          />
+        </Fragment>
+      ))}
+    </div>
+  )
+}
+
 /** The Deny action, which ends the sign-in request on the server. */
 function DenyButton({ busy, onDeny }: Readonly<{ busy: boolean; onDeny: () => void }>) {
   return <button type="button" disabled={busy} onClick={onDeny} className="flex-1 rounded-lg border border-input px-4 py-2 text-foreground disabled:opacity-50">Deny</button>
 }
 
-/** The request code field, the requesting client, the account, the request time and expiry, with Approve and Deny. */
-function Consent({ session, account, busy, approving, typedCode, codeCheck, onCodeChange, onApprove, onDeny }: Readonly<{
+/** The request code boxes, the requesting client, the account, the request time and expiry, with Approve and Deny. */
+function Consent({ session, account, busy, approving, codeCheck, onCodeChange, onApprove, onDeny }: Readonly<{
   session: CliSession
   account: User | null
   busy: boolean
   approving: boolean
-  typedCode: string
   codeCheck: CodeCheck
   onCodeChange: (value: string) => void
   onApprove: () => void
@@ -147,29 +239,20 @@ function Consent({ session, account, busy, approving, typedCode, codeCheck, onCo
   const signedIn = account ? `${account.full_name} (${account.email})` : 'your account'
   return (
     <div className="space-y-4">
-      <div className="space-y-1">
-        <label htmlFor="cli-request-code" className="block text-sm font-medium text-foreground">Request code</label>
-        <input
-          id="cli-request-code"
-          value={typedCode}
-          onChange={(event) => onCodeChange(event.target.value)}
-          autoComplete="off"
-          spellCheck={false}
-          autoCapitalize="characters"
-          aria-describedby="cli-request-code-help"
-          className="w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-2xl font-semibold tracking-widest text-foreground"
-        />
+      <fieldset className="min-w-0 space-y-1" aria-describedby="cli-request-code-help">
+        <legend className="mb-1 block text-sm font-medium text-foreground">Request code</legend>
+        <RequestCodeBoxes onChange={onCodeChange} />
         <p id="cli-request-code-help" className="text-sm text-muted-foreground">Type the code your terminal or AI client shows next to the link.</p>
         <output className={`block text-sm ${codeCheck === 'match' ? 'text-foreground' : 'text-destructive'}`}>{CHECK_TEXT[codeCheck]}</output>
-      </div>
+      </fieldset>
       <div>
-        <p className="font-semibold text-foreground">{session.client_name}</p>
+        <p className="font-semibold text-foreground wrap-anywhere">{session.client_name}</p>
         <p className="text-xs text-muted-foreground">Name given by the requesting client, not verified.</p>
       </div>
       <p className="text-sm text-muted-foreground">Approving signs this client in to {PRODUCT_NAME} as {signedIn}, with your full permissions.</p>
       <p className="text-sm text-muted-foreground">Requested {localTime(session.created_at)}. Expires {localTime(session.expires_at)}.</p>
       <p className={WARNING}>Approve only a sign-in you started yourself, on your own computer, in the last few minutes.</p>
-      <p className="text-sm text-muted-foreground">{destination}</p>
+      <p className="text-sm text-muted-foreground wrap-anywhere">{destination}</p>
       {session.mode === 'code' && (
         <p className={WARNING}>This request asks for a one-time code instead of returning to a client on this computer. If someone else sent you this link or asks you for the code, deny it: the code signs their client in to your account.</p>
       )}
@@ -328,7 +411,6 @@ export default function CliAuthApprovePage() {
         account={user}
         busy={busy}
         approving={approving}
-        typedCode={typedCode}
         codeCheck={codeCheck}
         onCodeChange={changeCode}
         onApprove={() => { void approve() }}
