@@ -166,7 +166,7 @@ function RequestCodeBoxes({ onChange }: Readonly<{ onChange: (value: string) => 
       setSlot(index, typed)
       focusBox(index + 1)
     } else if (typed.length === 2 && previous !== '' && typed.includes(previous)) {
-      setSlot(index, typed[0] === previous ? typed[1] : typed[0])
+      setSlot(index, typed.startsWith(previous) ? typed[1] : typed[0])
       focusBox(index + 1)
     } else if (typed !== '') {
       fill(typed)

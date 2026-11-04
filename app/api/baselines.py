@@ -86,7 +86,7 @@ LINK_ENDPOINT_TABLES = {
     "DES": "design_items",
     "RSK": "risk_items",
     "CHG": "change_requests",
-    **{kind: "documents" for kind in CANONICAL_DOCUMENT_KINDS},
+    **dict.fromkeys(CANONICAL_DOCUMENT_KINDS, "documents"),
 }
 
 

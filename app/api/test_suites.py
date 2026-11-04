@@ -447,7 +447,11 @@ async def add_suite_item(
     )
 
 
-@router.delete("/{suite_id}/items/{test_case_id}", status_code=204)
+@router.delete(
+    "/{suite_id}/items/{test_case_id}",
+    status_code=204,
+    responses={404: {"description": "Not Found"}},
+)
 async def remove_suite_item(
     suite_id: str,
     test_case_id: str,

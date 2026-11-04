@@ -617,7 +617,11 @@ async def _campaign_item_of(
     return item
 
 
-@router.delete("/{campaign_id}/items/{test_case_id}", status_code=204)
+@router.delete(
+    "/{campaign_id}/items/{test_case_id}",
+    status_code=204,
+    responses={404: {"description": "Not Found"}},
+)
 async def remove_campaign_item(
     campaign_id: str,
     test_case_id: str,

@@ -2,19 +2,21 @@
  * Date and time utilities for the Bloom PLM.
  */
 
+const DEFAULT_DATE_TIME_OPTIONS: Readonly<Intl.DateTimeFormatOptions> = {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+}
+
 /**
- * Format an ISO date string for display, 
+ * Format an ISO date string for display,
  * respecting the user's preferred timezone setting.
  */
 export function formatDateTime(
-  dateString: string | null | undefined, 
-  options: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }
+  dateString: string | null | undefined,
+  options: Intl.DateTimeFormatOptions = DEFAULT_DATE_TIME_OPTIONS
 ): string {
   if (!dateString) return '-'
   
