@@ -12,6 +12,13 @@ import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { formatDateTime } from '../lib/dateTime'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
 
+type SnapshotSection = { count?: number; ids?: string[]; titles?: string[]; records?: unknown[] }
+
+/** The sections of a baseline snapshot, leaving out plain values such as its schema version and capture time. */
+function snapshotSections(snapshot: Record<string, unknown> | null): [string, SnapshotSection][] {
+  return Object.entries(snapshot ?? {}).filter((entry): entry is [string, SnapshotSection] => typeof entry[1] === 'object' && entry[1] !== null)
+}
+
 export default function Baselines() {
   const { user } = useAuth()
   const { prefix } = useParams<{ prefix?: string }>()
@@ -161,11 +168,11 @@ export default function Baselines() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {Object.entries((selectedBaseline.snapshot as Record<string, { count?: number; ids?: string[]; titles?: string[] }>) || {}).map(([key, value]) => (
+                  {snapshotSections(selectedBaseline.snapshot).map(([key, value]) => (
                     <div key={key} className="rounded-lg border border-border p-4 bg-background/60">
                       <div className="flex items-center justify-between mb-2">
                         <div className="text-sm font-medium text-foreground capitalize">{key.replace('_', ' ')}</div>
-                        <div className="text-lg font-bold text-foreground">{value?.count ?? 0}</div>
+                        <div className="text-lg font-bold text-foreground">{value.count ?? value.records?.length ?? 0}</div>
                       </div>
                       <div className="text-xs text-muted-foreground wrap-break-word">
                         {value?.ids?.slice(0, 6).join(', ') || value?.titles?.slice(0, 6).join(', ') || 'No items'}
