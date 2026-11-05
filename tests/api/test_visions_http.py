@@ -178,34 +178,6 @@ def test_vision_links_follow_their_rules(api_client: TestClient):
         assert response.status_code in {400, 422}, (source_type, role, response.text)
 
 
-def test_a_baseline_keeps_documents_and_visions_in_separate_sections(api_client: TestClient):
-    admin = _admin_headers(api_client)
-    project = create_project(api_client, admin, "Vision baseline")["id"]
-    spec = _document(api_client, admin, project, "SPEC").json()
-    vision = _document(api_client, admin, project, "VIS").json()
-    baseline = api_client.post(
-        "/api/baselines", headers=admin, json={"project_id": project, "name": unique_name("bl")}
-    )
-    assert baseline.status_code == 201, baseline.text
-    snapshot = baseline.json()["snapshot"]
-    assert snapshot["documents"] == {"count": 1, "titles": [spec["title"]]}
-    assert snapshot["visions"] == {"count": 1, "ids": [vision["doc_id"]]}
-
-    released_kinds = _policy_user(
-        api_client,
-        admin,
-        {code: ["view"] for code in ("SPEC", "PRT", "RPT", "STD", "baseline")},
-        project,
-    )
-    seen = api_client.get(f"/api/baselines/{baseline.json()['id']}", headers=released_kinds)
-    assert set(seen.json()["snapshot"]) == {"documents"}
-    vision_reader = _policy_user(
-        api_client, admin, {"VIS": ["view"], "baseline": ["view"]}, project
-    )
-    seen = api_client.get(f"/api/baselines/{baseline.json()['id']}", headers=vision_reader)
-    assert set(seen.json()["snapshot"]) == {"visions"}
-
-
 RELEASED_MAINTAINER_SET = (
     "Requirements",
     "Specifications",

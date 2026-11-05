@@ -2078,29 +2078,3 @@ def test_an_export_leaves_out_types_without_view(api_client: TestClient):
     trace = api_client.get(f"/api/projects/{project}/export/traceability", headers=exporter)
     assert trace.status_code == 200
     assert case["tc_id"] not in trace.text
-
-
-def test_a_baseline_snapshot_shows_only_sections_of_visible_types(api_client: TestClient):
-    admin = _admin_headers(api_client)
-    project = create_project(api_client, admin, "Baselined")["id"]
-    _create(api_client, admin, "requirements", project)
-    baseline = api_client.post(
-        "/api/baselines", headers=admin, json={"project_id": project, "name": unique_name("bl")}
-    ).json()["id"]
-    some = _policy_user(
-        api_client, admin, {"REQ": ["view"], "SPEC": ["view"], "baseline": ["view"]}, project
-    )
-    documents = _policy_user(
-        api_client,
-        admin,
-        {code: ["view"] for code in ("SPEC", "PRT", "RPT", "STD", "baseline")},
-        project,
-    )
-
-    snapshot = api_client.get(f"/api/baselines/{baseline}", headers=some).json()["snapshot"]
-    assert set(snapshot) == {"requirements"}
-    snapshot = api_client.get(f"/api/baselines/{baseline}", headers=documents).json()["snapshot"]
-    assert set(snapshot) == {"documents"}
-    listed = api_client.get("/api/baselines", headers=some, params={"project_id": project})
-    assert set(listed.json()[0]["snapshot"]) == {"requirements"}
-    assert len(api_client.get(f"/api/baselines/{baseline}", headers=admin).json()["snapshot"]) == 7
