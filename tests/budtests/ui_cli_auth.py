@@ -11,7 +11,6 @@ from urllib.parse import urlparse
 from budtestlibrary import BudTestCase
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 from playwright.sync_api import sync_playwright
-
 from tests.budtests.config import UiCliAuth as c
 from tests.budtests.messages import UiCliAuth as m
 from tests.budtests.parameters import UiCliAuth as p
@@ -75,7 +74,9 @@ class UiCliAuth(BudTestCase):
             ("GET", c.SETUP_PATH): [(p.OK, p.SETUP)],
             ("GET", self.session_path()): [(p.OK, self.session)],
             ("POST", c.CHECK_PATH): [(p.OK, p.NOTHING)],
-            ("POST", c.APPROVE_PATH): [(p.OK, {"exchange_code": p.EXCHANGE_CODE, "expires_at": self.expires_at})],
+            ("POST", c.APPROVE_PATH): [
+                (p.OK, {"exchange_code": p.EXCHANGE_CODE, "expires_at": self.expires_at})
+            ],
             ("POST", c.DENY_PATH): [(p.OK, p.NOTHING)],
         }
         self.calls = []
@@ -84,7 +85,10 @@ class UiCliAuth(BudTestCase):
         self.page = self.context.new_page()
         self.page.set_default_timeout(c.TIMEOUT_MS)
         self.page.route(c.API_PATTERN, self._answer)
-        self.page.route(c.LOOPBACK_PATTERN, lambda route: route.fulfill(status=p.OK, content_type=c.HTML, body=""))
+        self.page.route(
+            c.LOOPBACK_PATTERN,
+            lambda route: route.fulfill(status=p.OK, content_type=c.HTML, body=""),
+        )
 
     def tearDown(self):
         """Close the page."""
@@ -95,7 +99,9 @@ class UiCliAuth(BudTestCase):
         answer is p.HOLD, or with 404."""
         request = route.request
         path = urlparse(request.url).path
-        self.calls.append((request.method, path, request.post_data_json if request.post_data else None))
+        self.calls.append(
+            (request.method, path, request.post_data_json if request.post_data else None)
+        )
         queue = self.answers.get((request.method, path))
         if not queue:
             route.fulfill(status=p.MISSING, content_type=c.JSON, body=json.dumps(p.NOT_FOUND))
@@ -117,7 +123,11 @@ class UiCliAuth(BudTestCase):
 
     def callback_mode(self, callback: str = p.CALLBACK):
         """Make the session a callback-mode request for a loopback callback."""
-        self.answer("GET", self.session_path(), (p.OK, {**self.session, "mode": "callback", "redirect_uri": callback}))
+        self.answer(
+            "GET",
+            self.session_path(),
+            (p.OK, {**self.session, "mode": "callback", "redirect_uri": callback}),
+        )
 
     def open_request(self):
         """Open the approval page of the pending session and wait for its first box."""
@@ -193,7 +203,9 @@ class UiCliAuth(BudTestCase):
 
     def lookups(self) -> int:
         """How often the page looked the session up."""
-        return len([to for (sent, to, _) in self.calls if sent == "GET" and to == self.session_path()])
+        return len(
+            [to for (sent, to, _) in self.calls if sent == "GET" and to == self.session_path()]
+        )
 
     def local_time(self, value: str) -> str:
         """A time the way the page's browser writes it."""
@@ -212,7 +224,9 @@ class UiCliAuth(BudTestCase):
         page = self.page.url
         self.matching_code()
         self.button(m.APPROVE).click()
-        self.assertIn(member=m.INVALID_CALLBACK, container=self.alert_text(), msg=f"{target!r} is refused")
+        self.assertIn(
+            member=m.INVALID_CALLBACK, container=self.alert_text(), msg=f"{target!r} is refused"
+        )
         self.assertEqual(self.page.url, page, f"the browser stays on the page for {target!r}")
 
     def bud_shows_the_consent_and_a_copyable_one_time_code(self):
@@ -221,12 +235,20 @@ class UiCliAuth(BudTestCase):
         self.open_request()
         shown = self.page_text()
         self.assertIn(member=p.CLIENT_NAME, container=shown, msg=f"{p.CLIENT_NAME!r} is shown")
-        self.assertIn(member=m.CODE_DESTINATION, container=shown, msg=f"{m.CODE_DESTINATION!r} is shown")
+        self.assertIn(
+            member=m.CODE_DESTINATION, container=shown, msg=f"{m.CODE_DESTINATION!r} is shown"
+        )
         self.assertEqual(self.lookups(), p.ONE, "the session is looked up once")
         self.matching_code()
         self.button(m.APPROVE).click()
-        self.assertTrue(self.shown(self.code_field()), "the one-time sign-in code field is shown", abort_on_fail=True)
-        self.assertEqual(self.code_field().input_value(), p.EXCHANGE_CODE, "the field holds the one-time code")
+        self.assertTrue(
+            self.shown(self.code_field()),
+            "the one-time sign-in code field is shown",
+            abort_on_fail=True,
+        )
+        self.assertEqual(
+            self.code_field().input_value(), p.EXCHANGE_CODE, "the field holds the one-time code"
+        )
         self.assertEqual(
             self.bodies("POST", c.APPROVE_PATH),
             [{"session_id": p.SESSION_ID, "request_code": p.CODE}],
@@ -234,7 +256,11 @@ class UiCliAuth(BudTestCase):
         )
         self.button(m.COPY).click()
         self.assertTrue(self.shown(self.text(m.COPIED)), f"{m.COPIED!r} is shown")
-        self.assertEqual(self.page.evaluate("navigator.clipboard.readText()"), p.EXCHANGE_CODE, "the code is copied")
+        self.assertEqual(
+            self.page.evaluate("navigator.clipboard.readText()"),
+            p.EXCHANGE_CODE,
+            "the code is copied",
+        )
         self.assertEqual(self.button(m.APPROVE).count(), 0, "Approve is gone")
 
     def bud_shows_the_unverified_client_name_the_account_the_request_time_and_the_expiry(self):
@@ -243,7 +269,9 @@ class UiCliAuth(BudTestCase):
         self.open_request()
         self.assertEqual(self.values(), p.EMPTY, "the boxes are empty")
         account = m.ACCOUNT.format(name=p.USER["full_name"], email=p.USER["email"])
-        times = m.TIMES.format(requested=self.local_time(self.created_at), expires=self.local_time(self.expires_at))
+        times = m.TIMES.format(
+            requested=self.local_time(self.created_at), expires=self.local_time(self.expires_at)
+        )
         shown = self.page_text()
         for text in (m.HELP, m.UNVERIFIED, account, times, m.WARNING):
             self.assertIn(member=text, container=shown, msg=f"{text!r} is shown")
@@ -274,14 +302,20 @@ class UiCliAuth(BudTestCase):
         """A failed approval shows the server's alert and no code field."""
         self.answer("POST", c.APPROVE_PATH, (p.SERVER_ERROR, p.ALREADY_APPROVED))
         self.approve_matching_code()
-        self.assertIn(member=m.NEW_SIGN_IN_LINK, container=self.alert_text(), msg="the alert asks for a new sign-in link")
+        self.assertIn(
+            member=m.NEW_SIGN_IN_LINK,
+            container=self.alert_text(),
+            msg="the alert asks for a new sign-in link",
+        )
         self.assertEqual(self.code_field().count(), 0, "no code field is shown")
 
     def bud_an_approval_without_a_code_asks_for_a_new_link(self):
         """An approval answer without a code shows the new link alert."""
         self.answer("POST", c.APPROVE_PATH, (p.OK, {"expires_at": self.expires_at}))
         self.approve_matching_code()
-        self.assertIn(member=m.NEW_LINK, container=self.alert_text(), msg=f"the alert says {m.NEW_LINK!r}")
+        self.assertIn(
+            member=m.NEW_LINK, container=self.alert_text(), msg=f"the alert says {m.NEW_LINK!r}"
+        )
 
     def bud_a_failing_clipboard_asks_to_copy_by_hand(self):
         """When the clipboard refuses, Copy code asks to copy the code by hand."""
@@ -299,7 +333,11 @@ class UiCliAuth(BudTestCase):
         [::1]."""
         for callback, shown in p.APPROVED_CALLBACKS.items():
             self.callback_mode(callback)
-            self.answer("POST", c.APPROVE_PATH, (p.OK, {"redirect_to": p.APPROVED.format(callback=callback)}))
+            self.answer(
+                "POST",
+                c.APPROVE_PATH,
+                (p.OK, {"redirect_to": p.APPROVED.format(callback=callback)}),
+            )
             self.approve_matching_code()
             try:
                 self.page.wait_for_url(shown)
@@ -342,12 +380,18 @@ class UiCliAuth(BudTestCase):
         """Approve is disabled while the code is incomplete, enabled once it matches, and disabled again
         after an edit."""
         self.open_request()
-        self.assertTrue(self.button(m.APPROVE).is_disabled(), "Approve is disabled with empty boxes")
+        self.assertTrue(
+            self.button(m.APPROVE).is_disabled(), "Approve is disabled with empty boxes"
+        )
         self.type_code(p.SEVEN)
-        self.assertTrue(self.button(m.APPROVE).is_disabled(), "Approve is disabled with seven characters")
+        self.assertTrue(
+            self.button(m.APPROVE).is_disabled(), "Approve is disabled with seven characters"
+        )
         self.page.keyboard.type(p.EIGHTH)
         self.assertTrue(self.shown(self.text(m.MATCH)), f"{m.MATCH!r} is shown")
-        self.assertTrue(self.button(m.APPROVE).is_enabled(), "Approve is enabled once the code matches")
+        self.assertTrue(
+            self.button(m.APPROVE).is_enabled(), "Approve is enabled once the code matches"
+        )
         self.box(p.BOXES).press("Backspace")
         self.assertTrue(self.button(m.APPROVE).is_disabled(), "Approve is disabled after an edit")
         self.assertEqual(self.text(m.MATCH).count(), 0, f"{m.MATCH!r} is gone after an edit")
@@ -359,7 +403,9 @@ class UiCliAuth(BudTestCase):
         self.open_request()
         self.type_code(p.WRONG)
         self.assertTrue(self.shown(self.text(m.MISMATCH)), f"{m.MISMATCH!r} is shown")
-        self.assertNotIn(member=m.NEW_SIGN_IN_LINK, container=self.page_text(), msg="no new link text is shown")
+        self.assertNotIn(
+            member=m.NEW_SIGN_IN_LINK, container=self.page_text(), msg="no new link text is shown"
+        )
         self.assertTrue(self.button(m.APPROVE).is_disabled(), "Approve stays disabled")
         self.assertEqual(self.lookups(), p.TWO, "the session is looked up again after the refusal")
 
@@ -370,7 +416,11 @@ class UiCliAuth(BudTestCase):
         self.answer("GET", self.session_path(), (p.OK, self.session), (p.BAD_REQUEST, p.REFUSED))
         self.open_request()
         self.type_code(p.WRONG)
-        self.assertIn(member=m.NEW_SIGN_IN_LINK, container=self.alert_text(), msg="the alert asks for a new sign-in link")
+        self.assertIn(
+            member=m.NEW_SIGN_IN_LINK,
+            container=self.alert_text(),
+            msg="the alert asks for a new sign-in link",
+        )
         self.assertEqual(self.button(m.APPROVE).count(), 0, "no Approve is shown")
 
     def bud_a_429_on_check_asks_to_wait(self):
@@ -415,7 +465,11 @@ class UiCliAuth(BudTestCase):
         self.assertEqual(self.values(), p.EMPTY, "the boxes are empty")
         self.button(m.DENY).click()
         self.assertTrue(self.shown(self.text(m.DENIED)), f"{m.DENIED!r} is shown")
-        self.assertEqual(self.bodies("POST", c.DENY_PATH), [{"session_id": p.SESSION_ID}], "Deny sends only the session")
+        self.assertEqual(
+            self.bodies("POST", c.DENY_PATH),
+            [{"session_id": p.SESSION_ID}],
+            "Deny sends only the session",
+        )
 
     def bud_an_approved_code_is_cleared_when_the_request_expires(self):
         """A one-time code shown for a request about to expire is replaced by the new link alert at the
@@ -423,7 +477,17 @@ class UiCliAuth(BudTestCase):
         expires = _iso(datetime.now(timezone.utc) + timedelta(seconds=p.EXPIRES_IN_SECONDS))
         self.answer("GET", self.session_path(), (p.OK, {**self.session, "expires_at": expires}))
         self.approve_matching_code()
-        self.assertTrue(self.shown(self.code_field()), "the one-time sign-in code field is shown", abort_on_fail=True)
-        self.assertEqual(self.code_field().input_value(), p.EXCHANGE_CODE, "the field holds the one-time code")
-        self.assertIn(member=m.NEW_LINK, container=self.alert_text(), msg=f"at the expiry the alert says {m.NEW_LINK!r}")
+        self.assertTrue(
+            self.shown(self.code_field()),
+            "the one-time sign-in code field is shown",
+            abort_on_fail=True,
+        )
+        self.assertEqual(
+            self.code_field().input_value(), p.EXCHANGE_CODE, "the field holds the one-time code"
+        )
+        self.assertIn(
+            member=m.NEW_LINK,
+            container=self.alert_text(),
+            msg=f"at the expiry the alert says {m.NEW_LINK!r}",
+        )
         self.assertEqual(self.code_field().count(), 0, "the code field is gone at the expiry")

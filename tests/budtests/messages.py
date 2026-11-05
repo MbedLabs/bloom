@@ -24,6 +24,8 @@ class UiCliAuth:
     MISMATCH = "This code does not match. Check the code in your terminal, or deny this request."
     LIMITED = "Too many attempts. Wait a minute and try again."
     NEW_LINK = "This sign-in request is invalid, expired or already approved. Request a new sign-in link from your client."
-    INVALID_CALLBACK = "The callback destination is invalid. Request a new sign-in link from your client."
+    INVALID_CALLBACK = (
+        "The callback destination is invalid. Request a new sign-in link from your client."
+    )
     NEW_SIGN_IN_LINK = "new sign-in link"
     DENIED = "This sign-in request was denied. The link no longer works."
