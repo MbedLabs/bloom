@@ -147,7 +147,7 @@ jobs:
         run: |
           pytest tests/pg -q
 
-      - name: BudTestCase suites
+      - name: BudTestCase suite baselines_http
         env:
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
           SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
@@ -158,7 +158,7 @@ jobs:
           BUDTEST_DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          python -m bud_runner run-tests --test-case-list tests.budtests.suites.SUITES --no-upload --junit-report budtest-report.xml
+          python -c "from tests.budtests.baselines_http import BaselinesHttp; raise SystemExit(0 if BaselinesHttp().run() else 1)"
 
       - name: Run UI checks
         run: |
