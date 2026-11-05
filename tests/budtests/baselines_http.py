@@ -36,7 +36,7 @@ class BaselinesHttp(BudTestCase):
         )
         self.document = self._created(
             self.client.post(
-                c.DOCUMENTS_ROUTE,
+                c.DOCUMENTS_ROUTE.format(project_id=self.project),
                 headers=self.admin,
                 json={
                     "project_id": self.project,

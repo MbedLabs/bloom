@@ -13,7 +13,7 @@ class BaselinesHttp:
     GRANTS_ROUTE = "/api/groups/{group_id}/grants"
     MEMBERS_ROUTE = "/api/groups/{group_id}/members"
     REQUIREMENTS_ROUTE = "/api/requirements"
-    DOCUMENTS_ROUTE = "/api/documents"
+    DOCUMENTS_ROUTE = "/api/projects/{project_id}/documents"
     BASELINES_ROUTE = "/api/baselines"
     BASELINE_ROUTE = "/api/baselines/{baseline_id}"
     READER_ROLE = "maintainer"
