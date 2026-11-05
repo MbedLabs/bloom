@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 from budtestlibrary import BudTestCase
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 from playwright.sync_api import sync_playwright
+
 from tests.budtests.config import UiCliAuth as c
 from tests.budtests.messages import UiCliAuth as m
 from tests.budtests.parameters import UiCliAuth as p

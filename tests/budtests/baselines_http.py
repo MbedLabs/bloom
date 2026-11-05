@@ -3,9 +3,10 @@
 import secrets
 import string
 
-import tests.budtests.support  # noqa: F401
 from budtestlibrary import BudTestCase
 from fastapi.testclient import TestClient
+
+import tests.budtests.support  # noqa: F401
 from tests.budtests.config import BaselinesHttp as c
 from tests.budtests.parameters import BaselinesHttp as p
 
