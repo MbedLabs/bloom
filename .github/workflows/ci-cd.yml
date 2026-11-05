@@ -147,6 +147,19 @@ jobs:
         run: |
           pytest tests/pg -q
 
+      - name: BudTestCase suites
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
+          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
+          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
+          ENABLE_DOCS: "false"
+          BLOOM_DOTENV_DISABLED: "1"
+          BLOOM_DISABLE_RATE_LIMIT: "1"
+          BUDTEST_DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python -m bud_runner run-tests --test-case-list tests.budtests.suites.SUITES --no-upload --junit-report budtest-report.xml
+
       - name: Run UI checks
         run: |
           npm --prefix ui run lint
