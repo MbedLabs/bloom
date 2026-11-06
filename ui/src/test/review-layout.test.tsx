@@ -78,8 +78,8 @@ const richPages: Record<string, () => void> = {
 }
 
 const sidePanelPages: Record<string, () => void> = {
-  suite: () => { renderAt('/projects/:prefix/suites/:suiteId', `/projects/PRJ/suites/${testSuite.id}`, <SuiteDetail />) },
-  campaign: () => { renderAt('/projects/:prefix/campaigns/:campaignId', '/projects/PRJ/campaigns/51', <CampaignDetail />) },
+  suite: () => { renderAt('/projects/:prefix/suites/:suiteId', `/projects/PRJ/suites/${testSuite.suite_id}`, <SuiteDetail />) },
+  campaign: () => { renderAt('/projects/:prefix/campaigns/:campaignId', '/projects/PRJ/campaigns/PRJ-CMP-001', <CampaignDetail />) },
   defect: () => { renderAt('/projects/:prefix/defects/:itemId', `/projects/PRJ/defects/${defect.id}`, <ArtefactDetail kind="defect" />) },
 }
 

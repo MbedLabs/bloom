@@ -293,15 +293,21 @@ def test_every_change_by_id_hides_what_an_external_user_cannot_see(api_client: T
     admin = _admin_headers(api_client)
     project = create_project(api_client, admin, "Guarded")["id"]
 
-    def made(path, body):
+    def made(path, body, key="id"):
         response = api_client.post(path, headers=admin, json=body)
         assert response.status_code == 201, response.text
-        return response.json()["id"]
+        return response.json()[key]
 
     defect = made("/api/defects", {"project_id": project, "title": unique_name("defect")})
-    campaign = made("/api/campaigns", {"project_id": project, "name": unique_name("campaign")})
-    suite = made("/api/test-suites", {"project_id": project, "name": unique_name("suite")})
-    test_case = made("/api/test-cases", {"project_id": project, "title": unique_name("case")})
+    campaign = made(
+        "/api/campaigns", {"project_id": project, "name": unique_name("campaign")}, "campaign_id"
+    )
+    suite = made(
+        "/api/test-suites", {"project_id": project, "name": unique_name("suite")}, "suite_id"
+    )
+    test_case = made(
+        "/api/test-cases", {"project_id": project, "title": unique_name("case")}, "tc_id"
+    )
     document = made(
         f"/api/projects/{project}/documents", {"project_id": project, "title": unique_name("doc")}
     )
@@ -330,7 +336,7 @@ def test_every_change_by_id_hides_what_an_external_user_cannot_see(api_client: T
         ("delete", f"/api/document-sections/{section}", None),
         (
             "post",
-            f"/api/campaigns/{own_campaign.json()['id']}/items?test_case_id={test_case}",
+            f"/api/campaigns/{own_campaign.json()['campaign_id']}/items?test_case_id={test_case}",
             None,
         ),
     ]
@@ -375,21 +381,20 @@ def test_an_external_user_changes_only_the_customer_rows_they_created(api_client
 def test_an_external_user_cannot_change_an_item_of_a_hidden_campaign(api_client: TestClient):
     admin = _admin_headers(api_client)
     project = create_project(api_client, admin, "Items")["id"]
-    case = _create(api_client, admin, "test-cases", project).json()["id"]
+    case = _create(api_client, admin, "test-cases", project).json()
     created = api_client.post(
         "/api/campaigns",
         headers=admin,
-        json={"project_id": project, "name": unique_name("c"), "test_case_ids": [case]},
+        json={"project_id": project, "name": unique_name("c"), "test_case_ids": [case["id"]]},
     )
     assert created.status_code == 201, created.text
-    campaign = created.json()["id"]
-    item_id = created.json()["items"][0]["id"]
+    campaign = created.json()["campaign_id"]
     user = _create_user(api_client, admin, role="external")
     headers = _headers_for(api_client, user["email"])
     _grant(api_client, admin, "Test Author", user["id"], project)
 
     changed = api_client.patch(
-        f"/api/campaigns/{campaign}/items/{item_id}",
+        f"/api/campaigns/{campaign}/items/{case['tc_id']}",
         headers=headers,
         json={"comment": "x"},
     )
@@ -463,7 +468,7 @@ def test_a_campaign_update_keeps_the_suites_the_editor_cannot_see(api_client: Te
     headers = _external_on(api_client, admin, project, "Test Author")
     campaign = api_client.post(
         "/api/campaigns", headers=headers, json={"project_id": project, "name": unique_name("c")}
-    ).json()["id"]
+    ).json()["campaign_id"]
     linked = api_client.patch(
         f"/api/campaigns/{campaign}", headers=admin, json={"suite_ids": [hidden, first]}
     )
@@ -511,7 +516,7 @@ def test_an_empty_suite_list_keeps_suites_outside_the_allowed_types(api_client: 
     headers = _headers_for(api_client, user["email"])
     campaign = api_client.post(
         "/api/campaigns", headers=headers, json={"project_id": project, "name": unique_name("c")}
-    ).json()["id"]
+    ).json()["campaign_id"]
     linked = api_client.patch(
         f"/api/campaigns/{campaign}", headers=admin, json={"suite_ids": [suite]}
     )
@@ -825,19 +830,22 @@ def test_adding_a_test_case_to_a_campaign_returns_the_item(api_client: TestClien
         case = _create(api_client, admin, "test-cases", project).json()
         campaign = api_client.post(
             "/api/campaigns", headers=admin, json={"project_id": project, "name": unique_name("c")}
-        ).json()["id"]
+        ).json()
         added = api_client.post(
-            f"/api/campaigns/{campaign}/items?test_case_id={case['id']}", headers=headers
+            f"/api/campaigns/{campaign['campaign_id']}/items?test_case_id={case['tc_id']}",
+            headers=headers,
         )
         assert added.status_code == 201, added.text
         body = added.json()
         assert (body["campaign_id"], body["test_case_id"], body["status"]) == (
-            campaign,
+            campaign["id"],
             case["id"],
             "Pending",
         )
         assert body["test_case"]["tc_id"] == case["tc_id"]
-        saved = api_client.get(f"/api/campaigns/{campaign}", headers=admin).json()["items"]
+        saved = api_client.get(f"/api/campaigns/{campaign['campaign_id']}", headers=admin).json()[
+            "items"
+        ]
         assert [(i["id"], i["test_case_id"]) for i in saved] == [(body["id"], case["id"])]
 
 
@@ -931,12 +939,13 @@ def test_an_external_user_changes_no_part_of_what_others_created(api_client: Tes
         return response.json()
 
     customer = {"visibility": "customer"}
-    case = made("/api/test-cases", {"title": unique_name("tc"), **customer})["id"]
+    case_row = made("/api/test-cases", {"title": unique_name("tc"), **customer})
+    case = case_row["id"]
     requirement = made(
         "/api/requirements", {"title": unique_name("req"), "req_origin": "Customer"}
     )["id"]
     defect = made("/api/defects", {"title": unique_name("def"), **customer})["id"]
-    suite = made("/api/test-suites", {"name": unique_name("ts"), **customer})["id"]
+    suite = made("/api/test-suites", {"name": unique_name("ts"), **customer})["suite_id"]
     campaign = made(
         "/api/campaigns", {"name": unique_name("cmp"), "test_case_ids": [case], **customer}
     )
@@ -946,18 +955,18 @@ def test_an_external_user_changes_no_part_of_what_others_created(api_client: Tes
     ).json()["id"]
     headers = _external_author(api_client, admin, project)
 
-    item = campaign["items"][0]["id"]
+    item = case_row["tc_id"]
     attempts = [
         ("patch", f"/api/test-cases/{case}", {"title": "x"}),
         ("delete", f"/api/test-cases/{case}", None),
         ("post", f"/api/requirements/{requirement}/link-testrun", {"test_run_id": 1}),
         ("patch", f"/api/defects/{defect}", {"title": "x"}),
         ("post", f"/api/defects/{defect}/refresh-external", None),
-        ("post", f"/api/test-suites/{suite}/items?test_case_id={case}", None),
+        ("post", f"/api/test-suites/{suite}/items?test_case_id={item}", None),
         ("delete", f"/api/test-suites/{suite}", None),
-        ("patch", f"/api/campaigns/{campaign['id']}", {"name": "x"}),
-        ("patch", f"/api/campaigns/{campaign['id']}/items/{item}", {"comment": "x"}),
-        ("delete", f"/api/campaigns/{campaign['id']}/items/{item}", None),
+        ("patch", f"/api/campaigns/{campaign['campaign_id']}", {"name": "x"}),
+        ("patch", f"/api/campaigns/{campaign['campaign_id']}/items/{item}", {"comment": "x"}),
+        ("delete", f"/api/campaigns/{campaign['campaign_id']}/items/{item}", None),
         ("patch", f"/api/documents/{document['id']}", {"title": "x"}),
         ("post", f"/api/documents/{document['id']}/sections", {"title": "x"}),
         ("patch", f"/api/document-sections/{section}", {"title": "x"}),
@@ -1470,12 +1479,12 @@ def test_controlled_case_and_suite_use_handoffs_while_campaign_keeps_its_rights(
     )
     assert campaign.status_code == 201, campaign.text
 
-    for slug, route, item in (
-        ("test-case", "test-cases", case),
-        ("test-suite", "test-suites", suite.json()["id"]),
+    for slug, route, item, ref in (
+        ("test-case", "test-cases", case, case),
+        ("test-suite", "test-suites", suite.json()["id"], suite.json()["suite_id"]),
     ):
         refused = api_client.patch(
-            f"/api/{route}/{item}", headers=headers, json={"status": "Approved"}
+            f"/api/{route}/{ref}", headers=headers, json={"status": "Approved"}
         )
         assert refused.status_code == 409, refused.text
         path = f"/api/artefacts/{slug}/{item}"
@@ -1501,11 +1510,11 @@ def test_controlled_case_and_suite_use_handoffs_while_campaign_keeps_its_rights(
             path + "/sign-off", headers=signer_headers, json={"step": "approve"}
         )
         assert approved.status_code == 200, approved.text
-        stored = api_client.get(f"/api/{route}/{item}", headers=admin)
+        stored = api_client.get(f"/api/{route}/{ref}", headers=admin)
         assert stored.status_code == 200, stored.text
         assert stored.json()["status"] == "Approved"
 
-    path = f"/api/campaigns/{campaign.json()['id']}"
+    path = f"/api/campaigns/{campaign.json()['campaign_id']}"
     moved = api_client.patch(path, headers=headers, json={"status": "In Progress"})
     assert moved.status_code == 200, moved.text
     refused = api_client.patch(path, headers=headers, json={"status": "Approved"})
@@ -1972,7 +1981,7 @@ def test_nested_rows_and_counts_follow_the_view_right(api_client: TestClient):
         "/api/campaigns",
         headers=admin,
         json={"project_id": project, "name": unique_name("cmp"), "test_case_ids": [case]},
-    ).json()["id"]
+    ).json()["campaign_id"]
     reader = _policy_user(api_client, admin, {"REQ": ["view"], "CMP": ["view"]}, project)
 
     detail = api_client.get(f"/api/requirements/{requirement}", headers=reader).json()
@@ -2069,29 +2078,3 @@ def test_an_export_leaves_out_types_without_view(api_client: TestClient):
     trace = api_client.get(f"/api/projects/{project}/export/traceability", headers=exporter)
     assert trace.status_code == 200
     assert case["tc_id"] not in trace.text
-
-
-def test_a_baseline_snapshot_shows_only_sections_of_visible_types(api_client: TestClient):
-    admin = _admin_headers(api_client)
-    project = create_project(api_client, admin, "Baselined")["id"]
-    _create(api_client, admin, "requirements", project)
-    baseline = api_client.post(
-        "/api/baselines", headers=admin, json={"project_id": project, "name": unique_name("bl")}
-    ).json()["id"]
-    some = _policy_user(
-        api_client, admin, {"REQ": ["view"], "SPEC": ["view"], "baseline": ["view"]}, project
-    )
-    documents = _policy_user(
-        api_client,
-        admin,
-        {code: ["view"] for code in ("SPEC", "PRT", "RPT", "STD", "baseline")},
-        project,
-    )
-
-    snapshot = api_client.get(f"/api/baselines/{baseline}", headers=some).json()["snapshot"]
-    assert set(snapshot) == {"requirements"}
-    snapshot = api_client.get(f"/api/baselines/{baseline}", headers=documents).json()["snapshot"]
-    assert set(snapshot) == {"documents"}
-    listed = api_client.get("/api/baselines", headers=some, params={"project_id": project})
-    assert set(listed.json()[0]["snapshot"]) == {"requirements"}
-    assert len(api_client.get(f"/api/baselines/{baseline}", headers=admin).json()["snapshot"]) == 7

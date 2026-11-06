@@ -192,10 +192,10 @@ describe('signed-in routes render their data', () => {
       '/projects/PRJ/impact-analysis/11',
       'PRJ-REQ-001',
     ],
-    ['/projects/:prefix/suites/:suiteId', '/projects/PRJ/suites/41', 'Smoke suite'],
+    ['/projects/:prefix/suites/:suiteId', '/projects/PRJ/suites/PRJ-TS-001', 'Smoke suite'],
     [
       '/projects/:prefix/campaigns/:campaignId',
-      '/projects/PRJ/campaigns/31',
+      '/projects/PRJ/campaigns/PRJ-CMP-001',
       'Release candidate sweep',
     ],
     ['/projects/:prefix/defects/:itemId', '/projects/PRJ/defects/51', 'Screen flickers on wake'],

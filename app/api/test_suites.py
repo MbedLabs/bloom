@@ -8,14 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
     apply_update,
+    audit_artefact_deleted,
     check_create_status_right,
     check_external_change,
     check_status_right,
     check_visibility_right,
-    delete_project_row,
     external_create_values,
     get_row_or_404,
-    get_visible_row,
+    get_visible_row_by_public_id,
     page_of,
     prepare_workflow_update,
     requirement_summary,
@@ -332,27 +332,32 @@ async def create_suite(
     return await _build_suite_detail(suite, db, current_user)
 
 
+SUITE_NOT_FOUND = "Test suite not found"
+
+
 @router.get("/{suite_id}", response_model=TestSuiteDetailResponse)
 async def get_suite(
-    suite_id: int,
+    suite_id: str,
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    suite = await get_visible_row(
-        db, TestSuite, suite_id, "Test suite not found", current_user, permission=("view", "TS")
+    """The test suite with the public ID, such as PRJ-TS-001."""
+    suite = await get_visible_row_by_public_id(
+        db, TestSuite.suite_id, suite_id, SUITE_NOT_FOUND, current_user, permission=("view", "TS")
     )
     return await _build_suite_detail(suite, db, current_user)
 
 
 @router.patch("/{suite_id}", response_model=TestSuiteDetailResponse)
 async def update_suite(
-    suite_id: int,
+    suite_id: str,
     data: TestSuiteUpdate,
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    suite = await get_visible_row(
-        db, TestSuite, suite_id, "Test suite not found", current_user, permission=("edit", "TS")
+    """Update the test suite with the public ID."""
+    suite = await get_visible_row_by_public_id(
+        db, TestSuite.suite_id, suite_id, SUITE_NOT_FOUND, current_user, permission=("edit", "TS")
     )
     changes = data.model_dump(exclude_unset=True)
     check_external_change(current_user, "TS", suite, changes)
@@ -366,19 +371,21 @@ async def update_suite(
 
 @router.delete("/{suite_id}", status_code=204)
 async def delete_suite(
-    suite_id: int,
+    suite_id: str,
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    await delete_project_row(
+    """Delete the test suite with the public ID."""
+    suite = await get_visible_row_by_public_id(
         db,
-        current_user,
-        TestSuite,
+        TestSuite.suite_id,
         suite_id,
-        "Test suite not found",
-        resource="TS",
-        audit_type="test-suite",
+        SUITE_NOT_FOUND,
+        current_user,
+        permission=("delete", "TS"),
     )
+    await audit_artefact_deleted(db, "test-suite", suite)
+    await db.delete(suite)
 
 
 @router.post(
@@ -391,29 +398,29 @@ async def delete_suite(
     },
 )
 async def add_suite_item(
-    suite_id: int,
-    test_case_id: int = Query(...),
+    suite_id: str,
+    test_case_id: str = Query(...),
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    suite = await get_visible_row(
-        db, TestSuite, suite_id, "Test suite not found", current_user, permission=("plan", "TS")
+    """Add the test case with the public ID, such as PRJ-TC-001, to the suite with the public ID."""
+    suite = await get_visible_row_by_public_id(
+        db, TestSuite.suite_id, suite_id, SUITE_NOT_FOUND, current_user, permission=("plan", "TS")
     )
-    tc = await get_visible_row(
+    tc = await get_visible_row_by_public_id(
         db,
-        TestCase,
+        TestCase.tc_id,
         test_case_id,
         "Test case not found in suite project",
         current_user,
         permission=("view", "TC"),
+        project_id=suite.project_id,
     )
-    if tc.project_id != suite.project_id:
-        raise HTTPException(status_code=404, detail="Test case not found in suite project")
     existing = (
         await db.execute(
             select(TestSuiteItem).where(
-                TestSuiteItem.suite_id == suite_id,
-                TestSuiteItem.test_case_id == test_case_id,
+                TestSuiteItem.suite_id == suite.id,
+                TestSuiteItem.test_case_id == tc.id,
             )
         )
     ).scalar_one_or_none()
@@ -422,11 +429,11 @@ async def add_suite_item(
 
     current_count = (
         await db.execute(
-            select(func.count(TestSuiteItem.id)).where(TestSuiteItem.suite_id == suite_id)
+            select(func.count(TestSuiteItem.id)).where(TestSuiteItem.suite_id == suite.id)
         )
     ).scalar() or 0
     await prepare_content_write(db, suite, current_user)
-    item = TestSuiteItem(suite_id=suite_id, test_case_id=test_case_id, order=current_count)
+    item = TestSuiteItem(suite_id=suite.id, test_case_id=tc.id, order=current_count)
     db.add(item)
     await db.flush()
     await db.refresh(item)
@@ -440,18 +447,29 @@ async def add_suite_item(
     )
 
 
-@router.delete("/{suite_id}/items/{item_id}", status_code=204)
+@router.delete(
+    "/{suite_id}/items/{test_case_id}",
+    status_code=204,
+    responses={404: {"description": "Not Found"}},
+)
 async def remove_suite_item(
-    suite_id: int,
-    item_id: int,
+    suite_id: str,
+    test_case_id: str,
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    suite = await get_visible_row(
-        db, TestSuite, suite_id, "Test suite not found", current_user, permission=("plan", "TS")
+    """Remove the test case with the public ID from the suite with the public ID."""
+    suite = await get_visible_row_by_public_id(
+        db, TestSuite.suite_id, suite_id, SUITE_NOT_FOUND, current_user, permission=("plan", "TS")
     )
-    item = await get_row_or_404(
-        db, TestSuiteItem, item_id, "Suite item not found", TestSuiteItem.suite_id == suite_id
-    )
+    item = (
+        await db.execute(
+            select(TestSuiteItem)
+            .join(TestCase, TestCase.id == TestSuiteItem.test_case_id)
+            .where(TestSuiteItem.suite_id == suite.id, TestCase.tc_id == test_case_id)
+        )
+    ).scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="Suite item not found")
     await prepare_content_write(db, suite, current_user)
     await db.delete(item)

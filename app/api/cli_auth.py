@@ -2,8 +2,9 @@
 
 A refused approve, deny, exchange or refresh rolls back the request's changes, records a failure
 audit event with its rejection code and answers with a generic message. While code sign-in is
-off, a manual-code request is refused with 403 at start, session lookup and approve, and with the
-generic 400 at exchange.
+off, a manual-code request is refused with 403 at start, session lookup, check and approve, and
+with the generic 400 at exchange. The approver types the request code the client shows; check and
+approve compare it with the code of the stored PKCE challenge.
 """
 
 from http import HTTPStatus
@@ -21,6 +22,7 @@ from app.schemas.cli_auth import (
     CliApproveRequest,
     CliCallbackApproval,
     CliCallbackDenial,
+    CliCheckRequest,
     CliCodeApproval,
     CliCodeDenial,
     CliDenyRequest,
@@ -40,6 +42,7 @@ AUTH_CLI_APPROVE = "auth.cli_approve"
 AUTH_CLI_DENY = "auth.cli_deny"
 AUTH_CLI_EXCHANGE = "auth.cli_exchange"
 AUTH_CLI_REFRESH = "auth.cli_refresh"
+AUTH_CLI_CODE_MISMATCH = "auth.cli_code_mismatch"
 SESSION_TARGET = "cli_auth_session"
 INVALID_AUTHORIZATION = (
     "Invalid or expired authorization. Request a new sign-in link from your client."
@@ -101,7 +104,7 @@ async def cli_start(request: Request, data: CliStartRequest, response: Response,
 async def cli_session(
     session_id: UUID, response: Response, current_user: CurrentUser, db: Database
 ):
-    """Show the signed-in user the client, destination, request time and request code."""
+    """Show the signed-in user the client, destination and request time."""
     response.headers["Cache-Control"] = NO_STORE
     try:
         session = await cli_auth.pending_session(db, session_id)
@@ -116,8 +119,37 @@ async def cli_session(
         expires_at=session.expires_at,
         consumed=session.consumed_at is not None,
         created_at=session.created_at,
-        request_code=cli_auth.request_code(session.code_challenge),
     )
+
+
+@router.post("/check", status_code=204, responses={**BAD_REQUEST, **FORBIDDEN})
+@limiter.limit("30/minute")
+async def cli_check(
+    request: Request,
+    data: CliCheckRequest,
+    response: Response,
+    current_user: CurrentUser,
+    db: Database,
+):
+    """Answer 204 when the typed request code matches a pending request; nothing is written."""
+    response.headers["Cache-Control"] = NO_STORE
+    actor_id = current_user.id
+    try:
+        await cli_auth.check_request_code(db, data.session_id, data.request_code)
+    except cli_auth.CliAuthorizationError as exc:
+        status_code, detail = _consent_refusal(exc)
+        if exc.reason != cli_auth.CODE_MISMATCH:
+            raise HTTPException(status_code=status_code, detail=detail) from exc
+        raise await _rejection(
+            db,
+            AUTH_CLI_CODE_MISMATCH,
+            exc,
+            status_code=status_code,
+            detail=detail,
+            actor_user_id=actor_id,
+            target_type=SESSION_TARGET,
+            target_id=data.session_id,
+        ) from exc
 
 
 @router.post(
@@ -125,20 +157,31 @@ async def cli_session(
     response_model=CliCallbackApproval | CliCodeApproval,
     responses={**BAD_REQUEST, **FORBIDDEN},
 )
+@limiter.limit("10/minute")
 async def cli_approve(
-    data: CliApproveRequest, response: Response, current_user: CurrentUser, db: Database
+    request: Request,
+    data: CliApproveRequest,
+    response: Response,
+    current_user: CurrentUser,
+    db: Database,
 ):
-    """Approve a request once as the signed-in user without adding permissions."""
+    """Approve a request once as the signed-in user after the typed request code matches.
+
+    No permission is added; a mismatch is audited as auth.cli_code_mismatch.
+    """
     response.headers["Cache-Control"] = NO_STORE
     actor_id = current_user.id
     try:
-        session, code = await cli_auth.approve_session(db, data.session_id, current_user)
+        session, code = await cli_auth.approve_session(
+            db, data.session_id, current_user, data.request_code
+        )
         approval = cli_auth.approval_response(session, code)
     except cli_auth.CliAuthorizationError as exc:
         status_code, detail = _consent_refusal(exc)
+        mismatch = exc.reason == cli_auth.CODE_MISMATCH
         raise await _rejection(
             db,
-            AUTH_CLI_APPROVE,
+            AUTH_CLI_CODE_MISMATCH if mismatch else AUTH_CLI_APPROVE,
             exc,
             status_code=status_code,
             detail=detail,

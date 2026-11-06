@@ -25,19 +25,22 @@
 - A source install needs Python 3.11 or later.
 - The container starts as root only to prepare its directories, data ownership and, on Cloudron, its secrets and migrations; supervisord, nginx and uvicorn then run as `appuser`. Kubernetes `runAsNonRoot` policies are not supported.
 - An administrator may request review of any controlled document and decline any pending review or approval request; the audit log records the step under the administrator. Marking a document reviewed or approved stays with its assigned reviewer and approver.
+- Test suites and campaigns are addressed by their public ID, such as `PRJ-TS-001` and `PRJ-CMP-001`, never by their database number. `/api/test-suites/{suite_id}` and `/api/campaigns/{campaign_id}` take the public ID, and their `/items` routes name a test case by its public ID (`POST .../items?test_case_id=PRJ-TC-001`, `PATCH` and `DELETE .../items/PRJ-TC-001`); a database number answers 404. Suite and campaign pages, their links and the document address open them by public ID only, so an older address with a database number no longer opens them. The page URLs that `POST /api/campaigns/sync-results` returns to Bud are `/projects/<prefix>/docs/test-suites/<public ID>` and `/projects/<prefix>/docs/campaigns/<public ID>`. Every campaign has a public ID and both public IDs are unique: the upgrade gives each campaign without one the next public ID of its project and stops, naming them, if two suites or two campaigns share a public ID.
 
 ### Fixed
 
-- A document address that names a document by its database number instead of its document ID, such as the links inside a document opened in the editor, opens the document; before, it answered not found and the page said "You don't have access" to everyone, administrators included.
+- A document address that names a document other than a test suite or campaign by its database number instead of its document ID, such as the links inside a document opened in the editor, opens the document; before, it answered not found and the page said "You don't have access" to everyone, administrators included.
 - An administrator could request access, even from himself. An administrator, or anyone who can already open what they ask for, is now told so and no request is recorded or emailed, and nobody is emailed about their own request.
 - An administrator who opened something that does not exist saw "You don't have access" with a Request access button. An administrator now sees Not found and is never offered a request; other users keep the access page.
-- References inside a document opened in the editor, search results and the defect, suite and campaign links used database numbers. They now use document IDs, and an address with a database number opens the item and shows its document ID in the address bar.
+- References inside a document opened in the editor, search results and the defect, suite and campaign links used database numbers. They now use document IDs, and an address with a database number opens the item, other than a test suite or campaign, and shows its document ID in the address bar.
 - Access requests, their emails and the audit log showed database numbers instead of document IDs and names. They now name projects by prefix, documents, suites, campaigns and defects by document ID, users by name and service credentials by name; only something that no longer exists keeps its number, marked deleted.
 - Line spacing in the document editor is set per paragraph and heading, list items, quotes and table cells included, and is saved with the document, so it shows the same after reopening, on the reading page and in approved revisions. The menu offers Single, 1.5 and Double as multiples of the normal spacing and marks the spacing at the cursor.
 - A 500 answer quotes the id of the request that failed, in its message, its `request_id` and its `x-request-id` header, the same id as the access log and the audit log; before, it quoted `-`.
 - Administrator welcome emails confirm the account is ready and give product-specific next steps, with matching HTML and plain-text instructions. The obsolete one-time runner registration key instructions are removed.
 
 ### Security
+
+- CLI and MCP sign-in: the approval page no longer shows the request code; the approver types the code the terminal or AI client shows, and the server checks it on `POST /api/auth/cli/check` and on approve, both rate limited. A wrong code is recorded as `auth.cli_code_mismatch` and the request stays pending.
 
 - Pillow raised to 13.0.0, certifi to 2026.10.19, dnspython to 2.9.0, follow-redirects to 1.16.1, vitest to 4.1.12 and zod to 4.6.7, the patched releases.
 

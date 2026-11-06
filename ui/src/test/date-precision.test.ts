@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { formatDateTime } from './date-utils'
+import { formatDateTime } from '../lib/dateTime'
 
 describe('Bloom shows times to the minute', () => {
   beforeEach(() => {

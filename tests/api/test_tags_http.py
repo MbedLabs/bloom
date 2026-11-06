@@ -361,38 +361,6 @@ def test_an_import_does_not_overwrite_a_test_case_the_importer_cannot_edit(
     assert (stored["title"], stored["visibility"]) == ("Kept", "internal")
 
 
-def test_a_baseline_shows_a_section_only_to_who_sees_every_row_of_its_type(
-    api_client: TestClient,
-):
-    admin = _admin_headers(api_client)
-    project = create_project(api_client, admin, "Snapshot")["id"]
-    _requirement(api_client, admin, project, origin="Internal")
-    baseline = api_client.post(
-        "/api/baselines", headers=admin, json={"project_id": project, "name": "B1"}
-    ).json()
-    tag = _tag(api_client, admin)
-    limited = _member(
-        api_client,
-        admin,
-        project,
-        "maintainer",
-        {"REQ": {"read": True, "tags": [tag["id"]]}, "baseline": {"read": True}},
-    )
-    split = _member(
-        api_client,
-        admin,
-        project,
-        "maintainer",
-        {"REQ": {"read": True, "visibility": ["internal"]}, "baseline": {"read": True}},
-        {"REQ": {"read": True, "visibility": ["customer"]}},
-    )
-    for headers, shown in ((limited, False), (split, True)):
-        snapshot = api_client.get(f"/api/baselines/{baseline['id']}", headers=headers).json()[
-            "snapshot"
-        ]
-        assert ("requirements" in snapshot) is shown
-
-
 def test_an_external_user_neither_deletes_nor_approves_even_with_write_and_delete(
     api_client: TestClient,
 ):

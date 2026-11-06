@@ -31,7 +31,7 @@ import {
 } from '../lib/docRegistryParams'
 import { docCreateUrl, docUrl, documentStatusOptions, normalizeDocTypeParam, DOC_TYPE_LABELS, type DocType } from '../types/doc'
 import { dedicatedListUrl } from './docCreateIdPolicy'
-import { formatDateTime } from '../test/date-utils'
+import { formatDateTime } from '../lib/dateTime'
 import { useAuth } from '../contexts/AuthContext'
 import { useDebounced } from '../hooks/useDebounced'
 import BudRunLink from '../components/BudRunLink'

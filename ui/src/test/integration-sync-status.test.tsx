@@ -8,7 +8,7 @@ import { ToastProvider } from '../components/Toast'
 import type { User } from '../api/client'
 import { createQueryClient } from '../lib/queryClient'
 import { integrationSetting, resetApiMocks, user } from './apiFixtures'
-import { formatDateTime } from './date-utils'
+import { formatDateTime } from '../lib/dateTime'
 
 let currentUser: User = user
 

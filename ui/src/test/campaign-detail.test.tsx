@@ -100,7 +100,7 @@ function renderCampaign() {
   return render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <MemoryRouter initialEntries={['/projects/PRJ/campaigns/31']}>
+        <MemoryRouter initialEntries={['/projects/PRJ/campaigns/PRJ-CMP-001']}>
           <Routes>
             <Route path="/projects/:prefix/campaigns/:campaignId" element={<CampaignDetail />} />
             <Route path={`/projects/:prefix/docs/test-suites/${testSuite.suite_id}`} element={<div>suite detail</div>} />
@@ -277,7 +277,7 @@ describe('editing a campaign', () => {
 
     await waitFor(() =>
       expect(lastCall(client.campaignsApi.update)).toEqual([
-        campaignDetail.id,
+        campaignDetail.campaign_id,
         {
           name: 'Final sweep',
           description: 'Sign-off run',

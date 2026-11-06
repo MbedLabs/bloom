@@ -94,7 +94,7 @@ class CliStartResponse(CliExpiryResponse):
 
 
 class CliSessionResponse(CliExpiryResponse):
-    """Consent metadata, the request time and the request code, without authorization secrets."""
+    """Consent metadata and the request time, without the request code or authorization secrets."""
 
     session_id: UUID
     client_name: str
@@ -102,7 +102,6 @@ class CliSessionResponse(CliExpiryResponse):
     redirect_uri: str | None
     consumed: bool
     created_at: datetime
-    request_code: str
 
     @field_serializer("created_at")
     def serialize_created(self, dt: datetime) -> str:
@@ -110,11 +109,21 @@ class CliSessionResponse(CliExpiryResponse):
         return f"{dt.isoformat()}Z"
 
 
-class CliApproveRequest(BaseModel):
-    """The browser's explicit approval of one pending request."""
+class CliSessionRequest(BaseModel):
+    """One pending request named by its session id."""
 
     model_config = ConfigDict(extra="forbid")
     session_id: UUID
+
+
+class CliCheckRequest(CliSessionRequest):
+    """The request code the approver typed for one pending request."""
+
+    request_code: str = Field(max_length=16)
+
+
+class CliApproveRequest(CliCheckRequest):
+    """The browser's explicit approval of one pending request with the typed request code."""
 
 
 class CliCallbackApproval(BaseModel):
@@ -123,7 +132,7 @@ class CliCallbackApproval(BaseModel):
     redirect_to: str
 
 
-class CliDenyRequest(CliApproveRequest):
+class CliDenyRequest(CliSessionRequest):
     """The browser's explicit denial of one pending request."""
 
 
@@ -145,7 +154,7 @@ class CliCodeApproval(CliExpiryResponse):
     exchange_code: str
 
 
-class CliExchangeRequest(CliApproveRequest):
+class CliExchangeRequest(CliSessionRequest):
     """A one-time code and the original client's PKCE verifier."""
 
     code: str = Field(min_length=1, max_length=256)

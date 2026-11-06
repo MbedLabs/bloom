@@ -147,6 +147,30 @@ jobs:
         run: |
           pytest tests/pg -q
 
+      - name: BudTestCase suite baselines_http
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
+          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
+          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
+          ENABLE_DOCS: "false"
+          BLOOM_DOTENV_DISABLED: "1"
+          BLOOM_DISABLE_RATE_LIMIT: "1"
+          BUDTEST_DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python -c "from tests.budtests.baselines_http import BaselinesHttp; raise SystemExit(0 if BaselinesHttp().run() else 1)"
+
+      - name: Build the UI and Chromium
+        run: |
+          npm --prefix ui run build
+          python -m playwright install --with-deps chromium
+
+      - name: BudTestCase suite ui_cli_auth
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python -c "from tests.budtests.ui_cli_auth import UiCliAuth; raise SystemExit(0 if UiCliAuth().run() else 1)"
+
       - name: Run UI checks
         run: |
           npm --prefix ui run lint

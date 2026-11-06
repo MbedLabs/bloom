@@ -15,7 +15,7 @@ import { usePageMeta } from '../contexts/PageMetaContext'
 import { useToast } from '../components/useToast'
 import { docUrl } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
-import { formatDateTime } from '../test/date-utils'
+import { formatDateTime } from '../lib/dateTime'
 import { buildBudRunUrl } from '../lib/budLinks'
 import { useProjectPermissions, useRowActions } from '../hooks/useProjectPermissions'
 import { useAuth } from '../contexts/AuthContext'
@@ -30,7 +30,8 @@ export default function CampaignDetail({
 }: { resolvedId?: number; allowedActions?: string[] } = {}) {
   const { prefix, campaignId, docId } = useParams<{ prefix: string; campaignId: string; docId: string }>()
   const { can } = useProjectPermissions(prefix)
-  const campId = resolvedId || Number.parseInt(campaignId || '0')
+  const campaignRef = docId ?? campaignId ?? ''
+  const detailKey = ['campaign', resolvedId ?? campaignRef]
   const navigate = useNavigate()
   const location = useLocation()
   const backUrl = (location.state as { returnTo?: string } | null)?.returnTo
@@ -55,23 +56,24 @@ export default function CampaignDetail({
   const editNameRef = useRef<HTMLInputElement>(null)
 
   const { data: campaign, isLoading, error: campaignError } = useQuery({
-    queryKey: ['campaign', campId],
-    queryFn: () => campaignsApi.get(campId),
-    enabled: !!campId,
+    queryKey: detailKey,
+    queryFn: () => campaignsApi.get(campaignRef),
+    enabled: !!campaignRef,
   })
+  const campId = resolvedId ?? campaign?.id ?? 0
 
   const updateMutation = useMutation({
     mutationFn: (data: { name?: string; description?: string; status?: string; visibility?: 'internal' | 'customer' }) =>
-      campaignsApi.update(campId, data),
+      campaignsApi.update(campaignRef, data),
     onSuccess: (updated) => {
       refreshProjectViews(queryClient, { prefix, projectId: updated.project_id })
-      queryClient.setQueryData(['campaign', campId], (old: unknown) => {
+      queryClient.setQueryData(detailKey, (old: unknown) => {
         if (old && typeof old === 'object') {
           return { ...(old as object), ...(updated as object) }
         }
         return updated
       })
-      void queryClient.invalidateQueries({ queryKey: ['campaign', campId] })
+      void queryClient.invalidateQueries({ queryKey: detailKey })
       setEditOpen(false)
       toast.notify('Campaign updated', 'success')
     },
@@ -81,7 +83,7 @@ export default function CampaignDetail({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: () => campaignsApi.delete(campId),
+    mutationFn: () => campaignsApi.delete(campaignRef),
     onSuccess: () => {
       toast.notify('Campaign deleted', 'success')
       setTimeout(() => {

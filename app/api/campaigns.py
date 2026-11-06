@@ -15,7 +15,7 @@ from app.api.artefact_utils import (
     check_visibility_right,
     external_create_values,
     get_row_or_404,
-    get_visible_row,
+    get_visible_row_by_public_id,
     naive_utc,
     page_of,
     requirement_summary,
@@ -71,18 +71,18 @@ CAMPAIGN_NOT_FOUND = "Campaign not found"
 router = APIRouter()
 
 
-def campaign_frontend_url(project_prefix: str, campaign_id: int) -> str | None:
-    """Bloom's own address for a campaign, or None when it does not know it."""
+def campaign_frontend_url(project_prefix: str, campaign_public_id: str) -> str | None:
+    """Bloom's own address for a campaign by its public ID, or None when it does not know it."""
 
     base = (settings.APP_BASE_URL or "").rstrip("/")
-    return f"{base}/projects/{project_prefix}/campaigns/{campaign_id}" if base else None
+    return f"{base}/projects/{project_prefix}/docs/campaigns/{campaign_public_id}" if base else None
 
 
-def suite_frontend_url(project_prefix: str, suite_id: int) -> str | None:
-    """Bloom's own address for a test suite, or None when it does not know it."""
+def suite_frontend_url(project_prefix: str, suite_public_id: str) -> str | None:
+    """Bloom's own address for a test suite by its public ID, or None when it does not know it."""
 
     base = (settings.APP_BASE_URL or "").rstrip("/")
-    return f"{base}/projects/{project_prefix}/suites/{suite_id}" if base else None
+    return f"{base}/projects/{project_prefix}/docs/test-suites/{suite_public_id}" if base else None
 
 
 def _resolved_execution_time(value: Optional[datetime]) -> datetime:
@@ -147,7 +147,7 @@ async def sync_results_global(
                 id=campaign.id,
                 campaign_id=campaign.campaign_id,
                 name=campaign.name,
-                url=campaign_frontend_url(project_prefix, campaign.id),
+                url=campaign_frontend_url(project_prefix, campaign.campaign_id),
             ),
         )
 
@@ -214,7 +214,7 @@ async def _suites_holding(db: AsyncSession, tc_ids: set[str]) -> list[SyncedSuit
             id=suite.id,
             suite_id=suite.suite_id,
             name=suite.name,
-            url=suite_frontend_url(project_prefix, suite.id),
+            url=suite_frontend_url(project_prefix, suite.suite_id),
             matched=count,
             size=sizes.get(suite.id, count),
         )
@@ -384,13 +384,14 @@ async def create_campaign(
 
 @router.get("/{campaign_id}", response_model=TestCampaignDetailResponse)
 async def get_campaign(
-    campaign_id: int,
+    campaign_id: str,
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    campaign = await get_visible_row(
+    """The campaign with the public ID, such as PRJ-CMP-001."""
+    campaign = await get_visible_row_by_public_id(
         db,
-        TestCampaign,
+        TestCampaign.campaign_id,
         campaign_id,
         CAMPAIGN_NOT_FOUND,
         current_user,
@@ -405,17 +406,17 @@ async def get_campaign(
     responses={404: {"description": "Not Found"}},
 )
 async def update_campaign(
-    campaign_id: int,
+    campaign_id: str,
     data: TestCampaignUpdate,
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    """Update a campaign. suite_ids, or the legacy suite_id, set its suites, each a visible suite of
-    the project (404 for any other).
+    """Update the campaign with the public ID. suite_ids, or the legacy suite_id, set its suites,
+    each a visible suite of the project (404 for any other).
     """
-    campaign = await get_visible_row(
+    campaign = await get_visible_row_by_public_id(
         db,
-        TestCampaign,
+        TestCampaign.campaign_id,
         campaign_id,
         CAMPAIGN_NOT_FOUND,
         current_user,
@@ -513,13 +514,14 @@ async def update_campaign(
 
 @router.delete("/{campaign_id}", status_code=204)
 async def delete_campaign(
-    campaign_id: int,
+    campaign_id: str,
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    campaign = await get_visible_row(
+    """Delete the campaign with the public ID."""
+    campaign = await get_visible_row_by_public_id(
         db,
-        TestCampaign,
+        TestCampaign.campaign_id,
         campaign_id,
         CAMPAIGN_NOT_FOUND,
         current_user,
@@ -536,38 +538,44 @@ async def delete_campaign(
     responses={400: {"description": "Bad Request"}, 404: {"description": "Not Found"}},
 )
 async def add_campaign_item(
-    campaign_id: int,
-    test_case_id: int = Query(...),
+    campaign_id: str,
+    test_case_id: str = Query(...),
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    campaign = await get_visible_row(
+    """Add the test case with the public ID, such as PRJ-TC-001, to the campaign with the public
+    ID."""
+    campaign = await get_visible_row_by_public_id(
         db,
-        TestCampaign,
+        TestCampaign.campaign_id,
         campaign_id,
         CAMPAIGN_NOT_FOUND,
         current_user,
         permission=("plan", "CMP"),
     )
 
-    test_case = await get_visible_row(
-        db, TestCase, test_case_id, "Test case not found", current_user, permission=("view", "TC")
+    test_case = await get_visible_row_by_public_id(
+        db,
+        TestCase.tc_id,
+        test_case_id,
+        "Test case not found",
+        current_user,
+        permission=("view", "TC"),
+        project_id=campaign.project_id,
     )
-    if test_case.project_id != campaign.project_id:
-        raise HTTPException(404, "Test case not found")
 
     existing = await db.execute(
         select(TestCampaignItem).where(
-            TestCampaignItem.campaign_id == campaign_id,
-            TestCampaignItem.test_case_id == test_case_id,
+            TestCampaignItem.campaign_id == campaign.id,
+            TestCampaignItem.test_case_id == test_case.id,
         )
     )
     if existing.scalar_one_or_none():
         raise HTTPException(400, "Test case already in campaign")
 
     item = TestCampaignItem(
-        campaign_id=campaign_id,
-        test_case_id=test_case_id,
+        campaign_id=campaign.id,
+        test_case_id=test_case.id,
         status="Pending",
     )
     db.add(item)
@@ -576,61 +584,68 @@ async def add_campaign_item(
     return await _campaign_item_response(item, test_case, db, current_user)
 
 
-@router.delete("/{campaign_id}/items/{item_id}", status_code=204)
-async def remove_campaign_item(
-    campaign_id: int,
-    item_id: int,
-    db: AsyncSession = Depends(get_db, scope="function"),
-    current_user: User = Depends(get_current_user),
-):
-    await get_visible_row(
+async def _campaign_item_of(
+    db: AsyncSession, campaign_id: str, test_case_id: str, current_user: User
+) -> TestCampaignItem:
+    """The item of the test case with the public ID in the campaign with the public ID, after the
+    plan check on the campaign, else a 404."""
+    campaign = await get_visible_row_by_public_id(
         db,
-        TestCampaign,
-        campaign_id,
-        CAMPAIGN_NOT_FOUND,
-        current_user,
-        permission=("plan", "CMP"),
-    )
-    item = await get_row_or_404(
-        db,
-        TestCampaignItem,
-        item_id,
-        "Campaign item not found",
-        TestCampaignItem.campaign_id == campaign_id,
-    )
-    await db.delete(item)
-
-
-@router.patch(
-    "/{campaign_id}/items/{item_id}",
-    response_model=TestCampaignItemResponse,
-    responses={404: {"description": "Not Found"}},
-)
-async def update_campaign_item(
-    campaign_id: int,
-    item_id: int,
-    data: TestCampaignItemUpdate,
-    db: AsyncSession = Depends(get_db, scope="function"),
-    current_user: User = Depends(get_current_user),
-):
-    await get_visible_row(
-        db,
-        TestCampaign,
+        TestCampaign.campaign_id,
         campaign_id,
         CAMPAIGN_NOT_FOUND,
         current_user,
         permission=("plan", "CMP"),
     )
     item = (
-        await db.execute(
-            select(TestCampaignItem).where(
-                TestCampaignItem.id == item_id,
-                TestCampaignItem.campaign_id == campaign_id,
+        (
+            await db.execute(
+                select(TestCampaignItem)
+                .join(TestCase, TestCase.id == TestCampaignItem.test_case_id)
+                .where(
+                    TestCampaignItem.campaign_id == campaign.id,
+                    TestCase.tc_id == test_case_id,
+                )
+                .order_by(TestCampaignItem.id)
             )
         )
-    ).scalar_one_or_none()
+        .scalars()
+        .first()
+    )
     if not item:
         raise HTTPException(404, "Campaign item not found")
+    return item
+
+
+@router.delete(
+    "/{campaign_id}/items/{test_case_id}",
+    status_code=204,
+    responses={404: {"description": "Not Found"}},
+)
+async def remove_campaign_item(
+    campaign_id: str,
+    test_case_id: str,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
+):
+    """Remove the test case with the public ID from the campaign with the public ID."""
+    await db.delete(await _campaign_item_of(db, campaign_id, test_case_id, current_user))
+
+
+@router.patch(
+    "/{campaign_id}/items/{test_case_id}",
+    response_model=TestCampaignItemResponse,
+    responses={404: {"description": "Not Found"}},
+)
+async def update_campaign_item(
+    campaign_id: str,
+    test_case_id: str,
+    data: TestCampaignItemUpdate,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    current_user: User = Depends(get_current_user),
+):
+    """Update the item of the test case with the public ID in the campaign with the public ID."""
+    item = await _campaign_item_of(db, campaign_id, test_case_id, current_user)
 
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(item, field, value)

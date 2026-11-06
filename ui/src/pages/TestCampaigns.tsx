@@ -8,7 +8,7 @@ import { campaignsApi, extractApiErrorMessage, testCasesApi, testSuitesApi } fro
 import { ArrowLeft, Plus, Clock, FlaskConical, Layers3, Search, ChevronUp, ChevronDown } from 'lucide-react'
 import { useProjectByPrefix } from '../hooks/useProjectByPrefix'
 import { useToast } from '../components/useToast'
-import { formatDateTime } from '../test/date-utils'
+import { formatDateTime } from '../lib/dateTime'
 import BudRunLink from '../components/BudRunLink'
 import { useProjectPermissions } from '../hooks/useProjectPermissions'
 import { useAuth } from '../contexts/AuthContext'
@@ -550,7 +550,7 @@ function CampaignCard({ campaign, prefix }: Readonly<{ campaign: import('../api/
 
   return (
     <Link
-      to={docUrl(prefix, 'CMP', campaign.campaign_id ?? String(campaign.id))}
+      to={docUrl(prefix, 'CMP', campaign.campaign_id)}
       className="bg-card rounded-lg shadow-elegant p-5 hover:shadow-glow hover:border-primary/20 border border-transparent transition-all duration-200 group"
     >
       <div className="flex items-start justify-between mb-3">

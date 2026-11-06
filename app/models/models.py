@@ -312,6 +312,7 @@ class TestSuite(Base):
     """Reusable suite of test cases."""
 
     __tablename__ = "test_suites"
+    __table_args__ = (Index("uq_test_suites_suite_id", "suite_id", unique=True),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     project_id: Mapped[int] = mapped_column(ForeignKey(PROJECTS_ID), nullable=False, index=True)
@@ -356,10 +357,11 @@ class TestCampaign(Base):
     """A test campaign: traceability scope and execution grouping for test cases."""
 
     __tablename__ = "test_campaigns"
+    __table_args__ = (Index("uq_test_campaigns_campaign_id", "campaign_id", unique=True),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     project_id: Mapped[int] = mapped_column(ForeignKey(PROJECTS_ID), nullable=False, index=True)
-    campaign_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    campaign_id: Mapped[str] = mapped_column(String(50), nullable=False)
     suite_id: Mapped[Optional[int]] = mapped_column(ForeignKey(TEST_SUITES_ID), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

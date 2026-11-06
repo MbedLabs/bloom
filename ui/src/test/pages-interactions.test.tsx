@@ -835,13 +835,20 @@ describe('importing requirements', () => {
 
 describe('a test suite in detail', () => {
   function renderSuite() {
-    return renderAt('/projects/:prefix/suites/:suiteId', '/projects/PRJ/suites/41', <SuiteDetail />)
+    return renderAt('/projects/:prefix/suites/:suiteId', '/projects/PRJ/suites/PRJ-TS-001', <SuiteDetail />)
   }
 
   it('shows the suite the URL names', async () => {
     renderSuite()
     expect(await screen.findAllByText(/Smoke suite/)).toBeTruthy()
-    expect(lastCall(client.testSuitesApi.get)[0]).toBe(testSuite.id)
+    expect(lastCall(client.testSuitesApi.get)[0]).toBe(testSuite.suite_id)
+  })
+
+  it('reads the suite by its public ID and its workflow by its record from the document address', async () => {
+    renderAt('/projects/:prefix/docs/:kind/:docId', '/projects/PRJ/docs/test-suites/PRJ-TS-001', <SuiteDetail resolvedId={testSuite.id} />)
+    expect(await screen.findAllByText(/Smoke suite/)).toBeTruthy()
+    expect(vi.mocked(client.testSuitesApi.get).mock.calls.map(([ref]) => ref)).toEqual(['PRJ-TS-001'])
+    await waitFor(() => expect(client.workflowApi.get).toHaveBeenCalledWith('test-suite', testSuite.id))
   })
 
   it('renames the suite', async () => {
@@ -855,8 +862,8 @@ describe('a test suite in detail', () => {
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
     await waitFor(() => {
-      const [id, payload] = lastCall(client.testSuitesApi.update) as [number, { name?: string }]
-      expect(id).toBe(testSuite.id)
+      const [id, payload] = lastCall(client.testSuitesApi.update) as [string, { name?: string }]
+      expect(id).toBe(testSuite.suite_id)
       expect(payload.name).toBe('Nightly smoke suite')
     })
   })
@@ -886,9 +893,9 @@ describe('a test suite in detail', () => {
     fireEvent.click(candidate.closest('button') as HTMLElement)
 
     await waitFor(() => expect(client.testSuitesApi.addItem).toHaveBeenCalled())
-    const [suiteId, testCaseId] = lastCall(client.testSuitesApi.addItem) as [number, number]
-    expect(suiteId).toBe(testSuite.id)
-    expect(testCaseId).toBe(testCase.id)
+    const [suiteId, testCaseId] = lastCall(client.testSuitesApi.addItem) as [string, string]
+    expect(suiteId).toBe(testSuite.suite_id)
+    expect(testCaseId).toBe(testCase.tc_id)
   })
 
   it('scopes a campaign from the suite', async () => {
@@ -996,7 +1003,7 @@ describe('a campaign in detail', () => {
   function renderCampaign() {
     return renderAt(
       '/projects/:prefix/campaigns/:campaignId',
-      '/projects/PRJ/campaigns/31',
+      '/projects/PRJ/campaigns/PRJ-CMP-001',
       <CampaignDetail />,
     )
   }
@@ -1004,7 +1011,14 @@ describe('a campaign in detail', () => {
   it('loads the campaign the URL names', async () => {
     renderCampaign()
     expect(await screen.findAllByText(/Release candidate sweep/)).toBeTruthy()
-    expect(lastCall(client.campaignsApi.get)[0]).toBe(31)
+    expect(lastCall(client.campaignsApi.get)[0]).toBe('PRJ-CMP-001')
+  })
+
+  it('reads the campaign by its public ID and its workflow by its record from the document address', async () => {
+    renderAt('/projects/:prefix/docs/:kind/:docId', '/projects/PRJ/docs/campaigns/PRJ-CMP-001', <CampaignDetail resolvedId={31} />)
+    expect(await screen.findAllByText(/Release candidate sweep/)).toBeTruthy()
+    expect(vi.mocked(client.campaignsApi.get).mock.calls.map(([ref]) => ref)).toEqual(['PRJ-CMP-001'])
+    await waitFor(() => expect(client.workflowApi.get).toHaveBeenCalledWith('campaign', 31))
   })
 
   it('links the campaign to the Bud run that executed it', async () => {
@@ -1023,8 +1037,8 @@ describe('a campaign in detail', () => {
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
     await waitFor(() => {
-      const [id, payload] = lastCall(client.campaignsApi.update) as [number, { status?: string }]
-      expect(id).toBe(31)
+      const [id, payload] = lastCall(client.campaignsApi.update) as [string, { status?: string }]
+      expect(id).toBe('PRJ-CMP-001')
       expect(payload.status).toBe('Completed')
     })
   })
@@ -1270,8 +1284,8 @@ describe('the changes one artefact allows', () => {
   it('hides the suite controls the row does not allow', async () => {
     renderAt(
       '/projects/:prefix/suites/:suiteId',
-      '/projects/PRJ/suites/41',
-      <SuiteDetail allowedActions={['edit']} />,
+      '/projects/PRJ/suites/PRJ-TS-001',
+      <SuiteDetail resolvedId={testSuite.id} allowedActions={['edit']} />,
     )
     await screen.findAllByText(new RegExp(testSuite.name))
 
@@ -1373,7 +1387,7 @@ describe('the changes one artefact allows, on every control', () => {
     } as never)
     const view = renderAt(
       '/projects/:prefix/suites/:suiteId',
-      '/projects/PRJ/suites/41',
+      '/projects/PRJ/suites/PRJ-TS-001',
       <SuiteDetail allowedActions={['edit']} />,
     )
     await screen.findAllByText(new RegExp(testCase.title))
@@ -1383,21 +1397,21 @@ describe('the changes one artefact allows, on every control', () => {
 
     renderAt(
       '/projects/:prefix/suites/:suiteId',
-      '/projects/PRJ/suites/41',
+      '/projects/PRJ/suites/PRJ-TS-001',
       <SuiteDetail allowedActions={['edit', 'plan']} />,
     )
     const actions = await screen.findByTitle('Row actions')
     expect(screen.queryByRole('button', { name: /^remove$/i })).toBeNull()
     fireEvent.click(actions)
     fireEvent.click(await screen.findByRole('button', { name: /^remove$/i }))
-    await waitFor(() => expect(client.testSuitesApi.removeItem).toHaveBeenCalledWith(testSuite.id, 5))
+    await waitFor(() => expect(client.testSuitesApi.removeItem).toHaveBeenCalledWith(testSuite.suite_id, testCase.tc_id))
     expect(client.testCasesApi.delete).not.toHaveBeenCalled()
   })
 
   it('keeps controlled status and visibility out of an external suite editor', async () => {
     currentUser = external
     vi.mocked(client.projectMembersApi.permissions).mockResolvedValue(writes as never)
-    renderAt('/projects/:prefix/suites/:suiteId', '/projects/PRJ/suites/41', <SuiteDetail allowedActions={['edit']} />)
+    renderAt('/projects/:prefix/suites/:suiteId', '/projects/PRJ/suites/PRJ-TS-001', <SuiteDetail allowedActions={['edit']} />)
     fireEvent.click(await screen.findByRole('button', { name: /^edit$/i }))
     expect(await screen.findByText('Edit Suite')).toBeTruthy()
     expect(screen.queryByText('Visibility', { selector: 'label' })).toBeNull()

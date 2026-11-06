@@ -333,10 +333,10 @@ describe('suite planning authority', () => {
   it('allows mutable suite membership with Plan and without Edit', async () => {
     vi.mocked(client.projectMembersApi.permissions).mockResolvedValue({ TS: ['view', 'plan'] })
     vi.mocked(client.workflowApi.get).mockResolvedValue({ ...workflowState, actions: { ...workflowState.actions, edit_current: false, plan_current: true } })
-    renderAt('/projects/:prefix/suites/:suiteId', `/projects/PRJ/suites/${testSuite.id}`, <SuiteDetail allowedActions={['plan']} />)
+    renderAt('/projects/:prefix/suites/:suiteId', `/projects/PRJ/suites/${testSuite.suite_id}`, <SuiteDetail allowedActions={['plan']} />)
     fireEvent.click(await screen.findByRole('button', { name: /^add test case$/i }))
     fireEvent.click(await screen.findByRole('button', { name: new RegExp(testCase.tc_id) }))
-    await waitFor(() => expect(client.testSuitesApi.addItem).toHaveBeenCalledWith(testSuite.id, testCase.id))
+    await waitFor(() => expect(client.testSuitesApi.addItem).toHaveBeenCalledWith(testSuite.suite_id, testCase.tc_id))
     expect(screen.queryByRole('button', { name: /^edit$/i })).toBeNull()
   })
 })
@@ -477,8 +477,8 @@ describe('visible document discussion', () => {
   })
 
   it.each(['test-suite', 'campaign'] as const)('shows the %s discussion in its side panel without opening a tab', async type => {
-    if (type === 'test-suite') renderAt('/projects/:prefix/suites/:suiteId', `/projects/PRJ/suites/${testSuite.id}`, <SuiteDetail />)
-    else renderAt('/projects/:prefix/campaigns/:campaignId', '/projects/PRJ/campaigns/51', <CampaignDetail />)
+    if (type === 'test-suite') renderAt('/projects/:prefix/suites/:suiteId', `/projects/PRJ/suites/${testSuite.suite_id}`, <SuiteDetail />)
+    else renderAt('/projects/:prefix/campaigns/:campaignId', '/projects/PRJ/campaigns/PRJ-CMP-001', <CampaignDetail />)
     const discussion = await screen.findByRole('region', { name: 'Document discussion' })
     expect(within(discussion).getByRole('heading', { name: 'Discussion' })).toBeTruthy()
     expect(discussion.closest('aside')?.getAttribute('aria-label')).toBe('Document side panel')

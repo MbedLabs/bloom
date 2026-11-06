@@ -87,7 +87,7 @@ def test_suite_creation_skips_test_cases_from_another_project(api_client: TestCl
     )
 
     assert created.status_code in (200, 201), created.text
-    detail = api_client.get(f"/api/test-suites/{created.json()['id']}", headers=headers)
+    detail = api_client.get(f"/api/test-suites/{created.json()['suite_id']}", headers=headers)
     assert detail.status_code == 200
     assert detail.json()["total_items"] == 1
 

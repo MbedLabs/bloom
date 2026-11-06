@@ -54,6 +54,12 @@ UPDATE_ROUTES = {
 }
 
 
+def _update_path(slug: str, row) -> str:
+    """The update route of the row: a suite by its public ID, any other kind by its id."""
+    ref = row.suite_id if slug == "test-suite" else row.id
+    return f"/api/{UPDATE_ROUTES[slug]}/{ref}"
+
+
 @pytest.mark.parametrize("status", ["Accepted", "Mitigated", "Closed", "Monitoring"])
 async def test_risk_registry_preserves_operational_status_and_filters(workflow_http, status):
     db, client, _, _ = workflow_http
@@ -362,9 +368,7 @@ async def test_actual_review_approval_and_revision_preserve_content(
         unchanged = await client.get(path + "/workflow")
         assert unchanged.json()["revision_number"] == 1
         assert unchanged.json()["actions"]["edit_current"] is True
-    response = await client.patch(
-        f"/api/{UPDATE_ROUTES[slug]}/{row.id}", json={title: "Saved changed content"}
-    )
+    response = await client.patch(_update_path(slug, row), json={title: "Saved changed content"})
     if slug == "change":
         assert response.status_code == 409, response.text
         assert row.status == "Approved"
@@ -875,17 +879,13 @@ async def test_approved_correction_reapproves_without_advancing_numbers(
     state = await client.get(path + "/workflow")
     assert state.json()["actions"]["edit_current"] is True
     original_version = getattr(row, "version", None)
-    response = await client.patch(
-        f"/api/{UPDATE_ROUTES[slug]}/{row.id}", json={title: fields[title]}
-    )
+    response = await client.patch(_update_path(slug, row), json={title: fields[title]})
     assert response.status_code == 200, response.text
     assert row.status == "Approved"
     response = await client.post(path + "/revisions", json={"change_request_id": 9999})
     assert response.status_code == 409
     current[0] = users[3]
-    response = await client.patch(
-        f"/api/{UPDATE_ROUTES[slug]}/{row.id}", json={title: "Corrected mistake"}
-    )
+    response = await client.patch(_update_path(slug, row), json={title: "Corrected mistake"})
     assert response.status_code == 200, response.text
     state = (await client.get(path + "/workflow")).json()
     assert state["phase"] == "Draft"

@@ -16,7 +16,7 @@ import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import { usePageMeta } from '../contexts/PageMetaContext'
 import { useToast } from '../components/useToast'
-import { formatDateTime } from '../test/date-utils'
+import { formatDateTime } from '../lib/dateTime'
 import BudRunLink from '../components/BudRunLink'
 import { useProjectPermissions, useRowActions } from '../hooks/useProjectPermissions'
 import { useAuth } from '../contexts/AuthContext'
@@ -36,8 +36,8 @@ export default function SuiteDetail({
   const external = user?.role === 'external'
   const { data: project } = useProjectByPrefix(prefix)
   const projectId = project?.id || 0
-  const parsedSuiteId = resolvedId || Number(suiteId)
-  const workflow = useDocumentWorkflow('test-suite', parsedSuiteId)
+  const suiteRef = docId ?? suiteId ?? ''
+  const detailKey = ['testSuite', resolvedId ?? suiteRef]
   const queryClient = useQueryClient()
   const toast = useToast()
   const navigate = useNavigate()
@@ -59,10 +59,12 @@ export default function SuiteDetail({
 
 
   const { data: suite, isLoading, error: suiteError } = useQuery({
-    queryKey: ['testSuite', parsedSuiteId],
-    queryFn: () => testSuitesApi.get(parsedSuiteId),
-    enabled: !!parsedSuiteId,
+    queryKey: detailKey,
+    queryFn: () => testSuitesApi.get(suiteRef),
+    enabled: !!suiteRef,
   })
+  const recordId = resolvedId ?? suite?.id ?? 0
+  const workflow = useDocumentWorkflow('test-suite', recordId)
 
   useEffect(() => {
     if (suite?.name) setCrumbLabel(suite.name)
@@ -77,11 +79,11 @@ export default function SuiteDetail({
   const testCases = testCasesData?.items
 
   const addItemMutation = useMutation({
-    mutationFn: (testCaseId: number) => testSuitesApi.addItem(parsedSuiteId, testCaseId),
+    mutationFn: (testCaseId: string) => testSuitesApi.addItem(suiteRef, testCaseId),
     onSuccess: () => {
       refreshProjectViews(queryClient, { prefix, projectId })
-      void queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
-      void queryClient.invalidateQueries({ queryKey: ['document-workflow', 'test-suite', parsedSuiteId] })
+      void queryClient.invalidateQueries({ queryKey: detailKey })
+      void queryClient.invalidateQueries({ queryKey: ['document-workflow', 'test-suite', recordId] })
       setShowAddCase(false)
       toast.notify('Test case added', 'success')
     },
@@ -91,11 +93,11 @@ export default function SuiteDetail({
   })
 
   const removeItemMutation = useMutation({
-    mutationFn: (itemId: number) => testSuitesApi.removeItem(parsedSuiteId, itemId),
+    mutationFn: (testCaseId: string) => testSuitesApi.removeItem(suiteRef, testCaseId),
     onSuccess: () => {
       refreshProjectViews(queryClient, { prefix, projectId })
-      void queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
-      void queryClient.invalidateQueries({ queryKey: ['document-workflow', 'test-suite', parsedSuiteId] })
+      void queryClient.invalidateQueries({ queryKey: detailKey })
+      void queryClient.invalidateQueries({ queryKey: ['document-workflow', 'test-suite', recordId] })
       toast.notify('Test case removed', 'success')
     },
     onError: (err: unknown) => {
@@ -108,15 +110,15 @@ export default function SuiteDetail({
       project_id: projectId,
       name: `${suite?.name || 'Suite'} Scope ${new Date().toISOString().slice(0, 10)}`,
       description: `Traceability scope campaign from suite ${suite?.suite_id || ''}`,
-      suite_ids: [parsedSuiteId],
+      suite_ids: [recordId],
       status: 'Scope',
       visibility: suite?.visibility === 'customer' ? 'customer' : 'internal',
     }),
     onSuccess: (campaign) => {
       refreshProjectViews(queryClient, { prefix, projectId })
-      void queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
+      void queryClient.invalidateQueries({ queryKey: detailKey })
       toast.notify('Campaign scope created', 'success')
-      void navigate(docUrl(prefix, 'CMP', campaign.campaign_id ?? String(campaign.id)), {
+      void navigate(docUrl(prefix, 'CMP', campaign.campaign_id), {
         state: { returnTo: location.pathname },
       })
     },
@@ -127,17 +129,17 @@ export default function SuiteDetail({
 
   const updateMutation = useMutation({
     mutationFn: (data: { name?: string; description?: string; status?: string; visibility?: 'internal' | 'customer' }) =>
-      testSuitesApi.update(parsedSuiteId, data),
+      testSuitesApi.update(suiteRef, data),
     onSuccess: (updated: unknown) => {
       refreshProjectViews(queryClient, { prefix, projectId })
-      queryClient.setQueryData(['testSuite', parsedSuiteId], (old: unknown) => {
+      queryClient.setQueryData(detailKey, (old: unknown) => {
         if (old && typeof old === 'object') {
           return { ...(old as object), ...(updated as object) }
         }
         return updated
       })
-      void queryClient.invalidateQueries({ queryKey: ['testSuite', parsedSuiteId] })
-      void queryClient.invalidateQueries({ queryKey: ['document-workflow', 'test-suite', parsedSuiteId] })
+      void queryClient.invalidateQueries({ queryKey: detailKey })
+      void queryClient.invalidateQueries({ queryKey: ['document-workflow', 'test-suite', recordId] })
       setEditing(false)
       toast.notify('Suite saved', 'success')
     },
@@ -147,11 +149,11 @@ export default function SuiteDetail({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: () => testSuitesApi.delete(parsedSuiteId),
+    mutationFn: () => testSuitesApi.delete(suiteRef),
     onSuccess: () => {
       toast.notify('Suite deleted', 'success')
       setTimeout(() => {
-        finishArtefactDeletion(queryClient, { prefix, projectId, detailKey: 'testSuite', artefactType: 'test-suite', recordId: parsedSuiteId, kind: 'test-suites', docId: suite?.suite_id }, () => navigate(backUrl))
+        finishArtefactDeletion(queryClient, { prefix, projectId, detailKey: 'testSuite', artefactType: 'test-suite', recordId, kind: 'test-suites', docId: suite?.suite_id }, () => navigate(backUrl))
       }, 800)
     },
     onError: (err: unknown) => {
@@ -263,7 +265,7 @@ export default function SuiteDetail({
         )}
       </div>
 
-      <DocumentDetailColumns rightRail={<WorkflowPanel artefactType="test-suite" artefactId={parsedSuiteId} projectPrefix={prefix} projectId={suite.project_id} />}>
+      <DocumentDetailColumns rightRail={<WorkflowPanel artefactType="test-suite" artefactId={recordId} projectPrefix={prefix} projectId={suite.project_id} />}>
       {canEditDocs && workflow.data?.actions?.edit_current && editing && (
         <div className="bg-card rounded-lg shadow-elegant p-5">
           <h3 className="text-sm font-medium text-muted-foreground mb-3">Edit Suite</h3>
@@ -329,34 +331,34 @@ export default function SuiteDetail({
           <div className="p-8 text-center text-muted-foreground">No test cases in this suite.</div>
         ) : (
           <div className="divide-y divide-border">
-            {suite.items.map((item) => (
-              <div key={item.id} className="px-6 py-4 flex items-center justify-between gap-4">
+            {suite.items.map(({ id, test_case: testCase }) => (
+              <div key={id} className="px-6 py-4 flex items-center justify-between gap-4">
                 <div>
-                  {item.test_case && (
+                  {testCase && (
                     <>
-                      <Link to={docUrl(prefix!, 'TC', item.test_case.tc_id)} className="font-mono text-sm text-primary hover:text-primary/80">
-                        {item.test_case.tc_id}
+                      <Link to={docUrl(prefix!, 'TC', testCase.tc_id)} className="font-mono text-sm text-primary hover:text-primary/80">
+                        {testCase.tc_id}
                       </Link>
-                      <div className="text-foreground mt-1">{item.test_case.title}</div>
+                      <div className="text-foreground mt-1">{testCase.title}</div>
                     </>
                   )}
                 </div>
-                {rowAllows('plan') && workflow.data?.actions?.plan_current && (
+                {testCase && rowAllows('plan') && workflow.data?.actions?.plan_current && (
                 <fieldset disabled={removeItemMutation.isPending} className="shrink-0">
                   <RowMenu
                     icon={<MoreVertical className="h-4 w-4" />}
                     title="Row actions"
                     buttonClassName="flex h-8 w-8 items-center justify-center rounded border border-transparent text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
                     menuHeight={44}
-                    open={menu?.id === item.id}
-                    position={menu?.id === item.id ? menu : null}
-                    onToggle={(position) => setMenu(menu?.id === item.id ? null : { id: item.id, ...position })}
+                    open={menu?.id === id}
+                    position={menu?.id === id ? menu : null}
+                    onToggle={(position) => setMenu(menu?.id === id ? null : { id, ...position })}
                   >
                     <MenuAction
                       icon={<Trash2 className="h-3.5 w-3.5" />}
                       label="Remove"
                       destructive
-                      onClick={() => { setMenu(null); removeItemMutation.mutate(item.id) }}
+                      onClick={() => { setMenu(null); removeItemMutation.mutate(testCase.tc_id) }}
                     />
                   </RowMenu>
                 </fieldset>
@@ -396,7 +398,7 @@ export default function SuiteDetail({
                   {availableCases.map((tc) => (
                     <button
                       key={tc.id}
-                      onClick={() => addItemMutation.mutate(tc.id)}
+                      onClick={() => addItemMutation.mutate(tc.tc_id)}
                       className="w-full text-left px-4 py-3 rounded-md border border-border hover:border-primary/50 hover:bg-primary/10"
                     >
                       <div className="font-mono text-xs text-primary">{tc.tc_id}</div>
@@ -416,7 +418,7 @@ export default function SuiteDetail({
       )}
 
       <div className="bg-card rounded-lg shadow-elegant overflow-hidden">
-        <DocumentActivityPanel artefactType="test-suite" artefactId={parsedSuiteId} />
+        <DocumentActivityPanel artefactType="test-suite" artefactId={recordId} />
       </div>
       </DocumentDetailColumns>
     </div>

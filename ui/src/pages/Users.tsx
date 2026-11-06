@@ -8,7 +8,7 @@ import { extractApiErrorMessage, InviteUserResponse, User, usersApi, policiesApi
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
 import { UserPlus, Edit2, Trash2, X, Shield, Wrench, Eye, Copy, Check, Mail, ChevronDown, ChevronRight } from 'lucide-react'
-import { formatDateTime } from '../test/date-utils'
+import { formatDateTime } from '../lib/dateTime'
 import { ROLE_LABELS } from '../lib/roles'
 import { policyPermissions, policyResourceSummary } from '../lib/policySummary'
 
