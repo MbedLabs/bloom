@@ -5,7 +5,7 @@
 * @author   Amine El Omari
 * @date     2026-11-06
 * @version  1.0.0
-* @note     Every call runs on the interface's own event loop against an in-memory database.
+* @note     Calls run on the interface's own loop, on in-memory SQLite or a new PostgreSQL database.
 """
 
 import asyncio
@@ -14,21 +14,28 @@ import hashlib
 import hmac
 import json
 import os
+import subprocess
+import sys
 import uuid
 from datetime import timedelta
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 from fastapi import FastAPI, HTTPException
-from sqlalchemy import func, select, text
+from sqlalchemy import event, func, select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 import tests.parameters as params
 from app import main
+from app.api import cli_auth as cli_auth_api
 from app.api import integrations
+from app.core.config import settings
 from app.core.database import Base, get_db
+from app.core.deps import limiter
+from app.core.security import create_access_token
 from app.models import (
     ChangeRequest,
     ChangeRequestSyncEvent,
@@ -38,11 +45,14 @@ from app.models import (
     Project,
 )
 from app.models import TestCase as TestCaseModel
+from app.models.cli_auth_session import CliAuthSession
 from app.models.user import User, UserRole
-from app.services import integration_sync
+from app.services import cli_auth, integration_sync
 from app.services.integration_secrets import encrypt_integration_secret
+from app.services.token_service import hash_token, invalidate_all_refresh_tokens
 
 REAL_CLIENT = httpx.AsyncClient
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class BloomInterface:
@@ -452,7 +462,7 @@ class BloomInterface:
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
 
-    def bloom_use_postgres(self):
+    def bloom_use_postgres(self, tables=True):
         url = os.environ.get(self.parameters.DATABASE_SETTING, "")
         if not url.startswith(self.parameters.POSTGRES_SCHEME):
             return False
@@ -461,10 +471,111 @@ class BloomInterface:
         self.pg_database = f"{self.parameters.PG_DATABASE_PREFIX}{uuid.uuid4().hex[:12]}"
         self._run(self.engine.dispose())
         self._run(self._create_postgres_database())
-        self.engine = create_async_engine(urlunsplit(parts._replace(path=f"/{self.pg_database}")))
-        self._run(self._create_tables())
+        self.pg_url = urlunsplit(parts._replace(path=f"/{self.pg_database}"))
+        self.engine = create_async_engine(self.pg_url)
+        if tables:
+            self._run(self._create_tables())
         self.maker = async_sessionmaker(self.engine, expire_on_commit=False)
         return True
+
+    def bloom_run_alembic(self, *args):
+        self._run(self.engine.dispose())
+        env = {**os.environ, self.parameters.DATABASE_SETTING: self.pg_url}
+        env["BLOOM_DOTENV_DISABLED"] = "1"
+        env.pop("BLOOM_DATABASE_URL", None)
+        done = subprocess.run(
+            [sys.executable, "-m", "alembic", *args],
+            cwd=ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        return done.returncode, done.stdout + done.stderr
+
+    def bloom_list_alembic_heads(self):
+        _, output = self.bloom_run_alembic("heads")
+        return [line.split()[0] for line in output.splitlines() if "(head)" in line]
+
+    def bloom_read_revision(self):
+        return self._run(self._fetch_value("SELECT version_num FROM alembic_version"))
+
+    def bloom_seed_retained_rows(self):
+        return self._run(self._seed_retained_rows())
+
+    def bloom_read_retained_rows(self, ids):
+        return self._run(self._read_retained_rows(ids))
+
+    def bloom_read_cli_session_table(self):
+        return self._run(self._read_cli_session_table())
+
+    def bloom_cli_session_model_columns(self):
+        return {column.name: column.nullable for column in CliAuthSession.__table__.columns}
+
+    def bloom_add_cli_sessions(self, user_id):
+        self._run(self._add_cli_sessions(user_id))
+
+    def bloom_start_cli_api(self):
+        app = FastAPI()
+        app.state.limiter = limiter
+        app.include_router(cli_auth_api.router, prefix=self.parameters.CLI_PREFIX)
+        app.dependency_overrides[get_db] = self._serve_session
+        self.patches.enter_context(patch.object(limiter, "enabled", False))
+        self.patches.enter_context(patch.object(settings, "CLI_CODE_MODE_ENABLED", True))
+        self.api = app
+
+    def bloom_sign_in(self, email):
+        user_id = self._run(
+            self._add(
+                User(email=email, full_name=email, hashed_password=email, role=UserRole.admin)
+            )
+        )
+        user = self._run(self._get(User, user_id))
+        token = create_access_token(
+            {"sub": str(user.id), "type": "user", "ver": user.session_version}
+        )
+        return {"Authorization": f"Bearer {token}"}
+
+    def bloom_start_cli_code_session(self, state):
+        body = {
+            "client_name": self.parameters.CLI_CLIENT_NAME,
+            "mode": self.parameters.CLI_CODE_MODE,
+            "code_challenge": cli_auth.pkce_challenge(self.parameters.CLI_VERIFIER),
+            "state": state,
+        }
+        return self._run(self._call("POST", self.parameters.CLI_START, body))
+
+    def bloom_cli_approve_body(self, session_id):
+        challenge = cli_auth.pkce_challenge(self.parameters.CLI_VERIFIER)
+        return {"session_id": session_id, "request_code": cli_auth.request_code(challenge)}
+
+    def bloom_cli_exchange_body(self, session_id, code):
+        return {
+            "session_id": session_id,
+            "code": code,
+            "code_verifier": self.parameters.CLI_VERIFIER,
+        }
+
+    def bloom_race_cli(self, calls):
+        async def race():
+            return await asyncio.wait_for(
+                asyncio.gather(
+                    *(self._call("POST", path, body, headers) for path, body, headers in calls)
+                ),
+                timeout=self.parameters.RACE_TIMEOUT_SECONDS,
+            )
+
+        return self._run(race())
+
+    def bloom_get_cli_session(self, session_id, headers):
+        path = self.parameters.CLI_SESSIONS + session_id
+        return self._run(self._call("GET", path, None, headers))
+
+    def bloom_cli_exchange(self, session_id, code):
+        body = self.bloom_cli_exchange_body(session_id, code)
+        return self._run(self._call("POST", self.parameters.CLI_EXCHANGE, body))
+
+    def bloom_refresh_during_revocation(self, email, refresh_token):
+        return self._run(self._refresh_during_revocation(email, refresh_token))
 
     def bloom_serve_jira_holding_creation(self, issue):
         searches = []
@@ -582,6 +693,222 @@ class BloomInterface:
         transport = httpx.ASGITransport(app=self.api)
         async with REAL_CLIENT(transport=transport, base_url=self.parameters.API_BASE) as client:
             return await client.post(path, content=body, headers=headers)
+
+    async def _serve_session(self):
+        async with self.maker() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+    async def _call(self, method, path, body=None, headers=None):
+        transport = httpx.ASGITransport(app=self.api)
+        async with REAL_CLIENT(transport=transport, base_url=self.parameters.API_BASE) as client:
+            return await client.request(
+                method, self.parameters.CLI_PREFIX + path, json=body, headers=headers
+            )
+
+    async def _fetch_value(self, statement, **values):
+        async with self.engine.connect() as connection:
+            return (await connection.execute(text(statement), values)).scalar()
+
+    async def _seed_retained_rows(self):
+        async with self.engine.begin() as connection:
+            user = (
+                await connection.execute(
+                    text(
+                        "INSERT INTO users (email, full_name, hashed_password, role, is_active, "
+                        "session_version, created_at, updated_at) VALUES (:email, :name, "
+                        "'unused', 'maintainer', true, :version, now(), now()) RETURNING id"
+                    ),
+                    {
+                        "email": self.parameters.RETAINED_EMAIL,
+                        "name": self.parameters.RETAINED_NAME,
+                        "version": self.parameters.RETAINED_SESSION_VERSION,
+                    },
+                )
+            ).scalar_one()
+            project = (
+                await connection.execute(
+                    text(
+                        "INSERT INTO projects (name, prefix, status, created_at, updated_at) "
+                        "VALUES (:name, :prefix, 'active', now(), now()) RETURNING id"
+                    ),
+                    {
+                        "name": self.parameters.RETAINED_PROJECT,
+                        "prefix": self.parameters.RETAINED_PREFIX,
+                    },
+                )
+            ).scalar_one()
+            await connection.execute(
+                text(
+                    "INSERT INTO user_tokens (user_id, purpose, token_hash, expires_at, "
+                    "created_at) VALUES (:user, 'refresh', :digest, now() + interval '1 day', "
+                    "now())"
+                ),
+                {"user": user, "digest": self.parameters.RETAINED_TOKEN_HASH},
+            )
+            await connection.execute(
+                text(
+                    "INSERT INTO audit_events (occurred_at, actor_type, actor_user_id, action, "
+                    "outcome) VALUES (now(), 'user', :user, 'auth.login', 'success')"
+                ),
+                {"user": user},
+            )
+        return {"user": user, "project": project}
+
+    async def _read_retained_rows(self, ids):
+        user = ids["user"]
+        return {
+            "version": await self._fetch_value(
+                "SELECT session_version FROM users WHERE id=:user", user=user
+            ),
+            "project": await self._fetch_value(
+                "SELECT name FROM projects WHERE id=:project", project=ids["project"]
+            ),
+            "token": await self._fetch_value(
+                "SELECT token_hash FROM user_tokens WHERE user_id=:user", user=user
+            ),
+            "audit": await self._fetch_value(
+                "SELECT count(*) FROM audit_events WHERE actor_user_id=:user", user=user
+            ),
+        }
+
+    async def _read_cli_session_table(self):
+        exists = await self._fetch_value(
+            "SELECT to_regclass('public.cli_auth_sessions') IS NOT NULL"
+        )
+        if not exists:
+            return None
+        async with self.engine.connect() as connection:
+            columns = (
+                await connection.execute(
+                    text(
+                        "SELECT column_name, is_nullable FROM information_schema.columns "
+                        "WHERE table_name='cli_auth_sessions'"
+                    )
+                )
+            ).all()
+            indexes = (
+                await connection.execute(
+                    text("SELECT indexname FROM pg_indexes WHERE tablename='cli_auth_sessions'")
+                )
+            ).scalars()
+            return {
+                "columns": {name: nullable == "YES" for name, nullable in columns},
+                "indexes": set(indexes),
+                "cascade": (
+                    await connection.execute(
+                        text(
+                            "SELECT delete_rule FROM information_schema.referential_constraints "
+                            "WHERE constraint_name='cli_auth_sessions_user_id_fkey'"
+                        )
+                    )
+                ).scalar(),
+                "check": (
+                    await connection.execute(
+                        text("SELECT count(*) FROM pg_constraint WHERE conname='ck_cli_auth_mode'")
+                    )
+                ).scalar(),
+                "sessions": (
+                    await connection.execute(text("SELECT count(*) FROM cli_auth_sessions"))
+                ).scalar(),
+            }
+
+    async def _add_cli_sessions(self, user_id):
+        challenge = cli_auth.pkce_challenge(self.parameters.CLI_VERIFIER)
+        async with self.engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "INSERT INTO cli_auth_sessions (id, client_name, mode, code_challenge, state, "
+                    "expires_at, created_at) VALUES (:id, :client, :mode, :challenge, :state, "
+                    "now() + interval '10 minutes', now())"
+                ),
+                {
+                    "id": uuid.uuid4(),
+                    "client": self.parameters.CLI_CLIENT_NAME,
+                    "mode": self.parameters.CLI_CODE_MODE,
+                    "challenge": challenge,
+                    "state": self.parameters.CLI_STATE,
+                },
+            )
+            await connection.execute(
+                text(
+                    "INSERT INTO cli_auth_sessions (id, client_name, mode, redirect_uri, "
+                    "code_challenge, state, exchange_code_hash, user_id, "
+                    "approved_session_version, expires_at, created_at) VALUES (:id, :client, "
+                    ":mode, :uri, :challenge, :state, :digest, :user, :version, "
+                    "now() + interval '10 minutes', now())"
+                ),
+                {
+                    "id": uuid.uuid4(),
+                    "client": self.parameters.CLI_CLIENT_NAME,
+                    "mode": self.parameters.CLI_CALLBACK_MODE,
+                    "uri": self.parameters.CLI_CALLBACK_URI,
+                    "challenge": challenge,
+                    "state": self.parameters.CLI_STATE,
+                    "digest": hash_token(self.parameters.CLI_APPROVED_CODE),
+                    "user": user_id,
+                    "version": self.parameters.RETAINED_SESSION_VERSION,
+                },
+            )
+
+    async def _refresh_during_revocation(self, email, refresh_token):
+        asked_for_lock = asyncio.Event()
+
+        def watch(conn, cursor, statement, parameters, context, executemany):
+            if "FROM users" in statement and "FOR " in statement:
+                asked_for_lock.set()
+
+        async with self.maker() as seed:
+            user = User(email=email, full_name=email, hashed_password=email, is_active=True)
+            seed.add(user)
+            await seed.flush()
+            user_id = user.id
+            await seed.execute(
+                text(
+                    "INSERT INTO user_tokens (user_id, purpose, token_hash, expires_at, "
+                    "created_at) VALUES (:user, 'refresh', :digest, now() + interval '1 day', "
+                    "now())"
+                ),
+                {"user": user_id, "digest": hash_token(refresh_token)},
+            )
+            await seed.commit()
+
+        async def refresh():
+            async with self.maker() as request:
+                try:
+                    await cli_auth.refresh_credentials(request, refresh_token)
+                    await request.commit()
+                    return None
+                except cli_auth.CliAuthorizationError as exc:
+                    await request.rollback()
+                    return exc.reason
+
+        event.listen(self.engine.sync_engine, "before_cursor_execute", watch)
+        try:
+            async with self.maker() as revoker:
+                account = await revoker.scalar(
+                    select(User).where(User.id == user_id).with_for_update()
+                )
+                task = asyncio.create_task(refresh())
+                with contextlib.suppress(TimeoutError):
+                    await asyncio.wait_for(
+                        asked_for_lock.wait(), self.parameters.CLI_LOCK_WAIT_SECONDS
+                    )
+                waited = asked_for_lock.is_set()
+                await revoker.execute(
+                    text(f"SET LOCAL lock_timeout='{self.parameters.CLI_LOCK_TIMEOUT}'")
+                )
+                account.session_version += 1
+                await invalidate_all_refresh_tokens(revoker, user_id)
+                await revoker.commit()
+                reason = await asyncio.wait_for(task, self.parameters.CLI_LOCK_WAIT_SECONDS)
+        finally:
+            event.remove(self.engine.sync_engine, "before_cursor_execute", watch)
+        return SimpleNamespace(waited=waited, reason=reason)
 
     async def _scalar(self, query):
         async with self.maker() as db:
