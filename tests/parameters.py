@@ -435,3 +435,70 @@ MSG_FRESH_UPGRADE = "a fresh database upgrades to the head"
 CLI_DENIED_CODE = _letters(string.ascii_letters + string.digits, 16, 32)
 CLI_CONSENT_ANSWERS = (STATUS_OK, STATUS_BAD_REQUEST)
 CLI_REFRESH_ANSWERS = (STATUS_OK, STATUS_UNAUTHORIZED)
+
+PUBLIC_ID_BEFORE = "0ef8b87db4d3"
+PUBLIC_ID_REVISION = "b2d4f6a8c0e1"
+PUBLIC_ID_INDEXES = ["uq_test_campaigns_campaign_id", "uq_test_suites_suite_id"]
+PUBLIC_ID_DUPLICATE_MESSAGE = "{column} holds duplicate public IDs"
+SUITE_COLUMN = "test_suites.suite_id"
+CAMPAIGN_COLUMN = "test_campaigns.campaign_id"
+UNIQUE_VIOLATION = "23505"
+NOT_NULL_VIOLATION = "23502"
+NULLABLE = "YES"
+NOT_NULLABLE = "NO"
+
+CAMPAIGN_PREFIXES = []
+while len(CAMPAIGN_PREFIXES) < 3:
+    _prefix = _letters(string.ascii_uppercase, 3, 3)
+    if _prefix not in CAMPAIGN_PREFIXES:
+        CAMPAIGN_PREFIXES.append(_prefix)
+TAKEN_PREFIX, EMPTY_PREFIX, WIDENED_PREFIX = CAMPAIGN_PREFIXES
+TAKEN_NUMBER = _draw.randint(1, 50)
+LOW_NUMBER = _draw.randint(1, 998)
+LAST_THREE_DIGIT_NUMBER = 999
+
+
+def _campaign_id(prefix: str, number: int, width: int = 3) -> str:
+    """The public ID of campaign ``number`` of a project, zero-padded to ``width`` digits."""
+    return f"{prefix}-CMP-{number:0{width}d}"
+
+
+CAMPAIGN_SEEDS = {
+    TAKEN_PREFIX: [None, _campaign_id(TAKEN_PREFIX, TAKEN_NUMBER), "", None],
+    EMPTY_PREFIX: [None],
+    WIDENED_PREFIX: [
+        _campaign_id(WIDENED_PREFIX, LOW_NUMBER),
+        _campaign_id(WIDENED_PREFIX, LAST_THREE_DIGIT_NUMBER),
+        None,
+    ],
+}
+CAMPAIGN_EXPECTED = {
+    TAKEN_PREFIX: [
+        _campaign_id(TAKEN_PREFIX, TAKEN_NUMBER + 1),
+        _campaign_id(TAKEN_PREFIX, TAKEN_NUMBER),
+        _campaign_id(TAKEN_PREFIX, TAKEN_NUMBER + 2),
+        _campaign_id(TAKEN_PREFIX, TAKEN_NUMBER + 3),
+    ],
+    EMPTY_PREFIX: [_campaign_id(EMPTY_PREFIX, 1)],
+    WIDENED_PREFIX: [
+        _campaign_id(WIDENED_PREFIX, LOW_NUMBER, 4),
+        _campaign_id(WIDENED_PREFIX, LAST_THREE_DIGIT_NUMBER, 4),
+        _campaign_id(WIDENED_PREFIX, LAST_THREE_DIGIT_NUMBER + 1, 4),
+    ],
+}
+DUPLICATE_SUITE_ID = f"{TAKEN_PREFIX}-TS-{_draw.randint(1, 999):03d}"
+DUPLICATE_CAMPAIGN_ID = _campaign_id(TAKEN_PREFIX, _draw.randint(1, 999))
+PUBLIC_ID_DUPLICATES = [
+    ([DUPLICATE_SUITE_ID, DUPLICATE_SUITE_ID], [None, None], SUITE_COLUMN),
+    ([None, None], [DUPLICATE_CAMPAIGN_ID, DUPLICATE_CAMPAIGN_ID], CAMPAIGN_COLUMN),
+]
+PUBLIC_ID_DUPLICATE_CASES = [(index,) for index in range(len(PUBLIC_ID_DUPLICATES))]
+
+MSG_PUBLIC_IDS_NUMBERED = "campaigns without a public ID get the next free number of their project"
+MSG_PUBLIC_IDS_REQUIRED = "the campaign public ID becomes required and both public IDs unique"
+MSG_PUBLIC_ID_VIOLATIONS = "a repeated suite or campaign public ID and a missing one are refused"
+MSG_PUBLIC_ID_DOWNGRADE = "the downgrade drops the indexes, makes the ID optional and keeps it"
+MSG_PUBLIC_ID_REUPGRADE = "upgrading again restores both unique indexes"
+MSG_DUPLICATES_REFUSED = "the upgrade stops on duplicate public IDs"
+MSG_DUPLICATES_NAMED = "the refusal names the column holding the duplicates"
+MSG_DUPLICATES_REVISION = "a refused upgrade stays at the revision before"

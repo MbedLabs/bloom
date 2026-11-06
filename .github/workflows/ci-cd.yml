@@ -230,6 +230,28 @@ jobs:
         run: |
           python -c "from tests.pg.BLOOM_cli_auth_refresh_revocation import CliAuthRefreshRevocationTest; raise SystemExit(0 if CliAuthRefreshRevocationTest().run() else 1)"
 
+      - name: BudTestCase BLOOM_campaign_public_id_migration
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
+          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
+          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
+          BLOOM_DOTENV_DISABLED: "1"
+          INTEGRATION_SYNC_MINUTES: "0"
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python -c "from tests.pg.BLOOM_campaign_public_id_migration import CampaignPublicIdMigrationTest; raise SystemExit(0 if CampaignPublicIdMigrationTest().run() else 1)"
+
+      - name: BudTestCase BLOOM_campaign_public_id_duplicates
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
+          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
+          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
+          BLOOM_DOTENV_DISABLED: "1"
+          INTEGRATION_SYNC_MINUTES: "0"
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python -c "from tests.pg.BLOOM_campaign_public_id_duplicates import CampaignPublicIdDuplicatesTest; raise SystemExit(0 if CampaignPublicIdDuplicatesTest().run() else 1)"
+
       - name: BudTestCase BLOOM_integration_sync_first_run
         env:
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"

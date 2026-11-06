@@ -25,7 +25,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 from fastapi import FastAPI, HTTPException
-from sqlalchemy import event, func, select, text
+from sqlalchemy import bindparam, event, func, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 import tests.parameters as params
@@ -467,9 +468,11 @@ class BloomInterface:
         if not url.startswith(self.parameters.POSTGRES_SCHEME):
             return False
         parts = urlsplit(url)
+        self._run(self.engine.dispose())
+        if getattr(self, "pg_database", None):
+            self._run(self._drop_postgres_database())
         self.pg_admin_url = urlunsplit(parts._replace(path=f"/{self.parameters.PG_ADMIN_DATABASE}"))
         self.pg_database = f"{self.parameters.PG_DATABASE_PREFIX}{uuid.uuid4().hex[:12]}"
-        self._run(self.engine.dispose())
         self._run(self._create_postgres_database())
         self.pg_url = urlunsplit(parts._replace(path=f"/{self.pg_database}"))
         self.engine = create_async_engine(self.pg_url)
@@ -576,6 +579,21 @@ class BloomInterface:
 
     def bloom_refresh_during_revocation(self, email, refresh_token):
         return self._run(self._refresh_during_revocation(email, refresh_token))
+
+    def bloom_seed_campaigns(self, seeds):
+        return self._run(self._seed_campaigns(seeds))
+
+    def bloom_seed_public_id_pairs(self, prefixes, suites, campaigns):
+        self._run(self._seed_public_id_pairs(prefixes, suites, campaigns))
+
+    def bloom_read_campaign_public_ids(self):
+        return self._run(self._read_campaign_public_ids())
+
+    def bloom_read_public_id_shape(self):
+        return self._run(self._read_public_id_shape())
+
+    def bloom_try_public_id_inserts(self, prefix, suite_id, campaign_id):
+        return self._run(self._try_public_id_inserts(prefix, suite_id, campaign_id))
 
     def bloom_serve_jira_holding_creation(self, issue):
         searches = []
@@ -854,6 +872,114 @@ class BloomInterface:
                     "version": self.parameters.RETAINED_SESSION_VERSION,
                 },
             )
+
+    async def _insert_project(self, connection, prefix):
+        return (
+            await connection.execute(
+                text(
+                    "INSERT INTO projects (name, prefix, status, created_at, updated_at) "
+                    "VALUES (:name, :prefix, 'active', now(), now()) RETURNING id"
+                ),
+                {"name": f"Project {prefix}", "prefix": prefix},
+            )
+        ).scalar_one()
+
+    async def _insert_campaign(self, connection, project, public_id):
+        return (
+            await connection.execute(
+                text(
+                    "INSERT INTO test_campaigns (project_id, campaign_id, name, status, "
+                    "visibility, created_at, updated_at) VALUES (:project, :public_id, "
+                    "'Demo', 'Planned', 'internal', now(), now()) RETURNING id"
+                ),
+                {"project": project, "public_id": public_id},
+            )
+        ).scalar_one()
+
+    async def _insert_suite(self, connection, project, public_id):
+        return (
+            await connection.execute(
+                text(
+                    "INSERT INTO test_suites (project_id, suite_id, name, status, visibility, "
+                    "created_at, updated_at) VALUES (:project, :public_id, 'Demo', 'Draft', "
+                    "'internal', now(), now()) RETURNING id"
+                ),
+                {"project": project, "public_id": public_id},
+            )
+        ).scalar_one()
+
+    async def _seed_campaigns(self, seeds):
+        ids = {}
+        async with self.engine.begin() as connection:
+            for prefix, public_ids in seeds.items():
+                project = await self._insert_project(connection, prefix)
+                ids[prefix] = [
+                    await self._insert_campaign(connection, project, public_id)
+                    for public_id in public_ids
+                ]
+        return ids
+
+    async def _seed_public_id_pairs(self, prefixes, suites, campaigns):
+        async with self.engine.begin() as connection:
+            for prefix, suite_id, campaign_id in zip(prefixes, suites, campaigns):
+                project = await self._insert_project(connection, prefix)
+                if suite_id:
+                    await self._insert_suite(connection, project, suite_id)
+                if campaign_id:
+                    await self._insert_campaign(connection, project, campaign_id)
+
+    async def _read_campaign_public_ids(self):
+        async with self.engine.connect() as connection:
+            rows = await connection.execute(text("SELECT id, campaign_id FROM test_campaigns"))
+            return dict(rows.all())
+
+    async def _read_public_id_shape(self):
+        async with self.engine.connect() as connection:
+            nullable = (
+                await connection.execute(
+                    text(
+                        "SELECT is_nullable FROM information_schema.columns "
+                        "WHERE table_name = 'test_campaigns' AND column_name = 'campaign_id'"
+                    )
+                )
+            ).scalar()
+            indexes = (
+                await connection.execute(
+                    text("SELECT indexname FROM pg_indexes WHERE indexname IN :names").bindparams(
+                        bindparam("names", expanding=True)
+                    ),
+                    {"names": self.parameters.PUBLIC_ID_INDEXES},
+                )
+            ).scalars()
+            revision = (
+                await connection.execute(text("SELECT version_num FROM alembic_version"))
+            ).scalar()
+            return {"nullable": nullable, "indexes": sorted(indexes), "revision": revision}
+
+    async def _try_public_id_inserts(self, prefix, suite_id, campaign_id):
+        states = []
+        async with self.engine.connect() as connection:
+            project = (
+                await connection.execute(
+                    text("SELECT id FROM projects WHERE prefix = :prefix"), {"prefix": prefix}
+                )
+            ).scalar_one()
+            await self._insert_suite(connection, project, suite_id)
+            await connection.commit()
+            attempts = (
+                (self._insert_suite, suite_id),
+                (self._insert_campaign, campaign_id),
+                (self._insert_campaign, None),
+            )
+            for insert, public_id in attempts:
+                try:
+                    await insert(connection, project, public_id)
+                    await connection.commit()
+                    states.append(None)
+                except IntegrityError as exc:
+                    await connection.rollback()
+                    states.append(getattr(exc.orig, "sqlstate", None))
+        return states
 
     async def _refresh_during_revocation(self, email, refresh_token):
         asked_for_lock = asyncio.Event()
