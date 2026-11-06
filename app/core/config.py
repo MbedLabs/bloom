@@ -155,8 +155,8 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("BLOOM_AUTO_SEED_ADMIN", "AUTO_SEED_ADMIN"),
     )
 
-    INTEGRATION_SYNC_MINUTES: int = Field(
-        default=15,
+    INTEGRATION_SYNC_MINUTES: Optional[int] = Field(
+        default=None,
         ge=0,
         validation_alias=AliasChoices("BLOOM_INTEGRATION_SYNC_MINUTES", "INTEGRATION_SYNC_MINUTES"),
     )

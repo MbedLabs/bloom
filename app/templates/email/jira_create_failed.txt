@@ -1,0 +1,15 @@
+${app_identity}
+
+Hello ${recipient_name},
+
+Jira did not create the issue of defect ${defect_id} "${defect_title}" in project ${project}.
+
+Jira's answer: ${error}
+
+The defect is saved in ${app_name}.
+
+Open defect: ${defect_link}
+
+${app_identity}
+
+(c) 2026 EmbedLabs. All rights reserved.

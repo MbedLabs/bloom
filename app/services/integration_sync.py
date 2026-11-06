@@ -1,8 +1,9 @@
 """Scheduled sync of every project's issue tracker integration.
 
-Each enabled integration that has what its tracker needs is synced once per interval:
+Each enabled integration that has what its tracker needs is synced at its own rate:
 Jira issues matching the project's filter become defects, linked Jira issues carry their
-changes and deletions onto their defects and change requests, and linked GitHub and
+changes and deletions onto their defects and change requests, new defects of a project
+whose Jira direction includes Bloom to Jira become Jira issues, and linked GitHub and
 GitLab issues carry their state. A run reads, calls the tracker outside any transaction,
 then writes under the setting's lock and records its result on the setting.
 """
@@ -20,6 +21,7 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.api.integrations import (
+    BLOOM_TO_JIRA,
     GITHUB_STATUS_MAP,
     GITLAB_STATUS_MAP,
     JIRA_ISSUE_DELETED,
@@ -47,6 +49,12 @@ from app.services.jira_inbound import (
     changed_jql,
     issue_matches,
     search_fields,
+)
+from app.services.jira_outbound import (
+    Answer,
+    prepare_sends,
+    record_sends,
+    send_to_jira,
 )
 
 logger = logging.getLogger(__name__)
@@ -390,15 +398,18 @@ async def _apply_jira(
     *,
     manual: bool,
     now: datetime,
+    answers: list[Answer],
 ) -> SyncRun:
-    """Create, follow and mark removed what the Jira answers call for, under the setting's
-    lock, and record the run on the setting."""
+    """Create, follow and mark removed what the Jira answers call for, then link the sent
+    defects and record the failed ones, under the setting's lock, and record the run on
+    the setting."""
     await lock_setting(db, setting.id)
     run = SyncRun()
     created = await _create_matching(db, setting, fetched.creation or [], manual, run)
     await _follow_changed(db, setting, fetched.changed, created, run)
     await _mark_removed(db, setting, fetched.removed, run)
     await db.flush()
+    await record_sends(db, setting, answers)
     await _record(db, setting.id, **_jira_values(fetched, run, now))
     scan = _scan_values(fetched)
     if scan:
@@ -414,16 +425,40 @@ async def _apply_jira(
     return run
 
 
-async def sync_now(db: AsyncSession, setting: IntegrationSetting) -> SyncRun:
+def _takes_from_jira(setting: IntegrationSetting) -> bool:
+    """True unless the setting's direction is Bloom to Jira only."""
+    return setting.direction != BLOOM_TO_JIRA
+
+
+def _nothing_fetched(now: datetime) -> _JiraFetch:
+    """The answers of a run that reads nothing from Jira."""
+    return _JiraFetch(
+        full=False, started=now, creation=None, changed=[], removed=[], checked_until=None
+    )
+
+
+async def sync_now(
+    db: AsyncSession,
+    setting: IntegrationSetting,
+    *,
+    maker: async_sessionmaker = async_session_maker,
+) -> SyncRun:
     """Run the whole Jira sync of one setting at once in the caller's session.
 
     The creation search is a full one and creates defects whatever the inbound-creation
-    flag says. Jira errors are raised to the caller.
+    flag says; a setting that takes nothing from Jira searches nothing. Defects Jira
+    refused are sent again. Jira errors of the searches are raised to the caller; a defect
+    Jira does not take is recorded on the defect.
     """
     now = _now()
-    candidates = await _removal_candidates(db, setting)
-    fetched = await _fetch_jira(setting, create=True, full=True, candidates=candidates, now=now)
-    return await _apply_jira(db, setting, fetched, manual=True, now=now)
+    outgoing = await prepare_sends(db, setting, manual=True)
+    if _takes_from_jira(setting):
+        candidates = await _removal_candidates(db, setting)
+        fetched = await _fetch_jira(setting, create=True, full=True, candidates=candidates, now=now)
+    else:
+        fetched = _nothing_fetched(now)
+    answers = await send_to_jira(maker, setting, outgoing)
+    return await _apply_jira(db, setting, fetched, manual=True, now=now, answers=answers)
 
 
 async def _linked_repos(db: AsyncSession, setting: IntegrationSetting) -> list[str]:
@@ -642,28 +677,33 @@ async def sync_setting(maker: async_sessionmaker, setting_id: int, now: datetime
         setting = await db.get(IntegrationSetting, setting_id)
         if setting.tracker == "jira":
             candidates = await _removal_candidates(db, setting)
+            outgoing = await prepare_sends(db, setting)
         else:
             repos = await _linked_repos(db, setting)
         await db.commit()
 
     if setting.tracker == "jira":
-        try:
-            fetched = await _fetch_jira(
-                setting,
-                create=bool(setting.create_defects_on_inbound),
-                full=bool(setting.sync_full_scan),
-                candidates=candidates,
-                now=now,
-            )
-        except (JiraCredentialError, httpx.HTTPError) as exc:
-            raise SyncError(_jira_error(exc)) from exc
+        if _takes_from_jira(setting):
+            try:
+                fetched = await _fetch_jira(
+                    setting,
+                    create=bool(setting.create_defects_on_inbound),
+                    full=bool(setting.sync_full_scan),
+                    candidates=candidates,
+                    now=now,
+                )
+            except (JiraCredentialError, httpx.HTTPError) as exc:
+                raise SyncError(_jira_error(exc)) from exc
+        else:
+            fetched = _nothing_fetched(now)
+        answers = await send_to_jira(maker, setting, outgoing)
     else:
         lists = await _fetch_lists(setting, repos)
 
     async with maker() as db:
         setting = await db.get(IntegrationSetting, setting_id)
         if setting.tracker == "jira":
-            run = await _apply_jira(db, setting, fetched, manual=False, now=now)
+            run = await _apply_jira(db, setting, fetched, manual=False, now=now, answers=answers)
         else:
             run = await _apply_lists(db, setting, lists, now)
         await db.commit()
@@ -677,30 +717,32 @@ async def _record_error(maker: async_sessionmaker, setting_id: int, text: str) -
         await db.commit()
 
 
+def _due(setting: IntegrationSetting, now: datetime) -> bool:
+    """True when the setting syncs automatically and its rate has passed since its last check."""
+    minutes = setting.auto_sync_minutes or 0
+    if minutes <= 0 or not has_credentials(setting):
+        return False
+    checked = setting.sync_checked_at
+    return checked is None or checked < now - timedelta(minutes=minutes)
+
+
 async def run_due(
-    minutes: int,
     *,
     maker: async_sessionmaker = async_session_maker,
     now: Optional[datetime] = None,
 ) -> list[int]:
-    """Sync every due setting this process claims; returns the ids it synced."""
+    """Sync every due setting this process claims, each at its own rate; returns the ids
+    it synced."""
     now = now or _now()
-    cutoff = now - timedelta(minutes=minutes)
     async with maker() as db:
         rows = await db.scalars(
             select(IntegrationSetting)
-            .where(
-                IntegrationSetting.enabled.is_(True),
-                or_(
-                    IntegrationSetting.sync_checked_at.is_(None),
-                    IntegrationSetting.sync_checked_at < cutoff,
-                ),
-            )
+            .where(IntegrationSetting.enabled.is_(True))
             .order_by(IntegrationSetting.id)
         )
-        due = [row.id for row in rows.all() if has_credentials(row)]
+        due = [(row.id, row.auto_sync_minutes) for row in rows.all() if _due(row, now)]
     synced = []
-    for setting_id in due:
+    for setting_id, minutes in due:
         if not await claim(maker, setting_id, minutes, now):
             continue
         try:
@@ -714,12 +756,12 @@ async def run_due(
     return synced
 
 
-async def sync_loop(minutes: int) -> None:
+async def sync_loop() -> None:
     """Run a sync pass every minute, the first one minute after start, for as long as the
     application runs."""
     while True:
         await asyncio.sleep(PASS_SECONDS)
         try:
-            await run_due(minutes)
+            await run_due()
         except Exception:
             logger.exception("Integration sync pass failed")
