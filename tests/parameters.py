@@ -64,7 +64,7 @@ JIRA_PRIORITY_MAP = {
 }
 JIRA_PRIORITY = _draw.choice(sorted(JIRA_PRIORITY_MAP))
 BLOOM_PRIORITY = JIRA_PRIORITY_MAP[JIRA_PRIORITY]
-NOW = datetime(2026, 1, 1) + timedelta(minutes=_draw.randrange(0, 365 * 24 * 60))
+NOW = datetime(2025, 1, 1) + timedelta(minutes=_draw.randrange(0, 365 * 24 * 60))
 SETTING_AGE = timedelta(minutes=_draw.randrange(11, 60 * 24 * 30))
 LAST_SYNC_MINUTES = _draw.randrange(11, 600)
 LAST_SYNC = timedelta(minutes=LAST_SYNC_MINUTES)
