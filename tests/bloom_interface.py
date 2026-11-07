@@ -814,7 +814,12 @@ class BloomInterface:
         return self._run(self._request("POST", "/api/users", headers, json=body))
 
     def bloom_api_create_policy(self, headers, name, permissions, types=None):
-        body = {"name": name, "rules": scenario_rules(permissions, "internal", types)}
+        return self.bloom_api_create_policy_rules(
+            headers, name, scenario_rules(permissions, "internal", types)
+        )
+
+    def bloom_api_create_policy_rules(self, headers, name, rules):
+        body = {"name": name, "rules": rules}
         return self._run(self._request("POST", "/api/policies", headers, json=body))
 
     def bloom_api_create_group(self, headers, name, policy_ids):

@@ -4,24 +4,6 @@ import re
 from pathlib import Path
 
 
-class BaselinesHttp:
-    """Set-up of the baselines_http suite."""
-
-    BASE_URL = "http://test"
-    LOGIN_ROUTE = "/api/auth/login"
-    USERS_ROUTE = "/api/users"
-    PROJECTS_ROUTE = "/api/projects"
-    POLICIES_ROUTE = "/api/policies"
-    GROUPS_ROUTE = "/api/groups"
-    GRANTS_ROUTE = "/api/groups/{group_id}/grants"
-    MEMBERS_ROUTE = "/api/groups/{group_id}/members"
-    REQUIREMENTS_ROUTE = "/api/requirements"
-    DOCUMENTS_ROUTE = "/api/projects/{project_id}/documents"
-    BASELINES_ROUTE = "/api/baselines"
-    BASELINE_ROUTE = "/api/baselines/{baseline_id}"
-    READER_ROLE = "maintainer"
-
-
 class UiCliAuth:
     """Set-up of the ui_cli_auth suite."""
 

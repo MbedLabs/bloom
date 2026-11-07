@@ -695,3 +695,18 @@ MSG_REVISION_STARTED = (
     "an edit under an approved change goes back to Draft and logs updated and a revision"
 )
 REVIEW_SETUP_EXPECTED = [STATUS_OK, STATUS_CREATED, STATUS_CREATED]
+
+SNAPSHOT_PREFIX = _letters(string.ascii_uppercase, 3, 3)
+SNAPSHOT_READER_EMAIL = f"reader-{_letters(string.ascii_lowercase, 4, 8)}@example.com"
+SNAPSHOT_READER_RULES = {"REQ": {"read": True, "all_origins": True}, "baseline": {"read": True}}
+SNAPSHOT_REQUIREMENT_TITLE = f"Requirement {_letters(string.ascii_lowercase, 4, 10)}"
+SNAPSHOT_DOCUMENT_TITLE = f"Document {_letters(string.ascii_lowercase, 4, 10)}"
+SNAPSHOT_CAPTURED_DOCUMENTS = 1
+MSG_SNAPSHOT_OPENS = "the reader opens the baseline"
+MSG_SNAPSHOT_REQUIREMENT = "the requirement's record is shown"
+MSG_SNAPSHOT_NO_DOCUMENT = "no document record is shown"
+MSG_SNAPSHOT_COUNT = "the captured document count is kept"
+MSG_SNAPSHOT_TITLE_HIDDEN = "the document's title is not shown"
+MSG_SNAPSHOT_LIST = (
+    "the list gives the baseline once with the requirement's public id and no records"
+)
