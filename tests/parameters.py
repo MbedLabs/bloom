@@ -561,3 +561,36 @@ SMOKE_PAYLOAD_PATTERN = r"-d '(\{\"name\":\"Demo\",\"prefix\":\"[^\"]+\"\})'"
 MSG_SMOKE_ADMIN_NAME = "the admin full name reaches docker as one environment argument"
 MSG_SMOKE_PAYLOAD_FOUND = "the script creates its project with a JSON payload"
 MSG_SMOKE_PAYLOAD_VALID = "the project payload passes the current create contract"
+
+API_ADMIN_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+API_PASSWORD = _letters(string.ascii_letters + string.digits, 16, 24)
+API_MEMBER_ROLE = "maintainer"
+STATUS_CREATED = 201
+BASELINE_PREFIXES = []
+while len(BASELINE_PREFIXES) < 4:
+    _prefix = _letters(string.ascii_uppercase, 3, 3)
+    if _prefix not in BASELINE_PREFIXES + CAMPAIGN_PREFIXES:
+        BASELINE_PREFIXES.append(_prefix)
+SCOPED_PREFIX, SEPARATE_PREFIX, ADMISSION_PREFIX, OWNED_PREFIX = BASELINE_PREFIXES
+BASELINE_NAME = f"Baseline {_letters(string.ascii_lowercase, 4, 10)}"
+BASELINE_PERMISSIONS = {"baseline": ["view"]}
+REQUIREMENT_PERMISSIONS = {"REQ": ["view"]}
+REQUIREMENT_TYPES = ["REQ"]
+BOTH_READS_ALLOWED = [STATUS_OK, STATUS_OK]
+BOTH_READS_DENIED = [STATUS_FORBIDDEN, STATUS_FORBIDDEN]
+MSG_API_SETUP = "every setup call through the API succeeds"
+MSG_GROUP_ADMITTED_READS = (
+    "a baseline-read group admitted to the project allows the list and the detail"
+)
+MSG_OVERRIDE_DENIES = "a project override without baseline read denies the list and the detail"
+MSG_OVERRIDE_ALLOWS = (
+    "adding baseline read to the override allows the list and the detail of the baseline"
+)
+MSG_OTHER_PROJECT_DENIED = "the other project's baselines stay denied"
+MSG_GROUP_POLICY_KEPT = "the group keeps its own policy after the override changes"
+MSG_GROUP_NEEDS_ADMISSION = "a baseline-read group without project admission denies both reads"
+MSG_OWNER_AUTHORITY = "the admin and the project owner read the baseline list and detail"
+BASELINE_MEMBER_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+BASELINE_POLICY_NAME = f"Policy {_letters(string.ascii_lowercase, 4, 10)}"
+REQUIREMENT_POLICY_NAME = BASELINE_POLICY_NAME + " requirements"
+BASELINE_GROUP_NAME = f"Group {_letters(string.ascii_lowercase, 4, 10)}"

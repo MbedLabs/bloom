@@ -285,6 +285,39 @@ jobs:
         run: |
           python -c "from tests.logic.BLOOM_e2e_image_smoke_script import E2eImageSmokeScriptTest; raise SystemExit(0 if E2eImageSmokeScriptTest().run() else 1)"
 
+      - name: BudTestCase BLOOM_baseline_read_override
+        env:
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
+          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
+          BLOOM_DOTENV_DISABLED: "1"
+          INTEGRATION_SYNC_MINUTES: "0"
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python -c "from tests.api.BLOOM_baseline_read_override import BaselineReadOverrideTest; raise SystemExit(0 if BaselineReadOverrideTest().run() else 1)"
+
+      - name: BudTestCase BLOOM_baseline_read_admission
+        env:
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
+          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
+          BLOOM_DOTENV_DISABLED: "1"
+          INTEGRATION_SYNC_MINUTES: "0"
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python -c "from tests.api.BLOOM_baseline_read_admission import BaselineReadAdmissionTest; raise SystemExit(0 if BaselineReadAdmissionTest().run() else 1)"
+
+      - name: BudTestCase BLOOM_baseline_read_owner
+        env:
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
+          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
+          BLOOM_DOTENV_DISABLED: "1"
+          INTEGRATION_SYNC_MINUTES: "0"
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python -c "from tests.api.BLOOM_baseline_read_owner import BaselineReadOwnerTest; raise SystemExit(0 if BaselineReadOwnerTest().run() else 1)"
+
       - name: BudTestCase BLOOM_integration_sync_first_run
         env:
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"

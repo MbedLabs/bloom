@@ -41,7 +41,7 @@ from app.core import id_generator
 from app.core.config import settings
 from app.core.database import Base, get_db
 from app.core.deps import limiter
-from app.core.security import create_access_token, get_current_user
+from app.core.security import create_access_token, get_current_user, get_password_hash
 from app.models import (
     ChangeRequest,
     ChangeRequestSyncEvent,
@@ -57,6 +57,7 @@ from app.schemas import ProjectCreate
 from app.services import cli_auth, integration_sync
 from app.services.integration_secrets import encrypt_integration_secret
 from app.services.token_service import hash_token, invalidate_all_refresh_tokens
+from tests.access_fixtures import scenario_rules
 
 REAL_CLIENT = httpx.AsyncClient
 ROOT = Path(__file__).resolve().parents[1]
@@ -669,6 +670,81 @@ class BloomInterface:
         except ValidationError as exc:
             return None, str(exc)
 
+    def bloom_start_full_api(self):
+        self.patches.enter_context(patch.dict(main.app.dependency_overrides))
+        main.app.dependency_overrides[get_db] = self._serve_session
+        self.patches.enter_context(patch.object(limiter, "enabled", False))
+        self.api = main.app
+
+    def bloom_add_admin(self, email, password):
+        return self._run(
+            self._add(
+                User(
+                    email=email,
+                    full_name=email,
+                    hashed_password=get_password_hash(password),
+                    role=UserRole.admin,
+                )
+            )
+        )
+
+    def bloom_log_in(self, email, password):
+        answer = self._run(
+            self._request("POST", "/api/auth/login", json={"email": email, "password": password})
+        )
+        token = answer.json().get("access_token") if answer.status_code == 200 else None
+        return {"Authorization": f"Bearer {token}"}, answer.status_code
+
+    def bloom_api_create_project(self, headers, prefix):
+        body = {"name": f"Project {prefix}", "prefix": prefix}
+        return self._run(self._request("POST", "/api/projects", headers, json=body))
+
+    def bloom_api_create_baseline(self, headers, project_id, name):
+        body = {"project_id": project_id, "name": name}
+        return self._run(self._request("POST", "/api/baselines", headers, json=body))
+
+    def bloom_api_create_user(self, headers, email, password, role):
+        body = {"email": email, "full_name": email, "password": password, "role": role}
+        return self._run(self._request("POST", "/api/users", headers, json=body))
+
+    def bloom_api_create_policy(self, headers, name, permissions, types=None):
+        body = {"name": name, "rules": scenario_rules(permissions, "internal", types)}
+        return self._run(self._request("POST", "/api/policies", headers, json=body))
+
+    def bloom_api_create_group(self, headers, name, policy_ids):
+        body = {"name": name, "description": name, "policy_ids": policy_ids}
+        return self._run(self._request("POST", "/api/groups", headers, json=body))
+
+    def bloom_api_add_group_member(self, headers, group_id, user_id):
+        path = f"/api/groups/{group_id}/members"
+        return self._run(self._request("POST", path, headers, json={"user_id": user_id}))
+
+    def bloom_api_admit_group(self, headers, group_id, project_id):
+        path = f"/api/groups/{group_id}/grants"
+        return self._run(self._request("POST", path, headers, json={"project_id": project_id}))
+
+    def bloom_api_add_project_member(self, headers, project_id, user_id, policy_ids, owner=False):
+        path = f"/api/projects/{project_id}/members"
+        body = {"user_id": user_id, "policy_ids": policy_ids}
+        if owner:
+            body["owner"] = True
+        return self._run(self._request("POST", path, headers, json=body))
+
+    def bloom_api_update_project_member(self, headers, project_id, member_id, policy_ids):
+        path = f"/api/projects/{project_id}/members/{member_id}"
+        body = {"policy_ids": policy_ids}
+        return self._run(self._request("PATCH", path, headers, json=body))
+
+    def bloom_api_get_group(self, headers, group_id):
+        return self._run(self._request("GET", f"/api/groups/{group_id}", headers))
+
+    def bloom_api_read_baselines(self, headers, project_id, baseline_id):
+        listed = self._run(
+            self._request("GET", "/api/baselines", headers, params={"project_id": project_id})
+        )
+        detail = self._run(self._request("GET", f"/api/baselines/{baseline_id}", headers))
+        return listed, detail
+
     def bloom_serve_jira_holding_creation(self, issue):
         searches = []
         both_searched = asyncio.Event()
@@ -946,6 +1022,11 @@ class BloomInterface:
                     "version": self.parameters.RETAINED_SESSION_VERSION,
                 },
             )
+
+    async def _request(self, method, path, headers=None, json=None, params=None):
+        transport = httpx.ASGITransport(app=self.api)
+        async with REAL_CLIENT(transport=transport, base_url=self.parameters.API_BASE) as client:
+            return await client.request(method, path, headers=headers, json=json, params=params)
 
     def _fake_docker(self):
         return (
