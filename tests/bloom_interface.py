@@ -35,6 +35,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 import tests.parameters as params
 from app import main
+from app.api import access_requests as access_requests_api
 from app.api import cli_auth as cli_auth_api
 from app.api import docs_facade, integrations
 from app.core import id_generator
@@ -703,8 +704,13 @@ class BloomInterface:
         body = {"project_id": project_id, "name": name}
         return self._run(self._request("POST", "/api/baselines", headers, json=body))
 
-    def bloom_api_create_user(self, headers, email, password, role):
-        body = {"email": email, "full_name": email, "password": password, "role": role}
+    def bloom_api_create_user(self, headers, email, password, role, full_name=None):
+        body = {
+            "email": email,
+            "full_name": full_name or email,
+            "password": password,
+            "role": role,
+        }
         return self._run(self._request("POST", "/api/users", headers, json=body))
 
     def bloom_api_create_policy(self, headers, name, permissions, types=None):
@@ -744,6 +750,57 @@ class BloomInterface:
         )
         detail = self._run(self._request("GET", f"/api/baselines/{baseline_id}", headers))
         return listed, detail
+
+    def bloom_capture_access_request_mail(self):
+        sent = []
+        self.patches.enter_context(
+            patch.object(
+                access_requests_api,
+                "send_access_request_email",
+                lambda **mail: sent.append(mail),
+            )
+        )
+        return sent
+
+    def bloom_api_create_requirement(self, headers, project_id, title, status):
+        body = {"project_id": project_id, "title": title, "status": status}
+        return self._run(self._request("POST", "/api/requirements", headers, json=body))
+
+    def bloom_api_open_requirement_doc(self, headers, prefix, ref):
+        path = f"/api/projects/{prefix}/docs/requirements/{ref}"
+        return self._run(self._request("GET", path, headers))
+
+    def bloom_api_request_access(self, headers, resource_type, resource_ref, prefix):
+        body = {
+            "resource_type": resource_type,
+            "resource_ref": str(resource_ref),
+            "project_prefix": prefix,
+        }
+        return self._run(self._request("POST", "/api/access-requests", headers, json=body))
+
+    def bloom_api_my_access_request(self, headers, resource_type, resource_ref, prefix):
+        query = {
+            "resource_type": resource_type,
+            "resource_ref": str(resource_ref),
+            "project_prefix": prefix,
+        }
+        return self._run(self._request("GET", "/api/access-requests/mine", headers, params=query))
+
+    def bloom_api_list_access_requests(self, headers, prefix):
+        query = {"project_prefix": prefix}
+        return self._run(self._request("GET", "/api/access-requests", headers, params=query))
+
+    def bloom_api_get_requirement(self, headers, requirement_id):
+        return self._run(self._request("GET", f"/api/requirements/{requirement_id}", headers))
+
+    def bloom_api_get_user(self, headers, user_id):
+        return self._run(self._request("GET", f"/api/users/{user_id}", headers))
+
+    def bloom_api_audit_event(self, headers, action, target_type, target_id):
+        query = {"action": action, "target_type": target_type, "target_id": str(target_id)}
+        page = self._run(self._request("GET", "/api/audit", headers, params=query))
+        items = page.json().get("items") if page.status_code == 200 else None
+        return items[0] if items else None
 
     def bloom_serve_jira_holding_creation(self, issue):
         searches = []

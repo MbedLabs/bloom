@@ -594,3 +594,34 @@ BASELINE_MEMBER_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
 BASELINE_POLICY_NAME = f"Policy {_letters(string.ascii_lowercase, 4, 10)}"
 REQUIREMENT_POLICY_NAME = BASELINE_POLICY_NAME + " requirements"
 BASELINE_GROUP_NAME = f"Group {_letters(string.ascii_lowercase, 4, 10)}"
+
+LABELS_PREFIX = _letters(string.ascii_uppercase, 3, 3)
+LABELS_REQUIREMENT_TITLE = f"Requirement {_letters(string.ascii_lowercase, 4, 10)}"
+REQUIREMENT_DRAFT = "Draft"
+HIDDEN_EMAIL = f"hidden-{_letters(string.ascii_lowercase, 4, 8)}@example.com"
+READER_EMAIL = f"reader-{_letters(string.ascii_lowercase, 4, 8)}@example.com"
+MEMBER_FULL_NAME = f"Member {_letters(string.ascii_lowercase, 4, 8)}"
+TEST_CASE_PERMISSIONS = {"TC": ["view"]}
+MISSING_DOC_NUMBER = _draw.randint(10**8, 10**9 - 1)
+MISSING_REQUIREMENT_NUMBER = MISSING_DOC_NUMBER - _draw.randint(1, 1000)
+ACCESS_REQUIREMENT = "requirement"
+ACCESS_PROJECT = "project"
+ACCESS_DOCUMENT = "document"
+ADMIN_REQUEST_DETAIL = "Administrators hold every access, so there is nothing to request."
+ALREADY_HAVE_ACCESS = "You already have access to {target}."
+DELETED_LABEL = "{ref} (deleted)"
+AUDIT_REQUEST_ACTION = "api.request"
+AUDIT_REQUIREMENT_LABEL = "requirement {ref}"
+AUDIT_USER_LABEL = "user {name}"
+MSG_ID_OPENS_DOCUMENT = "a database id in a document address opens the same document as its doc id"
+MSG_UNKNOWN_ID_NOT_FOUND = "an unknown id in a document address is not found"
+MSG_HIDDEN_NOT_FOUND = "a member who may not read requirements gets not found"
+MSG_READER_OPENS = "a member who may read requirements opens the document"
+MSG_ADMIN_CANNOT_REQUEST = "an administrator's access request is refused and sends no mail"
+MSG_HOLDER_CANNOT_REQUEST = "a member who holds the access cannot request it, and no mail is sent"
+MSG_REQUEST_LABELS = (
+    "requests show the id to the requester and the doc id or a deleted mark to admins"
+)
+MSG_REQUEST_MAIL = "the request mail goes to others than the requester and names the doc id"
+MSG_AUDIT_LABELS = "the audit log names targets and actors, and marks a deleted target"
+AUDIT_USER_TARGET = "user"
