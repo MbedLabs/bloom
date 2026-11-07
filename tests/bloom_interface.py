@@ -42,12 +42,14 @@ from app.core import id_generator
 from app.core.config import settings
 from app.core.database import Base, get_db
 from app.core.deps import limiter
+from app.core.permissions import DOC_TYPE_RESOURCES
 from app.core.security import create_access_token, get_current_user, get_password_hash
 from app.models import (
     ChangeRequest,
     ChangeRequestSyncEvent,
     Defect,
     DefectSyncEvent,
+    Document,
     IntegrationSetting,
     Project,
 )
@@ -58,7 +60,11 @@ from app.schemas import ProjectCreate
 from app.services import cli_auth, integration_sync
 from app.services.integration_secrets import encrypt_integration_secret
 from app.services.token_service import hash_token, invalidate_all_refresh_tokens
-from tests.access_fixtures import scenario_rules
+from tests.access_fixtures import (
+    allow_doc_types,
+    project_access_fixture,
+    scenario_rules,
+)
 
 REAL_CLIENT = httpx.AsyncClient
 ROOT = Path(__file__).resolve().parents[1]
@@ -678,16 +684,44 @@ class BloomInterface:
         self.api = main.app
 
     def bloom_add_admin(self, email, password):
+        return self.bloom_add_account(email, password, UserRole.admin.value)
+
+    def bloom_add_account(self, email, password, role):
         return self._run(
             self._add(
                 User(
                     email=email,
                     full_name=email,
                     hashed_password=get_password_hash(password),
-                    role=UserRole.admin,
+                    role=UserRole(role),
+                    is_active=True,
                 )
             )
         )
+
+    def bloom_add_external_member(self, project_id, user_id, permissions, visibility):
+        self._run(self._add_external_member(project_id, user_id, permissions, visibility))
+
+    def bloom_add_document(self, project_id, doc_id, title, visibility):
+        return self._run(
+            self._add(
+                Document(
+                    project_id=project_id,
+                    doc_id=doc_id,
+                    title=title,
+                    doc_type=self.parameters.DOCUMENT_TYPE,
+                    visibility=visibility,
+                    status=self.parameters.DOCUMENT_STATUS,
+                    version=self.parameters.DOCUMENT_VERSION,
+                )
+            )
+        )
+
+    def bloom_api_list_documents(self, headers, project_id):
+        return self._run(self._request("GET", f"/api/projects/{project_id}/documents", headers))
+
+    def bloom_api_get_document(self, headers, document_id):
+        return self._run(self._request("GET", f"/api/documents/{document_id}", headers))
 
     def bloom_log_in(self, email, password):
         answer = self._run(
@@ -1079,6 +1113,21 @@ class BloomInterface:
                     "version": self.parameters.RETAINED_SESSION_VERSION,
                 },
             )
+
+    async def _add_external_member(self, project_id, user_id, permissions, visibility):
+        async with self.maker() as db:
+            membership = project_access_fixture(
+                user_id=user_id,
+                project_id=project_id,
+                permissions=permissions,
+                visibility=visibility,
+                doc_types=[],
+            )
+            db.add(membership)
+            await db.flush()
+            for doc_type in DOC_TYPE_RESOURCES:
+                allow_doc_types(membership.policies[0], [doc_type])
+            await db.commit()
 
     async def _request(self, method, path, headers=None, json=None, params=None):
         transport = httpx.ASGITransport(app=self.api)

@@ -625,3 +625,23 @@ MSG_REQUEST_LABELS = (
 MSG_REQUEST_MAIL = "the request mail goes to others than the requester and names the doc id"
 MSG_AUDIT_LABELS = "the audit log names targets and actors, and marks a deleted target"
 AUDIT_USER_TARGET = "user"
+
+VISIBILITY_PREFIX = _letters(string.ascii_uppercase, 3, 3)
+EXTERNAL_EMAIL = f"external-{_letters(string.ascii_lowercase, 4, 8)}@example.com"
+EXTERNAL_ROLE = "external"
+EXTERNAL_PERMISSIONS = {"*": ["view", "comment"]}
+CUSTOMER_VISIBILITY = "customer"
+INTERNAL_VISIBILITY = "internal"
+DOCUMENT_TYPE = "SPEC"
+DOCUMENT_STATUS = "Draft"
+DOCUMENT_VERSION = "1.0"
+CUSTOMER_DOC_NUMBER, INTERNAL_DOC_NUMBER = _draw.sample(range(1, 999), 2)
+CUSTOMER_DOC_ID = _doc_id(VISIBILITY_PREFIX, DOCUMENT_TYPE, CUSTOMER_DOC_NUMBER)
+INTERNAL_DOC_ID = _doc_id(VISIBILITY_PREFIX, DOCUMENT_TYPE, INTERNAL_DOC_NUMBER)
+CUSTOMER_DOC_TITLE = f"Customer {_letters(string.ascii_lowercase, 4, 10)}"
+INTERNAL_DOC_TITLE = f"Internal {_letters(string.ascii_lowercase, 4, 10)}"
+MSG_EXTERNAL_SIGNS_IN = "the external member signs in"
+MSG_EXTERNAL_LIST = (
+    "an external member's document list holds the customer document and not the internal one"
+)
+MSG_EXTERNAL_DETAIL = "an external member opening an internal document gets not found"

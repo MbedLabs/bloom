@@ -329,6 +329,17 @@ jobs:
         run: |
           python -c "from tests.api.BLOOM_access_labels import AccessLabelsTest; raise SystemExit(0 if AccessLabelsTest().run() else 1)"
 
+      - name: BudTestCase BLOOM_documents_external_visibility
+        env:
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
+          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
+          BLOOM_DOTENV_DISABLED: "1"
+          INTEGRATION_SYNC_MINUTES: "0"
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python -c "from tests.api.BLOOM_documents_external_visibility import DocumentsExternalVisibilityTest; raise SystemExit(0 if DocumentsExternalVisibilityTest().run() else 1)"
+
       - name: BudTestCase BLOOM_integration_sync_first_run
         env:
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
