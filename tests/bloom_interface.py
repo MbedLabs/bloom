@@ -15,8 +15,10 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import subprocess
 import sys
+import tempfile
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -26,6 +28,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 from fastapi import FastAPI, HTTPException
+from pydantic import ValidationError
 from sqlalchemy import bindparam, event, func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -50,6 +53,7 @@ from app.models import (
 from app.models import TestCase as TestCaseModel
 from app.models.cli_auth_session import CliAuthSession
 from app.models.user import User, UserRole
+from app.schemas import ProjectCreate
 from app.services import cli_auth, integration_sync
 from app.services.integration_secrets import encrypt_integration_secret
 from app.services.token_service import hash_token, invalidate_all_refresh_tokens
@@ -634,6 +638,37 @@ class BloomInterface:
     def bloom_sign_in_with_token(self, token):
         return self._run(self._sign_in_with_token(token))
 
+    def bloom_run_smoke_script_with_fake_docker(self, image):
+        with tempfile.TemporaryDirectory() as folder:
+            log = Path(folder) / "docker-argv.jsonl"
+            docker = Path(folder) / "docker"
+            docker.write_text(self._fake_docker(), encoding="utf-8")
+            docker.chmod(0o755)
+            env = {**os.environ, "DOCKER_ARGV_LOG": str(log)}
+            env["PATH"] = f"{folder}{os.pathsep}{env['PATH']}"
+            subprocess.run(
+                ["bash", str(ROOT / self.parameters.SMOKE_SCRIPT), image],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            if not log.exists():
+                return []
+            return [json.loads(line) for line in log.read_text().splitlines()]
+
+    def bloom_read_smoke_project_payload(self):
+        script = (ROOT / self.parameters.SMOKE_SCRIPT).read_text(encoding="utf-8")
+        match = re.search(self.parameters.SMOKE_PAYLOAD_PATTERN, script)
+        return json.loads(match.group(1)) if match else None
+
+    def bloom_validate_project_payload(self, payload):
+        try:
+            return ProjectCreate.model_validate(payload).prefix, None
+        except ValidationError as exc:
+            return None, str(exc)
+
     def bloom_serve_jira_holding_creation(self, issue):
         searches = []
         both_searched = asyncio.Event()
@@ -911,6 +946,22 @@ class BloomInterface:
                     "version": self.parameters.RETAINED_SESSION_VERSION,
                 },
             )
+
+    def _fake_docker(self):
+        return (
+            "#!/usr/bin/env python3\n"
+            "import json, os, sys\n"
+            "args = sys.argv[1:]\n"
+            "with open(os.environ['DOCKER_ARGV_LOG'], 'a', encoding='utf-8') as log:\n"
+            "    log.write(json.dumps(args) + '\\n')\n"
+            "if 'current' in args:\n"
+            f"    print('{self.parameters.SMOKE_ALEMBIC_HEAD} (head)')\n"
+            "    sys.exit(0)\n"
+            "if args and args[0] == 'run' and '--name' in args:\n"
+            "    name = args[args.index('--name') + 1]\n"
+            f"    if name.startswith('{self.parameters.SMOKE_APP_CONTAINER}'):\n"
+            f"        sys.exit({self.parameters.SMOKE_STOP_CODE})\n"
+        )
 
     def _token_part(self, value):
         raw = json.dumps(value, separators=(",", ":")).encode()

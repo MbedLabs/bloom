@@ -550,3 +550,14 @@ TOKEN_REFUSAL_CASES = [(index,) for index in range(len(TOKEN_REFUSALS))]
 MSG_TOKEN_STANDARD = "a standard HS256 token signs its user in"
 MSG_TOKEN_ISSUED = "a token Bloom issues signs its user in"
 MSG_TOKEN_REFUSED = "an expired token or one signed with another algorithm is refused with 401"
+
+SMOKE_SCRIPT = "scripts/e2e_image_smoke.sh"
+SMOKE_IMAGE = f"ghcr.io/mbedlabs/bloom:{_letters(string.ascii_lowercase + string.digits, 6, 12)}"
+SMOKE_APP_CONTAINER = "bloom-e2e-app-"
+SMOKE_ADMIN_NAME_ARGUMENT = "ADMIN_FULL_NAME=E2E Admin"
+SMOKE_STOP_CODE = _draw.randint(2, 120)
+SMOKE_ALEMBIC_HEAD = _letters(string.hexdigits.lower(), 12, 12)
+SMOKE_PAYLOAD_PATTERN = r"-d '(\{\"name\":\"Demo\",\"prefix\":\"[^\"]+\"\})'"
+MSG_SMOKE_ADMIN_NAME = "the admin full name reaches docker as one environment argument"
+MSG_SMOKE_PAYLOAD_FOUND = "the script creates its project with a JSON payload"
+MSG_SMOKE_PAYLOAD_VALID = "the project payload passes the current create contract"
