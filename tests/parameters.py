@@ -537,3 +537,16 @@ NEXT_ID_FIRST = _doc_id(NEXT_ID_PREFIX, NEXT_ID_TYPE, 1)
 NEXT_ID_AFTER_TAKEN = _doc_id(NEXT_ID_PREFIX, NEXT_ID_TYPE, NEXT_ID_TAKEN + 1)
 NEXT_ID_AFTER_HIGH = _doc_id(NEXT_ID_PREFIX, NEXT_ID_TYPE, NEXT_ID_HIGH + 1)
 NEXT_ID_AFTER_LOW = _doc_id(NEXT_ID_PREFIX, NEXT_ID_TYPE, NEXT_ID_LOW + 1)
+
+TOKEN_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+TOKEN_STANDARD = "HS256"
+TOKEN_VALID_MINUTES = _draw.randint(1, 60)
+TOKEN_REFUSALS = [
+    (TOKEN_STANDARD, -_draw.randint(1, 60)),
+    ("HS512", TOKEN_VALID_MINUTES),
+    ("none", TOKEN_VALID_MINUTES),
+]
+TOKEN_REFUSAL_CASES = [(index,) for index in range(len(TOKEN_REFUSALS))]
+MSG_TOKEN_STANDARD = "a standard HS256 token signs its user in"
+MSG_TOKEN_ISSUED = "a token Bloom issues signs its user in"
+MSG_TOKEN_REFUSED = "an expired token or one signed with another algorithm is refused with 401"

@@ -9,6 +9,7 @@
 """
 
 import asyncio
+import base64
 import contextlib
 import hashlib
 import hmac
@@ -17,7 +18,7 @@ import os
 import subprocess
 import sys
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -37,7 +38,7 @@ from app.core import id_generator
 from app.core.config import settings
 from app.core.database import Base, get_db
 from app.core.deps import limiter
-from app.core.security import create_access_token
+from app.core.security import create_access_token, get_current_user
 from app.models import (
     ChangeRequest,
     ChangeRequestSyncEvent,
@@ -605,6 +606,34 @@ class BloomInterface:
     def bloom_list_docs_routes(self):
         return [route.path for route in docs_facade.router.routes]
 
+    def bloom_forge_token(self, user_id, algorithm, minutes):
+        user = self._run(self._get(User, user_id))
+        expires = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+        claims = {
+            "sub": str(user.id),
+            "type": "user",
+            "ver": user.session_version,
+            "exp": int(expires.timestamp()),
+        }
+        signing_input = f"{self._token_part({'alg': algorithm, 'typ': 'JWT'})}."
+        signing_input += self._token_part(claims)
+        hashes = {"HS256": hashlib.sha256, "HS512": hashlib.sha512}
+        if algorithm not in hashes:
+            return f"{signing_input}."
+        digest = hmac.new(
+            settings.SECRET_KEY.encode(), signing_input.encode(), hashes[algorithm]
+        ).digest()
+        return f"{signing_input}.{base64.urlsafe_b64encode(digest).rstrip(b'=').decode()}"
+
+    def bloom_issue_token(self, user_id):
+        user = self._run(self._get(User, user_id))
+        return create_access_token(
+            {"sub": str(user.id), "type": "user", "ver": user.session_version}
+        )
+
+    def bloom_sign_in_with_token(self, token):
+        return self._run(self._sign_in_with_token(token))
+
     def bloom_serve_jira_holding_creation(self, issue):
         searches = []
         both_searched = asyncio.Event()
@@ -882,6 +911,17 @@ class BloomInterface:
                     "version": self.parameters.RETAINED_SESSION_VERSION,
                 },
             )
+
+    def _token_part(self, value):
+        raw = json.dumps(value, separators=(",", ":")).encode()
+        return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+    async def _sign_in_with_token(self, token):
+        async with self.maker() as db:
+            try:
+                return (await get_current_user(token=token, db=db)).id, None
+            except HTTPException as exc:
+                return None, exc.status_code
 
     async def _insert_project(self, connection, prefix):
         return (
