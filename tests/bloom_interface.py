@@ -723,6 +723,72 @@ class BloomInterface:
     def bloom_api_get_document(self, headers, document_id):
         return self._run(self._request("GET", f"/api/documents/{document_id}", headers))
 
+    def bloom_api_me(self, headers):
+        answer = self._run(self._request("GET", "/api/auth/me", headers))
+        return answer.json().get("id") if answer.status_code == 200 else None
+
+    def bloom_api_create_artefact(self, headers, kind, project_id, title, **fields):
+        body = {"project_id": project_id, "title": title, **fields}
+        if kind == self.parameters.DOCUMENT_KIND:
+            body.setdefault("doc_type", self.parameters.DOCUMENT_TYPE)
+            path = f"/api/projects/{project_id}/documents"
+        else:
+            path = self.parameters.ARTEFACT_PATHS[kind]
+        return self._run(self._request("POST", path, headers, json=body))
+
+    def bloom_api_update_artefact(self, headers, kind, artefact_id, body):
+        path = f"{self.parameters.ARTEFACT_PATHS[kind]}/{artefact_id}"
+        return self._run(self._request("PATCH", path, headers, json=body))
+
+    def bloom_api_activity_types(self, headers, kind, artefact_id):
+        path = f"/api/artefacts/{kind}/{artefact_id}/activity"
+        answer = self._run(self._request("GET", path, headers))
+        if answer.status_code != 200:
+            return None
+        return [event["event_type"] for event in answer.json()]
+
+    def bloom_api_sign_off(self, headers, kind, artefact_id, step):
+        path = f"/api/artefacts/{kind}/{artefact_id}/sign-off"
+        return self._run(self._request("POST", path, headers, json={"step": step}))
+
+    def bloom_api_review(self, headers, kind, artefact_id, reviewer_id):
+        base = f"/api/artefacts/{kind}/{artefact_id}"
+        assigned = self._run(
+            self._request(
+                "PUT",
+                base + "/workflow/assignees",
+                headers,
+                json={"reviewer_id": reviewer_id, "approver_id": reviewer_id},
+            )
+        )
+        requested = self._run(
+            self._request(
+                "POST", base + "/requests", headers, json={"kind": self.parameters.REVIEW_REQUEST}
+            )
+        )
+        commented = self._run(
+            self._request(
+                "POST", base + "/comments", headers, json={"body": self.parameters.REVIEW_COMMENT}
+            )
+        )
+        signed = self.bloom_api_sign_off(headers, kind, artefact_id, self.parameters.REVIEW_STEP)
+        return [assigned.status_code, requested.status_code, commented.status_code], signed
+
+    def bloom_api_link(self, headers, project_id, source_id, target_id):
+        body = {
+            "project_id": project_id,
+            "source_type": self.parameters.LINK_SOURCE,
+            "source_id": source_id,
+            "target_type": self.parameters.LINK_TARGET,
+            "target_id": target_id,
+            "role": self.parameters.LINK_ROLE,
+        }
+        return self._run(self._request("POST", "/api/links", headers, json=body))
+
+    def bloom_api_list_docs(self, headers, prefix, doc_type):
+        path = f"/api/projects/{prefix}/docs"
+        return self._run(self._request("GET", path, headers, params={"type": doc_type}))
+
     def bloom_log_in(self, email, password):
         answer = self._run(
             self._request("POST", "/api/auth/login", json={"email": email, "password": password})

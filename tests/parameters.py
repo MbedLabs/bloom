@@ -645,3 +645,53 @@ MSG_EXTERNAL_LIST = (
     "an external member's document list holds the customer document and not the internal one"
 )
 MSG_EXTERNAL_DETAIL = "an external member opening an internal document gets not found"
+
+ACTIVITY_PREFIX = _letters(string.ascii_uppercase, 3, 3)
+ARTEFACT_PATHS = {
+    "requirement": "/api/requirements",
+    "test-case": "/api/test-cases",
+    "design": "/api/designs",
+    "change": "/api/changes",
+}
+DOCUMENT_KIND = "document"
+REQUIREMENT_KIND = "requirement"
+TEST_CASE_KIND = "test-case"
+DESIGN_KIND = "design"
+CHANGE_KIND = "change"
+REQ_TYPE = "Safety"
+REQ_ORIGIN = "Regulatory"
+DOCS_TYPE_FILTER = "REQ"
+ARTEFACT_TITLE = f"Artefact {_letters(string.ascii_lowercase, 4, 10)}"
+RENAMED_TITLE = ARTEFACT_TITLE + " renamed"
+REVIEW_COMMENT = f"Reviewed {_letters(string.ascii_lowercase, 4, 10)}"
+FORGED_REVIEWED_AT = (NOW - LATER).strftime("%Y-%m-%dT%H:%M:%SZ")
+UTC_SUFFIX = "Z"
+REVIEW_STEP = "review"
+APPROVE_STEP = "approve"
+REVIEW_REQUEST = "review"
+STATUS_APPROVED = "Approved"
+STATUS_DRAFT = "Draft"
+STATUS_UNPROCESSABLE = 422
+EVENT_CREATED = "created"
+EVENT_UPDATED = "updated"
+EVENT_REVIEWED = "reviewed"
+EVENT_APPROVED = "approved"
+EVENT_REVISION = "revision_started"
+LINK_SOURCE = "CHG"
+LINK_TARGET = "REQ"
+LINK_ROLE = "impacts"
+SIGN_OFF_CASES_LIST = [(TEST_CASE_KIND, True), (DOCUMENT_KIND, True), (DESIGN_KIND, False)]
+SIGN_OFF_CASES = [(index,) for index in range(len(SIGN_OFF_CASES_LIST))]
+MSG_DOCS_REQ_METADATA = "the REQ docs list gives the requirement's type and origin"
+MSG_CREATED_EVENT = "creating an artefact logs created"
+MSG_UPDATED_EVENT = "editing a requirement logs updated"
+MSG_REVIEW_FIELDS_REFUSED = "review fields set in an edit are refused with 422"
+MSG_REVIEW_RECORDS = "the review sign-off records the reviewer and a UTC time"
+MSG_REVIEW_LOGGED = "the review sign-off logs reviewed and no update"
+MSG_APPROVE_LOGGED = "the approval sign-off logs approved"
+MSG_STATUS_ONLY_APPROVED = "a status-only edit to Approved logs approved"
+MSG_MIXED_EDIT_REFUSED = "an edit of content and status together is refused with 409"
+MSG_REVISION_STARTED = (
+    "an edit under an approved change goes back to Draft and logs updated and a revision"
+)
+REVIEW_SETUP_EXPECTED = [STATUS_OK, STATUS_CREATED, STATUS_CREATED]
