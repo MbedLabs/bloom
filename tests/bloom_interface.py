@@ -32,7 +32,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 import tests.parameters as params
 from app import main
 from app.api import cli_auth as cli_auth_api
-from app.api import integrations
+from app.api import docs_facade, integrations
+from app.core import id_generator
 from app.core.config import settings
 from app.core.database import Base, get_db
 from app.core.deps import limiter
@@ -594,6 +595,15 @@ class BloomInterface:
 
     def bloom_try_public_id_inserts(self, prefix, suite_id, campaign_id):
         return self._run(self._try_public_id_inserts(prefix, suite_id, campaign_id))
+
+    def bloom_compute_next_id(self, existing_ids, prefix, type_code):
+        try:
+            return id_generator.compute_next_id(existing_ids, prefix, type_code), None
+        except ValueError as exc:
+            return None, type(exc).__name__
+
+    def bloom_list_docs_routes(self):
+        return [route.path for route in docs_facade.router.routes]
 
     def bloom_serve_jira_holding_creation(self, issue):
         searches = []

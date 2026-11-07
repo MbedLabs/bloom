@@ -502,3 +502,38 @@ MSG_PUBLIC_ID_REUPGRADE = "upgrading again restores both unique indexes"
 MSG_DUPLICATES_REFUSED = "the upgrade stops on duplicate public IDs"
 MSG_DUPLICATES_NAMED = "the refusal names the column holding the duplicates"
 MSG_DUPLICATES_REVISION = "a refused upgrade stays at the revision before"
+
+NEXT_ID_TYPE, NEXT_ID_OTHER_TYPE = _draw.sample(["REQ", "TC", "DES", "RSK", "CHG", "CPT", "DEF"], 2)
+NEXT_ID_PREFIX, NEXT_ID_OTHER_PREFIX = CAMPAIGN_PREFIXES[:2]
+NEXT_ID_UNSUPPORTED_TYPE = _letters(string.ascii_uppercase, 5, 8)
+NEXT_ID_TAKEN = _draw.randint(1, 50)
+NEXT_ID_LOW, NEXT_ID_HIGH = sorted(_draw.sample(range(1, 900), 2))
+NEXT_ID_ROUTE = "/projects/{project_ref}/next-doc-id/{type_code}"
+NEXT_ID_ERROR = "ValueError"
+
+
+def _doc_id(prefix: str, type_code: str, number: int) -> str:
+    """A document id in the application's format, zero-padded to three digits."""
+    return f"{prefix}-{type_code}-{number:03d}"
+
+
+MSG_NEXT_ID_EMPTY = "an empty project's preview is its first id"
+MSG_NEXT_ID_TAKEN = "the preview advances past the id already taken"
+MSG_NEXT_ID_HIGHEST = "the preview follows the highest number, so deleted ids are not reused"
+MSG_NEXT_ID_OTHERS = "ids of other types and other projects are ignored"
+MSG_NEXT_ID_UNSUPPORTED = "an unsupported type code is refused"
+MSG_NEXT_ID_ROUTE = "the next id has its own route beside the document routes"
+NEXT_ID_TAKEN_IDS = [_doc_id(NEXT_ID_PREFIX, NEXT_ID_TYPE, NEXT_ID_TAKEN)]
+NEXT_ID_GAP_IDS = [
+    _doc_id(NEXT_ID_PREFIX, NEXT_ID_TYPE, NEXT_ID_LOW),
+    _doc_id(NEXT_ID_PREFIX, NEXT_ID_TYPE, NEXT_ID_HIGH),
+]
+NEXT_ID_MIXED_IDS = [
+    _doc_id(NEXT_ID_PREFIX, NEXT_ID_OTHER_TYPE, NEXT_ID_HIGH),
+    _doc_id(NEXT_ID_OTHER_PREFIX, NEXT_ID_TYPE, NEXT_ID_HIGH),
+    _doc_id(NEXT_ID_PREFIX, NEXT_ID_TYPE, NEXT_ID_LOW),
+]
+NEXT_ID_FIRST = _doc_id(NEXT_ID_PREFIX, NEXT_ID_TYPE, 1)
+NEXT_ID_AFTER_TAKEN = _doc_id(NEXT_ID_PREFIX, NEXT_ID_TYPE, NEXT_ID_TAKEN + 1)
+NEXT_ID_AFTER_HIGH = _doc_id(NEXT_ID_PREFIX, NEXT_ID_TYPE, NEXT_ID_HIGH + 1)
+NEXT_ID_AFTER_LOW = _doc_id(NEXT_ID_PREFIX, NEXT_ID_TYPE, NEXT_ID_LOW + 1)
