@@ -16,6 +16,7 @@
 
 ### Changed
 
+- The CLI sign-in approval page shows the request code boxes, the requesting client, the account it signs in as, the request and expiry times and Approve and Deny. The code hint, the unverified-name note, the warnings and the callback address are no longer shown, and the code screen shows the one-time code and Copy code.
 - Every collection of a document type is named in the plural, with the names of the project sidebar: Designs in the sidebar and on the project overview, and Requirements, Designs, Changes, Standards, Test Campaigns and the others on the dashboard count tiles, the topology, the breadcrumbs, the policy editor rows and the link target picker and its search. One record keeps its singular name.
 - A controlled document has an assignee, at first its creator; the creator, the assignee and whoever may assign the reviewer hand it to another person who can see and edit it. The assignee requests review. Besides the reviewer, the creator, the assignee and the approver comment until the document is approved, and each comment notifies the others with a link to the document.
 - A linked GitHub, GitLab or Jira issue changes its defect's status only when the issue closes, which closes the defect, or when a closed issue is open again, which sets the Closed defect back to Open. Statuses set in Bloom stay otherwise, also a defect closed or reopened in Bloom while its issue stays as it was, and the issue's state still shows on the defect.
