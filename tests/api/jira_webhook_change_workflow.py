@@ -11,10 +11,13 @@
 from budtestlibrary import parameterized
 
 import tests.parameters as params
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraWebhookChangeWorkflowBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     @parameterized(params.CHANGE_WORKFLOW_CASES)
     def bud_closure_outside_the_workflow_is_refused(self, index):

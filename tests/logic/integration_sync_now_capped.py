@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of a capped Sync now.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncNowCappedBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_capped_sync_now_keeps_the_full_scan_from_the_last_created_issue(self):
         self.print_variables({"full scan, scan from": self.tc_first_state})

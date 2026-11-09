@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of this module tests which Jira issues a mapped project takes in.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraWebhookIssueFilterBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_task_is_ignored(self):
         self.print_variables({"answer": self.tc_task.json()})

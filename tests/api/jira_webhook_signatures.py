@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of this module tests the signature and delivery checks of the Jira webhook.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraWebhookSignaturesBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_missing_signature_is_refused(self):
         response = self.bloom.bloom_post_jira_webhook(

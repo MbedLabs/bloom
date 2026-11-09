@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of this module tests that refused deliveries leave no successful sync event.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraWebhookSpoofedEventsBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_refused_deliveries_log_no_success(self):
         successes = [

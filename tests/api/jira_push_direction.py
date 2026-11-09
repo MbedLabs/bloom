@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of this module tests when Bloom pushes edits of linked records to Jira.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraPushDirectionBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_no_push_from_jira_to_bloom(self):
         self.print_variables({"pushed": self.tc_before})

@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of this module tests Sync now with a token Jira only takes through Atlassian's gateway.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraScopedTokenGatewayBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_scoped_token_pulls_through_the_gateway(self):
         self.print_variables({"created": self.tc_result.created})

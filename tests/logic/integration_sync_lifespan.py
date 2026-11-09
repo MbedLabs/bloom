@@ -11,10 +11,13 @@
 from budtestlibrary import parameterized
 
 import tests.parameters as params
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncLifespanBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     @parameterized(params.LIFESPAN_CASES)
     def bud_sync_loop_starts_unless_the_sync_is_switched_off(self, index):

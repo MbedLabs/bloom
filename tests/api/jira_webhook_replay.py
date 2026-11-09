@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of this module tests that a delivery applies once.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraWebhookReplayBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_replay_answers_duplicate(self):
         self.print_variables({"replay": self.tc_replay.json()})

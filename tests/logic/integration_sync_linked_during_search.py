@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of a defect linked during the search.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncLinkedDuringSearchBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_defect_linked_during_the_search_is_not_created_twice(self):
         count = self.bloom.bloom_count_defects()

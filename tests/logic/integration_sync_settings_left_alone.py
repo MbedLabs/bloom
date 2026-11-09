@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of integrations the sync skips.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncSettingsLeftAloneBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_no_setting_is_synced(self):
         self.print_variables({"synced": self.tc_synced})

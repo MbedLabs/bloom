@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of failed Jira sync runs.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncJiraFailuresBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_refused_account_is_the_run_error(self):
         self.print_variables({"error": self.tc_refused.sync_error})

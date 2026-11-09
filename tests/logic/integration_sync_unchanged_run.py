@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of an unchanged Jira sync run.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncUnchangedRunBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_first_run_logs_the_follow_up(self):
         self.print_variables({"events after the first run": self.tc_first_events})

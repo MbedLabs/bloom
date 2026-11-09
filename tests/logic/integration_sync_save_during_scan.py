@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of a save during a scan.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncSaveDuringScanBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_save_during_a_full_scan_keeps_the_rescan(self):
         setting = self.bloom.bloom_get_setting(self.tc_setting_id)

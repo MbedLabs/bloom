@@ -11,10 +11,13 @@
 from budtestlibrary import parameterized
 
 import tests.parameters as params
+from tests.bloom_pg_interface import BloomPgInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class CampaignPublicIdDuplicatesBase(BloomTestCase):
+
+    interface = BloomPgInterface
 
     @parameterized(params.PUBLIC_ID_DUPLICATE_CASES)
     def bud_upgrade_stops_on_duplicate_public_ids(self, index):

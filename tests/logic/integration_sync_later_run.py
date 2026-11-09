@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of a later Jira sync.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncLaterRunBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_searches_cover_the_time_since_the_last_sync(self):
         window = self.parameters.LAST_SYNC_MINUTES + self.parameters.OVERLAP_MINUTES

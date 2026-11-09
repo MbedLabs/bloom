@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of the settings response.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncSettingsResponseBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_sync_times_are_given_in_utc(self):
         expected = self.parameters.NOW.strftime(self.parameters.API_TIME_FORMAT)

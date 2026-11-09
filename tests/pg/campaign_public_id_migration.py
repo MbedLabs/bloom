@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of the public ID migration.
 """
 
+from tests.bloom_pg_interface import BloomPgInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class CampaignPublicIdMigrationBase(BloomTestCase):
+
+    interface = BloomPgInterface
 
     def bud_every_alembic_command_succeeds(self):
         if not self.tc_postgres:

@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of the removal check.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncRemovedIssuesBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_first_run_reads_the_lowest_linked_issue(self):
         self.print_variables({"reads": self.tc_first_reads})

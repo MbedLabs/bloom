@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of a defect reopened in Bloom.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncReopenedInBloomBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_defect_reopened_in_bloom_stays_open(self):
         status = self.bloom.bloom_get_defect(self.tc_defect_id).status

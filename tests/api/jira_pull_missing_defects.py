@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of this module tests Sync now pulling the missing defects page by page.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraPullMissingDefectsBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_pull_counts_what_it_saw(self):
         found = (

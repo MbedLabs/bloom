@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of the sync race on PostgreSQL.
 """
 
+from tests.bloom_pg_interface import BloomPgInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncRaceBase(BloomTestCase):
+
+    interface = BloomPgInterface
 
     def bud_both_runs_searched_before_either_wrote(self):
         if not self.tc_postgres:

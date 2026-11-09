@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of the change request workflow.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncChangeWorkflowBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_run_succeeds_at_now(self):
         setting = self.bloom.bloom_get_setting(self.tc_setting_id)

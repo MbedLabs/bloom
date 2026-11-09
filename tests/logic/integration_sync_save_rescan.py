@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of the rescan after a save.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncSaveRescanBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_first_run_clears_the_full_scan(self):
         self.print_variables({"full scan after the run": self.tc_after_run})

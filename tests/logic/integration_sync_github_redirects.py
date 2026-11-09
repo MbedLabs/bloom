@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of GitHub redirects.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncGithubRedirectsBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_moved_repository_defect_is_closed(self):
         self.print_variables({"defect": self.tc_first_status})

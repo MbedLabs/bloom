@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of this module tests a mapped project that does not create defects from Jira.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraWebhookInboundOffBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_unmatched_issue_is_not_found(self):
         self.print_variables({"status": self.tc_response.status_code})

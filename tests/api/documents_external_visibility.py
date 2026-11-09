@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of the external document visibility.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class DocumentsExternalVisibilityBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_external_member_signs_in(self):
         self.print_variables({"sign-in": self.tc_sign_in})

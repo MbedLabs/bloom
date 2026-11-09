@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of this module tests the validation of an integration's Jira filter.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraFilterValidationBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_valid_filter_is_accepted(self):
         error = self.bloom.bloom_try_validate_jira_filter(

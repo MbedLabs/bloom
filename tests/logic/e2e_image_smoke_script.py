@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of the image smoke script.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class E2eImageSmokeScriptBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_admin_full_name_is_one_docker_argument(self):
         app_runs = [

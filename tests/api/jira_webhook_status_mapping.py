@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of this module tests which Jira statuses change the Bloom status of a defect.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraWebhookStatusMappingBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_other_jira_status_keeps_the_bloom_status(self):
         self.bloom.bloom_set_defect_status(self.tc_env.defect_id, self.parameters.DEFECT_VERIFIED)

@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of the Jira sync with creation off.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncCreationOffBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_no_creation_search_runs(self):
         creation = [q for q in self.bloom.site.jql if self.parameters.CREATION_MARK in q]

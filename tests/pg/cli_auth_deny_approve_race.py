@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of the deny and approve race on PostgreSQL.
 """
 
+from tests.bloom_pg_interface import BloomPgInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class CliAuthDenyApproveRaceBase(BloomTestCase):
+
+    interface = BloomPgInterface
 
     def bud_request_starts(self):
         if not self.tc_postgres:

@@ -16,8 +16,10 @@ from tests.bloom_interface import BloomInterface
 
 class BloomTestCase(BudTestCase):
 
+    interface: type[BloomInterface]
+
     def setUpClass(self):
-        self.bloom = BloomInterface()
+        self.bloom = self.interface()
         self.bloom.setUp()
         self.parameters = params
         self.log_info(f"BUDTEST_SEED={self.parameters.SEED}")

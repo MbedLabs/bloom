@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of this module tests where sync events are logged.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraWebhookEventLogsBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_events_land_in_their_own_logs(self):
         found = (

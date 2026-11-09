@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of this module tests a signed webhook that closes a linked defect.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraWebhookClosesDefectBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_signed_update_answers_for_the_defect(self):
         found = (self.tc_response.status_code, self.tc_response.json().get("target"))

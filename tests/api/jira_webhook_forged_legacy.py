@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of this module tests a forged delivery against a submitted change request.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraWebhookForgedLegacyBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_forged_delivery_is_refused_and_changes_nothing(self):
         status = self.bloom.bloom_get_change(self.tc_env.change_id).status

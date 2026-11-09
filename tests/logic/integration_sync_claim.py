@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of the sync claim.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncClaimBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_first_claim_wins(self):
         claimed = self.bloom.bloom_claim(

@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of this module tests the errors Sync now reports.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraPullErrorsBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_pull_without_project_key_is_refused(self):
         _, error = self.bloom.bloom_try_sync_now(

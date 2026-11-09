@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of this module tests signed deliveries the webhook does not apply.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraWebhookIgnoredDeliveriesBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_unlinked_issue_is_not_found(self):
         body = self.bloom.bloom_jira_webhook_body(

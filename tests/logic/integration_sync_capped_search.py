@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of a capped Jira search.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncCappedSearchBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_capped_run_keeps_the_full_scan(self):
         self.print_variables({"full scan": self.tc_first_run.sync_full_scan})

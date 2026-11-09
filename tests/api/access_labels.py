@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of the document addresses and labels.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class AccessLabelsBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_setup_calls_succeed(self):
         self.print_variables({"setup": self.tc_setup})

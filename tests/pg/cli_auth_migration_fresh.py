@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of the fresh database migration.
 """
 
+from tests.bloom_pg_interface import BloomPgInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class CliAuthMigrationFreshBase(BloomTestCase):
+
+    interface = BloomPgInterface
 
     def bud_fresh_database_upgrades(self):
         if not self.tc_postgres:

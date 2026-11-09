@@ -11,10 +11,13 @@
 from budtestlibrary import parameterized
 
 import tests.parameters as params
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class AccessTokenFormatBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_standard_hs256_token_signs_in(self):
         self.print_variables({"user": self.tc_user_id, "answer": self.tc_standard})

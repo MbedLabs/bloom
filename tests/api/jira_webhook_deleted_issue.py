@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of this module tests a Jira deletion of linked issues.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraWebhookDeletedIssueBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_deleted_issue_keeps_its_defect(self):
         defect = self.bloom.bloom_get_defect(self.tc_env.defect_id)

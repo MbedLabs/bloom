@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of the reopen rules.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncReopenRulesBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_open_issue_leaves_a_working_defect_in_progress(self):
         status = self.bloom.bloom_get_defect(self.tc_working_id).status

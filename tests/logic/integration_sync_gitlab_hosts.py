@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of the GitLab host choice.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncGitlabHostsBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_configured_base_url_is_called(self):
         hosts = [call.host for call in self.bloom.site.calls]

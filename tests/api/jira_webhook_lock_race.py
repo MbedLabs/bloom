@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of this module tests a create delivery whose issue is linked while it waits for the lock.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraWebhookLockRaceBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_delivery_is_processed(self):
         found = (self.tc_response.status_code, self.tc_response.json().get("status"))

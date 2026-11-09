@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of this module tests how a linked defect follows its Jira issue.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraWebhookFollowsIssueBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_edit_is_processed(self):
         self.print_variables({"answer": self.tc_edit.json()})

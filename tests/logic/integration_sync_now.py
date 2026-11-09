@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of Sync now.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncNowBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_sync_now_creates_updates_and_removes_in_one_call(self):
         found = (self.tc_result.created, self.tc_result.updated, self.tc_result.removed)

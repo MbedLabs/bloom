@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of the next document id.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class NextDocIdBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_empty_project_starts_at_its_first_id(self):
         self.print_variables({"preview": self.tc_empty})

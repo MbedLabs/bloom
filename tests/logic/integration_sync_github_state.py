@@ -10,10 +10,13 @@
 
 from datetime import timedelta
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncGithubStateBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_issue_list_is_read_on_github_since_creation(self):
         call = self.bloom.site.calls[0]

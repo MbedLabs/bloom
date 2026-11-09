@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of the refresh and revocation race on PostgreSQL.
 """
 
+from tests.bloom_pg_interface import BloomPgInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class CliAuthRefreshRevocationBase(BloomTestCase):
+
+    interface = BloomPgInterface
 
     def bud_database_upgrades(self):
         if not self.tc_postgres:

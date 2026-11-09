@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of this module tests what a defect created from a Jira issue copies.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraWebhookCopiesIssueBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_issue_creates_a_defect(self):
         self.print_variables({"answer": self.tc_response.json()})

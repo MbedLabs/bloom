@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of an unreadable repository.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncUnreadableRepositoryBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_readable_repository_is_still_synced(self):
         self.print_variables({"readable defect": self.tc_readable_status})

@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of this module tests defects created from Jira deliveries.
 """
 
+from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class JiraWebhookInboundCreationBase(BloomTestCase):
+
+    interface = BloomApiInterface
 
     def bud_unmatched_issue_creates_a_defect(self):
         found = (

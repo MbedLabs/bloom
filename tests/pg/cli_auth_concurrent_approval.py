@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of the concurrent CLI steps on PostgreSQL.
 """
 
+from tests.bloom_pg_interface import BloomPgInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class CliAuthConcurrentApprovalBase(BloomTestCase):
+
+    interface = BloomPgInterface
 
     def bud_request_starts(self):
         if not self.tc_postgres:

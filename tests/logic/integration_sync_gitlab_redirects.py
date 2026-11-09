@@ -8,10 +8,13 @@
 * @note     Base class containing the bud methods of GitLab redirects.
 """
 
+from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
 
 class IntegrationSyncGitlabRedirectsBase(BloomTestCase):
+
+    interface = BloomLogicInterface
 
     def bud_only_the_configured_gitlab_host_is_called(self):
         hosts = [call.host for call in self.bloom.site.calls]
