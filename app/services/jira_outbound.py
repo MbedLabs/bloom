@@ -24,7 +24,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.api.integrations import (
     JIRA_TO_BLOOM,
-    JiraCredentialError,
     _find_jira_target,
     _jira_api_base,
     _log_target_sync_event,
@@ -452,6 +451,68 @@ async def _post(
     return Answer(item.defect_pk, issue=issue, claimed_at=claim)
 
 
+@dataclass
+class _JiraRun:
+    """The client, setting and headers of one send run, with the API base and the reference
+    field kind looked up once."""
+
+    client: httpx.AsyncClient
+    setting: IntegrationSetting
+    headers: dict
+    base: Optional[str] = None
+    rich_reference: Optional[bool] = None
+    found: set = field(default_factory=set)
+
+    async def api_base(self) -> str:
+        """The Jira API base of the setting, looked up on first use."""
+        if self.base is None:
+            self.base = await _jira_api_base(self.client, self.setting, self.headers)
+        return self.base
+
+    async def fields(self, item: Outgoing) -> dict:
+        """The issue fields of a defect, with its test case id in the reference field."""
+        fields = dict(item.fields)
+        reference = self.setting.jira_reference_field
+        if reference and item.tc_id:
+            if self.rich_reference is None:
+                self.rich_reference = await _reference_is_rich(
+                    self.client, self.base, self.headers, reference
+                )
+            fields[reference] = text_to_adf(item.tc_id) if self.rich_reference else item.tc_id
+        return fields
+
+    async def found_answer(self, item: Outgoing) -> Optional[Answer]:
+        """The answer for an earlier send whose issue is found in Jira, else None."""
+        if item.claimed_at is None:
+            return None
+        issue = await _find_sent_issue(
+            self.client, self.base, self.headers, self.setting, item, self.found
+        )
+        if issue is None:
+            return None
+        self.found.add(issue)
+        return Answer(item.defect_pk, issue=issue, found=True, claimed_at=item.claimed_at)
+
+
+async def _send_one(maker: async_sessionmaker, run: _JiraRun, item: Outgoing) -> Optional[Answer]:
+    """Find, or take and create, the Jira issue of one defect and return Jira's answer, or
+    None when the defect is left to another run."""
+    try:
+        base = await run.api_base()
+        found = await run.found_answer(item)
+        if found is not None:
+            return found
+        fields = await run.fields(item)
+    except (httpx.HTTPError, ValueError) as exc:
+        if item.claimed_at is None:
+            return Answer(item.defect_pk, error=_refusal(exc), not_created=True)
+        return None
+    claim = await _take(maker, item.defect_pk, item.claimed_at)
+    if claim is None:
+        return None
+    return await _post(run.client, base, run.headers, item, fields, claim)
+
+
 async def send_to_jira(
     maker: async_sessionmaker, setting: IntegrationSetting, outgoing: list[Outgoing]
 ) -> list[Answer]:
@@ -469,43 +530,42 @@ async def send_to_jira(
             for item in outgoing
             if item.claimed_at is None
         ]
-    reference = setting.jira_reference_field
     answers: list[Answer] = []
-    found: set[tuple[str, int]] = set()
     async with httpx.AsyncClient(timeout=15) as client:
-        base: Optional[str] = None
-        rich_reference: Optional[bool] = None
+        run = _JiraRun(client, setting, headers)
         for item in outgoing:
-            try:
-                if base is None:
-                    base = await _jira_api_base(client, setting, headers)
-                if item.claimed_at is not None:
-                    issue = await _find_sent_issue(client, base, headers, setting, item, found)
-                    if issue is not None:
-                        found.add(issue)
-                        answers.append(
-                            Answer(
-                                item.defect_pk,
-                                issue=issue,
-                                found=True,
-                                claimed_at=item.claimed_at,
-                            )
-                        )
-                        continue
-                fields = dict(item.fields)
-                if reference and item.tc_id:
-                    if rich_reference is None:
-                        rich_reference = await _reference_is_rich(client, base, headers, reference)
-                    fields[reference] = text_to_adf(item.tc_id) if rich_reference else item.tc_id
-            except (JiraCredentialError, httpx.HTTPError, ValueError) as exc:
-                if item.claimed_at is None:
-                    answers.append(Answer(item.defect_pk, error=_refusal(exc), not_created=True))
-                continue
-            claim = await _take(maker, item.defect_pk, item.claimed_at)
-            if claim is None:
-                continue
-            answers.append(await _post(client, base, headers, item, fields, claim))
+            answer = await _send_one(maker, run, item)
+            if answer is not None:
+                answers.append(answer)
     return answers
+
+
+async def _record_answer(
+    db: AsyncSession, setting: IntegrationSetting, defect: Defect, answer: Answer, run: SendRun
+) -> None:
+    """Link a defect to its created or found issue, or record its failure."""
+    if answer.issue is None:
+        if answer.not_created and answer.claimed_at is not None:
+            await _give_back(db, defect.id, answer.claimed_at)
+        await _fail(db, defect, answer.error or "", answer.refused, run)
+        return
+    project_key, number = answer.issue
+    if answer.found and await _find_jira_target(db, project_key, number) is not None:
+        await _give_back(db, defect.id, answer.claimed_at)
+        return
+    await _give_back(db, defect.id, None)
+    _link(setting, defect, project_key, number)
+    verb = "found" if answer.found else "created"
+    _log_target_sync_event(
+        db,
+        "defect",
+        defect.id,
+        "outbound",
+        "jira",
+        CREATED_EVENT,
+        payload_summary=f"{verb} {project_key}-{number}",
+    )
+    run.sent.append(defect.defect_id)
 
 
 async def record_sends(
@@ -521,32 +581,7 @@ async def record_sends(
         if defect is None:
             continue
         await db.refresh(defect)
-        if defect.external_tracker:
-            continue
-        if answer.issue is None:
-            if answer.not_created and answer.claimed_at is not None:
-                await _give_back(db, defect.id, answer.claimed_at)
-            await _fail(db, defect, answer.error or "", answer.refused, run)
-            continue
-        project_key, number = answer.issue
-        if answer.found and await _find_jira_target(db, project_key, number) is not None:
-            await _give_back(db, defect.id, answer.claimed_at)
-            continue
-        await _give_back(db, defect.id, None)
-        _link(setting, defect, project_key, number)
-        _log_target_sync_event(
-            db,
-            "defect",
-            defect.id,
-            "outbound",
-            "jira",
-            CREATED_EVENT,
-            payload_summary=(
-                f"found {project_key}-{number}"
-                if answer.found
-                else f"created {project_key}-{number}"
-            ),
-        )
-        run.sent.append(defect.defect_id)
+        if not defect.external_tracker:
+            await _record_answer(db, setting, defect, answer, run)
     await db.flush()
     return run
