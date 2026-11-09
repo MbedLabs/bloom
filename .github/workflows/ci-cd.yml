@@ -151,7 +151,55 @@ jobs:
         run: |
           echo "INTEGRATION_ENCRYPTION_KEY=$(python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")" >> "$GITHUB_ENV"
 
-      - name: BudTestCase BLOOM_integration_sync_race
+      - name: Write the BudTestCase folder runner
+        run: |
+          echo "BUDTESTCASE_RUNNER=$RUNNER_TEMP/run_budtestcases.py" >> "$GITHUB_ENV"
+          cat > "$RUNNER_TEMP/run_budtestcases.py" <<'PY'
+          """Run every BudTestCase suite of one test folder in one process and fail when any suite fails."""
+          import importlib
+          import inspect
+          import pathlib
+          import sys
+          import traceback
+
+          from budtestlibrary.budtestcase import BudTestCase
+
+          folder = pathlib.Path(sys.argv[1])
+          prefix = sys.argv[2]
+          failed = []
+          ran = []
+          for path in sorted(folder.glob(f"{prefix}*.py")):
+              name = ".".join(path.with_suffix("").parts)
+              try:
+                  module = importlib.import_module(name)
+              except Exception:
+                  traceback.print_exc()
+                  failed.append(f"{name} (import)")
+                  continue
+              suites = [
+                  member
+                  for _, member in inspect.getmembers(module, inspect.isclass)
+                  if member.__module__ == name and issubclass(member, BudTestCase)
+              ]
+              if len(suites) != 1:
+                  failed.append(f"{name} (defines {len(suites)} suites, expected 1)")
+                  continue
+              suite = suites[0]
+              ran.append(f"{name}.{suite.__name__}")
+              try:
+                  passed = suite().run()
+              except Exception:
+                  traceback.print_exc()
+                  passed = False
+              if not passed:
+                  failed.append(ran[-1])
+          print(f"{len(ran)} BudTestCase suite(s) ran in {folder}, {len(failed)} failed")
+          for item in failed:
+              print(f"FAILED {item}")
+          raise SystemExit(1 if failed or not ran else 0)
+          PY
+
+      - name: BudTestCase suites in tests/pg
         env:
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
           SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
@@ -159,87 +207,9 @@ jobs:
           BLOOM_DOTENV_DISABLED: "1"
           INTEGRATION_SYNC_MINUTES: "0"
           PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.pg.BLOOM_integration_sync_race import IntegrationSyncRaceTest; raise SystemExit(0 if IntegrationSyncRaceTest().run() else 1)"
+        run: python "$BUDTESTCASE_RUNNER" tests/pg BLOOM_
 
-      - name: BudTestCase BLOOM_cli_auth_migration_round_trip
-        env:
-          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.pg.BLOOM_cli_auth_migration_round_trip import CliAuthMigrationRoundTripTest; raise SystemExit(0 if CliAuthMigrationRoundTripTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_cli_auth_migration_fresh
-        env:
-          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.pg.BLOOM_cli_auth_migration_fresh import CliAuthMigrationFreshTest; raise SystemExit(0 if CliAuthMigrationFreshTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_cli_auth_concurrent_approval
-        env:
-          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.pg.BLOOM_cli_auth_concurrent_approval import CliAuthConcurrentApprovalTest; raise SystemExit(0 if CliAuthConcurrentApprovalTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_cli_auth_deny_approve_race
-        env:
-          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.pg.BLOOM_cli_auth_deny_approve_race import CliAuthDenyApproveRaceTest; raise SystemExit(0 if CliAuthDenyApproveRaceTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_cli_auth_refresh_revocation
-        env:
-          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.pg.BLOOM_cli_auth_refresh_revocation import CliAuthRefreshRevocationTest; raise SystemExit(0 if CliAuthRefreshRevocationTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_campaign_public_id_migration
-        env:
-          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.pg.BLOOM_campaign_public_id_migration import CampaignPublicIdMigrationTest; raise SystemExit(0 if CampaignPublicIdMigrationTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_campaign_public_id_duplicates
-        env:
-          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.pg.BLOOM_campaign_public_id_duplicates import CampaignPublicIdDuplicatesTest; raise SystemExit(0 if CampaignPublicIdDuplicatesTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_next_doc_id
+      - name: BudTestCase suites in tests/logic
         env:
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
           SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
@@ -247,10 +217,9 @@ jobs:
           BLOOM_DOTENV_DISABLED: "1"
           INTEGRATION_SYNC_MINUTES: "0"
           PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_next_doc_id import NextDocIdTest; raise SystemExit(0 if NextDocIdTest().run() else 1)"
+        run: python "$BUDTESTCASE_RUNNER" tests/logic BLOOM_
 
-      - name: BudTestCase BLOOM_access_token_format
+      - name: BudTestCase suites in tests/api
         env:
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
           SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
@@ -258,651 +227,7 @@ jobs:
           BLOOM_DOTENV_DISABLED: "1"
           INTEGRATION_SYNC_MINUTES: "0"
           PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_access_token_format import AccessTokenFormatTest; raise SystemExit(0 if AccessTokenFormatTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_e2e_image_smoke_script
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_e2e_image_smoke_script import E2eImageSmokeScriptTest; raise SystemExit(0 if E2eImageSmokeScriptTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_baseline_read_override
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_baseline_read_override import BaselineReadOverrideTest; raise SystemExit(0 if BaselineReadOverrideTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_baseline_read_admission
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_baseline_read_admission import BaselineReadAdmissionTest; raise SystemExit(0 if BaselineReadAdmissionTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_baseline_read_owner
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_baseline_read_owner import BaselineReadOwnerTest; raise SystemExit(0 if BaselineReadOwnerTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_access_labels
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_access_labels import AccessLabelsTest; raise SystemExit(0 if AccessLabelsTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_documents_external_visibility
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_documents_external_visibility import DocumentsExternalVisibilityTest; raise SystemExit(0 if DocumentsExternalVisibilityTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_artefact_activity_basics
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_artefact_activity_basics import ArtefactActivityBasicsTest; raise SystemExit(0 if ArtefactActivityBasicsTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_requirement_workflow_activity
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_requirement_workflow_activity import RequirementWorkflowActivityTest; raise SystemExit(0 if RequirementWorkflowActivityTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_sign_off_activity
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_sign_off_activity import SignOffActivityTest; raise SystemExit(0 if SignOffActivityTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_baseline_snapshot_reader
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_baseline_snapshot_reader import BaselineSnapshotReaderTest; raise SystemExit(0 if BaselineSnapshotReaderTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_first_run
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_first_run import IntegrationSyncFirstRunTest; raise SystemExit(0 if IntegrationSyncFirstRunTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_creation_off
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_creation_off import IntegrationSyncCreationOffTest; raise SystemExit(0 if IntegrationSyncCreationOffTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_linked_during_search
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_linked_during_search import IntegrationSyncLinkedDuringSearchTest; raise SystemExit(0 if IntegrationSyncLinkedDuringSearchTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_capped_search
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_capped_search import IntegrationSyncCappedSearchTest; raise SystemExit(0 if IntegrationSyncCappedSearchTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_later_run
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_later_run import IntegrationSyncLaterRunTest; raise SystemExit(0 if IntegrationSyncLaterRunTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_change_workflow
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_change_workflow import IntegrationSyncChangeWorkflowTest; raise SystemExit(0 if IntegrationSyncChangeWorkflowTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_unchanged_run
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_unchanged_run import IntegrationSyncUnchangedRunTest; raise SystemExit(0 if IntegrationSyncUnchangedRunTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_removed_issues
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_removed_issues import IntegrationSyncRemovedIssuesTest; raise SystemExit(0 if IntegrationSyncRemovedIssuesTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_jira_failures
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_jira_failures import IntegrationSyncJiraFailuresTest; raise SystemExit(0 if IntegrationSyncJiraFailuresTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_failing_setting
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_failing_setting import IntegrationSyncFailingSettingTest; raise SystemExit(0 if IntegrationSyncFailingSettingTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_github_state
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_github_state import IntegrationSyncGithubStateTest; raise SystemExit(0 if IntegrationSyncGithubStateTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_reopen_rules
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_reopen_rules import IntegrationSyncReopenRulesTest; raise SystemExit(0 if IntegrationSyncReopenRulesTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_reopened_in_bloom
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_reopened_in_bloom import IntegrationSyncReopenedInBloomTest; raise SystemExit(0 if IntegrationSyncReopenedInBloomTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_gitlab_hosts
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_gitlab_hosts import IntegrationSyncGitlabHostsTest; raise SystemExit(0 if IntegrationSyncGitlabHostsTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_unreadable_repository
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_unreadable_repository import IntegrationSyncUnreadableRepositoryTest; raise SystemExit(0 if IntegrationSyncUnreadableRepositoryTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_outages
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_outages import IntegrationSyncOutagesTest; raise SystemExit(0 if IntegrationSyncOutagesTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_github_redirects
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_github_redirects import IntegrationSyncGithubRedirectsTest; raise SystemExit(0 if IntegrationSyncGithubRedirectsTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_gitlab_redirects
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_gitlab_redirects import IntegrationSyncGitlabRedirectsTest; raise SystemExit(0 if IntegrationSyncGitlabRedirectsTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_settings_left_alone
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_settings_left_alone import IntegrationSyncSettingsLeftAloneTest; raise SystemExit(0 if IntegrationSyncSettingsLeftAloneTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_claim
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_claim import IntegrationSyncClaimTest; raise SystemExit(0 if IntegrationSyncClaimTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_save_rescan
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_save_rescan import IntegrationSyncSaveRescanTest; raise SystemExit(0 if IntegrationSyncSaveRescanTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_save_during_scan
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_save_during_scan import IntegrationSyncSaveDuringScanTest; raise SystemExit(0 if IntegrationSyncSaveDuringScanTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_lifespan
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_lifespan import IntegrationSyncLifespanTest; raise SystemExit(0 if IntegrationSyncLifespanTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_settings_response
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_settings_response import IntegrationSyncSettingsResponseTest; raise SystemExit(0 if IntegrationSyncSettingsResponseTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_now
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_now import IntegrationSyncNowTest; raise SystemExit(0 if IntegrationSyncNowTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_integration_sync_now_capped
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.logic.BLOOM_integration_sync_now_capped import IntegrationSyncNowCappedTest; raise SystemExit(0 if IntegrationSyncNowCappedTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_filter_validation
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_filter_validation import JiraFilterValidationTest; raise SystemExit(0 if JiraFilterValidationTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_pull_errors
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_pull_errors import JiraPullErrorsTest; raise SystemExit(0 if JiraPullErrorsTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_pull_missing_defects
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_pull_missing_defects import JiraPullMissingDefectsTest; raise SystemExit(0 if JiraPullMissingDefectsTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_push_direction
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_push_direction import JiraPushDirectionTest; raise SystemExit(0 if JiraPushDirectionTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_scoped_token_gateway
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_scoped_token_gateway import JiraScopedTokenGatewayTest; raise SystemExit(0 if JiraScopedTokenGatewayTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_webhook_change_workflow
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_webhook_change_workflow import JiraWebhookChangeWorkflowTest; raise SystemExit(0 if JiraWebhookChangeWorkflowTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_webhook_closes_change
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_webhook_closes_change import JiraWebhookClosesChangeTest; raise SystemExit(0 if JiraWebhookClosesChangeTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_webhook_closes_defect
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_webhook_closes_defect import JiraWebhookClosesDefectTest; raise SystemExit(0 if JiraWebhookClosesDefectTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_webhook_copies_issue
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_webhook_copies_issue import JiraWebhookCopiesIssueTest; raise SystemExit(0 if JiraWebhookCopiesIssueTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_webhook_deleted_issue
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_webhook_deleted_issue import JiraWebhookDeletedIssueTest; raise SystemExit(0 if JiraWebhookDeletedIssueTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_webhook_event_logs
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_webhook_event_logs import JiraWebhookEventLogsTest; raise SystemExit(0 if JiraWebhookEventLogsTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_webhook_follows_issue
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_webhook_follows_issue import JiraWebhookFollowsIssueTest; raise SystemExit(0 if JiraWebhookFollowsIssueTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_webhook_forged_legacy
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_webhook_forged_legacy import JiraWebhookForgedLegacyTest; raise SystemExit(0 if JiraWebhookForgedLegacyTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_webhook_ignored_deliveries
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_webhook_ignored_deliveries import JiraWebhookIgnoredDeliveriesTest; raise SystemExit(0 if JiraWebhookIgnoredDeliveriesTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_webhook_inbound_creation
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_webhook_inbound_creation import JiraWebhookInboundCreationTest; raise SystemExit(0 if JiraWebhookInboundCreationTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_webhook_inbound_off
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_webhook_inbound_off import JiraWebhookInboundOffTest; raise SystemExit(0 if JiraWebhookInboundOffTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_webhook_issue_filter
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_webhook_issue_filter import JiraWebhookIssueFilterTest; raise SystemExit(0 if JiraWebhookIssueFilterTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_webhook_lock_race
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_webhook_lock_race import JiraWebhookLockRaceTest; raise SystemExit(0 if JiraWebhookLockRaceTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_webhook_replay
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_webhook_replay import JiraWebhookReplayTest; raise SystemExit(0 if JiraWebhookReplayTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_webhook_signatures
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_webhook_signatures import JiraWebhookSignaturesTest; raise SystemExit(0 if JiraWebhookSignaturesTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_webhook_spoofed_events
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_webhook_spoofed_events import JiraWebhookSpoofedEventsTest; raise SystemExit(0 if JiraWebhookSpoofedEventsTest().run() else 1)"
-
-      - name: BudTestCase BLOOM_jira_webhook_status_mapping
-        env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          BLOOM_DOTENV_DISABLED: "1"
-          INTEGRATION_SYNC_MINUTES: "0"
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.api.BLOOM_jira_webhook_status_mapping import JiraWebhookStatusMappingTest; raise SystemExit(0 if JiraWebhookStatusMappingTest().run() else 1)"
-
-      - name: Build the UI and Chromium
-        run: |
-          npm --prefix ui run build
-          python -m playwright install --with-deps chromium
+        run: python "$BUDTESTCASE_RUNNER" tests/api BLOOM_
 
       - name: Run UI checks
         run: |
