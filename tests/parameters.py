@@ -710,3 +710,16 @@ MSG_SNAPSHOT_TITLE_HIDDEN = "the document's title is not shown"
 MSG_SNAPSHOT_LIST = (
     "the list gives the baseline once with the requirement's public id and no records"
 )
+
+OUTBOUND_MARKER = datetime(2000, 1, 1)
+OUTBOUND_DIRECTION = "bloom_to_jira"
+OUTBOUND_SENT_TITLE = f"Defect {_letters(string.ascii_lowercase, 4, 10)}"
+OUTBOUND_REFUSED_TITLE = f"Defect {_letters(string.ascii_lowercase, 4, 10)}"
+OUTBOUND_FIRST_NUMBER = _draw.randrange(50_000, 60_000)
+OUTBOUND_ISSUE_PATH = "/rest/api/3/issue"
+OUTBOUND_CREATED_EVENT = "issue_created"
+OUTBOUND_REFUSED_EVENT = "issue_create_refused"
+MSG_OUTBOUND_BUG = "a new defect is sent to Jira as a Bug with its title as summary"
+MSG_OUTBOUND_LINKED = "the sent defect links to the issue Jira created"
+MSG_OUTBOUND_LOGGED = "the sent defect logs the issue it created"
+MSG_OUTBOUND_REFUSED = "a defect Jira refuses stays unlinked and logs the refusal"

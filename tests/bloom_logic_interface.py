@@ -31,10 +31,10 @@ from app.api import docs_facade, integrations
 from app.core import id_generator
 from app.core.config import settings
 from app.core.security import create_access_token, get_current_user
-from app.models import IntegrationSetting
+from app.models import IntegrationSetting, SystemMarker
 from app.models.user import User
 from app.schemas import ProjectCreate
-from app.services import integration_sync
+from app.services import integration_sync, jira_outbound
 from tests.bloom_interface import BloomInterface
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -44,6 +44,52 @@ class BloomLogicInterface(BloomInterface):
 
     def bloom_get_setting(self, setting_id):
         return self._run(self._get(IntegrationSetting, setting_id))
+
+    def bloom_mark_sends_since(self, moment):
+        self._run(self._mark_sends_since(moment))
+
+    def bloom_add_unlinked_defect(self, project_id, title):
+        return self._run(self._link_defect(project_id, None, None, None, {"title": title}))
+
+    def bloom_serve_jira_creation(self, first_number, refuse_after=None):
+        created = []
+
+        def answer(request):
+            if request.url.path.endswith(self.parameters.JIRA_MYSELF):
+                return httpx.Response(
+                    self.parameters.STATUS_OK, json={"accountId": self.parameters.JIRA_ACCOUNT}
+                )
+            if request.method == "POST" and request.url.path.endswith(
+                self.parameters.OUTBOUND_ISSUE_PATH
+            ):
+                created.append(json.loads(request.content)["fields"])
+                if refuse_after is not None and len(created) > refuse_after:
+                    return httpx.Response(
+                        self.parameters.STATUS_BAD_REQUEST, json={"errorMessages": ["refused"]}
+                    )
+                key = self.bloom_jira_key(first_number + len(created) - 1)
+                return httpx.Response(self.parameters.STATUS_CREATED, json={"key": key})
+            if request.method == "GET":
+                return httpx.Response(self.parameters.STATUS_OK, json={"fields": {}})
+            return httpx.Response(self.parameters.STATUS_OK, json={"issues": [], "isLast": True})
+
+        self.bloom_serve(answer)
+        return created
+
+    def bloom_send_now(self, setting_id):
+        return self._run(self._send_now(setting_id))
+
+    async def _send_now(self, setting_id):
+        async with self.maker() as db:
+            setting = await db.get(IntegrationSetting, setting_id)
+            run = await integration_sync.sync_now(db, setting, maker=self.maker)
+            await db.commit()
+            return run
+
+    async def _mark_sends_since(self, moment):
+        async with self.maker() as db:
+            db.add(SystemMarker(name=jira_outbound.SENDS_SINCE, marked_at=moment))
+            await db.commit()
 
     def bloom_get_setting_response(self, setting_id):
         setting = self.bloom_get_setting(setting_id)
