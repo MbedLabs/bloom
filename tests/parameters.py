@@ -11,7 +11,7 @@
 import os
 import random
 import string
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 SEED = int(os.environ.get("BUDTEST_SEED") or random.SystemRandom().randrange(1, 10**9))
 _draw = random.Random(SEED)
@@ -795,3 +795,15 @@ VISION_DOCUMENTS = [
 ]
 VISION_AFTER_RESTART = [("VIS", "PRJ-VIS-001"), ("SPEC", "PRJ-SPEC-001")]
 MSG_VISION_KEPT = "a restart keeps a Vision's kind and id and turns an unknown kind into SPEC"
+
+STAMP_NAIVE = datetime(2026, 9, 27, 12, 34, 56, 789)
+STAMP_AWARE = datetime(2026, 9, 27, 14, 34, tzinfo=timezone(timedelta(hours=2)))
+STAMP_TEXT = "2026-09-27 12:34 UTC"
+STAMP_NONE_TEXT = ""
+STAMP_EXECUTED = datetime(2026, 9, 27, 12, 0, tzinfo=timezone.utc)
+STAMP_EXECUTED_STORED = datetime(2026, 9, 27, 12, 0)
+STAMP_SERVER_ZONE = "Europe/Berlin"
+MSG_STAMP_MINUTES = "a time is written in UTC to the minute"
+MSG_STAMP_NONE = "a missing time is written as nothing"
+MSG_STAMP_AWARE = "a time in another zone is written in UTC"
+MSG_STAMP_EXECUTION_UTC = "an execution time is stored in UTC on a server in another zone"

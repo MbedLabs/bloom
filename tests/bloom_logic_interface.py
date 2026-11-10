@@ -17,6 +17,7 @@ import os
 import re
 import subprocess
 import tempfile
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -28,7 +29,7 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy import select, text
 
-from app.api import docs_facade, integrations
+from app.api import artefact_utils, campaigns, docs_facade, integrations
 from app.core import id_generator, security
 from app.core.config import settings
 from app.core.security import (
@@ -294,6 +295,22 @@ class BloomLogicInterface(BloomInterface):
     def bloom_list_document_kinds(self):
         documents = self._run(self._all(select(Document).order_by(Document.id)))
         return [(document.doc_type, document.doc_id) for document in documents]
+
+    def bloom_minute_utc(self, value):
+        return artefact_utils.minute_utc(value)
+
+    def bloom_resolve_execution_time_in_zone(self, executed, zone):
+        previous = os.environ.get("TZ")
+        os.environ["TZ"] = zone
+        time.tzset()
+        try:
+            return campaigns._resolved_execution_time(executed)
+        finally:
+            if previous is None:
+                os.environ.pop("TZ", None)
+            else:
+                os.environ["TZ"] = previous
+            time.tzset()
 
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))
