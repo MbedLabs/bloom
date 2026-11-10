@@ -23,6 +23,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import httpx
+import yaml
 from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy import text
@@ -234,6 +235,17 @@ class BloomLogicInterface(BloomInterface):
         admin = SimpleNamespace(id=self.parameters.EXTERNAL_USER_ID, role=UserRole.admin)
         allowed = self._run(get_external_doc_types(db, admin, project_id))
         return SimpleNamespace(allowed=allowed, queries=db.execute.await_count)
+
+    def bloom_read_repo_text(self, name):
+        return (ROOT / name).read_text(encoding="utf-8")
+
+    def bloom_read_repo_lines_with(self, name, words):
+        lines = self.bloom_read_repo_text(name).splitlines()
+        return "\n".join(line for line in lines if any(word in line for word in words))
+
+    def bloom_read_compose_service(self, service):
+        compose = yaml.safe_load(self.bloom_read_repo_text(self.parameters.COMPOSE_FILE))
+        return SimpleNamespace(service=compose["services"][service], volumes=compose["volumes"])
 
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))
