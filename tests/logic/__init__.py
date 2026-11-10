@@ -1,5 +1,7 @@
 """The Bloom suites of tests/logic, as bud-runner run-tests -t tests.logic.SUITES runs them."""
 
+import tests.config  # noqa: F401
+
 SUITES = [
     "tests.logic.BLOOM_access_token_format.AccessTokenFormatTest",
     "tests.logic.BLOOM_e2e_image_smoke_script.E2eImageSmokeScriptTest",

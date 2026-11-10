@@ -1,5 +1,7 @@
 """The Bloom suites of tests/pg, as bud-runner run-tests -t tests.pg.SUITES runs them."""
 
+import tests.config  # noqa: F401
+
 SUITES = [
     "tests.pg.BLOOM_campaign_public_id_duplicates.CampaignPublicIdDuplicatesTest",
     "tests.pg.BLOOM_campaign_public_id_migration.CampaignPublicIdMigrationTest",

@@ -1,5 +1,7 @@
 """The Bloom suites of tests/api, as bud-runner run-tests -t tests.api.SUITES runs them."""
 
+import tests.config  # noqa: F401
+
 SUITES = [
     "tests.api.BLOOM_access_labels.AccessLabelsTest",
     "tests.api.BLOOM_artefact_activity_basics.ArtefactActivityBasicsTest",
