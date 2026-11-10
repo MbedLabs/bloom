@@ -730,3 +730,10 @@ EXTERNAL_EVERY_TYPE = None
 EXTERNAL_NO_QUERY = 0
 MSG_EXTERNAL_ADMIN_EVERY_TYPE = "an admin is limited to no document type"
 MSG_EXTERNAL_ADMIN_NO_QUERY = "an admin's document types are answered without a database query"
+
+LOG_CAPACITY = 10_000
+APP_LOGGERS = ("bloom", "app")
+INVITE_INFO_PATH = "/api/auth/invite-info"
+ONE_TIME_TOKEN = _letters(string.ascii_letters + string.digits, 32, 40)
+MSG_TOKEN_REQUEST_LOGGED = "the invite lookup request reaches the application log"
+MSG_TOKEN_NOT_LOGGED = "the one-time token from the body or the query never reaches the log"

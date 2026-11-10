@@ -11,6 +11,8 @@
 import hashlib
 import hmac
 import json
+import logging
+from logging.handlers import BufferingHandler
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -447,6 +449,24 @@ class BloomApiInterface(BloomInterface):
         page = self._run(self._request("GET", "/api/audit", headers, params=query))
         items = page.json().get("items") if page.status_code == 200 else None
         return items[0] if items else None
+
+    def bloom_api_post_and_read_logs(self, posts):
+        root = logging.getLogger()
+        handler = BufferingHandler(self.parameters.LOG_CAPACITY)
+        level = root.level
+        root.addHandler(handler)
+        root.setLevel(logging.INFO)
+        try:
+            for path, body in posts:
+                self._run(self._request("POST", path, json=body))
+        finally:
+            root.removeHandler(handler)
+            root.setLevel(level)
+        return "\n".join(
+            record.getMessage()
+            for record in handler.buffer
+            if record.name.startswith(self.parameters.APP_LOGGERS)
+        )
 
     async def _update(self, model, row_id, **fields):
         async with self.maker() as db:
