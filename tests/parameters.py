@@ -772,3 +772,10 @@ MSG_INVITE_HASH_DIFFERS = "two different tokens hash differently"
 MSG_INVITE_PURPOSE = "the token purpose keeps its stored value"
 MSG_INVITE_UNUSED = "a new token is not marked used"
 MSG_INVITE_NOT_EXPIRED = "a token expiring in an hour is still valid now"
+
+EXTERNAL_MEMBERSHIP_ID = _draw.randrange(1, 10_000)
+EXTERNAL_VISIBILITY = ("customer",)
+EXTERNAL_GRANTED = ("REQ",)
+EXTERNAL_GRANTED_TYPE = "REQ"
+EXTERNAL_NOT_REFUSED = None
+MSG_EXTERNAL_GRANTED_ALLOWED = "an external member may open the document type granted to them"

@@ -29,7 +29,7 @@ from pydantic import ValidationError
 from sqlalchemy import text
 
 from app.api import docs_facade, integrations
-from app.core import id_generator
+from app.core import id_generator, security
 from app.core.config import settings
 from app.core.security import (
     create_access_token,
@@ -262,6 +262,22 @@ class BloomLogicInterface(BloomInterface):
         )
         return SimpleNamespace(used_at=token.used_at, expires_at=token.expires_at)
 
+    def bloom_external_doc_types(self, granted):
+        user = self._external_user(granted)
+        db = self._external_db(granted)
+        project_id = self.parameters.EXTERNAL_PROJECT_ID
+        return self._run(security.get_external_doc_types(db, user, project_id))
+
+    def bloom_require_external_doc_type(self, granted, doc_type):
+        user = self._external_user(granted)
+        db = self._external_db(granted)
+        project_id = self.parameters.EXTERNAL_PROJECT_ID
+        try:
+            self._run(security.require_external_doc_type_access(db, user, project_id, doc_type))
+        except HTTPException as exc:
+            return SimpleNamespace(status=exc.status_code, detail=exc.detail)
+        return SimpleNamespace(status=None, detail="")
+
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))
         expires = datetime.now(timezone.utc) + timedelta(minutes=minutes)
@@ -362,6 +378,30 @@ class BloomLogicInterface(BloomInterface):
             f"    if name.startswith('{self.parameters.SMOKE_APP_CONTAINER}'):\n"
             f"        sys.exit({self.parameters.SMOKE_STOP_CODE})\n"
         )
+
+    def _external_user(self, granted):
+        term = security.AccessTerm(
+            {"*": {"view"}},
+            frozenset(granted),
+            frozenset(self.parameters.EXTERNAL_VISIBILITY),
+            frozenset(),
+            True,
+        )
+        return SimpleNamespace(
+            id=self.parameters.EXTERNAL_USER_ID,
+            role=UserRole.external,
+            access_map={self.parameters.EXTERNAL_PROJECT_ID: (term,)},
+        )
+
+    def _external_db(self, granted):
+        membership = SimpleNamespace(id=self.parameters.EXTERNAL_MEMBERSHIP_ID, role="external")
+        rows = SimpleNamespace(all=lambda: list(granted))
+        db = AsyncMock()
+        db.execute.side_effect = [
+            SimpleNamespace(scalar_one_or_none=lambda: membership),
+            SimpleNamespace(scalars=lambda: rows),
+        ]
+        return db
 
     def _token_part(self, value):
         raw = json.dumps(value, separators=(",", ":")).encode()
