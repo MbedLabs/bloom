@@ -866,3 +866,12 @@ AUDIT_REMOVED = 1
 AUDIT_LEFT = ["new"]
 MSG_AUDIT_REMOVED = "the prune removes the one event older than the retention"
 MSG_AUDIT_LEFT = "the event inside the retention is kept"
+
+RESPONSE_PACKAGES = ("app.schemas", "app.api")
+RESPONSE_SUFFIXES = ("Response", "Summary", "Item", "Entry", "Created")
+RESPONSE_MIN_MODELS = 20
+RESPONSE_API_PREFIX = "app.api."
+RESPONSE_NONE_UNMARKED = []
+MSG_RESPONSE_SCAN_COUNT = "the scan finds more than twenty response models"
+MSG_RESPONSE_SCAN_API = "the scan finds response models inside app.api"
+MSG_RESPONSE_UTC = "every timestamp of a response model has the UTC serializer"

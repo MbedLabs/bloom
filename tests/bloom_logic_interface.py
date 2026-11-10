@@ -12,13 +12,17 @@ import asyncio
 import base64
 import hashlib
 import hmac
+import importlib
+import inspect
 import json
 import os
+import pkgutil
 import re
 import subprocess
 import tempfile
 import time
 import tomllib
+import typing
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -27,7 +31,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import yaml
 from fastapi import HTTPException
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from sqlalchemy import select, text
 
 from app import audit
@@ -363,6 +367,32 @@ class BloomLogicInterface(BloomInterface):
     def bloom_list_audit_actions(self):
         return [event.action for event in self._run(self._all(select(AuditEvent)))]
 
+    def bloom_response_models(self):
+        seen = {}
+        for package_name in self.parameters.RESPONSE_PACKAGES:
+            package = importlib.import_module(package_name)
+            for module_info in pkgutil.iter_modules(package.__path__):
+                module = importlib.import_module(f"{package_name}.{module_info.name}")
+                for name, cls in inspect.getmembers(module, inspect.isclass):
+                    if (
+                        issubclass(cls, BaseModel)
+                        and cls.__module__ == module.__name__
+                        and name.endswith(self.parameters.RESPONSE_SUFFIXES)
+                    ):
+                        seen[f"{cls.__module__}.{name}"] = cls
+        return seen
+
+    def bloom_unmarked_timestamps(self, models):
+        unmarked = []
+        for qualified, cls in models.items():
+            serialized = set()
+            for decorator in cls.__pydantic_decorators__.field_serializers.values():
+                serialized |= set(decorator.info.fields)
+            for field, info in cls.model_fields.items():
+                if self._is_datetime(info.annotation) and field not in serialized:
+                    unmarked.append(f"{qualified}.{field}")
+        return unmarked
+
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))
         expires = datetime.now(timezone.utc) + timedelta(minutes=minutes)
@@ -487,6 +517,11 @@ class BloomLogicInterface(BloomInterface):
             SimpleNamespace(scalars=lambda: rows),
         ]
         return db
+
+    def _is_datetime(self, annotation):
+        if annotation is datetime:
+            return True
+        return any(self._is_datetime(arg) for arg in typing.get_args(annotation))
 
     def _token_part(self, value):
         raw = json.dumps(value, separators=(",", ":")).encode()

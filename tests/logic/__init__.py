@@ -42,6 +42,7 @@ SUITES = [
     "tests.logic.BLOOM_invites.InvitesTest",
     "tests.logic.BLOOM_jira_outbound_send.JiraOutboundSendTest",
     "tests.logic.BLOOM_next_doc_id.NextDocIdTest",
+    "tests.logic.BLOOM_response_timestamps.ResponseTimestampsTest",
     "tests.logic.BLOOM_timestamp_text.TimestampTextTest",
     "tests.logic.BLOOM_vision_startup.VisionStartupTest",
 ]
