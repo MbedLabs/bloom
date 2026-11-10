@@ -30,6 +30,7 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy import select, text
 
+from app import audit
 from app.api import artefact_utils, campaigns, docs_facade, integrations
 from app.core import id_generator, security
 from app.core.config import settings
@@ -38,7 +39,13 @@ from app.core.security import (
     get_current_user,
     get_external_doc_types,
 )
-from app.models import Document, IntegrationSetting, SystemMarker, user_token
+from app.models import (
+    AuditEvent,
+    Document,
+    IntegrationSetting,
+    SystemMarker,
+    user_token,
+)
 from app.models.user import User, UserRole
 from app.schemas import ProjectCreate, schemas
 from app.services import integration_sync, jira_outbound, token_service
@@ -342,6 +349,19 @@ class BloomLogicInterface(BloomInterface):
     def bloom_project_version(self):
         project = tomllib.loads(self.bloom_read_repo_text(self.parameters.PYPROJECT))
         return project["project"]["version"]
+
+    def bloom_add_audit_event(self, action, age_days):
+        occurred = datetime.utcnow() - timedelta(days=age_days)
+        return self._run(
+            self._add(AuditEvent(actor_type="user", action=action, occurred_at=occurred))
+        )
+
+    def bloom_prune_audit(self, older_than_days):
+        with patch.object(audit, "async_session_maker", self.maker):
+            return self._run(audit.prune(older_than_days))
+
+    def bloom_list_audit_actions(self):
+        return [event.action for event in self._run(self._all(select(AuditEvent)))]
 
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))

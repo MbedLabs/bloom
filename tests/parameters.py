@@ -859,3 +859,10 @@ MSG_CLOUDRON_PUBLISH_STATE = "the catalog entry is in testing or published"
 MSG_CLOUDRON_CHANGELOG_VERSION = "the changelog has a header for the product version"
 MSG_CLOUDRON_CHANGELOG_TOP = "the changelog opens with a version header"
 MSG_CLOUDRON_CHANGELOG_NEWEST = "the changelog's top version is at least the product version"
+
+AUDIT_RETENTION_DAYS = 30
+AUDIT_EVENTS = [("old", 40), ("new", 5)]
+AUDIT_REMOVED = 1
+AUDIT_LEFT = ["new"]
+MSG_AUDIT_REMOVED = "the prune removes the one event older than the retention"
+MSG_AUDIT_LEFT = "the event inside the retention is kept"
