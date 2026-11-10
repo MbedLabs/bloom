@@ -36,10 +36,10 @@ from app.core.security import (
     get_current_user,
     get_external_doc_types,
 )
-from app.models import IntegrationSetting, SystemMarker
+from app.models import IntegrationSetting, SystemMarker, user_token
 from app.models.user import User, UserRole
 from app.schemas import ProjectCreate
-from app.services import integration_sync, jira_outbound
+from app.services import integration_sync, jira_outbound, token_service
 from tests.bloom_interface import BloomInterface
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -246,6 +246,21 @@ class BloomLogicInterface(BloomInterface):
     def bloom_read_compose_service(self, service):
         compose = yaml.safe_load(self.bloom_read_repo_text(self.parameters.COMPOSE_FILE))
         return SimpleNamespace(service=compose["services"][service], volumes=compose["volumes"])
+
+    def bloom_hash_token(self, token):
+        return token_service.hash_token(token)
+
+    def bloom_token_purpose_values(self):
+        return {purpose.name: purpose.value for purpose in user_token.UserTokenPurpose}
+
+    def bloom_new_invite_token(self, hours):
+        token = user_token.UserToken(
+            user_id=self.parameters.EXTERNAL_USER_ID,
+            purpose=user_token.UserTokenPurpose.invite,
+            token_hash=self.parameters.INVITE_TOKEN_HASH,
+            expires_at=datetime.utcnow() + timedelta(hours=hours),
+        )
+        return SimpleNamespace(used_at=token.used_at, expires_at=token.expires_at)
 
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))

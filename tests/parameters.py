@@ -756,3 +756,19 @@ MSG_ATTACHMENT_VOLUME_DECLARED = "the compose file declares the attachment volum
 MSG_ATTACHMENT_MKDIR = "the image creates the attachment mountpoint"
 MSG_ATTACHMENT_CHOWN = "the image gives /app to appuser"
 MSG_ATTACHMENT_EXAMPLE = "the example environment documents the attachment directory"
+
+INVITE_TOKEN = "abc123"
+INVITE_TOKEN_HASH = "6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090"
+INVITE_OTHER_TOKEN = "different"
+INVITE_PURPOSES = {
+    "invite": "invite",
+    "email_verification": "email_verification",
+    "password_reset": "password_reset",
+}
+INVITE_VALID_HOURS = 1
+INVITE_NOT_USED = None
+MSG_INVITE_HASH_KNOWN = "a token hashes to its known SHA-256 digest"
+MSG_INVITE_HASH_DIFFERS = "two different tokens hash differently"
+MSG_INVITE_PURPOSE = "the token purpose keeps its stored value"
+MSG_INVITE_UNUSED = "a new token is not marked used"
+MSG_INVITE_NOT_EXPIRED = "a token expiring in an hour is still valid now"

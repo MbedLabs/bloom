@@ -33,6 +33,7 @@ SUITES = [
     "tests.logic.BLOOM_integration_sync_settings_response.IntegrationSyncSettingsResponseTest",
     "tests.logic.BLOOM_integration_sync_unchanged_run.IntegrationSyncUnchangedRunTest",
     "tests.logic.BLOOM_integration_sync_unreadable_repository.IntegrationSyncUnreadableRepositoryTest",
+    "tests.logic.BLOOM_invites.InvitesTest",
     "tests.logic.BLOOM_jira_outbound_send.JiraOutboundSendTest",
     "tests.logic.BLOOM_next_doc_id.NextDocIdTest",
 ]
