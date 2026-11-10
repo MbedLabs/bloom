@@ -8,6 +8,7 @@ SUITES = [
     "tests.logic.BLOOM_e2e_image_smoke_script.E2eImageSmokeScriptTest",
     "tests.logic.BLOOM_external_doc_types_admin.ExternalDocTypesAdminTest",
     "tests.logic.BLOOM_external_doc_types_allow.ExternalDocTypesAllowTest",
+    "tests.logic.BLOOM_external_doc_types_allowlist.ExternalDocTypesAllowlistTest",
     "tests.logic.BLOOM_external_doc_types_rejection.ExternalDocTypesRejectionTest",
     "tests.logic.BLOOM_integration_sync_capped_search.IntegrationSyncCappedSearchTest",
     "tests.logic.BLOOM_integration_sync_change_workflow.IntegrationSyncChangeWorkflowTest",

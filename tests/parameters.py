@@ -783,3 +783,7 @@ MSG_EXTERNAL_GRANTED_ALLOWED = "an external member may open the document type gr
 EXTERNAL_OTHER_TYPE = "TC"
 EXTERNAL_REFUSAL_PATTERN = "[Nn]ot authorized"
 MSG_EXTERNAL_OTHER_REFUSED = "an external member is refused a document type not granted to them"
+
+EXTERNAL_ALLOWLIST = ("REQ", "TC")
+EXTERNAL_ALLOWLIST_EXPECTED = {"REQ", "TC"}
+MSG_EXTERNAL_ALLOWLIST = "an external member's document types are the types their term grants"
