@@ -410,8 +410,10 @@ class BloomApiInterface(BloomInterface):
         )
         return sent
 
-    def bloom_api_create_requirement(self, headers, project_id, title, status):
-        body = {"project_id": project_id, "title": title, "status": status}
+    def bloom_api_create_requirement(self, headers, project_id, title, status=None):
+        body = {"project_id": project_id, "title": title}
+        if status is not None:
+            body["status"] = status
         return self._run(self._request("POST", "/api/requirements", headers, json=body))
 
     def bloom_api_open_requirement_doc(self, headers, prefix, ref):
@@ -467,6 +469,12 @@ class BloomApiInterface(BloomInterface):
             for record in handler.buffer
             if record.name.startswith(self.parameters.APP_LOGGERS)
         )
+
+    def bloom_api_delete_project(self, headers, project_id):
+        return self._run(self._request("DELETE", f"/api/projects/{project_id}", headers))
+
+    def bloom_api_get_project(self, headers, project_id):
+        return self._run(self._request("GET", f"/api/projects/{project_id}", headers))
 
     async def _update(self, model, row_id, **fields):
         async with self.maker() as db:

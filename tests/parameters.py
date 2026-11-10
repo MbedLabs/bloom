@@ -875,3 +875,15 @@ RESPONSE_NONE_UNMARKED = []
 MSG_RESPONSE_SCAN_COUNT = "the scan finds more than twenty response models"
 MSG_RESPONSE_SCAN_API = "the scan finds response models inside app.api"
 MSG_RESPONSE_UTC = "every timestamp of a response model has the UTC serializer"
+
+STATUS_NO_CONTENT = 204
+DELETE_PREFIXES = [
+    first + _letters(string.ascii_uppercase, 2, 2)
+    for first in _draw.sample(string.ascii_uppercase, 3)
+]
+DELETE_REQUIREMENT_TITLE = f"Requirement {_letters(string.ascii_lowercase, 4, 10)}"
+MSG_DELETE_SIGN_IN = "the admin signs in"
+MSG_DELETE_ANSWER = "the admin's delete is answered with no content"
+MSG_DELETE_GONE = "the deleted project is no longer found"
+MSG_DELETE_REQUIREMENT = "a requirement is created in the project"
+MSG_DELETE_UNAUTHENTICATED = "a delete without a signed-in user is refused as unauthenticated"
