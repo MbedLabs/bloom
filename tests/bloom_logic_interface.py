@@ -20,7 +20,7 @@ import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 from fastapi import HTTPException
@@ -30,9 +30,13 @@ from sqlalchemy import text
 from app.api import docs_facade, integrations
 from app.core import id_generator
 from app.core.config import settings
-from app.core.security import create_access_token, get_current_user
+from app.core.security import (
+    create_access_token,
+    get_current_user,
+    get_external_doc_types,
+)
 from app.models import IntegrationSetting, SystemMarker
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas import ProjectCreate
 from app.services import integration_sync, jira_outbound
 from tests.bloom_interface import BloomInterface
@@ -224,6 +228,12 @@ class BloomLogicInterface(BloomInterface):
 
     def bloom_list_docs_routes(self):
         return [route.path for route in docs_facade.router.routes]
+
+    def bloom_external_doc_types_as_admin(self, project_id):
+        db = AsyncMock()
+        admin = SimpleNamespace(id=self.parameters.EXTERNAL_USER_ID, role=UserRole.admin)
+        allowed = self._run(get_external_doc_types(db, admin, project_id))
+        return SimpleNamespace(allowed=allowed, queries=db.execute.await_count)
 
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))

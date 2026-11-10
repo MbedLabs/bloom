@@ -723,3 +723,10 @@ MSG_OUTBOUND_BUG = "a new defect is sent to Jira as a Bug with its title as summ
 MSG_OUTBOUND_LINKED = "the sent defect links to the issue Jira created"
 MSG_OUTBOUND_LOGGED = "the sent defect logs the issue it created"
 MSG_OUTBOUND_REFUSED = "a defect Jira refuses stays unlinked and logs the refusal"
+
+EXTERNAL_PROJECT_ID = _draw.randrange(1, 10_000)
+EXTERNAL_USER_ID = _draw.randrange(1, 10_000)
+EXTERNAL_EVERY_TYPE = None
+EXTERNAL_NO_QUERY = 0
+MSG_EXTERNAL_ADMIN_EVERY_TYPE = "an admin is limited to no document type"
+MSG_EXTERNAL_ADMIN_NO_QUERY = "an admin's document types are answered without a database query"

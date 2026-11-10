@@ -5,6 +5,7 @@ import tests.config  # noqa: F401
 SUITES = [
     "tests.logic.BLOOM_access_token_format.AccessTokenFormatTest",
     "tests.logic.BLOOM_e2e_image_smoke_script.E2eImageSmokeScriptTest",
+    "tests.logic.BLOOM_external_doc_types_admin.ExternalDocTypesAdminTest",
     "tests.logic.BLOOM_integration_sync_capped_search.IntegrationSyncCappedSearchTest",
     "tests.logic.BLOOM_integration_sync_change_workflow.IntegrationSyncChangeWorkflowTest",
     "tests.logic.BLOOM_integration_sync_claim.IntegrationSyncClaimTest",
