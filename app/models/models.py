@@ -117,9 +117,6 @@ class Requirement(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     project_id: Mapped[int] = mapped_column(ForeignKey(PROJECTS_ID), nullable=False, index=True)
-    parent_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey(REQUIREMENTS_ID), nullable=True, index=True
-    )
     req_id: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -149,10 +146,6 @@ class Requirement(Base):
     project: Mapped["Project"] = relationship(
         back_populates="requirements", foreign_keys=[project_id]
     )
-    parent: Mapped[Optional["Requirement"]] = relationship(
-        remote_side=[id], back_populates="children"
-    )
-    children: Mapped[List["Requirement"]] = relationship(back_populates="parent")
     test_run_links: Mapped[List["TestRunLink"]] = relationship(back_populates="requirement")
     outgoing_links: Mapped[List["RequirementLink"]] = relationship(
         foreign_keys="RequirementLink.source_id", back_populates="source"

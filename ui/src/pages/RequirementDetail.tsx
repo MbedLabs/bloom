@@ -4,12 +4,12 @@ import ArtefactTags from '../components/ArtefactTags'
 import { useParams, Link, useNavigate } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { requirementsApi, projectsApi } from '../api/client'
-import { ExternalLink, ChevronRight, Trash2 } from 'lucide-react'
+import { ExternalLink, Trash2 } from 'lucide-react'
 import { formatDateTime } from '../lib/dateTime'
 import { docEditUrl, docUrl, type DocType } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
-import DocDetailShell, { StatusBadge, MetaItem, SectionCard } from '../components/DocDetailShell'
+import DocDetailShell, { MetaItem, SectionCard } from '../components/DocDetailShell'
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
@@ -113,11 +113,6 @@ export default function RequirementDetail({
       ),
     ]
   }, [requirement])
-  const { data: parentReq } = useQuery({
-    queryKey: ['requirement', requirement?.parent_id],
-    queryFn: () => requirementsApi.get(requirement!.parent_id!),
-    enabled: !!requirement?.parent_id,
-  })
 
 
 
@@ -201,15 +196,6 @@ export default function RequirementDetail({
       ) : undefined}
       info={<>
         <InfoSection title="Workflow state">
-      {requirement.parent_id && parentReq && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <span className="text-sm text-blue-600 font-medium">Parent Requirement: </span>
-          <Link to={docUrl(projectPrefix, 'REQ', parentReq.req_id)} className="text-sm text-primary hover:text-primary/80 font-medium">
-            {parentReq.req_id} ({parentReq.title}) →
-          </Link>
-        </div>
-      )}
-
           <WorkflowPanel artefactType="requirement" artefactId={reqId} projectPrefix={projectPrefix} projectId={requirement.project_id} layout="panel" />
         </InfoSection>
         <InfoSection title="Details">
@@ -254,29 +240,6 @@ export default function RequirementDetail({
           <p className="text-foreground whitespace-pre-wrap">
             {requirement.description || 'No description provided.'}
           </p>
-        </SectionCard>
-      )}
-
-      {requirement.children && requirement.children.length > 0 && (
-        <SectionCard title="Child Requirements" actions={<span className="text-sm text-muted-foreground">{requirement.children.length}</span>}>
-          <div className="divide-y divide-border -m-6">
-            {requirement.children.map((child) => (
-              <Link
-                key={child.id}
-                to={docUrl(projectPrefix, 'REQ', child.req_id)}
-                className="flex items-center justify-between px-6 py-4 hover:bg-accent/50 transition-colors"
-              >
-                <div className="flex items-center">
-                  <ChevronRight className="h-4 w-4 text-muted-foreground mr-3" />
-                  <div>
-                    <span className="font-mono text-sm text-primary mr-2">{child.req_id}</span>
-                    <span className="text-foreground">{child.title}</span>
-                  </div>
-                </div>
-                <StatusBadge status={child.status} />
-              </Link>
-            ))}
-          </div>
         </SectionCard>
       )}
 

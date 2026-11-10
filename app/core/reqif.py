@@ -133,30 +133,27 @@ class ReqIFBundle:
     specifications: List[ReqIFSpecification] = field(default_factory=list)
     relations: List[ReqIFRelation] = field(default_factory=list)
 
-    def ordered_object_refs(self) -> List[tuple]:
-        """Flatten every specification hierarchy into ``(object_ref, parent_ref)``
-        pairs in document order, parents always before their children.
+    def ordered_object_refs(self) -> List[str]:
+        """Every object reference once, in specification document order, then the objects
+        no specification lists.
         """
-        ordered: List[tuple] = []
+        ordered: List[str] = []
         seen: set = set()
 
-        def walk(node: ReqIFHierarchyNode, parent_ref: Optional[str]) -> None:
+        def walk(node: ReqIFHierarchyNode) -> None:
             if node.object_ref in self.objects and node.object_ref not in seen:
-                ordered.append((node.object_ref, parent_ref))
+                ordered.append(node.object_ref)
                 seen.add(node.object_ref)
-                effective_parent = node.object_ref
-            else:
-                effective_parent = parent_ref
             for child in node.children:
-                walk(child, effective_parent)
+                walk(child)
 
         for spec in self.specifications:
             for root in spec.roots:
-                walk(root, None)
+                walk(root)
 
         for identifier in self.objects:
             if identifier not in seen:
-                ordered.append((identifier, None))
+                ordered.append(identifier)
                 seen.add(identifier)
 
         return ordered

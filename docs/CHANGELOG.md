@@ -29,6 +29,10 @@
 - An administrator may request review of any controlled document and decline any pending review or approval request; the audit log records the step under the administrator. Marking a document reviewed or approved stays with its assigned reviewer and approver.
 - Test suites and campaigns are addressed by their public ID, such as `PRJ-TS-001` and `PRJ-CMP-001`, never by their database number. `/api/test-suites/{suite_id}` and `/api/campaigns/{campaign_id}` take the public ID, and their `/items` routes name a test case by its public ID (`POST .../items?test_case_id=PRJ-TC-001`, `PATCH` and `DELETE .../items/PRJ-TC-001`); a database number answers 404. Suite and campaign pages, their links and the document address open them by public ID only, so an older address with a database number no longer opens them. The page URLs that `POST /api/campaigns/sync-results` returns to Bud are `/projects/<prefix>/docs/test-suites/<public ID>` and `/projects/<prefix>/docs/campaigns/<public ID>`. Every campaign has a public ID and both public IDs are unique: the upgrade gives each campaign without one the next public ID of its project and stops, naming them, if two suites or two campaigns share a public ID.
 
+### Removed
+
+- Requirements no longer form a tree; they relate to each other only through links. The upgrade drops `requirements.parent_id` and the values it held. Requirement create and update no longer accept `parent_id`, requirement responses no longer carry `parent_id` or `children`, the requirement page no longer shows a parent, the requirements CSV export no longer has a `parent_req_id` column, and ReqIF import no longer sets a parent from the specification hierarchy.
+
 ### Fixed
 
 - A document address that names a document other than a test suite or campaign by its database number instead of its document ID, such as the links inside a document opened in the editor, opens the document; before, it answered not found and the page said "You don't have access" to everyone, administrators included.

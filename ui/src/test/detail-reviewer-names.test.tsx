@@ -22,7 +22,6 @@ import { workflowFixture } from './apiFixtures'
 const requirement = {
   id: 2001,
   project_id: 7,
-  parent_id: null,
   req_id: 'PRJ-REQ-2001',
   title: 'Brake actuator response time',
   description: 'Stop within budget.',
@@ -39,7 +38,6 @@ const requirement = {
   approved_at: '2026-07-03T00:00:00Z',
   created_at: '2026-07-01T00:00:00Z',
   updated_at: '2026-07-01T00:00:00Z',
-  children: [],
   linked_test_runs: [],
   suite_backlinks: [],
   campaign_backlinks: [],

@@ -759,7 +759,6 @@ interface TestCaseVerifiesLink {
 export interface Requirement {
   id: number
   project_id: number
-  parent_id: number | null
   req_id: string
   title: string
   description: string | null
@@ -783,7 +782,6 @@ export interface Requirement {
   source_ref?: string | null
   source_project_id?: number | null
   test_case_count: number
-  children: Requirement[]
   linked_test_cases: TestCaseSummary[]
   verified_by: RequirementVerifiedByLink[]
   linked_test_runs: TestRunLink[]
@@ -1302,7 +1300,6 @@ export const requirementsApi = {
     priority?: string
     req_type?: string
     req_origin?: string
-    parent_id?: number | null
   }) => {
     const response = await api.post<Requirement>('/requirements', data)
     return response.data

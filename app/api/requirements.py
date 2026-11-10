@@ -99,7 +99,6 @@ async def _get_verified_by(
 
 class ReqPrefetchContext:
     def __init__(self):
-        self.children_by_parent: dict[int, list[Requirement]] = defaultdict(list)
         self.verified_by_by_req: dict[int, list[RequirementVerifiedByLinkResponse]] = defaultdict(
             list
         )
@@ -118,33 +117,16 @@ async def _build_prefetch_context(
     """
     ctx = ReqPrefetchContext()
 
-    hierarchy = (
-        select(Requirement)
-        .where(Requirement.id == root_req_id)
-        .cte(name="hierarchy", recursive=True)
-    )
-    hierarchy = hierarchy.union_all(
-        select(Requirement).where(Requirement.parent_id == hierarchy.c.id)
-    )
-    from sqlalchemy.orm import aliased
-
-    req_alias = aliased(Requirement)
-    descendants_query = select(req_alias).join(hierarchy, req_alias.id == hierarchy.c.id)
+    req_query = select(Requirement).where(Requirement.id == root_req_id)
     if current_user is not None:
-        descendants_query = apply_external_visibility_filter(
-            descendants_query, req_alias, current_user
-        )
-    all_reqs = (await db.execute(descendants_query)).scalars().all()
+        req_query = apply_external_visibility_filter(req_query, Requirement, current_user)
+    all_reqs = (await db.execute(req_query)).scalars().all()
     req_ids = [r.id for r in all_reqs]
     types = (
         await visible_types(db, current_user, all_reqs[0].project_id)
         if current_user is not None and all_reqs
         else None
     )
-
-    for req in all_reqs:
-        if req.parent_id is not None:
-            ctx.children_by_parent[req.parent_id].append(req)
 
     if req_ids:
         verified_by_query = (
@@ -242,12 +224,6 @@ async def _build_requirement_response(
     verified_by = ctx.verified_by_by_req.get(req.id, [])
     tc_count = len(verified_by)
 
-    children = ctx.children_by_parent.get(req.id, [])
-    children_responses = []
-    for child in children:
-        child_resp = await _build_requirement_response(child, db, ctx, current_user)
-        children_responses.append(child_resp)
-
     linked_test_runs = ctx.test_run_links_by_req.get(req.id, [])
 
     suite_backlinks = []
@@ -271,7 +247,6 @@ async def _build_requirement_response(
         project_id=req.project_id,
         content_json=req.content_json,
         content_html=req.content_html,
-        parent_id=req.parent_id,
         req_id=req.req_id,
         title=req.title,
         description=req.description,
@@ -288,7 +263,6 @@ async def _build_requirement_response(
         approved_at=req.approved_at,
         created_at=req.created_at,
         updated_at=req.updated_at,
-        children=children_responses,
         test_case_count=tc_count,
         linked_test_cases=[link.test_case for link in verified_by],
         verified_by=verified_by,
@@ -306,7 +280,6 @@ def _build_requirement_list_response(
         project_id=req.project_id,
         content_json=req.content_json,
         content_html=req.content_html,
-        parent_id=req.parent_id,
         req_id=req.req_id,
         title=req.title,
         description=req.description,
@@ -323,7 +296,6 @@ def _build_requirement_list_response(
         approved_at=req.approved_at,
         created_at=req.created_at,
         updated_at=req.updated_at,
-        children=[],
         test_case_count=test_case_count,
         linked_test_cases=[],
         verified_by=[],
@@ -408,20 +380,6 @@ async def create_requirement(
     status = forced.get("status", data.status)
     req_origin = forced.get("req_origin", data.req_origin)
 
-    if data.parent_id is not None:
-        parent = await get_visible_row(
-            db,
-            Requirement,
-            data.parent_id,
-            "Parent requirement not found",
-            current_user,
-            permission=("view", "REQ"),
-        )
-        if parent.project_id != data.project_id:
-            raise HTTPException(
-                status_code=400, detail="Parent requirement must belong to same project"
-            )
-
     if data.reviewer_id is not None:
         reviewer = (
             await db.execute(select(UserModel).where(UserModel.id == data.reviewer_id))
@@ -453,7 +411,6 @@ async def create_requirement(
     requirement = Requirement(
         project_id=data.project_id,
         created_by_id=current_user.id,
-        parent_id=data.parent_id,
         req_id=req_id,
         title=data.title,
         description=data.description,
@@ -630,25 +587,6 @@ async def update_requirement(
     requirement.visibility = requirement_origin_visibility(requirement.req_origin)
     await audit_visibility_change(db, "requirement", requirement, previous_visibility)
 
-    if "parent_id" in fields_set:
-        if data.parent_id is None:
-            requirement.parent_id = None
-        else:
-            if data.parent_id == requirement_id:
-                raise HTTPException(status_code=400, detail="Requirement cannot be its own parent")
-            parent = await get_visible_row(
-                db,
-                Requirement,
-                data.parent_id,
-                "Parent requirement not found",
-                current_user,
-                permission=("view", "REQ"),
-            )
-            if parent.project_id != requirement.project_id:
-                raise HTTPException(
-                    status_code=400, detail="Parent requirement must belong to same project"
-                )
-            requirement.parent_id = data.parent_id
     previous_reviewer_id = requirement.reviewer_id
     previous_approver_id = requirement.approver_id
     if "reviewer_id" in fields_set:

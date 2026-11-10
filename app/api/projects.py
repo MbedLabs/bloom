@@ -5,7 +5,7 @@ Projects API endpoints.
 from http import HTTPStatus
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import delete, func, or_, select, update
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import get_row_or_404, type_visible, visible_types
@@ -95,9 +95,6 @@ async def _delete_project_scoped_data(db: AsyncSession, project_id: int) -> None
     await db.execute(delete(ChangeRequest).where(ChangeRequest.project_id == project_id))
     await db.execute(delete(Baseline).where(Baseline.project_id == project_id))
     await db.execute(delete(TestConcept).where(TestConcept.project_id == project_id))
-    await db.execute(
-        update(Requirement).where(Requirement.project_id == project_id).values(parent_id=None)
-    )
     await db.execute(delete(Requirement).where(Requirement.project_id == project_id))
 
 

@@ -138,10 +138,10 @@ def test_foreign_id_attribute_captured():
     assert obj.first_attr(FOREIGN_ID_HINTS) == "PRJ-042"
 
 
-def test_hierarchy_orders_parent_before_child():
+def test_objects_follow_specification_document_order():
     bundle = parse_reqif(SAMPLE_REQIF)
     ordered = bundle.ordered_object_refs()
-    assert ordered == [("OBJ-1", None), ("OBJ-2", "OBJ-1")]
+    assert ordered == ["OBJ-1", "OBJ-2"]
 
 
 def test_relations_parsed_with_type_name():
@@ -167,7 +167,7 @@ def test_objects_not_in_hierarchy_are_not_dropped():
     )
     bundle = parse_reqif(xml)
     ordered = bundle.ordered_object_refs()
-    assert ("OBJ-3", None) in ordered
+    assert "OBJ-3" in ordered
     assert len(ordered) == 3
 
 
@@ -236,7 +236,7 @@ async def _admin(db):
     return (await db.execute(select(User).where(User.role == UserRole.admin))).scalar_one()
 
 
-async def test_import_creates_requirements_with_hierarchy_and_links(session):
+async def test_import_creates_requirements_and_links(session):
     admin = await _admin(session)
     result = await import_reqif(
         project_id=1, file=_FakeUpload(SAMPLE_REQIF), db=session, current_user=admin
@@ -247,19 +247,18 @@ async def test_import_creates_requirements_with_hierarchy_and_links(session):
     assert result.new_ids == ["PRJ-REQ-001", "PRJ-REQ-002"]
 
     reqs = {r.req_id: r for r in (await session.execute(select(Requirement))).scalars().all()}
-    parent = reqs["PRJ-REQ-001"]
-    child = reqs["PRJ-REQ-002"]
-    assert parent.title == "System Requirements"
-    assert child.title == "Login"
-    assert child.parent_id == parent.id
-    assert child.priority == "High"
-    assert child.content_html
-    assert "<b>shall</b>" in child.content_html
-    assert child.req_origin == "External"
-    assert parent.source_ref == "OBJ-1"
+    system = reqs["PRJ-REQ-001"]
+    login = reqs["PRJ-REQ-002"]
+    assert system.title == "System Requirements"
+    assert login.title == "Login"
+    assert login.priority == "High"
+    assert login.content_html
+    assert "<b>shall</b>" in login.content_html
+    assert login.req_origin == "External"
+    assert system.source_ref == "OBJ-1"
 
     link = (await session.execute(select(ArtefactLink))).scalars().one()
-    assert (link.source_id, link.target_id) == (child.id, parent.id)
+    assert (link.source_id, link.target_id) == (login.id, system.id)
     assert (link.source_type, link.target_type, link.role) == ("REQ", "REQ", "refines")
     assert (await session.execute(select(RequirementLink))).scalars().all() == []
 

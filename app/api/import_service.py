@@ -467,7 +467,7 @@ async def import_reqif(
     )
     may_link = has_permission(rights, "create", "link")
 
-    for object_ref, parent_ref in bundle.ordered_object_refs():
+    for object_ref in bundle.ordered_object_refs():
         obj = bundle.objects.get(object_ref)
         if obj is None:
             continue
@@ -481,14 +481,12 @@ async def import_reqif(
             result.errors.append(f"object {source_ref}: not permitted")
             continue
 
-        parent_id = ref_to_req_id.get(parent_ref[:100]) if parent_ref else None
         new_req_id = format_doc_id(prefix, "REQ", next_num)
         priority = (obj.attributes.get("priority") or "Medium").strip()[:20] or "Medium"
 
         requirement = Requirement(
             project_id=target_project.id,
             created_by_id=current_user.id,
-            parent_id=parent_id,
             req_id=new_req_id,
             title=_requirement_title(obj),
             description=obj.first_attr(TEXT_ATTRIBUTE_HINTS),
