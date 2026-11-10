@@ -39,7 +39,7 @@ from app.core.security import (
 )
 from app.models import Document, IntegrationSetting, SystemMarker, user_token
 from app.models.user import User, UserRole
-from app.schemas import ProjectCreate
+from app.schemas import ProjectCreate, schemas
 from app.services import integration_sync, jira_outbound, token_service
 from tests.bloom_interface import BloomInterface
 
@@ -311,6 +311,29 @@ class BloomLogicInterface(BloomInterface):
             else:
                 os.environ["TZ"] = previous
             time.tzset()
+
+    def bloom_schema_fields(self, name):
+        return list(getattr(schemas, name).model_fields)
+
+    def bloom_build_schema(self, name, payload):
+        model = getattr(schemas, name)
+        body = dict(payload)
+        for field_name, field in model.model_fields.items():
+            if field.is_required() and field_name not in body:
+                body[field_name] = (
+                    self.parameters.RICH_TITLE
+                    if field_name in self.parameters.RICH_TITLE_FIELDS
+                    else self.parameters.RICH_FILLER
+                )
+        try:
+            instance = model(**body)
+        except ValidationError as exc:
+            return SimpleNamespace(content_json=None, content_html=None, error=str(exc))
+        return SimpleNamespace(
+            content_json=getattr(instance, "content_json", None),
+            content_html=getattr(instance, "content_html", None),
+            error=None,
+        )
 
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))

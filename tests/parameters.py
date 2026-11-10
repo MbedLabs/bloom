@@ -807,3 +807,24 @@ MSG_STAMP_MINUTES = "a time is written in UTC to the minute"
 MSG_STAMP_NONE = "a missing time is written as nothing"
 MSG_STAMP_AWARE = "a time in another zone is written in UTC"
 MSG_STAMP_EXECUTION_UTC = "an execution time is stored in UTC on a server in another zone"
+
+RICH_CONTENT_TYPES = [
+    "Requirement",
+    "TestCase",
+    "Document",
+    "DesignItem",
+    "RiskItem",
+    "ChangeRequest",
+    "TestConcept",
+]
+RICH_SCHEMA_SUFFIXES = ["Create", "Update", "Response"]
+RICH_FIELDS = ["content_json", "content_html"]
+RICH_TITLE_FIELDS = {"title", "name"}
+RICH_TITLE = "Title"
+RICH_FILLER = "x"
+RICH_JSON = {"type": "doc", "content": []}
+RICH_HTML = "<p>body</p>"
+RICH_PAYLOAD = {"project_id": 1, "content_json": RICH_JSON, "content_html": RICH_HTML}
+MSG_RICH_FIELD = "the schema carries the rich content field"
+MSG_RICH_JSON = "the create schema keeps the editor's JSON content"
+MSG_RICH_HTML = "the create schema keeps the editor's HTML content"
