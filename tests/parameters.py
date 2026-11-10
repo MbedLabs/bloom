@@ -787,3 +787,11 @@ MSG_EXTERNAL_OTHER_REFUSED = "an external member is refused a document type not 
 EXTERNAL_ALLOWLIST = ("REQ", "TC")
 EXTERNAL_ALLOWLIST_EXPECTED = {"REQ", "TC"}
 MSG_EXTERNAL_ALLOWLIST = "an external member's document types are the types their term grants"
+
+VISION_PREFIX = "PRJ"
+VISION_DOCUMENTS = [
+    ("PRJ-VIS-001", "VIS", "Vision"),
+    ("PRJ-XYZ-001", "XYZ", "Unknown"),
+]
+VISION_AFTER_RESTART = [("VIS", "PRJ-VIS-001"), ("SPEC", "PRJ-SPEC-001")]
+MSG_VISION_KEPT = "a restart keeps a Vision's kind and id and turns an unknown kind into SPEC"

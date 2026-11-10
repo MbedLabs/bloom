@@ -26,7 +26,7 @@ import httpx
 import yaml
 from fastapi import HTTPException
 from pydantic import ValidationError
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from app.api import docs_facade, integrations
 from app.core import id_generator, security
@@ -36,7 +36,7 @@ from app.core.security import (
     get_current_user,
     get_external_doc_types,
 )
-from app.models import IntegrationSetting, SystemMarker, user_token
+from app.models import Document, IntegrationSetting, SystemMarker, user_token
 from app.models.user import User, UserRole
 from app.schemas import ProjectCreate
 from app.services import integration_sync, jira_outbound, token_service
@@ -277,6 +277,23 @@ class BloomLogicInterface(BloomInterface):
         except HTTPException as exc:
             return SimpleNamespace(status=exc.status_code, detail=exc.detail)
         return SimpleNamespace(status=None, detail="")
+
+    def bloom_add_document(self, project_id, doc_id, doc_type, title):
+        return self._run(
+            self._add(
+                Document(project_id=project_id, doc_id=doc_id, doc_type=doc_type, title=title)
+            )
+        )
+
+    def bloom_normalize_document_kinds(self):
+        from app import main
+
+        with patch.object(main, "async_session_maker", self.maker):
+            self._run(main.normalize_document_kinds_and_ids())
+
+    def bloom_list_document_kinds(self):
+        documents = self._run(self._all(select(Document).order_by(Document.id)))
+        return [(document.doc_type, document.doc_id) for document in documents]
 
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))
