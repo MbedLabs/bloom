@@ -18,6 +18,7 @@ import re
 import subprocess
 import tempfile
 import time
+import tomllib
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -334,6 +335,13 @@ class BloomLogicInterface(BloomInterface):
             content_html=getattr(instance, "content_html", None),
             error=None,
         )
+
+    def bloom_read_repo_json(self, name):
+        return json.loads(self.bloom_read_repo_text(name))
+
+    def bloom_project_version(self):
+        project = tomllib.loads(self.bloom_read_repo_text(self.parameters.PYPROJECT))
+        return project["project"]["version"]
 
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))

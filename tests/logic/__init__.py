@@ -6,6 +6,7 @@ SUITES = [
     "tests.logic.BLOOM_access_token_format.AccessTokenFormatTest",
     "tests.logic.BLOOM_artefact_rich_content.ArtefactRichContentTest",
     "tests.logic.BLOOM_attachment_deployment_contract.AttachmentDeploymentContractTest",
+    "tests.logic.BLOOM_cloudron_metadata.CloudronMetadataTest",
     "tests.logic.BLOOM_e2e_image_smoke_script.E2eImageSmokeScriptTest",
     "tests.logic.BLOOM_external_doc_types_admin.ExternalDocTypesAdminTest",
     "tests.logic.BLOOM_external_doc_types_allow.ExternalDocTypesAllowTest",
