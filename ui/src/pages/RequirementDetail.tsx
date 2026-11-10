@@ -23,6 +23,7 @@ import { useArtefactLabels } from '../hooks/useArtefactLabels'
 import BudRunLink from '../components/BudRunLink'
 import ConfirmDelete from '../components/ConfirmDelete'
 import WorkflowPanel from '../components/WorkflowPanel'
+import { InfoSection } from '../components/DocumentInfoPanel'
 import { CommentableDocEditor, CommentsColumn, ReviewCommentsProvider } from '../components/comments/ReviewComments'
 import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
 import { useSignOffPeople } from '../hooks/useSignOff'
@@ -112,12 +113,12 @@ export default function RequirementDetail({
       ),
     ]
   }, [requirement])
-
   const { data: parentReq } = useQuery({
     queryKey: ['requirement', requirement?.parent_id],
     queryFn: () => requirementsApi.get(requirement!.parent_id!),
     enabled: !!requirement?.parent_id,
   })
+
 
 
 
@@ -198,9 +199,8 @@ export default function RequirementDetail({
           ))}
         </div>
       ) : undefined}
-      review={<WorkflowPanel artefactType="requirement" artefactId={reqId} projectPrefix={projectPrefix} projectId={requirement.project_id} layout="bar" />}
-      comments={<CommentsColumn />}
-    >
+      info={<>
+        <InfoSection title="Workflow state">
       {requirement.parent_id && parentReq && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <span className="text-sm text-blue-600 font-medium">Parent Requirement: </span>
@@ -210,6 +210,33 @@ export default function RequirementDetail({
         </div>
       )}
 
+          <WorkflowPanel artefactType="requirement" artefactId={reqId} projectPrefix={projectPrefix} projectId={requirement.project_id} layout="panel" />
+        </InfoSection>
+        <InfoSection title="Details">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+            <MetaItem label="Type" value={<TypeBadge reqType={requirement.req_type} />} />
+            <MetaItem label="Priority" value={requirement.priority} />
+          </div>
+        </InfoSection>
+        <InfoSection title="Metadata">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+            <div className="col-span-2">
+              <MetaItem label="Origin" value={
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <OriginBadge origin={requirement.req_origin} />
+                  <ArtefactTags type="requirement" id={reqId} projectId={requirement.project_id} canEdit={showEdit} />
+                </div>
+              } />
+            </div>
+            <MetaItem label="ID" value={requirement.req_id} mono />
+            <MetaItem label="Project" value={project ? `${project.prefix} · ${project.name}` : `#${requirement.project_id}`} />
+            <MetaItem label="Created" value={formatDateTime(requirement.created_at) + ' ago'} />
+            <MetaItem label="Updated" value={formatDateTime(requirement.updated_at) + ' ago'} />
+          </div>
+        </InfoSection>
+      </>}
+      comments={<CommentsColumn />}
+    >
       {(requirement.content_json as Record<string, unknown> | null) ? (
         <SectionCard title="Content">
           <CommentableDocEditor
@@ -311,41 +338,21 @@ export default function RequirementDetail({
         sourceDocId={requirement.req_id}
         derivedLinks={derivedMembershipLinks}
       />
-      <>
-          <SectionCard title="Metadata">
-            <div className="space-y-4">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Type</div>
-                <TypeBadge reqType={requirement.req_type} />
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Origin</div>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <OriginBadge origin={requirement.req_origin} />
-                  <ArtefactTags type="requirement" id={reqId} projectId={requirement.project_id} canEdit={showEdit} />
-                </div>
-              </div>
-              <MetaItem label="Created" value={formatDateTime(requirement.created_at) + ' ago'} />
-              <MetaItem label="Updated" value={formatDateTime(requirement.updated_at) + ' ago'} />
-            </div>
-          </SectionCard>
-
-          {requirement.linked_test_runs?.length > 0 && (
-            <SectionCard title="Test runs">
-              <ul className="space-y-2">
-                {requirement.linked_test_runs.map((run) => (
-                  <li key={run.id} className="text-sm">
-                    <BudRunLink runId={run.test_run_id} source={{ source_kind: 'requirement', source_id: requirement.id }} label={run.test_run_name || undefined} />
-                    <div className="text-xs text-muted-foreground">{run.status || 'Status not recorded'}</div>
-                  </li>
-                ))}
-              </ul>
-              <p className="text-xs text-muted-foreground mt-3">
-                A run opens in Bud, where its report can be downloaded.
-              </p>
-            </SectionCard>
-          )}
-      </>
+      {requirement.linked_test_runs?.length > 0 && (
+        <SectionCard title="Test runs">
+          <ul className="space-y-2">
+            {requirement.linked_test_runs.map((run) => (
+              <li key={run.id} className="text-sm">
+                <BudRunLink runId={run.test_run_id} source={{ source_kind: 'requirement', source_id: requirement.id }} label={run.test_run_name || undefined} />
+                <div className="text-xs text-muted-foreground">{run.status || 'Status not recorded'}</div>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted-foreground mt-3">
+            A run opens in Bud, where its report can be downloaded.
+          </p>
+        </SectionCard>
+      )}
     </DocDetailShell>
     </ReviewCommentsProvider>
   )

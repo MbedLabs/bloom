@@ -4,6 +4,7 @@ import { DOC_TYPE_SLUGS } from '../types/doc'
 import { refreshProjectViews, finishArtefactDeletion } from '../lib/refreshProjectViews'
 import ProfilePicture from '../components/ProfilePicture'
 import WorkflowPanel from '../components/WorkflowPanel'
+import { InfoSection } from '../components/DocumentInfoPanel'
 import { CommentableDocEditor, CommentsColumn, ReviewCommentsProvider } from '../components/comments/ReviewComments'
 import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
 import { useSignOffPeople } from '../hooks/useSignOff'
@@ -474,7 +475,46 @@ export default function ArtefactDetail({
             </div>
           </SectionCard>
         </> : undefined}
-      review={kind === 'defect' ? undefined : <WorkflowPanel artefactType={kind} artefactId={recordId} projectPrefix={projectPrefix} projectId={projectId} layout="bar" />}
+      info={kind === 'defect' ? undefined : <>
+        <InfoSection title="Workflow state">
+          <WorkflowPanel artefactType={kind} artefactId={recordId} projectPrefix={projectPrefix} projectId={projectId} layout="panel" />
+          {workflow.data && !workflow.data.controlled && <div className="space-y-3">
+            <MetaItem label="Current Status" value={<StatusBadge status={String(artefact.status)} />} />
+            <div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Available Transitions</div>
+              {allowedTransitions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No transition actions available.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {allowedTransitions.map((status) => (
+                    <button key={status} onClick={() => transitionMutation.mutate(status)} disabled={transitionMutation.isPending} className="px-3 py-2 rounded-md border border-input text-sm hover:bg-accent/40 disabled:opacity-50">
+                      Move to {status}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>}
+        </InfoSection>
+        <InfoSection title="Details">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+            {config.fields.filter((f) => f.key !== 'status' && f.key !== 'visibility').map((field) => (
+              <MetaItem key={field.key} label={field.label} value={fieldText(artefactRecord[field.key])} />
+            ))}
+          </div>
+        </InfoSection>
+        <InfoSection title="Metadata">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+            <div className="col-span-2">
+              <MetaItem label="Origin" value={<ArtefactTags type={kind} id={recordId} projectId={artefact.project_id} canEdit={showEdit} origin={artefact.visibility === 'customer' ? 'Customer' : 'Internal'} />} />
+            </div>
+            <MetaItem label="ID" value={code} mono />
+            <MetaItem label="Project" value={related?.project ? `${related.project.prefix} · ${related.project.name}` : `#${artefact.project_id}`} />
+            <MetaItem label="Created" value={formatDateTime(artefact.created_at) + ' ago'} />
+            <MetaItem label="Updated" value={formatDateTime(artefact.updated_at) + ' ago'} />
+          </div>
+        </InfoSection>
+      </>}
       comments={kind === 'defect' ? undefined : <CommentsColumn />}
     >
       <div className="border-b border-border overflow-x-auto">
@@ -724,50 +764,6 @@ export default function ArtefactDetail({
         </SectionCard>
       )}
       {kind !== 'defect' && <>
-          {workflow.data && !workflow.data.controlled && <SectionCard title="Workflow">
-            <div className="space-y-3">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Current Status</div>
-                <StatusBadge status={String(artefact.status)} />
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Available Transitions</div>
-                {allowedTransitions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No transition actions available.</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {allowedTransitions.map((status) => (
-                      <button key={status} onClick={() => transitionMutation.mutate(status)} disabled={transitionMutation.isPending} className="px-3 py-2 rounded-md border border-input text-sm hover:bg-accent/40 disabled:opacity-50">
-                        Move to {status}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </SectionCard>}
-
-          <SectionCard title="Details">
-            <div className="space-y-4">
-              {config.fields.filter((f) => f.key !== 'status' && f.key !== 'visibility').map((field) => (
-                <div key={field.key}>
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{field.label}</div>
-                  <div className="text-foreground text-sm">{fieldText(artefactRecord[field.key])}</div>
-                </div>
-              ))}
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Metadata">
-            <div className="space-y-4">
-              <MetaItem label="Origin" value={<ArtefactTags type={kind} id={recordId} projectId={artefact.project_id} canEdit={showEdit} origin={artefact.visibility === 'customer' ? 'Customer' : 'Internal'} />} />
-              <MetaItem label="ID" value={code} mono />
-              <MetaItem label="Project" value={related?.project ? `${related.project.prefix} · ${related.project.name}` : `#${artefact.project_id}`} />
-              <MetaItem label="Created" value={formatDateTime(artefact.created_at) + ' ago'} />
-              <MetaItem label="Updated" value={formatDateTime(artefact.updated_at) + ' ago'} />
-            </div>
-          </SectionCard>
-
           <SectionCard title="Quick Links">
             <div className="space-y-3 text-sm">
               <Link to={docRegistryListUrl(projectPrefix, config.docType)} className="block text-primary hover:text-primary/80">Back to project {config.singular.toLowerCase()} list</Link>

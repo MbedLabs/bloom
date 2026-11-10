@@ -1,6 +1,7 @@
 import { DOC_TYPE_SLUGS } from '../types/doc'
 import { finishArtefactDeletion } from '../lib/refreshProjectViews'
 import WorkflowPanel from '../components/WorkflowPanel'
+import { InfoSection } from '../components/DocumentInfoPanel'
 import { CommentableDocEditor, CommentsColumn, ReviewCommentsProvider } from '../components/comments/ReviewComments'
 import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
 import { useAuth } from '../contexts/AuthContext'
@@ -243,7 +244,25 @@ export default function DocumentDetail({
           onDelete={() => { setDeleteConfirm(false); deleteDocumentMutation.mutate(); }}
         />
       ) : undefined}
-      review={hasRichContent ? <WorkflowPanel artefactType="document" artefactId={docId} projectPrefix={projectPrefix} projectId={doc.project_id} layout="bar" /> : undefined}
+      info={hasRichContent ? <>
+        <InfoSection title="Workflow state">
+          <WorkflowPanel artefactType="document" artefactId={docId} projectPrefix={projectPrefix} projectId={doc.project_id} layout="panel" />
+        </InfoSection>
+        <InfoSection title="Details">
+          <MetaItem label="Version" value={`v${doc.version}`} />
+        </InfoSection>
+        <InfoSection title="Metadata">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+            <div className="col-span-2">
+              <MetaItem label="Origin" value={<ArtefactTags type="document" id={docId} projectId={doc.project_id} canEdit={showEdit} origin={doc.visibility === 'customer' ? 'Customer' : 'Internal'} />} />
+            </div>
+            <MetaItem label="ID" value={doc.doc_id || String(docId)} mono />
+            <MetaItem label="Project" value={project ? `${project.prefix} · ${project.name}` : `#${doc.project_id}`} />
+            <MetaItem label="Created" value={formatDateTime(doc.created_at) + ' ago'} />
+            <MetaItem label="Updated" value={formatDateTime(doc.updated_at) + ' ago'} />
+          </div>
+        </InfoSection>
+      </> : undefined}
       comments={hasRichContent ? <CommentsColumn /> : undefined}
       rightRail={hasRichContent ? undefined : <>
         <WorkflowPanel artefactType="document" artefactId={docId} projectPrefix={projectPrefix} projectId={doc.project_id} />
@@ -299,7 +318,6 @@ export default function DocumentDetail({
         sourceId={docId}
         sourceDocId={doc.doc_id ?? undefined}
       />
-      {hasRichContent && <DocumentMetadata doc={doc} docId={docId} canEdit={showEdit} />}
     </DocDetailShell>
     </ReviewCommentsProvider>
   )

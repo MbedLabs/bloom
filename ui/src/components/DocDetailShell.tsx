@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import type { DocType } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocumentDetailColumns from './DocumentDetailColumns'
+import DocumentInfoPanel from './DocumentInfoPanel'
 
 const STATUS_COLORS: Record<string, string> = {
   Draft: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
@@ -67,8 +68,8 @@ interface DocDetailShellProps {
   codeLabel?: ReactNode
   actions?: ReactNode
   rightRail?: ReactNode
-  /** The review summary shown above the content. */
-  review?: ReactNode
+  /** The workflow, details and metadata shown in the collapsible panel beside the content. */
+  info?: ReactNode
   /** The comments column shown beside the content. */
   comments?: ReactNode
   children: ReactNode
@@ -83,7 +84,7 @@ export default function DocDetailShell({
   codeLabel,
   actions,
   rightRail,
-  review,
+  info,
   comments,
   children,
   backTo,
@@ -102,16 +103,20 @@ export default function DocDetailShell({
     }
   }
 
+  const panel = info ? <DocumentInfoPanel>{info}</DocumentInfoPanel> : null
   let body = <div className="space-y-6">{children}</div>
   if (comments) {
     body = (
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] items-start gap-6">
         <div className="min-w-0 space-y-6">{children}</div>
-        <aside aria-label="Document comments column" className="order-first min-w-0 lg:order-last">{comments}</aside>
+        <div className="order-first min-w-0 space-y-6 lg:order-last">
+          {panel}
+          <aside aria-label="Document comments column" className="min-w-0">{comments}</aside>
+        </div>
       </div>
     )
-  } else if (rightRail) {
-    body = <DocumentDetailColumns rightRail={rightRail}>{children}</DocumentDetailColumns>
+  } else if (rightRail || panel) {
+    body = <DocumentDetailColumns rightRail={<>{panel}{rightRail}</>}>{children}</DocumentDetailColumns>
   }
 
   return (
@@ -136,7 +141,6 @@ export default function DocDetailShell({
         )}
       </div>
 
-      {review}
       {body}
     </div>
   )
