@@ -1031,3 +1031,39 @@ MSG_NAMING_BAD_UPDATE = "a project update refuses an invalid prefix"
 MSG_NAMING_FIELD_KEPT = "the create schema keeps the given field"
 MSG_NAMING_NO_CLIENT_ID = "the create schema takes no client-chosen public id"
 MSG_NAMING_BUILDS = "the create schema builds without a public id"
+
+START_SCRIPT = "docker/start.sh"
+SUPERVISORD_CONF = "docker/supervisord.conf"
+START_HANDOVER = 'exec gosu "$APP_USER" /usr/local/bin/supervisord -c /etc/supervisord.conf'
+START_APP_USER = "APP_USER=appuser"
+START_FD_LOOP = "for fd in 1 2; do"
+START_FD_TEST = 'if ! gosu "$APP_USER" test -w "/proc/self/fd/$fd"; then'
+START_FD_CHOWN = 'chown "$APP_UID:$APP_GID" "/proc/self/fd/$fd"'
+START_CLOUDRON_IF = 'if [ -n "${CLOUDRON_APP_ORIGIN:-}" ]; then'
+START_ELSE = "\nelse\n"
+START_FI = "\nfi\n"
+START_DATA_CHOWN = 'chown -R "$APP_UID:$APP_GID" /app/data'
+START_SECRETS = "secrets_file=/app/data/secrets.env"
+START_MIGRATION = 'gosu "$APP_USER" alembic upgrade head'
+START_ATTACHMENT_CHOWN = 'chown "$APP_UID:$APP_GID" /app/attachments'
+START_RECURSIVE = "chown -R"
+START_ROOT_SETTING = "user=root"
+START_PIDFILE = "pidfile=/run/bloom/supervisord.pid"
+START_USER_ROOT = r"(?m)^USER root$"
+START_NGINX_USER = "user appuser;"
+START_NGINX_USER_DROP = "-e '/^[[:space:]]*user[[:space:]]/d'"
+START_HANDOVERS = 1
+MSG_START_LAST = "start.sh ends by handing supervisord to appuser"
+MSG_START_ONCE = "start.sh hands over to supervisord exactly once"
+MSG_START_APP_USER = "start.sh runs its processes as appuser"
+MSG_START_FD = "start.sh gives the container output to appuser when it cannot write to it"
+MSG_START_FD_FIRST = "the output descriptors are fixed before the handover"
+MSG_START_DATA = "on Cloudron start.sh gives every file under /app/data to appuser"
+MSG_START_DATA_FIRST = "the data chown runs before the secrets and the migrations"
+MSG_START_LOCAL = "outside Cloudron start.sh gives the attachment directory to appuser"
+MSG_START_LOCAL_FLAT = "outside Cloudron no recursive chown runs"
+MSG_START_NOT_ROOT = "supervisord has no root user setting"
+MSG_START_PIDFILE = "supervisord keeps its pid file in the appuser runtime folder"
+MSG_START_USER_ROOT = "the image starts as root for the preparation"
+MSG_START_NGINX_USER = "nginx.conf keeps no user directive"
+MSG_START_NGINX_DROP = "the image build drops nginx's user directive"

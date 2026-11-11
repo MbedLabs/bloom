@@ -542,6 +542,16 @@ class BloomLogicInterface(BloomInterface):
             return SimpleNamespace(instance=None, error=type(exc).__name__)
         return SimpleNamespace(instance=instance, error=None)
 
+    def bloom_read_repo_lines(self, name):
+        lines = self.bloom_read_repo_text(name).splitlines()
+        return [line.strip() for line in lines if line.strip()]
+
+    def bloom_read_repo_block(self, name, start, end):
+        text = self.bloom_read_repo_text(name)
+        first = text.find(start)
+        last = text.find(end, first + 1) if first >= 0 else -1
+        return text[first:last] if first >= 0 and last >= 0 else ""
+
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))
         expires = datetime.now(timezone.utc) + timedelta(minutes=minutes)
