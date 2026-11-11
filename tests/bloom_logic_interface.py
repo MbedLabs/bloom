@@ -33,7 +33,7 @@ import httpx
 import yaml
 from fastapi import HTTPException, UploadFile
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 
 from app import audit
 from app.api import artefact_utils, campaigns, docs_facade, integrations
@@ -47,6 +47,7 @@ from app.core.security import (
 from app.models import (
     AuditEvent,
     Document,
+    ImportAttempt,
     IntegrationSetting,
     SystemMarker,
     user_token,
@@ -55,6 +56,7 @@ from app.models.user import User, UserRole
 from app.schemas import ProjectCreate, schemas
 from app.services import (
     attachment_storage,
+    import_attempts,
     integration_sync,
     jira_outbound,
     token_service,
@@ -464,6 +466,40 @@ class BloomLogicInterface(BloomInterface):
             )
         return SimpleNamespace(
             membership=membership, status=None, detail="", lookups=db.get.await_count
+        )
+
+    def bloom_role(self, name):
+        return UserRole(name)
+
+    def bloom_limit_imports(self, starts):
+        self.patches.enter_context(patch.object(settings, "REQIF_IMPORTS_PER_15_MINUTES", starts))
+
+    def bloom_begin_import(self, user_id, project_id):
+        async def begin():
+            async with self.maker() as db:
+                try:
+                    attempt = await import_attempts.begin_import_attempt(
+                        db, user_id=user_id, project_id=project_id
+                    )
+                except HTTPException as exc:
+                    retry = (exc.headers or {}).get("Retry-After")
+                    return SimpleNamespace(id=None, status=exc.status_code, retry_after=retry)
+                return SimpleNamespace(id=attempt.id, status=None, retry_after=None)
+
+        return self._run(begin())
+
+    def bloom_finish_import(self, attempt_id, outcome):
+        async def finish():
+            async with self.maker() as db:
+                await import_attempts.finish_import_attempt(db, attempt_id, outcome)
+
+        self._run(finish())
+
+    def bloom_count_imports(self, user_id):
+        return self._run(
+            self._scalar(
+                select(func.count(ImportAttempt.id)).where(ImportAttempt.user_id == user_id)
+            )
         )
 
     def bloom_forge_token(self, user_id, algorithm, minutes):

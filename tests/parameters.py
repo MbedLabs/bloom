@@ -962,3 +962,21 @@ MSG_IAM_ADMIN_LOOKUP = "an admin's admission looks the project up once"
 MSG_IAM_UNASSIGNED = "a user without access to the project is refused as not assigned"
 MSG_IAM_MISSING_ACTION = "a user whose terms lack the action is refused with missing permission"
 MSG_IAM_EXPLICIT_ACTION = "a user whose term grants the action is admitted"
+
+IMPORT_PREFIXES = [
+    first + _letters(string.ascii_uppercase, 2, 2)
+    for first in _draw.sample(string.ascii_uppercase, 2)
+]
+IMPORT_USERS = [
+    f"importer-{_letters(string.ascii_lowercase, 4, 8)}-{n}@example.com" for n in (1, 2)
+]
+IMPORT_ROLE = "admin"
+IMPORT_COMPLETED = "completed"
+IMPORT_STARTS_ALLOWED = 2
+IMPORT_RETRY_SECONDS = "900"
+MSG_IMPORT_FIRST = "the first import of the project starts"
+MSG_IMPORT_ACTIVE = "a second import while one is active in the project is refused with 429"
+MSG_IMPORT_STARTS = "an import start inside the user's limit starts"
+MSG_IMPORT_LIMITED = "a start past the user's limit in 15 minutes is refused with 429"
+MSG_IMPORT_RETRY = "the refusal asks to retry after 900 seconds"
+MSG_IMPORT_COUNT = "only the allowed starts are recorded"

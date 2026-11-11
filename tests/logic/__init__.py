@@ -15,6 +15,7 @@ SUITES = [
     "tests.logic.BLOOM_external_doc_types_allow.ExternalDocTypesAllowTest",
     "tests.logic.BLOOM_external_doc_types_allowlist.ExternalDocTypesAllowlistTest",
     "tests.logic.BLOOM_external_doc_types_rejection.ExternalDocTypesRejectionTest",
+    "tests.logic.BLOOM_import_attempts.ImportAttemptsTest",
     "tests.logic.BLOOM_integration_sync_capped_search.IntegrationSyncCappedSearchTest",
     "tests.logic.BLOOM_integration_sync_change_workflow.IntegrationSyncChangeWorkflowTest",
     "tests.logic.BLOOM_integration_sync_claim.IntegrationSyncClaimTest",
