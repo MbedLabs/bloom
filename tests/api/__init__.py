@@ -37,4 +37,5 @@ SUITES = [
     "tests.api.BLOOM_projects_delete.ProjectsDeleteTest",
     "tests.api.BLOOM_requirement_workflow_activity.RequirementWorkflowActivityTest",
     "tests.api.BLOOM_sign_off_activity.SignOffActivityTest",
+    "tests.api.BLOOM_user_deletion.UserDeletionTest",
 ]

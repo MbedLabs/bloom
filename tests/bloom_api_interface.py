@@ -356,9 +356,11 @@ class BloomApiInterface(BloomInterface):
         }
         return self._run(self._request("POST", "/api/users", headers, json=body))
 
-    def bloom_api_create_policy(self, headers, name, permissions, types=None):
+    def bloom_api_create_policy(
+        self, headers, name, permissions, types=None, visibility="internal"
+    ):
         return self.bloom_api_create_policy_rules(
-            headers, name, scenario_rules(permissions, "internal", types)
+            headers, name, scenario_rules(permissions, visibility, types)
         )
 
     def bloom_api_create_policy_rules(self, headers, name, rules):
@@ -486,6 +488,21 @@ class BloomApiInterface(BloomInterface):
         except ValueError:
             body = None
         return SimpleNamespace(status=answer.status_code, body=body)
+
+    def bloom_api_delete_user(self, headers, user_id):
+        return self.bloom_api_call("DELETE", f"/api/users/{user_id}", headers)
+
+    def bloom_api_list_user_ids(self, headers):
+        listed = self.bloom_api_call("GET", "/api/users", headers)
+        rows = listed.body.get("items", []) if isinstance(listed.body, dict) else listed.body or []
+        return listed.status, [row["id"] for row in rows]
+
+    def bloom_enforce_foreign_keys(self):
+        async def enforce():
+            async with self.engine.connect() as conn:
+                await conn.exec_driver_sql(self.parameters.SQLITE_FOREIGN_KEYS)
+
+        self._run(enforce())
 
     async def _update(self, model, row_id, **fields):
         async with self.maker() as db:

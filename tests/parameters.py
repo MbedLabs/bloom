@@ -1243,3 +1243,20 @@ MSG_BULK_RETAINED = "a bulk request keeps existing members and adds the rest"
 MSG_BULK_REPEATED = "repeating a bulk request is accepted"
 MSG_BULK_DUPLICATE = "adding an existing member alone is still a conflict"
 MSG_BULK_ADMIN_ONLY = "only an administrator may add members in bulk"
+
+SQLITE_FOREIGN_KEYS = "PRAGMA foreign_keys=ON"
+DELETION_EMAILS = [
+    f"deleteme-{_letters(string.ascii_lowercase, 4, 8)}-{n}@example.com" for n in (1, 2)
+]
+DELETION_ROLE = "external"
+DELETION_PREFIX = _letters(string.ascii_uppercase, 3, 3)
+DELETION_POLICY = f"Policy {_letters(string.ascii_lowercase, 4, 8)}"
+DELETION_PERMISSIONS = {"*": ["view", "comment"]}
+DELETION_VISIBILITY = "customer"
+DELETION_DOC_TYPES = ["REQ", "TC", "CPT", "CMP"]
+DELETION_ACCEPTED = [STATUS_OK, STATUS_CREATED]
+MSG_DELETION_CREATED = "the user is created"
+MSG_DELETION_MEMBER = "the user becomes a project member"
+MSG_DELETION_ANSWER = "the delete is answered with no content"
+MSG_DELETION_LISTED = "the user list answers"
+MSG_DELETION_GONE = "the deleted user is no longer listed"
