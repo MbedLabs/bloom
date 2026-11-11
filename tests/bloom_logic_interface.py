@@ -427,6 +427,19 @@ class BloomLogicInterface(BloomInterface):
             outcome.reads = getattr(upload, "reads", None)
             return outcome
 
+    def bloom_apply_test_result(self, test_case, result):
+        case = SimpleNamespace(**test_case)
+        applied = campaigns._apply_result_to_test_case(case, SimpleNamespace(**result))
+        return SimpleNamespace(applied=applied, case=case)
+
+    def bloom_build_sync_request(self, tc_id, status, count):
+        item = schemas.AutomatedResult(tc_id=tc_id, status=status)
+        try:
+            schemas.SyncResultsRequest(results=[item] * count)
+        except ValidationError as exc:
+            return type(exc).__name__
+        return None
+
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))
         expires = datetime.now(timezone.utc) + timedelta(minutes=minutes)

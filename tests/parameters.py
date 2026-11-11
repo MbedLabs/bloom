@@ -910,3 +910,40 @@ MSG_STREAM_NO_TARGET = "an oversize stream leaves no stored file"
 MSG_STREAM_CLEAN = "a failed stream leaves no file behind"
 MSG_STREAM_ERROR = "the interruption reaches the caller"
 MSG_STREAM_READS = "the stream stops at the interrupted second read"
+
+SYNC_RESULT_EMPTY_CASE = {
+    "last_execution_status": None,
+    "last_executed_at": None,
+    "last_execution_comment": None,
+    "last_bud_run_id": None,
+}
+SYNC_RESULT_FAILED = {
+    "status": "Failed",
+    "executed_at": None,
+    "comment": "Route endpoint returned fabricated polyline.",
+    "bud_run_id": 5,
+}
+SYNC_RESULT_NEWER_CASE = {
+    "last_execution_status": "Passed",
+    "last_executed_at": datetime(2026, 7, 22, 12, 0, 0),
+    "last_execution_comment": "newer",
+    "last_bud_run_id": 8,
+}
+SYNC_RESULT_OLDER = {
+    "status": "Failed",
+    "executed_at": datetime(2026, 7, 22, 11, 0, 0),
+    "comment": "older",
+    "bud_run_id": 7,
+}
+SYNC_RESULT_TC_ID = "PRJ-TC-001"
+SYNC_RESULT_STATUS = "Passed"
+SYNC_RESULT_TOO_MANY = 1001
+SYNC_RESULT_REFUSAL = "ValidationError"
+MSG_SYNC_RESULT_APPLIED = "the latest result is applied to the test case"
+MSG_SYNC_RESULT_STATUS = "the test case keeps the latest result's status"
+MSG_SYNC_RESULT_COMMENT = "the test case keeps the latest result's comment"
+MSG_SYNC_RESULT_RUN = "the test case keeps the latest result's Bud run"
+MSG_SYNC_RESULT_TIME = "the test case gets an execution time"
+MSG_SYNC_RESULT_OLDER = "an older result is not applied"
+MSG_SYNC_RESULT_KEPT = "the newer execution stays on the test case"
+MSG_SYNC_RESULT_BOUNDED = "a sync payload of more than 1000 results is refused"
