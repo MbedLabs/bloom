@@ -37,7 +37,7 @@ from sqlalchemy import func, select, text
 
 from app import audit
 from app.api import artefact_utils, campaigns, docs_facade, integrations
-from app.core import document_kinds, id_generator, permissions, security
+from app.core import document_kinds, id_generator, link_rules, permissions, security
 from app.core.config import settings
 from app.core.security import (
     create_access_token,
@@ -574,6 +574,9 @@ class BloomLogicInterface(BloomInterface):
 
     def bloom_permission_resources(self):
         return list(permissions.RESOURCES)
+
+    def bloom_link_rule(self, rule, *kinds):
+        return getattr(link_rules, rule)(*kinds)
 
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))

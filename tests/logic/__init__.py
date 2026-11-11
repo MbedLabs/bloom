@@ -46,6 +46,7 @@ SUITES = [
     "tests.logic.BLOOM_integration_sync_unreadable_repository.IntegrationSyncUnreadableRepositoryTest",
     "tests.logic.BLOOM_invites.InvitesTest",
     "tests.logic.BLOOM_jira_outbound_send.JiraOutboundSendTest",
+    "tests.logic.BLOOM_link_rules.LinkRulesTest",
     "tests.logic.BLOOM_next_doc_id.NextDocIdTest",
     "tests.logic.BLOOM_permissions.PermissionsTest",
     "tests.logic.BLOOM_project_naming.ProjectNamingTest",

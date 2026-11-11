@@ -1170,3 +1170,53 @@ MSG_PERM_VALID = "a valid matrix has no invalid entries"
 MSG_PERM_INVALID = "unknown resources, unknown actions and non-lists are named"
 MSG_PERM_LISTS = "permissions turn into sorted lists"
 MSG_PERM_MEMBERS = "project members and manage are not in the vocabulary"
+
+LINK_NORMALIZED = [("req", "REQ"), ("spec", "SPEC")]
+LINK_ROLES = [
+    ("TC", "REQ", ("verifies",)),
+    ("DES", "REQ", ("satisfies", "implements", "references")),
+    ("TC", "DES", ()),
+    ("CPT", "TC", ("implements",)),
+    ("CPT", "SPEC", ("covers", "verifies", "references")),
+    ("CPT", "REQ", ("covers", "verifies", "references")),
+    ("REQ", "SPEC", ("derives_from", "refines", "references")),
+    ("SPEC", "REQ", ()),
+    ("CMP", "REQ", ("covers", "references")),
+    ("CMP", "SPEC", ("verifies", "references")),
+    ("TS", "REQ", ("covers", "references")),
+    ("TS", "TC", ("contains", "references")),
+]
+LINK_KNOWN = [("TC", True), ("STD", True), ("TS", True), ("other", False)]
+LINK_ROLE_CHECKS = [
+    ("TC", "REQ", "verifies", True),
+    ("TC", "REQ", "references", False),
+    ("TC", "DES", "relates_to", False),
+    ("CPT", "TC", "implements", True),
+    ("TS", "TC", "contains", True),
+    ("CMP", "REQ", "verifies", False),
+    ("SPEC", "REQ", "references", False),
+    ("REQ", "REQ", "references", False),
+    ("REQ", "DES", "references", False),
+]
+LINK_TAG_HOSTS = [
+    (kind, True) for kind in ("REQ", "DES", "RSK", "CHG", "CPT", "SPEC", "PRT", "RPT", "STD")
+] + [(kind, False) for kind in ("TC", "TS", "CMP", "DEF", "other")]
+LINK_TAG_PAIRS = [
+    ("SPEC", "REQ", True),
+    ("REQ", "REQ", True),
+    ("REQ", "DES", True),
+    ("REQ", "CMP", True),
+    ("REQ", "TS", True),
+    ("REQ", "TC", True),
+    ("CMP", "REQ", False),
+    ("TS", "REQ", False),
+    ("TC", "REQ", False),
+    ("REQ", "other", False),
+    ("other", "REQ", False),
+]
+MSG_LINK_NORMALIZED = "a linkable kind is normalized to its code"
+MSG_LINK_ROLES = "a kind pair allows exactly the roles of its matrix row"
+MSG_LINK_KNOWN = "only supported kinds are linkable"
+MSG_LINK_ROLE = "a role is allowed only on the pairs whose matrix row lists it"
+MSG_LINK_TAG_HOST = "only prose bodies host tags"
+MSG_LINK_TAG_PAIR = "tags reach any known kind from a tag host, outside the link matrix"
