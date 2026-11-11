@@ -389,6 +389,9 @@ class BloomApiInterface(BloomInterface):
         body = {"policy_ids": policy_ids}
         return self._run(self._request("PATCH", path, headers, json=body))
 
+    def bloom_api_send_group_members(self, headers, group_id, body):
+        return self.bloom_api_call("POST", f"/api/groups/{group_id}/members", headers, json=body)
+
     def bloom_api_get_group(self, headers, group_id):
         return self._run(self._request("GET", f"/api/groups/{group_id}", headers))
 

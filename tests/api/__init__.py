@@ -10,6 +10,7 @@ SUITES = [
     "tests.api.BLOOM_baseline_read_owner.BaselineReadOwnerTest",
     "tests.api.BLOOM_baseline_snapshot_reader.BaselineSnapshotReaderTest",
     "tests.api.BLOOM_documents_external_visibility.DocumentsExternalVisibilityTest",
+    "tests.api.BLOOM_group_bulk_members.GroupBulkMembersTest",
     "tests.api.BLOOM_http_api.HttpApiTest",
     "tests.api.BLOOM_jira_filter_validation.JiraFilterValidationTest",
     "tests.api.BLOOM_jira_pull_errors.JiraPullErrorsTest",
