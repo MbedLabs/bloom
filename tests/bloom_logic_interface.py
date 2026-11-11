@@ -14,6 +14,7 @@ import hashlib
 import hmac
 import importlib
 import inspect
+import io
 import json
 import os
 import pkgutil
@@ -30,7 +31,7 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 import yaml
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import select, text
 
@@ -52,7 +53,12 @@ from app.models import (
 )
 from app.models.user import User, UserRole
 from app.schemas import ProjectCreate, schemas
-from app.services import integration_sync, jira_outbound, token_service
+from app.services import (
+    attachment_storage,
+    integration_sync,
+    jira_outbound,
+    token_service,
+)
 from tests.bloom_interface import BloomInterface
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -393,6 +399,34 @@ class BloomLogicInterface(BloomInterface):
                     unmarked.append(f"{qualified}.{field}")
         return unmarked
 
+    def bloom_stream_attachment(self, payload, max_bytes, interrupt=None):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            target = root / self.parameters.STREAM_FILE
+            upload = (
+                self._interrupted_upload(payload, interrupt)
+                if interrupt
+                else UploadFile(file=io.BytesIO(payload))
+            )
+            outcome = SimpleNamespace(stored=None, status=None, error=None)
+            with (
+                patch.object(attachment_storage, "get_attachment_root", lambda: root),
+                patch.object(attachment_storage, "CHUNK_BYTES", self.parameters.STREAM_CHUNK),
+            ):
+                try:
+                    outcome.stored = self._run(
+                        attachment_storage.write_stream(upload, target, max_bytes=max_bytes)
+                    )
+                except HTTPException as exc:
+                    outcome.status = exc.status_code
+                except (OSError, asyncio.CancelledError) as exc:
+                    outcome.error = type(exc).__name__
+            outcome.content = target.read_bytes() if target.exists() else None
+            outcome.parts = sorted(path.name for path in root.glob("*.part"))
+            outcome.files = sorted(path.name for path in root.iterdir())
+            outcome.reads = getattr(upload, "reads", None)
+            return outcome
+
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))
         expires = datetime.now(timezone.utc) + timedelta(minutes=minutes)
@@ -522,6 +556,18 @@ class BloomLogicInterface(BloomInterface):
         if annotation is datetime:
             return True
         return any(self._is_datetime(arg) for arg in typing.get_args(annotation))
+
+    def _interrupted_upload(self, first_chunk, error):
+        upload = SimpleNamespace(reads=0)
+
+        async def read(size):
+            upload.reads += 1
+            if upload.reads > 1:
+                raise error()
+            return first_chunk
+
+        upload.read = read
+        return upload
 
     def _token_part(self, value):
         raw = json.dumps(value, separators=(",", ":")).encode()

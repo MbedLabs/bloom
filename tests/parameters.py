@@ -8,6 +8,7 @@
 * @note     Test data is drawn from SEED; BUDTEST_SEED repeats a run with the same data.
 """
 
+import hashlib
 import os
 import random
 import string
@@ -887,3 +888,25 @@ MSG_DELETE_ANSWER = "the admin's delete is answered with no content"
 MSG_DELETE_GONE = "the deleted project is no longer found"
 MSG_DELETE_REQUIREMENT = "a requirement is created in the project"
 MSG_DELETE_UNAUTHENTICATED = "a delete without a signed-in user is refused as unauthenticated"
+
+STREAM_FILE = "attachment.txt"
+STREAM_CHUNK = 3
+STREAM_PAYLOAD = b"streamed attachment"
+STREAM_SHA256 = hashlib.sha256(STREAM_PAYLOAD).hexdigest()
+STREAM_OVERSIZE = b"too many bytes"
+STREAM_OVERSIZE_LIMIT = 4
+STREAM_FIRST_CHUNK = b"one"
+STREAM_INTERRUPT_LIMIT = 8
+STREAM_INTERRUPTIONS = ("OSError", "CancelledError")
+STREAM_INTERRUPTED_READS = 2
+STATUS_TOO_LARGE = 413
+STREAM_NO_FILES = []
+MSG_STREAM_CONTENT = "the stored file holds the streamed bytes"
+MSG_STREAM_SIZE = "the stored size is the streamed size"
+MSG_STREAM_SHA = "the stored checksum is the SHA-256 of the streamed bytes"
+MSG_STREAM_NO_PARTS = "no partial file is left after a complete stream"
+MSG_STREAM_TOO_LARGE = "an oversize stream is refused as too large"
+MSG_STREAM_NO_TARGET = "an oversize stream leaves no stored file"
+MSG_STREAM_CLEAN = "a failed stream leaves no file behind"
+MSG_STREAM_ERROR = "the interruption reaches the caller"
+MSG_STREAM_READS = "the stream stops at the interrupted second read"
