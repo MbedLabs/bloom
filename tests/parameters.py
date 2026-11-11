@@ -1376,3 +1376,24 @@ MSG_ROUTE_BOUNDARY = (
     "every API route outside the public and signed webhook lists needs a signed-in caller"
 )
 MSG_ROUTE_WEBHOOKS = "the signed webhook allowlist matches the registered webhook routes"
+
+DOC_STATUS_PREFIX = _letters(string.ascii_uppercase, 3, 3)
+DOC_STATUS_TYPES = ["SPEC", "PRT", "RPT", "STD"]
+DOC_STATUS_PAGE_BODY = {
+    "description": "Created as the create page does",
+    "content_json": None,
+    "status": "Draft",
+    "visibility": "internal",
+}
+DOC_STATUS_DRAFT = "Draft"
+DOC_STATUS_PLAIN = {"title": "Specification", "doc_type": "SPEC"}
+DOC_STATUS_REFUSED = ["Review", "Approved", "Rejected", "Obsolete"]
+DOC_STATUS_REFUSED_TYPE = "SPEC"
+DOC_STATUS_FIELD = ["body", "status"]
+MSG_DOC_STATUS_CREATED = "the create page's body creates the document"
+MSG_DOC_STATUS_TYPE = "the document keeps the kind it was created with"
+MSG_DOC_STATUS_DRAFT = "the document starts in Draft"
+MSG_DOC_STATUS_REFUSED = "a first status other than Draft is refused with 422"
+MSG_DOC_STATUS_FIELD = "the refusal points at the status field"
+MSG_DOC_STATUS_LISTED = "the project's documents are listed"
+MSG_DOC_STATUS_NOTHING = "a refused create leaves no document"
