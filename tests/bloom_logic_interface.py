@@ -37,7 +37,7 @@ from sqlalchemy import func, select, text
 
 from app import audit
 from app.api import artefact_utils, campaigns, docs_facade, integrations
-from app.core import document_kinds, id_generator, security
+from app.core import document_kinds, id_generator, permissions, security
 from app.core.config import settings
 from app.core.security import (
     create_access_token,
@@ -551,6 +551,29 @@ class BloomLogicInterface(BloomInterface):
         first = text.find(start)
         last = text.find(end, first + 1) if first >= 0 else -1
         return text[first:last] if first >= 0 and last >= 0 else ""
+
+    def bloom_role_baseline(self, instance_role, member_role):
+        return permissions.role_baseline(instance_role, member_role)
+
+    def bloom_has_permission(self, granted, action, resource):
+        return permissions.has_permission(granted, action, resource)
+
+    def bloom_merge_permissions(self, granted, *matrices):
+        for matrix in matrices:
+            permissions.merge(granted, matrix)
+        return granted
+
+    def bloom_transition_action(self, current, following):
+        return permissions.transition_action(current, following)
+
+    def bloom_invalid_permission_entries(self, matrix):
+        return permissions.invalid_entries(matrix)
+
+    def bloom_permissions_as_lists(self, granted):
+        return permissions.as_lists(granted)
+
+    def bloom_permission_resources(self):
+        return list(permissions.RESOURCES)
 
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))

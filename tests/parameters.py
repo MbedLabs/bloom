@@ -1104,3 +1104,69 @@ MSG_HTTP_ME_EMAIL = "the account is the admin's"
 MSG_HTTP_PROJECTS = "the signed-in admin lists projects"
 MSG_HTTP_PROJECTS_LIST = "the project list is a list"
 MSG_HTTP_LINKS_MISSING = "the links of a missing project answer 404"
+
+PERM_ANY = "*"
+PERM_ADMIN_ROLES = ("admin", None)
+PERM_UNASSIGNED_ROLES = ("maintainer", None)
+PERM_MAINTAINER_ROLES = ("maintainer", "maintainer")
+PERM_MERGE_ROLES = ("external", "external")
+PERM_ADMIN_BASELINE = {PERM_ANY: {PERM_ANY}}
+PERM_NO_BASELINE = {}
+PERM_MAINTAINER_CHECK = ("delete", "REQ")
+PERM_MEMBER_RESOURCE = "member"
+PERM_READER_ROLES = [
+    ("external", "external"),
+    ("maintainer", "external"),
+    ("external", "maintainer"),
+]
+PERM_READER_CHECKS = [
+    ("view", "REQ", True),
+    ("comment", "TC", True),
+    ("edit", "REQ", False),
+    ("view", "parameter", False),
+]
+PERM_MERGES = [{"TC": ["create"], "baseline": ["approve"]}, None]
+PERM_MERGE_CHECKS = [
+    ("create", "TC", True),
+    ("view", "TC", True),
+    ("approve", "baseline", True),
+    ("create", "REQ", False),
+]
+PERM_WILDCARDS = [
+    ({PERM_ANY: {"view"}}, "view", "DES", True),
+    ({PERM_ANY: {"view"}}, "edit", "DES", False),
+    ({"DES": {PERM_ANY}}, "approve", "DES", True),
+    ({}, "view", "DES", False),
+]
+PERM_TRANSITIONS = [
+    ("Draft", "Review", "edit"),
+    ("Review", "Draft", "review"),
+    ("Analysis", "Implemented", "review"),
+    ("Review", "Approved", "approve"),
+    ("Submitted", "Rejected", "approve"),
+    ("Open", "Closed", "edit"),
+]
+PERM_VALID_MATRIX = {"REQ": ["view"], PERM_ANY: [PERM_ANY], "link": ["create"]}
+PERM_INVALID_MATRIX = {"widget": ["view"], "DES": ["fly"], "RSK": "view"}
+PERM_INVALID_MESSAGES = [
+    "unknown resource 'widget'",
+    "unknown action 'fly' on 'DES'",
+    "actions for 'RSK' must be a list",
+]
+PERM_LISTS_INPUT = {"RSK": {"view", "edit"}, PERM_ANY: {"view"}}
+PERM_LISTS = {PERM_ANY: ["view"], "RSK": ["edit", "view"]}
+PERM_MEMBER_MATRIX = {"member": ["view"], "REQ": ["manage"]}
+PERM_MEMBER_MESSAGES = ["unknown resource 'member'", "unknown action 'manage' on 'REQ'"]
+MSG_PERM_ADMIN = "an admin's baseline grants every action on every resource"
+MSG_PERM_NO_MEMBERSHIP = "a maintainer without membership has no baseline"
+MSG_PERM_MAINTAINER_RESOURCES = "a project maintainer's baseline covers every resource"
+MSG_PERM_MAINTAINER_DELETE = "a project maintainer may delete requirements"
+MSG_PERM_NO_MEMBER_RESOURCE = "project members are not a permission resource"
+MSG_PERM_READER = "a reader's baseline grants viewing and commenting only"
+MSG_PERM_MERGE = "merging policies only adds actions"
+MSG_PERM_WILDCARD = "the wildcard stands for every resource or every action"
+MSG_PERM_TRANSITION = "a status transition needs its action"
+MSG_PERM_VALID = "a valid matrix has no invalid entries"
+MSG_PERM_INVALID = "unknown resources, unknown actions and non-lists are named"
+MSG_PERM_LISTS = "permissions turn into sorted lists"
+MSG_PERM_MEMBERS = "project members and manage are not in the vocabulary"
