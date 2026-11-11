@@ -18,6 +18,7 @@ from unittest.mock import patch
 
 import httpx
 from fastapi import FastAPI, HTTPException
+from fastapi.routing import APIRoute
 from sqlalchemy import event
 
 import tests.parameters as params
@@ -507,6 +508,37 @@ class BloomApiInterface(BloomInterface):
 
     def bloom_doc_id_pattern(self):
         return id_generator.DOC_ID_PATTERN.pattern
+
+    def bloom_api_routes(self):
+        routes = []
+        for path, route in self._api_routes(main.app):
+            names = set()
+            pending = list(route.dependant.dependencies)
+            while pending:
+                dependency = pending.pop()
+                name = getattr(dependency.call, "__name__", None)
+                if name:
+                    names.add(name)
+                pending.extend(dependency.dependencies)
+            methods = ",".join(sorted(route.methods or set()))
+            routes.append(
+                SimpleNamespace(
+                    path=path, methods=methods, endpoint=route.endpoint.__name__, dependencies=names
+                )
+            )
+        return routes
+
+    def _api_routes(self, router, prefix=""):
+        for route in router.routes:
+            if isinstance(route, APIRoute):
+                path = f"{prefix}{route.path}"
+                if path.startswith(self.parameters.API_PREFIX):
+                    yield path, route
+                continue
+            original = getattr(route, "original_router", None)
+            context = getattr(route, "include_context", None)
+            if original is not None and context is not None:
+                yield from self._api_routes(original, f"{prefix}{context.prefix}")
 
     async def _update(self, model, row_id, **fields):
         async with self.maker() as db:

@@ -1343,3 +1343,36 @@ MSG_VARIABLE_REFRESHED = "the update refreshes the changed variable once"
 MSG_VARIABLE_DUPLICATE = "a duplicate kind and key in the project is refused with 400"
 MSG_VARIABLE_DUPLICATE_DETAIL = "the refusal names the duplicate key"
 MSG_VARIABLE_NOT_WRITTEN = "a refused update writes nothing"
+
+API_PREFIX = "/api"
+ROUTE_PUBLIC_ENDPOINTS = {
+    "health_check",
+    "readiness_check",
+    "get_version",
+    "prometheus_metrics",
+    "login",
+    "refresh",
+    "logout",
+    "get_invite_info",
+    "accept_invite",
+    "verify_email",
+    "forgot_password",
+    "reset_password",
+    "confirm_email_change",
+    "setup_status",
+    "create_first_admin",
+    "cli_start",
+    "cli_exchange",
+    "cli_refresh",
+}
+ROUTE_SIGNED_WEBHOOKS = {"github_webhook", "gitlab_webhook", "jira_webhook"}
+ROUTE_AUTH_DEPENDENCIES = {
+    "get_current_user",
+    "require_admin",
+    "require_bud_sync_token",
+    "role_checker",
+}
+MSG_ROUTE_BOUNDARY = (
+    "every API route outside the public and signed webhook lists needs a signed-in caller"
+)
+MSG_ROUTE_WEBHOOKS = "the signed webhook allowlist matches the registered webhook routes"
