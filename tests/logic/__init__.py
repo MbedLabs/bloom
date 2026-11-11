@@ -10,6 +10,7 @@ SUITES = [
     "tests.logic.BLOOM_audit_prune.AuditPruneTest",
     "tests.logic.BLOOM_campaign_sync_results.CampaignSyncResultsTest",
     "tests.logic.BLOOM_cloudron_metadata.CloudronMetadataTest",
+    "tests.logic.BLOOM_document_kinds.DocumentKindsTest",
     "tests.logic.BLOOM_e2e_image_smoke_script.E2eImageSmokeScriptTest",
     "tests.logic.BLOOM_external_doc_types_admin.ExternalDocTypesAdminTest",
     "tests.logic.BLOOM_external_doc_types_allow.ExternalDocTypesAllowTest",

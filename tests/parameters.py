@@ -980,3 +980,33 @@ MSG_IMPORT_STARTS = "an import start inside the user's limit starts"
 MSG_IMPORT_LIMITED = "a start past the user's limit in 15 minutes is refused with 429"
 MSG_IMPORT_RETRY = "the refusal asks to retry after 900 seconds"
 MSG_IMPORT_COUNT = "only the allowed starts are recorded"
+
+DOC_KIND_LEGACY = [
+    ("DOC", "SPEC"),
+    ("Specification", "SPEC"),
+    ("Protocol", "PRT"),
+    ("Report", "RPT"),
+    ("External Standard", "STD"),
+    (None, "SPEC"),
+]
+DOC_KIND_ACCEPTED = ["SPEC", "PRT"]
+DOC_KIND_REFUSED = ["Protocol", "DOC", "OTHER", None]
+DOC_KIND_REFUSAL_PHRASES = ["Supported shared-document kinds", "not accepted on the public API"]
+STATUS_UNPROCESSABLE_ENTITY = 422
+DOC_KIND_SLUGS = [
+    ("specifications", "SPEC"),
+    ("protocols", "PRT"),
+    ("reports", "RPT"),
+    ("standards", "STD"),
+]
+DOC_KIND_LINK_PROJECT = 7
+DOC_KIND_LINK_TYPE = "SPEC"
+DOC_KIND_INCOMING = [(10, 2, 1)]
+DOC_KIND_OUTGOING = [(10, 3, 2)]
+DOC_KIND_LINK_COUNTS = {10: {"incoming": 2, "outgoing": 3, "suspect": 3}}
+MSG_DOC_KIND_LEGACY = "a legacy document kind maps to its canonical code"
+MSG_DOC_KIND_ACCEPTED = "a canonical document kind is accepted as it is"
+MSG_DOC_KIND_REFUSED = "a non-canonical document kind is refused with 422"
+MSG_DOC_KIND_REFUSAL_TEXT = "the refusal names the supported kinds and the refused wire values"
+MSG_DOC_KIND_SLUG = "a shared-document route slug maps to its kind"
+MSG_DOC_KIND_LINKS = "the link counts add incoming and outgoing suspect links"

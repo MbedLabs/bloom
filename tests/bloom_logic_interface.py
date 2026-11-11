@@ -37,7 +37,7 @@ from sqlalchemy import func, select, text
 
 from app import audit
 from app.api import artefact_utils, campaigns, docs_facade, integrations
-from app.core import id_generator, security
+from app.core import document_kinds, id_generator, security
 from app.core.config import settings
 from app.core.security import (
     create_access_token,
@@ -499,6 +499,39 @@ class BloomLogicInterface(BloomInterface):
         return self._run(
             self._scalar(
                 select(func.count(ImportAttempt.id)).where(ImportAttempt.user_id == user_id)
+            )
+        )
+
+    def bloom_normalize_document_kind(self, value):
+        return document_kinds.normalize_document_kind(value)
+
+    def bloom_require_document_kind(self, value):
+        try:
+            return SimpleNamespace(
+                kind=document_kinds.require_document_kind(value), status=None, detail=""
+            )
+        except HTTPException as exc:
+            return SimpleNamespace(kind=None, status=exc.status_code, detail=exc.detail)
+
+    def bloom_document_kind_from_slug(self, slug):
+        try:
+            return document_kinds.document_kind_from_slug(slug)
+        except HTTPException as exc:
+            return exc.status_code
+
+    def bloom_count_links(self, project_id, type_code, incoming, outgoing):
+        db = SimpleNamespace(
+            execute=AsyncMock(
+                side_effect=[
+                    SimpleNamespace(all=lambda: incoming),
+                    SimpleNamespace(all=lambda: outgoing),
+                ]
+            )
+        )
+        row_ids = sorted({row[0] for row in incoming + outgoing})
+        return self._run(
+            docs_facade._count_links(
+                db, project_id=project_id, type_code=type_code, row_ids=row_ids
             )
         )
 
