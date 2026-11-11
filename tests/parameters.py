@@ -1260,3 +1260,25 @@ MSG_DELETION_MEMBER = "the user becomes a project member"
 MSG_DELETION_ANSWER = "the delete is answered with no content"
 MSG_DELETION_LISTED = "the user list answers"
 MSG_DELETION_GONE = "the deleted user is no longer listed"
+
+PASSWORD_VALID = "correct horse battery"
+PASSWORD_SHORT = "short"
+PASSWORD_FILLER = "x"
+PASSWORD_SHORT_LENGTHS = ("none", "one", "one below the minimum")
+PASSWORD_OVERLONG = "a"
+PASSWORD_MULTIBYTE = "é" * 37
+PASSWORD_TOO_SHORT = "at least"
+PASSWORD_TOO_LONG = "too long"
+PASSWORD_SCHEMAS = {
+    "UserCreate": ("password", {"email": "u@example.com", "full_name": "U"}),
+    "PasswordChange": ("new_password", {"current_password": "whatever-old"}),
+    "AcceptInviteRequest": ("password", {"token": "t"}),
+    "ResetPasswordRequest": ("new_password", {"token": "t"}),
+}
+PASSWORD_REFUSAL = "ValidationError"
+MSG_PASSWORD_MINIMUM = "a password of exactly the minimum length is accepted"
+MSG_PASSWORD_SHORT = "a password below the minimum length is refused"
+MSG_PASSWORD_LONG = "a password over the byte limit is refused"
+MSG_PASSWORD_MULTIBYTE_LENGTH = "the multibyte password has fewer characters than the byte limit"
+MSG_PASSWORD_SCHEMA_SHORT = "every password entry point refuses a short password"
+MSG_PASSWORD_SCHEMA_VALID = "every password entry point keeps a valid password"

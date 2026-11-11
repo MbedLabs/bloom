@@ -37,7 +37,14 @@ from sqlalchemy import func, select, text
 
 from app import audit
 from app.api import artefact_utils, campaigns, docs_facade, integrations
-from app.core import document_kinds, id_generator, link_rules, permissions, security
+from app.core import (
+    document_kinds,
+    id_generator,
+    link_rules,
+    passwords,
+    permissions,
+    security,
+)
 from app.core.config import settings
 from app.core.security import (
     create_access_token,
@@ -53,7 +60,9 @@ from app.models import (
     user_token,
 )
 from app.models.user import User, UserRole
-from app.schemas import ProjectCreate, schemas
+from app.schemas import ProjectCreate
+from app.schemas import auth as auth_schemas
+from app.schemas import schemas
 from app.services import (
     attachment_storage,
     import_attempts,
@@ -577,6 +586,22 @@ class BloomLogicInterface(BloomInterface):
 
     def bloom_link_rule(self, rule, *kinds):
         return getattr(link_rules, rule)(*kinds)
+
+    def bloom_password_limits(self):
+        return passwords.PASSWORD_MIN_LENGTH, passwords.PASSWORD_MAX_BYTES
+
+    def bloom_check_password(self, value):
+        try:
+            return SimpleNamespace(value=passwords.validate_password_strength(value), error="")
+        except ValueError as exc:
+            return SimpleNamespace(value=None, error=str(exc))
+
+    def bloom_try_auth_schema(self, name, body):
+        try:
+            instance = getattr(auth_schemas, name)(**body)
+        except ValidationError as exc:
+            return SimpleNamespace(instance=None, error=type(exc).__name__)
+        return SimpleNamespace(instance=instance, error=None)
 
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))
