@@ -1010,3 +1010,24 @@ MSG_DOC_KIND_REFUSED = "a non-canonical document kind is refused with 422"
 MSG_DOC_KIND_REFUSAL_TEXT = "the refusal names the supported kinds and the refused wire values"
 MSG_DOC_KIND_SLUG = "a shared-document route slug maps to its kind"
 MSG_DOC_KIND_LINKS = "the link counts add incoming and outgoing suspect links"
+
+NAMING_PROJECT = {"name": "Demo", "prefix": " prj "}
+NAMING_PREFIX = "PRJ"
+NAMING_BAD_PREFIXES = ["BLOOM", "PR1", "PRJ-1", "PRJ REQ", "1VCU", "VCU_REQ", "PRJ.REQ"]
+NAMING_BAD_UPDATE = {"prefix": "PRJ-REQ-001"}
+NAMING_REFUSAL = "ValidationError"
+NAMING_REQUIREMENT = {"project_id": 1, "title": "Title"}
+NAMING_TEST_CASE = {"project_id": 1, "title": "TC Title"}
+NAMING_DOCUMENT = {"project_id": 1, "title": "Spec", "doc_type": "SPEC"}
+NAMING_OTHERS = {
+    "DesignItemCreate": ("design_id", {"project_id": 1, "title": "D"}),
+    "RiskItemCreate": ("risk_id", {"project_id": 1, "title": "R"}),
+    "ChangeRequestCreate": ("change_id", {"project_id": 1, "title": "C"}),
+    "TestConceptCreate": ("concept_id", {"project_id": 1, "name": "N"}),
+}
+MSG_NAMING_PREFIX = "a project prefix is trimmed and upper-cased"
+MSG_NAMING_BAD_PREFIX = "a prefix that would break generated ids is refused"
+MSG_NAMING_BAD_UPDATE = "a project update refuses an invalid prefix"
+MSG_NAMING_FIELD_KEPT = "the create schema keeps the given field"
+MSG_NAMING_NO_CLIENT_ID = "the create schema takes no client-chosen public id"
+MSG_NAMING_BUILDS = "the create schema builds without a public id"

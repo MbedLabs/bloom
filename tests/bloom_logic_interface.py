@@ -535,6 +535,13 @@ class BloomLogicInterface(BloomInterface):
             )
         )
 
+    def bloom_try_schema(self, name, body):
+        try:
+            instance = getattr(schemas, name)(**body)
+        except ValidationError as exc:
+            return SimpleNamespace(instance=None, error=type(exc).__name__)
+        return SimpleNamespace(instance=instance, error=None)
+
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))
         expires = datetime.now(timezone.utc) + timedelta(minutes=minutes)
