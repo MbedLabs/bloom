@@ -440,6 +440,32 @@ class BloomLogicInterface(BloomInterface):
             return type(exc).__name__
         return None
 
+    def bloom_require_project_access(self, role, actions=None, permission=None):
+        project_id = self.parameters.EXTERNAL_PROJECT_ID
+        user = SimpleNamespace(id=self.parameters.EXTERNAL_USER_ID, role=UserRole(role))
+        if actions is not None:
+            term = security.AccessTerm(actions, None, None, frozenset(), False)
+            user.access_map = {project_id: (term,)}
+        db = AsyncMock()
+        db.get.return_value = object()
+        db.execute.return_value = SimpleNamespace(
+            scalar_one_or_none=lambda: None,
+            scalars=lambda: SimpleNamespace(all=lambda: []),
+        )
+        options = {"permission": permission} if permission else {}
+        try:
+            membership = self._run(security.require_project_access(db, user, project_id, **options))
+        except HTTPException as exc:
+            return SimpleNamespace(
+                membership=None,
+                status=exc.status_code,
+                detail=exc.detail,
+                lookups=db.get.await_count,
+            )
+        return SimpleNamespace(
+            membership=membership, status=None, detail="", lookups=db.get.await_count
+        )
+
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))
         expires = datetime.now(timezone.utc) + timedelta(minutes=minutes)

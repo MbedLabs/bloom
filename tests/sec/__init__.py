@@ -3,5 +3,6 @@
 import tests.config  # noqa: F401
 
 SUITES = [
+    "tests.sec.BLOOM_project_iam.ProjectIamTest",
     "tests.sec.BLOOM_token_logging.TokenLoggingTest",
 ]
