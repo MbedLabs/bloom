@@ -52,11 +52,15 @@ from app.core.security import (
     get_external_doc_types,
 )
 from app.models import (
+    ArtefactLink,
     AuditEvent,
+    Defect,
     Document,
     ImportAttempt,
     IntegrationSetting,
+    Requirement,
     SystemMarker,
+    TestCase,
     user_token,
 )
 from app.models.user import User, UserRole
@@ -603,6 +607,44 @@ class BloomLogicInterface(BloomInterface):
             return SimpleNamespace(instance=None, error=type(exc).__name__)
         return SimpleNamespace(instance=instance, error=None)
 
+    def bloom_add_artefact(self, kind, **fields):
+        models = {"REQ": Requirement, "TC": TestCase, "DEF": Defect}
+        return self._run(self._add(models[kind](**fields)))
+
+    def bloom_add_link(self, project_id, source, target, role):
+        (source_type, source_id), (target_type, target_id) = source, target
+        link = ArtefactLink(
+            project_id=project_id,
+            source_type=source_type,
+            source_id=source_id,
+            target_type=target_type,
+            target_id=target_id,
+            role=role,
+        )
+        return self._run(self._add(link))
+
+    def bloom_lookup_artefact(self, artefact_type, reference, public_field):
+        async def lookup(db, admin):
+            try:
+                row = await artefact_utils.get_artefact_or_404(db, artefact_type, reference, admin)
+            except HTTPException as exc:
+                return SimpleNamespace(status=exc.status_code, id=None, public_id=None)
+            return SimpleNamespace(status=None, id=row.id, public_id=getattr(row, public_field))
+
+        return self._run(self._as_first_admin(lookup))
+
+    def bloom_related_artefacts(self, artefact_type, reference):
+        async def related(db, admin):
+            try:
+                answer = await artefact_utils.build_related_response(
+                    db, artefact_type, reference, admin
+                )
+            except HTTPException as exc:
+                return exc.status_code
+            return answer.model_dump()
+
+        return self._run(self._as_first_admin(related))
+
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))
         expires = datetime.now(timezone.utc) + timedelta(minutes=minutes)
@@ -732,6 +774,11 @@ class BloomLogicInterface(BloomInterface):
         if annotation is datetime:
             return True
         return any(self._is_datetime(arg) for arg in typing.get_args(annotation))
+
+    async def _as_first_admin(self, call):
+        async with self.maker() as db:
+            admin = await db.scalar(select(User).where(User.role == UserRole.admin))
+            return await call(db, admin)
 
     def _interrupted_upload(self, first_chunk, error):
         upload = SimpleNamespace(reads=0)

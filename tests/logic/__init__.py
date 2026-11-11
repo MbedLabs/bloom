@@ -4,6 +4,7 @@ import tests.config  # noqa: F401
 
 SUITES = [
     "tests.logic.BLOOM_access_token_format.AccessTokenFormatTest",
+    "tests.logic.BLOOM_artefact_public_id_lookup.ArtefactPublicIdLookupTest",
     "tests.logic.BLOOM_artefact_rich_content.ArtefactRichContentTest",
     "tests.logic.BLOOM_attachment_deployment_contract.AttachmentDeploymentContractTest",
     "tests.logic.BLOOM_attachment_stream.AttachmentStreamTest",
