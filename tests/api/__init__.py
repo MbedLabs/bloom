@@ -9,6 +9,7 @@ SUITES = [
     "tests.api.BLOOM_baseline_read_override.BaselineReadOverrideTest",
     "tests.api.BLOOM_baseline_read_owner.BaselineReadOwnerTest",
     "tests.api.BLOOM_baseline_snapshot_reader.BaselineSnapshotReaderTest",
+    "tests.api.BLOOM_create_ids.CreateIdsTest",
     "tests.api.BLOOM_documents_external_visibility.DocumentsExternalVisibilityTest",
     "tests.api.BLOOM_group_bulk_members.GroupBulkMembersTest",
     "tests.api.BLOOM_http_api.HttpApiTest",

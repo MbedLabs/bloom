@@ -24,6 +24,7 @@ import tests.parameters as params
 from app import main
 from app.api import access_requests as access_requests_api
 from app.api import integrations
+from app.core import id_generator
 from app.core.database import get_db
 from app.core.deps import limiter
 from app.core.permissions import DOC_TYPE_RESOURCES
@@ -503,6 +504,9 @@ class BloomApiInterface(BloomInterface):
                 await conn.exec_driver_sql(self.parameters.SQLITE_FOREIGN_KEYS)
 
         self._run(enforce())
+
+    def bloom_doc_id_pattern(self):
+        return id_generator.DOC_ID_PATTERN.pattern
 
     async def _update(self, model, row_id, **fields):
         async with self.maker() as db:

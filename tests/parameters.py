@@ -1282,3 +1282,19 @@ MSG_PASSWORD_LONG = "a password over the byte limit is refused"
 MSG_PASSWORD_MULTIBYTE_LENGTH = "the multibyte password has fewer characters than the byte limit"
 MSG_PASSWORD_SCHEMA_SHORT = "every password entry point refuses a short password"
 MSG_PASSWORD_SCHEMA_VALID = "every password entry point keeps a valid password"
+
+CREATE_ID_PREFIX = _letters(string.ascii_uppercase, 3, 3)
+CREATE_ID_CASES = [
+    ("/api/requirements", {"title": "Requirement"}, "req_id", "REQ"),
+    ("/api/test-cases", {"title": "Test case"}, "tc_id", "TC"),
+    (
+        "/api/projects/{project_id}/documents",
+        {"title": "Specification", "doc_type": "SPEC"},
+        "doc_id",
+        "SPEC",
+    ),
+]
+MSG_CREATE_ID_CREATED = "the artefact is created without a client-supplied id"
+MSG_CREATE_ID_PATTERN = "the assigned public id follows the id pattern"
+MSG_CREATE_ID_PREFIX = "the assigned public id starts with the project prefix and type code"
+MSG_CREATE_ID_SHAPE = "the assigned public id is prefix, type code and a three-digit number"
