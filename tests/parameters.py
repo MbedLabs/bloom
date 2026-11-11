@@ -1316,3 +1316,30 @@ MSG_LOOKUP_DATABASE = "a test case is still found by its database id"
 MSG_LOOKUP_UNKNOWN = "an unknown public id answers 404"
 MSG_LOOKUP_SAME_BACKLINKS = "a defect's backlinks are the same by public id and by database id"
 MSG_LOOKUP_BACKLINK = "the defect's backlinks name the linked requirement"
+
+VARIABLE_ITEM = {
+    "id": 42,
+    "project_id": 7,
+    "kind": "variable",
+    "key": "API_URL",
+    "value": "https://old.example.com",
+    "description": "old description",
+}
+VARIABLE_UPDATE = {
+    "kind": "parameter",
+    "key": "API_BASE_URL",
+    "value": "https://new.example.com",
+    "description": None,
+}
+VARIABLE_DUPLICATE = {"id": 43, "project_id": 7, "kind": "parameter", "key": "API_BASE_URL"}
+VARIABLE_DUPLICATE_UPDATE = {"kind": "parameter", "key": "API_BASE_URL"}
+VARIABLE_DUPLICATE_DETAIL = "Variable key already exists in this project"
+VARIABLE_ONE_WRITE = 1
+VARIABLE_NO_WRITE = 0
+MSG_VARIABLE_SAME_ITEM = "the update answers with the variable it changed"
+MSG_VARIABLE_FIELD = "the update writes the field it was given"
+MSG_VARIABLE_FLUSHED = "the update flushes once"
+MSG_VARIABLE_REFRESHED = "the update refreshes the changed variable once"
+MSG_VARIABLE_DUPLICATE = "a duplicate kind and key in the project is refused with 400"
+MSG_VARIABLE_DUPLICATE_DETAIL = "the refusal names the duplicate key"
+MSG_VARIABLE_NOT_WRITTEN = "a refused update writes nothing"

@@ -37,6 +37,7 @@ from sqlalchemy import func, select, text
 
 from app import audit
 from app.api import artefact_utils, campaigns, docs_facade, integrations
+from app.api import project_variables as project_variables_api
 from app.core import (
     document_kinds,
     id_generator,
@@ -64,7 +65,7 @@ from app.models import (
     user_token,
 )
 from app.models.user import User, UserRole
-from app.schemas import ProjectCreate
+from app.schemas import ProjectCreate, ProjectVariableUpdate
 from app.schemas import auth as auth_schemas
 from app.schemas import schemas
 from app.services import (
@@ -644,6 +645,36 @@ class BloomLogicInterface(BloomInterface):
             return answer.model_dump()
 
         return self._run(self._as_first_admin(related))
+
+    def bloom_update_project_variable(self, item_fields, update, duplicate=None):
+        item = SimpleNamespace(**item_fields)
+        found = [item, SimpleNamespace(**duplicate) if duplicate else None]
+        db = SimpleNamespace(
+            execute=AsyncMock(
+                side_effect=[
+                    SimpleNamespace(scalar_one_or_none=lambda row=row: row) for row in found
+                ]
+            ),
+            flush=AsyncMock(),
+            refresh=AsyncMock(),
+            get=AsyncMock(return_value=SimpleNamespace(id=item.project_id)),
+        )
+        admin = SimpleNamespace(role=UserRole.admin)
+        outcome = SimpleNamespace(same_item=False, status=None, detail=None)
+        try:
+            response = self._run(
+                project_variables_api.update_project_variable(
+                    item_id=item.id, data=ProjectVariableUpdate(**update), db=db, current_user=admin
+                )
+            )
+            outcome.same_item = response is item
+        except HTTPException as exc:
+            outcome.status, outcome.detail = exc.status_code, exc.detail
+        refreshed = [call.args[0] is item for call in db.refresh.await_args_list]
+        outcome.item = vars(item)
+        outcome.flushes = db.flush.await_count
+        outcome.refreshed_item = refreshed
+        return outcome
 
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))

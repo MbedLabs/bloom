@@ -51,6 +51,7 @@ SUITES = [
     "tests.logic.BLOOM_next_doc_id.NextDocIdTest",
     "tests.logic.BLOOM_permissions.PermissionsTest",
     "tests.logic.BLOOM_project_naming.ProjectNamingTest",
+    "tests.logic.BLOOM_project_variables.ProjectVariablesTest",
     "tests.logic.BLOOM_response_timestamps.ResponseTimestampsTest",
     "tests.logic.BLOOM_timestamp_text.TimestampTextTest",
     "tests.logic.BLOOM_vision_startup.VisionStartupTest",
