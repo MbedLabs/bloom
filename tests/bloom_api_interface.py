@@ -476,6 +476,14 @@ class BloomApiInterface(BloomInterface):
     def bloom_api_get_project(self, headers, project_id):
         return self._run(self._request("GET", f"/api/projects/{project_id}", headers))
 
+    def bloom_api_call(self, method, path, headers=None, json=None, params=None):
+        answer = self._run(self._request(method, path, headers, json=json, params=params))
+        try:
+            body = answer.json()
+        except ValueError:
+            body = None
+        return SimpleNamespace(status=answer.status_code, body=body)
+
     async def _update(self, model, row_id, **fields):
         async with self.maker() as db:
             row = await db.get(model, row_id)
