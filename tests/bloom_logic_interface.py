@@ -676,6 +676,23 @@ class BloomLogicInterface(BloomInterface):
         outcome.refreshed_item = refreshed
         return outcome
 
+    def bloom_nginx_locations(self, name):
+        text = self.bloom_read_repo_text(name)
+        blocks = []
+        for match in re.finditer(r"^\s*(location[^\n{]*)\{", text, re.MULTILINE):
+            start = index = match.end()
+            depth = 1
+            while index < len(text) and depth:
+                depth += {"{": 1, "}": -1}.get(text[index], 0)
+                index += 1
+            blocks.append((match.group(1).strip(), text[start : index - 1]))
+        return blocks
+
+    def bloom_nginx_server_head(self, name):
+        text = self.bloom_read_repo_text(name)
+        first = re.search(r"^\s*location[^\n{]*\{", text, re.MULTILINE)
+        return text[: first.start()] if first else text
+
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))
         expires = datetime.now(timezone.utc) + timedelta(minutes=minutes)

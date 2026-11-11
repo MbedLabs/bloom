@@ -3,6 +3,7 @@
 import tests.config  # noqa: F401
 
 SUITES = [
+    "tests.sec.BLOOM_nginx_security_headers.NginxSecurityHeadersTest",
     "tests.sec.BLOOM_password_policy.PasswordPolicyTest",
     "tests.sec.BLOOM_project_iam.ProjectIamTest",
     "tests.sec.BLOOM_route_auth_matrix.RouteAuthMatrixTest",

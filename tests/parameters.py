@@ -1397,3 +1397,28 @@ MSG_DOC_STATUS_REFUSED = "a first status other than Draft is refused with 422"
 MSG_DOC_STATUS_FIELD = "the refusal points at the status field"
 MSG_DOC_STATUS_LISTED = "the project's documents are listed"
 MSG_DOC_STATUS_NOTHING = "a refused create leaves no document"
+
+NGINX_CONF = "docker/nginx.conf"
+NGINX_HEADERS_CONF = "docker/security-headers.conf"
+NGINX_REQUIRED_HEADERS = (
+    "X-Content-Type-Options",
+    "Referrer-Policy",
+    "Permissions-Policy",
+    "Content-Security-Policy",
+)
+NGINX_ALWAYS = "always;"
+NGINX_INCLUDE = "include /etc/nginx/security-headers.conf;"
+NGINX_SCRIPT_SRC = "script-src 'self'"
+NGINX_UNSAFE_INLINE = "unsafe-inline"
+NGINX_FRAME_ANCESTORS = "frame-ancestors 'self'"
+NGINX_IMAGE_COPY = "docker/security-headers.conf /etc/nginx/security-headers.conf"
+MSG_NGINX_HEADER = "the shared header file sets the header"
+MSG_NGINX_ALWAYS = "the header is marked always, so it survives error responses"
+MSG_NGINX_SERVER_INCLUDE = "the server block includes the shared header file"
+MSG_NGINX_LOCATION_INCLUDE = (
+    "a location setting its own header includes the shared header file again"
+)
+MSG_NGINX_SCRIPT_SRC = "the content security policy allows scripts from the site only"
+MSG_NGINX_NO_INLINE = "the content security policy forbids inline script"
+MSG_NGINX_FRAMES = "the content security policy allows framing by the site only"
+MSG_NGINX_IMAGE = "the image ships the shared header file"
