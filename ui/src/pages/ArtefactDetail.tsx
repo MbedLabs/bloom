@@ -763,14 +763,14 @@ export default function ArtefactDetail({
           )}
         </SectionCard>
       )}
-      {kind !== 'defect' && <>
+      {kind !== 'defect' && (
           <SectionCard title="Quick Links">
             <div className="space-y-3 text-sm">
               <Link to={docRegistryListUrl(projectPrefix, config.docType)} className="block text-primary hover:text-primary/80">Back to project {config.singular.toLowerCase()} list</Link>
               {related?.project && <Link to={`/projects/${related.project.prefix}`} className="block text-primary hover:text-primary/80">Open project workspace</Link>}
             </div>
           </SectionCard>
-      </>}
+      )}
     </DocDetailShell>
     </ReviewCommentsProvider>
   )
