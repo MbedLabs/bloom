@@ -426,7 +426,7 @@ class BloomLogicInterface(BloomInterface):
             )
             outcome = SimpleNamespace(stored=None, status=None, error=None)
             with (
-                patch.object(attachment_storage, "get_attachment_root", lambda: root),
+                patch.object(attachment_storage, "get_attachment_root", return_value=root),
                 patch.object(attachment_storage, "CHUNK_BYTES", self.parameters.STREAM_CHUNK),
             ):
                 try:
