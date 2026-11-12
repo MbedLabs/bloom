@@ -375,7 +375,6 @@ async def export_requirements(
         content = _requirements_pdf(project, requirements, await _load_report_logo(db))
         return _pdf_response(content, f"{project.prefix}-requirements.pdf")
 
-    id_by_pk = {r.id: r.req_id for r in requirements}
     rows = [
         [
             r.req_id,
