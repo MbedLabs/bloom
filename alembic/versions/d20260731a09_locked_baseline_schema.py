@@ -1,16 +1,21 @@
 """locked baseline schema"""
 
-from typing import Sequence, Union
+from typing import Sequence
 
 from alembic import op
 import sqlalchemy as sa
 
-
 revision: str = "d20260731a09"
-down_revision: Union[str, Sequence[str], None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
+
+USERS_ID = "users.id"
+PROJECTS_ID = "projects.id"
+REQUIREMENTS_ID = "requirements.id"
+TEST_SUITES_ID = "test_suites.id"
+ACTIVE_STATUS = "status = 'active'"
 
 _PERFORMANCE_INDEXES = (
     ("ix_test_cases_tc_id", "test_cases", ["tc_id"]),
@@ -168,7 +173,7 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["invited_by_user_id"],
-            ["users.id"],
+            [USERS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -186,7 +191,7 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
@@ -219,7 +224,7 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -250,11 +255,11 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["source_project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -292,19 +297,19 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["owner_id"],
-            ["users.id"],
+            [USERS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["reporter_id"],
-            ["users.id"],
+            [USERS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["reviewer_id"],
-            ["users.id"],
+            [USERS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -327,11 +332,11 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["source_project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -344,10 +349,10 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("expires_at", sa.DateTime(), nullable=False),
         sa.Column("completed_at", sa.DateTime(), nullable=True),
-        sa.ForeignKeyConstraint(["project_id"], ["projects.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["project_id"], [PROJECTS_ID], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(
             ["user_id"],
-            ["users.id"],
+            [USERS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -368,8 +373,8 @@ def upgrade() -> None:
         "import_attempts",
         ["project_id"],
         unique=True,
-        postgresql_where=sa.text("status = 'active'"),
-        sqlite_where=sa.text("status = 'active'"),
+        postgresql_where=sa.text(ACTIVE_STATUS),
+        sqlite_where=sa.text(ACTIVE_STATUS),
     )
     op.create_table(
         "integration_settings",
@@ -385,7 +390,7 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("project_id", "tracker", name="uq_integration_project_tracker"),
@@ -403,11 +408,11 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["user_id"],
-            ["users.id"],
+            [USERS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -429,11 +434,11 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["user_id"],
-            ["users.id"],
+            [USERS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("user_id", "project_id", name="uq_project_membership_user_project"),
@@ -450,7 +455,7 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -481,31 +486,31 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["approved_by_id"],
-            ["users.id"],
+            [USERS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["approver_id"],
-            ["users.id"],
+            [USERS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["parent_id"],
-            ["requirements.id"],
+            [REQUIREMENTS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["reviewed_by_id"],
-            ["users.id"],
+            [USERS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["reviewer_id"],
-            ["users.id"],
+            [USERS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["source_project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -527,7 +532,7 @@ def upgrade() -> None:
         sa.Column("created_by_user_id", sa.Integer(), nullable=False),
         sa.ForeignKeyConstraint(
             ["created_by_user_id"],
-            ["users.id"],
+            [USERS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("token_hash"),
@@ -579,27 +584,27 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["approved_by_id"],
-            ["users.id"],
+            [USERS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["approver_id"],
-            ["users.id"],
+            [USERS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["reviewed_by_id"],
-            ["users.id"],
+            [USERS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["reviewer_id"],
-            ["users.id"],
+            [USERS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["source_project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -623,11 +628,11 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["source_project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -644,7 +649,7 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -672,11 +677,11 @@ def upgrade() -> None:
         sa.Column("target_email", sa.String(length=255), nullable=True),
         sa.ForeignKeyConstraint(
             ["created_by_user_id"],
-            ["users.id"],
+            [USERS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["user_id"],
-            ["users.id"],
+            [USERS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -746,15 +751,15 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["linked_requirement_id"],
-            ["requirements.id"],
+            [REQUIREMENTS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["source_project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -776,7 +781,7 @@ def upgrade() -> None:
         ),
         sa.ForeignKeyConstraint(
             ["linked_requirement_id"],
-            ["requirements.id"],
+            [REQUIREMENTS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["parent_section_id"],
@@ -805,11 +810,11 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["source_id"],
-            ["requirements.id"],
+            [REQUIREMENTS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["target_id"],
-            ["requirements.id"],
+            [REQUIREMENTS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("source_id", "target_id", "link_type", name="uq_req_link"),
@@ -836,15 +841,15 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["linked_requirement_id"],
-            ["requirements.id"],
+            [REQUIREMENTS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["source_project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -867,11 +872,11 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["project_id"],
-            ["projects.id"],
+            [PROJECTS_ID],
         ),
         sa.ForeignKeyConstraint(
             ["suite_id"],
-            ["test_suites.id"],
+            [TEST_SUITES_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -886,7 +891,7 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["requirement_id"],
-            ["requirements.id"],
+            [REQUIREMENTS_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -899,7 +904,7 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["suite_id"],
-            ["test_suites.id"],
+            [TEST_SUITES_ID],
         ),
         sa.ForeignKeyConstraint(
             ["test_case_id"],
@@ -945,7 +950,7 @@ def upgrade() -> None:
         ),
         sa.ForeignKeyConstraint(
             ["suite_id"],
-            ["test_suites.id"],
+            [TEST_SUITES_ID],
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("campaign_id", "suite_id", name="uq_campaign_suite"),
@@ -1032,8 +1037,8 @@ def downgrade() -> None:
     op.drop_index(
         "uq_import_attempts_active_project",
         table_name="import_attempts",
-        postgresql_where=sa.text("status = 'active'"),
-        sqlite_where=sa.text("status = 'active'"),
+        postgresql_where=sa.text(ACTIVE_STATUS),
+        sqlite_where=sa.text(ACTIVE_STATUS),
     )
     op.drop_index(op.f("ix_import_attempts_user_id"), table_name="import_attempts")
     op.drop_index(op.f("ix_import_attempts_project_id"), table_name="import_attempts")
