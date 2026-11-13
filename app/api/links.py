@@ -84,12 +84,10 @@ async def list_links(
         visible_rows = []
         for row in rows:
             ends = (row.source_type, row.source_id), (row.target_type, row.target_id)
-            if all(
-                [
-                    (await link_end(db, project_id, kind, item, current_user))[1]
-                    for kind, item in ends
-                ]
-            ):
+            visible_ends = [
+                (await link_end(db, project_id, kind, item, current_user))[1] for kind, item in ends
+            ]
+            if all(visible_ends):
                 visible_rows.append(row)
         rows = visible_rows
 
