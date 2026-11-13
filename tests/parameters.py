@@ -8,6 +8,7 @@
 * @note     Test data is drawn from SEED; BUDTEST_SEED repeats a run with the same data.
 """
 
+import base64
 import hashlib
 import os
 import random
@@ -1579,3 +1580,28 @@ MSG_TAG_REFUSAL_NAMES = "the refusal names the kind"
 MSG_TAG_NO_LINK = "a refused or hidden tag leaves no link"
 MSG_TAG_HIDDEN = "a tag the user may not see is skipped without error"
 MSG_TAG_SELF = "a body tagging itself creates nothing"
+
+LOGO_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+)
+LOGO_PNG_TYPE = "image/png"
+LOGO_FILE = "logo.png"
+LOGO_NOT_IMAGE = b"nope"
+LOGO_TEXT_TYPE = "text/plain"
+LOGO_PREFIX = "PRJ"
+LOGO_ADMIN = f"logo-{_letters(string.ascii_lowercase, 4, 8)}@example.com"
+LOGO_ADMIN_ROLE = "admin"
+LOGO_REQUIREMENT = {"req_id": "PRJ-REQ-001", "title": "Login", "status": "Approved"}
+LOGO_REQUIREMENT_KIND = "REQ"
+LOGO_PDF_HEADER = b"%PDF-"
+STATUS_UNSUPPORTED_MEDIA = 415
+MSG_LOGO_TYPE = "the stored logo keeps its image type"
+MSG_LOGO_SIZE = "the stored logo keeps its size"
+MSG_LOGO_BODY = "the logo is served as uploaded"
+MSG_LOGO_MEDIA = "the logo is served with its image type"
+MSG_LOGO_REPORT = "reports use the stored logo"
+MSG_LOGO_DELETED = "a deleted logo answers 404"
+MSG_LOGO_REPORT_NONE = "reports have no logo after it is deleted"
+MSG_LOGO_NOT_IMAGE = "a logo that is not an image is refused with 415"
+MSG_LOGO_PDF = "the requirements report is a PDF"
+MSG_LOGO_PDF_SIZE = "the report with the logo is at least as large as the one without"

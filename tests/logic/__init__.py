@@ -11,6 +11,7 @@ SUITES = [
     "tests.logic.BLOOM_audit_prune.AuditPruneTest",
     "tests.logic.BLOOM_campaign_sync_results.CampaignSyncResultsTest",
     "tests.logic.BLOOM_cloudron_metadata.CloudronMetadataTest",
+    "tests.logic.BLOOM_company_logo.CompanyLogoTest",
     "tests.logic.BLOOM_container_start.ContainerStartTest",
     "tests.logic.BLOOM_document_kinds.DocumentKindsTest",
     "tests.logic.BLOOM_e2e_image_smoke_script.E2eImageSmokeScriptTest",

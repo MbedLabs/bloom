@@ -35,9 +35,17 @@ import yaml
 from fastapi import HTTPException, UploadFile
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import func, select, text
+from starlette.datastructures import Headers
 
 from app import audit
-from app.api import artefact_utils, campaigns, docs_facade, integrations
+from app.api import (
+    artefact_utils,
+    campaigns,
+    company_logo,
+    docs_facade,
+    export,
+    integrations,
+)
 from app.api import project_variables as project_variables_api
 from app.core import (
     document_kinds,
@@ -60,6 +68,7 @@ from app.models import (
     Document,
     ImportAttempt,
     IntegrationSetting,
+    Project,
     Requirement,
     SystemMarker,
     TestCase,
@@ -729,6 +738,50 @@ class BloomLogicInterface(BloomInterface):
 
     async def _hidden_end(self, *args, **kwargs):
         return None, False
+
+    def bloom_set_logo(self, data, content_type):
+        async def upload(db, admin):
+            file = UploadFile(
+                io.BytesIO(data),
+                filename=self.parameters.LOGO_FILE,
+                headers=Headers({"content-type": content_type}),
+            )
+            try:
+                answer = await company_logo.set_company_logo(file=file, db=db, current_user=admin)
+            except HTTPException as exc:
+                return SimpleNamespace(status=exc.status_code, content_type=None, size=None)
+            await db.commit()
+            return SimpleNamespace(status=None, **answer)
+
+        return self._run(self._as_first_admin(upload))
+
+    def bloom_get_logo(self):
+        async def read(db, admin):
+            try:
+                answer = await company_logo.get_company_logo(db=db, current_user=admin)
+            except HTTPException as exc:
+                return SimpleNamespace(status=exc.status_code, body=None, media_type=None)
+            return SimpleNamespace(status=None, body=answer.body, media_type=answer.media_type)
+
+        return self._run(self._as_first_admin(read))
+
+    def bloom_delete_logo(self):
+        async def remove(db, admin):
+            await company_logo.delete_company_logo(db=db, current_user=admin)
+            await db.commit()
+
+        self._run(self._as_first_admin(remove))
+
+    def bloom_report_logo(self):
+        async def load(db, admin):
+            return await export._load_report_logo(db)
+
+        return self._run(self._as_first_admin(load))
+
+    def bloom_requirements_pdf(self, logo):
+        project = self._run(self._all(select(Project)))[0]
+        requirements = self._run(self._all(select(Requirement)))
+        return export._requirements_pdf(project, list(requirements), logo)
 
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))
