@@ -160,7 +160,7 @@ function DocumentInfo({ doc, docId, projectPrefix, project, canEdit }: Readonly<
 }>) {
   return (
     <>
-      <InfoSection title="Workflow state">
+      <InfoSection label="Workflow state">
         <WorkflowPanel artefactType="document" artefactId={docId} projectPrefix={projectPrefix} projectId={doc.project_id} layout="panel" />
       </InfoSection>
       <InfoSection title="Details">

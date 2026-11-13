@@ -179,7 +179,7 @@ export default function TestCaseDetail({
         </div>
       ) : undefined}
       info={<>
-        <InfoSection title="Workflow state">
+        <InfoSection label="Workflow state">
           <WorkflowPanel artefactType="test-case" artefactId={tcId} projectPrefix={projectPrefix} projectId={testCase.project_id} layout="panel" />
         </InfoSection>
         <InfoSection title="Last Execution">
@@ -222,7 +222,7 @@ export default function TestCaseDetail({
       comments={<CommentsColumn />}
     >
       {!!testCase.content_json && (
-        <SectionCard title="Content">
+        <div className="bg-card rounded-lg shadow-elegant p-6">
           <CommentableDocEditor
             content={testCase.content_json as Record<string, unknown>}
             editable={false}
@@ -232,7 +232,7 @@ export default function TestCaseDetail({
             minHeight="min-h-[120px]"
             className="border-0"
           />
-        </SectionCard>
+        </div>
       )}
       {!testCase.content_json && !!testCase.description && (
         <SectionCard title="Description">

@@ -8,11 +8,11 @@ function storedCollapsed(): boolean {
   return globalThis.localStorage?.getItem(COLLAPSED_KEY) === 'true'
 }
 
-/** One titled section of the document information panel. */
-export function InfoSection({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
+/** One section of the document information panel, with a visible heading when it has a title. */
+export function InfoSection({ title, label, children }: Readonly<{ title?: string; label?: string; children: ReactNode }>) {
   return (
-    <section aria-label={title} className="space-y-3 px-4 py-4">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
+    <section aria-label={title ?? label} className="space-y-3 px-4 py-4">
+      {title && <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>}
       {children}
     </section>
   )

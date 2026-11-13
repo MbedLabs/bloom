@@ -97,7 +97,7 @@ const detailSections: Record<string, [string, string[]]> = {
   requirement: ['Details', ['Type', 'Priority']],
   'test case': ['Last Execution', ['Result', 'Executed', 'Bud Run']],
   document: ['Details', ['Version']],
-  design: ['Details', ['Design Type', 'Priority']],
+  design: ['Details', ['Priority']],
   risk: ['Details', ['Category', 'Severity', 'Probability']],
   change: ['Details', ['Change Type', 'Priority']],
   'test concept': ['Details', ['Coverage']],
@@ -142,6 +142,9 @@ describe('the layout of a rich-text document page', () => {
     const [detailTitle, detailLabels] = detailSections[page]
     const details = within(panel).getByRole('region', { name: detailTitle })
     for (const label of detailLabels) expect(within(details).getByText(label)).toBeTruthy()
+    expect(within(details).queryByText('Design Type')).toBeNull()
+    expect(within(panel).queryByRole('heading', { name: 'Workflow state' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Content' })).toBeNull()
 
     const metadata = within(panel).getByRole('region', { name: 'Metadata' })
     for (const label of METADATA_LABELS) expect(within(metadata).getByText(label)).toBeTruthy()

@@ -195,7 +195,7 @@ export default function RequirementDetail({
         </div>
       ) : undefined}
       info={<>
-        <InfoSection title="Workflow state">
+        <InfoSection label="Workflow state">
           <WorkflowPanel artefactType="requirement" artefactId={reqId} projectPrefix={projectPrefix} projectId={requirement.project_id} layout="panel" />
         </InfoSection>
         <InfoSection title="Details">
@@ -224,7 +224,7 @@ export default function RequirementDetail({
       comments={<CommentsColumn />}
     >
       {(requirement.content_json as Record<string, unknown> | null) ? (
-        <SectionCard title="Content">
+        <div className="bg-card rounded-lg shadow-elegant p-6">
           <CommentableDocEditor
             content={requirement.content_json as Record<string, unknown>}
             editable={false}
@@ -234,7 +234,7 @@ export default function RequirementDetail({
             minHeight="min-h-[120px]"
             className="border-0"
           />
-        </SectionCard>
+        </div>
       ) : (
         <SectionCard title="Description">
           <p className="text-foreground whitespace-pre-wrap">

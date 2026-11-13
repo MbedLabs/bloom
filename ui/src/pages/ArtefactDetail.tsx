@@ -476,7 +476,7 @@ export default function ArtefactDetail({
           </SectionCard>
         </> : undefined}
       info={kind === 'defect' ? undefined : <>
-        <InfoSection title="Workflow state">
+        <InfoSection label="Workflow state">
           <WorkflowPanel artefactType={kind} artefactId={recordId} projectPrefix={projectPrefix} projectId={projectId} layout="panel" />
           {workflow.data && !workflow.data.controlled && <div className="space-y-3">
             <MetaItem label="Current Status" value={<StatusBadge status={String(artefact.status)} />} />
@@ -498,7 +498,7 @@ export default function ArtefactDetail({
         </InfoSection>
         <InfoSection title="Details">
           <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-            {config.fields.filter((f) => f.key !== 'status' && f.key !== 'visibility').map((field) => (
+            {config.fields.filter((f) => f.key !== 'status' && f.key !== 'visibility' && f.key !== 'design_type').map((field) => (
               <MetaItem key={field.key} label={field.label} value={fieldText(artefactRecord[field.key])} />
             ))}
           </div>
@@ -604,7 +604,7 @@ export default function ArtefactDetail({
               </SectionCard>
             )}
             {kind !== 'defect' && !!artefactRecord.content_json && (
-              <SectionCard title="Content">
+              <div className="bg-card rounded-lg shadow-elegant p-6">
                 <CommentableDocEditor
                   content={artefactRecord.content_json as Record<string, unknown>}
                   editable={false}
@@ -614,7 +614,7 @@ export default function ArtefactDetail({
                   minHeight="min-h-[120px]"
                   className="border-0"
                 />
-              </SectionCard>
+              </div>
             )}
             {kind !== 'defect' && !artefactRecord.content_json && (
               <SectionCard title="Description">
