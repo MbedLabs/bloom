@@ -26,7 +26,7 @@ def _letters(alphabet: str, low: int, high: int) -> str:
 
 _WORDS = ["valve", "sensor", "drift", "reset", "timeout", "relay", "fault", "bus", "boot", "flash"]
 
-SYNC_DATABASE = "sqlite+aiosqlite:///:memory:"
+SYNC_DATABASE = os.environ.get("BLOOM_SUITE_DATABASE") or "sqlite+aiosqlite:///:memory:"
 SYNC_PROJECT_PREFIX = _letters(string.ascii_uppercase, 3, 3)
 SYNC_OTHER_PREFIX = _letters(string.ascii_uppercase, 4, 4)
 SYNC_TOKEN = _letters(string.ascii_letters + string.digits, 24, 32)

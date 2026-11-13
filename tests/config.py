@@ -39,31 +39,38 @@ def _postgres_port_allowed(port: int | None) -> bool:
 SMTP_PORT = _test_smtp_port()
 
 
+def _require_test_database(database_url: str) -> None:
+    """Refuse a database URL that is not the isolated test PostgreSQL or in-memory SQLite."""
+    parsed = urlparse(database_url)
+    if parsed.scheme.startswith("postgres") and (
+        parsed.scheme not in {"postgres", "postgresql", "postgresql+asyncpg"}
+        or parsed.hostname not in LOOPBACK_HOSTS
+        or parsed.username != "test_user"
+        or parsed.password != "test_password"
+        or not (parsed.path == "/test_bloom" or re.fullmatch(r"/k75_[0-9a-f]{10}", parsed.path))
+        or not _postgres_port_allowed(parsed.port)
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise RuntimeError("Tests require the isolated test database and test credentials")
+    if parsed.scheme.startswith("sqlite") and database_url not in {
+        "sqlite:///:memory:",
+        "sqlite+aiosqlite:///:memory:",
+    }:
+        raise RuntimeError("Tests require an in-memory SQLite database")
+    if not parsed.scheme.startswith(("postgres", "sqlite")):
+        raise RuntimeError("Tests require an isolated PostgreSQL or SQLite database")
+
+
 def _isolate_test_environment() -> None:
     """Configure test-only application credentials and the unauthenticated test Mailpit."""
     from cryptography.fernet import Fernet
 
+    if os.environ.get("BLOOM_SUITE_DATABASE"):
+        _require_test_database(os.environ["BLOOM_SUITE_DATABASE"])
     database_url = os.environ.get("DATABASE_URL", "")
     if database_url:
-        parsed = urlparse(database_url)
-        if parsed.scheme.startswith("postgres") and (
-            parsed.scheme not in {"postgres", "postgresql", "postgresql+asyncpg"}
-            or parsed.hostname not in LOOPBACK_HOSTS
-            or parsed.username != "test_user"
-            or parsed.password != "test_password"
-            or not (parsed.path == "/test_bloom" or re.fullmatch(r"/k75_[0-9a-f]{10}", parsed.path))
-            or not _postgres_port_allowed(parsed.port)
-            or parsed.query
-            or parsed.fragment
-        ):
-            raise RuntimeError("Tests require the isolated test database and test credentials")
-        if parsed.scheme.startswith("sqlite") and database_url not in {
-            "sqlite:///:memory:",
-            "sqlite+aiosqlite:///:memory:",
-        }:
-            raise RuntimeError("Tests require an in-memory SQLite database")
-        if not parsed.scheme.startswith(("postgres", "sqlite")):
-            raise RuntimeError("Tests require an isolated PostgreSQL or SQLite database")
+        _require_test_database(database_url)
     else:
         database_url = f"postgresql+asyncpg://test_user:test_password@localhost:{TEST_POSTGRES_PORT}/test_bloom"
 
