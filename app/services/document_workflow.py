@@ -393,7 +393,9 @@ async def linked_revision_change(db, row, workflow, actor):
     ).all()
     unavailable = len(changes) != len(ids)
     if not unavailable:
-        hidden = [not await row_allows(db, actor, change, "view", "CHG") for change in changes]
+        hidden = []
+        for change in changes:
+            hidden.append(not await row_allows(db, actor, change, "view", "CHG"))
         unavailable = any(hidden)
     if unavailable:
         raise HTTPException(
