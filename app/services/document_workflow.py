@@ -391,9 +391,11 @@ async def linked_revision_change(db, row, workflow, actor):
             .with_for_update()
         )
     ).all()
-    if len(changes) != len(ids) or any(
-        [not await row_allows(db, actor, change, "view", "CHG") for change in changes]
-    ):
+    unavailable = len(changes) != len(ids)
+    if not unavailable:
+        hidden = [not await row_allows(db, actor, change, "view", "CHG") for change in changes]
+        unavailable = any(hidden)
+    if unavailable:
         raise HTTPException(
             status_code=409, detail="The linked CHG is not available for this change."
         )
