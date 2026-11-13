@@ -10,6 +10,7 @@
 
 import asyncio
 import base64
+import contextlib
 import hashlib
 import hmac
 import importlib
@@ -73,6 +74,7 @@ from app.services import (
     import_attempts,
     integration_sync,
     jira_outbound,
+    tag_links,
     token_service,
 )
 from tests.bloom_interface import BloomInterface
@@ -692,6 +694,41 @@ class BloomLogicInterface(BloomInterface):
         text = self.bloom_read_repo_text(name)
         first = re.search(r"^\s*location[^\n{]*\{", text, re.MULTILINE)
         return text[: first.start()] if first else text
+
+    def bloom_mention(self, kind, identifier):
+        return {
+            "type": "mention",
+            "attrs": {"id": f"{kind}:{identifier}", "mentionSuggestionChar": "#"},
+        }
+
+    def bloom_sync_tag_links(self, project_id, source, source_id, content, hidden=False):
+        async def sync(db, admin):
+            try:
+                with contextlib.ExitStack() as stack:
+                    if hidden:
+                        stack.enter_context(patch.object(tag_links, "link_end", self._hidden_end))
+                    created = await tag_links.sync_tag_links(
+                        db,
+                        project_id=project_id,
+                        source_type=source,
+                        source_id=source_id,
+                        content_json=content,
+                        user=admin,
+                    )
+                await db.commit()
+            except HTTPException as exc:
+                await db.rollback()
+                return SimpleNamespace(created=None, status=exc.status_code, detail=str(exc.detail))
+            return SimpleNamespace(created=created, status=None, detail="")
+
+        return self._run(self._as_first_admin(sync))
+
+    def bloom_list_links(self):
+        links = self._run(self._all(select(ArtefactLink).order_by(ArtefactLink.id)))
+        return [(link.source_type, link.target_type, link.role) for link in links]
+
+    async def _hidden_end(self, *args, **kwargs):
+        return None, False
 
     def bloom_forge_token(self, user_id, algorithm, minutes):
         user = self._run(self._get(User, user_id))

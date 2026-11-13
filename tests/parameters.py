@@ -1557,3 +1557,25 @@ MSG_DATABASE_ID_UNLISTED = "no API route outside the allowlist takes a database 
 MSG_DATABASE_ID_STALE = "every allowlisted route still takes a database id in its path"
 MSG_DATABASE_ID_ONE_OWNER = "each allowlisted route belongs to one group only"
 MSG_DATABASE_ID_SUITES = "suite and campaign routes take no database id"
+
+TAG_PREFIX = "PRJ"
+TAG_ADMIN = f"tags-{_letters(string.ascii_lowercase, 4, 8)}@example.com"
+TAG_ADMIN_ROLE = "admin"
+TAG_REQUIREMENTS = [
+    {"req_id": "PRJ-REQ-001", "title": "Source"},
+    {"req_id": "PRJ-REQ-002", "title": "Target"},
+]
+TAG_KIND = "REQ"
+TAG_INVALID_PAIRS = [("TC", "REQ"), ("REQ", "UNKNOWN")]
+TAG_CREATED = 1
+TAG_NONE_CREATED = 0
+TAG_LINK = ("REQ", "REQ", "references")
+TAG_NO_LINKS = []
+MSG_TAG_CREATED = "a tag between two requirements creates one link"
+MSG_TAG_LINK = "the tag link is a references link between the two requirements"
+MSG_TAG_REPEATED = "syncing the same tag again creates nothing"
+MSG_TAG_REFUSED = "a tag pair the rules do not allow is refused with 422"
+MSG_TAG_REFUSAL_NAMES = "the refusal names the kind"
+MSG_TAG_NO_LINK = "a refused or hidden tag leaves no link"
+MSG_TAG_HIDDEN = "a tag the user may not see is skipped without error"
+MSG_TAG_SELF = "a body tagging itself creates nothing"
