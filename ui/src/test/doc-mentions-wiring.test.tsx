@@ -60,7 +60,7 @@ const parameter = { ...projectVariable, id: 301, kind: 'parameter' as const, key
 const variable = { ...projectVariable, id: 302, kind: 'variable' as const, key: 'BOARD_REV' }
 const person = { ...user, id: 7, full_name: 'Grace Hopper', role: 'maintainer' as const }
 
-function renderCreate(type = 'requirements') {
+function renderCreate(type = 'designs') {
   const queryClient = createQueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   })
@@ -170,7 +170,7 @@ describe('what # offers', () => {
       items: found,
     } as never)
 
-    const offered = await (await searchFrom('requirements'))('brake')
+    const offered = await (await searchFrom('designs'))('brake')
 
     expect(offered).toEqual([
       { id: 42, label: 'PRJ-REQ-0042', hint: 'Brake pressure', docType: 'REQ' },
@@ -185,7 +185,7 @@ describe('what # offers', () => {
       items: [],
     } as never)
 
-    await (await searchFrom('requirements'))('brake')
+    await (await searchFrom('designs'))('brake')
 
     expect(client.searchApi.global).toHaveBeenCalledWith(
       'brake',
@@ -212,7 +212,7 @@ describe('what # offers', () => {
       items: [{ id: 42, type: 'REQ', doc_id: null, title: 'Brake pressure' }],
     } as never)
 
-    const offered = await (await searchFrom('requirements'))('brake')
+    const offered = await (await searchFrom('designs'))('brake')
 
     expect(offered[0].label).toBe('REQ 42')
   })
@@ -224,7 +224,7 @@ describe('what # offers', () => {
       items: [found[0], { id: 3, type: 'NOPE', doc_id: 'PRJ-XXX-003', title: 'Unknown' }],
     } as never)
 
-    const offered = await (await searchFrom('requirements'))('brake')
+    const offered = await (await searchFrom('designs'))('brake')
 
     expect(offered.map((item) => item.label)).toEqual(['PRJ-REQ-0042'])
   })
@@ -236,8 +236,15 @@ describe('what # offers', () => {
     expect(screen.queryByTestId('doc-editor')).toBeNull()
   })
 
-  it('links a tag to the artefact page for its kind', async () => {
+  it('gives a requirement a plain description box and no editor, because a requirement is a title and a description', async () => {
     renderCreate('requirements')
+
+    expect(await screen.findByRole('textbox', { name: 'Description' })).toBeTruthy()
+    expect(screen.queryByTestId('doc-editor')).toBeNull()
+  })
+
+  it('links a tag to the artefact page for its kind', async () => {
+    renderCreate('designs')
     await screen.findByTestId('doc-editor')
     await waitFor(() => expect(lastEditorProps.artefactHref).toBeTypeOf('function'))
 

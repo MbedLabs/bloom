@@ -223,7 +223,7 @@ export default function RequirementDetail({
       </>}
       comments={<CommentsColumn />}
     >
-      {(requirement.content_json as Record<string, unknown> | null) ? (
+      {!requirement.description && (requirement.content_json as Record<string, unknown> | null) ? (
         <div className="bg-card rounded-lg shadow-elegant p-6">
           <CommentableDocEditor
             content={requirement.content_json as Record<string, unknown>}

@@ -48,7 +48,7 @@ function renderAt(path: string, url: string, element: ReactElement) {
 
 const richPages: Record<string, () => void> = {
   requirement: () => {
-    vi.mocked(client.requirementsApi.get).mockResolvedValue({ ...requirement, content_json: richContent } as never)
+    vi.mocked(client.requirementsApi.get).mockResolvedValue({ ...requirement, description: null, content_json: richContent } as never)
     renderAt('/projects/:prefix/requirements/:itemId', `/projects/PRJ/requirements/${requirement.id}`, <RequirementDetail />)
   },
   'test case': () => {
@@ -194,7 +194,7 @@ describe('the layout of a rich-text document page', () => {
 
   it('keeps the requirement test runs below the content in the main column', async () => {
     const run = { id: 1, test_run_id: 77, test_run_name: 'Nightly run', status: 'Passed', teststation_url: null, created_at: '2026-10-11T00:00:00Z' }
-    vi.mocked(client.requirementsApi.get).mockResolvedValue({ ...requirement, content_json: richContent, linked_test_runs: [run] } as never)
+    vi.mocked(client.requirementsApi.get).mockResolvedValue({ ...requirement, description: null, content_json: richContent, linked_test_runs: [run] } as never)
     renderAt('/projects/:prefix/requirements/:itemId', `/projects/PRJ/requirements/${requirement.id}`, <RequirementDetail />)
     const aside = await screen.findByRole('complementary', { name: 'Document comments column' })
     const contentColumn = aside.parentElement!.parentElement!.firstElementChild as HTMLElement

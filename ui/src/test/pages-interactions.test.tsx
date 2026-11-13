@@ -538,7 +538,7 @@ describe('creating a document', () => {
     await screen.findByText(/PRJ-REQ-004/)
 
     fireEvent.change(screen.getByPlaceholderText('Untitled'), { target: { value: 'A requirement' } })
-    fireEvent.change(screen.getByPlaceholderText(/brief description/i), {
+    fireEvent.change(screen.getByRole('textbox', { name: 'Description' }), {
       target: { value: 'Why it exists.' },
     })
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
@@ -547,6 +547,8 @@ describe('creating a document', () => {
       const [payload] = lastCall(client.requirementsApi.create) as [Record<string, unknown>]
       expect(payload.status).toBe('Draft')
       expect(payload.description).toBe('Why it exists.')
+      expect(payload).not.toHaveProperty('content_json')
+      expect(payload).not.toHaveProperty('content_html')
     })
   })
 
