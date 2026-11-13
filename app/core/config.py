@@ -389,9 +389,8 @@ class Settings(BaseSettings):
         cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings
     ):
         """Let CI/pytest bypass workspace `.env` when injecting `DATABASE_URL` / secrets via the shell."""
-        if os.environ.get("BLOOM_DOTENV_DISABLED") == "1":
-            return init_settings, env_settings, file_secret_settings
-        return init_settings, env_settings, dotenv_settings, file_secret_settings
+        dotenv = () if os.environ.get("BLOOM_DOTENV_DISABLED") == "1" else (dotenv_settings,)
+        return (init_settings, env_settings, *dotenv, file_secret_settings)
 
     @model_validator(mode="after")
     def prefer_app_base_url_over_legacy_frontend_url(self):
