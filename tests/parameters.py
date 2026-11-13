@@ -1605,3 +1605,20 @@ MSG_LOGO_REPORT_NONE = "reports have no logo after it is deleted"
 MSG_LOGO_NOT_IMAGE = "a logo that is not an image is refused with 415"
 MSG_LOGO_PDF = "the requirements report is a PDF"
 MSG_LOGO_PDF_SIZE = "the report with the logo is at least as large as the one without"
+
+PROMOTION_EMAILS = [
+    f"user-{_letters(string.ascii_lowercase, 4, 8)}-{n}@example.com" for n in range(4)
+]
+PROMOTION_ADMIN = "admin"
+PROMOTION_MAINTAINER = "maintainer"
+PROMOTION_CREATED = [STATUS_OK, STATUS_CREATED]
+PROMOTION_ONLY_SEED = "Only the initial administrator can promote users to admin"
+PROMOTION_ADMIN_FIXED = "Admin role cannot be changed"
+MSG_PROMOTION_SIGN_IN = "the account signs in"
+MSG_PROMOTION_CREATED = "the account is created"
+MSG_PROMOTION_DONE = "the initial administrator promotes a maintainer"
+MSG_PROMOTION_ROLE = "the promoted user is an admin"
+MSG_PROMOTION_REFUSED = "another admin may not promote anyone to admin"
+MSG_PROMOTION_REFUSAL_TEXT = "the refusal names the initial administrator"
+MSG_DEMOTION_REFUSED = "an admin may not be demoted"
+MSG_DEMOTION_REFUSAL_TEXT = "the refusal says the admin role is fixed"

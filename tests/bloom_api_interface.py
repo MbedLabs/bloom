@@ -26,6 +26,7 @@ from app import main
 from app.api import access_requests as access_requests_api
 from app.api import integrations
 from app.core import id_generator
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import limiter
 from app.core.permissions import DOC_TYPE_RESOURCES
@@ -553,6 +554,12 @@ class BloomApiInterface(BloomInterface):
             context = getattr(route, "include_context", None)
             if original is not None and context is not None:
                 yield from self._api_routes(original, f"{prefix}{context.prefix}")
+
+    def bloom_seed_admin_email(self):
+        return settings.ADMIN_EMAIL
+
+    def bloom_api_set_role(self, headers, user_id, role):
+        return self.bloom_api_call("PATCH", f"/api/users/{user_id}", headers, json={"role": role})
 
     async def _update(self, model, row_id, **fields):
         async with self.maker() as db:
