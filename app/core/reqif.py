@@ -315,14 +315,21 @@ def _read_specifications(root: ET.Element, bundle: ReqIFBundle) -> None:
         if not ident:
             continue
         specification = ReqIFSpecification(identifier=ident, long_name=spec.get("LONG-NAME"))
-        children = _first_child(spec, "CHILDREN")
-        if children is not None:
-            for hier in children:
-                if _local(hier.tag) == "spec-hierarchy":
-                    node = _build_hierarchy(hier)
-                    if node is not None:
-                        specification.roots.append(node)
+        specification.roots.extend(_hierarchy_roots(spec))
         bundle.specifications.append(specification)
+
+
+def _hierarchy_roots(spec: ET.Element) -> List[ReqIFHierarchyNode]:
+    """The non-empty hierarchy nodes built from a specification's spec-hierarchy children."""
+    roots: List[ReqIFHierarchyNode] = []
+    children = _first_child(spec, "CHILDREN")
+    if children is not None:
+        for hier in children:
+            if _local(hier.tag) == "spec-hierarchy":
+                node = _build_hierarchy(hier)
+                if node is not None:
+                    roots.append(node)
+    return roots
 
 
 def _read_relations(root: ET.Element, bundle: ReqIFBundle, rel_type_name: Dict[str, str]) -> None:
