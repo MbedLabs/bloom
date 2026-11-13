@@ -1422,3 +1422,138 @@ MSG_NGINX_SCRIPT_SRC = "the content security policy allows scripts from the site
 MSG_NGINX_NO_INLINE = "the content security policy forbids inline script"
 MSG_NGINX_FRAMES = "the content security policy allows framing by the site only"
 MSG_NGINX_IMAGE = "the image ships the shared header file"
+
+DATABASE_ID_ROUTES = {
+    "BLOOM-128": frozenset(
+        {
+            "DELETE /api/requirements/{requirement_id}",
+            "GET /api/requirements/{requirement_id}",
+            "PATCH /api/requirements/{requirement_id}",
+            "POST /api/requirements/{requirement_id}/link-testrun",
+            "GET /api/requirements/{requirement_id}/test-runs",
+            "DELETE /api/test-cases/{test_case_id}",
+            "GET /api/test-cases/{test_case_id}",
+            "PATCH /api/test-cases/{test_case_id}",
+        }
+    ),
+    "BLOOM-129": frozenset(
+        {
+            "DELETE /api/changes/{change_id}",
+            "GET /api/changes/{change_id}",
+            "PATCH /api/changes/{change_id}",
+            "DELETE /api/defects/{defect_pk}",
+            "GET /api/defects/{defect_pk}",
+            "PATCH /api/defects/{defect_pk}",
+            "POST /api/defects/{defect_pk}/refresh-external",
+            "DELETE /api/designs/{design_id}",
+            "GET /api/designs/{design_id}",
+            "PATCH /api/designs/{design_id}",
+            "DELETE /api/document-sections/{section_id}",
+            "PATCH /api/document-sections/{section_id}",
+            "DELETE /api/documents/{document_id}",
+            "GET /api/documents/{document_id}",
+            "PATCH /api/documents/{document_id}",
+            "POST /api/documents/{document_id}/sections",
+            "POST /api/documents/{document_id}/sections/reorder",
+            "GET /api/projects/{project_id}/documents",
+            "POST /api/projects/{project_id}/documents",
+            "DELETE /api/risks/{risk_id}",
+            "GET /api/risks/{risk_id}",
+            "PATCH /api/risks/{risk_id}",
+            "DELETE /api/test-concepts/{concept_id}",
+            "GET /api/test-concepts/{concept_id}",
+            "PATCH /api/test-concepts/{concept_id}",
+        }
+    ),
+    "BLOOM-130": frozenset(
+        {
+            "DELETE /api/baselines/{baseline_id}",
+            "GET /api/baselines/{baseline_id}",
+            "PATCH /api/baselines/{baseline_id}",
+            "GET /api/projects/{project_id}/export/requirements",
+            "GET /api/projects/{project_id}/export/test-cases",
+            "GET /api/projects/{project_id}/export/traceability",
+            "GET /api/projects/{project_id}/export/verification-dossier",
+            "GET /api/traceability/coverage-gaps/{project_id}",
+            "GET /api/traceability/impact/{requirement_id}",
+        }
+    ),
+    "BLOOM-131": frozenset(
+        {
+            "DELETE /api/attachments/{attachment_id}",
+            "GET /api/attachments/{attachment_id}/download",
+            "GET /api/documents/{document_id}/attachments",
+            "POST /api/documents/{document_id}/attachments",
+            "DELETE /api/project-variables/{item_id}",
+            "PATCH /api/project-variables/{item_id}",
+            "DELETE /api/projects/{project_id}",
+            "GET /api/projects/{project_id}",
+            "PATCH /api/projects/{project_id}",
+            "GET /api/projects/{project_id}/access",
+            "GET /api/projects/{project_id}/capabilities",
+            "GET /api/projects/{project_id}/members",
+            "POST /api/projects/{project_id}/members",
+            "DELETE /api/projects/{project_id}/members/{membership_id}",
+            "GET /api/projects/{project_id}/members/{membership_id}",
+            "PATCH /api/projects/{project_id}/members/{membership_id}",
+            "GET /api/projects/{project_id}/permissions",
+            "DELETE /api/service-credentials/{credential_id}",
+            "POST /api/service-credentials/{credential_id}/rotate",
+        }
+    ),
+    "UNASSIGNED": frozenset(
+        {
+            "POST /api/access-requests/{request_id}/decision",
+            "POST /api/artefact-requests/{request_id}/decline",
+            "POST /api/artefacts/{artefact_type}/{artefact_id}/comments/{comment_id}/reopen",
+            "POST /api/artefacts/{artefact_type}/{artefact_id}/comments/{comment_id}/resolve",
+            "GET /api/artefacts/{artefact_type}/{artefact_id}/tags",
+            "PUT /api/artefacts/{artefact_type}/{artefact_id}/tags",
+            "GET /api/artefacts/{slug}/{identifier}/revisions/{number}",
+            "GET /api/artefacts/{slug}/{identifier}/revisions/{number}/attachments/{file_id}",
+            "POST /api/bud/report-requests/{request_id}/refuse",
+            "DELETE /api/groups/{group_id}",
+            "GET /api/groups/{group_id}",
+            "PATCH /api/groups/{group_id}",
+            "POST /api/groups/{group_id}/assignments",
+            "POST /api/groups/{group_id}/grants",
+            "DELETE /api/groups/{group_id}/grants/{grant_id}",
+            "PATCH /api/groups/{group_id}/grants/{grant_id}",
+            "POST /api/groups/{group_id}/members",
+            "DELETE /api/groups/{group_id}/members/{user_id}",
+            "DELETE /api/integrations/settings/{setting_id}",
+            "PATCH /api/integrations/settings/{setting_id}",
+            "POST /api/integrations/settings/{setting_id}/jira/pull",
+            "DELETE /api/links/{link_id}",
+            "POST /api/notifications/{notification_id}/read",
+            "DELETE /api/policies/{policy_id}",
+            "GET /api/policies/{policy_id}",
+            "PATCH /api/policies/{policy_id}",
+            "POST /api/policies/{policy_id}/duplicate",
+            "GET /api/projects/{project_id}/artefact-requests",
+            "POST /api/projects/{project_id}/import",
+            "POST /api/projects/{project_id}/import/markdown",
+            "POST /api/projects/{project_id}/import/reqif",
+            "POST /api/projects/{project_id}/import/test-cases",
+            "POST /api/projects/{project_id}/import/testrail",
+            "POST /api/projects/{project_id}/import/testrail/columns",
+            "PATCH /api/tags/{tag_id}",
+            "DELETE /api/users/{user_id}",
+            "GET /api/users/{user_id}",
+            "PATCH /api/users/{user_id}",
+            "GET /api/users/{user_id}/access-summary",
+            "GET /api/users/{user_id}/application-policies",
+            "PUT /api/users/{user_id}/application-policies",
+            "DELETE /api/users/{user_id}/email",
+            "POST /api/users/{user_id}/email",
+            "POST /api/users/{user_id}/email/approve",
+            "POST /api/users/{user_id}/resend-invite",
+            "POST /api/users/{user_id}/revoke-invite",
+        }
+    ),
+}
+DATABASE_ID_FREE_PREFIXES = ("/api/test-suites", "/api/campaigns")
+MSG_DATABASE_ID_UNLISTED = "no API route outside the allowlist takes a database id in its path"
+MSG_DATABASE_ID_STALE = "every allowlisted route still takes a database id in its path"
+MSG_DATABASE_ID_ONE_OWNER = "each allowlisted route belongs to one group only"
+MSG_DATABASE_ID_SUITES = "suite and campaign routes take no database id"

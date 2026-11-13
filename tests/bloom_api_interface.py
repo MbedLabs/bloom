@@ -521,12 +521,26 @@ class BloomApiInterface(BloomInterface):
                     names.add(name)
                 pending.extend(dependency.dependencies)
             methods = ",".join(sorted(route.methods or set()))
+            integer_path = any(
+                self._is_integer(param.field_info.annotation)
+                for param in route.dependant.path_params
+            )
             routes.append(
                 SimpleNamespace(
-                    path=path, methods=methods, endpoint=route.endpoint.__name__, dependencies=names
+                    path=path,
+                    methods=methods,
+                    method_list=sorted(route.methods or set()),
+                    endpoint=route.endpoint.__name__,
+                    dependencies=names,
+                    integer_path=integer_path,
                 )
             )
         return routes
+
+    def _is_integer(self, annotation):
+        return (
+            isinstance(annotation, type) and issubclass(annotation, int) and annotation is not bool
+        )
 
     def _api_routes(self, router, prefix=""):
         for route in router.routes:
