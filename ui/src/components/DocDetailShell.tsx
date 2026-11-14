@@ -4,7 +4,9 @@ import { ArrowLeft } from 'lucide-react'
 import type { DocType } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocumentDetailColumns from './DocumentDetailColumns'
+import { useInfoPanelCollapsed } from '../hooks/useInfoPanelCollapsed'
 import DocumentInfoPanel from './DocumentInfoPanel'
+import { useCommentsShown } from './comments/reviewCommentsContext'
 
 const STATUS_COLORS: Record<string, string> = {
   Draft: 'bg-slate-500/10 text-slate-700 dark:text-slate-400',
@@ -103,11 +105,14 @@ export default function DocDetailShell({
     }
   }
 
-  const panel = info ? <DocumentInfoPanel>{info}</DocumentInfoPanel> : null
+  const [infoCollapsed, toggleInfo] = useInfoPanelCollapsed()
+  const commentsShown = useCommentsShown() ?? true
+  const panel = info ? <DocumentInfoPanel collapsed={infoCollapsed} onToggle={toggleInfo}>{info}</DocumentInfoPanel> : null
+  const sideOpen = commentsShown || (!!info && !infoCollapsed)
   let body = <div className="space-y-6">{children}</div>
   if (comments) {
     body = (
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] items-start gap-6">
+      <div className={`grid grid-cols-1 ${sideOpen ? 'lg:grid-cols-[minmax(0,1fr)_380px]' : 'lg:grid-cols-[minmax(0,1fr)_auto]'} items-start gap-6`}>
         <div className="min-w-0 space-y-6">{children}</div>
         <div className="order-first min-w-0 space-y-6 lg:order-last">
           {panel}

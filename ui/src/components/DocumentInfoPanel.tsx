@@ -1,12 +1,5 @@
-import { useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { Info, X } from 'lucide-react'
-
-const COLLAPSED_KEY = 'bloom-document-info-collapsed'
-
-/** Whether the reader last hid the document information panel. */
-function storedCollapsed(): boolean {
-  return globalThis.localStorage?.getItem(COLLAPSED_KEY) === 'true'
-}
 
 /** One section of the document information panel, with a visible heading when it has a title. */
 export function InfoSection({ title, label, children }: Readonly<{ title?: string; label?: string; children: ReactNode }>) {
@@ -19,14 +12,7 @@ export function InfoSection({ title, label, children }: Readonly<{ title?: strin
 }
 
 /** The document's workflow, details and metadata beside the document, hidden and shown with a button like the outline. */
-export default function DocumentInfoPanel({ children }: Readonly<{ children: ReactNode }>) {
-  const [collapsed, setCollapsed] = useState(storedCollapsed)
-  const toggle = () => {
-    const next = !collapsed
-    setCollapsed(next)
-    globalThis.localStorage?.setItem(COLLAPSED_KEY, String(next))
-  }
-
+export default function DocumentInfoPanel({ collapsed, onToggle: toggle, children }: Readonly<{ collapsed: boolean; onToggle: () => void; children: ReactNode }>) {
   if (collapsed) {
     return (
       <aside aria-label="Document information">
