@@ -12,6 +12,7 @@ import { DocEditor } from '../editor'
 import type { HighlightedThread } from '../editor/CommentHighlights'
 import UserIdentity from '../UserIdentity'
 import { useToast } from '../useToast'
+import { useWideScreen } from '../../hooks/useWideScreen'
 import { ReviewCommentsContext, type Pending } from './reviewCommentsContext'
 
 const buttonClass = 'px-2.5 py-1 rounded-md border border-input text-xs hover:bg-accent/40 disabled:opacity-50'
@@ -227,21 +228,6 @@ export function ThreadList({ artefactType, artefactId, projectPrefix, projectId 
 }
 
 const COMPOSER_ID = -1
-
-/** True while the window is at least as wide as the given number of pixels; the fallback value without window.matchMedia. */
-function useWideScreen(width: number, fallback = false): boolean {
-  const query = `(min-width: ${width}px)`
-  const [wide, setWide] = useState(() => typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(query).matches : fallback)
-  useLayoutEffect(() => {
-    if (typeof window.matchMedia !== 'function') return
-    const media = window.matchMedia(query)
-    const update = () => setWide(media.matches)
-    update()
-    media.addEventListener('change', update)
-    return () => media.removeEventListener('change', update)
-  }, [query])
-  return wide
-}
 
 /** The comments column beside a document's text: general and detached threads behind two buttons at its top, and from 1024 pixels wide the passage threads level with their passages; narrower, the passage threads as a list in text order. Hide comments collapses it to one Show comments button with the number of open threads. */
 export function CommentsColumn() {

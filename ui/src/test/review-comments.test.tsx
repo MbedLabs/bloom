@@ -543,12 +543,29 @@ describe('the right column of a detail page', () => {
     expect(shellGrid().classList.contains(wideTrack)).toBe(true)
   })
 
-  it('opens the comments collapsed beside the document information on a narrow window', async () => {
-    setWindowWidth(1000)
+  it('opens the comments and the document information collapsed on a window narrower than 1280 pixels and gives the text the width', async () => {
+    setWindowWidth(1279)
     renderShell()
     await loaded()
-    expect(screen.getByRole('complementary', { name: 'Document information' })).toBeTruthy()
     expect(screen.queryByRole('region', { name: 'Document comments' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Show comments (3)' })).toBeTruthy()
+    expect(screen.queryByText('Panel contents')).toBeNull()
+    const showInfo = screen.getByRole('button', { name: /Show document information/ })
+    expect(showInfo.getAttribute('aria-expanded')).toBe('false')
+    expect(shellGrid().classList.contains('lg:grid-cols-[minmax(0,1fr)_auto]')).toBe(true)
+    fireEvent.click(showInfo)
+    expect(screen.getByText('Panel contents')).toBeTruthy()
+    expect(shellGrid().classList.contains('lg:grid-cols-[minmax(0,1fr)_380px]')).toBe(true)
+  })
+
+  it('opens the document information as the reader last left it on a window 1280 pixels wide', async () => {
+    localStorage.setItem('bloom-document-info-collapsed', 'true')
+    setWindowWidth(1280)
+    renderShell()
+    await loaded()
+    expect(screen.queryByText('Panel contents')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Show document information/ }))
+    expect(screen.getByText('Panel contents')).toBeTruthy()
+    expect(localStorage.getItem('bloom-document-info-collapsed')).toBe('false')
   })
 })

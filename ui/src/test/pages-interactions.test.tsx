@@ -141,7 +141,7 @@ beforeEach(() => {
   window.localStorage.clear()
   window.confirm = () => true
   window.matchMedia = ((query: string) => ({
-    matches: false,
+    matches: query.includes('min-width'),
     media: query,
     onchange: null,
     addEventListener: () => {},
