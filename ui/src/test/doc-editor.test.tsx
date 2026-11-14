@@ -125,7 +125,7 @@ describe('editing', () => {
         throw new Error('Document focus was read after editor teardown')
       })
       await act(async () => { await vi.advanceTimersByTimeAsync(500) })
-      expect(menuVisibility.mock.calls.length).toBeGreaterThan(before)
+      expect(menuVisibility.mock.calls.length).toBe(before)
       expect(documentFocus).not.toHaveBeenCalled()
     } finally {
       documentFocus?.mockRestore()
