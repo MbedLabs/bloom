@@ -181,6 +181,12 @@ class BloomPgInterface(BloomInterface):
     def bloom_try_public_id_inserts(self, prefix, suite_id, campaign_id):
         return self._run(self._try_public_id_inserts(prefix, suite_id, campaign_id))
 
+    def bloom_seed_requirement_texts(self, prefix, rows):
+        self._run(self._seed_requirement_texts(prefix, rows))
+
+    def bloom_read_requirement_texts(self):
+        return self._run(self._read_requirement_texts())
+
     def bloom_serve_jira_holding_creation(self, issue):
         searches = []
         both_searched = asyncio.Event()
@@ -445,6 +451,37 @@ class BloomPgInterface(BloomInterface):
                     await self._insert_suite(connection, project, suite_id)
                 if campaign_id:
                     await self._insert_campaign(connection, project, campaign_id)
+
+    async def _seed_requirement_texts(self, prefix, rows):
+        async with self.engine.begin() as connection:
+            project = await self._insert_project(connection, prefix)
+            for req_id, description, content_json, content_html in rows:
+                await connection.execute(
+                    text(
+                        "INSERT INTO requirements (project_id, req_id, title, description, "
+                        "content_json, content_html, status, priority, req_type, req_origin, "
+                        "visibility, created_at, updated_at) VALUES (:project, :req_id, :req_id, "
+                        ":description, CAST(:content_json AS JSON), :content_html, 'Draft', "
+                        "'Medium', 'Functional', 'Internal', 'internal', now(), now())"
+                    ),
+                    {
+                        "project": project,
+                        "req_id": req_id,
+                        "description": description,
+                        "content_json": None if content_json is None else json.dumps(content_json),
+                        "content_html": content_html,
+                    },
+                )
+
+    async def _read_requirement_texts(self):
+        async with self.engine.connect() as connection:
+            rows = await connection.execute(
+                text(
+                    "SELECT req_id, description, content_json, content_html FROM requirements "
+                    "ORDER BY req_id"
+                )
+            )
+            return {req_id: (description, body, html) for req_id, description, body, html in rows}
 
     async def _read_campaign_public_ids(self):
         async with self.engine.connect() as connection:

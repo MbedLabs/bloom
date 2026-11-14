@@ -44,6 +44,7 @@ from app.api import (
     company_logo,
     docs_facade,
     export,
+    import_service,
     integrations,
 )
 from app.api import project_variables as project_variables_api
@@ -70,6 +71,7 @@ from app.models import (
     IntegrationSetting,
     Project,
     Requirement,
+    RequirementLink,
     SystemMarker,
     TestCase,
     user_token,
@@ -83,6 +85,7 @@ from app.services import (
     import_attempts,
     integration_sync,
     jira_outbound,
+    rich_text,
     tag_links,
     token_service,
 )
@@ -738,6 +741,59 @@ class BloomLogicInterface(BloomInterface):
 
     async def _hidden_end(self, *args, **kwargs):
         return None, False
+
+    def bloom_plain_text(self, content_json, content_html):
+        return rich_text.plain_text(content_json, content_html)
+
+    def bloom_description_with_content(self, description, content_json, content_html):
+        return rich_text.description_with_content(description, content_json, content_html)
+
+    def bloom_import_reqif(self, project_id, data):
+        stream = io.BytesIO(data)
+
+        async def read(size=-1):
+            return stream.read(size)
+
+        async def run(db, admin):
+            return await import_service.import_reqif(
+                project_id=project_id,
+                file=SimpleNamespace(read=read),
+                db=db,
+                current_user=admin,
+            )
+
+        return self._run(self._as_first_admin(run))
+
+    def bloom_copy_requirements(self, source_id, target_id):
+        async def copy(db, admin):
+            source = await db.get(Project, source_id)
+            target = await db.get(Project, target_id)
+            ids = list(
+                await db.scalars(select(Requirement.id).where(Requirement.project_id == source_id))
+            )
+            result = import_service.ImportResult(imported=0, skipped=0, new_ids=[], errors=[])
+            await import_service._import_docs(db, admin, "REQ", ids, source, target, result)
+            await db.commit()
+            return result
+
+        return self._run(self._as_first_admin(copy))
+
+    def bloom_requirement_rows(self, fields, project_id=None):
+        query = select(Requirement).order_by(Requirement.req_id)
+        if project_id is not None:
+            query = query.where(Requirement.project_id == project_id)
+        rows = self._run(self._all(query))
+        return [tuple(getattr(row, name) for name in fields) for row in rows]
+
+    def bloom_list_link_ends(self):
+        links = self._run(self._all(select(ArtefactLink).order_by(ArtefactLink.id)))
+        return [
+            (link.source_id, link.target_id, link.source_type, link.target_type, link.role)
+            for link in links
+        ]
+
+    def bloom_count_requirement_links(self):
+        return len(self._run(self._all(select(RequirementLink))))
 
     def bloom_set_logo(self, data, content_type):
         async def upload(db, admin):

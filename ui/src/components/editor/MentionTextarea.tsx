@@ -1,13 +1,14 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { TextareaHTMLAttributes } from 'react'
 
 import MentionList, { type MentionListRef, type MentionSuggestion } from './MentionList'
 
 const PARAMETER_TRIGGER = '{{'
 const PARAMETER_SUFFIX = '}}'
+const ARTEFACT_TRIGGER = '#'
 
 /**
- * A plain <textarea> that offers the same two mention triggers as DocEditor.
+ * A plain <textarea> that offers DocEditor's `@` and `{{` mention triggers and, given an artefact search, `#` tags written as `#ID`.
  *
  * The TCS table stores `description` and `expected_result` as plain strings -
  * the Bud runner and the exporters read them as text - so a mention here has to
@@ -17,7 +18,7 @@ const PARAMETER_SUFFIX = '}}'
  * requirement.
  */
 
-type TriggerKind = 'parameter' | 'user'
+type TriggerKind = 'parameter' | 'user' | 'artefact'
 
 interface ActiveTrigger {
   kind: TriggerKind
@@ -32,6 +33,7 @@ export interface MentionTextareaProps
   onChange: (value: string) => void
   mentionItems?: MentionSuggestion[]
   userMentionItems?: MentionSuggestion[]
+  artefactSearch?: (query: string) => Promise<MentionSuggestion[]>
 }
 
 /**
@@ -41,10 +43,14 @@ export interface MentionTextareaProps
  * patterns cannot both match, but ordering keeps that independent of the
  * charsets drifting later.
  */
-function detectTrigger(textBeforeCaret: string): ActiveTrigger | null {
+function detectTrigger(textBeforeCaret: string, tags: boolean): ActiveTrigger | null {
   const parameter = /\{\{([^{}\n]*)$/.exec(textBeforeCaret)
   if (parameter) {
     return { kind: 'parameter', start: parameter.index, query: parameter[1] }
+  }
+  const artefact = tags ? /(?:^|\s)(#)([^\s#]*)$/.exec(textBeforeCaret) : null
+  if (artefact) {
+    return { kind: 'artefact', start: textBeforeCaret.length - artefact[2].length - 1, query: artefact[2] }
   }
   const user = /@([^\s@{}]*)$/.exec(textBeforeCaret)
   if (user) {
@@ -65,6 +71,7 @@ export default function MentionTextarea({
   onChange,
   mentionItems = [],
   userMentionItems = [],
+  artefactSearch,
   onKeyDown,
   onBlur,
   ...textareaProps
@@ -74,8 +81,20 @@ export default function MentionTextarea({
   const [trigger, setTrigger] = useState<ActiveTrigger | null>(null)
   const [anchor, setAnchor] = useState<{ left: number; top: number } | null>(null)
 
+  const [artefactItems, setArtefactItems] = useState<MentionSuggestion[]>([])
+  const artefactQuery = trigger?.kind === 'artefact' ? trigger.query : null
+
+  useEffect(() => {
+    if (artefactQuery === null || !artefactSearch) return
+    let current = true
+    artefactSearch(artefactQuery).then((found) => { if (current) setArtefactItems(found) }, () => { if (current) setArtefactItems([]) })
+    return () => { current = false }
+  }, [artefactQuery, artefactSearch])
+
   const suggestionPool = trigger?.kind === 'parameter' ? mentionItems : userMentionItems
-  const items = trigger ? filterSuggestions(suggestionPool, trigger.query) : []
+  let items: MentionSuggestion[] = []
+  if (trigger?.kind === 'artefact') items = artefactItems
+  else if (trigger) items = filterSuggestions(suggestionPool, trigger.query)
 
   const close = useCallback(() => {
     setTrigger(null)
@@ -87,10 +106,10 @@ export default function MentionTextarea({
       close()
       return
     }
-    const next = detectTrigger(element.value.slice(0, element.selectionStart))
+    const next = detectTrigger(element.value.slice(0, element.selectionStart), !!artefactSearch)
     setTrigger(next)
     if (!next) setAnchor(null)
-  }, [close])
+  }, [artefactSearch, close])
 
   useLayoutEffect(() => {
     if (!trigger) return
@@ -104,9 +123,8 @@ export default function MentionTextarea({
     const element = textareaRef.current
     if (!element || !trigger) return
     const caret = element.selectionStart
-    const replacement = trigger.kind === 'parameter'
-      ? `${PARAMETER_TRIGGER}${item.label}${PARAMETER_SUFFIX}`
-      : `@${item.label}`
+    const prefixes: Record<TriggerKind, string> = { parameter: PARAMETER_TRIGGER, user: '@', artefact: ARTEFACT_TRIGGER }
+    const replacement = `${prefixes[trigger.kind]}${item.label}${trigger.kind === 'parameter' ? PARAMETER_SUFFIX : ''}`
     const next = `${value.slice(0, trigger.start)}${replacement}${value.slice(caret)}`
     onChange(next)
     close()
@@ -162,7 +180,7 @@ export default function MentionTextarea({
             ref={listRef}
             items={items}
             command={insert}
-            triggerPrefix={trigger.kind === 'parameter' ? PARAMETER_TRIGGER : '@'}
+            triggerPrefix={{ parameter: PARAMETER_TRIGGER, user: '@', artefact: ARTEFACT_TRIGGER }[trigger.kind]}
             triggerSuffix={trigger.kind === 'parameter' ? PARAMETER_SUFFIX : ''}
           />
         </div>

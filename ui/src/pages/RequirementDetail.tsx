@@ -6,27 +6,23 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { requirementsApi, projectsApi } from '../api/client'
 import { ExternalLink, Trash2 } from 'lucide-react'
 import { formatDateTime } from '../lib/dateTime'
-import { docEditUrl, docUrl, type DocType } from '../types/doc'
+import { docEditUrl } from '../types/doc'
 import { docRegistryListUrl } from '../lib/docRegistryParams'
 import DocumentActivityPanel from '../components/DocumentActivityPanel'
 import DocDetailShell, { MetaItem, SectionCard } from '../components/DocDetailShell'
 import { DocumentLinksPanel } from '../components/DocumentLinksPanel'
-import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/useToast'
 import {
   membershipLinksForCampaigns,
   membershipLinksForSuites,
 } from '../lib/membershipLinks'
 import { useProjectPermissions, useRowActions } from '../hooks/useProjectPermissions'
-import { useParameterValues } from '../hooks/useParameterValues'
-import { useArtefactLabels } from '../hooks/useArtefactLabels'
 import BudRunLink from '../components/BudRunLink'
 import ConfirmDelete from '../components/ConfirmDelete'
 import WorkflowPanel from '../components/WorkflowPanel'
 import { InfoSection } from '../components/DocumentInfoPanel'
-import { CommentableDocEditor, CommentsColumn, ReviewCommentsProvider } from '../components/comments/ReviewComments'
+import { CommentsColumn, ReviewCommentsProvider } from '../components/comments/ReviewComments'
 import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
-import { useSignOffPeople } from '../hooks/useSignOff'
 
 function TypeBadge({ reqType }: Readonly<{ reqType: string }>) {
   return (
@@ -71,10 +67,8 @@ export default function RequirementDetail({
   resolvedId,
   allowedActions,
 }: { resolvedId?: number; allowedActions?: string[] } = {}) {
-  const { user } = useAuth()
   const { prefix, itemId } = useParams<{ prefix: string; itemId: string }>()
   const { can } = useProjectPermissions(prefix)
-  const parameterValues = useParameterValues(prefix)
   const reqId = resolvedId || Number.parseInt(itemId || '0')
   const workflow = useDocumentWorkflow('requirement', reqId)
   const queryClient = useQueryClient()
@@ -87,7 +81,6 @@ export default function RequirementDetail({
     enabled: !!reqId,
   })
 
-  const artefactLabels = useArtefactLabels(prefix, requirement?.content_json)
   const { data: project } = useQuery({
     queryKey: ['project', requirement?.project_id],
     queryFn: () => projectsApi.get(requirement!.project_id),
@@ -117,7 +110,6 @@ export default function RequirementDetail({
 
 
 
-  const users = useSignOffPeople(requirement?.project_id, user?.role === 'admin')
 
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const deleteMutation = useMutation({
@@ -223,25 +215,11 @@ export default function RequirementDetail({
       </>}
       comments={<CommentsColumn />}
     >
-      {!requirement.description && (requirement.content_json as Record<string, unknown> | null) ? (
-        <div className="bg-card rounded-lg shadow-elegant p-6">
-          <CommentableDocEditor
-            content={requirement.content_json as Record<string, unknown>}
-            editable={false}
-            userMentionItems={users.map(person => ({ id: person.id, label: person.full_name, user: person }))}
-            parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues} artefactLabels={artefactLabels}
-            artefactHref={(type, _id, label) => docUrl(prefix, type as DocType, label)}
-            minHeight="min-h-[120px]"
-            className="border-0"
-          />
-        </div>
-      ) : (
-        <SectionCard title="Description">
-          <p className="text-foreground whitespace-pre-wrap">
-            {requirement.description || 'No description provided.'}
-          </p>
-        </SectionCard>
-      )}
+      <SectionCard title="Description">
+        <p className="text-foreground whitespace-pre-wrap">
+          {requirement.description || 'No description provided.'}
+        </p>
+      </SectionCard>
 
       {requirement.linked_test_runs && requirement.linked_test_runs.length > 0 && (
         <SectionCard title="Linked Test Runs">

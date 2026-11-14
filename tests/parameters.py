@@ -1622,3 +1622,249 @@ MSG_PROMOTION_REFUSED = "another admin may not promote anyone to admin"
 MSG_PROMOTION_REFUSAL_TEXT = "the refusal names the initial administrator"
 MSG_DEMOTION_REFUSED = "an admin may not be demoted"
 MSG_DEMOTION_REFUSAL_TEXT = "the refusal says the admin role is fixed"
+
+TEXT_PREFIX = "PRJ"
+TEXT_COPY_PREFIXES = ("ABC", "XYZ")
+TEXT_ADMIN = f"text-{_letters(string.ascii_lowercase, 4, 8)}@example.com"
+TEXT_ADMIN_ROLE = "admin"
+TEXT_BODY = {
+    "type": "doc",
+    "content": [
+        {"type": "heading", "content": [{"type": "text", "text": "Boot"}]},
+        {
+            "type": "paragraph",
+            "content": [
+                {"type": "text", "text": "Within "},
+                {"type": "mention", "attrs": {"label": "BOOT_MS", "mentionSuggestionChar": "{{"}},
+                {"type": "text", "text": ", see "},
+                {
+                    "type": "mention",
+                    "attrs": {"label": "PRJ-DES-001", "mentionSuggestionChar": "#"},
+                },
+                {"type": "text", "text": ", ask "},
+                {
+                    "type": "mention",
+                    "attrs": {"label": "Grace Hopper", "mentionSuggestionChar": "@"},
+                },
+            ],
+        },
+        {
+            "type": "bulletList",
+            "content": [
+                {
+                    "type": "listItem",
+                    "content": [
+                        {"type": "paragraph", "content": [{"type": "text", "text": "cold"}]}
+                    ],
+                },
+                {
+                    "type": "listItem",
+                    "content": [
+                        {"type": "paragraph", "content": [{"type": "text", "text": "warm"}]}
+                    ],
+                },
+            ],
+        },
+    ],
+}
+TEXT_BODY_PLAIN = "Boot\nWithin {{BOOT_MS}}, see #PRJ-DES-001, ask @Grace Hopper\ncold\nwarm"
+TEXT_PLAIN_CASES = [
+    ((TEXT_BODY, None), TEXT_BODY_PLAIN),
+    ((None, "<p>A &amp; B</p><p>C<br>D</p>"), "A & B\nC\nD"),
+    ((None, None), ""),
+]
+TEXT_DESCRIPTION_CASES = [
+    ((None, None, "<p>Boots fast</p>"), "Boots fast"),
+    (("Short", None, "<p>Long text</p>"), "Short\n\nLong text"),
+    (("Boots fast.", None, "<p>Boots fast</p>"), "Boots fast."),
+]
+TEXT_COPY_SOURCE = {
+    "req_id": "ABC-REQ-001",
+    "title": "Boot",
+    "description": "Boots fast",
+    "content_json": {"type": "doc", "content": []},
+    "content_html": "<p>Boots fast</p>",
+}
+TEXT_COPY_EXPECTED = [("XYZ-REQ-001", "Boot", "Boots fast", None, None)]
+TEXT_NO_CONTENT = (None, None)
+REQIF_SAMPLE = """<?xml version="1.0" encoding="UTF-8"?>
+<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <CORE-CONTENT>
+    <REQ-IF-CONTENT>
+      <DATATYPES>
+        <DATATYPE-DEFINITION-ENUMERATION IDENTIFIER="DT-PRIO" LONG-NAME="Priority">
+          <SPECIFIED-VALUES>
+            <ENUM-VALUE IDENTIFIER="PRIO-HIGH" LONG-NAME="High"/>
+            <ENUM-VALUE IDENTIFIER="PRIO-MED" LONG-NAME="Medium"/>
+            <ENUM-VALUE IDENTIFIER="PRIO-LOW" LONG-NAME="Low"/>
+          </SPECIFIED-VALUES>
+        </DATATYPE-DEFINITION-ENUMERATION>
+      </DATATYPES>
+      <SPEC-TYPES>
+        <SPEC-OBJECT-TYPE IDENTIFIER="OT-REQ" LONG-NAME="Requirement Type">
+          <SPEC-ATTRIBUTES>
+            <ATTRIBUTE-DEFINITION-STRING IDENTIFIER="AD-HEADING" LONG-NAME="ReqIF.ChapterName"/>
+            <ATTRIBUTE-DEFINITION-XHTML IDENTIFIER="AD-TEXT" LONG-NAME="ReqIF.Text"/>
+            <ATTRIBUTE-DEFINITION-STRING IDENTIFIER="AD-FID" LONG-NAME="ReqIF.ForeignID"/>
+            <ATTRIBUTE-DEFINITION-ENUMERATION IDENTIFIER="AD-PRIO" LONG-NAME="Priority">
+              <TYPE>
+                <DATATYPE-DEFINITION-ENUMERATION-REF>DT-PRIO</DATATYPE-DEFINITION-ENUMERATION-REF>
+              </TYPE>
+            </ATTRIBUTE-DEFINITION-ENUMERATION>
+          </SPEC-ATTRIBUTES>
+        </SPEC-OBJECT-TYPE>
+        <SPEC-RELATION-TYPE IDENTIFIER="RT-REFINES" LONG-NAME="Refines"/>
+      </SPEC-TYPES>
+      <SPEC-OBJECTS>
+        <SPEC-OBJECT IDENTIFIER="OBJ-1">
+          <VALUES>
+            <ATTRIBUTE-VALUE-STRING THE-VALUE="System Requirements">
+              <DEFINITION>
+                <ATTRIBUTE-DEFINITION-STRING-REF>AD-HEADING</ATTRIBUTE-DEFINITION-STRING-REF>
+              </DEFINITION>
+            </ATTRIBUTE-VALUE-STRING>
+          </VALUES>
+        </SPEC-OBJECT>
+        <SPEC-OBJECT IDENTIFIER="OBJ-2">
+          <VALUES>
+            <ATTRIBUTE-VALUE-STRING THE-VALUE="Login">
+              <DEFINITION>
+                <ATTRIBUTE-DEFINITION-STRING-REF>AD-HEADING</ATTRIBUTE-DEFINITION-STRING-REF>
+              </DEFINITION>
+            </ATTRIBUTE-VALUE-STRING>
+            <ATTRIBUTE-VALUE-XHTML>
+              <DEFINITION>
+                <ATTRIBUTE-DEFINITION-XHTML-REF>AD-TEXT</ATTRIBUTE-DEFINITION-XHTML-REF>
+              </DEFINITION>
+              <THE-VALUE><xhtml:div>The system <xhtml:b>shall</xhtml:b> allow login.</xhtml:div></THE-VALUE>
+            </ATTRIBUTE-VALUE-XHTML>
+            <ATTRIBUTE-VALUE-STRING THE-VALUE="PRJ-042">
+              <DEFINITION>
+                <ATTRIBUTE-DEFINITION-STRING-REF>AD-FID</ATTRIBUTE-DEFINITION-STRING-REF>
+              </DEFINITION>
+            </ATTRIBUTE-VALUE-STRING>
+            <ATTRIBUTE-VALUE-ENUMERATION>
+              <DEFINITION>
+                <ATTRIBUTE-DEFINITION-ENUMERATION-REF>AD-PRIO</ATTRIBUTE-DEFINITION-ENUMERATION-REF>
+              </DEFINITION>
+              <VALUES>
+                <ENUM-VALUE-REF>PRIO-HIGH</ENUM-VALUE-REF>
+              </VALUES>
+            </ATTRIBUTE-VALUE-ENUMERATION>
+          </VALUES>
+        </SPEC-OBJECT>
+      </SPEC-OBJECTS>
+      <SPEC-RELATIONS>
+        <SPEC-RELATION IDENTIFIER="REL-1">
+          <TYPE><SPEC-RELATION-TYPE-REF>RT-REFINES</SPEC-RELATION-TYPE-REF></TYPE>
+          <SOURCE><SPEC-OBJECT-REF>OBJ-2</SPEC-OBJECT-REF></SOURCE>
+          <TARGET><SPEC-OBJECT-REF>OBJ-1</SPEC-OBJECT-REF></TARGET>
+        </SPEC-RELATION>
+      </SPEC-RELATIONS>
+      <SPECIFICATIONS>
+        <SPECIFICATION IDENTIFIER="SPEC-1" LONG-NAME="System Specification">
+          <CHILDREN>
+            <SPEC-HIERARCHY IDENTIFIER="H-1">
+              <OBJECT><SPEC-OBJECT-REF>OBJ-1</SPEC-OBJECT-REF></OBJECT>
+              <CHILDREN>
+                <SPEC-HIERARCHY IDENTIFIER="H-2">
+                  <OBJECT><SPEC-OBJECT-REF>OBJ-2</SPEC-OBJECT-REF></OBJECT>
+                </SPEC-HIERARCHY>
+              </CHILDREN>
+            </SPEC-HIERARCHY>
+          </CHILDREN>
+        </SPECIFICATION>
+      </SPECIFICATIONS>
+    </REQ-IF-CONTENT>
+  </CORE-CONTENT>
+</REQ-IF>
+""".encode("utf-8")
+REQIF_FIELDS = (
+    "req_id",
+    "title",
+    "priority",
+    "description",
+    "content_json",
+    "content_html",
+    "req_origin",
+    "source_ref",
+)
+REQIF_COUNTS = (2, 1, 1, ["PRJ-REQ-001", "PRJ-REQ-002"])
+REQIF_LOGIN = (
+    "PRJ-REQ-002",
+    "Login",
+    "High",
+    "The system shall allow login.",
+    None,
+    None,
+    "External",
+    "OBJ-2",
+)
+REQIF_SYSTEM_SOURCE = ("PRJ-REQ-001", "System Requirements", "OBJ-1")
+REQIF_LINK = ("REQ", "REQ", "refines")
+REQIF_NO_REQUIREMENT_LINKS = 0
+MSG_TEXT_PLAIN = "editor content becomes plain lines with mentions as @Name, #ID and {{KEY}}"
+MSG_TEXT_DESCRIPTION = "the text fills or follows a description that does not already hold it"
+MSG_TEXT_COPY = "a copied requirement keeps its description and no editor content"
+MSG_REQIF_COUNTS = "the ReqIF import creates two requirements, one link and one specification"
+MSG_REQIF_LOGIN = "an imported requirement holds its ReqIF text as plain description"
+MSG_REQIF_SYSTEM = "the heading object is imported with its title and source"
+MSG_REQIF_LINK = "the ReqIF relation becomes one refines link from login to system"
+MSG_REQIF_LEGACY = "the import writes no legacy requirement links"
+
+DESCRIPTION_PREFIX = _letters(string.ascii_uppercase, 3, 3)
+DESCRIPTION_BODY = {
+    "type": "doc",
+    "content": [
+        {
+            "type": "paragraph",
+            "content": [
+                {"type": "text", "text": "boots in "},
+                {
+                    "type": "mention",
+                    "attrs": {"id": "1", "label": "BOOT_BUDGET_MS", "mentionSuggestionChar": "{{"},
+                },
+            ],
+        }
+    ],
+}
+DESCRIPTION_BODY_HTML = "<p>boots in {{BOOT_BUDGET_MS}}</p>"
+DESCRIPTION_FROM_BODY = ("boots in {{BOOT_BUDGET_MS}}", None, None)
+DESCRIPTION_EDIT_HTML = "<p>and logs <b>every</b> boot</p>"
+DESCRIPTION_AFTER_EDIT = ("boots in {{BOOT_BUDGET_MS}}\n\nand logs every boot", None, None)
+DESCRIPTION_SPEC_TITLE = "Target specification"
+DESCRIPTION_UNKNOWN_TAG = "#XYZ-SPEC-999"
+DESCRIPTION_UNTAGGED = "No tag yet."
+DESCRIPTION_TAG_TYPE = "SPEC"
+DESCRIPTION_TAG_ROLE = "references"
+MSG_DESCRIPTION_CREATED = "a requirement is created"
+MSG_DESCRIPTION_FROM_BODY = (
+    "editor content sent on create becomes the description and is not stored"
+)
+MSG_DESCRIPTION_DETAIL = "the requirement detail holds the description and no editor content"
+MSG_DESCRIPTION_EDIT = "editor content sent on edit follows the description and is not stored"
+MSG_DESCRIPTION_TAG_CREATE = (
+    "a #ID in a new description links the requirement to that document only"
+)
+MSG_DESCRIPTION_NO_TAG = "a description without a tag creates no link"
+MSG_DESCRIPTION_TAG_EDIT = "a #ID added on edit links the requirement to that document"
+
+TEXT_MIGRATION_BEFORE = "a7d2c5f81b39"
+TEXT_MIGRATION_REVISION = "b8e3d1f6a920"
+TEXT_MIGRATION_PREFIX = "PRJ"
+TEXT_MIGRATION_ROWS = [
+    ("PRJ-REQ-001", None, TEXT_BODY, None),
+    ("PRJ-REQ-002", "Short", None, "<p>Long text</p>"),
+    ("PRJ-REQ-003", "Boots fast.", None, "<p>Boots fast</p>"),
+    ("PRJ-REQ-004", "Plain only", None, None),
+]
+TEXT_MIGRATION_EXPECTED = {
+    "PRJ-REQ-001": (TEXT_BODY_PLAIN, None, None),
+    "PRJ-REQ-002": ("Short\n\nLong text", None, None),
+    "PRJ-REQ-003": ("Boots fast.", None, None),
+    "PRJ-REQ-004": ("Plain only", None, None),
+}
+MSG_TEXT_MIGRATION_UPGRADE = "the upgrade moves each requirement's editor text into its description"
+MSG_TEXT_MIGRATION_DOWNGRADE = "the downgrade keeps the descriptions and restores no editor content"
+MSG_TEXT_MIGRATION_REUPGRADE = "upgrading again leaves the descriptions as they are"

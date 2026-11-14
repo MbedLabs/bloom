@@ -6,7 +6,7 @@ import TagPicker from '../components/TagPicker'
 import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router'
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { ArrowLeft, PanelRightOpen, PanelRightClose, Trash2 } from 'lucide-react'
-import { DocEditor } from '../components/editor'
+import { DocEditor, MentionTextarea } from '../components/editor'
 import { TcsArteTable } from '../components/TcsArteTable'
 import { createDefaultTcRows, normalizeTcsRows, type TcsRow } from '../utils/tcs'
 import {
@@ -64,12 +64,6 @@ function artefactActivityTypeForDocType(docType: DocType): string | null {
   if (docType === 'CHG') return 'change'
   if (docType === 'RSK') return 'risk'
   return null
-}
-
-/** The plain text of stored HTML. */
-function plainTextOf(html: string): string {
-  const doc = new DOMParser().parseFromString(html, 'text/html')
-  return (doc.body.textContent || '').trim()
 }
 
 function isControlledSharedDocument(docType: DocType): boolean {
@@ -363,7 +357,6 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
       }
       if (typeof data.visibility === 'string') meta.visibility = data.visibility
       if (data.status) meta.status = data.status as string
-      if (docType === 'REQ' && !meta.description && typeof data.content_html === 'string') meta.description = plainTextOf(data.content_html)
       setMetadata(meta)
     }).catch(() => {
       setSaveError('Could not load document for editing.')
@@ -702,10 +695,13 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
             )}
             <div className={`${docType === 'TC' ? 'max-w-none' : 'max-w-4xl mx-auto'} w-full px-4 py-4`}>
               {docType === 'REQ' && (
-                <textarea
+                <MentionTextarea
                   aria-label="Description"
                   value={metadata.description || ''}
-                  onChange={(e) => setMetadata({ ...metadata, description: e.target.value })}
+                  onChange={(description) => setMetadata({ ...metadata, description })}
+                  mentionItems={parameterMentionItems}
+                  userMentionItems={userMentionItems}
+                  artefactSearch={artefactSearch}
                   placeholder="Describe the requirement..."
                   rows={8}
                   className="w-full px-4 py-3 rounded-md border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-hidden focus:ring-2 focus:ring-ring"

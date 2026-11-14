@@ -31,8 +31,12 @@ describe.each(DETAIL_PAGES)('%s', (_name, source) => {
 })
 
 describe('detail pages render the stored body', () => {
+  it('RequirementDetail shows the description only, never an editor', () => {
+    expect(requirementDetailSource).not.toContain('content_json')
+    expect(requirementDetailSource).not.toContain('DocEditor')
+  })
+
   it.each([
-    ['RequirementDetail', requirementDetailSource],
     ['TestCaseDetail', testCaseDetailSource],
   ])('%s shows rich content read-only', (_name, source) => {
     expect(source).toContain('content_json')

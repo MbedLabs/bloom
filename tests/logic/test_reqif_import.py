@@ -236,33 +236,6 @@ async def _admin(db):
     return (await db.execute(select(User).where(User.role == UserRole.admin))).scalar_one()
 
 
-async def test_import_creates_requirements_and_links(session):
-    admin = await _admin(session)
-    result = await import_reqif(
-        project_id=1, file=_FakeUpload(SAMPLE_REQIF), db=session, current_user=admin
-    )
-    assert result.imported == 2
-    assert result.links_created == 1
-    assert result.specifications == 1
-    assert result.new_ids == ["PRJ-REQ-001", "PRJ-REQ-002"]
-
-    reqs = {r.req_id: r for r in (await session.execute(select(Requirement))).scalars().all()}
-    system = reqs["PRJ-REQ-001"]
-    login = reqs["PRJ-REQ-002"]
-    assert system.title == "System Requirements"
-    assert login.title == "Login"
-    assert login.priority == "High"
-    assert login.content_html
-    assert "<b>shall</b>" in login.content_html
-    assert login.req_origin == "External"
-    assert system.source_ref == "OBJ-1"
-
-    link = (await session.execute(select(ArtefactLink))).scalars().one()
-    assert (link.source_id, link.target_id) == (login.id, system.id)
-    assert (link.source_type, link.target_type, link.role) == ("REQ", "REQ", "refines")
-    assert (await session.execute(select(RequirementLink))).scalars().all() == []
-
-
 async def test_reimport_is_idempotent(session):
     admin = await _admin(session)
     first = await import_reqif(

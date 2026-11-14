@@ -73,7 +73,8 @@ from app.schemas import (
 )
 from app.services.artefact_tags import attach_tags, creation_tags
 from app.services.notification_service import notify_assignment
-from app.services.tag_links import sync_tag_links
+from app.services.rich_text import description_with_content
+from app.services.tag_links import sync_tag_links, text_tag_content
 
 REQUIREMENT_NOT_FOUND = "Requirement not found"
 
@@ -413,7 +414,9 @@ async def create_requirement(
         created_by_id=current_user.id,
         req_id=req_id,
         title=data.title,
-        description=data.description,
+        description=description_with_content(
+            data.description, data.content_json, data.content_html
+        ),
         status=status,
         visibility=requirement_origin_visibility(req_origin),
         priority=data.priority,
@@ -421,8 +424,6 @@ async def create_requirement(
         req_origin=req_origin,
         reviewer_id=data.reviewer_id,
         approver_id=data.approver_id,
-        content_json=data.content_json,
-        content_html=data.content_html,
     )
 
     db.add(requirement)
@@ -440,7 +441,17 @@ async def create_requirement(
         project_id=requirement.project_id,
         source_type="REQ",
         source_id=requirement.id,
-        content_json=requirement.content_json,
+        content_json=data.content_json,
+        user=current_user,
+    )
+    await sync_tag_links(
+        db,
+        project_id=requirement.project_id,
+        source_type="REQ",
+        source_id=requirement.id,
+        content_json=await text_tag_content(
+            db, requirement.project_id, "REQ", requirement.description
+        ),
         user=current_user,
     )
     await log_artefact_activity(
@@ -572,8 +583,11 @@ async def update_requirement(
         requirement.req_origin = data.req_origin
     if data.visibility is not None:
         requirement.visibility = data.visibility
+    if data.content_json is not None or data.content_html is not None:
+        requirement.description = description_with_content(
+            requirement.description, data.content_json, data.content_html
+        )
     if data.content_json is not None:
-        requirement.content_json = data.content_json
         await sync_tag_links(
             db,
             project_id=requirement.project_id,
@@ -582,8 +596,21 @@ async def update_requirement(
             content_json=data.content_json,
             user=current_user,
         )
-    if data.content_html is not None:
-        requirement.content_html = data.content_html
+    if (
+        data.description is not None
+        or data.content_json is not None
+        or data.content_html is not None
+    ):
+        await sync_tag_links(
+            db,
+            project_id=requirement.project_id,
+            source_type="REQ",
+            source_id=requirement.id,
+            content_json=await text_tag_content(
+                db, requirement.project_id, "REQ", requirement.description
+            ),
+            user=current_user,
+        )
     requirement.visibility = requirement_origin_visibility(requirement.req_origin)
     await audit_visibility_change(db, "requirement", requirement, previous_visibility)
 

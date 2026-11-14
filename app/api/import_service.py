@@ -91,6 +91,7 @@ from app.services.reqif_worker import (
     parse_in_worker,
     parse_reqif_in_worker,
 )
+from app.services.rich_text import description_with_content
 
 TARGET_PROJECT_NOT_FOUND = "Target project not found"
 IMPORT_RUN = "import.run"
@@ -247,8 +248,6 @@ _COPIED_FIELDS = {
         (
             "title",
             "description",
-            "content_json",
-            "content_html",
             "priority",
             "req_type",
             "req_origin",
@@ -489,8 +488,9 @@ async def import_reqif(
             created_by_id=current_user.id,
             req_id=new_req_id,
             title=_requirement_title(obj),
-            description=obj.first_attr(TEXT_ATTRIBUTE_HINTS),
-            content_html=obj.first_html(TEXT_ATTRIBUTE_HINTS),
+            description=description_with_content(
+                obj.first_attr(TEXT_ATTRIBUTE_HINTS), None, obj.first_html(TEXT_ATTRIBUTE_HINTS)
+            ),
             priority=priority,
             source_ref=source_ref,
             **{"status": "Draft", "req_origin": "External", **forced},

@@ -46,9 +46,16 @@ function renderAt(path: string, url: string, element: ReactElement) {
   )
 }
 
+const REQUIREMENT_TEXT = 'The system shall boot in 3 seconds.'
+
+/** The element holding a page's text: the description of a requirement, the editor of every other page. */
+function pageText(page: string, scope: HTMLElement = document.body): HTMLElement | null {
+  return page === 'requirement' ? within(scope).queryByText(REQUIREMENT_TEXT) : within(scope).queryByTestId('doc-editor')
+}
+
 const richPages: Record<string, () => void> = {
   requirement: () => {
-    vi.mocked(client.requirementsApi.get).mockResolvedValue({ ...requirement, description: null, content_json: richContent } as never)
+    vi.mocked(client.requirementsApi.get).mockResolvedValue({ ...requirement, description: REQUIREMENT_TEXT, content_json: null } as never)
     renderAt('/projects/:prefix/requirements/:itemId', `/projects/PRJ/requirements/${requirement.id}`, <RequirementDetail />)
   },
   'test case': () => {
@@ -122,8 +129,8 @@ describe('the layout of a rich-text document page', () => {
     expect(grid.classList.contains('lg:grid-cols-[minmax(0,1fr)_380px]')).toBe(true)
     const contentColumn = grid.firstElementChild!
     expect(contentColumn).not.toBe(column)
-    expect(within(contentColumn as HTMLElement).getByTestId('doc-editor')).toBeTruthy()
-    expect(within(column).queryByTestId('doc-editor')).toBeNull()
+    expect(pageText(page, contentColumn as HTMLElement)).toBeTruthy()
+    expect(pageText(page, column)).toBeNull()
     expect(screen.queryByRole('complementary', { name: 'Document side panel' })).toBeNull()
   })
 
@@ -133,7 +140,7 @@ describe('the layout of a rich-text document page', () => {
     const comments = screen.getByRole('complementary', { name: 'Document comments column' })
     expect(panel.parentElement).toBe(comments.parentElement)
     expect(panel.compareDocumentPosition(comments) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(panel.contains(screen.getByTestId('doc-editor'))).toBe(false)
+    expect(panel.contains(pageText(page))).toBe(false)
 
     const workflow = within(panel).getByRole('region', { name: 'Workflow state' })
     const review = await within(workflow).findByRole('region', { name: 'Document review' })
@@ -165,7 +172,7 @@ describe('the layout of a rich-text document page', () => {
     expect(screen.queryByRole('region', { name: 'Document discussion' })).toBeNull()
     const titleBlock = screen.getByRole('heading', { level: 2 }).closest('.animate-fade-in > div')!
     const body = titleBlock.nextElementSibling as HTMLElement
-    expect(body.contains(screen.getByTestId('doc-editor'))).toBe(true)
+    expect(body.contains(pageText(page))).toBe(true)
     expect(body.nextElementSibling).toBeNull()
   })
 
@@ -194,12 +201,13 @@ describe('the layout of a rich-text document page', () => {
 
   it('keeps the requirement test runs below the content in the main column', async () => {
     const run = { id: 1, test_run_id: 77, test_run_name: 'Nightly run', status: 'Passed', teststation_url: null, created_at: '2026-10-11T00:00:00Z' }
-    vi.mocked(client.requirementsApi.get).mockResolvedValue({ ...requirement, description: null, content_json: richContent, linked_test_runs: [run] } as never)
+    vi.mocked(client.requirementsApi.get).mockResolvedValue({ ...requirement, description: REQUIREMENT_TEXT, content_json: null, linked_test_runs: [run] } as never)
     renderAt('/projects/:prefix/requirements/:itemId', `/projects/PRJ/requirements/${requirement.id}`, <RequirementDetail />)
     const aside = await screen.findByRole('complementary', { name: 'Document comments column' })
     const contentColumn = aside.parentElement!.parentElement!.firstElementChild as HTMLElement
     const runs = await within(contentColumn).findByRole('heading', { name: 'Test runs' })
-    expect(screen.getByTestId('doc-editor').compareDocumentPosition(runs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByText(REQUIREMENT_TEXT).compareDocumentPosition(runs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByTestId('doc-editor')).toBeNull()
   })
 })
 

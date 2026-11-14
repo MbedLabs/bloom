@@ -37,6 +37,7 @@ SUITES = [
     "tests.api.BLOOM_jira_webhook_spoofed_events.JiraWebhookSpoofedEventsTest",
     "tests.api.BLOOM_jira_webhook_status_mapping.JiraWebhookStatusMappingTest",
     "tests.api.BLOOM_projects_delete.ProjectsDeleteTest",
+    "tests.api.BLOOM_requirement_description.RequirementDescriptionTest",
     "tests.api.BLOOM_requirement_workflow_activity.RequirementWorkflowActivityTest",
     "tests.api.BLOOM_sign_off_activity.SignOffActivityTest",
     "tests.api.BLOOM_user_deletion.UserDeletionTest",
