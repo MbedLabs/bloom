@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import html
 import re
+from html.parser import HTMLParser
 from typing import Any
 
 BLOCK_TYPES = frozenset(
@@ -19,9 +19,40 @@ BLOCK_TYPES = frozenset(
     }
 )
 MENTION_PREFIXES = {"@": "@", "#": "#"}
-HTML_BREAKS = re.compile(r"<\s*(br|/p|/h[1-6]|/li|/tr|/blockquote|/pre)\s*/?\s*>", re.IGNORECASE)
-HTML_TAGS = re.compile(r"<[^>]+>")
+LINE_END_TAGS = frozenset(
+    {"p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "tr", "blockquote", "pre"}
+)
 BLANK_LINES = re.compile(r"\n{3,}")
+
+
+class _HtmlText(HTMLParser):
+    """Collects the text of HTML with a line break after each block and at each br."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list) -> None:
+        """Add a line break at a br."""
+        if tag == "br":
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag: str) -> None:
+        """Add a line break after a block."""
+        if tag in LINE_END_TAGS:
+            self.parts.append("\n")
+
+    def handle_data(self, data: str) -> None:
+        """Keep the text."""
+        self.parts.append(data)
+
+
+def _html_text(content_html: str) -> str:
+    """The text of HTML with a line break after each block and at each br."""
+    parser = _HtmlText()
+    parser.feed(content_html)
+    parser.close()
+    return "".join(parser.parts)
 
 
 def _node_text(node: Any) -> str:
@@ -51,7 +82,7 @@ def plain_text(content_json: Any, content_html: str | None) -> str:
     if isinstance(content_json, dict):
         text = _node_text(content_json)
     elif content_html:
-        text = html.unescape(HTML_TAGS.sub("", HTML_BREAKS.sub("\n", content_html)))
+        text = _html_text(content_html)
     else:
         text = ""
     return BLANK_LINES.sub("\n\n", text).strip()

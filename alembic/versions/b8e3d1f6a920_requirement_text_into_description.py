@@ -9,9 +9,9 @@ content is added to its description, mentions written as @Name, #ID and {{KEY}},
 content is cleared. The downgrade leaves the descriptions as they are.
 """
 
-import html
 import json
 import re
+from html.parser import HTMLParser
 
 import sqlalchemy as sa
 
@@ -34,9 +34,40 @@ BLOCK_TYPES = frozenset(
         "horizontalRule",
     }
 )
-HTML_BREAKS = re.compile(r"<\s*(br|/p|/h[1-6]|/li|/tr|/blockquote|/pre)\s*/?\s*>", re.IGNORECASE)
-HTML_TAGS = re.compile(r"<[^>]+>")
+LINE_END_TAGS = frozenset(
+    {"p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "tr", "blockquote", "pre"}
+)
 BLANK_LINES = re.compile(r"\n{3,}")
+
+
+class _HtmlText(HTMLParser):
+    """Collects the text of HTML with a line break after each block and at each br."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+
+    def handle_starttag(self, tag, attrs):
+        """Add a line break at a br."""
+        if tag == "br":
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag):
+        """Add a line break after a block."""
+        if tag in LINE_END_TAGS:
+            self.parts.append("\n")
+
+    def handle_data(self, data):
+        """Keep the text."""
+        self.parts.append(data)
+
+
+def _html_text(content_html):
+    """The text of HTML with a line break after each block and at each br."""
+    parser = _HtmlText()
+    parser.feed(content_html)
+    parser.close()
+    return "".join(parser.parts)
 
 
 def _node_text(node):
@@ -68,7 +99,7 @@ def _plain_text(content_json, content_html):
     if isinstance(content_json, dict):
         text = _node_text(content_json)
     elif content_html:
-        text = html.unescape(HTML_TAGS.sub("", HTML_BREAKS.sub("\n", content_html)))
+        text = _html_text(content_html)
     else:
         text = ""
     return BLANK_LINES.sub("\n\n", text).strip()
