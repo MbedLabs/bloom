@@ -1,6 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { MessageSquarePlus } from 'lucide-react'
+import { MessageSquare, MessageSquarePlus, X } from 'lucide-react'
 
 import { artefactsApi, type ArtefactComment, type CommentAnchor } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
@@ -12,39 +12,42 @@ import { DocEditor } from '../editor'
 import type { HighlightedThread } from '../editor/CommentHighlights'
 import UserIdentity from '../UserIdentity'
 import { useToast } from '../useToast'
+import { ReviewCommentsContext, type Pending } from './reviewCommentsContext'
 
 const buttonClass = 'px-2.5 py-1 rounded-md border border-input text-xs hover:bg-accent/40 disabled:opacity-50'
 const boxClass = 'block w-full rounded-md border border-input bg-background p-2 text-sm resize-y'
 
-type Pending = { anchor: CommentAnchor; rect: DOMRect; pageTop: number }
+const COMMENTS_SHOWN_FROM = 1280
+const OUTLINE_SHOWN_FROM = 1536
 
-interface ReviewCommentsState {
-  artefactType: string
-  artefactId: number
-  projectPrefix?: string
-  projectId?: number
-  selectedId: number | null
-  select: (id: number | null) => void
-  pending: Pending | null
-  setPending: (pending: Pending | null) => void
-  composing: Pending | null
-  setComposing: (pending: Pending | null) => void
-  showResolved: boolean
-  setShowResolved: (show: boolean) => void
-}
-
-const ReviewCommentsContext = createContext<ReviewCommentsState | null>(null)
-
-/** Shares a document's selected thread, its text selection and the resolved-thread toggle between its text and its comments column. */
+/** Shares a document's selected thread, its text selection, the resolved-thread toggle and whether its comments are shown between its text and its comments column. The comments open shown on a window at least 1280 pixels wide and collapsed on a narrower one; the reader's choice wins, and selecting a thread or commenting on a passage shows them. */
 export function ReviewCommentsProvider({ artefactType, artefactId, projectPrefix, projectId, children }: Readonly<{ artefactType: string; artefactId: number; projectPrefix?: string; projectId?: number; children: ReactNode }>) {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [pending, setPending] = useState<Pending | null>(null)
-  const [composing, setComposing] = useState<Pending | null>(null)
+  const [composingPassage, setComposingPassage] = useState<Pending | null>(null)
   const [showResolved, setShowResolved] = useState(false)
+  const wide = useWideScreen(COMMENTS_SHOWN_FROM, true)
+  const [commentsChoice, setCommentsChoice] = useState<boolean | null>(null)
+  const commentsShown = commentsChoice ?? wide
+  const select = useCallback((id: number | null) => {
+    setSelectedId(id)
+    if (id !== null) setCommentsChoice(true)
+  }, [])
+  const setComposing = useCallback((next: Pending | null) => {
+    setComposingPassage(next)
+    if (next) setCommentsChoice(true)
+  }, [])
   const value = useMemo(() => ({
-    artefactType, artefactId, projectPrefix, projectId, selectedId, select: setSelectedId, pending, setPending, composing, setComposing, showResolved, setShowResolved,
-  }), [artefactType, artefactId, projectPrefix, projectId, selectedId, pending, composing, showResolved])
+    artefactType, artefactId, projectPrefix, projectId, selectedId, select, pending, setPending, composing: composingPassage, setComposing, showResolved, setShowResolved, commentsShown, setCommentsShown: setCommentsChoice,
+  }), [artefactType, artefactId, projectPrefix, projectId, selectedId, select, pending, composingPassage, setComposing, showResolved, commentsShown])
   return <ReviewCommentsContext.Provider value={value}>{children}</ReviewCommentsContext.Provider>
+}
+
+/** True when a rich-text document holds at least one heading. */
+function hasHeading(node: unknown): boolean {
+  if (!node || typeof node !== 'object') return false
+  const { type, content } = node as { type?: unknown; content?: unknown }
+  return type === 'heading' || (Array.isArray(content) && content.some(hasHeading))
 }
 
 /** The threads of a document and whether the viewer may comment and resolve. */
@@ -64,9 +67,16 @@ function useThreads(artefactType: string, artefactId: number) {
   return { comments, canComment, canResolve }
 }
 
-/** A read-only document text whose commented passages are highlighted and whose selections can be commented. */
+/** A read-only document text whose commented passages are highlighted and whose selections can be commented. Its outline opens shown when the text has headings and the window is at least 1536 pixels wide, collapsed otherwise, and the reader shows and hides it. */
 export function CommentableDocEditor(props: Readonly<ComponentProps<typeof DocEditor>>) {
   const context = useContext(ReviewCommentsContext)
+  const outlineFits = useWideScreen(OUTLINE_SHOWN_FROM, true)
+  const [outlineChoice, setOutlineChoice] = useState<boolean | null>(null)
+  const headings = useMemo(() => hasHeading(props.content), [props.content])
+  const outline = {
+    showOutline: props.showOutline ?? outlineChoice ?? (outlineFits && headings),
+    onOutlineToggle: props.onOutlineToggle ?? setOutlineChoice,
+  }
   const { comments, canComment } = useThreads(context?.artefactType ?? '', context?.artefactId ?? 0)
   const threads = useMemo<HighlightedThread[]>(() => (comments.data ?? [])
     .filter(thread => thread.anchor && (context?.showResolved || !thread.resolved_at))
@@ -81,9 +91,9 @@ export function CommentableDocEditor(props: Readonly<ComponentProps<typeof DocEd
     window.addEventListener('scroll', clear, { passive: true })
     return () => window.removeEventListener('scroll', clear)
   }, [setPending, composing])
-  if (!context) return <DocEditor {...props} />
+  if (!context) return <DocEditor {...props} {...outline} />
   return <>
-    <DocEditor {...props} commentThreads={threads} onThreadClick={context.select} onCommentSelection={onSelection} />
+    <DocEditor {...props} {...outline} commentThreads={threads} onThreadClick={context.select} onCommentSelection={onSelection} />
     {context.pending && !context.composing && <button
       type="button"
       className="fixed z-40 inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-xs text-primary-foreground shadow-elegant"
@@ -218,10 +228,10 @@ export function ThreadList({ artefactType, artefactId, projectPrefix, projectId 
 
 const COMPOSER_ID = -1
 
-/** True while the window is at least as wide as the given number of pixels. */
-function useWideScreen(width: number): boolean {
+/** True while the window is at least as wide as the given number of pixels; the fallback value without window.matchMedia. */
+function useWideScreen(width: number, fallback = false): boolean {
   const query = `(min-width: ${width}px)`
-  const [wide, setWide] = useState(() => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(query).matches)
+  const [wide, setWide] = useState(() => typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(query).matches : fallback)
   useLayoutEffect(() => {
     if (typeof window.matchMedia !== 'function') return
     const media = window.matchMedia(query)
@@ -233,11 +243,11 @@ function useWideScreen(width: number): boolean {
   return wide
 }
 
-/** The comments column beside a document's text: general and detached threads behind two buttons at its top, and from 1024 pixels wide the passage threads level with their passages; narrower, the passage threads as a list in text order. */
+/** The comments column beside a document's text: general and detached threads behind two buttons at its top, and from 1024 pixels wide the passage threads level with their passages; narrower, the passage threads as a list in text order. Hide comments collapses it to one Show comments button with the number of open threads. */
 export function CommentsColumn() {
   const context = useContext(ReviewCommentsContext)
   if (!context) throw new Error('CommentsColumn needs a ReviewCommentsProvider')
-  const { artefactType, artefactId, projectPrefix, projectId, selectedId, select, composing, setComposing, setPending, showResolved, setShowResolved } = context
+  const { artefactType, artefactId, projectPrefix, projectId, selectedId, select, composing, setComposing, setPending, showResolved, setShowResolved, commentsShown, setCommentsShown } = context
   const { comments, canComment, canResolve } = useThreads(artefactType, artefactId)
   const { post, resolve, busy } = useDiscussion(artefactType, artefactId, projectPrefix, projectId)
   const wide = useWideScreen(1024)
@@ -293,12 +303,24 @@ export function CommentsColumn() {
       onCancel={() => { setComposing(null); setPending(null) }} />
   </div>
 
+  if (!commentsShown) {
+    return <button type="button" aria-expanded={false} onClick={() => setCommentsShown(true)}
+      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">
+      <MessageSquare className="h-4 w-4" aria-hidden="true" />
+      Show comments ({all.filter(thread => !thread.resolved_at).length})
+    </button>
+  }
+
   return <section aria-label="Document comments" className="min-w-0 space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h3 className="text-lg font-semibold text-foreground">Comments</h3>
       <div className="flex flex-wrap items-center gap-3">
         <ResolvedToggle show={showResolved} onChange={setShowResolved} count={all.filter(thread => thread.resolved_at).length} />
         {canComment && !writingGeneral && <button type="button" className={`${buttonClass} whitespace-nowrap`} onClick={() => setWritingGeneral(true)}>Add a general comment</button>}
+        <button type="button" aria-expanded={true} aria-label="Hide comments" title="Hide comments" onClick={() => setCommentsShown(false)}
+          className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+          <X className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
       </div>
     </div>
     {(general.length > 0 || detached.length > 0) && <div className="flex flex-wrap gap-2">

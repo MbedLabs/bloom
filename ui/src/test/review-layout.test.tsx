@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ToastProvider } from '../components/Toast'
 import { createQueryClient } from '../lib/queryClient'
-import { change, defect, design, docDetail, requirement, resetApiMocks, risk, testCase, testConcept, testSuite, user } from './apiFixtures'
+import { artefactRelated, change, defect, design, docDetail, project, requirement, resetApiMocks, risk, testCase, testConcept, testSuite, user } from './apiFixtures'
 
 vi.mock('../api/client', async importOriginal => {
   const { mockApiModule } = await import('./apiFixtures')
@@ -48,11 +48,11 @@ function renderAt(path: string, url: string, element: ReactElement) {
 
 const richPages: Record<string, () => void> = {
   requirement: () => {
-    vi.mocked(client.requirementsApi.get).mockResolvedValue({ ...requirement, content_json: richContent } as never)
+    vi.mocked(client.requirementsApi.get).mockResolvedValue({ ...requirement, description: null, content_json: richContent } as never)
     renderAt('/projects/:prefix/requirements/:itemId', `/projects/PRJ/requirements/${requirement.id}`, <RequirementDetail />)
   },
   'test case': () => {
-    vi.mocked(client.testCasesApi.get).mockResolvedValue({ ...testCase, content_json: richContent } as never)
+    vi.mocked(client.testCasesApi.get).mockResolvedValue({ ...testCase, content_json: richContent, last_execution_status: 'Passed', last_executed_at: '2026-10-11T00:00:00Z', last_bud_run_id: 77 } as never)
     renderAt('/projects/:prefix/test-cases/:itemId', `/projects/PRJ/test-cases/${testCase.id}`, <TestCaseDetail />)
   },
   document: () => {
@@ -86,48 +86,120 @@ const sidePanelPages: Record<string, () => void> = {
 beforeEach(() => {
   vi.clearAllMocks()
   resetApiMocks(client as unknown as Record<string, unknown>, vi)
+  vi.mocked(client.artefactsApi.getRelated).mockResolvedValue({ ...artefactRelated, project: { id: project.id, prefix: project.prefix, name: project.name } } as never)
 })
 
 afterEach(() => {
   cleanup()
 })
 
+const detailSections: Record<string, [string, string[]]> = {
+  requirement: ['Details', ['Type', 'Priority']],
+  'test case': ['Last Execution', ['Result', 'Executed', 'Bud Run']],
+  document: ['Details', ['Version']],
+  design: ['Details', ['Priority']],
+  risk: ['Details', ['Category', 'Severity', 'Probability']],
+  change: ['Details', ['Change Type', 'Priority']],
+  'test concept': ['Details', ['Coverage']],
+}
+
+const METADATA_LABELS = ['Origin', 'ID', 'Project', 'Created', 'Updated']
+
 describe('the layout of a rich-text document page', () => {
+  beforeEach(() => {
+    localStorage.removeItem('bloom-document-info-collapsed')
+  })
+
   it.each(Object.keys(richPages))('puts the %s comments in a 380 px column before the content below 1024 px and beside it from 1024 px', async page => {
     richPages[page]()
     const aside = await screen.findByRole('complementary', { name: 'Document comments column' })
     expect(within(aside).getByRole('region', { name: 'Document comments' })).toBeTruthy()
-    expect(aside.classList.contains('order-first')).toBe(true)
-    expect(aside.classList.contains('lg:order-last')).toBe(true)
-    const grid = aside.parentElement!
+    const column = aside.parentElement!
+    expect(column.classList.contains('order-first')).toBe(true)
+    expect(column.classList.contains('lg:order-last')).toBe(true)
+    const grid = column.parentElement!
     expect(grid.classList.contains('grid-cols-1')).toBe(true)
     expect(grid.classList.contains('lg:grid-cols-[minmax(0,1fr)_380px]')).toBe(true)
     const contentColumn = grid.firstElementChild!
-    expect(contentColumn).not.toBe(aside)
+    expect(contentColumn).not.toBe(column)
     expect(within(contentColumn as HTMLElement).getByTestId('doc-editor')).toBeTruthy()
-    expect(within(aside).queryByTestId('doc-editor')).toBeNull()
+    expect(within(column).queryByTestId('doc-editor')).toBeNull()
     expect(screen.queryByRole('complementary', { name: 'Document side panel' })).toBeNull()
   })
 
-  it.each(Object.keys(richPages))('shows the %s review bar with Details above the content and the comments', async page => {
+  it.each(Object.keys(richPages))('shows the %s workflow, details and metadata in one open panel above the comments, beside the content', async page => {
     richPages[page]()
-    const aside = await screen.findByRole('complementary', { name: 'Document comments column' })
-    await screen.findByRole('button', { name: 'Details' })
-    const review = screen.getByRole('region', { name: 'Document review' })
+    const panel = await screen.findByRole('complementary', { name: 'Document information' })
+    const comments = screen.getByRole('complementary', { name: 'Document comments column' })
+    expect(panel.parentElement).toBe(comments.parentElement)
+    expect(panel.compareDocumentPosition(comments) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(panel.contains(screen.getByTestId('doc-editor'))).toBe(false)
+
+    const workflow = within(panel).getByRole('region', { name: 'Workflow state' })
+    const review = await within(workflow).findByRole('region', { name: 'Document review' })
     expect(within(review).getByRole('button', { name: 'Details' }).getAttribute('aria-expanded')).toBe('false')
-    expect(aside.contains(review)).toBe(false)
-    expect(review.compareDocumentPosition(aside.parentElement!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(review.compareDocumentPosition(screen.getByTestId('doc-editor')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(screen.queryByRole('region', { name: 'Document discussion' })).toBeNull()
+
+    const [detailTitle, detailLabels] = detailSections[page]
+    const details = within(panel).getByRole('region', { name: detailTitle })
+    for (const label of detailLabels) expect(within(details).getByText(label)).toBeTruthy()
+    expect(within(details).queryByText('Design Type')).toBeNull()
+    expect(within(panel).queryByRole('heading', { name: 'Workflow state' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Content' })).toBeNull()
+
+    const metadata = within(panel).getByRole('region', { name: 'Metadata' })
+    for (const label of METADATA_LABELS) expect(within(metadata).getByText(label)).toBeTruthy()
+    expect(await within(metadata).findByText('PRJ · Demo')).toBeTruthy()
   })
 
-  it('moves the requirement metadata and test runs below the content in the main column', async () => {
+  it.each(Object.keys(richPages))('shows the %s workflow, details and metadata only once and nothing between the title and the content', async page => {
+    richPages[page]()
+    const panel = await screen.findByRole('complementary', { name: 'Document information' })
+    await within(panel).findByRole('region', { name: 'Document review' })
+    expect(screen.getAllByRole('region', { name: 'Document review' })).toHaveLength(1)
+    expect(screen.getAllByRole('region', { name: 'Metadata' })).toHaveLength(1)
+    expect(screen.queryByRole('heading', { name: 'Metadata', level: 3 })?.closest('aside')).toBe(panel)
+    expect(screen.getAllByText('Created')).toHaveLength(1)
+    expect(screen.getAllByText('Updated')).toHaveLength(1)
+    const [detailTitle] = detailSections[page]
+    expect(screen.getAllByRole('heading', { name: detailTitle })).toHaveLength(1)
+    expect(screen.queryByRole('region', { name: 'Document discussion' })).toBeNull()
+    const titleBlock = screen.getByRole('heading', { level: 2 }).closest('.animate-fade-in > div')!
+    const body = titleBlock.nextElementSibling as HTMLElement
+    expect(body.contains(screen.getByTestId('doc-editor'))).toBe(true)
+    expect(body.nextElementSibling).toBeNull()
+  })
+
+  it.each(Object.keys(richPages))('hides and shows the %s information panel with a button and remembers the choice', async page => {
+    richPages[page]()
+    const panel = await screen.findByRole('complementary', { name: 'Document information' })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Hide document information' }))
+    const hidden = screen.getByRole('complementary', { name: 'Document information' })
+    expect(within(hidden).queryByRole('region', { name: 'Metadata' })).toBeNull()
+    expect(within(hidden).queryByRole('region', { name: 'Document review' })).toBeNull()
+    expect(localStorage.getItem('bloom-document-info-collapsed')).toBe('true')
+    expect(screen.getByRole('complementary', { name: 'Document comments column' })).toBeTruthy()
+
+    fireEvent.click(within(hidden).getByRole('button', { name: 'Show document information' }))
+    expect(within(screen.getByRole('complementary', { name: 'Document information' })).getByRole('region', { name: 'Metadata' })).toBeTruthy()
+    expect(localStorage.getItem('bloom-document-info-collapsed')).toBe('false')
+  })
+
+  it('opens the panel hidden when the reader hid it before', async () => {
+    localStorage.setItem('bloom-document-info-collapsed', 'true')
     richPages.requirement()
+    const panel = await screen.findByRole('complementary', { name: 'Document information' })
+    expect(within(panel).getByRole('button', { name: 'Show document information' }).getAttribute('aria-expanded')).toBe('false')
+    expect(within(panel).queryByRole('region', { name: 'Metadata' })).toBeNull()
+  })
+
+  it('keeps the requirement test runs below the content in the main column', async () => {
+    const run = { id: 1, test_run_id: 77, test_run_name: 'Nightly run', status: 'Passed', teststation_url: null, created_at: '2026-10-11T00:00:00Z' }
+    vi.mocked(client.requirementsApi.get).mockResolvedValue({ ...requirement, description: null, content_json: richContent, linked_test_runs: [run] } as never)
+    renderAt('/projects/:prefix/requirements/:itemId', `/projects/PRJ/requirements/${requirement.id}`, <RequirementDetail />)
     const aside = await screen.findByRole('complementary', { name: 'Document comments column' })
-    const contentColumn = aside.parentElement!.firstElementChild as HTMLElement
-    const metadata = await within(contentColumn).findByRole('heading', { name: 'Metadata' })
-    expect(screen.getByTestId('doc-editor').compareDocumentPosition(metadata) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(within(aside).queryByRole('heading', { name: 'Metadata' })).toBeNull()
+    const contentColumn = aside.parentElement!.parentElement!.firstElementChild as HTMLElement
+    const runs = await within(contentColumn).findByRole('heading', { name: 'Test runs' })
+    expect(screen.getByTestId('doc-editor').compareDocumentPosition(runs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })
 
@@ -139,5 +211,6 @@ describe('the layout of a page without rich content', () => {
     expect(screen.queryByRole('complementary', { name: 'Document comments column' })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Document comments' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Details' })).toBeNull()
+    expect(screen.queryByRole('complementary', { name: 'Document information' })).toBeNull()
   })
 })

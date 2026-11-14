@@ -326,6 +326,37 @@ async def get_me(current_user: User = Depends(get_current_user)):
     return UserResponse.model_validate(current_user)
 
 
+def _apply_profile(user: User, data: UserUpdate) -> None:
+    """Take the full name from a profile update when it carries one."""
+    if data.full_name is not None:
+        user.full_name = data.full_name
+
+
+def _start_email_change(user: User, new_email: str) -> None:
+    """Record the requested new address and the time of the request."""
+    user.pending_email = new_email
+    user.email_change_requested_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _set_email_change_status(user: User, status_value: str) -> None:
+    """Set the status of the user's email change."""
+    user.email_change_status = status_value
+
+
+def _clear_email_change(user: User) -> None:
+    """Clear the pending address, status and request time of an email change."""
+    user.pending_email = None
+    user.email_change_status = None
+    user.email_change_requested_at = None
+
+
+def _set_password(user: User, new_password: str) -> None:
+    """Store the new password hash and its time, and end the user's other sessions."""
+    user.hashed_password = get_password_hash(new_password)
+    user.password_set_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    user.session_version += 1
+
+
 @router.put("/me", response_model=UserResponse)
 async def update_me(
     data: UserUpdate,
@@ -335,8 +366,7 @@ async def update_me(
     """Update the signed-in user's profile. An email change goes through request_email_change, with the current
     password and a confirmation from the new address.
     """
-    if data.full_name is not None:
-        current_user.full_name = data.full_name
+    _apply_profile(current_user, data)
 
     await db.flush()
     await db.refresh(current_user)
@@ -380,11 +410,10 @@ async def request_email_change(
         raise HTTPException(status_code=400, detail="Email already in use")
 
     await invalidate_tokens(db, current_user.id, purpose=UserTokenPurpose.email_change)
-    current_user.pending_email = new_email
-    current_user.email_change_requested_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    _start_email_change(current_user, new_email)
 
     if current_user.role == UserRole.admin:
-        current_user.email_change_status = "awaiting_current_confirmation"
+        _set_email_change_status(current_user, "awaiting_current_confirmation")
         token = await create_user_token(
             db,
             user_id=current_user.id,
@@ -415,7 +444,7 @@ async def request_email_change(
             message="Authorization link sent to your current email address."
         )
 
-    current_user.email_change_status = "requested"
+    _set_email_change_status(current_user, "requested")
     await record_audit_event(
         db,
         "auth.email_change_requested",
@@ -447,9 +476,7 @@ async def cancel_email_change(
     )
     if current_user is None:
         raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
-    current_user.pending_email = None
-    current_user.email_change_status = None
-    current_user.email_change_requested_at = None
+    _clear_email_change(current_user)
     await invalidate_tokens(db, current_user.id, purpose=UserTokenPurpose.email_change)
     await record_audit_event(
         db, "auth.email_change_cancelled", target_type="user", target_id=current_user.id
@@ -598,9 +625,7 @@ async def change_password(
             details={"reason": "wrong_current_password"},
         )
         raise HTTPException(status_code=400, detail="Current password is incorrect")
-    current_user.hashed_password = get_password_hash(data.new_password)
-    current_user.password_set_at = datetime.now(timezone.utc).replace(tzinfo=None)
-    current_user.session_version += 1
+    _set_password(current_user, data.new_password)
     await invalidate_all_refresh_tokens(db, current_user.id)
     _clear_refresh_cookie(response)
     await record_audit_event(

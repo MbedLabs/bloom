@@ -224,3 +224,34 @@ def send_workflow_request_email(
             "workflow_request.html", {key: html.escape(value) for key, value in context.items()}
         ),
     )
+
+
+def send_jira_create_failed_email(
+    *,
+    to_email: str,
+    recipient_name: str,
+    defect_id: str,
+    defect_title: str,
+    project: str,
+    error: str,
+    defect_link: str,
+) -> None:
+    """Tell a recipient that Jira did not create the issue of a defect."""
+    context = {
+        "recipient_name": recipient_name,
+        "defect_id": defect_id,
+        "defect_title": defect_title,
+        "project": project,
+        "error": error,
+        "defect_link": defect_link,
+        "app_name": PRODUCT_NAME,
+        "app_identity": PRODUCT_IDENTITY,
+    }
+    send_email(
+        to_email=to_email,
+        subject=f"Jira did not create the issue of {defect_id}",
+        text_body=render_template("jira_create_failed.txt", context),
+        html_body=render_template(
+            "jira_create_failed.html", {key: html.escape(value) for key, value in context.items()}
+        ),
+    )

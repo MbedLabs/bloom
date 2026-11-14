@@ -133,30 +133,27 @@ class ReqIFBundle:
     specifications: List[ReqIFSpecification] = field(default_factory=list)
     relations: List[ReqIFRelation] = field(default_factory=list)
 
-    def ordered_object_refs(self) -> List[tuple]:
-        """Flatten every specification hierarchy into ``(object_ref, parent_ref)``
-        pairs in document order, parents always before their children.
+    def ordered_object_refs(self) -> List[str]:
+        """Every object reference once, in specification document order, then the objects
+        no specification lists.
         """
-        ordered: List[tuple] = []
+        ordered: List[str] = []
         seen: set = set()
 
-        def walk(node: ReqIFHierarchyNode, parent_ref: Optional[str]) -> None:
+        def walk(node: ReqIFHierarchyNode) -> None:
             if node.object_ref in self.objects and node.object_ref not in seen:
-                ordered.append((node.object_ref, parent_ref))
+                ordered.append(node.object_ref)
                 seen.add(node.object_ref)
-                effective_parent = node.object_ref
-            else:
-                effective_parent = parent_ref
             for child in node.children:
-                walk(child, effective_parent)
+                walk(child)
 
         for spec in self.specifications:
             for root in spec.roots:
-                walk(root, None)
+                walk(root)
 
         for identifier in self.objects:
             if identifier not in seen:
-                ordered.append((identifier, None))
+                ordered.append(identifier)
                 seen.add(identifier)
 
         return ordered
@@ -183,29 +180,30 @@ def _first_child(elem: ET.Element, local_name: str) -> Optional[ET.Element]:
     return None
 
 
+def _render_xhtml(node: ET.Element, parts: List[str]) -> None:
+    """Append one XHTML node to parts: kept tags around its text, children and their tails."""
+    tag = _local(node.tag)
+    keep = tag in _XHTML_KEEP_TAGS
+    if keep:
+        parts.append(f"<{tag}>")
+    if node.text:
+        parts.append(_escape(node.text))
+    for child in node:
+        _render_xhtml(child, parts)
+        if child.tail:
+            parts.append(_escape(child.tail))
+    if keep:
+        parts.append(f"</{tag}>")
+
+
 def _xhtml_to_html(elem: ET.Element) -> str:
     """Render an XHTML THE-VALUE subtree to a compact HTML string.
 
     Text placed directly on THE-VALUE is kept.
     """
     parts: List[str] = []
-
-    def render(node: ET.Element) -> None:
-        tag = _local(node.tag)
-        keep = tag in _XHTML_KEEP_TAGS
-        if keep:
-            parts.append(f"<{tag}>")
-        if node.text:
-            parts.append(_escape(node.text))
-        for child in node:
-            render(child)
-            if child.tail:
-                parts.append(_escape(child.tail))
-        if keep:
-            parts.append(f"</{tag}>")
-
     for child in elem:
-        render(child)
+        _render_xhtml(child, parts)
         if child.tail:
             parts.append(_escape(child.tail))
     if not list(elem) and elem.text:
@@ -244,28 +242,56 @@ def parse_reqif(data: bytes) -> ReqIFBundle:
     if _local(root.tag) != "req-if" and not _find_all(root, "SPEC-OBJECT"):
         raise ReqIFParseError("No ReqIF content (SPEC-OBJECT) found.")
 
+    enum_option_name = _enum_option_names(root)
+    attr_def_name = _attribute_definition_names(root)
+    rel_type_name = _relation_type_names(root)
+
+    bundle = ReqIFBundle()
+    _read_objects(root, bundle, attr_def_name, enum_option_name)
+    _read_specifications(root, bundle)
+    _read_relations(root, bundle, rel_type_name)
+    return bundle
+
+
+def _enum_option_names(root: ET.Element) -> Dict[str, str]:
+    """Each enumeration option's name by its identifier, the identifier when it has no name."""
     enum_option_name: Dict[str, str] = {}
     for opt in _find_all(root, "ENUM-VALUE"):
         ident = opt.get("IDENTIFIER")
         name = opt.get("LONG-NAME")
         if ident:
             enum_option_name[ident] = name or ident
+    return enum_option_name
 
+
+def _attribute_definition_names(root: ET.Element) -> Dict[str, str]:
+    """Each attribute definition's name by its identifier, the identifier when it has no name."""
     attr_def_name: Dict[str, str] = {}
     for adef in root.iter():
         if _local(adef.tag).startswith("attribute-definition-"):
             ident = adef.get("IDENTIFIER")
             if ident:
                 attr_def_name[ident] = adef.get("LONG-NAME") or ident
+    return attr_def_name
 
+
+def _relation_type_names(root: ET.Element) -> Dict[str, str]:
+    """Each relation type's name by its identifier, the identifier when it has no name."""
     rel_type_name: Dict[str, str] = {}
     for rtype in _find_all(root, "SPEC-RELATION-TYPE"):
         ident = rtype.get("IDENTIFIER")
         if ident:
             rel_type_name[ident] = rtype.get("LONG-NAME") or ident
+    return rel_type_name
 
-    bundle = ReqIFBundle()
 
+def _read_objects(
+    root: ET.Element,
+    bundle: ReqIFBundle,
+    attr_def_name: Dict[str, str],
+    enum_option_name: Dict[str, str],
+) -> None:
+    """Add every identified spec object with its attribute values, within the object limit."""
     spec_objects = _find_all(root, "SPEC-OBJECT")
     if len(spec_objects) > settings.REQIF_MAX_OBJECTS:
         raise ReqIFParseError(
@@ -281,20 +307,33 @@ def parse_reqif(data: bytes) -> ReqIFBundle:
             _consume_attribute_value(av, obj, attr_def_name, enum_option_name)
         bundle.objects[ident] = obj
 
+
+def _read_specifications(root: ET.Element, bundle: ReqIFBundle) -> None:
+    """Add every identified specification with its hierarchy roots."""
     for spec in _find_all(root, "SPECIFICATION"):
         ident = spec.get("IDENTIFIER")
         if not ident:
             continue
         specification = ReqIFSpecification(identifier=ident, long_name=spec.get("LONG-NAME"))
-        children = _first_child(spec, "CHILDREN")
-        if children is not None:
-            for hier in children:
-                if _local(hier.tag) == "spec-hierarchy":
-                    node = _build_hierarchy(hier)
-                    if node is not None:
-                        specification.roots.append(node)
+        specification.roots.extend(_hierarchy_roots(spec))
         bundle.specifications.append(specification)
 
+
+def _hierarchy_roots(spec: ET.Element) -> List[ReqIFHierarchyNode]:
+    """The non-empty hierarchy nodes built from a specification's spec-hierarchy children."""
+    roots: List[ReqIFHierarchyNode] = []
+    children = _first_child(spec, "CHILDREN")
+    if children is not None:
+        for hier in children:
+            if _local(hier.tag) == "spec-hierarchy":
+                node = _build_hierarchy(hier)
+                if node is not None:
+                    roots.append(node)
+    return roots
+
+
+def _read_relations(root: ET.Element, bundle: ReqIFBundle, rel_type_name: Dict[str, str]) -> None:
+    """Add every relation with an identifier, source and target, within the relation limit."""
     spec_relations = _find_all(root, "SPEC-RELATION")
     if len(spec_relations) > settings.REQIF_MAX_RELATIONS:
         raise ReqIFParseError(
@@ -316,8 +355,6 @@ def parse_reqif(data: bytes) -> ReqIFBundle:
             )
         )
 
-    return bundle
-
 
 def _consume_attribute_value(
     av: ET.Element,
@@ -332,6 +369,25 @@ def _consume_attribute_value(
     if not kind.startswith("attribute-value-"):
         return
 
+    def_name = _definition_name(av, attr_def_name)
+    if not def_name:
+        return
+    key = def_name.lower()
+
+    if kind == "attribute-value-xhtml":
+        _record_xhtml(av, obj, key)
+    elif kind == "attribute-value-enumeration":
+        refs = _find_all(av, "ENUM-VALUE-REF")
+        names = [enum_option_name.get((r.text or "").strip()) for r in refs]
+        obj.attributes[key] = ", ".join(n for n in names if n)
+    else:
+        value = _plain_value(av)
+        if value is not None:
+            obj.attributes[key] = value
+
+
+def _definition_name(av: ET.Element, attr_def_name: Dict[str, str]) -> Optional[str]:
+    """The long-name of the first known definition an attribute value refers to."""
     definition = _first_child(av, "DEFINITION")
     def_name: Optional[str] = None
     if definition is not None:
@@ -339,26 +395,24 @@ def _consume_attribute_value(
             def_name = attr_def_name.get((ref.text or "").strip())
             if def_name:
                 break
-    if not def_name:
-        return
-    key = def_name.lower()
+    return def_name
 
-    if kind == "attribute-value-xhtml":
+
+def _record_xhtml(av: ET.Element, obj: ReqIFObject, key: str) -> None:
+    """Record an XHTML value both as HTML and as plain text."""
+    the_value = _first_child(av, "THE-VALUE")
+    if the_value is not None:
+        obj.html_attributes[key] = _xhtml_to_html(the_value)
+        obj.attributes[key] = _plain_text(the_value)
+
+
+def _plain_value(av: ET.Element) -> Optional[str]:
+    """A plain value from the THE-VALUE attribute, else from a THE-VALUE element's text."""
+    value = av.get("THE-VALUE")
+    if value is None:
         the_value = _first_child(av, "THE-VALUE")
-        if the_value is not None:
-            obj.html_attributes[key] = _xhtml_to_html(the_value)
-            obj.attributes[key] = _plain_text(the_value)
-    elif kind == "attribute-value-enumeration":
-        refs = _find_all(av, "ENUM-VALUE-REF")
-        names = [enum_option_name.get((r.text or "").strip()) for r in refs]
-        obj.attributes[key] = ", ".join(n for n in names if n)
-    else:
-        value = av.get("THE-VALUE")
-        if value is None:
-            the_value = _first_child(av, "THE-VALUE")
-            value = _plain_text(the_value) if the_value is not None else None
-        if value is not None:
-            obj.attributes[key] = value
+        value = _plain_text(the_value) if the_value is not None else None
+    return value
 
 
 def _build_hierarchy(
@@ -377,6 +431,17 @@ def _build_hierarchy(
         raise ReqIFParseError("ReqIF hierarchy cycle detected.")
     node = ReqIFHierarchyNode(object_ref=object_ref or "")
     next_ancestors = ancestor_refs | ({object_ref} if object_ref else set())
+    node.children.extend(_child_nodes(hier, depth, next_ancestors))
+    if not node.object_ref and not node.children:
+        return None
+    return node
+
+
+def _child_nodes(
+    hier: ET.Element, depth: int, ancestors: frozenset[str]
+) -> List[ReqIFHierarchyNode]:
+    """The non-empty hierarchy nodes built from a hierarchy's spec-hierarchy children."""
+    nodes: List[ReqIFHierarchyNode] = []
     children = _first_child(hier, "CHILDREN")
     if children is not None:
         for child in children:
@@ -384,13 +449,11 @@ def _build_hierarchy(
                 built = _build_hierarchy(
                     child,
                     depth=depth + 1,
-                    ancestor_refs=frozenset(next_ancestors),
+                    ancestor_refs=frozenset(ancestors),
                 )
                 if built is not None:
-                    node.children.append(built)
-    if not node.object_ref and not node.children:
-        return None
-    return node
+                    nodes.append(built)
+    return nodes
 
 
 def _ref_text(parent: ET.Element, wrapper_local: str) -> Optional[str]:

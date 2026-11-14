@@ -20,8 +20,8 @@ const actionButtonClass = 'px-3 py-2 rounded-md border border-input text-sm hove
 const reviewButtonClass = 'w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-amber-500/90 text-white text-xs font-medium hover:bg-amber-500 disabled:opacity-50'
 const approvalButtonClass = 'w-full inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-500 disabled:opacity-50'
 
-/** A document's review state and actions: as cards with its discussion in a side panel, or as one summary line above the content. */
-export default function WorkflowPanel({ artefactType, artefactId, projectPrefix, projectId, layout = 'rail' }: Readonly<{ artefactType: string; artefactId: number; projectPrefix?: string; projectId?: number; layout?: 'rail' | 'bar' }>) {
+/** A document's review state and actions: as cards with its discussion in a side panel, or as a compact summary in the document information panel. */
+export default function WorkflowPanel({ artefactType, artefactId, projectPrefix, projectId, layout = 'rail' }: Readonly<{ artefactType: string; artefactId: number; projectPrefix?: string; projectId?: number; layout?: 'rail' | 'panel' }>) {
   const workflow = useDocumentWorkflow(artefactType, artefactId)
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -126,15 +126,16 @@ export default function WorkflowPanel({ artefactType, artefactId, projectPrefix,
     </SectionCard>}
     {revision !== null && <dialog open aria-label={`Approved revision ${revision}`} className="static m-0 w-full max-w-none text-foreground rounded-lg border border-border bg-card p-6 space-y-4"><div className="flex justify-between"><h3>Approved revision {revision}</h3><button className={actionButtonClass} type="button" onClick={() => setRevision(null)}>Close revision</button></div>{archive.isPending && <p>Loading approved content...</p>}{!archive.isPending && (archive.isError || !archive.data) && <p role="alert">Could not load this approved revision.</p>}{!archive.isPending && !archive.isError && archive.data && <ArchivedBody archive={archive.data} projectPrefix={projectPrefix} download={download} downloadId={downloadId} />}</dialog>}
   </>
-  if (layout === 'bar') {
+  if (layout === 'panel') {
     const name = (person: typeof state.reviewer) => person ? person.full_name : 'Unassigned'
-    return <section aria-label="Document review" className="rounded-lg border border-border bg-card p-3 space-y-3">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-        {state.controlled && state.phase && <span className="font-medium text-foreground">{state.phase}{state.revision_number !== null && ` · Revision ${state.revision_number}`}</span>}
-        {state.controlled && <span><span className="text-muted-foreground">Assignee </span>{name(state.assignee)}</span>}
-        <span><span className="text-muted-foreground">Reviewer </span>{name(state.reviewer)}</span>
-        {state.controlled && <span><span className="text-muted-foreground">Approver </span>{name(state.approver)}</span>}
-        <span className="flex-1" />
+    return <section aria-label="Document review" className="space-y-3">
+      <div className="space-y-1.5 text-sm">
+        {state.controlled && state.phase && <div className="font-medium text-foreground">{state.phase}{state.revision_number !== null && ` · Revision ${state.revision_number}`}</div>}
+        {state.controlled && <div><span className="text-muted-foreground">Assignee </span>{name(state.assignee)}</div>}
+        <div><span className="text-muted-foreground">Reviewer </span>{name(state.reviewer)}</div>
+        {state.controlled && <div><span className="text-muted-foreground">Approver </span>{name(state.approver)}</div>}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
         <fieldset disabled={busy} className="flex flex-wrap items-center gap-2">
           {state.controlled && state.actions.request_review && <button className={actionButtonClass} type="button" onClick={() => mutation.mutate({ kind: 'review' })}>Request review</button>}
           {state.controlled && state.actions.request_approval && <button className={actionButtonClass} type="button" onClick={() => mutation.mutate({ kind: 'approval' })}>Mark Reviewed</button>}
@@ -144,7 +145,7 @@ export default function WorkflowPanel({ artefactType, artefactId, projectPrefix,
         </fieldset>
         <button className={actionButtonClass} type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>Details</button>
       </div>
-      {expanded && <div className="grid gap-4 md:grid-cols-2">{reviewCard}{approvalCard}</div>}
+      {expanded && <div className="space-y-4">{reviewCard}{approvalCard}</div>}
       {extras}
     </section>
   }

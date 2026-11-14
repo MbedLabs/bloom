@@ -271,7 +271,6 @@ def test_the_access_migration_seeds_defaults_and_converts_memberships():
                 "-m",
                 "pytest",
                 "tests/api/test_group_owned_policies_http.py",
-                "tests/api/test_group_bulk_members_http.py",
                 "tests/api/test_groups_http.py",
                 "tests/api/test_group_permissions_http.py",
                 "tests/api/test_project_policy_grants_http.py",
@@ -291,6 +290,20 @@ def test_the_access_migration_seeds_defaults_and_converts_memberships():
         )
         assert checked.returncode == 0, checked.stdout + checked.stderr
         print(checked.stdout)
+
+        suite = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import sys; from tests.api.BLOOM_group_bulk_members import GroupBulkMembersTest; "
+                "sys.exit(0 if GroupBulkMembersTest().run() else 1)",
+            ],
+            cwd=ROOT,
+            env={**environment, "BLOOM_SUITE_DATABASE": url},
+            capture_output=True,
+            text=True,
+        )
+        assert suite.returncode == 0, suite.stdout[-4000:] + suite.stderr[-4000:]
 
     finally:
         asyncio.run(admin(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))

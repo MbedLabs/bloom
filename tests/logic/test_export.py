@@ -34,21 +34,20 @@ async def session():
         )
         await db.flush()
 
-        parent = Requirement(
+        login = Requirement(
             project_id=project.id,
             req_id="PRJ-REQ-001",
             title="Login shall be possible",
             description="Users must be able to log in.",
             status="Approved",
         )
-        db.add(parent)
+        db.add(login)
         await db.flush()
         db.add(
             Requirement(
                 project_id=project.id,
                 req_id="PRJ-REQ-002",
                 title="Uncovered requirement",
-                parent_id=parent.id,
             )
         )
         tc = TestCase(
@@ -65,7 +64,7 @@ async def session():
                 source_type="TC",
                 source_id=tc.id,
                 target_type="REQ",
-                target_id=parent.id,
+                target_id=login.id,
                 role="verifies",
             )
         )
@@ -82,19 +81,29 @@ def _parse_csv(response) -> list[list[str]]:
     return list(csv.reader(io.StringIO(response.body.decode("utf-8"))))
 
 
-async def test_requirements_csv_contains_rows_and_parent_ref(session):
+async def test_requirements_csv_contains_rows(session):
     admin = await _admin(session)
     response = await export_requirements(project_id=1, format="csv", db=session, current_user=admin)
     assert response.media_type.startswith("text/csv")
     assert 'filename="PRJ-requirements.csv"' in response.headers["content-disposition"]
 
     rows = _parse_csv(response)
-    assert rows[0][:4] == ["req_id", "title", "status", "priority"]
+    assert rows[0] == [
+        "req_id",
+        "title",
+        "status",
+        "priority",
+        "type",
+        "origin",
+        "visibility",
+        "description",
+        "created_at",
+        "updated_at",
+    ]
     by_id = {r[0]: r for r in rows[1:]}
     assert by_id["PRJ-REQ-001"][1] == "Login shall be possible"
     assert by_id["PRJ-REQ-001"][2] == "Approved"
-    parent_col = rows[0].index("parent_req_id")
-    assert by_id["PRJ-REQ-002"][parent_col] == "PRJ-REQ-001"
+    assert by_id["PRJ-REQ-002"][1] == "Uncovered requirement"
 
 
 async def test_requirements_pdf_is_valid_pdf(session):

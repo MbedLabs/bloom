@@ -104,6 +104,8 @@ export default function OutlineSidebar({ editor, open, onToggle }: Readonly<Outl
     return (
       <button
         onClick={onToggle}
+        aria-label="Show outline"
+        aria-expanded={false}
         className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
         title="Show outline"
       >
@@ -121,6 +123,8 @@ export default function OutlineSidebar({ editor, open, onToggle }: Readonly<Outl
         </span>
         <button
           onClick={onToggle}
+          aria-label="Hide outline"
+          aria-expanded={true}
           className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           title="Hide outline"
         >

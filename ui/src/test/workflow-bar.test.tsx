@@ -30,7 +30,7 @@ const noActions = { ...workflowFixture.actions, comment: false, edit_current: fa
 const state = { ...workflowFixture, phase: 'Review', revision_number: 2, assignee: user, reviewer, approver, options: { assignees: [user, reviewer], reviewers: [reviewer], approvers: [approver], changes: [] }, actions: noActions }
 const ACTION_BUTTONS = ['Request review', 'Mark Reviewed', 'Mark Approved', 'Decline', 'Start working Draft']
 
-/** Render the review bar of a requirement with the given workflow state. */
+/** Render the review summary of a requirement in its panel layout with the given workflow state. */
 async function renderBar(workflow: Record<string, unknown>) {
   vi.mocked(client.workflowApi.get).mockResolvedValue(workflow as never)
   const queryClient = createQueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } })
@@ -38,7 +38,7 @@ async function renderBar(workflow: Record<string, unknown>) {
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <MemoryRouter>
-          <WorkflowPanel artefactType="requirement" artefactId={requirement.id} projectPrefix="PRJ" projectId={1} layout="bar" />
+          <WorkflowPanel artefactType="requirement" artefactId={requirement.id} projectPrefix="PRJ" projectId={1} layout="panel" />
         </MemoryRouter>
       </ToastProvider>
     </QueryClientProvider>,
@@ -47,7 +47,7 @@ async function renderBar(workflow: Record<string, unknown>) {
   return screen.getByRole('region', { name: 'Document review' })
 }
 
-/** The names of the action buttons the bar shows, in order. */
+/** The names of the action buttons the summary shows, in order. */
 function shownActions(bar: HTMLElement) {
   return within(bar).queryAllByRole('button').map(button => button.textContent).filter(name => ACTION_BUTTONS.includes(name ?? ''))
 }
@@ -61,8 +61,8 @@ afterEach(() => {
   cleanup()
 })
 
-describe('the review bar above a document', () => {
-  it('summarises the phase and the people on one line', async () => {
+describe('the review summary in the document information panel', () => {
+  it('summarises the phase and the people', async () => {
     const bar = await renderBar(state)
     expect(within(bar).getByText('Review · Revision 2')).toBeTruthy()
     expect(within(bar).getByText('Assignee').parentElement?.textContent).toBe(`Assignee ${user.full_name}`)

@@ -5,7 +5,6 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 const requirement = {
   id: 1064,
   project_id: 7,
-  parent_id: null,
   req_id: 'PRJ-REQ-1064',
   title: 'Audit Stats Top-User Count Consistency',
   description: 'Keep audit statistics consistent.',
@@ -22,7 +21,6 @@ const requirement = {
   approved_at: null,
   created_at: '2026-07-01T00:00:00Z',
   updated_at: '2026-07-01T00:00:00Z',
-  children: [],
   linked_test_runs: [],
   suite_backlinks: [],
   campaign_backlinks: [],

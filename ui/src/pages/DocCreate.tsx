@@ -66,6 +66,12 @@ function artefactActivityTypeForDocType(docType: DocType): string | null {
   return null
 }
 
+/** The plain text of stored HTML. */
+function plainTextOf(html: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  return (doc.body.textContent || '').trim()
+}
+
 function isControlledSharedDocument(docType: DocType): boolean {
   return docType === 'SPEC' || docType === 'PRT' || docType === 'RPT' || docType === 'STD' || docType === 'VIS'
 }
@@ -357,6 +363,7 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
       }
       if (typeof data.visibility === 'string') meta.visibility = data.visibility
       if (data.status) meta.status = data.status as string
+      if (docType === 'REQ' && !meta.description && typeof data.content_html === 'string') meta.description = plainTextOf(data.content_html)
       setMetadata(meta)
     }).catch(() => {
       setSaveError('Could not load document for editing.')
@@ -403,6 +410,8 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
       }
       if (docType === 'REQ') {
         payload.visibility = requirementVisibilityFromOrigin(sent.req_origin)
+        delete payload.content_json
+        delete payload.content_html
       }
       if (controlled) payload.status = 'Draft'
       if (docType !== 'REQ') delete payload.reviewer_id
@@ -452,6 +461,8 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
       }
       if (docType === 'REQ') {
         payload.visibility = requirementVisibilityFromOrigin(sent.req_origin)
+        delete payload.content_json
+        delete payload.content_html
       }
       if (controlled) delete payload.status
       delete payload.reviewer_id
@@ -672,7 +683,7 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
               className="w-full text-3xl font-bold text-foreground placeholder:text-muted-foreground/40 bg-transparent border-none outline-hidden mb-2"
             />
 
-            {showDescriptionMetadata && (
+            {showDescriptionMetadata && docType !== 'REQ' && (
               <input
                 type="text"
                 value={metadata.description || ''}
@@ -690,7 +701,17 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
               </div>
             )}
             <div className={`${docType === 'TC' ? 'max-w-none' : 'max-w-4xl mx-auto'} w-full px-4 py-4`}>
-              {docType === 'TC' ? (
+              {docType === 'REQ' && (
+                <textarea
+                  aria-label="Description"
+                  value={metadata.description || ''}
+                  onChange={(e) => setMetadata({ ...metadata, description: e.target.value })}
+                  placeholder="Describe the requirement..."
+                  rows={8}
+                  className="w-full px-4 py-3 rounded-md border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-hidden focus:ring-2 focus:ring-ring"
+                />
+              )}
+              {docType === 'TC' && (
                 <TcsArteTable
                   rows={tcRows}
                   onChange={setTcRows}
@@ -699,7 +720,8 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
                   userMentionItems={userMentionItems}
                   parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues}
                 />
-              ) : (
+              )}
+              {docType !== 'REQ' && docType !== 'TC' && (
                 <DocEditor
                   content={contentJson}
                   onChange={handleEditorChange}

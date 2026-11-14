@@ -125,7 +125,7 @@ describe('editing', () => {
         throw new Error('Document focus was read after editor teardown')
       })
       await act(async () => { await vi.advanceTimersByTimeAsync(500) })
-      expect(menuVisibility.mock.calls.length).toBeGreaterThan(before)
+      expect(menuVisibility.mock.calls.length).toBe(before)
       expect(documentFocus).not.toHaveBeenCalled()
     } finally {
       documentFocus?.mockRestore()
@@ -529,5 +529,24 @@ describe('the outline', () => {
 
     fireEvent.click(screen.getByTitle('Toggle outline'))
     expect(onOutlineToggle).toHaveBeenCalledWith(true)
+  })
+
+  it('names its show and hide controls on a read-only text and reports whether it is expanded', async () => {
+    const onOutlineToggle = vi.fn()
+    const { container, rerender } = render(
+      <DocEditor content={document_} editable={false} onOutlineToggle={onOutlineToggle} />,
+    )
+    await editorSurface(container)
+
+    const show = screen.getByRole('button', { name: 'Show outline' })
+    expect(show.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(show)
+    expect(onOutlineToggle).toHaveBeenLastCalledWith(true)
+
+    rerender(<DocEditor content={document_} editable={false} showOutline onOutlineToggle={onOutlineToggle} />)
+    const hide = screen.getByRole('button', { name: 'Hide outline' })
+    expect(hide.getAttribute('aria-expanded')).toBe('true')
+    fireEvent.click(hide)
+    expect(onOutlineToggle).toHaveBeenLastCalledWith(false)
   })
 })

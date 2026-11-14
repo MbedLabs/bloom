@@ -45,6 +45,7 @@ vi.mock('../components/editor/DocEditor', () => ({
 
 const client = await import('../api/client')
 const { CommentableDocEditor, CommentsColumn, OpenThreads, ReviewCommentsProvider, ThreadList } = await import('../components/comments/ReviewComments')
+const { default: DocDetailShell } = await import('../components/DocDetailShell')
 
 const brake: CommentAnchor = { exact: 'brake', prefix: 'The ', suffix: ' shall engage' }
 
@@ -70,14 +71,14 @@ function allowComment(comment: boolean) {
 }
 
 /** Render a document text and its comments column, as a detail page does. */
-function renderReview({ column = true }: { column?: boolean } = {}) {
+function renderReview({ column = true, content = { type: 'doc' } }: { column?: boolean; content?: Record<string, unknown> } = {}) {
   const queryClient = createQueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <MemoryRouter>
           <ReviewCommentsProvider artefactType="requirement" artefactId={11}>
-            <div data-testid="text"><CommentableDocEditor content={{ type: 'doc' }} editable={false} /></div>
+            <div data-testid="text"><CommentableDocEditor content={content} editable={false} /></div>
             {column && <CommentsColumn />}
           </ReviewCommentsProvider>
         </MemoryRouter>
@@ -121,6 +122,16 @@ function threadCard(body: string) {
 function setWide(wide: boolean) {
   window.matchMedia = ((query: string) => ({
     matches: wide,
+    media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  })) as unknown as typeof window.matchMedia
+}
+
+/** Make the window the given number of pixels wide for every min-width query. */
+function setWindowWidth(width: number) {
+  window.matchMedia = ((query: string) => ({
+    matches: width >= Number(/min-width:\s*(\d+)px/.exec(query)?.[1] ?? 0),
     media: query,
     addEventListener: () => undefined,
     removeEventListener: () => undefined,
@@ -306,6 +317,7 @@ describe('the comments column on a narrow screen', () => {
     setWide(false)
     renderReview()
     await loaded()
+    fireEvent.click(screen.getByRole('button', { name: 'Show comments (3)' }))
     const card = threadCard('Which brake?')
     expect(card.parentElement!.classList.contains('absolute')).toBe(false)
     selectBrake()
@@ -407,5 +419,136 @@ describe('the open comments of the editing page', () => {
     expect(within(region).queryByText('Fixed the typo')).toBeNull()
     expect(within(region).queryByRole('textbox')).toBeNull()
     expect(within(region).queryByRole('button')).toBeNull()
+  })
+})
+
+/** A document text with one heading. */
+const withHeading = { type: 'doc', content: [{ type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Scope' }] }] }
+
+/** Render a detail page shell with its document information panel, text and comments column. */
+function renderShell() {
+  const queryClient = createQueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } })
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <MemoryRouter>
+          <ReviewCommentsProvider artefactType="requirement" artefactId={11}>
+            <DocDetailShell projectPrefix="PRJ" docType="REQ" docCode="PRJ-REQ-001" title="Brake requirement" status="Draft" info={<p>Panel contents</p>} comments={<CommentsColumn />}>
+              <CommentableDocEditor content={withHeading} editable={false} />
+            </DocDetailShell>
+          </ReviewCommentsProvider>
+        </MemoryRouter>
+      </ToastProvider>
+    </QueryClientProvider>,
+  )
+}
+
+/** The grid that holds the text and the right column of the shell. */
+function shellGrid() {
+  return screen.getByRole('complementary', { name: 'Document comments column' }).parentElement!.parentElement!
+}
+
+describe('showing and hiding the comments', () => {
+  it('opens the comments shown on a window 1280 pixels wide and hides and shows them with one control', async () => {
+    setWindowWidth(1280)
+    renderReview()
+    await loaded()
+    expect(screen.getByRole('region', { name: 'Document comments' })).toBeTruthy()
+    const hide = screen.getByRole('button', { name: 'Hide comments' })
+    expect(hide.getAttribute('aria-expanded')).toBe('true')
+    fireEvent.click(hide)
+    expect(screen.queryByRole('region', { name: 'Document comments' })).toBeNull()
+    const show = screen.getByRole('button', { name: 'Show comments (3)' })
+    expect(show.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(show)
+    expect(screen.getByRole('region', { name: 'Document comments' })).toBeTruthy()
+    expect(threadCard('Which brake?')).toBeTruthy()
+  })
+
+  it('opens the comments collapsed on a window narrower than 1280 pixels', async () => {
+    setWindowWidth(1279)
+    renderReview()
+    await loaded()
+    expect(screen.queryByRole('region', { name: 'Document comments' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Show comments (3)' }).getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('shows the collapsed comments with the composer when a passage is commented on', async () => {
+    setWindowWidth(1000)
+    renderReview()
+    await loaded()
+    selectBrake()
+    fireEvent.click(within(screen.getByTestId('text')).getByRole('button', { name: 'Comment' }))
+    expect(screen.getByRole('region', { name: 'Document comments' })).toBeTruthy()
+    expect(await screen.findByRole('textbox', { name: 'Comment on the selected passage' })).toBeTruthy()
+  })
+
+  it('shows the collapsed comments with the thread selected when its highlight is clicked', async () => {
+    setWindowWidth(1000)
+    const { container } = renderReview()
+    await loaded()
+    fireEvent.click(container.querySelector('[data-comment-id="1"]')!)
+    expect(screen.getByRole('region', { name: 'Document comments' })).toBeTruthy()
+    expect(within(threadCard('Which brake?')).getByRole('textbox', { name: 'Reply' })).toBeTruthy()
+  })
+})
+
+describe('showing and hiding the outline', () => {
+  it('opens the outline shown for a text with headings on a window 1536 pixels wide and hides and shows it', async () => {
+    setWindowWidth(1536)
+    renderReview({ content: withHeading })
+    await loaded()
+    expect(editorProps!.showOutline).toBe(true)
+    act(() => editorProps!.onOutlineToggle!(false))
+    expect(editorProps!.showOutline).toBe(false)
+    act(() => editorProps!.onOutlineToggle!(true))
+    expect(editorProps!.showOutline).toBe(true)
+  })
+
+  it('opens the outline collapsed on a window narrower than 1536 pixels and shows it on request', async () => {
+    setWindowWidth(1535)
+    renderReview({ content: withHeading })
+    await loaded()
+    expect(editorProps!.showOutline).toBe(false)
+    act(() => editorProps!.onOutlineToggle!(true))
+    expect(editorProps!.showOutline).toBe(true)
+  })
+
+  it('opens the outline collapsed for a text without headings', async () => {
+    setWindowWidth(1536)
+    renderReview()
+    await loaded()
+    expect(editorProps!.showOutline).toBe(false)
+  })
+})
+
+describe('the right column of a detail page', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('keeps its 380 pixels while the comments or the document information are shown and gives the text the width when both are hidden', async () => {
+    setWindowWidth(1280)
+    renderShell()
+    await loaded()
+    const wideTrack = 'lg:grid-cols-[minmax(0,1fr)_380px]'
+    const autoTrack = 'lg:grid-cols-[minmax(0,1fr)_auto]'
+    expect(shellGrid().classList.contains(wideTrack)).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Hide comments' }))
+    expect(shellGrid().classList.contains(wideTrack)).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Hide document information' }))
+    expect(shellGrid().classList.contains(autoTrack)).toBe(true)
+    expect(shellGrid().classList.contains(wideTrack)).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Show comments (3)' }))
+    expect(shellGrid().classList.contains(wideTrack)).toBe(true)
+  })
+
+  it('opens the comments collapsed beside the document information on a narrow window', async () => {
+    setWindowWidth(1000)
+    renderShell()
+    await loaded()
+    expect(screen.getByRole('complementary', { name: 'Document information' })).toBeTruthy()
+    expect(screen.queryByRole('region', { name: 'Document comments' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Show comments (3)' })).toBeTruthy()
   })
 })

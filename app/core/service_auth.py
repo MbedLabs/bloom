@@ -79,10 +79,9 @@ async def require_bud_sync_token(
     )
     if not token.startswith(TOKEN_PREFIX):
         raise unauthorized
+    lookup = token[:TOKEN_LOOKUP_LENGTH]
     credential = await db.scalar(
-        select(ServiceCredential).where(
-            ServiceCredential.token_prefix == token[:TOKEN_LOOKUP_LENGTH]
-        )
+        select(ServiceCredential).where(ServiceCredential.token_prefix == lookup)
     )
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     if (

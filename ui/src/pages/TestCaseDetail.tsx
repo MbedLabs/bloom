@@ -29,6 +29,7 @@ import { useParameterValues } from '../hooks/useParameterValues'
 import { useArtefactLabels } from '../hooks/useArtefactLabels'
 import ConfirmDelete from '../components/ConfirmDelete'
 import WorkflowPanel from '../components/WorkflowPanel'
+import { InfoSection } from '../components/DocumentInfoPanel'
 import { CommentableDocEditor, CommentsColumn, ReviewCommentsProvider } from '../components/comments/ReviewComments'
 import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
 import { useSignOffPeople } from '../hooks/useSignOff'
@@ -177,11 +178,51 @@ export default function TestCaseDetail({
           ))}
         </div>
       ) : undefined}
-      review={<WorkflowPanel artefactType="test-case" artefactId={tcId} projectPrefix={projectPrefix} projectId={testCase.project_id} layout="bar" />}
+      info={<>
+        <InfoSection label="Workflow state">
+          <WorkflowPanel artefactType="test-case" artefactId={tcId} projectPrefix={projectPrefix} projectId={testCase.project_id} layout="panel" />
+        </InfoSection>
+        <InfoSection title="Last Execution">
+          {testCase.last_execution_status ? (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <MetaItem label="Result" value={<ExecutionBadge status={testCase.last_execution_status} />} />
+              <MetaItem
+                label="Executed"
+                value={testCase.last_executed_at ? formatDateTime(testCase.last_executed_at) : 'Unknown'}
+              />
+              <div className="col-span-2">
+                <MetaItem
+                  label="Bud Run"
+                  value={<BudRunLink runId={testCase.last_bud_run_id} source={{ source_kind: 'test-case', source_id: testCase.id }} />}
+                />
+              </div>
+              {testCase.last_execution_comment && (
+                <div className="col-span-2">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Comment</div>
+                  <div className="text-sm text-foreground whitespace-pre-wrap">{testCase.last_execution_comment}</div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No synced execution has been recorded for this test case yet.</p>
+          )}
+        </InfoSection>
+        <InfoSection title="Metadata">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+            <div className="col-span-2">
+              <MetaItem label="Origin" value={<ArtefactTags type="test-case" id={tcId} projectId={testCase.project_id} canEdit={showEdit} origin={testCase.visibility === 'customer' ? 'Customer' : 'Internal'} />} />
+            </div>
+            <MetaItem label="ID" value={testCase.tc_id} mono />
+            <MetaItem label="Project" value={project ? `${project.prefix} · ${project.name}` : `#${testCase.project_id}`} />
+            <MetaItem label="Created" value={formatDateTime(testCase.created_at) + ' ago'} />
+            <MetaItem label="Updated" value={formatDateTime(testCase.updated_at) + ' ago'} />
+          </div>
+        </InfoSection>
+      </>}
       comments={<CommentsColumn />}
     >
       {!!testCase.content_json && (
-        <SectionCard title="Content">
+        <div className="bg-card rounded-lg shadow-elegant p-6">
           <CommentableDocEditor
             content={testCase.content_json as Record<string, unknown>}
             editable={false}
@@ -191,7 +232,7 @@ export default function TestCaseDetail({
             minHeight="min-h-[120px]"
             className="border-0"
           />
-        </SectionCard>
+        </div>
       )}
       {!testCase.content_json && !!testCase.description && (
         <SectionCard title="Description">
@@ -216,42 +257,6 @@ export default function TestCaseDetail({
         />
       )}
 
-      <>
-          <SectionCard title="Last Execution">
-            {testCase.last_execution_status ? (
-              <div className="space-y-4">
-                <div>
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Result</div>
-                  <ExecutionBadge status={testCase.last_execution_status} />
-                </div>
-                <MetaItem
-                  label="Executed"
-                  value={testCase.last_executed_at ? formatDateTime(testCase.last_executed_at) : 'Unknown'}
-                />
-                <MetaItem
-                  label="Bud Run"
-                  value={<BudRunLink runId={testCase.last_bud_run_id} source={{ source_kind: 'test-case', source_id: testCase.id }} />}
-                />
-                {testCase.last_execution_comment && (
-                  <div>
-                    <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Comment</div>
-                    <div className="text-sm text-foreground whitespace-pre-wrap">{testCase.last_execution_comment}</div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No synced execution has been recorded for this test case yet.</p>
-            )}
-          </SectionCard>
-
-          <SectionCard title="Metadata">
-            <div className="space-y-4">
-              <MetaItem label="Origin" value={<ArtefactTags type="test-case" id={tcId} projectId={testCase.project_id} canEdit={showEdit} origin={testCase.visibility === 'customer' ? 'Customer' : 'Internal'} />} />
-              <MetaItem label="Created" value={formatDateTime(testCase.created_at) + ' ago'} />
-              <MetaItem label="Updated" value={formatDateTime(testCase.updated_at) + ' ago'} />
-            </div>
-          </SectionCard>
-      </>
     </DocDetailShell>
     </ReviewCommentsProvider>
   )
