@@ -88,7 +88,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("BLOOM_AUTH_COOKIE_SECURE", "AUTH_COOKIE_SECURE"),
     )
 
-    BLOOM_APP_VERSION: str = "1.2.0"
+    BLOOM_APP_VERSION: str = "1.3.0"
 
     APP_BASE_URL: str = Field(
         default=HTTP_LOCALHOST_8000,
