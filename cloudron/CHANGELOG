@@ -1,4 +1,13 @@
 [1.3.0]
+* Review like a word processor: select a passage to comment on it, with replies and resolve, in a comments column beside the document.
+* The document's workflow, details and metadata sit in one panel beside the text, visible without scrolling; the outline and comments collapse.
+* A requirement is a title and a plain description; requirements relate through links instead of a tree.
+* Visions, a document type for an idea that becomes binding once approved.
+* Controlled documents have an assignee who requests review; the creator, assignee, reviewer and approver comment.
+* Issue trackers sync by themselves on a schedule, and defects can be created in Jira.
+* A person can hold several policy groups in one project; User Management shows each user's groups and projects.
+* Every API call and every refused attempt is recorded in the audit log; access requests and the audit log name documents and people instead of showing numbers.
+* Line spacing is saved per paragraph and shown everywhere the document is read.
 * Bloom PLM by EmbedLabs is the product name across the application, emails and API; the BLOOM_APP_NAME environment setting no longer changes it.
 * The invitation and email change dialogs close with Escape and focus their first field; project cards open with the keyboard.
 * The administrator welcome email confirms the account and names the next steps; the outdated runner key paragraph is removed.

@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.3.0 - unreleased
+## 1.3.0 - 2026-11-15
 
 ### Added
 
@@ -37,7 +37,7 @@
 ### Fixed
 
 - A document address that names a document other than a test suite or campaign by its database number instead of its document ID, such as the links inside a document opened in the editor, opens the document; before, it answered not found and the page said "You don't have access" to everyone, administrators included.
-- An administrator could request access, even from himself. An administrator, or anyone who can already open what they ask for, is now told so and no request is recorded or emailed, and nobody is emailed about their own request.
+- An administrator could request access, even from themselves. An administrator, or anyone who can already open what they ask for, is now told so and no request is recorded or emailed, and nobody is emailed about their own request.
 - An administrator who opened something that does not exist saw "You don't have access" with a Request access button. An administrator now sees Not found and is never offered a request; other users keep the access page.
 - References inside a document opened in the editor, search results and the defect, suite and campaign links used database numbers. They now use document IDs, and an address with a database number opens the item, other than a test suite or campaign, and shows its document ID in the address bar.
 - Access requests, their emails and the audit log showed database numbers instead of document IDs and names. They now name projects by prefix, documents, suites, campaigns and defects by document ID, users by name and service credentials by name; only something that no longer exists keeps its number, marked deleted.
@@ -48,7 +48,6 @@
 ### Security
 
 - CLI and MCP sign-in: the approval page no longer shows the request code; the approver types the code the terminal or AI client shows, and the server checks it on `POST /api/auth/cli/check` and on approve, both rate limited. A wrong code is recorded as `auth.cli_code_mismatch` and the request stays pending.
-
 - Pillow raised to 13.0.0, certifi to 2026.10.19, dnspython to 2.9.2, follow-redirects to 1.16.1, vitest to 4.1.12 and zod to 4.6.7, the patched releases.
 
 ## 1.2.0 - 2026-10-17
