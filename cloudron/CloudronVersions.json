@@ -139,8 +139,8 @@
                 "dockerImage": "ghcr.io/mbedlabs/bloom:v1.3.0"
             },
             "creationDate": "Sun, 15 Nov 2026 02:12:55 GMT",
-            "ts": "Sun, 15 Nov 2026 02:12:55 GMT",
-            "publishState": "testing"
+            "ts": "Sun, 15 Nov 2026 13:21:19 GMT",
+            "publishState": "published"
         }
     }
 }
