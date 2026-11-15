@@ -58,7 +58,7 @@ jobs:
           python-version: '3.11'
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
         with:
           version: "0.11.14"
           enable-cache: false
@@ -147,29 +147,39 @@ jobs:
         run: |
           pytest tests/pg -q
 
-      - name: BudTestCase suite baselines_http
+      - name: Generate the integration encryption key
+        run: |
+          echo "INTEGRATION_ENCRYPTION_KEY=$(python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")" >> "$GITHUB_ENV"
+
+      - name: Run the tests in tests/pg
         env:
           DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
           SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
           SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          ENABLE_DOCS: "false"
           BLOOM_DOTENV_DISABLED: "1"
-          BLOOM_DISABLE_RATE_LIMIT: "1"
-          BUDTEST_DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
+          INTEGRATION_SYNC_MINUTES: "0"
           PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.budtests.baselines_http import BaselinesHttp; raise SystemExit(0 if BaselinesHttp().run() else 1)"
+        run: bud-runner run-tests -t tests.pg.SUITES --no-upload -o "$RUNNER_TEMP/tests-pg-junit.xml"
 
-      - name: Build the UI and Chromium
-        run: |
-          npm --prefix ui run build
-          python -m playwright install --with-deps chromium
-
-      - name: BudTestCase suite ui_cli_auth
+      - name: Run the tests in tests/logic
         env:
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
+          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
+          BLOOM_DOTENV_DISABLED: "1"
+          INTEGRATION_SYNC_MINUTES: "0"
           PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "from tests.budtests.ui_cli_auth import UiCliAuth; raise SystemExit(0 if UiCliAuth().run() else 1)"
+        run: bud-runner run-tests -t tests.logic.SUITES --no-upload -o "$RUNNER_TEMP/tests-logic-junit.xml"
+
+      - name: Run the tests in tests/api
+        env:
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
+          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
+          BLOOM_DOTENV_DISABLED: "1"
+          INTEGRATION_SYNC_MINUTES: "0"
+          PYTHONPATH: ${{ github.workspace }}
+        run: bud-runner run-tests -t tests.api.SUITES --no-upload -o "$RUNNER_TEMP/tests-api-junit.xml"
 
       - name: Run UI checks
         run: |

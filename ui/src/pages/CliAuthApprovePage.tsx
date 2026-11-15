@@ -33,7 +33,6 @@ const TOO_MANY = 'Too many attempts. Wait a minute and try again.'
 const CODE_MATCHES = 'The code matches.'
 const CODE_MISMATCH = 'This code does not match. Check the code in your terminal, or deny this request.'
 const CODE_LETTERS = 8
-const WARNING = 'rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200'
 const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const LOOPBACK_TARGET = /^http:\/\/(?:127\.0\.0\.1|localhost|\[::1\]):(\d+)(?:[/?]|$)/i
 
@@ -119,8 +118,6 @@ function ManualCode({ code }: Readonly<{ code: string }>) {
   }
   return (
     <div className="space-y-4">
-      <p className={WARNING}>Paste this code only into the client where you started this sign-in. Never send it to anyone.</p>
-      <p className="text-sm text-muted-foreground">It expires with this sign-in request.</p>
       <label htmlFor="cli-code" className="block text-sm font-medium text-foreground">One-time sign-in code</label>
       <input id="cli-code" value={code} readOnly autoComplete="off" className="w-full rounded-lg border border-input bg-background px-3 py-2 text-foreground font-mono text-sm" />
       <button type="button" onClick={() => { void copyCode() }} className="w-full rounded-lg bg-primary px-4 py-2 text-primary-foreground">Copy code</button>
@@ -233,29 +230,19 @@ function Consent({ session, account, busy, approving, codeCheck, onCodeChange, o
   onApprove: () => void
   onDeny: () => void
 }>) {
-  const destination = session.mode === 'callback'
-    ? `Approval returns to your local client at ${session.redirect_uri}.`
-    : 'Approval shows a one-time code to paste into your client.'
   const signedIn = account ? `${account.full_name} (${account.email})` : 'your account'
   return (
     <div className="space-y-4">
-      <fieldset className="min-w-0 space-y-1" aria-describedby="cli-request-code-help">
+      <fieldset className="min-w-0 space-y-1">
         <legend className="mb-1 block text-sm font-medium text-foreground">Request code</legend>
         <RequestCodeBoxes onChange={onCodeChange} />
-        <p id="cli-request-code-help" className="text-sm text-muted-foreground">Type the code your terminal or AI client shows next to the link.</p>
         <output className={`block text-sm ${codeCheck === 'match' ? 'text-foreground' : 'text-destructive'}`}>{CHECK_TEXT[codeCheck]}</output>
       </fieldset>
       <div>
         <p className="font-semibold text-foreground wrap-anywhere">{session.client_name}</p>
-        <p className="text-xs text-muted-foreground">Name given by the requesting client, not verified.</p>
       </div>
-      <p className="text-sm text-muted-foreground">Approving signs this client in to {PRODUCT_NAME} as {signedIn}, with your full permissions.</p>
+      <p className="text-sm text-muted-foreground">Approving signs this client in to {PRODUCT_NAME} as {signedIn}.</p>
       <p className="text-sm text-muted-foreground">Requested {localTime(session.created_at)}. Expires {localTime(session.expires_at)}.</p>
-      <p className={WARNING}>Approve only a sign-in you started yourself, on your own computer, in the last few minutes.</p>
-      <p className="text-sm text-muted-foreground wrap-anywhere">{destination}</p>
-      {session.mode === 'code' && (
-        <p className={WARNING}>This request asks for a one-time code instead of returning to a client on this computer. If someone else sent you this link or asks you for the code, deny it: the code signs their client in to your account.</p>
-      )}
       <div className="flex gap-3">
         <button type="button" disabled={busy || codeCheck !== 'match'} onClick={onApprove} className="flex-1 rounded-lg bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">{approving ? 'Approving...' : 'Approve'}</button>
         <DenyButton busy={busy} onDeny={onDeny} />

@@ -412,7 +412,6 @@ def _external_on(api_client, admin, project, *policies):
 def test_a_request_body_cannot_reach_a_hidden_artefact(api_client: TestClient):
     admin = _admin_headers(api_client)
     project = create_project(api_client, admin, "Bodies")["id"]
-    hidden_requirement = _create(api_client, admin, "requirements", project).json()["id"]
     hidden_case = _create(api_client, admin, "test-cases", project).json()["id"]
     shown_case = api_client.post(
         "/api/test-cases",
@@ -423,14 +422,6 @@ def test_a_request_body_cannot_reach_a_hidden_artefact(api_client: TestClient):
         "/api/test-suites", headers=admin, json={"project_id": project, "name": unique_name("s")}
     ).json()["id"]
     headers = _external_on(api_client, admin, project, "Requirements Author", "Test Author")
-
-    child = api_client.post(
-        "/api/requirements",
-        headers=headers,
-        json={"project_id": project, "title": unique_name("req"), "parent_id": hidden_requirement},
-    )
-    assert child.status_code == 404
-    assert child.json()["detail"] == "Parent requirement not found"
 
     suite = api_client.post(
         "/api/test-suites",

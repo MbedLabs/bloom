@@ -88,13 +88,6 @@ def test_requirement_detail_n1_queries(api_client, query_counter):
     )
     root_id = root_req.json()["id"]
 
-    for i in range(15):
-        api_client.post(
-            "/api/requirements",
-            headers=headers,
-            json={"project_id": project_id, "title": f"Child {i}", "parent_id": root_id},
-        )
-
     query_counter.count = 0
 
     req_detail = api_client.get(f"/api/requirements/{root_id}", headers=headers)

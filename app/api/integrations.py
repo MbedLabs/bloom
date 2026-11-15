@@ -19,7 +19,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import get_row_or_404, get_visible_row
-from app.core.config import settings as app_settings
 from app.core.database import get_db
 from app.core.id_generator import next_doc_id
 from app.core.identity import PRODUCT_NAME
@@ -57,6 +56,12 @@ INTEGRATION_SETTING_NOT_FOUND = "Integration setting not found"
 INVALID_SIGNATURE = "Invalid signature"
 APPLICATION_JSON = "application/json"
 JIRA_ISSUE_DELETED = "jira:issue_deleted"
+JIRA_TO_BLOOM = "jira_to_bloom"
+BLOOM_TO_JIRA = "bloom_to_jira"
+BOTH = "both"
+DIRECTION_PATTERN = f"^({JIRA_TO_BLOOM}|{BLOOM_TO_JIRA}|{BOTH})$"
+DEFAULT_SYNC_MINUTES = 10
+MIN_SYNC_MINUTES = 5
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +86,9 @@ class IntegrationSettingCreate(BaseModel):
     jira_jql: Optional[str] = None
     jira_reference_field: Optional[str] = None
     jira_priority_map: Optional[dict[str, str]] = None
-    two_way: bool = False
+    direction: Optional[str] = Field(None, pattern=DIRECTION_PATTERN)
+    two_way: Optional[bool] = None
+    auto_sync_minutes: int = DEFAULT_SYNC_MINUTES
     enabled: bool = True
 
 
@@ -100,6 +107,7 @@ class IntegrationSettingResponse(BaseModel):
     jira_jql: Optional[str] = None
     jira_reference_field: Optional[str] = None
     jira_priority_map: Optional[dict[str, str]] = None
+    direction: str = JIRA_TO_BLOOM
     two_way: bool = False
     enabled: bool
     sync_checked_at: Optional[datetime] = None
@@ -108,7 +116,7 @@ class IntegrationSettingResponse(BaseModel):
     sync_warning: Optional[str] = None
     sync_created: int = 0
     sync_updated: int = 0
-    auto_sync_minutes: int = 0
+    auto_sync_minutes: int = DEFAULT_SYNC_MINUTES
     created_at: datetime
     updated_at: datetime
 
@@ -132,7 +140,9 @@ class IntegrationSettingUpdate(BaseModel):
     jira_jql: Optional[str] = None
     jira_reference_field: Optional[str] = None
     jira_priority_map: Optional[dict[str, str]] = None
+    direction: Optional[str] = Field(None, pattern=DIRECTION_PATTERN)
     two_way: Optional[bool] = None
+    auto_sync_minutes: Optional[int] = None
     enabled: Optional[bool] = None
 
 
@@ -169,6 +179,25 @@ def _validate_jira_filter(issue_types_value, priority_map) -> None:
         )
 
 
+def _direction(direction: Optional[str], two_way: Optional[bool]) -> Optional[str]:
+    """The direction given, else the one ``two_way`` stands for: both when true,
+    jira_to_bloom when false; None when neither is given."""
+    if direction is not None:
+        return direction
+    if two_way is None:
+        return None
+    return BOTH if two_way else JIRA_TO_BLOOM
+
+
+def _validate_sync_minutes(minutes: int) -> None:
+    """The automatic sync runs every 5 minutes or more, or never at 0."""
+    if minutes != 0 and minutes < MIN_SYNC_MINUTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"The sync rate is 0 (off) or at least {MIN_SYNC_MINUTES} minutes.",
+        )
+
+
 def _setting_response(s: IntegrationSetting) -> IntegrationSettingResponse:
     return IntegrationSettingResponse(
         id=s.id,
@@ -185,7 +214,8 @@ def _setting_response(s: IntegrationSetting) -> IntegrationSettingResponse:
         jira_jql=s.jira_jql,
         jira_reference_field=s.jira_reference_field,
         jira_priority_map=s.jira_priority_map,
-        two_way=s.two_way,
+        direction=s.direction,
+        two_way=s.direction == BOTH,
         enabled=s.enabled,
         sync_checked_at=s.sync_checked_at,
         synced_at=s.synced_at,
@@ -193,7 +223,7 @@ def _setting_response(s: IntegrationSetting) -> IntegrationSettingResponse:
         sync_warning=s.sync_warning,
         sync_created=s.sync_created or 0,
         sync_updated=s.sync_updated or 0,
-        auto_sync_minutes=app_settings.INTEGRATION_SYNC_MINUTES,
+        auto_sync_minutes=s.auto_sync_minutes,
         created_at=s.created_at,
         updated_at=s.updated_at,
     )
@@ -254,6 +284,7 @@ async def create_integration_setting(
             detail=f"Integration for {data.tracker} already exists in this project",
         )
     _validate_jira_filter(data.jira_issue_types, data.jira_priority_map)
+    _validate_sync_minutes(data.auto_sync_minutes)
 
     setting = IntegrationSetting(
         project_id=data.project_id,
@@ -271,7 +302,8 @@ async def create_integration_setting(
         jira_jql=data.jira_jql or None,
         jira_reference_field=data.jira_reference_field or None,
         jira_priority_map=data.jira_priority_map,
-        two_way=data.two_way,
+        direction=_direction(data.direction, data.two_way) or JIRA_TO_BLOOM,
+        auto_sync_minutes=data.auto_sync_minutes,
         enabled=data.enabled,
     )
     db.add(setting)
@@ -333,8 +365,12 @@ async def update_integration_setting(
             setattr(setting, name, getattr(data, name) or None)
     if "jira_priority_map" in data.model_fields_set:
         setting.jira_priority_map = data.jira_priority_map or None
-    if data.two_way is not None:
-        setting.two_way = data.two_way
+    direction = _direction(data.direction, data.two_way)
+    if direction is not None:
+        setting.direction = direction
+    if data.auto_sync_minutes is not None:
+        _validate_sync_minutes(data.auto_sync_minutes)
+        setting.auto_sync_minutes = data.auto_sync_minutes
     if data.enabled is not None:
         setting.enabled = data.enabled
     setting.sync_full_scan = True
@@ -1033,12 +1069,18 @@ async def _create_defect_from_jira_issue(
     """Create a Bloom defect from an inbound Jira issue the mapped project takes in.
 
     Falls back to the historical 404 when no enabled jira integration claims the
-    project key or creation is disabled, so unmapped issues stay rejected. An issue
-    outside the project's filter, or a deletion of an issue Bloom never had, is ignored.
+    project key, creation is disabled or the project takes nothing from Jira; unmapped
+    issues stay rejected. An issue outside the project's filter, or a deletion of an issue
+    Bloom never had, is ignored.
     An issue linked by the time the setting's lock is held is followed instead.
     """
     setting = await _jira_setting_for_key(db, project_key)
-    if setting is None or not setting.webhook_secret or not setting.create_defects_on_inbound:
+    if (
+        setting is None
+        or not setting.webhook_secret
+        or not setting.create_defects_on_inbound
+        or setting.direction == BLOOM_TO_JIRA
+    ):
         raise HTTPException(status_code=404, detail="No matching webhook target.")
     if not signature or not _verify_sha256_signature(
         body, decrypt_integration_secret(setting.webhook_secret), signature
@@ -1155,6 +1197,8 @@ async def jira_webhook(
         raise HTTPException(status_code=400, detail="Missing Jira webhook identifier.")
     if not await _reserve_webhook_delivery(db, setting, "jira", x_atlassian_webhook_identifier):
         return {"status": "duplicate", "delivery": x_atlassian_webhook_identifier}
+    if setting.direction == BLOOM_TO_JIRA:
+        return {"status": "ignored", "reason": "this project does not take changes from Jira"}
 
     await follow_jira_target(
         db,
@@ -1226,7 +1270,8 @@ async def pull_jira_issues(
 
     It searches Jira with the saved filter from the start, creates the missing defects
     whatever the inbound-creation flag says, follows the linked issues changed since the
-    last sync and checks linked issues for deletion. It reads from Jira only.
+    last sync and checks linked issues for deletion, unless the project takes nothing from
+    Jira. When the direction includes Bloom to Jira it then sends the new defects to Jira.
     """
     from app.services import integration_sync
 
@@ -1305,7 +1350,7 @@ async def _sync_to_tracker(
 
     if not setting or not setting.token_encrypted:
         return
-    if setting.tracker == "jira" and not setting.two_way:
+    if setting.tracker == "jira" and setting.direction == JIRA_TO_BLOOM:
         return
 
     try:

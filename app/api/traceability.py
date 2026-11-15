@@ -57,7 +57,6 @@ def _req_id_sort_key(req_id: str) -> list:
 
 class TraceabilityContext:
     def __init__(self):
-        self.children_by_parent: dict[int, list[Requirement]] = defaultdict(list)
         self.linked_tcs_by_req: dict[int, list[TestCaseResponse]] = defaultdict(list)
         self.linked_trs_by_req: dict[int, list[TestRunLinkResponse]] = defaultdict(list)
 
@@ -67,18 +66,6 @@ async def _build_traceability_context(
 ) -> TraceabilityContext:
     ctx = TraceabilityContext()
     types = await visible_types(db, current_user, project_id)
-
-    req_query = select(Requirement).where(
-        Requirement.project_id == project_id, type_visible(types, "REQ")
-    )
-    reqs = (
-        (await db.execute(apply_external_visibility_filter(req_query, Requirement, current_user)))
-        .scalars()
-        .all()
-    )
-    for req in reqs:
-        if req.parent_id is not None:
-            ctx.children_by_parent[req.parent_id].append(req)
 
     if not req_ids:
         return ctx
@@ -122,13 +109,9 @@ async def _build_traceability_context(
 
 def _build_req_response_sync(req: Requirement, ctx: TraceabilityContext) -> RequirementResponse:
     tc_count = len(ctx.linked_tcs_by_req.get(req.id, []))
-    children = ctx.children_by_parent.get(req.id, [])
-    children_responses = [_build_req_response_sync(child, ctx) for child in children]
-
     return RequirementResponse(
         id=req.id,
         project_id=req.project_id,
-        parent_id=req.parent_id,
         req_id=req.req_id,
         title=req.title,
         description=req.description,
@@ -139,7 +122,6 @@ def _build_req_response_sync(req: Requirement, ctx: TraceabilityContext) -> Requ
         req_origin=req.req_origin,
         created_at=req.created_at,
         updated_at=req.updated_at,
-        children=children_responses,
         test_case_count=tc_count,
     )
 
@@ -406,7 +388,6 @@ async def get_impact_analysis(
                     requirement=RequirementResponse(
                         id=tc_resp.id,
                         project_id=tc_resp.project_id,
-                        parent_id=None,
                         req_id=tc_resp.tc_id,
                         title=tc_resp.title,
                         description=tc_resp.description,
@@ -423,7 +404,6 @@ async def get_impact_analysis(
                         approved_at=tc_resp.approved_at,
                         created_at=tc_resp.created_at,
                         updated_at=tc_resp.updated_at,
-                        children=[],
                         test_case_count=0,
                     ),
                     link_type=VERIFY_LINK_ROLE,

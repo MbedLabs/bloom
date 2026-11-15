@@ -335,10 +335,8 @@ async def lifespan(app: FastAPI):
             await asyncio.sleep(24 * 60 * 60)
 
     tasks = [asyncio.create_task(cleanup_loop())]
-    if settings.INTEGRATION_SYNC_MINUTES > 0:
-        tasks.append(
-            asyncio.create_task(integration_sync.sync_loop(settings.INTEGRATION_SYNC_MINUTES))
-        )
+    if settings.INTEGRATION_SYNC_MINUTES != 0:
+        tasks.append(asyncio.create_task(integration_sync.sync_loop()))
     try:
         yield
     finally:

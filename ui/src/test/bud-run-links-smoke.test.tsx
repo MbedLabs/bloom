@@ -74,9 +74,10 @@ vi.mock('../components/DocumentActivityPanel', () => ({
 }))
 
 vi.mock('../components/DocDetailShell', () => ({
-  default: ({ children, rightRail }: { children?: ReactNode; rightRail?: ReactNode }) => (
+  default: ({ children, rightRail, info }: { children?: ReactNode; rightRail?: ReactNode; info?: ReactNode }) => (
     <div>
       <div>{children}</div>
+      <div>{info}</div>
       <div>{rightRail}</div>
     </div>
   ),

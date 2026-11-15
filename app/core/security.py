@@ -145,21 +145,27 @@ def _policy_terms(policy, external: bool, resources=RESOURCES) -> list[AccessTer
         if not actions:
             continue
         if resource in DOC_TYPE_RESOURCES:
-            scope = (policy.type_tags or {}).get(resource) or {}
-            if not (scope.get("all") or scope.get("visibility") or scope.get("tags")):
-                continue
-            terms.append(
-                AccessTerm(
-                    {resource: actions},
-                    frozenset({resource}),
-                    None if scope.get("all") else frozenset(scope.get("visibility") or []),
-                    frozenset(scope.get("tags") or []),
-                    external,
-                )
-            )
+            term = _doc_type_term(policy, resource, actions, external)
+            if term is not None:
+                terms.append(term)
         else:
             terms.append(AccessTerm({resource: actions}, frozenset(), None, frozenset(), external))
     return terms
+
+
+def _doc_type_term(policy, resource: str, actions, external: bool) -> Optional[AccessTerm]:
+    """The term a policy grants on a document type, covering the tags it ticks for that
+    type; None when it ticks none."""
+    scope = (policy.type_tags or {}).get(resource) or {}
+    if not (scope.get("all") or scope.get("visibility") or scope.get("tags")):
+        return None
+    return AccessTerm(
+        {resource: actions},
+        frozenset({resource}),
+        None if scope.get("all") else frozenset(scope.get("visibility") or []),
+        frozenset(scope.get("tags") or []),
+        external,
+    )
 
 
 def _owner_term(external: bool) -> AccessTerm:
@@ -210,25 +216,36 @@ async def _access_map(db: AsyncSession, user: User) -> dict:
         if entry.project_id in replaced_projects and entry.user_id != user.id:
             continue
         merged = by_project.setdefault(entry.project_id, {})
-        terms = [_owner_term(external)] if entry.owner else []
-        if entry.policy_group_id is not None:
-            selected = entry.policy_group.policies
-        else:
-            selected = inherited.values() if entry.inherit_policies else entry.policies
-        for policy in selected:
-            terms.extend(_policy_terms(policy, external))
-        for term in terms:
-            key = (term.doc_types is None, term.visibilities, term.tags, term.customer_only)
-            known = merged.get(key)
-            known_doc_types = known.doc_types if known else frozenset()
-            merged[key] = AccessTerm(
-                merge(merge({}, known.permissions if known else {}), term.permissions),
-                None if term.doc_types is None else term.doc_types | known_doc_types,
-                term.visibilities,
-                term.tags,
-                term.customer_only,
-            )
+        for term in _entry_terms(entry, external, inherited):
+            _merge_term(merged, term)
     return {project_id: tuple(terms.values()) for project_id, terms in by_project.items()}
+
+
+def _entry_terms(entry, external: bool, inherited: dict) -> list[AccessTerm]:
+    """The terms one access entry gives: the Owner term when it names an owner, then the
+    terms of its policy group's, inherited or own policies."""
+    terms = [_owner_term(external)] if entry.owner else []
+    if entry.policy_group_id is not None:
+        selected = entry.policy_group.policies
+    else:
+        selected = inherited.values() if entry.inherit_policies else entry.policies
+    for policy in selected:
+        terms.extend(_policy_terms(policy, external))
+    return terms
+
+
+def _merge_term(merged: dict, term: AccessTerm) -> None:
+    """Merge a term into the project's terms covering the same tags, joining document types."""
+    key = (term.doc_types is None, term.visibilities, term.tags, term.customer_only)
+    known = merged.get(key)
+    known_doc_types = known.doc_types if known else frozenset()
+    merged[key] = AccessTerm(
+        merge(merge({}, known.permissions if known else {}), term.permissions),
+        None if term.doc_types is None else term.doc_types | known_doc_types,
+        term.visibilities,
+        term.tags,
+        term.customer_only,
+    )
 
 
 async def access_terms(db: AsyncSession, user: User, project_id: Optional[int]) -> tuple:
@@ -500,26 +517,48 @@ def _term_condition(term: AccessTerm, model) -> object:
     tag_type = TAG_TYPE_OF_MODEL.get(model)
     fixed_type = TYPE_CODES.get(tag_type) if tag_type else None
     parts = []
+    refused, type_part = _type_part(term, model, tag_type, fixed_type)
+    if refused:
+        return false()
+    if type_part is not None:
+        parts.append(type_part)
+    if hasattr(model, "visibility"):
+        refused, visibility_parts = _visibility_parts(term, model, tag_type)
+        if refused:
+            return false()
+        parts.extend(visibility_parts)
+    return and_(*parts) if parts else true()
+
+
+def _type_part(term: AccessTerm, model, tag_type, fixed_type) -> tuple[bool, object]:
+    """Whether the term covers no document type of the model's rows, and the condition on
+    their type when the model holds several types."""
     if tag_type and fixed_type is None and hasattr(model, "doc_type"):
         kinds = [kind for kind in CANONICAL_DOCUMENT_KINDS if term_type_allows(term, "view", kind)]
         if not kinds:
-            return false()
-        parts.append(model.doc_type.in_(kinds))
-    elif fixed_type is not None and not term_type_allows(term, "view", fixed_type):
-        return false()
-    if hasattr(model, "visibility"):
-        if term.customer_only:
-            parts.append(model.visibility == ArtefactVisibility.customer.value)
-        if term.visibilities is not None:
-            covered = []
-            if term.visibilities:
-                covered.append(model.visibility.in_(sorted(term.visibilities)))
-            if term.tags and tag_type:
-                covered.append(_carries(model, tag_type, term.tags))
-            if not covered:
-                return false()
-            parts.append(or_(*covered))
-    return and_(*parts) if parts else true()
+            return True, None
+        return False, model.doc_type.in_(kinds)
+    if fixed_type is not None and not term_type_allows(term, "view", fixed_type):
+        return True, None
+    return False, None
+
+
+def _visibility_parts(term: AccessTerm, model, tag_type) -> tuple[bool, list]:
+    """Whether the term covers no visibility or tag of the model's rows, and the conditions
+    on their visibility and tags."""
+    parts = []
+    if term.customer_only:
+        parts.append(model.visibility == ArtefactVisibility.customer.value)
+    if term.visibilities is not None:
+        covered = []
+        if term.visibilities:
+            covered.append(model.visibility.in_(sorted(term.visibilities)))
+        if term.tags and tag_type:
+            covered.append(_carries(model, tag_type, term.tags))
+        if not covered:
+            return True, []
+        parts.append(or_(*covered))
+    return False, parts
 
 
 def apply_external_visibility_filter(query, model, current_user: User):

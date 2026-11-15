@@ -141,7 +141,7 @@ beforeEach(() => {
   window.localStorage.clear()
   window.confirm = () => true
   window.matchMedia = ((query: string) => ({
-    matches: false,
+    matches: query.includes('min-width'),
     media: query,
     onchange: null,
     addEventListener: () => {},
@@ -538,7 +538,7 @@ describe('creating a document', () => {
     await screen.findByText(/PRJ-REQ-004/)
 
     fireEvent.change(screen.getByPlaceholderText('Untitled'), { target: { value: 'A requirement' } })
-    fireEvent.change(screen.getByPlaceholderText(/brief description/i), {
+    fireEvent.change(screen.getByRole('textbox', { name: 'Description' }), {
       target: { value: 'Why it exists.' },
     })
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
@@ -547,6 +547,8 @@ describe('creating a document', () => {
       const [payload] = lastCall(client.requirementsApi.create) as [Record<string, unknown>]
       expect(payload.status).toBe('Draft')
       expect(payload.description).toBe('Why it exists.')
+      expect(payload).not.toHaveProperty('content_json')
+      expect(payload).not.toHaveProperty('content_html')
     })
   })
 
@@ -620,6 +622,23 @@ describe('editing an existing document', () => {
     expect(payload.title).toBe('The system shall boot in 3 seconds')
     await settle()
     expect(client.requirementsApi.create).not.toHaveBeenCalled()
+  })
+
+  it('edits a requirement as a title and a plain description, without the editor and without rich content', async () => {
+    vi.mocked(client.requirementsApi.get).mockResolvedValue({ ...requirement, description: 'Boots fast.', content_json: null, content_html: null } as never)
+    renderEdit()
+    const description = (await screen.findByRole('textbox', { name: 'Description' })) as HTMLTextAreaElement
+    await waitFor(() => expect(description.value).toBe('Boots fast.'))
+    expect(screen.queryByTestId('doc-editor')).toBeNull()
+
+    fireEvent.change(description, { target: { value: 'Boots in 3 seconds.' } })
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+    await waitFor(() => expect(client.requirementsApi.update).toHaveBeenCalled())
+    const [, payload] = lastCall(client.requirementsApi.update) as [number, Record<string, unknown>]
+    expect(payload.description).toBe('Boots in 3 seconds.')
+    expect(payload).not.toHaveProperty('content_json')
+    expect(payload).not.toHaveProperty('content_html')
   })
 
   it('asks before deleting, and deletes when told to', async () => {
@@ -1114,6 +1133,14 @@ describe('a requirement in detail', () => {
     renderRequirement()
     expect(await screen.findAllByText(new RegExp(requirement.title))).toBeTruthy()
     expect(lastCall(client.requirementsApi.get)[0]).toBe(requirement.id)
+  })
+
+  it('shows the description and no editor', async () => {
+    vi.mocked(client.requirementsApi.get).mockResolvedValue({ ...requirement, description: 'Boots in 3 seconds.', content_json: null } as never)
+    renderRequirement()
+    expect(await screen.findByText('Boots in 3 seconds.')).toBeTruthy()
+    expect(screen.queryByTestId('doc-editor')).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Content' })).toBeNull()
   })
 
   it('requests approval only when the workflow permits the reviewer handoff', async () => {

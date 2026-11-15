@@ -1,6 +1,7 @@
 import { DOC_TYPE_SLUGS } from '../types/doc'
 import { finishArtefactDeletion } from '../lib/refreshProjectViews'
 import WorkflowPanel from '../components/WorkflowPanel'
+import { InfoSection } from '../components/DocumentInfoPanel'
 import { CommentableDocEditor, CommentsColumn, ReviewCommentsProvider } from '../components/comments/ReviewComments'
 import { useDocumentWorkflow } from '../hooks/useDocumentWorkflow'
 import { useAuth } from '../contexts/AuthContext'
@@ -137,6 +138,73 @@ function EmptyDocument({ showEdit, onEdit }: Readonly<{ showEdit: boolean; onEdi
   )
 }
 
+/** The message for a document that does not exist, with a link back to its list. */
+function DocumentNotFound({ kind, projectPrefix }: Readonly<{ kind?: string; projectPrefix: string }>) {
+  return (
+    <div className="flex items-center justify-center h-64 animate-fade-in">
+      <div className="text-center">
+        <h3 className="text-lg font-semibold text-foreground mb-2">Document not found</h3>
+        <Link to={kind ? `/projects/${projectPrefix}/docs?type=${kind}` : `/projects/${projectPrefix}/docs`} className="text-sm text-primary hover:text-primary/80 transition-colors">&larr; Back to Documents</Link>
+      </div>
+    </div>
+  )
+}
+
+/** The workflow state, details and metadata panel of a rich document. */
+function DocumentInfo({ doc, docId, projectPrefix, project, canEdit }: Readonly<{
+  doc: DocumentRecord
+  docId: number
+  projectPrefix: string
+  project?: { prefix: string; name: string }
+  canEdit: boolean
+}>) {
+  return (
+    <>
+      <InfoSection label="Workflow state">
+        <WorkflowPanel artefactType="document" artefactId={docId} projectPrefix={projectPrefix} projectId={doc.project_id} layout="panel" />
+      </InfoSection>
+      <InfoSection title="Details">
+        <MetaItem label="Version" value={`v${doc.version}`} />
+      </InfoSection>
+      <InfoSection title="Metadata">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+          <div className="col-span-2">
+            <MetaItem label="Origin" value={<ArtefactTags type="document" id={docId} projectId={doc.project_id} canEdit={canEdit} origin={doc.visibility === 'customer' ? 'Customer' : 'Internal'} />} />
+          </div>
+          <MetaItem label="ID" value={doc.doc_id || String(docId)} mono />
+          <MetaItem label="Project" value={project ? `${project.prefix} · ${project.name}` : `#${doc.project_id}`} />
+          <MetaItem label="Created" value={formatDateTime(doc.created_at) + ' ago'} />
+          <MetaItem label="Updated" value={formatDateTime(doc.updated_at) + ' ago'} />
+        </div>
+      </InfoSection>
+    </>
+  )
+}
+
+/** The outline and section cards of a document kept in the older section format. */
+function LegacySections({ topSections, sections }: Readonly<{ topSections: DocumentSection[]; sections: DocumentSection[] }>) {
+  return (
+    <div className="flex gap-6">
+      <div className="w-56 shrink-0">
+        <div className="bg-card rounded-lg border border-border shadow-elegant p-3 sticky top-20">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Outline</p>
+          {topSections.map((section) => (
+            <TocItem key={section.id} section={section} depth={0} />
+          ))}
+        </div>
+      </div>
+      <div className="flex-1 space-y-4">
+        {flattenSections(sections).map((section) => (
+          <div key={section.id} className="bg-card border border-border rounded-lg p-5">
+            <h3 className="font-semibold text-foreground text-sm mb-2">{section.title}</h3>
+            {section.content && <pre className="text-sm text-muted-foreground whitespace-pre-wrap">{section.content}</pre>}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function DocumentDetail({
   resolvedId,
   allowedActions,
@@ -199,14 +267,7 @@ export default function DocumentDetail({
   }
 
   if (!doc) {
-    return (
-      <div className="flex items-center justify-center h-64 animate-fade-in">
-        <div className="text-center">
-          <h3 className="text-lg font-semibold text-foreground mb-2">Document not found</h3>
-          <Link to={kind ? `/projects/${projectPrefix}/docs?type=${kind}` : `/projects/${projectPrefix}/docs`} className="text-sm text-primary hover:text-primary/80 transition-colors">&larr; Back to Documents</Link>
-        </div>
-      </div>
-    )
+    return <DocumentNotFound kind={kind} projectPrefix={projectPrefix} />
   }
 
   if (!resolvedDocType) {
@@ -243,7 +304,7 @@ export default function DocumentDetail({
           onDelete={() => { setDeleteConfirm(false); deleteDocumentMutation.mutate(); }}
         />
       ) : undefined}
-      review={hasRichContent ? <WorkflowPanel artefactType="document" artefactId={docId} projectPrefix={projectPrefix} projectId={doc.project_id} layout="bar" /> : undefined}
+      info={hasRichContent ? <DocumentInfo doc={doc} docId={docId} projectPrefix={projectPrefix} project={project} canEdit={showEdit} /> : undefined}
       comments={hasRichContent ? <CommentsColumn /> : undefined}
       rightRail={hasRichContent ? undefined : <>
         <WorkflowPanel artefactType="document" artefactId={docId} projectPrefix={projectPrefix} projectId={doc.project_id} />
@@ -265,26 +326,7 @@ export default function DocumentDetail({
         </div>
       )}
 
-      {hasLegacySections && (
-        <div className="flex gap-6">
-          <div className="w-56 shrink-0">
-            <div className="bg-card rounded-lg border border-border shadow-elegant p-3 sticky top-20">
-              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Outline</p>
-              {topSections.map((section) => (
-                <TocItem key={section.id} section={section} depth={0} />
-              ))}
-            </div>
-          </div>
-          <div className="flex-1 space-y-4">
-            {flattenSections(doc.sections).map((section) => (
-              <div key={section.id} className="bg-card border border-border rounded-lg p-5">
-                <h3 className="font-semibold text-foreground text-sm mb-2">{section.title}</h3>
-                {section.content && <pre className="text-sm text-muted-foreground whitespace-pre-wrap">{section.content}</pre>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {hasLegacySections && <LegacySections topSections={topSections} sections={doc.sections} />}
 
       {!hasRichContent && !hasLegacySections && <EmptyDocument showEdit={showEdit} onEdit={openEditor} />}
 
@@ -299,7 +341,6 @@ export default function DocumentDetail({
         sourceId={docId}
         sourceDocId={doc.doc_id ?? undefined}
       />
-      {hasRichContent && <DocumentMetadata doc={doc} docId={docId} canEdit={showEdit} />}
     </DocDetailShell>
     </ReviewCommentsProvider>
   )

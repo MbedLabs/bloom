@@ -117,9 +117,6 @@ class Requirement(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     project_id: Mapped[int] = mapped_column(ForeignKey(PROJECTS_ID), nullable=False, index=True)
-    parent_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey(REQUIREMENTS_ID), nullable=True, index=True
-    )
     req_id: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -149,10 +146,6 @@ class Requirement(Base):
     project: Mapped["Project"] = relationship(
         back_populates="requirements", foreign_keys=[project_id]
     )
-    parent: Mapped[Optional["Requirement"]] = relationship(
-        remote_side=[id], back_populates="children"
-    )
-    children: Mapped[List["Requirement"]] = relationship(back_populates="parent")
     test_run_links: Mapped[List["TestRunLink"]] = relationship(back_populates="requirement")
     outgoing_links: Mapped[List["RequirementLink"]] = relationship(
         foreign_keys="RequirementLink.source_id", back_populates="source"
@@ -649,7 +642,10 @@ class TestConcept(Base):
 
 
 class Defect(Base):
-    """A confirmed or triaged problem linked to verification, requirements, or external trackers."""
+    """A confirmed or triaged problem linked to verification, requirements, or external trackers.
+
+    jira_send_started_at is when a sync took the defect to create its Jira issue; while it is
+    set and the defect is linked to no tracker, no other sync sends it."""
 
     __tablename__ = "defects"
 
@@ -676,6 +672,7 @@ class Defect(Base):
     external_issue_state: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     external_issue_closed: Mapped[Optional[bool]] = mapped_column(nullable=True)
     external_last_event_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    jira_send_started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
@@ -697,7 +694,8 @@ class IntegrationSetting(Base):
     unused. The sync_* columns record the scheduled sync: last attempt and last success, the
     last failure and the repositories the last run skipped, the counts of the last run, whether
     a full Jira creation search is pending and where a capped one continues, and the issue
-    number the deletion check reached.
+    number the deletion check reached. direction is jira_to_bloom, bloom_to_jira or both, and
+    auto_sync_minutes is how often the scheduled sync runs, 0 for never.
     """
 
     __tablename__ = "integration_settings"
@@ -720,7 +718,8 @@ class IntegrationSetting(Base):
     jira_jql: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     jira_reference_field: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     jira_priority_map: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    two_way: Mapped[bool] = mapped_column(default=False)
+    direction: Mapped[str] = mapped_column(String(20), default="jira_to_bloom")
+    auto_sync_minutes: Mapped[int] = mapped_column(default=10)
     enabled: Mapped[bool] = mapped_column(default=True)
     sync_checked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
@@ -737,6 +736,15 @@ class IntegrationSetting(Base):
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
     )
+
+
+class SystemMarker(Base):
+    """A named moment of the installation, recorded once by a migration."""
+
+    __tablename__ = "system_markers"
+
+    name: Mapped[str] = mapped_column(String(64), primary_key=True)
+    marked_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
 class DefectSyncEvent(Base):

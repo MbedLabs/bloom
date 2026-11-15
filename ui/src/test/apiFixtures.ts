@@ -66,7 +66,6 @@ export const requirement = {
   priority: 'High',
   req_type: 'Functional',
   req_origin: 'Customer',
-  parent_id: null,
   reviewer_id: 1,
   approver_id: 1,
   reviewed_by_id: null,

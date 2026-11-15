@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Iterable
 
 from fastapi import HTTPException
@@ -66,6 +67,53 @@ async def link_end(
 
 
 TAG_TRIGGER = "#"
+
+PUBLIC_ID_COLUMNS = {
+    "REQ": "req_id",
+    "TC": "tc_id",
+    "DES": "design_id",
+    "RSK": "risk_id",
+    "CHG": "change_id",
+    "CPT": "concept_id",
+    "DEF": "defect_id",
+    "CMP": "campaign_id",
+    "TS": "suite_id",
+}
+
+TEXT_TAG = re.compile(r"(?<![\w#])#([A-Z][A-Z0-9]*-[A-Z]+-\d+)\b")
+
+
+async def text_tag_content(
+    db: AsyncSession, project_id: int, source_type: str, text: str | None
+) -> list[dict]:
+    """Tag mention nodes for each #ID in plain text that names an allowed record of the project."""
+    source = normalize_linkable_type(source_type)
+    nodes: list[dict] = []
+    for public_id in dict.fromkeys(TEXT_TAG.findall(text or "")):
+        type_code = normalize_linkable_type(public_id.split("-")[-2])
+        if not is_allowed_tag_pair(source, type_code):
+            continue
+        if type_code in PUBLIC_ID_COLUMNS:
+            model = LINK_END_MODELS[type_code]
+            column = getattr(model, PUBLIC_ID_COLUMNS[type_code])
+            query = select(model.id).where(model.project_id == project_id, column == public_id)
+        elif type_code in CANONICAL_DOCUMENT_KINDS:
+            query = select(Document.id).where(
+                Document.project_id == project_id,
+                Document.doc_id == public_id,
+                Document.doc_type == type_code,
+            )
+        else:
+            continue
+        row_id = (await db.execute(query)).scalar_one_or_none()
+        if row_id is not None:
+            nodes.append(
+                {
+                    "type": "mention",
+                    "attrs": {"id": f"{type_code}:{row_id}", "mentionSuggestionChar": TAG_TRIGGER},
+                }
+            )
+    return nodes
 
 
 def _walk(node: Any) -> Iterable[dict]:

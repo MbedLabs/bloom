@@ -6,7 +6,7 @@ import TagPicker from '../components/TagPicker'
 import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router'
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { ArrowLeft, PanelRightOpen, PanelRightClose, Trash2 } from 'lucide-react'
-import { DocEditor } from '../components/editor'
+import { DocEditor, MentionTextarea } from '../components/editor'
 import { TcsArteTable } from '../components/TcsArteTable'
 import { createDefaultTcRows, normalizeTcsRows, type TcsRow } from '../utils/tcs'
 import {
@@ -403,6 +403,8 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
       }
       if (docType === 'REQ') {
         payload.visibility = requirementVisibilityFromOrigin(sent.req_origin)
+        delete payload.content_json
+        delete payload.content_html
       }
       if (controlled) payload.status = 'Draft'
       if (docType !== 'REQ') delete payload.reviewer_id
@@ -452,6 +454,8 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
       }
       if (docType === 'REQ') {
         payload.visibility = requirementVisibilityFromOrigin(sent.req_origin)
+        delete payload.content_json
+        delete payload.content_html
       }
       if (controlled) delete payload.status
       delete payload.reviewer_id
@@ -672,7 +676,7 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
               className="w-full text-3xl font-bold text-foreground placeholder:text-muted-foreground/40 bg-transparent border-none outline-hidden mb-2"
             />
 
-            {showDescriptionMetadata && (
+            {showDescriptionMetadata && docType !== 'REQ' && (
               <input
                 type="text"
                 value={metadata.description || ''}
@@ -690,7 +694,20 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
               </div>
             )}
             <div className={`${docType === 'TC' ? 'max-w-none' : 'max-w-4xl mx-auto'} w-full px-4 py-4`}>
-              {docType === 'TC' ? (
+              {docType === 'REQ' && (
+                <MentionTextarea
+                  aria-label="Description"
+                  value={metadata.description || ''}
+                  onChange={(description) => setMetadata({ ...metadata, description })}
+                  mentionItems={parameterMentionItems}
+                  userMentionItems={userMentionItems}
+                  artefactSearch={artefactSearch}
+                  placeholder="Describe the requirement..."
+                  rows={8}
+                  className="w-full px-4 py-3 rounded-md border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-hidden focus:ring-2 focus:ring-ring"
+                />
+              )}
+              {docType === 'TC' && (
                 <TcsArteTable
                   rows={tcRows}
                   onChange={setTcRows}
@@ -699,7 +716,8 @@ export default function DocCreate({ editMode = false }: Readonly<DocCreateProps>
                   userMentionItems={userMentionItems}
                   parameterHref={prefix ? `/projects/${prefix}/parameters` : undefined} parameterValues={parameterValues}
                 />
-              ) : (
+              )}
+              {docType !== 'REQ' && docType !== 'TC' && (
                 <DocEditor
                   content={contentJson}
                   onChange={handleEditorChange}

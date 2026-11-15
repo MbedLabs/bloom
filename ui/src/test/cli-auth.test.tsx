@@ -85,10 +85,11 @@ describe('CLI browser approval', () => {
     expect(mocks.get).not.toHaveBeenCalled()
   })
 
-  it('names the local callback destination before approval', async () => {
+  it('shows the client name before approval and not the callback address', async () => {
     mocks.get.mockResolvedValue(session({ mode: 'callback', redirect_uri: 'http://127.0.0.1:8123/callback' }))
     renderApproval()
-    expect(await screen.findByText(/returns to your local client at http:\/\/127\.0\.0\.1:8123\/callback/i)).toBeInTheDocument()
+    expect(await screen.findByText('Example client')).toBeInTheDocument()
+    expect(screen.queryByText(/127\.0\.0\.1:8123/)).toBeNull()
   })
 
   it.each([

@@ -208,7 +208,6 @@ class RequirementCreate(StrictModel):
 
     project_id: int
     tag_ids: List[int] = Field(default_factory=list)
-    parent_id: Optional[int] = None
     title: str = Field(..., min_length=1, max_length=500)
     description: Optional[str] = None
     status: str = "Draft"
@@ -234,7 +233,6 @@ class RequirementUpdate(StrictModel):
     req_origin: Optional[str] = None
     reviewer_id: Optional[int] = None
     approver_id: Optional[int] = None
-    parent_id: Optional[int] = None
     content_json: Optional[Dict[str, Any]] = None
     content_html: Optional[str] = None
 
@@ -244,7 +242,6 @@ class RequirementResponse(BaseModel):
 
     id: int
     project_id: int
-    parent_id: Optional[int] = None
     req_id: str
     title: str
     description: Optional[str] = None
@@ -263,7 +260,6 @@ class RequirementResponse(BaseModel):
     approver_can_sign: Optional[bool] = None
     created_at: datetime
     updated_at: datetime
-    children: List["RequirementResponse"] = []
     test_case_count: int = 0
     linked_test_cases: List[TestCaseSummary] = []
     verified_by: List[RequirementVerifiedByLinkResponse] = []

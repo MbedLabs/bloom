@@ -9,7 +9,6 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 const requirement = {
   id: 3001,
   project_id: 7,
-  parent_id: null,
   req_id: 'PRJ-REQ-3001',
   title: 'Response time',
   description: '',
@@ -26,7 +25,6 @@ const requirement = {
   approved_at: null,
   created_at: '2026-07-01T00:00:00Z',
   updated_at: '2026-07-01T00:00:00Z',
-  children: [],
   linked_test_runs: [
     {
       id: 1,

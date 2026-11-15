@@ -138,28 +138,6 @@ async def _seed_direct_visibility_data(session_maker: async_sessionmaker[AsyncSe
         session.add(root_requirement)
         await session.flush()
 
-        visible_child_requirement = Requirement(
-            project_id=project.id,
-            parent_id=root_requirement.id,
-            req_id="PRJ-REQ-002",
-            title="Visible child requirement",
-            status="Draft",
-            visibility="customer",
-            priority="Medium",
-            req_type="Functional",
-            req_origin="Customer",
-        )
-        hidden_child_requirement = Requirement(
-            project_id=project.id,
-            parent_id=root_requirement.id,
-            req_id="PRJ-REQ-003",
-            title="Hidden child requirement",
-            status="Draft",
-            visibility="internal",
-            priority="Medium",
-            req_type="Functional",
-            req_origin="Internal",
-        )
         hidden_requirement = Requirement(
             project_id=project.id,
             req_id="PRJ-REQ-004",
@@ -170,13 +148,7 @@ async def _seed_direct_visibility_data(session_maker: async_sessionmaker[AsyncSe
             req_type="Functional",
             req_origin="Internal",
         )
-        session.add_all(
-            [
-                visible_child_requirement,
-                hidden_child_requirement,
-                hidden_requirement,
-            ]
-        )
+        session.add(hidden_requirement)
         await session.flush()
 
         visible_test_case = TestCaseModel(
@@ -284,8 +256,6 @@ async def _seed_direct_visibility_data(session_maker: async_sessionmaker[AsyncSe
             "external": external,
             "project": project,
             "root_requirement": root_requirement,
-            "visible_child_requirement": visible_child_requirement,
-            "hidden_child_requirement": hidden_child_requirement,
             "hidden_requirement": hidden_requirement,
             "visible_test_case": visible_test_case,
             "hidden_test_case": hidden_test_case,
@@ -293,7 +263,7 @@ async def _seed_direct_visibility_data(session_maker: async_sessionmaker[AsyncSe
         }
 
 
-def test_external_requirement_detail_hides_hidden_children_and_linked_objects():
+def test_external_requirement_detail_hides_hidden_linked_objects():
     harness, engine = _build_harness()
     try:
         seeded = harness.run(_seed_direct_visibility_data(harness.session_maker))
@@ -303,7 +273,6 @@ def test_external_requirement_detail_hides_hidden_children_and_linked_objects():
         assert response.status_code == 200, response.text
         body = response.json()
 
-        assert [child["req_id"] for child in body["children"]] == ["PRJ-REQ-002"]
         assert [tc["tc_id"] for tc in body["linked_test_cases"]] == ["PRJ-TC-001"]
         assert [link["test_case"]["tc_id"] for link in body["verified_by"]] == ["PRJ-TC-001"]
         assert [suite["suite_id"] for suite in body["suite_backlinks"]] == ["PRJ-TS-001"]
