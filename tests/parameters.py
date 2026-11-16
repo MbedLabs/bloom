@@ -2362,3 +2362,27 @@ MSG_READER_REQ_LIST = "an external reader lists the customer requirement and not
 MSG_READER_REQ_HIDDEN = "an internal requirement is answered 404 to an external reader"
 MSG_READER_ORIGIN_CUSTOMER = "a requirement created with the Customer origin is customer-visible"
 MSG_READER_ORIGIN_INTERNAL = "a requirement changed to the Internal origin becomes internal"
+READER_COVERAGE = (1, 1, 0)
+MSG_READER_MATRIX = "an external reader's traceability holds the customer requirement with the customer test case only"
+MSG_READER_COVERAGE = (
+    "an external reader's coverage counts the customer requirement only, as covered"
+)
+MSG_READER_IMPACT_HIDDEN = (
+    "the impact of an internal requirement is answered 404 to an external reader"
+)
+READER_VISIBLE_SUITE = f"{VISIBILITY_PREFIX}-TS-001"
+READER_HIDDEN_SUITE = f"{VISIBILITY_PREFIX}-TS-002"
+READER_EXECUTED_AT = datetime(2026, 7, 2, 10, 30, 0)
+READER_EXECUTED_AT_TEXT = "2026-07-02T10:30:00"
+READER_BUD_RUN = _draw.randrange(100, 10_000)
+READER_SUITE_EXECUTION = (1, "Passed", READER_EXECUTED_AT_TEXT, READER_BUD_RUN)
+MSG_READER_SUITE_LIST = "an external reader lists the customer suite and not the internal one"
+MSG_READER_SUITE_LIST_EXECUTION = (
+    "the listed suite counts its one visible test case and carries its last execution"
+)
+MSG_READER_SUITE_HIDDEN = "an internal suite is answered 404 to an external reader"
+MSG_READER_SUITE_SHOWN = "the customer suite opens with 200 and carries its visibility"
+MSG_READER_SUITE_EXECUTION = (
+    "the opened suite counts its one visible test case and carries its last execution"
+)
+MSG_READER_SUITE_ITEMS = "the opened suite holds the customer test case and not the internal one"

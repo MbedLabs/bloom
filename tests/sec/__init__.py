@@ -22,5 +22,7 @@ SUITES = [
     "tests.sec.BLOOM_route_auth_matrix.RouteAuthMatrixTest",
     "tests.sec.BLOOM_service_credentials.ServiceCredentialsTest",
     "tests.sec.BLOOM_test_cases_external_visibility.TestCasesExternalVisibilityTest",
+    "tests.sec.BLOOM_test_suites_external_visibility.TestSuitesExternalVisibilityTest",
     "tests.sec.BLOOM_token_logging.TokenLoggingTest",
+    "tests.sec.BLOOM_traceability_external_visibility.TraceabilityExternalVisibilityTest",
 ]

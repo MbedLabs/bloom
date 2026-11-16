@@ -48,6 +48,8 @@ from app.models import (
     Requirement,
 )
 from app.models import TestCase as TestCaseModel
+from app.models import TestSuite as TestSuiteModel
+from app.models import TestSuiteItem as TestSuiteItemModel
 from app.models.groups import Group, GroupMembership, Policy
 from app.models.project_membership import ProjectAccess
 from app.models.user import User, UserRole
@@ -534,6 +536,39 @@ class BloomApiInterface(BloomInterface):
     def bloom_api_set_requirement_origin(self, headers, requirement_id, origin):
         path = f"/api/requirements/{requirement_id}"
         return self.bloom_api_call("PATCH", path, headers, json={"req_origin": origin})
+
+    def bloom_api_coverage_gaps(self, headers, project_id):
+        return self.bloom_api_call("GET", f"/api/traceability/coverage-gaps/{project_id}", headers)
+
+    def bloom_api_impact(self, headers, requirement_id):
+        return self.bloom_api_call("GET", f"/api/traceability/impact/{requirement_id}", headers)
+
+    def bloom_add_test_suite(self, project_id, suite_id, visibility, test_case_ids):
+        suite = self._run(
+            self._add(
+                TestSuiteModel(
+                    project_id=project_id,
+                    suite_id=suite_id,
+                    name=suite_id,
+                    status=self.parameters.DOCUMENT_STATUS,
+                    visibility=visibility,
+                )
+            )
+        )
+        for order, test_case_id in enumerate(test_case_ids):
+            self._run(
+                self._add(
+                    TestSuiteItemModel(suite_id=suite, test_case_id=test_case_id, order=order)
+                )
+            )
+        return suite
+
+    def bloom_api_list_test_suites(self, headers, project_id):
+        query = {"project_id": project_id}
+        return self.bloom_api_call("GET", "/api/test-suites", headers, params=query)
+
+    def bloom_api_get_test_suite(self, headers, suite_id):
+        return self.bloom_api_call("GET", f"/api/test-suites/{suite_id}", headers)
 
     def bloom_api_get_baseline(self, headers, baseline_id):
         return self.bloom_api_call("GET", f"/api/baselines/{baseline_id}", headers)
