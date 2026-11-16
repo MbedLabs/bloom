@@ -11,6 +11,7 @@ SUITES = [
     "tests.pg.BLOOM_cli_auth_migration_round_trip.CliAuthMigrationRoundTripTest",
     "tests.pg.BLOOM_cli_auth_refresh_revocation.CliAuthRefreshRevocationTest",
     "tests.pg.BLOOM_document_assignee_migration.DocumentAssigneeMigrationTest",
+    "tests.pg.BLOOM_document_workflow_concurrency.DocumentWorkflowConcurrencyTest",
     "tests.pg.BLOOM_id_widening.IdWideningTest",
     "tests.pg.BLOOM_integration_sync_race.IntegrationSyncRaceTest",
     "tests.pg.BLOOM_integrity_conflict.IntegrityConflictTest",
@@ -20,4 +21,5 @@ SUITES = [
     "tests.pg.BLOOM_requirement_parent_drop_migration.RequirementParentDropMigrationTest",
     "tests.pg.BLOOM_requirement_text_migration.RequirementTextMigrationTest",
     "tests.pg.BLOOM_session_invalidation.SessionInvalidationTest",
+    "tests.pg.BLOOM_token_concurrency.TokenConcurrencyTest",
 ]

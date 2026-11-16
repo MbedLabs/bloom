@@ -454,6 +454,35 @@ MSG_SESSION_ACCESS = "the access token from before the password {event} is refus
 MSG_SESSION_REFRESH = "the refresh cookie from before the password {event} is refused with 401"
 MSG_SESSION_OLD_PASSWORD = "after the password {event} the old password is refused with 401"
 MSG_SESSION_NEW_PASSWORD = "after the password {event} the new password signs in"
+WORKFLOW_RACE_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+WORKFLOW_RACE_PREFIX = _letters(string.ascii_uppercase, 3, 3)
+WORKFLOW_RACE_REQ_ID = f"{WORKFLOW_RACE_PREFIX}-REQ-001"
+WORKFLOW_RACE_PATH = "/api/artefacts/requirement/{id}/workflow"
+WORKFLOW_RACE_LOOKUP = "SELECT artefact_workflows."
+WORKFLOW_RACE_WAIT = 0.25
+WORKFLOW_RACE_FIRST_REVISION = 1
+WORKFLOW_RACE_REVISION_KEY = "revision_number"
+WORKFLOW_RACE_CREATOR_KEY = "creator"
+WORKFLOW_RACE_ID_KEY = "id"
+MSG_WORKFLOW_RACE_READS = "both first reads of the workflow are answered 200"
+MSG_WORKFLOW_RACE_ONE = "two first reads at once store one workflow"
+MSG_WORKFLOW_RACE_STATE = "the stored workflow is revision 1, a draft of the requirement's creator"
+MSG_WORKFLOW_RACE_LATER = "a later read is answered 200"
+MSG_WORKFLOW_RACE_REVISION = "the later read and the first reads show revision 1"
+MSG_WORKFLOW_RACE_CREATOR = "the later read names the requirement's creator"
+TOKEN_RACE_USES = 6
+TOKEN_RACE_RESET_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+TOKEN_RACE_INVITE_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+TOKEN_RACE_VERIFY_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+TOKEN_RACE_USE = {
+    "refresh": "refresh cookie",
+    "reset": "password reset token",
+    "invite": "invitation token",
+    "verify": "verification token",
+}
+MSG_TOKEN_RACE_ISSUED = "the {token} is issued"
+MSG_TOKEN_RACE_ONE = "of six uses of one {token} at once, one is answered 200"
+MSG_TOKEN_RACE_OTHERS = "every other use of the {token} is refused with {status}"
 
 CLI_PREFIX = "/api/auth/cli"
 CLI_START = "/start"

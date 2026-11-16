@@ -26,18 +26,19 @@ import httpx
 from fastapi import Depends, FastAPI
 from sqlalchemy import bindparam, event, func, select, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app import main
 from app.api import auth as auth_api
 from app.api import cli_auth as cli_auth_api
 from app.api import integrations
+from app.api import users as users_api
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import limiter
 from app.core.id_generator import next_doc_id
-from app.core.security import create_access_token
-from app.models import AuditEvent, Project, Requirement
+from app.core.security import create_access_token, get_current_user
+from app.models import ArtefactWorkflow, AuditEvent, Project, Requirement
 from app.models import TestCase as TestCaseModel
 from app.models.cli_auth_session import CliAuthSession
 from app.models.user import User, UserRole
@@ -172,17 +173,60 @@ class BloomPgInterface(BloomInterface):
         return answer.status_code
 
     def bloom_request_password_reset(self, email):
-        captured = {}
+        return self._mailed_token(
+            auth_api,
+            "send_password_reset_email",
+            "reset_link",
+            self._send("POST", "/api/auth/forgot-password", json={"email": email}),
+        )
 
-        def capture(*, to_email, full_name, reset_link):
-            captured["link"] = reset_link
+    def bloom_invite(self, admin_token, email, role):
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        body = {"email": email, "full_name": email, "role": role}
+        return self._mailed_token(
+            users_api,
+            "send_invite_email",
+            "invite_link",
+            self._send("POST", "/api/users/invite", json=body, headers=headers),
+        )
 
-        with patch.object(auth_api, "send_password_reset_email", capture):
-            answer = self._run(
-                self._send("POST", "/api/auth/forgot-password", json={"email": email})
-            )
-        found = re.search(r"token=([^&\s]+)", captured.get("link", ""))
-        return SimpleNamespace(status=answer.status_code, token=found.group(1) if found else None)
+    def bloom_request_verification(self, token):
+        headers = {"Authorization": f"Bearer {token}"}
+        return self._mailed_token(
+            auth_api,
+            "send_verification_email",
+            "verification_link",
+            self._send("POST", "/api/auth/resend-verification", headers=headers),
+        )
+
+    def bloom_race_requests(self, path, json=None, cookie=None):
+        async def race():
+            sends = [
+                self._send("POST", path, json=json, cookie=cookie)
+                for _ in range(self.parameters.TOKEN_RACE_USES)
+            ]
+            return [answer.status_code for answer in await asyncio.gather(*sends)]
+
+        return self._run(race())
+
+    def bloom_act_as(self, user_id):
+        user = self._run(self._get(User, user_id))
+
+        async def actor():
+            return user
+
+        main.app.dependency_overrides[get_current_user] = actor
+
+    def bloom_race_first_workflow_reads(self, requirement_id):
+        return self._run(self._race_first_workflow_reads(requirement_id))
+
+    def bloom_read_workflow(self, requirement_id):
+        path = self.parameters.WORKFLOW_RACE_PATH.format(id=requirement_id)
+        answer = self._run(self._send("GET", path))
+        return SimpleNamespace(status=answer.status_code, body=answer.json())
+
+    def bloom_list_workflows(self):
+        return self._run(self._all(select(ArtefactWorkflow).order_by(ArtefactWorkflow.id)))
 
     def bloom_reset_password(self, token, new):
         body = {"token": token, "new_password": new}
@@ -208,8 +252,8 @@ class BloomPgInterface(BloomInterface):
     def bloom_read_requirement_parent_state(self):
         return self._run(self._read_requirement_parent_state())
 
-    def bloom_add_requirements(self, project_id, req_ids):
-        for req_id in req_ids:
+    def bloom_add_requirements(self, project_id, req_ids, created_by_id=None):
+        return [
             self._run(
                 self._add(
                     Requirement(
@@ -217,9 +261,12 @@ class BloomPgInterface(BloomInterface):
                         req_id=req_id,
                         title=req_id,
                         status=self.parameters.STATUS_DRAFT,
+                        created_by_id=created_by_id,
                     )
                 )
             )
+            for req_id in req_ids
+        ]
 
     def bloom_add_test_case(self, project_id, tc_id, title):
         return self._run(self._add(TestCaseModel(project_id=project_id, tc_id=tc_id, title=title)))
@@ -413,6 +460,58 @@ class BloomPgInterface(BloomInterface):
             cookie=header[len(name) :].split(";")[0] or None,
             access_token=body.get("access_token") if isinstance(body, dict) else None,
         )
+
+    def _mailed_token(self, module, sender, link, request):
+        captured = {}
+        with patch.object(module, sender, lambda **mail: captured.update(link=mail[link])):
+            answer = self._run(request)
+        found = re.search(r"token=([^&\s]+)", captured.get("link", ""))
+        return SimpleNamespace(status=answer.status_code, token=found.group(1) if found else None)
+
+    async def _race_first_workflow_reads(self, requirement_id):
+        arrived = asyncio.Event()
+        lookups = []
+        execute = AsyncSession.execute
+
+        async def held_execute(session, statement, *args, **kwargs):
+            result = await execute(session, statement, *args, **kwargs)
+            first_lookup = (
+                session.info.get("racing")
+                and str(statement).startswith(self.parameters.WORKFLOW_RACE_LOOKUP)
+                and len(lookups) < 2
+            )
+            if first_lookup:
+                lookups.append(statement)
+                if len(lookups) == 2:
+                    arrived.set()
+                with contextlib.suppress(asyncio.TimeoutError):
+                    await asyncio.wait_for(arrived.wait(), self.parameters.WORKFLOW_RACE_WAIT)
+            return result
+
+        async def racing_session():
+            async with self.maker() as session:
+                session.info["racing"] = True
+                try:
+                    yield session
+                    await session.commit()
+                except Exception:
+                    await session.rollback()
+                    raise
+
+        path = self.parameters.WORKFLOW_RACE_PATH.format(id=requirement_id)
+        transport = httpx.ASGITransport(app=self.api)
+        with (
+            patch.dict(main.app.dependency_overrides, {get_db: racing_session}),
+            patch.object(AsyncSession, "execute", held_execute),
+        ):
+            async with REAL_CLIENT(
+                transport=transport, base_url=self.parameters.API_BASE
+            ) as client:
+                replies = await asyncio.wait_for(
+                    asyncio.gather(client.get(path), client.get(path)),
+                    self.parameters.RACE_TIMEOUT_SECONDS,
+                )
+        return [SimpleNamespace(status=reply.status_code, body=reply.json()) for reply in replies]
 
     async def _next_requirement_id(self, project_id, prefix):
         async with self.maker() as db:
