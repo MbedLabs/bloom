@@ -3092,3 +3092,29 @@ MSG_TCS_LEADING = "text before the first row becomes a step"
 MSG_TCS_XML = "the XML export reimports with the same rows"
 MSG_TCS_MARKDOWN = "the Markdown export reimports as the same test case"
 MSG_TCS_PRECONDITION = "plain preconditions become a precondition row in the Markdown export"
+EXR_REQUIREMENT_HEADER = [
+    "req_id",
+    "title",
+    "status",
+    "priority",
+    "type",
+    "origin",
+    "visibility",
+    "description",
+    "created_at",
+    "updated_at",
+]
+EXR_TRACE_HEADER = [
+    "req_id",
+    "req_title",
+    "req_status",
+    "covered",
+    "tc_id",
+    "tc_title",
+    "tc_last_execution",
+]
+EXR_MIN_PDF_BYTES = 800
+MSG_EXR_CSV = "the requirements CSV has its file name, header and both requirements"
+MSG_EXR_PDF = "the requirements PDF is a PDF of more than 800 bytes"
+MSG_EXR_TRACE = "the traceability CSV marks the verified requirement covered and the other not"
+MSG_EXR_MISSING = "a requirements export of a missing project is refused with 404"

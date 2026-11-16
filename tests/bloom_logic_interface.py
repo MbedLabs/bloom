@@ -53,7 +53,13 @@ from app.api import (
     integrations,
 )
 from app.api import project_variables as project_variables_api
-from app.api.export import _test_cases_markdown, _test_cases_xml, export_test_cases
+from app.api.export import (
+    _test_cases_markdown,
+    _test_cases_xml,
+    export_requirements,
+    export_test_cases,
+    export_traceability,
+)
 from app.api.import_service import (
     ImportResult,
     _import_docs,
@@ -373,6 +379,75 @@ class BloomLogicInterface(BloomInterface):
             check=True,
         )
         return done.stdout.strip().splitlines()[-1]
+
+    def bloom_seed_export_requirements(self):
+        return self._run(self._seed_export_requirements())
+
+    def bloom_export(self, kind, project_id, export_format):
+        exports = {"requirements": export_requirements, "traceability": export_traceability}
+        return self._run(self._export(exports[kind], project_id, export_format))
+
+    async def _export(self, export, project_id, export_format):
+        async with self.maker() as db:
+            admin = (await db.execute(select(User).where(User.role == UserRole.admin))).scalar_one()
+            try:
+                answer = await export(
+                    project_id=project_id, format=export_format, db=db, current_user=admin
+                )
+            except HTTPException as exc:
+                return SimpleNamespace(status=exc.status_code)
+        csv_rows = None
+        if export_format == "csv":
+            csv_rows = list(csv.reader(io.StringIO(answer.body.decode("utf-8"))))
+        return SimpleNamespace(
+            status=200,
+            media_type=answer.media_type,
+            disposition=answer.headers.get("content-disposition", ""),
+            body=answer.body,
+            rows=csv_rows,
+        )
+
+    async def _seed_export_requirements(self):
+        async with self.maker() as db:
+            project = Project(name="Demo", prefix="PRJ")
+            admin = User(
+                email="admin@test.local",
+                full_name="Ada Admin",
+                hashed_password="x",
+                role=UserRole.admin,
+            )
+            db.add_all([project, admin])
+            await db.flush()
+            login = Requirement(
+                project_id=project.id,
+                req_id="PRJ-REQ-001",
+                title="Login shall be possible",
+                description="Users must be able to log in.",
+                status="Approved",
+            )
+            other = Requirement(
+                project_id=project.id, req_id="PRJ-REQ-002", title="Uncovered requirement"
+            )
+            case = TestCase(
+                project_id=project.id,
+                tc_id="PRJ-TC-001",
+                title="Verify login",
+                last_execution_status="passed",
+            )
+            db.add_all([login, other, case])
+            await db.flush()
+            db.add(
+                ArtefactLink(
+                    project_id=project.id,
+                    source_type="TC",
+                    source_id=case.id,
+                    target_type="REQ",
+                    target_id=login.id,
+                    role="verifies",
+                )
+            )
+            await db.commit()
+            return project.id
 
     def bloom_seed_export_cases(self):
         return self._run(self._seed_export_cases())
