@@ -3504,3 +3504,17 @@ MSG_SRC_EXTERNAL = "an external reader finds only customer records of the allowe
 MSG_SRC_EXTERNAL_INTERNAL = "an external reader does not find an internal record"
 MSG_SRC_NO_ALLOWLIST = "an external reader without allowed document types finds nothing"
 MSG_SRC_RANK = "{what} ranks {rank}"
+STB_REPAIR_STEPS = [
+    "create_tables",
+    "migrate_user_columns",
+    "normalize_document_kinds_and_ids",
+    "backfill_campaign_public_ids",
+    "normalize_non_document_public_ids",
+]
+STB_SEED_STEP = "seed_admin_user"
+MSG_STB_NEITHER = "with both switches off the start runs no repair and seeds no administrator"
+MSG_STB_REPAIR = "with only the repair switch on the start runs the five repair steps in order"
+MSG_STB_SEED = "with only the seed switch on the start seeds the administrator"
+MSG_STB_BOTH = (
+    "with both switches on the start runs the repair steps and then seeds the administrator"
+)

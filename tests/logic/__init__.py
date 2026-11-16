@@ -74,6 +74,7 @@ SUITES = [
     "tests.logic.BLOOM_requirement_text.RequirementTextTest",
     "tests.logic.BLOOM_response_timestamps.ResponseTimestampsTest",
     "tests.logic.BLOOM_search.SearchTest",
+    "tests.logic.BLOOM_startup_bootstrap.StartupBootstrapTest",
     "tests.logic.BLOOM_tag_links.TagLinksTest",
     "tests.logic.BLOOM_tc_steps.TcStepsTest",
     "tests.logic.BLOOM_testrail.TestrailTest",

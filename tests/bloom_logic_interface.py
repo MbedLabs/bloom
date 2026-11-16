@@ -1381,6 +1381,29 @@ class BloomLogicInterface(BloomInterface):
             self._run(start())
         return calls == [session], len(calls)
 
+    def bloom_startup_calls(self, repair, seed_admin):
+        calls = []
+
+        def recorder(name):
+            async def record():
+                calls.append(name)
+
+            return record
+
+        async def start():
+            async with main_module.lifespan(main_module.app):
+                pass
+
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(
+                patch.object(main_module.settings, "RUN_STARTUP_DATA_REPAIR", repair)
+            )
+            stack.enter_context(patch.object(main_module.settings, "AUTO_SEED_ADMIN", seed_admin))
+            for name in (*self.parameters.STB_REPAIR_STEPS, self.parameters.STB_SEED_STEP):
+                stack.enter_context(patch.object(main_module, name, recorder(name)))
+            self._run(start())
+        return calls
+
     def bloom_parse_markdown(self, text, default_type=None):
         if default_type is None:
             return parse_markdown_document(text)
