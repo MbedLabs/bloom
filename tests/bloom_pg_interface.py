@@ -13,6 +13,7 @@ import contextlib
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import uuid
@@ -28,13 +29,16 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app import main
+from app.api import auth as auth_api
 from app.api import cli_auth as cli_auth_api
 from app.api import integrations
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import limiter
+from app.core.id_generator import next_doc_id
 from app.core.security import create_access_token
-from app.models import AuditEvent, Project
+from app.models import AuditEvent, Project, Requirement
+from app.models import TestCase as TestCaseModel
 from app.models.cli_auth_session import CliAuthSession
 from app.models.user import User, UserRole
 from app.services import cli_auth, integration_sync
@@ -160,6 +164,75 @@ class BloomPgInterface(BloomInterface):
         headers = {"Authorization": f"Bearer {token}"}
         answer = self._run(self._send("GET", "/api/auth/me", headers=headers))
         return SimpleNamespace(status=answer.status_code, body=answer.json())
+
+    def bloom_change_password(self, token, current, new):
+        headers = {"Authorization": f"Bearer {token}"}
+        body = {"current_password": current, "new_password": new}
+        answer = self._run(self._send("PUT", "/api/auth/me/password", json=body, headers=headers))
+        return answer.status_code
+
+    def bloom_request_password_reset(self, email):
+        captured = {}
+
+        def capture(*, to_email, full_name, reset_link):
+            captured["link"] = reset_link
+
+        with patch.object(auth_api, "send_password_reset_email", capture):
+            answer = self._run(
+                self._send("POST", "/api/auth/forgot-password", json={"email": email})
+            )
+        found = re.search(r"token=([^&\s]+)", captured.get("link", ""))
+        return SimpleNamespace(status=answer.status_code, token=found.group(1) if found else None)
+
+    def bloom_reset_password(self, token, new):
+        body = {"token": token, "new_password": new}
+        return self._run(self._send("POST", "/api/auth/reset-password", json=body)).status_code
+
+    def bloom_probe_sessions(self, login, email, old_password, new_password):
+        return SimpleNamespace(
+            account=self.bloom_read_account(login.access_token).status,
+            refresh=self.bloom_refresh(login.cookie).status,
+            old_password=self.bloom_log_in_for_cookie(email, old_password).status,
+            new_password=self.bloom_log_in_for_cookie(email, new_password).status,
+        )
+
+    def bloom_seed_workflow_of_a_creator(self):
+        return self._run(self._seed_workflow_of_a_creator())
+
+    def bloom_read_workflow_assignees(self):
+        return self._run(self._read_workflow_assignees())
+
+    def bloom_seed_requirement_with_parent(self, prefix, req_ids):
+        self._run(self._seed_requirement_with_parent(prefix, req_ids))
+
+    def bloom_read_requirement_parent_state(self):
+        return self._run(self._read_requirement_parent_state())
+
+    def bloom_add_requirements(self, project_id, req_ids):
+        for req_id in req_ids:
+            self._run(
+                self._add(
+                    Requirement(
+                        project_id=project_id,
+                        req_id=req_id,
+                        title=req_id,
+                        status=self.parameters.STATUS_DRAFT,
+                    )
+                )
+            )
+
+    def bloom_add_test_case(self, project_id, tc_id, title):
+        return self._run(self._add(TestCaseModel(project_id=project_id, tc_id=tc_id, title=title)))
+
+    def bloom_next_requirement_id(self, project_id, prefix):
+        return self._run(self._next_requirement_id(project_id, prefix))
+
+    def bloom_list_requirement_ids(self, project_id):
+        query = select(Requirement.req_id).where(Requirement.project_id == project_id)
+        return self._run(self._all(query.order_by(Requirement.req_id)))
+
+    def bloom_list_test_case_ids(self):
+        return self._run(self._all(select(TestCaseModel.tc_id)))
 
     def bloom_repair_pre_baseline_schema(self):
         return self._run(self._repair_pre_baseline_schema())
@@ -340,6 +413,73 @@ class BloomPgInterface(BloomInterface):
             cookie=header[len(name) :].split(";")[0] or None,
             access_token=body.get("access_token") if isinstance(body, dict) else None,
         )
+
+    async def _next_requirement_id(self, project_id, prefix):
+        async with self.maker() as db:
+            new_id = await next_doc_id(
+                db,
+                Requirement,
+                Requirement.req_id,
+                project_id,
+                prefix,
+                self.parameters.WIDENING_KIND,
+            )
+            await db.commit()
+            return new_id
+
+    async def _seed_workflow_of_a_creator(self):
+        async with self.engine.begin() as connection:
+            project = await self._insert_project(connection, self.parameters.ASSIGNEE_PREFIX)
+            person = (
+                await connection.execute(
+                    text(
+                        "INSERT INTO users (email, full_name, hashed_password, role, is_active, "
+                        "created_at, updated_at) VALUES (:email, :email, 'x', 'maintainer', true, "
+                        "now(), now()) RETURNING id"
+                    ),
+                    {"email": self.parameters.ASSIGNEE_EMAIL},
+                )
+            ).scalar_one()
+            await connection.execute(
+                text(
+                    "INSERT INTO artefact_workflows (project_id, artefact_type, artefact_id, "
+                    "revision_number, revision_creator_id, phase) "
+                    "VALUES (:project, 'requirement', 1, 1, :person, 'Draft')"
+                ),
+                {"project": project, "person": person},
+            )
+        return person
+
+    async def _read_workflow_assignees(self):
+        async with self.engine.connect() as connection:
+            rows = await connection.execute(
+                text("SELECT revision_creator_id, assignee_id FROM artefact_workflows ORDER BY id")
+            )
+            return [tuple(row) for row in rows]
+
+    async def _seed_requirement_with_parent(self, prefix, req_ids):
+        statement = (
+            "INSERT INTO requirements (project_id, parent_id, req_id, title, status, priority, "
+            "req_type, req_origin, visibility, created_at, updated_at) VALUES (:project, :parent, "
+            ":req_id, :req_id, 'Draft', 'Medium', 'Functional', 'Internal', 'internal', now(), "
+            "now()) RETURNING id"
+        )
+        async with self.engine.begin() as connection:
+            project = await self._insert_project(connection, prefix)
+            parent = None
+            for req_id in req_ids:
+                values = {"project": project, "parent": parent, "req_id": req_id}
+                parent = (await connection.execute(text(statement), values)).scalar_one()
+
+    async def _read_requirement_parent_state(self):
+        async with self.engine.connect() as connection:
+            rows = await connection.execute(text("SELECT req_id FROM requirements ORDER BY req_id"))
+            req_ids = [row[0] for row in rows]
+        has_parent = await self._fetch_value(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns "
+            "WHERE table_name = 'requirements' AND column_name = 'parent_id')"
+        )
+        return req_ids, has_parent
 
     async def _repair_pre_baseline_schema(self):
         path = ROOT / "alembic" / "versions" / self.parameters.REPAIR_MIGRATION
