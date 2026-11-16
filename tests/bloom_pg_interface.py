@@ -10,6 +10,7 @@
 
 import asyncio
 import contextlib
+import importlib.util
 import json
 import os
 import subprocess
@@ -22,8 +23,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 from fastapi import Depends, FastAPI
-from sqlalchemy import bindparam, event, select, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import bindparam, event, func, select, text
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app import main
@@ -33,7 +34,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import limiter
 from app.core.security import create_access_token
-from app.models import Project
+from app.models import AuditEvent, Project
 from app.models.cli_auth_session import CliAuthSession
 from app.models.user import User, UserRole
 from app.services import cli_auth, integration_sync
@@ -134,12 +135,48 @@ class BloomPgInterface(BloomInterface):
         self.patches.callback(setattr, main.app.router, "routes", routes)
 
     def bloom_api_post(self, path):
-        answer = self._run(self._post(path))
+        answer = self._run(self._send("POST", path))
         try:
             body = answer.json()
         except ValueError:
             body = None
         return SimpleNamespace(status=answer.status_code, body=body, text=answer.text)
+
+    def bloom_log_in_for_cookie(self, email, password):
+        body = {"email": email, "password": password}
+        return self._session_answer(self._run(self._send("POST", "/api/auth/login", json=body)))
+
+    def bloom_refresh(self, cookie=None):
+        return self._session_answer(
+            self._run(self._send("POST", "/api/auth/refresh", cookie=cookie))
+        )
+
+    def bloom_log_out(self, cookie):
+        return self._session_answer(
+            self._run(self._send("POST", "/api/auth/logout", cookie=cookie))
+        )
+
+    def bloom_read_account(self, token):
+        headers = {"Authorization": f"Bearer {token}"}
+        answer = self._run(self._send("GET", "/api/auth/me", headers=headers))
+        return SimpleNamespace(status=answer.status_code, body=answer.json())
+
+    def bloom_repair_pre_baseline_schema(self):
+        return self._run(self._repair_pre_baseline_schema())
+
+    def bloom_burst_forged_requests(self):
+        return self._run(self._burst_forged_requests())
+
+    def bloom_count_audit_events(self, action, ip, outcome=None):
+        query = select(func.count(AuditEvent.id)).where(
+            AuditEvent.action == action, AuditEvent.ip == ip
+        )
+        if outcome:
+            query = query.where(AuditEvent.outcome == outcome)
+        return self._run(self._scalar(query))
+
+    def bloom_refusal_threshold(self):
+        return settings.AUDIT_REFUSAL_THRESHOLD
 
     def bloom_sign_in(self, email):
         user_id = self._run(
@@ -281,10 +318,77 @@ class BloomPgInterface(BloomInterface):
                 method, self.parameters.CLI_PREFIX + path, json=body, headers=headers
             )
 
-    async def _post(self, path):
+    async def _send(self, method, path, json=None, headers=None, cookie=None):
+        headers = dict(headers or {})
+        if cookie:
+            headers["Cookie"] = f"{self.parameters.REFRESH_COOKIE}={cookie}"
         transport = httpx.ASGITransport(app=self.api)
         async with REAL_CLIENT(transport=transport, base_url=self.parameters.API_BASE) as client:
-            return await client.post(path)
+            return await client.request(method, path, json=json, headers=headers)
+
+    def _session_answer(self, answer):
+        name = f"{self.parameters.REFRESH_COOKIE}="
+        header = next((h for h in answer.headers.get_list("set-cookie") if h.startswith(name)), "")
+        try:
+            body = answer.json()
+        except ValueError:
+            body = None
+        return SimpleNamespace(
+            status=answer.status_code,
+            body=body,
+            set_cookie=header,
+            cookie=header[len(name) :].split(";")[0] or None,
+            access_token=body.get("access_token") if isinstance(body, dict) else None,
+        )
+
+    async def _repair_pre_baseline_schema(self):
+        path = ROOT / "alembic" / "versions" / self.parameters.REPAIR_MIGRATION
+        spec = importlib.util.spec_from_file_location(path.stem, path)
+        migration = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(migration)
+        async with self.engine.begin() as connection:
+            await connection.exec_driver_sql(
+                "ALTER TABLE integration_settings DROP COLUMN account_email"
+            )
+            await connection.exec_driver_sql("DROP TABLE change_request_sync_events")
+            for statement in migration.REPAIR_STATEMENTS:
+                await connection.exec_driver_sql(statement)
+        repeat_error = None
+        try:
+            async with self.engine.begin() as connection:
+                for statement in migration.REPAIR_STATEMENTS:
+                    await connection.exec_driver_sql(statement)
+        except DBAPIError as error:
+            repeat_error = str(error)
+        return SimpleNamespace(
+            repeat_error=repeat_error,
+            column=await self._fetch_value(
+                "SELECT count(*) FROM information_schema.columns "
+                "WHERE table_name = 'integration_settings' AND column_name = 'account_email'"
+            ),
+            table_columns=await self._fetch_value(
+                "SELECT count(*) FROM information_schema.columns "
+                "WHERE table_name = 'change_request_sync_events'"
+            ),
+            index=await self._fetch_value(
+                "SELECT count(*) FROM pg_indexes "
+                "WHERE indexname = 'ix_change_request_sync_events_change_request_id'"
+            ),
+        )
+
+    async def _burst_forged_requests(self):
+        origin = (self.parameters.REFUSAL_ADDRESS, self.parameters.REFUSAL_PORT)
+        transport = httpx.ASGITransport(app=self.api, client=origin)
+        async with REAL_CLIENT(transport=transport, base_url=self.parameters.API_BASE) as client:
+            answers = await asyncio.gather(
+                *[
+                    client.get(
+                        self.parameters.REFUSAL_PATH, headers=self.parameters.REFUSAL_HEADERS
+                    )
+                    for _ in range(self.parameters.REFUSAL_REQUESTS)
+                ]
+            )
+        return [answer.status_code for answer in answers]
 
     async def _fetch_value(self, statement, **values):
         async with self.engine.connect() as connection:

@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 import tests.parameters as params
 from app.api import integrations
 from app.core.database import Base
+from app.core.security import get_password_hash
 from app.models import (
     ChangeRequest,
     ChangeRequestSyncEvent,
@@ -133,6 +134,22 @@ class BloomInterface:
     def bloom_add_user(self, email, role):
         return self._run(
             self._add(User(email=email, full_name=email, hashed_password=email, role=role))
+        )
+
+    def bloom_add_admin(self, email, password):
+        return self.bloom_add_account(email, password, UserRole.admin.value)
+
+    def bloom_add_account(self, email, password, role):
+        return self._run(
+            self._add(
+                User(
+                    email=email,
+                    full_name=email,
+                    hashed_password=get_password_hash(password),
+                    role=UserRole(role),
+                    is_active=True,
+                )
+            )
         )
 
     def bloom_list_defects(self):

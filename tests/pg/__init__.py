@@ -12,5 +12,8 @@ SUITES = [
     "tests.pg.BLOOM_cli_auth_refresh_revocation.CliAuthRefreshRevocationTest",
     "tests.pg.BLOOM_integration_sync_race.IntegrationSyncRaceTest",
     "tests.pg.BLOOM_integrity_conflict.IntegrityConflictTest",
+    "tests.pg.BLOOM_pre_baseline_repair.PreBaselineRepairTest",
+    "tests.pg.BLOOM_refresh_flow.RefreshFlowTest",
+    "tests.pg.BLOOM_repeated_refusals.RepeatedRefusalsTest",
     "tests.pg.BLOOM_requirement_text_migration.RequirementTextMigrationTest",
 ]

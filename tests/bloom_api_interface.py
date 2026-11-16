@@ -30,7 +30,6 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import limiter
 from app.core.permissions import DOC_TYPE_RESOURCES
-from app.core.security import get_password_hash
 from app.models import ChangeRequest, Defect, Document, IntegrationSetting
 from app.models import TestCase as TestCaseModel
 from app.models.user import User, UserRole
@@ -228,22 +227,6 @@ class BloomApiInterface(BloomInterface):
         main.app.dependency_overrides[get_db] = self._serve_session
         self.patches.enter_context(patch.object(limiter, "enabled", False))
         self.api = main.app
-
-    def bloom_add_admin(self, email, password):
-        return self.bloom_add_account(email, password, UserRole.admin.value)
-
-    def bloom_add_account(self, email, password, role):
-        return self._run(
-            self._add(
-                User(
-                    email=email,
-                    full_name=email,
-                    hashed_password=get_password_hash(password),
-                    role=UserRole(role),
-                    is_active=True,
-                )
-            )
-        )
 
     def bloom_add_external_member(self, project_id, user_id, permissions, visibility):
         self._run(self._add_external_member(project_id, user_id, permissions, visibility))
