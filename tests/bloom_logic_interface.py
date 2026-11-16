@@ -401,7 +401,7 @@ class BloomLogicInterface(BloomInterface):
         return main_module.app.title, main_module.app.description
 
     def bloom_app_name_setting(self, name):
-        with self._scratch_folder() as folder, contextlib.ExitStack() as stack:
+        with self._temp_dir() as folder, contextlib.ExitStack() as stack:
             env_file = Path(folder) / ".env"
             env_file.write_text(f"BLOOM_APP_NAME={name} from dotenv\n", encoding="utf-8")
             stack.enter_context(patch.dict(os.environ, {"BLOOM_APP_NAME": name}))
@@ -956,7 +956,7 @@ class BloomLogicInterface(BloomInterface):
         return found
 
     def bloom_reconcile_attachments(self, files, referenced, old, grace_seconds, old_age_seconds):
-        with self._scratch_folder() as folder, contextlib.ExitStack() as stack:
+        with self._temp_dir() as folder, contextlib.ExitStack() as stack:
             root = Path(folder)
             stack.enter_context(patch.object(settings, "ATTACHMENT_DIR", folder))
             stack.enter_context(patch.object(attachment_storage, "_ROOT", None))
@@ -1167,7 +1167,7 @@ class BloomLogicInterface(BloomInterface):
                     unmarked.append(f"{qualified}.{field}")
         return unmarked
 
-    def _scratch_folder(self):
+    def _temp_dir(self):
         return tempfile.TemporaryDirectory()
 
     def bloom_stream_attachment(self, payload, max_bytes, interrupt=None):
