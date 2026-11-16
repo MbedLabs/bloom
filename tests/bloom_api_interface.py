@@ -8,8 +8,10 @@
 * @note     Requests go through an ASGI transport; no server is started.
 """
 
+import csv
 import hashlib
 import hmac
+import io
 import json
 import logging
 from logging.handlers import BufferingHandler
@@ -20,13 +22,14 @@ import httpx
 from cryptography.fernet import Fernet
 from fastapi import FastAPI, HTTPException
 from fastapi.routing import APIRoute
-from sqlalchemy import event
+from sqlalchemy import event, select
 
 import tests.parameters as params
 from app import main
 from app.api import access_requests as access_requests_api
 from app.api import integrations
 from app.core import id_generator
+from app.core.cache import dashboard_stats_cache
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import limiter
@@ -35,6 +38,7 @@ from app.models import (
     ArtefactActivity,
     ArtefactComment,
     ArtefactLink,
+    AuditEvent,
     Baseline,
     ChangeRequest,
     Defect,
@@ -44,6 +48,8 @@ from app.models import (
     Requirement,
 )
 from app.models import TestCase as TestCaseModel
+from app.models.groups import Group, GroupMembership, Policy
+from app.models.project_membership import ProjectAccess
 from app.models.user import User, UserRole
 from app.schemas.memberships import DEFAULT_EXTERNAL_DOC_TYPES
 from app.services.integration_secrets import (
@@ -56,6 +62,7 @@ from tests.access_fixtures import (
     allow_doc_types,
     project_access_fixture,
     scenario_rules,
+    scenario_type_tags,
 )
 from tests.bloom_interface import BloomInterface
 
@@ -434,6 +441,85 @@ class BloomApiInterface(BloomInterface):
     def bloom_api_list_links(self, headers, project_id):
         return self.bloom_api_call("GET", "/api/links", headers, params={"project_id": project_id})
 
+    def bloom_api_list_projects(self, headers):
+        return self.bloom_api_call("GET", "/api/projects", headers)
+
+    def bloom_api_list_requirements(self, headers, project_id):
+        query = {"project_id": project_id}
+        return self.bloom_api_call("GET", "/api/requirements", headers, params=query)
+
+    def bloom_api_read_requirement(self, headers, requirement_id):
+        return self.bloom_api_call("GET", f"/api/requirements/{requirement_id}", headers)
+
+    def bloom_api_traceability(self, headers, project_id):
+        query = {"project_id": project_id}
+        return self.bloom_api_call("GET", "/api/traceability", headers, params=query)
+
+    def bloom_api_dashboard_stats(self, headers):
+        dashboard_stats_cache._store.clear()
+        return self.bloom_api_call("GET", "/api/dashboard/stats", headers)
+
+    def bloom_api_import_from(self, headers, project_id, source_project_id, doc_type, doc_ids):
+        body = {
+            "source_project_id": source_project_id,
+            "doc_type": doc_type,
+            "doc_ids": doc_ids,
+            "include_links": True,
+        }
+        return self.bloom_api_call("POST", f"/api/projects/{project_id}/import", headers, json=body)
+
+    def bloom_api_upload_reqif(self, headers, project_id, content):
+        files = {"file": ("requirements.reqif", content, "application/xml")}
+        path = f"/api/projects/{project_id}/import/reqif"
+        return self._answer(self._run(self._upload(path, headers, files)))
+
+    def bloom_create_export_project(self):
+        values = self.parameters
+        project = self.bloom_create_project(values.EXPORT_PREFIX)
+        shown, hidden = values.CUSTOMER_VISIBILITY, values.INTERNAL_VISIBILITY
+        pairs = (
+            (values.EXPORT_SHOWN_REQ, values.EXPORT_SHOWN_TC, values.EXPORT_SHOWN_TITLE, shown),
+            (values.EXPORT_HIDDEN_REQ, values.EXPORT_HIDDEN_TC, values.EXPORT_HIDDEN_TITLE, hidden),
+        )
+        for req_id, tc_id, title, visibility in pairs:
+            requirement = self._run(
+                self._add(
+                    Requirement(
+                        project_id=project, req_id=req_id, title=title, visibility=visibility
+                    )
+                )
+            )
+            fields = {"last_execution_status": values.EXPORT_PASSED} if visibility == shown else {}
+            test_case = self.bloom_add_test_case(
+                project, tc_id, title, visibility=visibility, **fields
+            )
+            self.bloom_add_artefact_link(project, test_case, requirement)
+        return project
+
+    def bloom_add_group_exporter(self, project_id, email, permissions):
+        user_id = self.bloom_add_account(
+            email, self.parameters.API_PASSWORD, self.parameters.EXTERNAL_ROLE
+        )
+        self._run(self._add_group_exporter(project_id, user_id, email, permissions))
+        return user_id
+
+    def bloom_api_export(self, headers, project_id, kind, pdf=False):
+        path = f"/api/projects/{project_id}/export/{kind}"
+        query = {"format": "pdf"} if pdf and kind != self.parameters.EXPORT_DOSSIER else None
+        answer = self._run(self._request("GET", path, headers, params=query))
+        is_pdf = answer.content.startswith(b"%PDF")
+        return SimpleNamespace(
+            status=answer.status_code,
+            content_type=answer.headers.get("content-type"),
+            is_pdf=is_pdf,
+            text="" if is_pdf else answer.text,
+            rows=[] if is_pdf else list(csv.DictReader(io.StringIO(answer.text))),
+        )
+
+    def bloom_list_audit_details(self, action):
+        query = select(AuditEvent).where(AuditEvent.action == action).order_by(AuditEvent.id)
+        return [event.details for event in self._run(self._all(query))]
+
     def bloom_api_get_baseline(self, headers, baseline_id):
         return self.bloom_api_call("GET", f"/api/baselines/{baseline_id}", headers)
 
@@ -783,6 +869,30 @@ class BloomApiInterface(BloomInterface):
                 return SimpleNamespace(value=call(value), status=None)
         except HTTPException as exc:
             return SimpleNamespace(value=None, status=exc.status_code)
+
+    async def _upload(self, path, headers, files):
+        transport = httpx.ASGITransport(app=self.api)
+        async with REAL_CLIENT(transport=transport, base_url=self.parameters.API_BASE) as client:
+            return await client.post(path, headers=headers, files=files)
+
+    async def _add_group_exporter(self, project_id, user_id, name, permissions):
+        async with self.maker() as db:
+            read = {resource: ["view"] for resource in permissions}
+            policy = Policy(
+                name=name,
+                permissions=permissions,
+                type_tags=scenario_type_tags(read, self.parameters.CUSTOMER_VISIBILITY),
+            )
+            group = Group(name=name)
+            db.add_all([policy, group])
+            await db.flush()
+            db.add_all(
+                [
+                    GroupMembership(group_id=group.id, user_id=user_id),
+                    ProjectAccess(group_id=group.id, project_id=project_id, policies=[policy]),
+                ]
+            )
+            await db.commit()
 
     async def _post(self, path, body, headers):
         transport = httpx.ASGITransport(app=self.api)
