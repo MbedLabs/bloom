@@ -55,6 +55,12 @@ class BloomInterface:
     def _release_database(self):
         pass
 
+    def bloom_new_database(self):
+        self._run(self.engine.dispose())
+        self.engine = create_async_engine(self.parameters.SYNC_DATABASE)
+        self._run(self._create_tables())
+        self.maker = async_sessionmaker(self.engine, expire_on_commit=False)
+
     def bloom_create_project(self, prefix=None):
         prefix = prefix or self.parameters.SYNC_PROJECT_PREFIX
         return self._run(self._add(Project(name=f"Project {prefix}", prefix=prefix)))

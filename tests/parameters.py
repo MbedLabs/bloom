@@ -3003,3 +3003,34 @@ MSG_JIN_REFERENCES = (
 )
 MSG_JIN_JQL = "the JQL names the project, the types, open issues, the label and the extra clause"
 MSG_JIN_FIELDS = "the search asks for the reference field and builds the issue link"
+CPY_SOURCE = ("Demo", "PRJ")
+CPY_TARGET = ("ABC", "ABC")
+CPY_MISSING_ID = 99999
+CPY_COPIED_REQ = "ABC-REQ-008"
+CPY_COPIED_TC = "ABC-TC-001"
+MSG_CPY_COUNTS = "one requirement is copied after the target's highest id and the missing one is skipped with an error"
+MSG_CPY_FIELDS = "the copy keeps title, description, priority, type and origin"
+MSG_CPY_SOURCE = "the copy is a draft that names its source requirement and project"
+MSG_CPY_NEXT = "the next requirement number of the target follows the copy"
+MSG_CPY_TEST_CASE = (
+    "a copied test case keeps its preconditions and steps, as a draft naming its source"
+)
+ITC_UPDATE_CSV = (
+    "tc_id,title,status,visibility,preconditions,steps,description\n"
+    "PRJ-TC-001,Updated login,Draft,internal,User exists,1. Open => Form,Round-trip\n"
+    ",Brand new case,Draft,internal,,1. Do X => Y,New one\n"
+)
+ITC_APPROVE_CSV = (
+    "tc_id,title,status\nPRJ-TC-001,Unreviewed change,Approved\n,Unreviewed new case,Approved\n"
+)
+ITC_XML = (
+    '<?xml version="1.0"?><test-cases>'
+    '<test-case id="X"><title>From XML</title><status>Draft</status>'
+    "<steps>1. Click => Opens</steps></test-case></test-cases>"
+)
+ITC_NO_TITLE_CSV = "tc_id,title,steps\n,,1. x\n"
+MSG_ITC_UPDATE = "a CSV import updates the existing test case and creates the new one"
+MSG_ITC_UPDATED = "the updated test case has its new title, stays a draft and has its step"
+MSG_ITC_NO_APPROVAL = "a CSV import that sets Approved is skipped and changes nothing"
+MSG_ITC_XML = "an XML import creates the test case with its step and a project id"
+MSG_ITC_NO_TITLE = "a row without a title is skipped with its error"

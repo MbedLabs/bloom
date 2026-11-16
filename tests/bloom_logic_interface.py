@@ -54,6 +54,12 @@ from app.api import (
 )
 from app.api import project_variables as project_variables_api
 from app.api.export import export_test_cases
+from app.api.import_service import (
+    ImportResult,
+    _import_docs,
+    _next_number,
+    import_test_cases_file,
+)
 from app.core import (
     document_kinds,
     id_generator,
@@ -456,6 +462,121 @@ class BloomLogicInterface(BloomInterface):
             rows=list(csv.reader(io.StringIO(body))) if export_format == "csv" else None,
             xml=ElementTree.fromstring(answer.body) if export_format == "xml" else None,
         )
+
+    def bloom_seed_copy_projects(self):
+        return self._run(self._seed_copy_projects())
+
+    def bloom_copy_docs(self, doc_type, source_id, target_id, extra_ids=()):
+        return self._run(self._copy_docs(doc_type, source_id, target_id, list(extra_ids)))
+
+    def bloom_requirement_by_ref(self, req_id):
+        return self._run(self._one(select(Requirement).where(Requirement.req_id == req_id)))
+
+    def bloom_test_case_by_ref(self, tc_id):
+        return self._run(self._one(select(TestCase).where(TestCase.tc_id == tc_id)))
+
+    def bloom_test_case_titled(self, title):
+        return self._run(self._one(select(TestCase).where(TestCase.title == title)))
+
+    def bloom_list_test_cases(self):
+        return self._run(self._all(select(TestCase).order_by(TestCase.id)))
+
+    def bloom_next_number(self, project_id, prefix, kind):
+        return self._run(self._next_number(project_id, prefix, kind))
+
+    def bloom_seed_import_case(self):
+        return self._run(self._seed_import_case())
+
+    def bloom_import_test_cases(self, project_id, file_format, content):
+        return self._run(self._import_test_cases(project_id, file_format, content))
+
+    async def _one(self, query):
+        async with self.maker() as db:
+            return (await db.execute(query)).scalar_one()
+
+    async def _next_number(self, project_id, prefix, kind):
+        async with self.maker() as db:
+            return await _next_number(db, project_id, prefix, kind)
+
+    async def _seed_copy_projects(self):
+        async with self.maker() as db:
+            source = Project(
+                name=self.parameters.CPY_SOURCE[0], prefix=self.parameters.CPY_SOURCE[1]
+            )
+            target = Project(
+                name=self.parameters.CPY_TARGET[0], prefix=self.parameters.CPY_TARGET[1]
+            )
+            db.add_all([source, target])
+            await db.flush()
+            db.add_all(
+                [
+                    Requirement(
+                        project_id=source.id,
+                        req_id="PRJ-REQ-001",
+                        title="Boot",
+                        description="Boots fast",
+                        content_json={"k": 1},
+                        content_html="<p>1</p>",
+                        status="Approved",
+                        priority="High",
+                        req_type="functional",
+                        req_origin="customer",
+                    ),
+                    TestCase(
+                        project_id=source.id,
+                        tc_id="PRJ-TC-001",
+                        title="Boot test",
+                        status="Approved",
+                        preconditions="Powered",
+                        steps=[{"action": "Power on"}],
+                    ),
+                    Requirement(project_id=target.id, req_id="ABC-REQ-007", title="Existing"),
+                ]
+            )
+            await db.commit()
+            return source.id, target.id
+
+    async def _copy_docs(self, doc_type, source_id, target_id, extra_ids):
+        model = Requirement if doc_type == "REQ" else TestCase
+        async with self.maker() as db:
+            source, target = await db.get(Project, source_id), await db.get(Project, target_id)
+            ids = list(
+                (await db.scalars(select(model.id).where(model.project_id == source_id))).all()
+            )
+            result = ImportResult(imported=0, skipped=0, new_ids=[], errors=[])
+            admin = User(email="admin@test.local", full_name="Ada Admin", role=UserRole.admin)
+            await _import_docs(db, admin, doc_type, ids + extra_ids, source, target, result)
+            await db.commit()
+            return result
+
+    async def _seed_import_case(self):
+        async with self.maker() as db:
+            project = Project(name="Demo", prefix="PRJ")
+            admin = User(
+                email="admin@test.local",
+                full_name="Ada Admin",
+                hashed_password="x",
+                role=UserRole.admin,
+            )
+            db.add_all([project, admin])
+            await db.flush()
+            db.add(
+                TestCase(
+                    project_id=project.id, tc_id="PRJ-TC-001", title="Verify login", status="Draft"
+                )
+            )
+            await db.commit()
+            return project.id
+
+    async def _import_test_cases(self, project_id, file_format, content):
+        async with self.maker() as db:
+            admin = (await db.execute(select(User).where(User.role == UserRole.admin))).scalar_one()
+            upload = UploadFile(file=io.BytesIO(content.encode()))
+            result = await import_test_cases_file(
+                project_id=project_id, format=file_format, file=upload, db=db, current_user=admin
+            )
+            await db.commit()
+            return result
 
     def bloom_revision_sources(self):
         versions = ROOT / "alembic" / "versions"
