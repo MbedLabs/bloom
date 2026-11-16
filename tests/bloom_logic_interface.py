@@ -12,6 +12,7 @@ import ast
 import asyncio
 import base64
 import contextlib
+import csv
 import hashlib
 import hmac
 import importlib
@@ -22,6 +23,7 @@ import os
 import pkgutil
 import re
 import subprocess
+import sys
 import tempfile
 import time
 import tomllib
@@ -30,6 +32,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
+from xml.etree import ElementTree
 
 import httpx
 import yaml
@@ -50,6 +53,7 @@ from app.api import (
     integrations,
 )
 from app.api import project_variables as project_variables_api
+from app.api.export import export_test_cases
 from app.core import (
     document_kinds,
     id_generator,
@@ -58,7 +62,8 @@ from app.core import (
     permissions,
     security,
 )
-from app.core.config import settings
+from app.core.config import Settings, settings
+from app.core.identity import POWERED_BY, PRODUCT_IDENTITY, PRODUCT_NAME
 from app.core.md_import import (
     Parameter,
     parameter_name_collisions,
@@ -98,11 +103,23 @@ from app.services import (
     import_attempts,
     integration_sync,
     jira_outbound,
+    mail_service,
     rich_text,
     tag_links,
     token_service,
 )
 from app.services.attachment_cleanup import reconcile_attachments
+from app.services.jira_inbound import (
+    adf_to_text,
+    bloom_level,
+    build_jql,
+    is_resolved,
+    issue_matches,
+    issue_types,
+    issue_url,
+    referenced_tc_ids,
+    search_fields,
+)
 from tests.bloom_interface import BloomInterface
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -298,6 +315,147 @@ class BloomLogicInterface(BloomInterface):
         admin = SimpleNamespace(id=self.parameters.EXTERNAL_USER_ID, role=UserRole.admin)
         allowed = self._run(get_external_doc_types(db, admin, project_id))
         return SimpleNamespace(allowed=allowed, queries=db.execute.await_count)
+
+    def bloom_identity(self):
+        return PRODUCT_NAME, PRODUCT_IDENTITY, POWERED_BY
+
+    def bloom_capture_mail(self, sender, **fields):
+        sent = []
+
+        def send_email(*, to_email, subject, text_body, html_body=None):
+            sent.append({"to": to_email, "subject": subject, "text": text_body, "html": html_body})
+
+        with patch.object(mail_service, "send_email", send_email):
+            getattr(mail_service, sender)(**fields)
+        return sent
+
+    def bloom_api_identity(self):
+        return main_module.app.title, main_module.app.description
+
+    def bloom_app_name_setting(self, name):
+        with self._scratch_folder() as folder, contextlib.ExitStack() as stack:
+            env_file = Path(folder) / ".env"
+            env_file.write_text(f"BLOOM_APP_NAME={name} from dotenv\n", encoding="utf-8")
+            stack.enter_context(patch.dict(os.environ, {"BLOOM_APP_NAME": name}))
+            os.environ.pop("BLOOM_DOTENV_DISABLED", None)
+            stack.callback(os.environ.__setitem__, "BLOOM_DOTENV_DISABLED", "1")
+            loaded = Settings(_env_file=env_file)
+        return "BLOOM_APP_NAME" in Settings.model_fields, hasattr(loaded, "BLOOM_APP_NAME")
+
+    def bloom_title_with_app_name(self, name):
+        env = {**os.environ, "BLOOM_APP_NAME": name, "BLOOM_DOTENV_DISABLED": "1"}
+        done = subprocess.run(
+            [sys.executable, "-c", "from app.main import app; print(app.title)"],
+            cwd=ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=True,
+        )
+        return done.stdout.strip().splitlines()[-1]
+
+    def bloom_seed_export_cases(self):
+        return self._run(self._seed_export_cases())
+
+    def bloom_export_test_cases(self, project_id, export_format):
+        return self._run(self._export_test_cases(project_id, export_format))
+
+    def bloom_jira_setting(self, **overrides):
+        values = {
+            "jira_issue_types": None,
+            "jira_label": None,
+            "jira_jql": None,
+            "jira_reference_field": None,
+            "jira_priority_map": None,
+            "jira_project_key": "PROJ",
+            "base_url": "https://acme.atlassian.net/",
+        }
+        values.update(overrides)
+        return SimpleNamespace(**values)
+
+    def bloom_adf_to_text(self, value):
+        return adf_to_text(value)
+
+    def bloom_jira_filter(self, setting, fields):
+        return issue_matches(setting, fields)
+
+    def bloom_jira_issue_types(self, setting):
+        return issue_types(setting)
+
+    def bloom_jira_level(self, setting, fields):
+        return bloom_level(setting, fields)
+
+    def bloom_jira_resolved(self, fields):
+        return is_resolved(fields)
+
+    def bloom_jira_references(self, prefix, setting, fields):
+        return referenced_tc_ids(prefix, setting, fields)
+
+    def bloom_jira_jql(self, setting):
+        return build_jql(setting)
+
+    def bloom_jira_search_fields(self, setting):
+        return search_fields(setting)
+
+    def bloom_jira_issue_url(self, setting, key):
+        return issue_url(setting, key)
+
+    async def _seed_export_cases(self):
+        async with self.maker() as db:
+            project = Project(name="Demo", prefix=self.parameters.ETC_PREFIX)
+            admin = User(
+                email="admin@test.local",
+                full_name="Ada Admin",
+                hashed_password="x",
+                role=UserRole.admin,
+            )
+            db.add_all([project, admin])
+            await db.flush()
+            db.add_all(
+                [
+                    TestCase(
+                        project_id=project.id,
+                        tc_id=self.parameters.ETC_FIRST,
+                        title="Verify login",
+                        status="Approved",
+                        preconditions="User exists",
+                        steps=[
+                            {"action": "Open login", "expected": "Form shown"},
+                            {"action": "Submit", "expected": "Dashboard"},
+                        ],
+                        description="Covers the happy path.",
+                        last_execution_status="passed",
+                    ),
+                    TestCase(
+                        project_id=project.id,
+                        tc_id=self.parameters.ETC_SECOND,
+                        title="Verify logout",
+                        status="Draft",
+                    ),
+                ]
+            )
+            await db.commit()
+            return project.id, admin.id
+
+    async def _export_test_cases(self, project_id, export_format):
+        async with self.maker() as db:
+            admin = (await db.execute(select(User).where(User.role == UserRole.admin))).scalar_one()
+            try:
+                answer = await export_test_cases(
+                    project_id=project_id, format=export_format, db=db, current_user=admin
+                )
+            except HTTPException as exc:
+                return SimpleNamespace(status=exc.status_code)
+        body = answer.body.decode("utf-8")
+        return SimpleNamespace(
+            status=200,
+            media_type=answer.media_type,
+            disposition=answer.headers["content-disposition"],
+            body=body,
+            rows=list(csv.reader(io.StringIO(body))) if export_format == "csv" else None,
+            xml=ElementTree.fromstring(answer.body) if export_format == "xml" else None,
+        )
 
     def bloom_revision_sources(self):
         versions = ROOT / "alembic" / "versions"

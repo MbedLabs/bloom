@@ -2912,3 +2912,94 @@ MSG_MDI_TEST_CASE = (
     "test case lines become step rows with their type, indent, description and expected result"
 )
 MSG_MDI_STRAY = "step lines outside a test case stay text"
+PID_NAME = "Bloom PLM"
+PID_IDENTITY = "Bloom PLM by EmbedLabs"
+PID_POWERED_BY = "Powered by EmbedLabs"
+PID_RENAMED = "Renamed"
+PID_INVITE = {
+    "to_email": "ada@example.com",
+    "full_name": "Ada",
+    "invite_link": "https://bloom.example/i#t",
+}
+PID_ACCESS = {
+    "to_email": "admin@example.com",
+    "admin_name": "Admin",
+    "requester_name": "Ada",
+    "requester_email": "ada@example.com",
+    "resource": "Requirements",
+    "project": "PRJ",
+    "requested_at": "2026-10-19 10:00 UTC",
+    "request_id": "7",
+    "review_link": "https://bloom.example/access",
+}
+PID_AUTHORIZATION = {
+    "to_email": "admin@example.com",
+    "full_name": "Admin",
+    "old_email": "admin@example.com",
+    "new_email": "new@example.com",
+    "confirm_link": "https://bloom.example/c#t",
+}
+PID_SEPARATE_LINK = "Bloom PLM will send a separate verification link"
+MSG_PID_CONSTANTS = "the product name, identity and footer are fixed"
+MSG_PID_INVITE = "the invitation names Bloom PLM in its subject, title, heading and text"
+MSG_PID_ACCESS = "the access request mail names Bloom PLM and leaves no identity placeholder"
+MSG_PID_AUTHORIZATION = "the email change authorization names Bloom PLM in its text and HTML"
+MSG_PID_API = "the API title and description are the fixed identity"
+MSG_PID_NOT_A_SETTING = "BLOOM_APP_NAME is not a setting, from the environment or a dotenv file"
+MSG_PID_ENVIRONMENT = "BLOOM_APP_NAME in the environment does not rename the application"
+ETC_PREFIX = "PRJ"
+ETC_FIRST = "PRJ-TC-001"
+ETC_SECOND = "PRJ-TC-002"
+ETC_MISSING_PROJECT = 99
+MSG_ETC_CSV = "the CSV export has its file name, header and the steps of the first test case"
+MSG_ETC_MARKDOWN = "the Markdown export has its file name, title, heading, precondition and step"
+MSG_ETC_XML = "the XML export is well formed and lists both test cases in order"
+MSG_ETC_MISSING = "an export of a missing project is refused with 404"
+JIN_ADF = {
+    "type": "doc",
+    "content": [
+        {"type": "paragraph", "content": [{"type": "text", "text": "Found by PRJ-TC-004"}]},
+        {
+            "type": "bulletList",
+            "content": [
+                {
+                    "type": "listItem",
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [
+                                {"type": "text", "text": "line one"},
+                                {"type": "hardBreak"},
+                                {"type": "mention", "attrs": {"text": "@Ada"}},
+                            ],
+                        }
+                    ],
+                }
+            ],
+        },
+    ],
+}
+JIN_BUG = {"issuetype": {"name": "Bug"}, "labels": ["bench"]}
+JIN_TASK = {"issuetype": {"name": "Task"}}
+JIN_REFERENCE_FIELD = "customfield_1"
+JIN_REFERENCES = {
+    "summary": "prj-tc-002 fails",
+    "customfield_1": "PRJ-TC-002, PRJ-TC-009, ABC-TC-001",
+}
+JIN_JQL_FULL = (
+    'project = "PROJ" AND issuetype in ("Bug", "Say \\"hi\\"") AND statusCategory != Done '
+    'AND labels = "bench" AND (priority = High) ORDER BY created ASC'
+)
+JIN_JQL_DEFAULT = (
+    'project = "PROJ" AND issuetype in ("Bug") AND statusCategory != Done ORDER BY created ASC'
+)
+JIN_URL = "https://acme.atlassian.net/browse/PROJ-7"
+MSG_JIN_TEXT = "Atlassian document text is flattened to plain lines"
+MSG_JIN_FILTER = "the filter takes bugs by default and honours the issue types and the label"
+MSG_JIN_PRIORITY = "Jira priorities map to Bloom levels, with the setting's own map first"
+MSG_JIN_RESOLVED = "an issue with a resolution is resolved, one without is not"
+MSG_JIN_REFERENCES = (
+    "test case ids are read from the summary and description, and from the reference field when set"
+)
+MSG_JIN_JQL = "the JQL names the project, the types, open issues, the label and the extra clause"
+MSG_JIN_FIELDS = "the search asks for the reference field and builds the issue link"
