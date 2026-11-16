@@ -34,20 +34,27 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import limiter
 from app.core.permissions import DOC_TYPE_RESOURCES
+from app.core.service_auth import require_bud_sync_token
 from app.models import (
     ArtefactActivity,
     ArtefactComment,
     ArtefactLink,
     AuditEvent,
     Baseline,
+    CampaignSuite,
     ChangeRequest,
     Defect,
+    DesignItem,
     Document,
     IntegrationSetting,
     ProjectVariable,
     Requirement,
+    RiskItem,
+    TestCampaign,
+    TestCampaignItem,
 )
 from app.models import TestCase as TestCaseModel
+from app.models import TestConcept
 from app.models import TestSuite as TestSuiteModel
 from app.models import TestSuiteItem as TestSuiteItemModel
 from app.models.groups import Group, GroupMembership, Policy
@@ -570,6 +577,63 @@ class BloomApiInterface(BloomInterface):
     def bloom_api_get_test_suite(self, headers, suite_id):
         return self.bloom_api_call("GET", f"/api/test-suites/{suite_id}", headers)
 
+    def bloom_add_controlled_pair(self, project_id, kind, code):
+        prefix = self.parameters.VISIBILITY_PREFIX
+        visible, hidden = f"{prefix}-{code}-001", f"{prefix}-{code}-002"
+        shown, internal = self.parameters.CUSTOMER_VISIBILITY, self.parameters.INTERNAL_VISIBILITY
+        return SimpleNamespace(
+            public=visible,
+            visible=self._run(self._add(self._controlled(kind, project_id, visible, shown))),
+            hidden=self._run(self._add(self._controlled(kind, project_id, hidden, internal))),
+        )
+
+    def bloom_api_probe_controlled(self, headers, project_id, path, pair):
+        query = {"project_id": project_id}
+        return SimpleNamespace(
+            listed=self.bloom_api_call("GET", path, headers, params=query),
+            hidden=self.bloom_api_call("GET", f"{path}/{pair.hidden}", headers),
+            visible=self.bloom_api_call("GET", f"{path}/{pair.visible}", headers),
+        )
+
+    def bloom_add_campaign(self, project_id, campaign_id, visibility, suite_ids, items):
+        campaign = self._run(
+            self._add(
+                TestCampaign(
+                    project_id=project_id,
+                    campaign_id=campaign_id,
+                    name=campaign_id,
+                    status="Planned",
+                    visibility=visibility,
+                )
+            )
+        )
+        for suite_id in suite_ids:
+            self._run(self._add(CampaignSuite(campaign_id=campaign, suite_id=suite_id)))
+        for test_case_id, fields in items:
+            self._run(
+                self._add(
+                    TestCampaignItem(campaign_id=campaign, test_case_id=test_case_id, **fields)
+                )
+            )
+        return campaign
+
+    def bloom_allow_bud_sync(self):
+        async def credential():
+            return object()
+
+        main.app.dependency_overrides[require_bud_sync_token] = credential
+
+    def bloom_api_list_campaigns(self, headers, project_id):
+        query = {"project_id": project_id}
+        return self.bloom_api_call("GET", "/api/campaigns", headers, params=query)
+
+    def bloom_api_get_campaign(self, headers, campaign_id):
+        return self.bloom_api_call("GET", f"/api/campaigns/{campaign_id}", headers)
+
+    def bloom_api_sync_results(self, headers, results):
+        body = {"results": results}
+        return self.bloom_api_call("POST", "/api/campaigns/sync-results", headers, json=body)
+
     def bloom_api_get_baseline(self, headers, baseline_id):
         return self.bloom_api_call("GET", f"/api/baselines/{baseline_id}", headers)
 
@@ -903,6 +967,47 @@ class BloomApiInterface(BloomInterface):
             for name, value in fields.items():
                 setattr(row, name, value)
             await db.commit()
+
+    def _controlled(self, kind, project_id, public, visibility):
+        common = {"project_id": project_id, "visibility": visibility}
+        if kind == "design":
+            return DesignItem(
+                design_id=public,
+                title=public,
+                status="Draft",
+                priority="Medium",
+                design_type="Architecture",
+                **common,
+            )
+        if kind == "risk":
+            return RiskItem(
+                risk_id=public,
+                title=public,
+                status="Open",
+                severity="Medium",
+                probability="Medium",
+                risk_category="Technical",
+                **common,
+            )
+        if kind == "change":
+            return ChangeRequest(
+                change_id=public,
+                title=public,
+                status="Submitted",
+                priority="Medium",
+                change_type="Enhancement",
+                **common,
+            )
+        if kind == "concept":
+            return TestConcept(concept_id=public, name=public, status="Draft", coverage=0, **common)
+        return Defect(
+            defect_id=public,
+            title=public,
+            status="Open",
+            severity="Medium",
+            priority="Medium",
+            **common,
+        )
 
     def _answer(self, answer):
         try:

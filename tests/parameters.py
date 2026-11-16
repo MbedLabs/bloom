@@ -2386,3 +2386,38 @@ MSG_READER_SUITE_EXECUTION = (
     "the opened suite counts its one visible test case and carries its last execution"
 )
 MSG_READER_SUITE_ITEMS = "the opened suite holds the customer test case and not the internal one"
+CONTROLLED_KINDS = [
+    ("design", "/api/designs", "design_id", "DES"),
+    ("risk", "/api/risks", "risk_id", "RSK"),
+    ("change", "/api/changes", "change_id", "CHG"),
+    ("concept", "/api/test-concepts", "concept_id", "CPT"),
+    ("defect", "/api/defects", "defect_id", "DEF"),
+]
+MSG_CONTROLLED_LIST = "an external reader lists the customer {kind} and not the internal one"
+MSG_CONTROLLED_HIDDEN = "an internal {kind} is answered 404 to an external reader"
+MSG_CONTROLLED_SHOWN = "the customer {kind} opens with 200 and carries its id and visibility"
+READER_VISIBLE_CAMPAIGN = f"{VISIBILITY_PREFIX}-CMP-001"
+READER_HIDDEN_CAMPAIGN = f"{VISIBILITY_PREFIX}-CMP-002"
+READER_CAMPAIGN_EXECUTED_AT = datetime(2026, 7, 2, 11, 15, 0)
+READER_CAMPAIGN_EXECUTION = (1, "Passed", "2026-07-02T11:15:00")
+READER_CAMPAIGN_EXECUTED = {"status": "Executed", "result": "Passed"}
+READER_CAMPAIGN_PENDING = {"status": "Pending"}
+READER_SYNC_AT = "2026-07-04T10:45:00"
+READER_SYNC_RUN = _draw.randrange(100, 10_000)
+READER_SYNC_COMMENT = " ".join(_draw.sample(_WORDS, 3))
+MSG_READER_CAMPAIGN_LIST = "an external reader lists the customer campaign and not the internal one"
+MSG_READER_CAMPAIGN_LIST_EXECUTION = (
+    "the listed campaign counts its one visible test case and carries its last execution"
+)
+MSG_READER_CAMPAIGN_HIDDEN = "an internal campaign is answered 404 to an external reader"
+MSG_READER_CAMPAIGN_SHOWN = "the customer campaign opens with 200 and carries its visibility"
+MSG_READER_CAMPAIGN_EXECUTION = (
+    "the opened campaign counts its one visible test case and carries its last execution"
+)
+MSG_READER_CAMPAIGN_ITEMS = (
+    "the opened campaign holds the customer test case and not the internal one"
+)
+MSG_READER_CAMPAIGN_SUITES = "the opened campaign names the customer suite and not the internal one"
+MSG_READER_SYNC = "synchronising a result is answered 200"
+MSG_READER_SYNC_NO_RUN = "the synchronised result gives the campaign no Bud run of its own"
+MSG_READER_SYNC_ITEM = "the campaign's item carries the synchronised result and its time"

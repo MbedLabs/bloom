@@ -6,6 +6,8 @@ SUITES = [
     "tests.sec.BLOOM_artefact_comments_activity_external_visibility.ArtefactCommentsActivityExternalVisibilityTest",
     "tests.sec.BLOOM_artefacts_external_visibility.ArtefactsExternalVisibilityTest",
     "tests.sec.BLOOM_baselines_external_visibility.BaselinesExternalVisibilityTest",
+    "tests.sec.BLOOM_campaigns_external_visibility.CampaignsExternalVisibilityTest",
+    "tests.sec.BLOOM_controlled_artefacts_external_visibility.ControlledArtefactsExternalVisibilityTest",
     "tests.sec.BLOOM_defect_webhook_security.DefectWebhookSecurityTest",
     "tests.sec.BLOOM_docs_facade_external_visibility.DocsFacadeExternalVisibilityTest",
     "tests.sec.BLOOM_exports.ExportsTest",
