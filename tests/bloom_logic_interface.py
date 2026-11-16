@@ -81,6 +81,7 @@ from app.core import (
     passwords,
     permissions,
     security,
+    testrail,
 )
 from app.core.config import Settings, settings
 from app.core.identity import POWERED_BY, PRODUCT_IDENTITY, PRODUCT_NAME
@@ -344,6 +345,32 @@ class BloomLogicInterface(BloomInterface):
             return id_generator.compute_next_id(existing_ids, prefix, type_code), None
         except ValueError as exc:
             return None, type(exc).__name__
+
+    def bloom_parse_testrail(self, kind, data, mapping=None, **limits):
+        with contextlib.ExitStack() as stack:
+            for name, value in limits.items():
+                stack.enter_context(patch.object(settings, name, value))
+            try:
+                if kind == "xml":
+                    return testrail.parse_testrail_xml(data), None
+                if mapping is None:
+                    return testrail.parse_testrail_csv(data), None
+                return testrail.parse_testrail_csv(data, mapping), None
+            except testrail.TestRailParseError as refused:
+                return None, str(refused)
+
+    def bloom_testrail_rows(self, case):
+        return [(r["row_type"], r["description"], r["expected_result"]) for r in case.rows]
+
+    def bloom_normalize_case_ids(self, values):
+        return [testrail.normalize_case_id(value) for value in values]
+
+    def bloom_testrail_header(self, data):
+        header = testrail.read_csv_header(data)
+        return header, testrail.detect_columns(header)
+
+    def bloom_new_testrail_case(self, case_id, title):
+        return testrail.TestRailCase(case_id, title)
 
     def bloom_seed_related_docs(self):
         return self._run(self._seed_related_docs())

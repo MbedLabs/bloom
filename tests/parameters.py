@@ -3305,3 +3305,65 @@ MSG_RDF_NONE = "a document without links has no related artefacts"
 MSG_RDF_PROJECT = "links do not reach across projects"
 MSG_RDF_PARAMETERS = "the document list takes the related_to, role and direction parameters"
 MSG_RDF_SCOPED = "the project holds its two links"
+TRL_SUITE_XML = b'<?xml version="1.0" encoding="UTF-8"?>\n<suite>\n  <id>S1</id><name>Firmware</name>\n  <sections>\n    <section>\n      <name>Boot</name>\n      <cases>\n        <case>\n          <id>C7</id><title>Cold boot</title><template>Test Case (Steps)</template>\n          <type>Functional</type><priority>High</priority><estimate>5m</estimate>\n          <references>PRJ-REQ-001, JIRA-9</references>\n          <custom>\n            <preconds>Relay open\n\nSerial console attached</preconds>\n            <steps_separated>\n              <step><index>1</index><content>Close the relay</content><expected>Relay closed</expected></step>\n              <step><index>2</index><content>Read the serial port</content><expected>Boot banner</expected></step>\n            </steps_separated>\n          </custom>\n        </case>\n      </cases>\n      <sections>\n        <section>\n          <name>Warm</name>\n          <cases>\n            <case>\n              <id>8</id><title>Warm boot</title><template>Test Case (Text)</template>\n              <custom><steps>Reset the board</steps><expected>Banner within budget</expected></custom>\n            </case>\n          </cases>\n        </section>\n      </sections>\n    </section>\n  </sections>\n</suite>'
+TRL_SEPARATED_CSV = b'\xef\xbb\xbfID,Title,Section Hierarchy,Type,Priority,Estimate,References,Preconditions,Steps (Step),Steps (Expected Result)\nC7,Cold boot,Firmware > Boot,Functional,High,5m,"PRJ-REQ-001, JIRA-9",Relay open,Close the relay,Relay closed\nC7,,,,,,,,Read the serial port,Boot banner\nC9,Soak,Firmware > Soak,,,,,,"1. Start the soak\n2. Wait\nstill waiting","1. Running\n2. Done"\n'
+TRL_TEXT_CSV = b"Title,Steps,Expected Result\nWarm boot,Reset the board,Banner\n"
+TRL_MAPPED_CSV = b"Name,Do,Expect\nCold boot,Close relay,Closed\n"
+TRL_MAPPING = {"title": "Name", "steps": "Do", "expected": "Expect"}
+TRL_COLD_ROWS = [
+    ("precondition", "Relay open", ""),
+    ("precondition", "Serial console attached", ""),
+    ("step", "Close the relay", "Relay closed"),
+    ("step", "Read the serial port", "Boot banner"),
+]
+TRL_CSV_COLD_ROWS = [
+    ("precondition", "Relay open", ""),
+    ("step", "Close the relay", "Relay closed"),
+    ("step", "Read the serial port", "Boot banner"),
+]
+TRL_SOAK_ROWS = [("step", "Start the soak", "Running"), ("step", "Wait\nstill waiting", "Done")]
+TRL_CASE_IDS = (["123", "C123", "c123", "", "X-1"], ["C123", "C123", "C123", "", "X-1"])
+TRL_BAD_XML = [
+    ("broken XML", b"<suite><sections>", "not valid XML"),
+    ("XML without a suite", b"<cases/>", "no <suite>"),
+]
+TRL_LIMITS = [
+    ("case count", {"REQIF_MAX_OBJECTS": 1}, "more than 1 test cases"),
+    ("depth", {"REQIF_MAX_OBJECTS": 999, "REQIF_MAX_HIERARCHY_DEPTH": 1}, "nested deeper"),
+    (
+        "size",
+        {"REQIF_MAX_OBJECTS": 999, "REQIF_MAX_HIERARCHY_DEPTH": 1, "REQIF_MAX_REQUEST_BYTES": 10},
+        "size limit",
+    ),
+]
+TRL_BAD_CSV = [
+    ("unmapped title", b"Name,Do,Expect\nCold boot,Close relay,Closed\n", None, "no Title column"),
+    (
+        "missing mapped column",
+        b"Name,Do,Expect\nCold boot,Close relay,Closed\n",
+        {"title": "Nope"},
+        "no column named 'Nope'",
+    ),
+    ("empty title mapping", b"Title\nx\n", {"title": ""}, "no Title column"),
+    (
+        "unknown field",
+        b"Name,Do,Expect\nCold boot,Close relay,Closed\n",
+        {"colour": "Name"},
+        "Unknown field",
+    ),
+    ("non UTF-8 file", b"\xff\xfeT\x00", None, "not UTF-8"),
+    ("empty file", b"", None, "empty"),
+]
+MSG_TRL_COLD = "the XML case keeps its id, title, section, type, priority, estimate and references"
+MSG_TRL_COLD_ROWS = "the XML preconditions and separated steps become numbered rows"
+MSG_TRL_WARM = "a text template case gets a C id, its nested section path and one step"
+MSG_TRL_XML_REFUSED = "{what} is refused as {phrase}"
+MSG_TRL_LIMIT = "the XML import is refused when it passes the {limit} limit"
+MSG_TRL_CASE_IDS = "case ids are normalised to the C form"
+MSG_TRL_CSV = "CSV rows of one id group into one case with its sections, references and steps"
+MSG_TRL_CSV_TEXT = "a CSV text template case has one step, no id and no section"
+MSG_TRL_MAPPING = "a CSV with other column names reads through a column mapping"
+MSG_TRL_CSV_REFUSED = "the CSV {what} is refused as {phrase}"
+MSG_TRL_COLUMNS = "the header and the detected step columns are read from the CSV"
+MSG_TRL_ROW_LIMIT = "a CSV with more rows than the limit is refused"
+MSG_TRL_MODEL = "a new case model starts without rows"

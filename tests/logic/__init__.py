@@ -72,6 +72,7 @@ SUITES = [
     "tests.logic.BLOOM_response_timestamps.ResponseTimestampsTest",
     "tests.logic.BLOOM_tag_links.TagLinksTest",
     "tests.logic.BLOOM_tc_steps.TcStepsTest",
+    "tests.logic.BLOOM_testrail.TestrailTest",
     "tests.logic.BLOOM_timestamp_text.TimestampTextTest",
     "tests.logic.BLOOM_vision_startup.VisionStartupTest",
 ]
