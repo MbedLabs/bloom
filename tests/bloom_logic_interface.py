@@ -92,9 +92,12 @@ from app.core.permissions import (
 )
 from app.core.security import (
     _policy_terms,
+    access_terms,
     create_access_token,
+    effective_permissions,
     get_current_user,
     get_external_doc_types,
+    require_role,
 )
 from app.core.service_auth import (
     create_service_credential,
@@ -116,8 +119,9 @@ from app.models import (
     TestCase,
     user_token,
 )
-from app.models.groups import Policy
+from app.models.groups import Group, GroupMembership, Policy
 from app.models.models import ServiceCredential
+from app.models.project_membership import ProjectAccess
 from app.models.user import User, UserRole
 from app.schemas import ProjectCreate, ProjectVariableUpdate
 from app.schemas import auth as auth_schemas
@@ -379,6 +383,146 @@ class BloomLogicInterface(BloomInterface):
             check=True,
         )
         return done.stdout.strip().splitlines()[-1]
+
+    def bloom_app_scope_case(self, scope="app", admission=None, role=None):
+        return self._run(self._app_scope_case(scope, admission, role or UserRole.maintainer))
+
+    def bloom_admin_permissions(self):
+        return self._run(self._admin_permissions())
+
+    def bloom_release_module(self):
+        path = ROOT / "scripts" / "image_release.py"
+        spec = importlib.util.spec_from_file_location("image_release", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def bloom_eligible_aliases(self, *arguments):
+        return self.bloom_release_module().eligible_aliases(*arguments)
+
+    def bloom_promote(self, image, aliases, digest_of=None):
+        release, executed = self.bloom_release_module(), []
+        try:
+            if digest_of is None:
+                release.promote(image, aliases, execute=lambda *call: executed.append(call))
+            else:
+                release.promote(image, aliases, digest_of, lambda *call: executed.append(call))
+        except RuntimeError as refused:
+            return str(refused), executed
+        return None, executed
+
+    def bloom_digest(self, reference, returncode=0, stdout="", stderr=""):
+        release, calls = self.bloom_release_module(), []
+
+        def run(args, **_kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=returncode, stdout=stdout, stderr=stderr)
+
+        with patch.object(release.subprocess, "run", run):
+            try:
+                return release.digest(reference), calls
+            except ValueError as refused:
+                return str(refused), calls
+
+    def bloom_promote_workflow(self, digest_value, source, aliases):
+        release, inspected, executed = self.bloom_release_module(), [], []
+
+        def run(args, **_kwargs):
+            inspected.append(args[4])
+            return SimpleNamespace(returncode=0, stdout=digest_value, stderr="")
+
+        with patch.object(release.subprocess, "run", run):
+            found = release.digest(source)
+            image = source.split(":sha-")[0] + "@" + digest_value
+            release.promote(image, aliases, execute=lambda *call: executed.append(call))
+        return found, len(executed), set(inspected)
+
+    async def _app_scope_case(self, scope, admission, role):
+        async with self.maker() as db:
+            user = User(
+                email="scope@example.com", full_name="Scope", hashed_password="x", role=role
+            )
+            project = Project(name="Demo", prefix="PRJ")
+            policy = Policy(
+                name="Application rules",
+                scope=scope,
+                permissions={
+                    "users": ["view", "create", "edit"],
+                    "access": ["delete"],
+                    "REQ": ["view", "edit"],
+                    "project": ["view"],
+                },
+                type_tags={"REQ": {"all": True}},
+            )
+            group = Group(name="Scope group", policies=[policy])
+            db.add_all([user, project, group])
+            await db.flush()
+            db.add(GroupMembership(user_id=user.id, group_id=group.id))
+            await db.flush()
+            if admission:
+                db.add(
+                    ProjectAccess(project_id=project.id, group_id=group.id, inherit_policies=True)
+                )
+            if admission == "replacement":
+                replacement = Policy(
+                    name="Project read",
+                    scope="document",
+                    permissions={"REQ": ["view"]},
+                    type_tags={"REQ": {"all": True}},
+                )
+                db.add(
+                    ProjectAccess(project_id=project.id, user_id=user.id, policies=[replacement])
+                )
+            if admission == "bundles":
+                first = Policy(
+                    name="Direct requirements",
+                    permissions={"REQ": ["view"]},
+                    type_tags={"REQ": {"all": True}},
+                )
+                second = Policy(
+                    name="Direct tests",
+                    permissions={"TC": ["edit"]},
+                    type_tags={"TC": {"all": True}},
+                )
+                bundles = [
+                    Group(name="Readers", policies=[first]),
+                    Group(name="Testers", policies=[second]),
+                ]
+                db.add_all(bundles)
+                await db.flush()
+                db.add_all(
+                    [
+                        ProjectAccess(project_id=project.id, user_id=user.id, policy_group=bundle)
+                        for bundle in bundles
+                    ]
+                )
+            await db.flush()
+            try:
+                await require_role(UserRole.admin)(user)
+                admin_only = None
+            except HTTPException as refused:
+                admin_only = refused.status_code
+            return SimpleNamespace(
+                app_terms=sorted(
+                    {r for term in await access_terms(db, user, None) for r in term.permissions}
+                ),
+                project_terms=await access_terms(db, user, project.id),
+                app=await effective_permissions(db, user, None),
+                project=await effective_permissions(db, user, project.id),
+                admin_only=admin_only,
+            )
+
+    async def _admin_permissions(self):
+        async with self.maker() as db:
+            user = User(
+                email="admin-scope@example.com",
+                full_name="Admin",
+                hashed_password="x",
+                role=UserRole.admin,
+            )
+            db.add(user)
+            await db.flush()
+            return await effective_permissions(db, user, None)
 
     def bloom_seed_export_requirements(self):
         return self._run(self._seed_export_requirements())

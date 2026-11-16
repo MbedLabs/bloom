@@ -3118,3 +3118,82 @@ MSG_EXR_CSV = "the requirements CSV has its file name, header and both requireme
 MSG_EXR_PDF = "the requirements PDF is a PDF of more than 800 bytes"
 MSG_EXR_TRACE = "the traceability CSV marks the verified requirement covered and the other not"
 MSG_EXR_MISSING = "a requirements export of a missing project is refused with 404"
+APS_APP_RESOURCES = ["access", "users"]
+APS_APP_PERMISSIONS = {"users": {"view", "create", "edit"}, "access": {"delete"}}
+APS_ADMITTED = {"REQ": {"view", "comment", "edit"}, "project": {"view"}}
+APS_REPLACED = {"REQ": {"view"}}
+APS_BUNDLES = {"REQ": {"view"}, "TC": {"view", "comment", "edit"}}
+MSG_APS_APP = "group app rules apply without project admission and give nothing inside a project"
+MSG_APS_SCOPE = "a {scope} policy supplies no app terms"
+MSG_APS_ADMITTED = (
+    "an admitted group gives its content rules and never its app rules inside the project"
+)
+MSG_APS_REPLACED = "a direct project entry replaces the group's content rules but not its app rules"
+MSG_APS_ADMIN_ONLY = "app rules do not open the administrator-only management"
+MSG_APS_ADMIN = "an instance administrator holds every permission without a policy"
+MSG_APS_BUNDLES = (
+    "two direct bundles combine without restoring indirect project rights, and app rules stay"
+)
+IMR_DIGEST = "sha256:" + "a" * 64
+IMR_OTHER = "sha256:" + "b" * 64
+IMR_IMAGE = "ghcr.io/mbedlabs/product@sha256:" + "a" * 64
+IMR_FLOATING = ["image:v1.0.0", "image:1.0.0", "image:1", "image:1.0", "image:stable"]
+IMR_GOOD_REFERENCES = [
+    "ghcr.io/mbedlabs/product",
+    "ghcr.io/mbedlabs/product:sha-" + "0" * 40,
+    "ghcr.io/mbedlabs/product:1.2.0",
+    "ghcr.io/mbedlabs/product@sha256:" + "a" * 64,
+    "localhost:5000/product:dev",
+    "registry:5000/product:dev",
+    "registry.example.com:443/team/sub_name/product-name:v1.2.0-rc.1",
+]
+IMR_BAD_REFERENCES = [
+    "",
+    "-oProxyCommand=id",
+    "--format={{.Name}}",
+    "-ghcr.io/mbedlabs/product:dev",
+    "product:dev",
+    "mbedlabs/product:dev",
+    "ghcr.io",
+    "ghcr.io/MbedLabs/product:dev",
+    "ghcr.io/mbedlabs/product:dev --help",
+    "ghcr.io/mbedlabs/product:dev\n--help",
+    "ghcr.io/mbedlabs/product:-dev",
+    "ghcr.io/mbedlabs/product@sha256:abc",
+    "ghcr.io/mbedlabs/product@sha256:" + "A" * 64,
+    "ghcr.io/mbedlabs/product:" + "t" * 129,
+    "ghcr.io/mbedlabs/product:dev@sha256:" + "a" * 64,
+    "ghcr.io//product:dev",
+    "registry/product:dev",
+    "ghcr.io:99999999/product:dev",
+    "ghcr.io:99999/product:dev",
+    "ghcr.io:0/product:dev",
+    "ghcr.io:\u0665\u0660\u0660\u0660/product:dev",
+    "registry:/product:dev",
+    None,
+]
+IMR_COMMIT = "0123456789abcdef0123456789abcdef01234567"
+IMR_WORKFLOW_ALIASES = [
+    "ghcr.io/mbedlabs/bloom:1.2.0",
+    "ghcr.io/mbedlabs/bloom:1.2",
+    "ghcr.io/mbedlabs/bloom:1",
+    "ghcr.io/mbedlabs/bloom:v1.2.0",
+    "ghcr.io/mbedlabs/bloom:stable",
+    "ghcr.io/mbedlabs/bloom:latest",
+    "ghcr.io/mbedlabs/bloom:dev",
+    "ghcr.io/mbedlabs/bloom:main",
+    "ghcr.io/mbedlabs/bloom:1.3.0-beta.1",
+]
+MSG_IMR_OLDER = "an older release moves only its own version tags"
+MSG_IMR_CURRENT = "the current release may promote stable"
+MSG_IMR_STALE = "a stale branch run does not promote latest"
+MSG_IMR_PRERELEASE = "a prerelease does not promote stable"
+MSG_IMR_CONFLICT = "a version tag on another digest aborts the promotion before any tag moves"
+MSG_IMR_REPEAT = "a repeated promotion retags each alias with the same image"
+MSG_IMR_MISMATCH = "a digest that differs after promotion fails the promotion"
+MSG_IMR_GOOD = (
+    "the well-formed reference {reference!r} is inspected once with the exact docker command"
+)
+MSG_IMR_BAD = "the malformed reference {reference!r} is refused before docker runs"
+MSG_IMR_MISSING = "a missing image reports no digest"
+MSG_IMR_WORKFLOW = "every reference shape the workflow produces is inspected and promoted"
