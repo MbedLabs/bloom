@@ -3,6 +3,7 @@
 import tests.config  # noqa: F401
 
 SUITES = [
+    "tests.sec.BLOOM_access_requests.AccessRequestsTest",
     "tests.sec.BLOOM_artefact_comments_activity_external_visibility.ArtefactCommentsActivityExternalVisibilityTest",
     "tests.sec.BLOOM_artefacts_external_visibility.ArtefactsExternalVisibilityTest",
     "tests.sec.BLOOM_baselines_external_visibility.BaselinesExternalVisibilityTest",

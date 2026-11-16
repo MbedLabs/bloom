@@ -67,6 +67,7 @@ from app.services.integration_secrets import (
     encrypt_integration_secret,
     is_encrypted,
 )
+from app.services.mail_service import MailConfigurationError
 from tests.access_fixtures import (
     allow_doc_types,
     project_access_fixture,
@@ -847,6 +848,27 @@ class BloomApiInterface(BloomInterface):
     def bloom_api_list_access_requests(self, headers, prefix):
         query = {"project_prefix": prefix}
         return self._run(self._request("GET", "/api/access-requests", headers, params=query))
+
+    def bloom_api_decide_access_request(self, headers, request_id, decision):
+        path = f"/api/access-requests/{request_id}/decision"
+        return self._run(self._request("POST", path, headers, json={"decision": decision}))
+
+    def bloom_api_list_all_access_requests(self, headers, status=None):
+        query = {"status": status} if status else None
+        return self._run(self._request("GET", "/api/access-requests", headers, params=query))
+
+    def bloom_api_request_access_while_mail_fails(
+        self, headers, resource_type, resource_ref, prefix
+    ):
+        def fail(**mail):
+            raise MailConfigurationError(self.parameters.ARQ_MAIL_ERROR)
+
+        with patch.object(access_requests_api, "send_access_request_email", fail):
+            return self.bloom_api_request_access(headers, resource_type, resource_ref, prefix)
+
+    def bloom_list_audit_events(self, action):
+        query = select(AuditEvent).where(AuditEvent.action == action).order_by(AuditEvent.id)
+        return self._run(self._all(query))
 
     def bloom_api_get_requirement(self, headers, requirement_id):
         return self._run(self._request("GET", f"/api/requirements/{requirement_id}", headers))

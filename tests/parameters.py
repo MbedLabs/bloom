@@ -2428,3 +2428,72 @@ MSG_DIRECT_TEST_CASE = (
     "the customer test case shows its customer requirement, suite and campaign only"
 )
 MSG_DIRECT_CAMPAIGN = "the customer campaign shows its customer test case and that test case's customer requirement only"
+ARQ_BOSS_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+ARQ_SECOND_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+ARQ_MEMBER_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+ARQ_KIND = "requirement"
+ARQ_PREFIX = "PRJ"
+ARQ_REF = "PRJ-REQ-001"
+ARQ_MINE_REF = "PRJ-REQ-002"
+ARQ_FAILED_MAIL_REF = "PRJ-REQ-003"
+ARQ_DECIDED_PREFIX = "XYZ"
+ARQ_DECIDED_REF = "XYZ-REQ-001"
+ARQ_OTHER_PREFIX = "ABC"
+ARQ_REFUSED_REF = "ABC-REQ-001"
+ARQ_PENDING_REF = "ABC-REQ-002"
+ARQ_INVALID_REF = "../../etc"
+ARQ_ADMIN_REF = "PRJ-REQ-009"
+ARQ_MAIL_ERROR = "SMTP is disabled"
+ARQ_PENDING = "pending"
+ARQ_GRANTED = "granted"
+ARQ_REFUSED = "refused"
+ARQ_RESOURCE_LABEL = "PRJ-REQ-001 (not found)"
+ARQ_REVIEW_LINK_END = "/projects/PRJ/edit"
+ARQ_REQUESTED_ACTION = "access.requested"
+ARQ_GRANTED_ACTION = "access.granted"
+ARQ_REFUSED_ACTION = "access.refused"
+ARQ_NOTHING_PHRASE = "nothing to request"
+ARQ_FIELDS = [
+    "already_requested",
+    "created_at",
+    "decided_at",
+    "id",
+    "mail_sent",
+    "project_prefix",
+    "requester_email",
+    "requester_name",
+    "requester_profile_picture_url",
+    "resource_label",
+    "resource_ref",
+    "resource_type",
+    "status",
+]
+MSG_ARQ_CREATED = "a first request is created with 201, pending, and reports its mail as sent"
+MSG_ARQ_REPEATED = "the same request again is answered 200 as already requested, with the same id"
+MSG_ARQ_MAILED = "the request mails each administrator once"
+MSG_ARQ_MAIL = (
+    "the mail names the requester, the resource, the project, the review page and the request id"
+)
+MSG_ARQ_RECORDED = "the request is recorded once with its resource"
+MSG_ARQ_FIELDS = "the answer holds the request's own fields only"
+MSG_ARQ_UNDISCLOSED = "the answer names no requester email and no picture"
+MSG_ARQ_NONE_YET = "before a request the page learns that none is pending"
+MSG_ARQ_MINE = "after the request the page learns that it is pending"
+MSG_ARQ_MAIL_FAILED = (
+    "a request whose mail fails is created with 201 and reports its mail as not sent"
+)
+MSG_ARQ_LISTED = "an administrator lists the request of the project with its requester"
+MSG_ARQ_MEMBER_DECISION = "a member's decision is refused with 403"
+MSG_ARQ_GRANT = "an administrator's grant is answered 200 as granted"
+MSG_ARQ_DECIDED_TWICE = "a second decision on a decided request is refused with 409"
+MSG_ARQ_GRANT_RECORDED = "the grant is recorded once with the administrator and the requester"
+MSG_ARQ_MEMBER_LIST = "a member's list of every request is refused with 403"
+MSG_ARQ_ALL = "an administrator lists every pending request"
+MSG_ARQ_REFUSE = "an administrator's refusal is answered 200 as refused"
+MSG_ARQ_PENDING_LEFT = "the refused request leaves the pending list"
+MSG_ARQ_HISTORY = "the refused request is listed under refused"
+MSG_ARQ_REFUSAL_RECORDED = "the refusal is recorded once with the administrator and the requester"
+MSG_ARQ_ANONYMOUS = "a request without a sign-in is refused with 401"
+MSG_ARQ_INVALID = "a resource reference with path characters is refused with 422"
+MSG_ARQ_ADMIN = "an administrator's own request is refused with 409 as nothing to request"
+MSG_ARQ_ADMIN_SILENT = "the administrator's refused request mails nobody and is not recorded"
