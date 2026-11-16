@@ -14,6 +14,7 @@ import hmac
 import io
 import json
 import logging
+from datetime import datetime
 from logging.handlers import BufferingHandler
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -634,6 +635,78 @@ class BloomApiInterface(BloomInterface):
     def bloom_api_sync_results(self, headers, results):
         body = {"results": results}
         return self.bloom_api_call("POST", "/api/campaigns/sync-results", headers, json=body)
+
+    def bloom_rules_for(self, permissions):
+        return scenario_rules(permissions)
+
+    def bloom_api_try_log_in(self, email, password):
+        headers = {"user-agent": self.parameters.AUDITLOG_USER_AGENT}
+        body = {"email": email, "password": password}
+        return self._run(self._request("POST", "/api/auth/login", headers, json=body))
+
+    def bloom_add_design(self, project_id, design_id):
+        return self._run(
+            self._add(DesignItem(project_id=project_id, design_id=design_id, title=design_id))
+        )
+
+    def bloom_api_set_design_visibility(self, headers, design_id, visibility):
+        body = {"visibility": visibility}
+        return self.bloom_api_call("PATCH", f"/api/designs/{design_id}", headers, json=body)
+
+    def bloom_api_delete_design(self, headers, design_id):
+        return self.bloom_api_call("DELETE", f"/api/designs/{design_id}", headers)
+
+    def bloom_api_audit(self, headers, **query):
+        return self.bloom_api_call("GET", "/api/audit", headers, params=query)
+
+    def bloom_add_audit_events(self, hours, rows, actors):
+        ids = []
+        for hour, (actor, action, target, outcome, ip, request_id) in zip(hours, rows):
+            actor_id = actors.get(actor, actor)
+            ids.append(
+                self._run(
+                    self._add(
+                        AuditEvent(
+                            occurred_at=datetime(2026, 10, 12, hour),
+                            actor_user_id=actor_id,
+                            actor_type="anonymous" if actor_id is None else "user",
+                            action=action,
+                            target_type=target,
+                            target_id=str(hour),
+                            outcome=outcome,
+                            ip=ip,
+                            request_id=request_id,
+                        )
+                    )
+                )
+            )
+        return ids
+
+    def bloom_api_audit_pages(self, headers, action, field, direction):
+        ids = []
+        for offset in (0, self.parameters.AUDITLOG_PAGE):
+            page = self.bloom_api_audit(
+                headers,
+                action=action,
+                sort=field,
+                dir=direction,
+                limit=self.parameters.AUDITLOG_PAGE,
+                offset=offset,
+            )
+            if page.status != self.parameters.STATUS_OK:
+                return page.status
+            ids.extend(item["id"] for item in page.body["items"])
+        return ids
+
+    def bloom_route_methods_of(self, module):
+        return sorted(
+            {
+                method
+                for _, route in self._api_routes(main.app)
+                if route.endpoint.__module__ == module
+                for method in route.methods
+            }
+        )
 
     def bloom_api_get_baseline(self, headers, baseline_id):
         return self.bloom_api_call("GET", f"/api/baselines/{baseline_id}", headers)

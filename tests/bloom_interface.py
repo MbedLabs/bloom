@@ -139,12 +139,12 @@ class BloomInterface:
     def bloom_add_admin(self, email, password):
         return self.bloom_add_account(email, password, UserRole.admin.value)
 
-    def bloom_add_account(self, email, password, role):
+    def bloom_add_account(self, email, password, role, full_name=None):
         return self._run(
             self._add(
                 User(
                     email=email,
-                    full_name=email,
+                    full_name=full_name or email,
                     hashed_password=get_password_hash(password),
                     role=UserRole(role),
                     is_active=True,

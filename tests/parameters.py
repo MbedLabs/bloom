@@ -2497,3 +2497,68 @@ MSG_ARQ_ANONYMOUS = "a request without a sign-in is refused with 401"
 MSG_ARQ_INVALID = "a resource reference with path characters is refused with 422"
 MSG_ARQ_ADMIN = "an administrator's own request is refused with 409 as nothing to request"
 MSG_ARQ_ADMIN_SILENT = "the administrator's refused request mails nobody and is not recorded"
+AUDITLOG_USER_AGENT = "audit-test/1.0"
+AUDITLOG_SOMEONE = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+AUDITLOG_MEMBER = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+AUDITLOG_DEMOTED = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+AUDITLOG_ADMIN = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+AUDITLOG_ADMIN_NAME = "Admin"
+AUDITLOG_ADA = ("Ada@example.com", "Ada")
+AUDITLOG_ZOE = ("Zoe@example.com", "Zoe")
+AUDITLOG_PREFIX = "PRJ"
+AUDITLOG_DESIGN = "PRJ-DES-001"
+AUDITLOG_POLICY = f"Policy {_letters(string.ascii_lowercase, 4, 10)}"
+AUDITLOG_SECRET = _letters(string.ascii_letters + string.digits, 24, 32)
+AUDITLOG_LOGIN = "auth.login"
+AUDITLOG_AUTH_FILTER = "auth."
+AUDITLOG_SORT_FILTER = "sort."
+AUDITLOG_FAILED_LOGIN = ("failure", "anonymous", "user")
+AUDITLOG_ROLE_CHANGE = {"from": "maintainer", "to": "external"}
+AUDITLOG_SORT_HOURS = (3, 1, 4, 2)
+AUDITLOG_SORT_ROWS = [
+    ("zoe", "sort.b", "user", "success", "10.0.0.2", "req-d"),
+    ("ada", "sort.d", "project", "failure", None, "req-c"),
+    (None, "sort.a", "policy", "ignored", "10.0.0.3", None),
+    (999, "sort.c", None, "success", "10.0.0.1", "req-a"),
+]
+AUDITLOG_SORTED = {
+    "occurred_at": ([1, 2, 3, 4], [4, 3, 2, 1]),
+    "actor": ([1, 2, 3, 4], [4, 3, 2, 1]),
+    "action": ([4, 3, 2, 1], [1, 2, 3, 4]),
+    "target": ([2, 4, 1, 3], [3, 1, 4, 2]),
+    "outcome": ([1, 4, 3, 2], [2, 3, 4, 1]),
+    "ip": ([1, 2, 3, 4], [4, 3, 2, 1]),
+    "request_id": ([4, 2, 1, 3], [3, 1, 2, 4]),
+}
+AUDITLOG_DIRECTIONS = ("asc", "desc")
+AUDITLOG_PAGE = 2
+AUDITLOG_INVALID = [{"sort": "details"}, {"dir": "sideways"}]
+AUDITLOG_MODULE = "app.api.audit"
+MSG_AUDITLOG_REFUSED_LOGIN = "a sign-in with a wrong password is refused with 401"
+MSG_AUDITLOG_FAILURE = (
+    "the refused sign-in is recorded as a failure by an anonymous actor on the account"
+)
+MSG_AUDITLOG_REQUEST = "the record carries the request id, the user agent and an address"
+MSG_AUDITLOG_NO_PASSWORD = "the record does not contain the password that was tried"
+MSG_AUDITLOG_SUCCESS = "a sign-in is recorded as a success by that user"
+MSG_AUDITLOG_ROLE = (
+    "a role change is answered 200 and recorded with the administrator, the account and both roles"
+)
+MSG_AUDITLOG_STATUSES = (
+    "adding a member, changing a visibility and deleting an artefact are answered 201, 200 and 204"
+)
+MSG_AUDITLOG_MEMBER = "the added member is recorded with the project and the account"
+MSG_AUDITLOG_VISIBILITY = (
+    "the visibility change is recorded with the artefact and the new visibility"
+)
+MSG_AUDITLOG_DELETED = "the deletion is recorded with the project and the artefact type"
+MSG_AUDITLOG_ROTATED = "a new token is answered 200 and recorded as a changed token field"
+MSG_AUDITLOG_NO_SECRET = "the record does not contain the new token"
+MSG_AUDITLOG_MEMBER_REFUSED = "a member's read of the audit log is refused with 403"
+MSG_AUDITLOG_FILTERED = (
+    "an administrator reads the sign-in records, every one of them and nothing else"
+)
+MSG_AUDITLOG_NEWEST = "the newest record names the administrator who signed in last"
+MSG_AUDITLOG_SORT = "sorted by {field} {direction}, two pages of two hold the four records in order"
+MSG_AUDITLOG_INVALID = "the query {query} is refused with 422"
+MSG_AUDITLOG_READ_ONLY = "every audit endpoint is a GET"
