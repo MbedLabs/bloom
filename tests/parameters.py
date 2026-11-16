@@ -2421,3 +2421,10 @@ MSG_READER_CAMPAIGN_SUITES = "the opened campaign names the customer suite and n
 MSG_READER_SYNC = "synchronising a result is answered 200"
 MSG_READER_SYNC_NO_RUN = "the synchronised result gives the campaign no Bud run of its own"
 MSG_READER_SYNC_ITEM = "the campaign's item carries the synchronised result and its time"
+MSG_DIRECT_REQUIREMENT = (
+    "the customer requirement shows its customer test case, suite and campaign only"
+)
+MSG_DIRECT_TEST_CASE = (
+    "the customer test case shows its customer requirement, suite and campaign only"
+)
+MSG_DIRECT_CAMPAIGN = "the customer campaign shows its customer test case and that test case's customer requirement only"

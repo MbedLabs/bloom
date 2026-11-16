@@ -13,6 +13,7 @@ SUITES = [
     "tests.sec.BLOOM_exports.ExportsTest",
     "tests.sec.BLOOM_external_test_cases_visibility.ExternalTestCasesVisibilityTest",
     "tests.sec.BLOOM_external_test_suites_visibility.ExternalTestSuitesVisibilityTest",
+    "tests.sec.BLOOM_external_visibility_direct_apis.ExternalVisibilityDirectApisTest",
     "tests.sec.BLOOM_integration_secrets.IntegrationSecretsTest",
     "tests.sec.BLOOM_integrations_settings_redaction.IntegrationsSettingsRedactionTest",
     "tests.sec.BLOOM_links_external_visibility.LinksExternalVisibilityTest",
