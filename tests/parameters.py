@@ -2840,3 +2840,75 @@ MSG_CLIS_MISMATCH_AUDIT = (
 MSG_CLIS_RACE = (
     "a request approved elsewhere after its code check is refused with 400 as not pending"
 )
+ABL_HEAD = "d20260731a09"
+ABL_BASELINE = "d20260731a09_locked_baseline_schema.py"
+ABL_ROOT_MARKERS = ("down_revision: Union[str, Sequence[str], None] = None", "down_revision = None")
+ABL_CORE_TABLES = ["users", "projects", "requirements", "defects", "change_requests"]
+ABL_KEPT_INDEXES = [
+    "ix_defects_project_id",
+    "ix_artefact_links_project_types",
+    "pg_trgm",
+    "gin_trgm_ops",
+]
+MSG_ABL_ROOT = "the locked baseline is the only revision without a parent"
+MSG_ABL_PARENT = "{name} names a parent revision"
+MSG_ABL_NO_CREATE_ALL = "{name} does not rebuild the schema from the models"
+MSG_ABL_HEAD = "the baseline keeps the deployed head id and has no parent"
+MSG_ABL_EXPLICIT = "the baseline creates its tables with explicit DDL and never calls create_all"
+MSG_ABL_TABLE = "the baseline creates the {table} table"
+MSG_ABL_INDEX = "the baseline keeps {index}, which the models do not declare"
+MSG_ABL_ENUMS = "the baseline drops its enum types on downgrade"
+ACL_REFERENCED = "referenced.txt"
+ACL_FRESH = "fresh.txt"
+ACL_OLD = "old.txt"
+ACL_MISSING = "missing.txt"
+ACL_GRACE_SECONDS = 3600
+ACL_OLD_AGE_SECONDS = 2 * 60 * 60
+MSG_ACL_COUNTS = "the reconciliation counts one orphan file and one missing file"
+MSG_ACL_FILES = "the referenced and the fresh orphan file stay, the old orphan file is removed"
+MSG_ACL_COMMITTED = "the reconciliation commits its session"
+MSG_ACL_LIFESPAN = "the application start runs the reconciliation once with its session"
+MDI_FRONTMATTER = "---\ntype: requirement\n---\n# Login\nMust work."
+MDI_TAGGED = "## [REQ] Boot fast\nbody a\n## [DES] Boot design\nbody b"
+MDI_UNMARKED = "# Untagged\nsome text"
+MDI_WRAPPED = (
+    "## [REQ] Boot\n"
+    "Boot within {{parameter: BOOT_MS, value: 500}} ms of power-on, "
+    "below {{parameter: MAX_TEMP, value: 85C}}.\n"
+)
+MDI_REFERENCE = "## [REQ] Boot\nBoot within {{BOOT_MS}} ms.\n"
+MDI_HEADING = "## [REQ] Boot in {{parameter: BOOT_MS, value: 500}} ms\n"
+MDI_TEST_CASE = (
+    "## [TC] Boot within budget\n"
+    "Measures the cold boot time of the device under test.\n"
+    "- Pre-Condition: device under test powered off through the relay\n"
+    "- Loop: repeat {{parameter: BOOT_CYCLES, value: 3}} times\n"
+    "  - Step: switch the relay on => relay reports closed\n"
+    "  - Step: measure the time from relay on to boot banner => within "
+    "{{parameter: BOOT_BUDGET_MS, value: 500}} ms +- "
+    "{{parameter: BOOT_TOLERANCE_MS, value: 50}} ms\n"
+)
+MDI_TEST_CASE_ROWS = [
+    ("precondition", "Pre-Condition", 0, "device under test powered off through the relay", ""),
+    ("loop", "Loop", 0, "repeat {{BOOT_CYCLES}} times", ""),
+    ("step", "Step", 1, "switch the relay on", "relay reports closed"),
+    (
+        "step",
+        "Step",
+        1,
+        "measure the time from relay on to boot banner",
+        "within {{BOOT_BUDGET_MS}} ms +- {{BOOT_TOLERANCE_MS}} ms",
+    ),
+]
+MDI_STRAY_STEP = "## [REQ] Boot\n- Step: not a test case row\n"
+MSG_MDI_FRONTMATTER = "the frontmatter type sets the document and section type"
+MSG_MDI_TAGGED = "a heading tag classifies its own section"
+MSG_MDI_DEFAULT = "an unmarked document takes the default type"
+MSG_MDI_WRAPPED = "parameters written in a sentence become placeholders and are collected"
+MSG_MDI_REFERENCE = "an existing parameter reference is left alone and collects nothing"
+MSG_MDI_HEADING = "a parameter in a heading is replaced and collected"
+MSG_MDI_COLLISION = "a parameter whose name exists in any case is reported as a collision"
+MSG_MDI_TEST_CASE = (
+    "test case lines become step rows with their type, indent, description and expected result"
+)
+MSG_MDI_STRAY = "step lines outside a test case stay text"

@@ -8,6 +8,7 @@
 * @note     Only the lifespan check loads the application object, inside that one call.
 """
 
+import ast
 import asyncio
 import base64
 import contextlib
@@ -38,6 +39,7 @@ from sqlalchemy import func, select, text
 from starlette.datastructures import Headers
 
 from app import audit
+from app import main as main_module
 from app.api import (
     artefact_utils,
     campaigns,
@@ -57,6 +59,11 @@ from app.core import (
     security,
 )
 from app.core.config import settings
+from app.core.md_import import (
+    Parameter,
+    parameter_name_collisions,
+    parse_markdown_document,
+)
 from app.core.security import (
     create_access_token,
     get_current_user,
@@ -95,6 +102,7 @@ from app.services import (
     tag_links,
     token_service,
 )
+from app.services.attachment_cleanup import reconcile_attachments
 from tests.bloom_interface import BloomInterface
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -291,6 +299,93 @@ class BloomLogicInterface(BloomInterface):
         allowed = self._run(get_external_doc_types(db, admin, project_id))
         return SimpleNamespace(allowed=allowed, queries=db.execute.await_count)
 
+    def bloom_revision_sources(self):
+        versions = ROOT / "alembic" / "versions"
+        return {
+            path.name: path.read_text()
+            for path in sorted(versions.glob("*.py"))
+            if path.name != "__init__.py"
+        }
+
+    def bloom_create_all_calls(self, source):
+        found = []
+        for node in ast.walk(ast.parse(source)):
+            if isinstance(node, ast.Call):
+                func = node.func
+                if isinstance(func, ast.Attribute) and func.attr == "create_all":
+                    found.append(func.attr)
+                elif isinstance(func, ast.Name) and func.id == "create_all":
+                    found.append(func.id)
+        return found
+
+    def bloom_reconcile_attachments(self, files, referenced, old, grace_seconds, old_age_seconds):
+        with self._scratch_folder() as folder, contextlib.ExitStack() as stack:
+            root = Path(folder)
+            stack.enter_context(patch.object(settings, "ATTACHMENT_DIR", folder))
+            stack.enter_context(patch.object(attachment_storage, "_ROOT", None))
+            for name in files:
+                (root / name).write_bytes(name.encode())
+            stamp = time.time() - old_age_seconds
+            os.utime(root / old, (stamp, stamp))
+            session = self._reconcile_session(referenced)
+            report = self._run(reconcile_attachments(session, orphan_grace_seconds=grace_seconds))
+            kept = sorted(path.name for path in root.iterdir())
+        return SimpleNamespace(report=report, kept=kept, committed=session.committed)
+
+    def bloom_lifespan_reconcile_calls(self):
+        calls, session = [], object()
+
+        class SessionContext:
+            async def __aenter__(self):
+                return session
+
+            async def __aexit__(self, *_args):
+                return None
+
+        async def fake_reconcile(received):
+            calls.append(received)
+            return SimpleNamespace(leader_acquired=True, orphan_files=0, missing_files=0)
+
+        async def start():
+            async with main_module.lifespan(main_module.app):
+                await asyncio.sleep(0)
+
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(
+                patch.object(main_module.settings, "RUN_STARTUP_DATA_REPAIR", False)
+            )
+            stack.enter_context(patch.object(main_module.settings, "AUTO_SEED_ADMIN", False))
+            stack.enter_context(patch.object(main_module, "async_session_maker", SessionContext))
+            stack.enter_context(patch.object(main_module, "reconcile_attachments", fake_reconcile))
+            self._run(start())
+        return calls == [session], len(calls)
+
+    def bloom_parse_markdown(self, text, default_type=None):
+        if default_type is None:
+            return parse_markdown_document(text)
+        return parse_markdown_document(text, default_type=default_type)
+
+    def bloom_parameter_collisions(self, names_and_values, existing):
+        found = [Parameter(name, value) for name, value in names_and_values]
+        return parameter_name_collisions(found, existing_names=existing)
+
+    def _reconcile_session(self, referenced):
+        class Scalars:
+            def all(self):
+                return referenced
+
+        class Session:
+            bind = SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
+            committed = False
+
+            async def scalars(self, _statement):
+                return Scalars()
+
+            async def commit(self):
+                Session.committed = True
+
+        return Session()
+
     def bloom_read_repo_text(self, name):
         return (ROOT / name).read_text(encoding="utf-8")
 
@@ -434,6 +529,9 @@ class BloomLogicInterface(BloomInterface):
                 if self._is_datetime(info.annotation) and field not in serialized:
                     unmarked.append(f"{qualified}.{field}")
         return unmarked
+
+    def _scratch_folder(self):
+        return tempfile.TemporaryDirectory()
 
     def bloom_stream_attachment(self, payload, max_bytes, interrupt=None):
         with tempfile.TemporaryDirectory() as folder:

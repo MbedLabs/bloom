@@ -4,8 +4,10 @@ import tests.config  # noqa: F401
 
 SUITES = [
     "tests.logic.BLOOM_access_token_format.AccessTokenFormatTest",
+    "tests.logic.BLOOM_alembic_baseline.AlembicBaselineTest",
     "tests.logic.BLOOM_artefact_public_id_lookup.ArtefactPublicIdLookupTest",
     "tests.logic.BLOOM_artefact_rich_content.ArtefactRichContentTest",
+    "tests.logic.BLOOM_attachment_cleanup.AttachmentCleanupTest",
     "tests.logic.BLOOM_attachment_deployment_contract.AttachmentDeploymentContractTest",
     "tests.logic.BLOOM_attachment_stream.AttachmentStreamTest",
     "tests.logic.BLOOM_audit_prune.AuditPruneTest",
@@ -49,6 +51,7 @@ SUITES = [
     "tests.logic.BLOOM_invites.InvitesTest",
     "tests.logic.BLOOM_jira_outbound_send.JiraOutboundSendTest",
     "tests.logic.BLOOM_link_rules.LinkRulesTest",
+    "tests.logic.BLOOM_md_import.MdImportTest",
     "tests.logic.BLOOM_next_doc_id.NextDocIdTest",
     "tests.logic.BLOOM_permissions.PermissionsTest",
     "tests.logic.BLOOM_project_naming.ProjectNamingTest",
