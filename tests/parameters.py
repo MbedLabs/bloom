@@ -3402,3 +3402,21 @@ MSG_DFX_SIGNATURE = (
     "a GitHub signature of the body with the secret is accepted and a wrong one refused"
 )
 MSG_DFX_TOKEN = "a GitLab token equal to the secret is accepted and another refused"
+TRI_COLD_DESCRIPTION = "Imported from TestRail case C7. Type: Functional. Priority: High. Estimate: 5m. References: JIRA-9."
+TRI_MAPPED_CSV = b"Name,Do,Expect\nCold boot,Close relay,Closed\n"
+TRI_MAPPING = '{"title": "Name", "steps": "Do", "expected": "Expect"}'
+TRI_NO_TITLE_XML = b"<suite><cases><case><id>C1</id><title></title></case></cases></suite>"
+MSG_TRI_COUNTS = "an XML import creates two test cases, one link and one suite"
+MSG_TRI_COLD = "the imported case is an unreviewed draft naming its source, with its preconditions, rows and description"
+MSG_TRI_LINK = "the imported case verifies the referenced requirement"
+MSG_TRI_SUITE = "the suite takes the section name and holds both cases"
+MSG_TRI_REIMPORT = "a second import updates both cases and creates no suite, link or duplicate"
+MSG_TRI_CSV = "a CSV import creates two cases, one link and the Firmware suite"
+MSG_TRI_MAPPING = "a CSV import through a column mapping creates the case with its step"
+MSG_TRI_ERRORS = (
+    "a broken mapping, a file without a suite and a CSV without a title column are refused with 422"
+)
+MSG_TRI_NO_TITLE = "a case without a title is skipped with its error"
+MSG_TRI_PREVIEW = "the column preview lists the header and the detected section column"
+MSG_TRI_LOOKUPS = "importing twenty cases takes as many lookups as importing one"
+MSG_TRI_ROLE = "an import whose link role no longer exists is refused naming the case and the role, and writes nothing"

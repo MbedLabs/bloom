@@ -39,7 +39,7 @@ import httpx
 import yaml
 from fastapi import HTTPException, UploadFile
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import func, select, text
+from sqlalchemy import event, func, select, text
 from starlette.datastructures import Headers
 
 from app import audit
@@ -72,6 +72,8 @@ from app.api.import_service import (
     _import_rows_from_xml,
     _next_number,
     import_test_cases_file,
+    import_testrail,
+    testrail_csv_columns,
 )
 from app.api.policies import _apply_rules, _validate_rules, policy_rules
 from app.core import (
@@ -133,6 +135,8 @@ from app.models import (
     RequirementLink,
     SystemMarker,
     TestCase,
+    TestSuite,
+    TestSuiteItem,
     user_token,
 )
 from app.models.groups import Group, GroupMembership, Policy
@@ -351,6 +355,96 @@ class BloomLogicInterface(BloomInterface):
             return id_generator.compute_next_id(existing_ids, prefix, type_code), None
         except ValueError as exc:
             return None, type(exc).__name__
+
+    def bloom_seed_testrail_project(self):
+        return self._run(self._seed_testrail_project())
+
+    def bloom_import_testrail(
+        self, project_id, content, file_format="xml", mapping=None, without_link_rules=False
+    ):
+        with contextlib.ExitStack() as stack:
+            if without_link_rules:
+                stack.enter_context(patch.object(link_rules, "LINK_RULE_ROWS", ()))
+            return self._run(self._import_testrail(project_id, content, file_format, mapping))
+
+    def bloom_count_import_lookups(self, project_id, contents):
+        statements, counts, results = [], [], []
+
+        def record(conn, cursor, statement, parameters, context, executemany):
+            if statement.lstrip().upper().startswith("SELECT"):
+                statements.append(statement)
+
+        event.listen(self.engine.sync_engine, "before_cursor_execute", record)
+        try:
+            for content in contents:
+                statements.clear()
+                results.append(self.bloom_import_testrail(project_id, content)[0])
+                counts.append(len(statements))
+        finally:
+            event.remove(self.engine.sync_engine, "before_cursor_execute", record)
+        return results, counts
+
+    def bloom_testrail_export(self, suite, first, count):
+        cases = "".join(
+            f"<case><id>C{n}</id><title>Case {n}</title><references>PRJ-REQ-001</references></case>"
+            for n in range(first, first + count)
+        )
+        return f"<suite><sections><section><name>{suite}</name><cases>{cases}</cases></section></sections></suite>".encode()
+
+    def bloom_testrail_columns(self, project_id, content):
+        return self._run(self._testrail_columns(project_id, content))
+
+    def bloom_list_suites(self):
+        return self._run(self._all(select(TestSuite).order_by(TestSuite.id)))
+
+    def bloom_list_suite_items(self):
+        return self._run(self._all(select(TestSuiteItem)))
+
+    def bloom_list_artefact_links(self):
+        return self._run(self._all(select(ArtefactLink).order_by(ArtefactLink.id)))
+
+    async def _seed_testrail_project(self):
+        async with self.maker() as db:
+            project = Project(name="Demo", prefix="PRJ")
+            admin = User(
+                email="admin@test.local",
+                full_name="Ada Admin",
+                hashed_password="x",
+                role=UserRole.admin,
+            )
+            db.add_all([project, admin])
+            await db.flush()
+            db.add(Requirement(project_id=project.id, req_id="PRJ-REQ-001", title="Boot fast"))
+            await db.commit()
+            return project.id
+
+    async def _import_testrail(self, project_id, content, file_format, mapping):
+        async with self.maker() as db:
+            admin = (await db.execute(select(User).where(User.role == UserRole.admin))).scalar_one()
+            try:
+                result = await import_testrail(
+                    project_id=project_id,
+                    format=file_format,
+                    file=UploadFile(file=io.BytesIO(content)),
+                    mapping=mapping,
+                    db=db,
+                    current_user=admin,
+                )
+            except HTTPException as refused:
+                await db.rollback()
+                return None, (refused.status_code, refused.detail)
+            await db.commit()
+            return result, None
+
+    async def _testrail_columns(self, project_id, content):
+        async with self.maker() as db:
+            admin = (await db.execute(select(User).where(User.role == UserRole.admin))).scalar_one()
+            return await testrail_csv_columns(
+                project_id=project_id,
+                file=UploadFile(file=io.BytesIO(content)),
+                db=db,
+                current_user=admin,
+            )
 
     def bloom_link_roles(self, source, target):
         return link_rules.get_allowed_link_roles(source, target)
