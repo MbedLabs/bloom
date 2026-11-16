@@ -322,6 +322,51 @@ class BloomPgInterface(BloomInterface):
     def bloom_compare_workflow_schema(self):
         return self._run(self._compare_workflow_schema())
 
+    def bloom_request_email_change(self, token, password, new_email):
+        body = {"current_password": password, "new_email": new_email}
+        return self._mail_call("POST", "/api/auth/me/email", token, body)
+
+    def bloom_confirm_email_change(self, token):
+        return self._mail_call("POST", "/api/auth/confirm-email-change", json={"token": token})
+
+    def bloom_approve_email_change(self, admin_token, user_id):
+        return self._mail_call("POST", f"/api/users/{user_id}/email/approve", admin_token)
+
+    def bloom_start_email_change_for(self, admin_token, user_id, new_email):
+        body = {"new_email": new_email}
+        return self._mail_call("POST", f"/api/users/{user_id}/email", admin_token, body)
+
+    def bloom_update_account_email(self, admin_token, user_id, email):
+        return self._mail_call("PATCH", f"/api/users/{user_id}", admin_token, {"email": email})
+
+    def bloom_send_invitation(self, admin_token, email, role):
+        body = {"email": email, "full_name": email, "role": role}
+        return self._mail_call("POST", "/api/users/invite", admin_token, body)
+
+    def bloom_accept_invitation(self, token, password):
+        body = {"token": token, "password": password}
+        return self._mail_call("POST", "/api/auth/accept-invite", json=body)
+
+    def bloom_mail_token(self, mail):
+        link = mail.get("confirm_link") or mail.get("invite_link") or ""
+        found = re.search(r"token=([^&\s]+)", link)
+        return found.group(1) if found else None
+
+    def bloom_set_pending_email(self, user_id, email):
+        self._run(
+            self._execute(
+                "UPDATE users SET pending_email = :email WHERE id = :id", email=email, id=user_id
+            )
+        )
+
+    def bloom_probe_email_sessions(self, login, old_email, new_email, password):
+        return (
+            self.bloom_read_account(login.access_token).status,
+            self.bloom_refresh(login.cookie).status,
+            self.bloom_log_in_for_cookie(old_email, password).status,
+            self.bloom_log_in_for_cookie(new_email, password).status,
+        )
+
     def bloom_seed_overlap_entries(self):
         return self._run(self._pg(self._seed_overlap_entries))
 
@@ -588,6 +633,29 @@ class BloomPgInterface(BloomInterface):
             cookie=header[len(name) :].split(";")[0] or None,
             access_token=body.get("access_token") if isinstance(body, dict) else None,
         )
+
+    def _mail_call(self, method, path, token=None, json=None):
+        mails = []
+        headers = {"Authorization": f"Bearer {token}"} if token else None
+        senders = (
+            (auth_api, self.parameters.EMAIL_AUTHORIZATION_SENDER),
+            (auth_api, self.parameters.EMAIL_CHANGE_SENDER),
+            (users_api, self.parameters.EMAIL_CHANGE_SENDER),
+            (users_api, self.parameters.EMAIL_INVITE_SENDER),
+        )
+
+        def recorder(sender):
+            return lambda **mail: mails.append({self.parameters.EMAIL_SENDER_KEY: sender, **mail})
+
+        with contextlib.ExitStack() as stack:
+            for module, sender in senders:
+                stack.enter_context(patch.object(module, sender, recorder(sender)))
+            answer = self._run(self._send(method, path, json=json, headers=headers))
+        try:
+            body = answer.json()
+        except ValueError:
+            body = None
+        return SimpleNamespace(status=answer.status_code, body=body, mails=mails)
 
     def _mailed_token(self, module, sender, link, request):
         captured = {}

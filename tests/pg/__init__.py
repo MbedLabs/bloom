@@ -13,6 +13,7 @@ SUITES = [
     "tests.pg.BLOOM_document_assignee_migration.DocumentAssigneeMigrationTest",
     "tests.pg.BLOOM_document_workflow_concurrency.DocumentWorkflowConcurrencyTest",
     "tests.pg.BLOOM_document_workflow_migration.DocumentWorkflowMigrationTest",
+    "tests.pg.BLOOM_email_change.EmailChangeTest",
     "tests.pg.BLOOM_id_widening.IdWideningTest",
     "tests.pg.BLOOM_integration_sync_race.IntegrationSyncRaceTest",
     "tests.pg.BLOOM_integrity_conflict.IntegrityConflictTest",
