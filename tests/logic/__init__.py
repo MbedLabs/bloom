@@ -22,6 +22,7 @@ SUITES = [
     "tests.logic.BLOOM_defects.DefectsTest",
     "tests.logic.BLOOM_document_kinds.DocumentKindsTest",
     "tests.logic.BLOOM_e2e_image_smoke_script.E2eImageSmokeScriptTest",
+    "tests.logic.BLOOM_entitlements.EntitlementsTest",
     "tests.logic.BLOOM_export.ExportTest",
     "tests.logic.BLOOM_export_test_cases.ExportTestCasesTest",
     "tests.logic.BLOOM_external_doc_types_admin.ExternalDocTypesAdminTest",

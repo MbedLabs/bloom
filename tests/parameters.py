@@ -3950,3 +3950,36 @@ MSG_MLS_ACCESS = "the access request mail has the Bloom subject, heading, one li
 MSG_MLS_ACCESS_ESCAPED = "the requester name is escaped in the HTML and plain in the text"
 MSG_MLS_EVERY_COUNT = "all eight mails are rendered"
 MSG_MLS_EVERY = "the {sender} mail has the product title and heading, one link in both formats, the rights line and no old name"
+ENT_READ = {"REQ": ["view"]}
+ENT_EDIT = {"REQ": ["edit"]}
+ENT_LINKS = {"REQ": ["view"], "link": ["create"]}
+ENT_PARAMETER = {"parameter": ["view"]}
+ENT_AUTHOR = {"REQ": ["view", "create"]}
+ENT_SIGNER = {"REQ": ["view", "approve"]}
+ENT_CUSTOMER_AUTHOR = {"REQ": ["edit", "approve", "delete"]}
+ENT_INTERNAL_ROW = ("PRJ-REQ-001", "Internal", "internal")
+ENT_CUSTOMER_ROW = ("PRJ-REQ-002", "Customer", "customer")
+MSG_ENT_GROUP_PROJECT = "a group grant reaches its own project and no other"
+MSG_ENT_NO_GRANT = "a user without a grant is refused with 403"
+MSG_ENT_ADMIN = "an instance administrator reaches a project without any entry"
+MSG_ENT_LEGACY = "a membership row or a group without a project entry grants no access"
+MSG_ENT_SEPARATE = "with a direct read grant in place, no term carries the group's edit"
+MSG_ENT_DIRECT_KEPT = "after leaving the group the direct read grant is the only term"
+MSG_ENT_BROAD_READ = (
+    "a broad read shows the internal row but lends no edit to the customer-only write"
+)
+MSG_ENT_LINK = (
+    "a policy limited to requirements keeps its link permission and gives none on test cases"
+)
+MSG_ENT_EXTERNAL_PARAMETERS = "an external user {how} cannot read parameters: 403"
+MSG_ENT_OWNER = "an owner entry reaches its project with every permission, no other project, and keeps the instance role"
+MSG_ENT_IDENTITY = "a customer-scoped policy does not make an internal account customer-only; an external account is"
+MSG_ENT_EXTERNAL_READING = "an external account reads customer rows only, even with a broad policy"
+MSG_ENT_CREATION = "both policies cover creating rows of either origin"
+MSG_ENT_APPROVAL = "approval is covered only for the origin the approving policy covers"
+MSG_ENT_WRITE_SCOPE = (
+    "a customer write grant reads and edits customer requirements and nothing else"
+)
+MSG_ENT_BUNDLES = "overlapping bundles keep their own origins for {who}"
+MSG_ENT_BUNDLE_CAPS = "internal reading, approval and deletion are {state} for {who}"
+MSG_ENT_TAG_SCOPE = "a write limited to one tag does not borrow the unrestricted read's tag scope"

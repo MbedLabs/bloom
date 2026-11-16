@@ -142,11 +142,16 @@ from app.core.search_registry import rank_match
 from app.core.security import (
     _policy_terms,
     access_terms,
+    apply_external_visibility_filter,
     create_access_token,
+    creation_covered,
+    customer_only,
     effective_permissions,
     get_current_user,
     get_external_doc_types,
     require_role,
+    row_allows,
+    user_can_access_project,
 )
 from app.core.service_auth import (
     create_service_credential,
@@ -165,6 +170,7 @@ from app.models import (
     IntegrationSetting,
     Notification,
     Project,
+    ProjectMembership,
     ProjectVariable,
     Requirement,
     RequirementLink,
@@ -412,6 +418,177 @@ class BloomLogicInterface(BloomInterface):
             return id_generator.compute_next_id(existing_ids, prefix, type_code), None
         except ValueError as exc:
             return None, type(exc).__name__
+
+    def bloom_seed_entitlement_user(self, role="maintainer"):
+        async def work(db):
+            user = User(
+                email="user@example.com", full_name="User", hashed_password="x", role=UserRole(role)
+            )
+            project, other = Project(name="Demo", prefix="PRJ"), Project(name="ABC", prefix="ABC")
+            db.add_all([user, project, other])
+            await db.commit()
+            return SimpleNamespace(user=user.id, project=project.id, other=other.id)
+
+        return self._run(self._with_db(work))
+
+    def bloom_add_external_account(self):
+        return self._run(
+            self._add(
+                User(
+                    email="external@example.com",
+                    full_name="External",
+                    hashed_password="x",
+                    role=UserRole.external,
+                )
+            )
+        )
+
+    def bloom_add_access_policy(
+        self, name, permissions, visibility="internal", types=None, type_tags=None
+    ):
+        tags = (
+            scenario_type_tags(permissions, visibility, types) if type_tags is None else type_tags
+        )
+        return self._run(self._add(Policy(name=name, permissions=permissions, type_tags=tags)))
+
+    def bloom_add_team(self, user_id, project_id, policy_ids):
+        async def work(db):
+            group = Group(
+                name="Team", policies=[await db.get(Policy, policy_id) for policy_id in policy_ids]
+            )
+            db.add(group)
+            await db.flush()
+            membership = GroupMembership(group_id=group.id, user_id=user_id)
+            db.add_all(
+                [
+                    membership,
+                    ProjectAccess(group_id=group.id, project_id=project_id, inherit_policies=True),
+                ]
+            )
+            await db.commit()
+            return membership.id
+
+        return self._run(self._with_db(work))
+
+    def bloom_remove_team_membership(self, membership_id):
+        async def work(db):
+            await db.delete(await db.get(GroupMembership, membership_id))
+            await db.commit()
+
+        self._run(self._with_db(work))
+
+    def bloom_add_direct_access(self, user_id, project_id, policy_ids=(), owner=False):
+        async def work(db):
+            policies = [await db.get(Policy, policy_id) for policy_id in policy_ids]
+            db.add(
+                ProjectAccess(
+                    user_id=user_id, project_id=project_id, owner=owner, policies=policies
+                )
+            )
+            await db.commit()
+
+        self._run(self._with_db(work))
+
+    def bloom_add_policy_bundles(self, user_id, project_id, bundles):
+        async def work(db):
+            for name, policy_ids in bundles.items():
+                bundle = Group(
+                    name=name,
+                    policies=[await db.get(Policy, policy_id) for policy_id in policy_ids],
+                )
+                db.add(bundle)
+                await db.flush()
+                db.add(ProjectAccess(user_id=user_id, project_id=project_id, policy_group=bundle))
+            await db.commit()
+
+        self._run(self._with_db(work))
+
+    def bloom_add_membership_without_entry(self, user_id, project_id):
+        async def work(db):
+            group = Group(name="Old team")
+            db.add(group)
+            await db.flush()
+            db.add_all(
+                [
+                    ProjectMembership(user_id=user_id, project_id=project_id, role="maintainer"),
+                    GroupMembership(group_id=group.id, user_id=user_id),
+                ]
+            )
+            await db.commit()
+
+        self._run(self._with_db(work))
+
+    def bloom_add_requirement_row(self, project_id, req_id, title, visibility):
+        return self._run(
+            self._add(
+                Requirement(
+                    project_id=project_id, req_id=req_id, title=title, visibility=visibility
+                )
+            )
+        )
+
+    def bloom_can_access_project(self, user_id, project_id):
+        async def work(db):
+            return bool(await user_can_access_project(db, await db.get(User, user_id), project_id))
+
+        return self._run(self._with_db(work))
+
+    def bloom_project_access_refusal(self, user_id, project_id, permission=None):
+        async def work(db):
+            options = {} if permission is None else {"permission": permission}
+            try:
+                await security.require_project_access(
+                    db, await db.get(User, user_id), project_id, **options
+                )
+            except HTTPException as refused:
+                return refused.status_code
+            return None
+
+        return self._run(self._with_db(work))
+
+    def bloom_access_term_permissions(self, user_id, project_id):
+        async def work(db):
+            terms = await access_terms(db, await db.get(User, user_id), project_id)
+            return [term.permissions for term in terms]
+
+        return self._run(self._with_db(work))
+
+    def bloom_row_allows(self, user_id, requirement_id, action, resource):
+        async def work(db):
+            row = await db.get(Requirement, requirement_id)
+            return bool(await row_allows(db, await db.get(User, user_id), row, action, resource))
+
+        return self._run(self._with_db(work))
+
+    def bloom_creation_covered(self, user_id, project_id, resource, visibility, tags, action=None):
+        async def work(db):
+            extra = () if action is None else (action,)
+            user = await db.get(User, user_id)
+            return bool(
+                await creation_covered(db, user, project_id, resource, visibility, tags, *extra)
+            )
+
+        return self._run(self._with_db(work))
+
+    def bloom_is_customer_only(self, user_id, project_id):
+        async def work(db):
+            user = await db.get(User, user_id)
+            await access_terms(db, user, project_id)
+            return customer_only(user)
+
+        return self._run(self._with_db(work))
+
+    def bloom_role_of(self, user_id):
+        return self._run(self._get(User, user_id)).role.value
+
+    def bloom_visible_requirement_ids(self, user_id, project_id):
+        async def work(db):
+            user = await db.get(User, user_id)
+            await access_terms(db, user, project_id)
+            query = apply_external_visibility_filter(select(Requirement), Requirement, user)
+            return [row.id for row in (await db.execute(query)).scalars().all()]
+
+        return self._run(self._with_db(work))
 
     def bloom_run_test_bootstrap(self, code="", extra_env=None, with_folder=False):
         kept = {"PATH", "PYTHONPATH", "HOME", "LANG"}
