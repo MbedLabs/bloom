@@ -336,6 +336,25 @@ class BloomLogicInterface(BloomInterface):
         except ValueError as exc:
             return None, type(exc).__name__
 
+    def bloom_widened_ids(self, existing_ids, prefix, type_code, width):
+        return id_generator.widened_ids(existing_ids, prefix, type_code, width)
+
+    def bloom_id_pattern_matches(self, value):
+        return id_generator.DOC_ID_PATTERN.fullmatch(value) is not None
+
+    def bloom_id_refusal(self, existing_ids, prefix, type_code):
+        try:
+            id_generator.compute_next_id(existing_ids, prefix, type_code)
+        except ValueError as refused:
+            return str(refused)
+        return None
+
+    def bloom_normalize_doc_id(self, value, **expected):
+        try:
+            return id_generator.normalize_doc_id(value, **expected), None
+        except ValueError as refused:
+            return None, str(refused)
+
     def bloom_list_docs_routes(self):
         return [route.path for route in docs_facade.router.routes]
 

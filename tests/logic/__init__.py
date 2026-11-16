@@ -25,6 +25,7 @@ SUITES = [
     "tests.logic.BLOOM_external_doc_types_allow.ExternalDocTypesAllowTest",
     "tests.logic.BLOOM_external_doc_types_allowlist.ExternalDocTypesAllowlistTest",
     "tests.logic.BLOOM_external_doc_types_rejection.ExternalDocTypesRejectionTest",
+    "tests.logic.BLOOM_id_generator.IdGeneratorTest",
     "tests.logic.BLOOM_image_release.ImageReleaseTest",
     "tests.logic.BLOOM_import_attempts.ImportAttemptsTest",
     "tests.logic.BLOOM_import_test_cases.ImportTestCasesTest",

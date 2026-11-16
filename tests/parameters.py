@@ -3197,3 +3197,39 @@ MSG_IMR_GOOD = (
 MSG_IMR_BAD = "the malformed reference {reference!r} is refused before docker runs"
 MSG_IMR_MISSING = "a missing image reports no digest"
 MSG_IMR_WORKFLOW = "every reference shape the workflow produces is inspected and promoted"
+IDG_CASES = [
+    ("none exist", [], "REQ", "PRJ-REQ-001"),
+    ("sequential", ["PRJ-REQ-001", "PRJ-REQ-002", "PRJ-REQ-003"], "REQ", "PRJ-REQ-004"),
+    ("gap after a deletion", ["PRJ-REQ-001", "PRJ-REQ-003"], "REQ", "PRJ-REQ-004"),
+    ("only the highest left", ["PRJ-REQ-010"], "REQ", "PRJ-REQ-011"),
+    ("malformed ids ignored", ["PRJ-REQ-001", "PRJ-REQ-abc", "PRJ-REQ-003"], "REQ", "PRJ-REQ-004"),
+    (
+        "other projects and types ignored",
+        ["PRJ-REQ-001", "XYZ-REQ-099", "PRJ-TC-050", "PRJ-REQ-002-extra"],
+        "REQ",
+        "PRJ-REQ-002",
+    ),
+    ("test cases", ["PRJ-TC-005", "PRJ-TC-012"], "TC", "PRJ-TC-013"),
+    ("past 999", ["PRJ-REQ-999"], "REQ", "PRJ-REQ-1000"),
+    ("past 9999", ["PRJ-REQ-9999"], "REQ", "PRJ-REQ-10000"),
+    ("bulk import", ["PRJ-REQ-001", "PRJ-REQ-002", "PRJ-REQ-005"], "REQ", "PRJ-REQ-006"),
+    ("empty string ignored", ["", "PRJ-REQ-001"], "REQ", "PRJ-REQ-002"),
+    ("only malformed", ["PRJ-REQ-abc", "PRJ-REQ-", "PRJ-REQ-xyz"], "REQ", "PRJ-REQ-001"),
+    ("padded below 100", ["PRJ-REQ-098"], "REQ", "PRJ-REQ-099"),
+    ("four digits continue", ["PRJ-REQ-1000"], "REQ", "PRJ-REQ-1001"),
+]
+IDG_TYPE_CODES = ["TC", "DES", "RSK", "CHG", "CPT", "SPEC", "PRT", "RPT", "STD", "BL", "TS"]
+IDG_WIDEN = (
+    ["PRJ-REQ-001", "PRJ-REQ-099", "PRJ-REQ-999", "PRJ-REQ-1000"],
+    {"PRJ-REQ-001": "PRJ-REQ-0001", "PRJ-REQ-099": "PRJ-REQ-0099", "PRJ-REQ-999": "PRJ-REQ-0999"},
+)
+IDG_WIDEN_OTHERS = (["PRJ-REQ-001", "PRJ-TC-001", "ABC-REQ-001"], {"PRJ-REQ-001": "PRJ-REQ-0001"})
+MSG_IDG_NEXT = "the next id when {case} is {expected}"
+MSG_IDG_TYPE = "the first {type_code} id is PRJ-{type_code}-001"
+MSG_IDG_WIDEN = "passing 999 renumbers the narrower ids to four digits and leaves the wider one"
+MSG_IDG_WIDEN_OTHERS = "widening leaves other projects and types alone"
+MSG_IDG_PATTERN = "the id pattern accepts three and four digits"
+MSG_IDG_PREFIX = "a project prefix that is not three letters is refused"
+MSG_IDG_TYPE_CODE = "an unsupported type code is refused"
+MSG_IDG_NORMALIZE = "a supplied id is trimmed and upper-cased"
+MSG_IDG_WRONG_PROJECT = "a supplied id of another project is refused"
