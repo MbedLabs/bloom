@@ -17,6 +17,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import httpx
+from cryptography.fernet import Fernet
 from fastapi import FastAPI, HTTPException
 from fastapi.routing import APIRoute
 from sqlalchemy import event
@@ -33,7 +34,12 @@ from app.core.permissions import DOC_TYPE_RESOURCES
 from app.models import ChangeRequest, Defect, Document, IntegrationSetting
 from app.models import TestCase as TestCaseModel
 from app.models.user import User, UserRole
-from app.services.integration_secrets import encrypt_integration_secret
+from app.services.integration_secrets import (
+    ENVELOPE_PREFIX,
+    decrypt_integration_secret,
+    encrypt_integration_secret,
+    is_encrypted,
+)
 from tests.access_fixtures import (
     allow_doc_types,
     project_access_fixture,
@@ -120,6 +126,71 @@ class BloomApiInterface(BloomInterface):
         if delivery is not None:
             headers["X-Atlassian-Webhook-Identifier"] = delivery
         return self._run(self._post(self.parameters.WEBHOOK_PATH, body, headers))
+
+    def bloom_github_issue_body(self, number, repo):
+        payload = {
+            "action": "closed",
+            "issue": {"number": number, "state": "closed"},
+            "repository": {"full_name": repo},
+        }
+        return json.dumps(payload).encode()
+
+    def bloom_oversized_webhook_body(self):
+        return b"{" + b"x" * self.parameters.HOOK_OVERSIZED_BYTES
+
+    def bloom_post_github_webhook(self, body, signature=None, delivery=None):
+        headers = {"X-GitHub-Event": "issues", "Content-Type": "application/json"}
+        if signature is not None:
+            headers["X-Hub-Signature-256"] = signature
+        if delivery is not None:
+            headers["X-GitHub-Delivery"] = delivery
+        return self._answer(self._run(self._post(self.parameters.HOOK_GITHUB_PATH, body, headers)))
+
+    def bloom_post_gitlab_webhook(self, number, repo, token=None, delivery=None):
+        payload = {
+            "object_attributes": {"iid": number, "state": "closed", "action": "close"},
+            "project": {"path_with_namespace": repo},
+        }
+        headers = {"X-Gitlab-Event": "Issue Hook", "Content-Type": "application/json"}
+        if token is not None:
+            headers["X-Gitlab-Token"] = token
+        if delivery is not None:
+            headers["X-Gitlab-Event-UUID"] = delivery
+        body = json.dumps(payload).encode()
+        return self._answer(self._run(self._post(self.parameters.HOOK_GITLAB_PATH, body, headers)))
+
+    def bloom_encrypt_secret(self, secret, key=None):
+        return self._with_key(key, encrypt_integration_secret, secret)
+
+    def bloom_decrypt_secret(self, envelope, key=None):
+        return self._with_key(key, decrypt_integration_secret, envelope)
+
+    def bloom_is_encrypted(self, value):
+        return is_encrypted(value)
+
+    def bloom_envelope_prefix(self):
+        return ENVELOPE_PREFIX
+
+    def bloom_new_encryption_key(self):
+        return Fernet.generate_key().decode()
+
+    def bloom_api_create_setting(self, headers, project_id, tracker, token, webhook_secret):
+        body = {
+            "project_id": project_id,
+            "tracker": tracker,
+            "token": token,
+            "webhook_secret": webhook_secret,
+            "enabled": True,
+        }
+        return self.bloom_api_call("POST", "/api/integrations/settings", headers, json=body)
+
+    def bloom_api_rotate_setting_token(self, headers, setting_id, token):
+        path = f"/api/integrations/settings/{setting_id}"
+        return self.bloom_api_call("PATCH", path, headers, json={"token": token})
+
+    def bloom_read_setting_secrets(self, setting_id):
+        setting = self._run(self._get(IntegrationSetting, setting_id))
+        return setting.token_encrypted, setting.webhook_secret
 
     def bloom_set_defect_status(self, defect_id, status):
         self._run(self._update(Defect, defect_id, status=status))
@@ -550,6 +621,22 @@ class BloomApiInterface(BloomInterface):
             for name, value in fields.items():
                 setattr(row, name, value)
             await db.commit()
+
+    def _answer(self, answer):
+        try:
+            body = answer.json()
+        except ValueError:
+            body = None
+        return SimpleNamespace(status=answer.status_code, body=body)
+
+    def _with_key(self, key, call, value):
+        try:
+            if key is None:
+                return SimpleNamespace(value=call(value), status=None)
+            with patch.object(settings, "INTEGRATION_ENCRYPTION_KEY", key):
+                return SimpleNamespace(value=call(value), status=None)
+        except HTTPException as exc:
+            return SimpleNamespace(value=None, status=exc.status_code)
 
     async def _post(self, path, body, headers):
         transport = httpx.ASGITransport(app=self.api)

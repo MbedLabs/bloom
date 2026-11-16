@@ -62,6 +62,11 @@ from app.core.security import (
     get_current_user,
     get_external_doc_types,
 )
+from app.core.service_auth import (
+    create_service_credential,
+    require_bud_sync_token,
+    revoke_service_credential,
+)
 from app.models import (
     ArtefactLink,
     AuditEvent,
@@ -76,6 +81,7 @@ from app.models import (
     TestCase,
     user_token,
 )
+from app.models.models import ServiceCredential
 from app.models.user import User, UserRole
 from app.schemas import ProjectCreate, ProjectVariableUpdate
 from app.schemas import auth as auth_schemas
@@ -867,6 +873,21 @@ class BloomLogicInterface(BloomInterface):
     def bloom_sign_in_with_token(self, token):
         return self._run(self._sign_in_with_token(token))
 
+    def bloom_issue_untyped_token(self, user_id):
+        return create_access_token({"sub": str(user_id)})
+
+    def bloom_create_service_credential(self, user_id, name):
+        return self._run(self._create_service_credential(user_id, name))
+
+    def bloom_authenticate_service_token(self, raw):
+        return self._run(self._authenticate_service_token(raw))
+
+    def bloom_revoke_service_credential(self, credential_id):
+        self._run(self._revoke_service_credential(credential_id))
+
+    def bloom_expire_service_credential(self, credential_id):
+        self._run(self._expire_service_credential(credential_id))
+
     def bloom_run_smoke_script_with_fake_docker(self, image):
         with tempfile.TemporaryDirectory() as folder:
             log = Path(folder) / "docker-argv.jsonl"
@@ -989,6 +1010,39 @@ class BloomLogicInterface(BloomInterface):
     def _token_part(self, value):
         raw = json.dumps(value, separators=(",", ":")).encode()
         return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+    async def _create_service_credential(self, user_id, name):
+        async with self.maker() as db:
+            credential, raw = await create_service_credential(
+                db, created_by_user_id=user_id, name=name
+            )
+            await db.commit()
+            return SimpleNamespace(
+                id=credential.id,
+                scope=credential.scope,
+                token_hash=credential.token_hash,
+                expires_at=credential.expires_at,
+                deadline=datetime.utcnow() + self.parameters.SERVICE_LIFETIME,
+                raw=raw,
+            )
+
+    async def _authenticate_service_token(self, raw):
+        async with self.maker() as db:
+            try:
+                return (await require_bud_sync_token(token=raw, db=db)).id, None
+            except HTTPException as exc:
+                return None, exc.status_code
+
+    async def _revoke_service_credential(self, credential_id):
+        async with self.maker() as db:
+            await revoke_service_credential(db, credential_id)
+            await db.commit()
+
+    async def _expire_service_credential(self, credential_id):
+        async with self.maker() as db:
+            credential = await db.get(ServiceCredential, credential_id)
+            credential.expires_at = datetime.utcnow() - timedelta(seconds=1)
+            await db.commit()
 
     async def _sign_in_with_token(self, token):
         async with self.maker() as db:
