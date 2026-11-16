@@ -483,6 +483,69 @@ TOKEN_RACE_USE = {
 MSG_TOKEN_RACE_ISSUED = "the {token} is issued"
 MSG_TOKEN_RACE_ONE = "of six uses of one {token} at once, one is answered 200"
 MSG_TOKEN_RACE_OTHERS = "every other use of the {token} is refused with {status}"
+LINK_BEFORE = "e1a7c3f9b204"
+LINK_PREFIX = "PRJ"
+LINK_REQ_IDS = ["PRJ-REQ-001", "PRJ-REQ-002"]
+LINK_CONSTRAINT = "fk_artefact_links_allowed_triple"
+LINK_FORBIDDEN = ("REQ", "REQ", "forbidden")
+LINK_CORRECTED_ROLE = "refines"
+LINK_OLD_ENDS = (1, 2)
+LINK_NEW_ENDS = (2, 1)
+LINK_REJECTED = [
+    ("REQ", "REQ", "forbidden"),
+    ("TC", "REQ", "references"),
+    ("UNKNOWN", "REQ", "refines"),
+]
+LINK_ACCEPTED = [
+    ("TCO", "PROT", "references"),
+    ("PROT", "TCO", "implements"),
+    ("REQ", "REQ", "references"),
+    ("REQ", "REQ", "refines"),
+]
+LINK_LEGACY = ("derived_from", "derives_from")
+LINK_TABLE = "artefact_links"
+LINK_LEGACY_TABLE = "requirement_links"
+LINK_REPORT_TABLE_KEY = "table"
+LINK_CHECK_REFUSED = 1
+LINK_CHECK_PASSED = 0
+MSG_LINK_UNVALIDATED = "after the upgrade the link constraint is not validated"
+MSG_LINK_KEPT = "the upgrade keeps the link with the forbidden triple"
+MSG_LINK_REJECTED = "a new link {triple} is refused by the constraint"
+MSG_LINK_ACCEPTED = "a new link {triple} is stored"
+MSG_LINK_TABLE_IS_CODE = "the allowed triples in the database are the triples of the code"
+MSG_LINK_CHECK_REFUSED = "the check answers 1 while a forbidden link exists"
+MSG_LINK_REPORT_INVALID = "the report names the forbidden link with its role"
+MSG_LINK_REPORT_LEGACY = "the report maps the legacy requirement link to its new role"
+MSG_LINK_STILL_UNVALIDATED = "the refused check leaves the constraint not validated"
+MSG_LINK_CHECK_PASSED = "the check answers 0 once the link has an allowed role"
+MSG_LINK_VALIDATED = "the passed check validates the constraint"
+MSG_LINK_COUNTS = "one requirement link and one artefact link remain"
+LEGACY_CHANGE_ID = "PRJ-CHG-001"
+LEGACY_CHANGE_STATUS = "Implemented"
+LEGACY_REQUIREMENT_STATUS = "Approved"
+LEGACY_BASELINE_NAME = "Frozen"
+LEGACY_SNAPSHOT = '{"legacy": true}'
+WORKFLOW_SCHEMA_ASPECTS = {
+    "columns": "column names",
+    "types": "column types and nullability",
+    "primary": "primary keys",
+    "unique": "unique constraints",
+    "foreign": "foreign keys",
+    "checks": "check constraints",
+    "pending": "pending-request index",
+    "comments": "comment columns and their request key",
+}
+WORKFLOW_PENDING_INDEX = "uq_artefact_requests_pending_cycle"
+WORKFLOW_PENDING_COLUMNS = ["workflow_id", "revision_number", "kind"]
+WORKFLOW_PENDING_WHERE = "status='pending'"
+WORKFLOW_COMMENT_COLUMNS = ("revision_number", "content_hash", "review_request_id")
+WORKFLOW_COMMENT_KEY = (["review_request_id"], "artefact_requests", "SET NULL")
+MSG_WORKFLOW_SCHEMA_COMPARED = "the {aspect} of the workflow tables were compared"
+MSG_WORKFLOW_SCHEMA = "the migrated {aspect} equal the models"
+MSG_LEGACY_REQUIREMENTS = "the upgrade leaves every requirement status as it was"
+MSG_LEGACY_CHANGE = "the upgrade leaves the change request status as it was"
+MSG_LEGACY_BASELINE = "the upgrade leaves the baseline snapshot as it was"
+MSG_LEGACY_NO_WORKFLOWS = "the upgrade creates no workflow, revision or request"
 
 CLI_PREFIX = "/api/auth/cli"
 CLI_START = "/start"

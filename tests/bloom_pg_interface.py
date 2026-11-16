@@ -24,7 +24,16 @@ from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 from fastapi import Depends, FastAPI
-from sqlalchemy import bindparam, event, func, select, text
+from sqlalchemy import (
+    CheckConstraint,
+    UniqueConstraint,
+    bindparam,
+    event,
+    func,
+    inspect,
+    select,
+    text,
+)
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -37,13 +46,27 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import limiter
 from app.core.id_generator import next_doc_id
+from app.core.link_rules import allowed_link_triples
 from app.core.security import create_access_token, get_current_user
-from app.models import ArtefactWorkflow, AuditEvent, Project, Requirement
+from app.models import (
+    ArtefactComment,
+    ArtefactWorkflow,
+    AuditEvent,
+    Project,
+    Requirement,
+)
 from app.models import TestCase as TestCaseModel
 from app.models.cli_auth_session import CliAuthSession
 from app.models.user import User, UserRole
+from app.models.workflow import (
+    ArtefactRequest,
+    ArtefactRequestRecipient,
+    ArtefactRevision,
+    ArtefactRevisionFile,
+)
 from app.services import cli_auth, integration_sync
 from app.services.token_service import hash_token, invalidate_all_refresh_tokens
+from app.tools.check_link_rules import check_link_rules
 from tests.bloom_interface import BloomInterface
 
 REAL_CLIENT = httpx.AsyncClient
@@ -239,6 +262,64 @@ class BloomPgInterface(BloomInterface):
             old_password=self.bloom_log_in_for_cookie(email, old_password).status,
             new_password=self.bloom_log_in_for_cookie(email, new_password).status,
         )
+
+    def bloom_seed_requirements(self, prefix, req_ids):
+        return self._run(self._seed_requirements(prefix, req_ids))
+
+    def bloom_insert_link(self, project, source, target, role, ends, keep=True):
+        return self._run(self._insert_link(project, source, target, role, ends, keep))
+
+    def bloom_insert_legacy_requirement_link(self):
+        self._run(
+            self._execute(
+                "INSERT INTO requirement_links (source_id, target_id, link_type, created_at) "
+                "VALUES (1, 2, :link_type, now())",
+                link_type=self.parameters.LINK_LEGACY[0],
+            )
+        )
+
+    def bloom_link_constraint_validated(self):
+        return self._run(
+            self._fetch_value(
+                "SELECT convalidated FROM pg_constraint WHERE conname = :constraint "
+                "AND conrelid = 'artefact_links'::regclass",
+                constraint=self.parameters.LINK_CONSTRAINT,
+            )
+        )
+
+    def bloom_first_link_id(self):
+        return self._run(self._fetch_value("SELECT id FROM artefact_links ORDER BY id"))
+
+    def bloom_set_link_role(self, link_id, role):
+        self._run(
+            self._execute(
+                "UPDATE artefact_links SET role = :role WHERE id = :id", role=role, id=link_id
+            )
+        )
+
+    def bloom_count_links(self):
+        return (
+            self._run(self._fetch_value("SELECT count(*) FROM requirement_links")),
+            self._run(self._fetch_value("SELECT count(*) FROM artefact_links")),
+        )
+
+    def bloom_check_link_rules(self):
+        return self._run(self._check_link_rules())
+
+    def bloom_read_allowed_link_triples(self):
+        return self._run(self._read_allowed_link_triples())
+
+    def bloom_code_link_triples(self):
+        return set(allowed_link_triples())
+
+    def bloom_seed_legacy_rows(self, project):
+        self._run(self._seed_legacy_rows(project))
+
+    def bloom_read_legacy_rows(self, workflows=False):
+        return self._run(self._read_legacy_rows(workflows))
+
+    def bloom_compare_workflow_schema(self):
+        return self._run(self._compare_workflow_schema())
 
     def bloom_seed_workflow_of_a_creator(self):
         return self._run(self._seed_workflow_of_a_creator())
@@ -512,6 +593,248 @@ class BloomPgInterface(BloomInterface):
                     self.parameters.RACE_TIMEOUT_SECONDS,
                 )
         return [SimpleNamespace(status=reply.status_code, body=reply.json()) for reply in replies]
+
+    async def _execute(self, statement, **values):
+        async with self.engine.begin() as connection:
+            await connection.execute(text(statement), values)
+
+    async def _seed_requirements(self, prefix, req_ids):
+        statement = (
+            "INSERT INTO requirements (project_id, req_id, title, status, priority, req_type, "
+            "req_origin, visibility, created_at, updated_at) VALUES (:project, :req_id, :req_id, "
+            "'Draft', 'Medium', 'Functional', 'Internal', 'internal', now(), now())"
+        )
+        async with self.engine.begin() as connection:
+            project = await self._insert_project(connection, prefix)
+            for req_id in req_ids:
+                await connection.execute(text(statement), {"project": project, "req_id": req_id})
+        return project
+
+    async def _insert_link(self, project, source, target, role, ends, keep):
+        statement = text(
+            "INSERT INTO artefact_links (project_id, source_type, source_id, target_type, "
+            "target_id, role, suspect, created_at) "
+            "VALUES (:project, :source, :source_id, :target, :target_id, :role, false, now()) "
+            "RETURNING id"
+        )
+        values = {"project": project, "source": source, "target": target, "role": role}
+        values["source_id"], values["target_id"] = ends
+        async with self.engine.connect() as connection:
+            transaction = await connection.begin()
+            try:
+                link_id = (await connection.execute(statement, values)).scalar_one()
+            except IntegrityError as error:
+                await transaction.rollback()
+                return SimpleNamespace(id=None, error=str(error))
+            if keep:
+                await transaction.commit()
+            else:
+                await transaction.rollback()
+            return SimpleNamespace(id=link_id, error=None)
+
+    async def _check_link_rules(self):
+        lines = []
+        async with self.maker() as db:
+            exit_code = await check_link_rules(db, validate=True, emit=lines.append)
+            await db.commit()
+        return SimpleNamespace(exit_code=exit_code, report=[json.loads(line) for line in lines])
+
+    async def _read_allowed_link_triples(self):
+        async with self.engine.connect() as connection:
+            rows = await connection.execute(
+                text("SELECT source_type, target_type, role FROM allowed_link_triples")
+            )
+            return {tuple(row) for row in rows}
+
+    async def _seed_legacy_rows(self, project):
+        await self._execute(
+            "UPDATE requirements SET status = :status WHERE id = 1",
+            status=self.parameters.LEGACY_REQUIREMENT_STATUS,
+        )
+        await self._execute(
+            "INSERT INTO change_requests (project_id, change_id, title, status, visibility, "
+            "priority, change_type, created_at, updated_at) VALUES (:project, :change_id, "
+            ":change_id, :status, 'internal', 'Medium', 'Enhancement', now(), now())",
+            project=project,
+            change_id=self.parameters.LEGACY_CHANGE_ID,
+            status=self.parameters.LEGACY_CHANGE_STATUS,
+        )
+        await self._execute(
+            "INSERT INTO baselines (project_id, name, status, baseline_type, snapshot, "
+            "created_at, updated_at) VALUES (:project, :name, 'Open', 'Milestone', "
+            "CAST(:snapshot AS JSON), now(), now())",
+            project=project,
+            name=self.parameters.LEGACY_BASELINE_NAME,
+            snapshot=self.parameters.LEGACY_SNAPSHOT,
+        )
+
+    async def _read_legacy_rows(self, workflows):
+        async with self.engine.connect() as connection:
+            rows = await connection.execute(text("SELECT id, status FROM requirements ORDER BY id"))
+            requirements = [tuple(row) for row in rows]
+        counts = None
+        if workflows:
+            counts = [
+                await self._fetch_value("SELECT count(*) FROM artefact_workflows"),
+                await self._fetch_value("SELECT count(*) FROM artefact_revisions"),
+                await self._fetch_value("SELECT count(*) FROM artefact_requests"),
+            ]
+        return SimpleNamespace(
+            requirements=requirements,
+            change=await self._fetch_value("SELECT status FROM change_requests"),
+            baseline=await self._fetch_value("SELECT snapshot::text FROM baselines"),
+            workflows=counts,
+        )
+
+    async def _compare_workflow_schema(self):
+        async with self.engine.connect() as connection:
+            return await connection.run_sync(self._workflow_schema_mismatches)
+
+    def _workflow_schema_mismatches(self, connection):
+        inspector = inspect(connection)
+        found = {aspect: [] for aspect in self.parameters.WORKFLOW_SCHEMA_ASPECTS}
+        compared = dict.fromkeys(found, 0)
+        quoted = r"'([^']*)'"
+
+        def note(aspect, where, actual, expected):
+            compared[aspect] += 1
+            if actual != expected:
+                found[aspect].append(f"{where}: {actual!r} is not {expected!r}")
+
+        def kind(column_type):
+            return str(column_type.compile(dialect=connection.dialect)).upper()
+
+        models = (
+            ArtefactWorkflow,
+            ArtefactRevision,
+            ArtefactRequest,
+            ArtefactRequestRecipient,
+            ArtefactRevisionFile,
+        )
+        for table in (model.__table__ for model in models):
+            columns = inspector.get_columns(table.name)
+            note(
+                "columns",
+                table.name,
+                sorted(column["name"] for column in columns),
+                sorted(table.columns.keys()),
+            )
+            for column in columns:
+                if column["name"] in table.c:
+                    expected = table.c[column["name"]]
+                    note(
+                        "types",
+                        f"{table.name}.{column['name']}",
+                        (column["nullable"], kind(column["type"])),
+                        (expected.nullable, kind(expected.type)),
+                    )
+            note(
+                "primary",
+                table.name,
+                inspector.get_pk_constraint(table.name)["constrained_columns"],
+                [column.name for column in table.primary_key],
+            )
+            note(
+                "unique",
+                table.name,
+                sorted(
+                    tuple(u["column_names"]) for u in inspector.get_unique_constraints(table.name)
+                ),
+                sorted(
+                    tuple(column.name for column in constraint.columns)
+                    for constraint in table.constraints
+                    if type(constraint) is UniqueConstraint
+                ),
+            )
+            note(
+                "foreign",
+                table.name,
+                sorted(
+                    (
+                        (
+                            tuple(key["constrained_columns"]),
+                            tuple(f"{key['referred_table']}.{c}" for c in key["referred_columns"]),
+                            key["options"].get("ondelete"),
+                        )
+                        for key in inspector.get_foreign_keys(table.name)
+                    ),
+                    key=repr,
+                ),
+                sorted(
+                    (
+                        (
+                            tuple(column.name for column in constraint.columns),
+                            tuple(element.target_fullname for element in constraint.elements),
+                            constraint.ondelete,
+                        )
+                        for constraint in table.foreign_key_constraints
+                    ),
+                    key=repr,
+                ),
+            )
+            checks = inspector.get_check_constraints(table.name)
+            expected_checks = {
+                constraint.name: str(constraint.sqltext)
+                for constraint in table.constraints
+                if type(constraint) is CheckConstraint
+            }
+            note("checks", table.name, sorted(c["name"] for c in checks), sorted(expected_checks))
+            for check in checks:
+                sqltext = expected_checks.get(check["name"])
+                if sqltext is not None:
+                    note(
+                        "checks",
+                        f"{check['name']} values",
+                        re.findall(quoted, check["sqltext"]),
+                        re.findall(quoted, sqltext),
+                    )
+                    field = sqltext.split()[0]
+                    note(
+                        "checks",
+                        f"{check['name']} on {field}",
+                        bool(re.search(rf"\b{field}\b", check["sqltext"])),
+                        True,
+                    )
+        pending = next(
+            (
+                index
+                for index in inspector.get_indexes(ArtefactRequest.__table__.name)
+                if index["name"] == self.parameters.WORKFLOW_PENDING_INDEX
+            ),
+            None,
+        )
+        actual = None
+        if pending is not None:
+            predicate = re.sub(
+                r"::[a-z ]+", "", str(pending["dialect_options"]["postgresql_where"])
+            )
+            actual = (pending["unique"], pending["column_names"], re.sub(r"[()\s]", "", predicate))
+        note(
+            "pending",
+            self.parameters.WORKFLOW_PENDING_INDEX,
+            actual,
+            (
+                True,
+                self.parameters.WORKFLOW_PENDING_COLUMNS,
+                self.parameters.WORKFLOW_PENDING_WHERE,
+            ),
+        )
+        comment = ArtefactComment.__table__
+        stored = {column["name"]: column for column in inspector.get_columns(comment.name)}
+        for name in self.parameters.WORKFLOW_COMMENT_COLUMNS:
+            column = stored.get(name)
+            note(
+                "comments",
+                f"{comment.name}.{name}",
+                None if column is None else (column["nullable"], kind(column["type"])),
+                (True, kind(comment.c[name].type)),
+            )
+        keys = [
+            (key["constrained_columns"], key["referred_table"], key["options"].get("ondelete"))
+            for key in inspector.get_foreign_keys(comment.name)
+        ]
+        note("comments", "review request key", self.parameters.WORKFLOW_COMMENT_KEY in keys, True)
+        return SimpleNamespace(found=found, compared=compared)
 
     async def _next_requirement_id(self, project_id, prefix):
         async with self.maker() as db:
