@@ -29,6 +29,7 @@ import tempfile
 import time
 import tomllib
 import typing
+import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -108,6 +109,8 @@ from app.core.permissions import (
     rule_of,
 )
 from app.core.policy_seed import DEFAULT_GROUPS, DEFAULT_POLICIES
+from app.core.reqif import ReqIFParseError, parse_reqif
+from app.core.reqif_policy import _validate_member, read_reqif_upload
 from app.core.security import (
     _policy_terms,
     access_terms,
@@ -169,9 +172,27 @@ from app.services.jira_inbound import (
     referenced_tc_ids,
     search_fields,
 )
+from app.services.reqif_worker import ReqIFProcessingTimeout, parse_reqif_in_worker
 from tests.bloom_interface import BloomInterface
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+class _ChunkedUpload:
+    def __init__(self, payload, max_chunk=3):
+        self.payload = payload
+        self.offset = 0
+        self.max_chunk = max_chunk
+        self.read_calls = 0
+
+    async def read(self, size=-1):
+        self.read_calls += 1
+        if self.offset >= len(self.payload):
+            return b""
+        requested = len(self.payload) if size < 0 else size
+        chunk = self.payload[self.offset : self.offset + min(requested, self.max_chunk)]
+        self.offset += len(chunk)
+        return chunk
 
 
 class BloomLogicInterface(BloomInterface):
@@ -355,6 +376,65 @@ class BloomLogicInterface(BloomInterface):
             return id_generator.compute_next_id(existing_ids, prefix, type_code), None
         except ValueError as exc:
             return None, type(exc).__name__
+
+    def bloom_read_reqif_upload(self, payload, **limits):
+        upload = _ChunkedUpload(payload)
+        with contextlib.ExitStack() as stack:
+            for name, value in limits.items():
+                stack.enter_context(patch.object(settings, name, value))
+            try:
+                data, refusal = self._run(read_reqif_upload(upload)), None
+            except ReqIFParseError as refused:
+                data, refusal = None, str(refused)
+        return SimpleNamespace(
+            data=data, refusal=refusal, read_calls=upload.read_calls, read_bytes=upload.offset
+        )
+
+    def bloom_reqif_archive(self, entries, deflated=False):
+        buffer = io.BytesIO()
+        compression = zipfile.ZIP_DEFLATED if deflated else zipfile.ZIP_STORED
+        with zipfile.ZipFile(buffer, "w", compression=compression) as archive:
+            for name, payload in entries:
+                archive.writestr(name, payload)
+        return buffer.getvalue()
+
+    def bloom_reqif_document(self, objects=b"", relations=b"", hierarchy=b""):
+        return (
+            b'<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd">'
+            b"<CORE-CONTENT><REQ-IF-CONTENT><SPEC-OBJECTS>"
+            + objects
+            + b"</SPEC-OBJECTS><SPECIFICATIONS>"
+            + hierarchy
+            + b"</SPECIFICATIONS><SPEC-RELATIONS>"
+            + relations
+            + b"</SPEC-RELATIONS></REQ-IF-CONTENT></CORE-CONTENT></REQ-IF>"
+        )
+
+    def bloom_parse_reqif(self, payload, **limits):
+        with contextlib.ExitStack() as stack:
+            for name, value in limits.items():
+                stack.enter_context(patch.object(settings, name, value))
+            try:
+                return parse_reqif(payload), None
+            except ReqIFParseError as refused:
+                return None, str(refused)
+
+    def bloom_check_encrypted_member(self):
+        info = zipfile.ZipInfo("document.reqif")
+        info.flag_bits |= 0x1
+        info.file_size = 1
+        info.compress_size = 1
+        try:
+            _validate_member(info)
+        except ReqIFParseError as refused:
+            return str(refused)
+        return None
+
+    def bloom_parse_reqif_in_worker(self, payload, timeout_seconds):
+        try:
+            return self._run(parse_reqif_in_worker(payload, timeout_seconds=timeout_seconds)), False
+        except ReqIFProcessingTimeout:
+            return None, True
 
     def bloom_seed_testrail_project(self):
         return self._run(self._seed_testrail_project())

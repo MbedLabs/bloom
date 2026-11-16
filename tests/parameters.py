@@ -3420,3 +3420,59 @@ MSG_TRI_NO_TITLE = "a case without a title is skipped with its error"
 MSG_TRI_PREVIEW = "the column preview lists the header and the detected section column"
 MSG_TRI_LOOKUPS = "importing twenty cases takes as many lookups as importing one"
 MSG_TRI_ROLE = "an import whose link role no longer exists is refused naming the case and the role, and writes nothing"
+RQL_MINIMAL = (
+    b'<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd">'
+    b"<CORE-CONTENT><REQ-IF-CONTENT><SPEC-OBJECTS>"
+    b'<SPEC-OBJECT IDENTIFIER="OBJ-1"><VALUES/></SPEC-OBJECT>'
+    b"</SPEC-OBJECTS></REQ-IF-CONTENT></CORE-CONTENT></REQ-IF>"
+)
+RQL_STREAM_LIMITS = {"REQIF_MAX_REQUEST_BYTES": 10, "REQIF_STREAM_CHUNK_BYTES": 4}
+RQL_WRONG_ARCHIVES = [
+    ("no ReqIF member", [("readme.txt", b"no")]),
+    ("two ReqIF members", [("a.reqif", RQL_MINIMAL), ("b.REQIF", RQL_MINIMAL)]),
+    ("an XML member only", [("only.xml", RQL_MINIMAL)]),
+]
+RQL_THREE_ENTRIES = [("document.reqif", RQL_MINIMAL), ("a.txt", b"a"), ("b.txt", b"b")]
+RQL_ONE_ENTRY = [("document.reqif", RQL_MINIMAL)]
+RQL_PADDED_ENTRY = [("document.reqif", RQL_MINIMAL + b" " * 100_000)]
+RQL_THREE_OBJECTS = b"".join(
+    f'<SPEC-OBJECT IDENTIFIER="OBJ-{index}"><VALUES/></SPEC-OBJECT>'.encode() for index in range(3)
+)
+RQL_ONE_OBJECT = b'<SPEC-OBJECT IDENTIFIER="OBJ"><VALUES/></SPEC-OBJECT>'
+RQL_TWO_RELATIONS = b"".join(
+    (
+        f'<SPEC-RELATION IDENTIFIER="REL-{index}">'
+        "<SOURCE><SPEC-OBJECT-REF>OBJ</SPEC-OBJECT-REF></SOURCE>"
+        "<TARGET><SPEC-OBJECT-REF>OBJ</SPEC-OBJECT-REF></TARGET>"
+        "</SPEC-RELATION>"
+    ).encode()
+    for index in range(2)
+)
+RQL_THREE_LEVELS = (
+    b'<SPECIFICATION IDENTIFIER="SPEC"><CHILDREN>'
+    b"<SPEC-HIERARCHY><OBJECT><SPEC-OBJECT-REF>A</SPEC-OBJECT-REF></OBJECT><CHILDREN>"
+    b"<SPEC-HIERARCHY><OBJECT><SPEC-OBJECT-REF>B</SPEC-OBJECT-REF></OBJECT><CHILDREN>"
+    b"<SPEC-HIERARCHY><OBJECT><SPEC-OBJECT-REF>C</SPEC-OBJECT-REF></OBJECT>"
+    b"</SPEC-HIERARCHY></CHILDREN></SPEC-HIERARCHY></CHILDREN></SPEC-HIERARCHY>"
+    b"</CHILDREN></SPECIFICATION>"
+)
+RQL_REPEATED_ANCESTOR = (
+    b'<SPECIFICATION IDENTIFIER="SPEC"><CHILDREN>'
+    b"<SPEC-HIERARCHY><OBJECT><SPEC-OBJECT-REF>A</SPEC-OBJECT-REF></OBJECT><CHILDREN>"
+    b"<SPEC-HIERARCHY><OBJECT><SPEC-OBJECT-REF>A</SPEC-OBJECT-REF></OBJECT>"
+    b"</SPEC-HIERARCHY></CHILDREN></SPEC-HIERARCHY>"
+    b"</CHILDREN></SPECIFICATION>"
+)
+MSG_RQL_AT_LIMIT = "an upload exactly at the request limit is read whole, in several chunks"
+MSG_RQL_OVER_LIMIT = "an upload over the request limit is refused before it is read to the end"
+MSG_RQL_ONE_MEMBER = "an archive with {what} is refused: exactly one ReqIF member is required"
+MSG_RQL_ENTRIES = "an archive with more entries than the limit is refused"
+MSG_RQL_MEMBER_SIZE = "a member larger than the uncompressed limit is refused"
+MSG_RQL_RATIO = "a member compressed beyond the ratio limit is refused"
+MSG_RQL_ENCRYPTED = "an encrypted archive member is refused"
+MSG_RQL_WORKER = "the worker parses the document and returns its object"
+MSG_RQL_DEADLINE = "the worker is stopped when the deadline passes"
+MSG_RQL_OBJECTS = "a document with more objects than the limit is refused"
+MSG_RQL_RELATIONS = "a document with more relations than the limit is refused"
+MSG_RQL_DEPTH = "a hierarchy deeper than the limit is refused"
+MSG_RQL_CYCLE = "a hierarchy that repeats an ancestor is refused as a cycle"
