@@ -77,6 +77,7 @@ from app.api.import_service import (
     testrail_csv_columns,
 )
 from app.api.policies import _apply_rules, _validate_rules, policy_rules
+from app.api.search import run_global_search
 from app.core import (
     document_kinds,
     id_generator,
@@ -111,6 +112,7 @@ from app.core.permissions import (
 from app.core.policy_seed import DEFAULT_GROUPS, DEFAULT_POLICIES
 from app.core.reqif import ReqIFParseError, parse_reqif
 from app.core.reqif_policy import _validate_member, read_reqif_upload
+from app.core.search_registry import rank_match
 from app.core.security import (
     _policy_terms,
     access_terms,
@@ -143,7 +145,7 @@ from app.models import (
     user_token,
 )
 from app.models.groups import Group, GroupMembership, Policy
-from app.models.models import ServiceCredential
+from app.models.models import ArtefactVisibility, ServiceCredential
 from app.models.project_membership import ProjectAccess
 from app.models.user import User, UserRole
 from app.schemas import ProjectCreate, ProjectVariableUpdate
@@ -376,6 +378,77 @@ class BloomLogicInterface(BloomInterface):
             return id_generator.compute_next_id(existing_ids, prefix, type_code), None
         except ValueError as exc:
             return None, type(exc).__name__
+
+    def bloom_seed_search_records(self):
+        return self._run(self._seed_search_records())
+
+    def bloom_search(self, user_id, query, project_id=None):
+        return self._run(self._search(user_id, query, project_id))
+
+    def bloom_rank_match(self, query, doc_id, title):
+        return rank_match(query, doc_id, title)
+
+    async def _search(self, user_id, query, project_id):
+        async with self.maker() as db:
+            user = await db.get(User, user_id)
+            return await run_global_search(db, user, q=query, project_id=project_id)
+
+    async def _seed_search_records(self):
+        customer, internal = ArtefactVisibility.customer.value, ArtefactVisibility.internal.value
+        async with self.maker() as db:
+            alpha, beta = Project(name="Demo", prefix="PRJ"), Project(name="ABC", prefix="ABC")
+            admin = User(
+                email="admin@test.local",
+                full_name="Ada Admin",
+                hashed_password="x",
+                role=UserRole.admin,
+            )
+            member = User(
+                email="member@test.local",
+                full_name="Mia Maintainer",
+                hashed_password="x",
+                role=UserRole.maintainer,
+            )
+            external = User(
+                email="ext@test.local",
+                full_name="Eve External",
+                hashed_password="x",
+                role=UserRole.external,
+            )
+            db.add_all([alpha, beta, admin, member, external])
+            await db.flush()
+            db.add_all(
+                [
+                    Requirement(
+                        project_id=alpha.id,
+                        req_id="PRJ-REQ-001",
+                        title="Login shall be possible",
+                        visibility=customer,
+                    ),
+                    Requirement(
+                        project_id=alpha.id,
+                        req_id="PRJ-REQ-002",
+                        title="Internal crypto module",
+                        visibility=internal,
+                    ),
+                    Requirement(project_id=beta.id, req_id="ABC-REQ-001", title="Login for Beta"),
+                    TestCase(
+                        project_id=alpha.id,
+                        tc_id="PRJ-TC-001",
+                        title="Verify login flow",
+                        visibility=customer,
+                    ),
+                    Document(project_id=alpha.id, doc_id="PRJ-SPEC-001", title="Login spec"),
+                    Defect(
+                        project_id=alpha.id, defect_id="PRJ-DEF-001", title="Login button broken"
+                    ),
+                    TestSuite(project_id=alpha.id, suite_id="PRJ-TS-001", name="Login suite"),
+                ]
+            )
+            await db.commit()
+            return SimpleNamespace(
+                alpha=alpha.id, beta=beta.id, admin=admin.id, member=member.id, external=external.id
+            )
 
     def bloom_read_reqif_upload(self, payload, **limits):
         upload = _ChunkedUpload(payload)

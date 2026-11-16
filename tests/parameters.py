@@ -3476,3 +3476,31 @@ MSG_RQL_OBJECTS = "a document with more objects than the limit is refused"
 MSG_RQL_RELATIONS = "a document with more relations than the limit is refused"
 MSG_RQL_DEPTH = "a hierarchy deeper than the limit is refused"
 MSG_RQL_CYCLE = "a hierarchy that repeats an ancestor is refused as a cycle"
+SRC_ALL_LOGIN = {
+    ("REQ", "PRJ-REQ-001"),
+    ("REQ", "ABC-REQ-001"),
+    ("TC", "PRJ-TC-001"),
+    ("SPEC", "PRJ-SPEC-001"),
+    ("DEF", "PRJ-DEF-001"),
+    ("TS", "PRJ-TS-001"),
+}
+SRC_EXACT_ID = "PRJ-REQ-001"
+SRC_READER = {"*": ["view", "comment"]}
+SRC_EVERYTHING = {"*": ["*"]}
+SRC_RANKS = [
+    ("an exact id", "prj-req-001", "PRJ-REQ-001", "anything", 0),
+    ("the start of an id", "prj-req", "PRJ-REQ-001", "x", 1),
+    ("the start of a title", "login", "PRJ-REQ-001", "Login shall", 2),
+    ("a part of an id", "req-001", "PRJ-REQ-001", "x", 3),
+    ("a part of a title", "shall", "PRJ-REQ-001", "Login shall", 4),
+    ("no match", "zzz", "PRJ-REQ-001", "Login shall", 5),
+]
+MSG_SRC_ADMIN = "an administrator finds the matching records of every type in every project"
+MSG_SRC_EXACT = "the record whose id equals the query comes first"
+MSG_SRC_PROJECT = "the project filter keeps the results of that project only"
+MSG_SRC_MEMBER = "a member finds records of their own project only"
+MSG_SRC_NO_MEMBERSHIP = "a user without project access finds nothing"
+MSG_SRC_EXTERNAL = "an external reader finds only customer records of the allowed document type"
+MSG_SRC_EXTERNAL_INTERNAL = "an external reader does not find an internal record"
+MSG_SRC_NO_ALLOWLIST = "an external reader without allowed document types finds nothing"
+MSG_SRC_RANK = "{what} ranks {rank}"

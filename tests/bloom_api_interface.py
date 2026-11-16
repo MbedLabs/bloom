@@ -353,22 +353,6 @@ class BloomApiInterface(BloomInterface):
         self.patches.enter_context(patch.object(limiter, "enabled", False))
         self.api = main.app
 
-    def bloom_add_external_member(
-        self, project_id, user_id, permissions, visibility, doc_types=None
-    ):
-        self._run(
-            self._add_external_member(project_id, user_id, permissions, visibility, doc_types)
-        )
-
-    def bloom_add_internal_member(self, project_id, user_id, permissions):
-        self._run(
-            self._add(
-                project_access_fixture(
-                    user_id=user_id, project_id=project_id, permissions=permissions
-                )
-            )
-        )
-
     def bloom_create_external_reader_environment(self, doc_types=()):
         values = self.parameters
         self.bloom_start_full_api()
@@ -805,7 +789,7 @@ class BloomApiInterface(BloomInterface):
 
     def bloom_cli_change_session(self, session_id, **values):
         statement = update(CliAuthSession).where(CliAuthSession.id == UUID(session_id))
-        self._run(self._update(statement.values(**values)))
+        self._run(self._execute_statement(statement.values(**values)))
 
     def bloom_cli_expire(self, session_id):
         self.bloom_cli_change_session(
@@ -814,11 +798,13 @@ class BloomApiInterface(BloomInterface):
 
     def bloom_set_session_version(self, user_id, version):
         self._run(
-            self._update(update(User).where(User.id == user_id).values(session_version=version))
+            self._execute_statement(
+                update(User).where(User.id == user_id).values(session_version=version)
+            )
         )
 
     def bloom_change_refresh_rows(self, **values):
-        self._run(self._update(update(UserToken).values(**values)))
+        self._run(self._execute_statement(update(UserToken).values(**values)))
 
     def bloom_count_user_tokens(self):
         return len(self._run(self._all(select(UserToken))))
@@ -955,7 +941,9 @@ class BloomApiInterface(BloomInterface):
         return {"Authorization": f"Bearer {create_access_token(claims)}"}
 
     def bloom_deactivate(self, user_id):
-        self._run(self._update(update(User).where(User.id == user_id).values(is_active=False)))
+        self._run(
+            self._execute_statement(update(User).where(User.id == user_id).values(is_active=False))
+        )
 
     def bloom_add_notification(self, user_id):
         return self._run(
@@ -1534,7 +1522,7 @@ class BloomApiInterface(BloomInterface):
         async with REAL_CLIENT(transport=transport, base_url=self.parameters.API_BASE) as client:
             return await client.request(method, path, headers=headers, **fields)
 
-    async def _update(self, statement):
+    async def _execute_statement(self, statement):
         async with self.maker() as db:
             await db.execute(statement)
             await db.commit()
@@ -1567,21 +1555,6 @@ class BloomApiInterface(BloomInterface):
         transport = httpx.ASGITransport(app=self.api)
         async with REAL_CLIENT(transport=transport, base_url=self.parameters.API_BASE) as client:
             return await client.post(path, content=body, headers=headers)
-
-    async def _add_external_member(self, project_id, user_id, permissions, visibility, doc_types):
-        async with self.maker() as db:
-            membership = project_access_fixture(
-                user_id=user_id,
-                project_id=project_id,
-                permissions=permissions,
-                visibility=visibility,
-                doc_types=[],
-            )
-            db.add(membership)
-            await db.flush()
-            for doc_type in DOC_TYPE_RESOURCES if doc_types is None else doc_types:
-                allow_doc_types(membership.policies[0], [doc_type])
-            await db.commit()
 
     async def _request(self, method, path, headers=None, json=None, params=None):
         transport = httpx.ASGITransport(app=self.api)

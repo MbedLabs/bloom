@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 import tests.parameters as params
 from app.api import integrations
 from app.core.database import Base
+from app.core.permissions import DOC_TYPE_RESOURCES
 from app.core.security import get_password_hash
 from app.models import (
     ChangeRequest,
@@ -31,6 +32,7 @@ from app.models import (
 )
 from app.models.user import User, UserRole
 from app.services.integration_secrets import encrypt_integration_secret
+from tests.access_fixtures import allow_doc_types, project_access_fixture
 
 REAL_CLIENT = httpx.AsyncClient
 
@@ -158,6 +160,22 @@ class BloomInterface:
             )
         )
 
+    def bloom_add_external_member(
+        self, project_id, user_id, permissions, visibility, doc_types=None
+    ):
+        self._run(
+            self._add_external_member(project_id, user_id, permissions, visibility, doc_types)
+        )
+
+    def bloom_add_internal_member(self, project_id, user_id, permissions):
+        self._run(
+            self._add(
+                project_access_fixture(
+                    user_id=user_id, project_id=project_id, permissions=permissions
+                )
+            )
+        )
+
     def bloom_list_defects(self):
         return self._run(self._all(select(Defect).order_by(Defect.id)))
 
@@ -192,6 +210,21 @@ class BloomInterface:
             except Exception:
                 await session.rollback()
                 raise
+
+    async def _add_external_member(self, project_id, user_id, permissions, visibility, doc_types):
+        async with self.maker() as db:
+            membership = project_access_fixture(
+                user_id=user_id,
+                project_id=project_id,
+                permissions=permissions,
+                visibility=visibility,
+                doc_types=[],
+            )
+            db.add(membership)
+            await db.flush()
+            for doc_type in DOC_TYPE_RESOURCES if doc_types is None else doc_types:
+                allow_doc_types(membership.policies[0], [doc_type])
+            await db.commit()
 
     async def _scalar(self, query):
         async with self.maker() as db:
