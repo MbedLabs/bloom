@@ -2284,3 +2284,21 @@ MSG_READER_VARIABLES_REFUSED = (
     "an external reader's list of the project parameters is refused with 403"
 )
 MSG_READER_VARIABLES_SHOWN = "a member with every permission lists the project parameter"
+READER_CUSTOMER_TC = f"{VISIBILITY_PREFIX}-TC-001"
+READER_INTERNAL_TC = f"{VISIBILITY_PREFIX}-TC-002"
+READER_VISIBLE_COMMENT = " ".join(_draw.sample(_WORDS, 3))
+READER_HIDDEN_COMMENT = " ".join(_draw.sample(_WORDS, 3))
+READER_VISIBLE_ACTIVITY = " ".join(_draw.sample(_WORDS, 3))
+READER_HIDDEN_ACTIVITY = " ".join(_draw.sample(_WORDS, 3))
+READER_LINK = ("TC", "REQ", "verifies")
+MSG_READER_TC_LIST = "an external reader lists the customer test case and not the internal one"
+MSG_READER_TC_VISIBILITY = "a test case read by an administrator carries its visibility"
+MSG_READER_COMMENTS_HIDDEN = (
+    "the comments of an internal requirement are answered 404 to an external reader"
+)
+MSG_READER_ACTIVITY_HIDDEN = (
+    "the activity of an internal requirement is answered 404 to an external reader"
+)
+MSG_READER_COMMENTS_SHOWN = "an external reader gets the comment of the customer requirement"
+MSG_READER_ACTIVITY_SHOWN = "an external reader gets the activity of the customer requirement"
+MSG_READER_LINKS = "an external reader lists only the link whose two ends are customer artefacts"

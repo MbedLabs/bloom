@@ -3,11 +3,13 @@
 import tests.config  # noqa: F401
 
 SUITES = [
+    "tests.sec.BLOOM_artefact_comments_activity_external_visibility.ArtefactCommentsActivityExternalVisibilityTest",
     "tests.sec.BLOOM_artefacts_external_visibility.ArtefactsExternalVisibilityTest",
     "tests.sec.BLOOM_baselines_external_visibility.BaselinesExternalVisibilityTest",
     "tests.sec.BLOOM_defect_webhook_security.DefectWebhookSecurityTest",
     "tests.sec.BLOOM_integration_secrets.IntegrationSecretsTest",
     "tests.sec.BLOOM_integrations_settings_redaction.IntegrationsSettingsRedactionTest",
+    "tests.sec.BLOOM_links_external_visibility.LinksExternalVisibilityTest",
     "tests.sec.BLOOM_nginx_security_headers.NginxSecurityHeadersTest",
     "tests.sec.BLOOM_no_database_ids_in_paths.NoDatabaseIdsInPathsTest",
     "tests.sec.BLOOM_password_policy.PasswordPolicyTest",
@@ -15,5 +17,6 @@ SUITES = [
     "tests.sec.BLOOM_project_variables_external_access.ProjectVariablesExternalAccessTest",
     "tests.sec.BLOOM_route_auth_matrix.RouteAuthMatrixTest",
     "tests.sec.BLOOM_service_credentials.ServiceCredentialsTest",
+    "tests.sec.BLOOM_test_cases_external_visibility.TestCasesExternalVisibilityTest",
     "tests.sec.BLOOM_token_logging.TokenLoggingTest",
 ]

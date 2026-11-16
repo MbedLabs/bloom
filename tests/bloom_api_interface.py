@@ -32,6 +32,9 @@ from app.core.database import get_db
 from app.core.deps import limiter
 from app.core.permissions import DOC_TYPE_RESOURCES
 from app.models import (
+    ArtefactActivity,
+    ArtefactComment,
+    ArtefactLink,
     Baseline,
     ChangeRequest,
     Defect,
@@ -207,8 +210,10 @@ class BloomApiInterface(BloomInterface):
     def bloom_update_setting(self, setting_id, **fields):
         self._run(self._update(IntegrationSetting, setting_id, **fields))
 
-    def bloom_add_test_case(self, project_id, tc_id, title):
-        return self._run(self._add(TestCaseModel(project_id=project_id, tc_id=tc_id, title=title)))
+    def bloom_add_test_case(self, project_id, tc_id, title, **fields):
+        return self._run(
+            self._add(TestCaseModel(project_id=project_id, tc_id=tc_id, title=title, **fields))
+        )
 
     def bloom_log_sync_event(self, target, target_id, event_type):
         async def log():
@@ -376,6 +381,58 @@ class BloomApiInterface(BloomInterface):
                 ProjectVariable(project_id=project_id, kind="parameter", key=key, value=value)
             )
         )
+
+    def bloom_add_comment(self, kind, artefact_id, body):
+        return self._run(
+            self._add(
+                ArtefactComment(
+                    artefact_type=kind, artefact_id=artefact_id, author_name="System", body=body
+                )
+            )
+        )
+
+    def bloom_add_activity(self, kind, artefact_id, summary):
+        return self._run(
+            self._add(
+                ArtefactActivity(
+                    artefact_type=kind,
+                    artefact_id=artefact_id,
+                    event_type="created",
+                    summary=summary,
+                )
+            )
+        )
+
+    def bloom_add_artefact_link(self, project_id, source_id, target_id):
+        source_type, target_type, role = self.parameters.READER_LINK
+        return self._run(
+            self._add(
+                ArtefactLink(
+                    project_id=project_id,
+                    source_type=source_type,
+                    source_id=source_id,
+                    target_type=target_type,
+                    target_id=target_id,
+                    role=role,
+                )
+            )
+        )
+
+    def bloom_api_list_test_cases(self, headers, project_id):
+        query = {"project_id": project_id}
+        return self.bloom_api_call("GET", "/api/test-cases", headers, params=query)
+
+    def bloom_api_get_test_case(self, headers, test_case_id):
+        return self.bloom_api_call("GET", f"/api/test-cases/{test_case_id}", headers)
+
+    def bloom_api_comments(self, headers, kind, artefact_id):
+        return self.bloom_api_call("GET", f"/api/artefacts/{kind}/{artefact_id}/comments", headers)
+
+    def bloom_api_activity(self, headers, kind, artefact_id):
+        return self.bloom_api_call("GET", f"/api/artefacts/{kind}/{artefact_id}/activity", headers)
+
+    def bloom_api_list_links(self, headers, project_id):
+        return self.bloom_api_call("GET", "/api/links", headers, params={"project_id": project_id})
 
     def bloom_api_get_baseline(self, headers, baseline_id):
         return self.bloom_api_call("GET", f"/api/baselines/{baseline_id}", headers)
