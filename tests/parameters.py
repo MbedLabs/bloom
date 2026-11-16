@@ -2247,3 +2247,40 @@ MSG_HOOK_REPLAY = "the same delivery a second time is answered as a duplicate"
 MSG_HOOK_GITLAB_UNSIGNED = "a GitLab delivery without the token is refused with 403"
 MSG_HOOK_GITLAB_UNCHANGED = "after the refused GitLab delivery the defect is still open"
 MSG_HOOK_GITLAB_PROCESSED = "a GitLab delivery with the token is processed with 200"
+READER_BASELINE_ID = f"{VISIBILITY_PREFIX}-BL-001"
+READER_SNAPSHOT = {
+    "requirements": {
+        "count": 2,
+        "ids": [f"{VISIBILITY_PREFIX}-REQ-001", f"{VISIBILITY_PREFIX}-REQ-002"],
+    },
+    "test_cases": {
+        "count": 2,
+        "ids": [f"{VISIBILITY_PREFIX}-TC-001", f"{VISIBILITY_PREFIX}-TC-002"],
+    },
+}
+READER_CUSTOMER_REQ = f"{VISIBILITY_PREFIX}-REQ-001"
+READER_INTERNAL_REQ = f"{VISIBILITY_PREFIX}-REQ-002"
+READER_REQUIREMENT_KIND = "requirement"
+READER_TRACKER = "github"
+READER_SECRET_FIELD = "webhook_secret"
+READER_VARIABLE_KEY = "API_KEY"
+READER_VARIABLE_VALUE = _letters(string.ascii_letters + string.digits, 16, 24)
+READER_MAINTAINER_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+READER_ALL_PERMISSIONS = {"*": ["*"]}
+MSG_READER_BASELINE = "an external reader's read of a baseline is answered 200"
+MSG_READER_NO_SNAPSHOT = "the baseline an external reader gets has no snapshot"
+MSG_READER_SETTINGS = (
+    "an external reader's list of the tracker settings is answered 200 with the one setting"
+)
+MSG_READER_SETTING_FLAGS = "the setting says a token and a webhook secret are set"
+MSG_READER_NO_SECRET = "the setting does not contain the webhook secret"
+MSG_READER_RELATED_HIDDEN = (
+    "the related artefacts of an internal requirement are answered 404 to an external reader"
+)
+MSG_READER_RELATED_SHOWN = (
+    "the related artefacts of a customer requirement are answered 200 to an external reader"
+)
+MSG_READER_VARIABLES_REFUSED = (
+    "an external reader's list of the project parameters is refused with 403"
+)
+MSG_READER_VARIABLES_SHOWN = "a member with every permission lists the project parameter"

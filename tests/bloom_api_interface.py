@@ -31,9 +31,18 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import limiter
 from app.core.permissions import DOC_TYPE_RESOURCES
-from app.models import ChangeRequest, Defect, Document, IntegrationSetting
+from app.models import (
+    Baseline,
+    ChangeRequest,
+    Defect,
+    Document,
+    IntegrationSetting,
+    ProjectVariable,
+    Requirement,
+)
 from app.models import TestCase as TestCaseModel
 from app.models.user import User, UserRole
+from app.schemas.memberships import DEFAULT_EXTERNAL_DOC_TYPES
 from app.services.integration_secrets import (
     ENVELOPE_PREFIX,
     decrypt_integration_secret,
@@ -299,8 +308,88 @@ class BloomApiInterface(BloomInterface):
         self.patches.enter_context(patch.object(limiter, "enabled", False))
         self.api = main.app
 
-    def bloom_add_external_member(self, project_id, user_id, permissions, visibility):
-        self._run(self._add_external_member(project_id, user_id, permissions, visibility))
+    def bloom_add_external_member(
+        self, project_id, user_id, permissions, visibility, doc_types=None
+    ):
+        self._run(
+            self._add_external_member(project_id, user_id, permissions, visibility, doc_types)
+        )
+
+    def bloom_add_internal_member(self, project_id, user_id, permissions):
+        self._run(
+            self._add(
+                project_access_fixture(
+                    user_id=user_id, project_id=project_id, permissions=permissions
+                )
+            )
+        )
+
+    def bloom_create_external_reader_environment(self, doc_types=()):
+        values = self.parameters
+        self.bloom_start_full_api()
+        project_id = self.bloom_create_project(values.VISIBILITY_PREFIX)
+        user_id = self.bloom_add_account(
+            values.EXTERNAL_EMAIL, values.API_PASSWORD, values.EXTERNAL_ROLE
+        )
+        self.bloom_add_external_member(
+            project_id,
+            user_id,
+            values.EXTERNAL_PERMISSIONS,
+            values.CUSTOMER_VISIBILITY,
+            doc_types,
+        )
+        headers, _ = self.bloom_log_in(values.EXTERNAL_EMAIL, values.API_PASSWORD)
+        return SimpleNamespace(project_id=project_id, user_id=user_id, headers=headers)
+
+    def bloom_default_external_doc_types(self):
+        return sorted(DEFAULT_EXTERNAL_DOC_TYPES)
+
+    def bloom_add_baseline(self, project_id, baseline_id, name, snapshot):
+        return self._run(
+            self._add(
+                Baseline(
+                    project_id=project_id,
+                    baseline_id=baseline_id,
+                    name=name,
+                    baseline_type="Milestone",
+                    snapshot=snapshot,
+                )
+            )
+        )
+
+    def bloom_add_requirement(self, project_id, req_id, visibility):
+        return self._run(
+            self._add(
+                Requirement(
+                    project_id=project_id,
+                    req_id=req_id,
+                    title=req_id,
+                    status=self.parameters.DOCUMENT_STATUS,
+                    visibility=visibility,
+                )
+            )
+        )
+
+    def bloom_add_project_variable(self, project_id, key, value):
+        return self._run(
+            self._add(
+                ProjectVariable(project_id=project_id, kind="parameter", key=key, value=value)
+            )
+        )
+
+    def bloom_api_get_baseline(self, headers, baseline_id):
+        return self.bloom_api_call("GET", f"/api/baselines/{baseline_id}", headers)
+
+    def bloom_api_list_settings(self, headers, project_id):
+        query = {"project_id": project_id}
+        return self.bloom_api_call("GET", "/api/integrations/settings", headers, params=query)
+
+    def bloom_api_related(self, headers, kind, artefact_id):
+        return self.bloom_api_call("GET", f"/api/artefacts/{kind}/{artefact_id}/related", headers)
+
+    def bloom_api_list_variables(self, headers, project_id):
+        query = {"project_id": project_id}
+        return self.bloom_api_call("GET", "/api/project-variables", headers, params=query)
 
     def bloom_add_document(self, project_id, doc_id, title, visibility):
         return self._run(
@@ -643,7 +732,7 @@ class BloomApiInterface(BloomInterface):
         async with REAL_CLIENT(transport=transport, base_url=self.parameters.API_BASE) as client:
             return await client.post(path, content=body, headers=headers)
 
-    async def _add_external_member(self, project_id, user_id, permissions, visibility):
+    async def _add_external_member(self, project_id, user_id, permissions, visibility, doc_types):
         async with self.maker() as db:
             membership = project_access_fixture(
                 user_id=user_id,
@@ -654,7 +743,7 @@ class BloomApiInterface(BloomInterface):
             )
             db.add(membership)
             await db.flush()
-            for doc_type in DOC_TYPE_RESOURCES:
+            for doc_type in DOC_TYPE_RESOURCES if doc_types is None else doc_types:
                 allow_doc_types(membership.policies[0], [doc_type])
             await db.commit()
 
