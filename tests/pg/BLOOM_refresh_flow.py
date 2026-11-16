@@ -23,12 +23,7 @@ class RefreshFlowTest(RefreshFlowBase):
         self.bloom.bloom_add_admin(email, password)
         self.login = self.bloom.bloom_log_in_for_cookie(email, password)
         self.refresh = self.bloom.bloom_refresh(self.login.cookie)
-        self.account = self.bloom.bloom_read_account(self.refresh.access_token)
-        self.without_cookie = self.bloom.bloom_refresh()
-        self.replay = self.bloom.bloom_refresh(self.login.cookie)
         self.second_login = self.bloom.bloom_log_in_for_cookie(email, password)
-        self.logout = self.bloom.bloom_log_out(self.second_login.cookie)
-        self.after_logout = self.bloom.bloom_refresh(self.second_login.cookie)
 
     def tearDownClass(self):
         super().tearDownClass()

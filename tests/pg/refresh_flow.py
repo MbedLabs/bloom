@@ -75,9 +75,10 @@ class RefreshFlowBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.account.status, "body": self.account.body})
+        account = self.bloom.bloom_read_account(self.refresh.access_token)
+        self.print_variables({"status": account.status, "body": account.body})
         self.assertEqual(
-            (self.account.status, self.account.body.get(self.parameters.REFRESH_EMAIL_KEY)),
+            (account.status, account.body.get(self.parameters.REFRESH_EMAIL_KEY)),
             (self.parameters.STATUS_OK, self.parameters.ADMIN_EMAIL),
             msg=self.parameters.MSG_REFRESH_ACCOUNT,
             abort_on_fail=False,
@@ -87,9 +88,10 @@ class RefreshFlowBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.without_cookie.status})
+        without_cookie = self.bloom.bloom_refresh()
+        self.print_variables({"status": without_cookie.status})
         self.assertEqual(
-            self.without_cookie.status,
+            without_cookie.status,
             self.parameters.STATUS_UNAUTHORIZED,
             msg=self.parameters.MSG_REFRESH_NO_COOKIE,
             abort_on_fail=False,
@@ -99,6 +101,7 @@ class RefreshFlowBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
+        self.print_variables({"before": self.login.cookie, "after": self.refresh.cookie})
         self.assertTrue(
             self.refresh.cookie, msg=self.parameters.MSG_REFRESH_NEW_COOKIE, abort_on_fail=False
         )
@@ -113,9 +116,10 @@ class RefreshFlowBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.replay.status, "body": self.replay.body})
+        replay = self.bloom.bloom_refresh(self.login.cookie)
+        self.print_variables({"status": replay.status, "body": replay.body})
         self.assertEqual(
-            self.replay.status,
+            replay.status,
             self.parameters.STATUS_UNAUTHORIZED,
             msg=self.parameters.MSG_REFRESH_REPLAY,
             abort_on_fail=False,
@@ -125,9 +129,10 @@ class RefreshFlowBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.logout.status})
+        logout = self.bloom.bloom_log_out(self.second_login.cookie)
+        self.print_variables({"status": logout.status})
         self.assertEqual(
-            self.logout.status,
+            logout.status,
             self.parameters.STATUS_OK,
             msg=self.parameters.MSG_REFRESH_LOGOUT,
             abort_on_fail=False,
@@ -137,9 +142,10 @@ class RefreshFlowBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.after_logout.status})
+        after_logout = self.bloom.bloom_refresh(self.second_login.cookie)
+        self.print_variables({"status": after_logout.status})
         self.assertEqual(
-            self.after_logout.status,
+            after_logout.status,
             self.parameters.STATUS_UNAUTHORIZED,
             msg=self.parameters.MSG_REFRESH_AFTER_LOGOUT,
             abort_on_fail=False,
