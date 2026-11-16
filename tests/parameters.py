@@ -3578,3 +3578,77 @@ MSG_OBJ_COMMAND_NO_BUCKET = "the migrate command exits 2 without a bucket"
 MSG_OBJ_NEEDS_BUCKET = "S3 storage without a bucket is refused, and the prefix defaults to bloom"
 MSG_OBJ_CLIENT = "the client takes the endpoint and region from the settings"
 MSG_OBJ_NO_PREFIX = "without a prefix an object key is the file name"
+MDI_DOCUMENT = (
+    "---\n"
+    "type: requirement\n"
+    "---\n"
+    "## [REQ] Fast boot\n"
+    "Boot within {{parameter: BOOT_MS, value: 500}} ms\n"
+    "## [DES] Boot design\n"
+    "Greets with {{parameter: NEW_ONE, value: hello}}\n"
+).encode()
+MDI_TWICE = MDI_DOCUMENT + b"The budget {{BOOT_MS}} applies twice.\n"
+MDI_LIMIT = b"## [REQ] Limit\nStay under {{parameter: limit, value: 5}}\n"
+MDI_FRESH = (
+    b"## [REQ] Fresh\nUses {{parameter: FRESH_A, value: 1}} and {{parameter: FRESH_B, value: 2}}\n"
+)
+MDI_TEST_CASE = (
+    b"## [TC] Relay boot\n"
+    b"Checks the relay-driven boot.\n"
+    b"- Pre-Condition: relay open\n"
+    b"- Step: close the relay => boot banner within {{parameter: RELAY_MS, value: 200}} ms\n"
+)
+MDI_KEEP = {"BOOT_MS": {"action": "existing"}}
+MDI_RENAME = {"boot_ms": {"action": "rename", "to": "BOOT_MS_V2"}}
+MDI_COLLISION = [{"name": "BOOT_MS", "existing_value": "old", "imported_value": "500"}]
+MDI_REFUSED_ACTIONS = [
+    (
+        "a new name that the import already uses",
+        {"BOOT_MS": {"action": "rename", "to": "NEW_ONE"}},
+        "already taken",
+    ),
+    (
+        "a new name equal to the old one",
+        {"BOOT_MS": {"action": "rename", "to": "BOOT_MS"}},
+        "already taken",
+    ),
+    (
+        "a new name that is not a parameter name",
+        {"BOOT_MS": {"action": "rename", "to": "BAD, NAME"}},
+        "not a valid parameter name",
+    ),
+    ("an unknown action", {"BOOT_MS": {"action": "delete"}}, "Choose 'existing' or 'rename'"),
+    ("a list of names", ["BOOT_MS"], "must be an object"),
+]
+MDI_RENAME_TEXT = (
+    "A {{parameter: X, value: 1}} and {{ x }} and {{Y}} and {{parameter: Y, value: 2}}"
+)
+MDI_RENAMED_TEXT = (
+    "A {{parameter: X2, value: 1}} and {{X2}} and {{Y}} and {{parameter: Y, value: 2}}"
+)
+MDI_STEP_ROWS = [
+    ("precondition", "relay open", ""),
+    ("step", "close the relay", "boot banner within {{RELAY_MS}} ms"),
+]
+MSG_MDI_BLOCKED = (
+    "a parameter name already in the project blocks the import with 409 and names the collision"
+)
+MSG_MDI_NOTHING = "the blocked import creates no requirement and no parameter"
+MSG_MDI_KEEP = "keeping the existing value creates the other parameter and reports the collision"
+MSG_MDI_KEEP_VALUES = (
+    "the existing parameter keeps its value and the new one takes the imported value"
+)
+MSG_MDI_ARTEFACTS = "both sections become artefacts of their type with the parameters as references"
+MSG_MDI_NOTES = "two notifications are created and one asks to check the necessity"
+MSG_MDI_RENAME = "importing under a new name creates both parameters and reports the rename"
+MSG_MDI_RENAME_VALUES = "the project holds the old parameter, the renamed one and the new one"
+MSG_MDI_RENAME_TEXT = "every reference in the imported text uses the new name"
+MSG_MDI_EITHER_KIND = "a name also collides with a parameter of the other kind, whatever its case"
+MSG_MDI_REFUSED = "{what} is refused with 422"
+MSG_MDI_BROKEN = "collision actions that are not JSON are refused, and nothing is imported"
+MSG_MDI_FRESH = "an import without a collision creates every parameter"
+MSG_MDI_REWRITE = "renaming rewrites the declaration and the reference of that parameter only"
+MSG_MDI_TEST_CASE = "a test case section is imported with its id, description and step rows"
+MSG_MDI_PERMISSION = (
+    "an import needs the import permission on every imported type, and creates nothing without it"
+)

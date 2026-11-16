@@ -115,6 +115,7 @@ from app.core.md_import import (
     Parameter,
     parameter_name_collisions,
     parse_markdown_document,
+    rename_parameters,
 )
 from app.core.permissions import (
     DOC_TYPE_RESOURCES,
@@ -148,11 +149,14 @@ from app.models import (
     ArtefactLink,
     AuditEvent,
     Defect,
+    DesignItem,
     Document,
     DocumentAttachment,
     ImportAttempt,
     IntegrationSetting,
+    Notification,
     Project,
+    ProjectVariable,
     Requirement,
     RequirementLink,
     SystemMarker,
@@ -194,6 +198,7 @@ from app.services.jira_inbound import (
     search_fields,
 )
 from app.services.reqif_worker import ReqIFProcessingTimeout, parse_reqif_in_worker
+from tests.access_fixtures import scenario_type_tags
 from tests.bloom_interface import BloomInterface
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -397,6 +402,103 @@ class BloomLogicInterface(BloomInterface):
             return id_generator.compute_next_id(existing_ids, prefix, type_code), None
         except ValueError as exc:
             return None, type(exc).__name__
+
+    def bloom_seed_markdown_project(self):
+        async def work(db):
+            project = Project(name="Demo", prefix="PRJ")
+            admin = User(
+                email="admin@test.local",
+                full_name="Ada Admin",
+                hashed_password="x",
+                role=UserRole.admin,
+            )
+            db.add_all([project, admin])
+            await db.flush()
+            db.add(
+                ProjectVariable(project_id=project.id, kind="variable", key="BOOT_MS", value="old")
+            )
+            await db.commit()
+            return SimpleNamespace(project=project.id, admin=admin.id)
+
+        return self._run(self._with_db(work))
+
+    def bloom_import_markdown(self, project_id, user_id, content, actions=None, raw_actions=None):
+        chosen = (
+            raw_actions
+            if raw_actions is not None
+            else (None if actions is None else json.dumps(actions))
+        )
+
+        async def work(db):
+            try:
+                result = await import_service.import_markdown(
+                    project_id=project_id,
+                    default_type=None,
+                    file=UploadFile(file=io.BytesIO(content)),
+                    collision_actions=chosen,
+                    db=db,
+                    current_user=await db.get(User, user_id),
+                )
+            except HTTPException as refused:
+                await db.rollback()
+                return None, (refused.status_code, refused.detail)
+            await db.commit()
+            return result, None
+
+        return self._run(self._with_db(work))
+
+    def bloom_add_project_variable(self, project_id, kind, key, value):
+        return self._run(
+            self._add(ProjectVariable(project_id=project_id, kind=kind, key=key, value=value))
+        )
+
+    def bloom_project_variables(self):
+        rows = self._run(self._all(select(ProjectVariable).order_by(ProjectVariable.id)))
+        return {row.key: row.value for row in rows}
+
+    def bloom_count_artefacts(self, kind):
+        model = next(model for model in ARTEFACT_MODELS if model.__name__ == kind)
+        return self._run(self._scalar(select(func.count(model.id))))
+
+    def bloom_artefact_titled(self, kind, title):
+        model = next(model for model in ARTEFACT_MODELS if model.__name__ == kind)
+        return self._run(self._scalar(select(model).where(model.title == title)))
+
+    def bloom_notification_bodies(self):
+        return [
+            note.body or ""
+            for note in self._run(self._all(select(Notification).order_by(Notification.id)))
+        ]
+
+    def bloom_rename_parameters(self, text, names):
+        return rename_parameters(text, names)
+
+    def bloom_add_requirement_importer(self, project_id):
+        async def work(db):
+            author = User(
+                email="author@test.local",
+                full_name="Rae Author",
+                hashed_password="x",
+                role=UserRole.maintainer,
+            )
+            policy = Policy(
+                name="Requirement importer",
+                permissions={"REQ": ["view", "import"], "parameter": ["view", "create"]},
+                type_tags=scenario_type_tags({"REQ": ["view"]}),
+            )
+            group = Group(name="Importers")
+            db.add_all([author, policy, group])
+            await db.flush()
+            db.add_all(
+                [
+                    GroupMembership(group_id=group.id, user_id=author.id),
+                    ProjectAccess(group_id=group.id, project_id=project_id, policies=[policy]),
+                ]
+            )
+            await db.commit()
+            return author.id
+
+        return self._run(self._with_db(work))
 
     def bloom_new_object_store(self, backend="s3", mirror=True):
         if getattr(self, "store", None):
