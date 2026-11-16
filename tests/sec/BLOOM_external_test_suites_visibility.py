@@ -1,5 +1,5 @@
 """
-* @file     ${tests/sec/BLOOM_test_suites_external_visibility.py}
+* @file     ${tests/sec/BLOOM_external_test_suites_visibility.py}
 * @copyright © EmbedLabs, Aachen ${2026} - all rights reserved
 * @brief    An external reader gets customer suites only, each with its customer test cases and its last execution.
 * @author   Amine El Omari
@@ -8,10 +8,10 @@
 * @note     This module tests the test suite API with one external reader, a customer suite holding both test cases and an internal suite.
 """
 
-from tests.sec.test_suites_external_visibility import TestSuitesExternalVisibilityBase
+from tests.sec.external_test_suites_visibility import ExternalTestSuitesVisibilityBase
 
 
-class TestSuitesExternalVisibilityTest(TestSuitesExternalVisibilityBase):
+class ExternalTestSuitesVisibilityTest(ExternalTestSuitesVisibilityBase):
 
     def setUpClass(self):
         super().setUpClass()
@@ -46,4 +46,4 @@ class TestSuitesExternalVisibilityTest(TestSuitesExternalVisibilityBase):
 
 
 if __name__ == "__main__":
-    TestSuitesExternalVisibilityTest().run()
+    ExternalTestSuitesVisibilityTest().run()

@@ -9,6 +9,8 @@ SUITES = [
     "tests.sec.BLOOM_defect_webhook_security.DefectWebhookSecurityTest",
     "tests.sec.BLOOM_docs_facade_external_visibility.DocsFacadeExternalVisibilityTest",
     "tests.sec.BLOOM_exports.ExportsTest",
+    "tests.sec.BLOOM_external_test_cases_visibility.ExternalTestCasesVisibilityTest",
+    "tests.sec.BLOOM_external_test_suites_visibility.ExternalTestSuitesVisibilityTest",
     "tests.sec.BLOOM_integration_secrets.IntegrationSecretsTest",
     "tests.sec.BLOOM_integrations_settings_redaction.IntegrationsSettingsRedactionTest",
     "tests.sec.BLOOM_links_external_visibility.LinksExternalVisibilityTest",
@@ -21,8 +23,6 @@ SUITES = [
     "tests.sec.BLOOM_requirements_external_visibility.RequirementsExternalVisibilityTest",
     "tests.sec.BLOOM_route_auth_matrix.RouteAuthMatrixTest",
     "tests.sec.BLOOM_service_credentials.ServiceCredentialsTest",
-    "tests.sec.BLOOM_test_cases_external_visibility.TestCasesExternalVisibilityTest",
-    "tests.sec.BLOOM_test_suites_external_visibility.TestSuitesExternalVisibilityTest",
     "tests.sec.BLOOM_token_logging.TokenLoggingTest",
     "tests.sec.BLOOM_traceability_external_visibility.TraceabilityExternalVisibilityTest",
 ]

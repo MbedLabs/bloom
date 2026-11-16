@@ -1,5 +1,5 @@
 """
-* @file     ${tests/sec/BLOOM_test_cases_external_visibility.py}
+* @file     ${tests/sec/BLOOM_external_test_cases_visibility.py}
 * @copyright © EmbedLabs, Aachen ${2026} - all rights reserved
 * @brief    An external reader lists customer test cases only, and a test case carries its visibility.
 * @author   Amine El Omari
@@ -8,10 +8,10 @@
 * @note     This module tests the test case API with one external reader, one administrator, one customer and one internal test case.
 """
 
-from tests.sec.test_cases_external_visibility import TestCasesExternalVisibilityBase
+from tests.sec.external_test_cases_visibility import ExternalTestCasesVisibilityBase
 
 
-class TestCasesExternalVisibilityTest(TestCasesExternalVisibilityBase):
+class ExternalTestCasesVisibilityTest(ExternalTestCasesVisibilityBase):
 
     def setUpClass(self):
         super().setUpClass()
@@ -39,4 +39,4 @@ class TestCasesExternalVisibilityTest(TestCasesExternalVisibilityBase):
 
 
 if __name__ == "__main__":
-    TestCasesExternalVisibilityTest().run()
+    ExternalTestCasesVisibilityTest().run()

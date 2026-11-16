@@ -1,5 +1,5 @@
 """
-* @file     ${tests/sec/test_cases_external_visibility.py}
+* @file     ${tests/sec/external_test_cases_visibility.py}
 * @copyright © EmbedLabs, Aachen ${2026} - all rights reserved
 * @brief    This module tests which test cases an external reader lists.
 * @author   Amine El Omari
@@ -12,7 +12,7 @@ from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
-class TestCasesExternalVisibilityBase(BloomTestCase):
+class ExternalTestCasesVisibilityBase(BloomTestCase):
 
     interface = BloomApiInterface
 

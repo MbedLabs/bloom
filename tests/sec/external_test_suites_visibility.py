@@ -1,5 +1,5 @@
 """
-* @file     ${tests/sec/test_suites_external_visibility.py}
+* @file     ${tests/sec/external_test_suites_visibility.py}
 * @copyright © EmbedLabs, Aachen ${2026} - all rights reserved
 * @brief    This module tests which test suites an external reader gets and what they show.
 * @author   Amine El Omari
@@ -12,7 +12,7 @@ from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
 
-class TestSuitesExternalVisibilityBase(BloomTestCase):
+class ExternalTestSuitesVisibilityBase(BloomTestCase):
 
     interface = BloomApiInterface
 
