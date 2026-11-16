@@ -17,6 +17,7 @@ SUITES = [
     "tests.logic.BLOOM_company_logo.CompanyLogoTest",
     "tests.logic.BLOOM_container_start.ContainerStartTest",
     "tests.logic.BLOOM_copy_import.CopyImportTest",
+    "tests.logic.BLOOM_default_policy_catalogue.DefaultPolicyCatalogueTest",
     "tests.logic.BLOOM_document_kinds.DocumentKindsTest",
     "tests.logic.BLOOM_e2e_image_smoke_script.E2eImageSmokeScriptTest",
     "tests.logic.BLOOM_export.ExportTest",

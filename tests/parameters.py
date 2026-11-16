@@ -3233,3 +3233,60 @@ MSG_IDG_PREFIX = "a project prefix that is not three letters is refused"
 MSG_IDG_TYPE_CODE = "an unsupported type code is refused"
 MSG_IDG_NORMALIZE = "a supplied id is trimmed and upper-cased"
 MSG_IDG_WRONG_PROJECT = "a supplied id of another project is refused"
+CAT_DOCUMENT_POLICIES = {
+    "Requirements": "REQ",
+    "Specifications": "SPEC",
+    "Standards": "STD",
+    "Designs": "DES",
+    "Risks": "RSK",
+    "Change Requests": "CHG",
+    "Concepts": "CPT",
+    "Test Cases": "TC",
+    "Suites": "TS",
+    "Campaigns": "CMP",
+    "Defects": "DEF",
+    "Protocols": "PRT",
+    "Reports": "RPT",
+    "Visions": "VIS",
+}
+CAT_OTHER_POLICIES = {
+    "Baselines",
+    "Parameters",
+    "Traceability",
+    "Project Management",
+    "Read Internal",
+    "Read Customer",
+    "Review Internal",
+    "Review Customer",
+    "Access Management",
+    "Application Administration",
+}
+CAT_PROJECT_POLICIES = [
+    ("Baselines", "baseline"),
+    ("Parameters", "parameter"),
+    ("Traceability", "link"),
+    ("Project Management", "project"),
+]
+CAT_READERS = [("Read Internal", None), ("Read Customer", "customer")]
+CAT_REVIEWERS = [("Review Internal", None), ("Review Customer", "customer")]
+CAT_NO_REVIEW = {"RPT", "STD", "RSK", "CMP"}
+CAT_GROUPS = {"Product Owners", "Developers", "Testers", "Administrators", "Customers"}
+CAT_COUNT = 24
+CAT_RELEASE_MIGRATION = "c5e8a1f2b9d4_access_entries.py"
+CAT_VISIONS_MIGRATION = "637f976e78e0_visions.py"
+MSG_CAT_NAMES = "the catalogue holds the 24 named policies, one per document type plus ten others"
+MSG_CAT_DOCUMENT = (
+    "the {name} policy covers {resource} alone with every supported action on every origin"
+)
+MSG_CAT_PROJECT = "the {name} policy covers {resource} alone with every action"
+MSG_CAT_READER = "the {name} policy gives view and comment on every resource for its origin"
+MSG_CAT_ACCESS = "Access Management is an app policy with every access action and no tags"
+MSG_CAT_ADMIN = "Application Administration is an app policy with every action on every resource"
+MSG_CAT_GROUPS = "the five default groups hold known policies once each and no people or projects"
+MSG_CAT_GROUP_READ = "the {name} group reads {what}"
+MSG_CAT_FROZEN = "the runtime catalogue equals the release catalogue with the Visions additions"
+MSG_CAT_FROZEN_GROUPS = "the runtime groups equal the release groups with Visions after Specifications for product owners"
+MSG_CAT_MAINTAINER_SET = "the released maintainer set is every document and project policy except the readers and reviewers"
+MSG_CAT_REVIEWER = (
+    "the {name} policy grants review only on every document type for its origin and is in no group"
+)

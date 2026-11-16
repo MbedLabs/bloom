@@ -12,6 +12,7 @@ import ast
 import asyncio
 import base64
 import contextlib
+import copy
 import csv
 import hashlib
 import hmac
@@ -86,10 +87,13 @@ from app.core.md_import import (
 from app.core.permissions import (
     DOC_TYPE_RESOURCES,
     EXTERNAL_DENIED_ACTIONS,
+    RESOURCE_ACTIONS,
+    RESOURCES,
     actions_for_rule,
     actions_on,
     rule_of,
 )
+from app.core.policy_seed import DEFAULT_GROUPS, DEFAULT_POLICIES
 from app.core.security import (
     _policy_terms,
     access_terms,
@@ -335,6 +339,22 @@ class BloomLogicInterface(BloomInterface):
             return id_generator.compute_next_id(existing_ids, prefix, type_code), None
         except ValueError as exc:
             return None, type(exc).__name__
+
+    def bloom_default_catalogue(self):
+        return copy.deepcopy(DEFAULT_POLICIES), copy.deepcopy(DEFAULT_GROUPS)
+
+    def bloom_resource_actions(self):
+        return {resource: set(actions) for resource, actions in RESOURCE_ACTIONS.items()}
+
+    def bloom_resources(self):
+        return list(RESOURCES)
+
+    def bloom_load_migration(self, name):
+        path = ROOT / "alembic" / "versions" / name
+        spec = importlib.util.spec_from_file_location(path.stem, path)
+        migration = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(migration)
+        return migration
 
     def bloom_widened_ids(self, existing_ids, prefix, type_code, width):
         return id_generator.widened_ids(existing_ids, prefix, type_code, width)
