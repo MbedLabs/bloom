@@ -2733,3 +2733,110 @@ MSG_TPX_DEFAULT_KEY = "with the empty default the rate limit key of {scope} is t
 MSG_TPX_KEY = "behind a trusted proxy the rate limit key of {scope} is the resolved address"
 MSG_TPX_LOADED = "the setting reads a JSON array and normalises each entry to a network"
 MSG_TPX_REFUSED = "the setting refuses an entry that is not a network"
+CLIS_VERIFIER = "v" * 43
+CLIS_CALLBACK = "http://127.0.0.1:8123/callback"
+CLIS_CODE_MODE_OFF = "Code sign-in is turned off on this instance. Use callback mode."
+CLIS_INVALID = "Invalid or expired authorization. Request a new sign-in link from your client."
+CLIS_BAD_REDIRECTS = [
+    "https://127.0.0.1:8123/callback",
+    "http://example.com:8123/callback",
+    "http://127.0.0.2:8123/callback",
+    "http://localhost.evil.test:8123/callback",
+    "http://localhost/callback",
+    "http://localhost:0/callback",
+    "http://localhost:65536/callback",
+    "http://localhost:port/callback",
+    "http://user:password@localhost:8123/callback",
+    "http://127.0.0.1:80@evil.test/callback",
+    "http://localhost:8123/callback#fragment",
+    "http://localhost:8123/callback?code=existing",
+    "http://localhost:8123/callback?state=existing",
+    "http://localhost:8123/callback?%63ode=existing",
+    "http://localhost:8123/callback?STATE=existing",
+    "http://localhost:8123/callback?code",
+    "http://localhost:8123/callback?x=a&state=b",
+    "http://127.1:8123/callback",
+    "http://2130706433:8123/callback",
+    "//localhost:8123/callback",
+    "http://localhost:8123/call\\back",
+    "http://local\nhost:8123/callback",
+    "http://localhost:8123/call back",
+]
+CLIS_BAD_STARTS = [
+    {"code_challenge": "short"},
+    {"code_challenge": "a" * 42 + "="},
+    {"code_challenge": "a" * 44},
+    {"state": ""},
+    {"state": "s" * 129},
+    {"client_name": " "},
+    {"client_name": "c" * 101},
+    {"mode": "callback"},
+    {"mode": "other"},
+    {"mode": "code", "redirect_uri": "http://localhost:8123/callback"},
+    {"extra": "field"},
+]
+CLIS_BAD_VERIFIERS = ["x" * 43, "short", "x" * 129, "+" * 43]
+CLIS_BINDINGS = [None, True, "1", -1, 999999]
+CLIS_MUTATIONS = ["expired", "purpose", "user", "version"]
+CLIS_WRONG_VERIFIER = "w" * 43
+CLIS_WRONG_CODE = "AAAA-AAAA"
+CLIS_EVIL_CALLBACK = "https://evil.test/callback"
+CLIS_PUBLIC_LIMITS = [("start", 10), ("exchange", 30), ("refresh", 30)]
+CLIS_SIGNED_IN_LIMITS = [("check", 30), ("approve", 10)]
+MSG_CLIS_REDIRECT = "the callback {uri!r} is refused with 422"
+MSG_CLIS_START = "a start with {change} is refused with 422"
+MSG_CLIS_PKCE = (
+    "the verifier {verifier!r} is refused with 400 or 422, issues no token and consumes nothing"
+)
+MSG_CLIS_PKCE_KEPT = "after the refused verifiers the right one still exchanges with 200"
+MSG_CLIS_LENGTHS = "codes over 256 characters are refused with 422 and 256 with 400; refresh tokens likewise with 422 and 401"
+MSG_CLIS_REJECTED = "an unapproved session, a wrong code, an unknown session and an unknown lookup are each refused with 400"
+MSG_CLIS_REJECTED_AUDIT = (
+    "each refused exchange is recorded as a failure with its reason, no actor and no code"
+)
+MSG_CLIS_STILL = "after the refusals the approved code still exchanges with 200"
+MSG_CLIS_EXPIRED = "an expired {state} session refuses lookup, approval and exchange with 400"
+MSG_CLIS_DISABLED = "a disabled account's approval is refused with 403, its exchange with 400 and its refresh with 401"
+MSG_CLIS_DISABLED_AUDIT = "the refused refresh is recorded as a failure on the user with its reason"
+MSG_CLIS_STALE = (
+    "an approval whose account changed meanwhile is refused and leaves the session unapproved"
+)
+MSG_CLIS_BINDING = "a CLI token whose refresh binding is {binding!r} is refused with 401"
+MSG_CLIS_MUTATION = "a CLI token whose refresh row is {mutation} is refused with 401"
+MSG_CLIS_REFRESH_REJECT = "an unknown refresh token is refused with 401, a missing one with 422, and the failure carries no token"
+MSG_CLIS_NO_SECRET = "no record holds the {secret}"
+MSG_CLIS_OUTCOMES = "the sign-in records hold both successes and failures"
+MSG_CLIS_LIMIT = "the {path} endpoint answers its first {limit} calls and refuses the next with 429"
+MSG_CLIS_MODE_OFF_START = (
+    "with code sign-in off a code start is refused with 403 and stores nothing"
+)
+MSG_CLIS_MODE_OFF_CALLBACK = (
+    "with code sign-in off a callback sign-in is looked up, approved, exchanged and denied"
+)
+MSG_CLIS_MODE_OFF_STORED = (
+    "with code sign-in off every stored code request refuses lookup and approval with 403"
+)
+MSG_CLIS_MODE_OFF_EXCHANGE = "with code sign-in off an approved code request refuses its exchange with 400 and issues no token"
+MSG_CLIS_MODE_OFF_AUDIT = "each refusal is recorded with the reason code_mode_disabled, and the requests stay stored and unapproved"
+MSG_CLIS_MODE_OFF_MISSING = (
+    "with code sign-in off a missing request keeps the answers and reasons of a missing request"
+)
+MSG_CLIS_MODE_OFF_DENY = "with code sign-in off a stored code request can still be denied, which removes it and is recorded"
+MSG_CLIS_DENY_GUARD = "a deny without a sign-in or for an unknown account is refused with 401, an extra or missing field with 422"
+MSG_CLIS_DENY_GUARD_STATE = "the refused denies remove nothing and record nothing"
+MSG_CLIS_DENY_NOT_PENDING = (
+    "a deny of an approved, an expired and an unknown request is refused with 400"
+)
+MSG_CLIS_DENY_NOT_PENDING_AUDIT = "each refused deny is recorded as not pending, nothing is removed, and the approved code still exchanges"
+MSG_CLIS_DENY_AUDIENCE = "any signed-in account may deny or approve, and is recorded as the actor"
+MSG_CLIS_DENY_CALLBACK = (
+    "a stored callback that is no longer valid cannot be denied and stays stored"
+)
+MSG_CLIS_DENY_NO_LIMIT = "twelve denies of an unknown request are each answered 400, never 429"
+MSG_CLIS_MISMATCH = "a wrong typed code is refused on check and approve with 400, the right one passes the check with 204"
+MSG_CLIS_MISMATCH_AUDIT = (
+    "both wrong codes are recorded as mismatches, and only the later approval succeeds"
+)
+MSG_CLIS_RACE = (
+    "a request approved elsewhere after its code check is refused with 400 as not pending"
+)

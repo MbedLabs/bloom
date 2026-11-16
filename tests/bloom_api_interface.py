@@ -8,6 +8,7 @@
 * @note     Requests go through an ASGI transport; no server is started.
 """
 
+import base64
 import contextlib
 import csv
 import gzip
@@ -21,6 +22,8 @@ from datetime import datetime, timedelta
 from logging.handlers import BufferingHandler
 from types import SimpleNamespace
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlsplit
+from uuid import UUID, uuid4
 
 import httpx
 from cryptography.fernet import Fernet
@@ -30,6 +33,7 @@ from pydantic import ValidationError
 from slowapi.util import get_remote_address
 from sqlalchemy import event, select, update
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from starlette.requests import Request
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
@@ -59,6 +63,7 @@ from app.models import (
     Document,
     IntegrationSetting,
     Notification,
+    Project,
     ProjectVariable,
     Requirement,
     RiskItem,
@@ -69,12 +74,15 @@ from app.models import TestCase as TestCaseModel
 from app.models import TestConcept
 from app.models import TestSuite as TestSuiteModel
 from app.models import TestSuiteItem as TestSuiteItemModel
-from app.models.groups import Group, GroupMembership, Policy
+from app.models.cli_auth_session import CliAuthSession
+from app.models.groups import Group, GroupMembership, Policy, user_application_policies
 from app.models.project_membership import ProjectAccess
 from app.models.user import User, UserRole
 from app.models.user_token import UserToken, UserTokenPurpose
+from app.schemas.cli_auth import CliStartRequest
 from app.schemas.memberships import DEFAULT_EXTERNAL_DOC_TYPES
 from app.services import audit as audit_service
+from app.services import cli_auth
 from app.services.audit import request_outcome, route_template
 from app.services.integration_secrets import (
     ENVELOPE_PREFIX,
@@ -726,6 +734,127 @@ class BloomApiInterface(BloomInterface):
         headers = {"user-agent": self.parameters.RQA_AGENT, **(headers or {})}
         return self._run(self._send_from(method, path, headers, address, errors, fields))
 
+    def bloom_new_cli_world(self):
+        self._run(self.engine.dispose())
+        self.engine = create_async_engine(self.parameters.SYNC_DATABASE)
+        self._run(self._create_tables())
+        self.maker = async_sessionmaker(self.engine, expire_on_commit=False)
+        self.bloom_enforce_foreign_keys()
+        self.patches.enter_context(patch.object(settings, "CLI_CODE_MODE_ENABLED", True))
+        return self._run(self._seed_cli_world())
+
+    def bloom_set_code_mode(self, enabled):
+        self.patches.enter_context(patch.object(settings, "CLI_CODE_MODE_ENABLED", enabled))
+
+    def bloom_cli_challenge(self, verifier=None):
+        verifier = verifier or self.parameters.CLIS_VERIFIER
+        digest = hashlib.sha256(verifier.encode()).digest()
+        challenge = base64.urlsafe_b64encode(digest).decode().rstrip("=")
+        letters = base64.b32encode(hashlib.sha256(challenge.encode()).digest()[:5]).decode()
+        return challenge, f"{letters[:4]}-{letters[4:]}"
+
+    def bloom_cli_start(self, **overrides):
+        challenge, _ = self.bloom_cli_challenge()
+        body = {"client_name": "Example client", "mode": "code", "code_challenge": challenge}
+        body.update({"state": "test-state", **overrides})
+        return self._cli("POST", "/start", json=body)
+
+    def bloom_cli_session(self, **overrides):
+        return self.bloom_cli_start(**overrides).json()["session_id"]
+
+    def bloom_cli_approve(self, headers, session_id, request_code=None):
+        code = request_code or self.bloom_cli_challenge()[1]
+        body = {"session_id": session_id, "request_code": code}
+        return self._cli("POST", "/approve", headers, json=body)
+
+    def bloom_cli_check(self, headers, session_id, request_code=None):
+        code = request_code or self.bloom_cli_challenge()[1]
+        body = {"session_id": session_id, "request_code": code}
+        return self._cli("POST", "/check", headers, json=body)
+
+    def bloom_cli_exchange(self, session_id, code, verifier=None):
+        body = {
+            "session_id": session_id,
+            "code": code,
+            "code_verifier": verifier or self.parameters.CLIS_VERIFIER,
+        }
+        return self._cli("POST", "/exchange", json=body)
+
+    def bloom_cli_deny(self, headers, session_id, **extra):
+        return self._cli("POST", "/deny", headers, json={"session_id": session_id, **extra})
+
+    def bloom_cli_lookup(self, headers, session_id):
+        return self._cli("GET", f"/sessions/{session_id}", headers)
+
+    def bloom_cli_refresh(self, body):
+        return self._cli("POST", "/refresh", json=body)
+
+    def bloom_cli_post(self, path, headers=None, body=None):
+        return self._cli("POST", f"/{path}", headers, json=body)
+
+    def bloom_cli_signed_in(self, headers):
+        session_id = self.bloom_cli_session()
+        code = self.bloom_cli_approve(headers, session_id).json()["exchange_code"]
+        return self.bloom_cli_exchange(session_id, code).json()
+
+    def bloom_cli_stored_ids(self):
+        return {str(value) for value in self._run(self._all(select(CliAuthSession.id)))}
+
+    def bloom_cli_get_session(self, session_id):
+        return self._run(self._get(CliAuthSession, UUID(session_id)))
+
+    def bloom_cli_change_session(self, session_id, **values):
+        statement = update(CliAuthSession).where(CliAuthSession.id == UUID(session_id))
+        self._run(self._update(statement.values(**values)))
+
+    def bloom_cli_expire(self, session_id):
+        self.bloom_cli_change_session(
+            session_id, expires_at=datetime.utcnow() - timedelta(seconds=1)
+        )
+
+    def bloom_set_session_version(self, user_id, version):
+        self._run(
+            self._update(update(User).where(User.id == user_id).values(session_version=version))
+        )
+
+    def bloom_change_refresh_rows(self, **values):
+        self._run(self._update(update(UserToken).values(**values)))
+
+    def bloom_count_user_tokens(self):
+        return len(self._run(self._all(select(UserToken))))
+
+    def bloom_token_headers(self, claims):
+        return {"Authorization": "Bearer " + create_access_token(claims)}
+
+    def bloom_password_reset_purpose(self):
+        return UserTokenPurpose.password_reset
+
+    def bloom_callback_code(self, target):
+        return parse_qs(urlsplit(target).query)["code"][0]
+
+    def bloom_unknown_session(self):
+        return str(uuid4())
+
+    def bloom_approve_with_stale_account(self, user_id):
+        return self._run(self._approve_with_stale_account(user_id))
+
+    def bloom_approve_after_concurrent_approval(self, headers, session_id, user_id):
+        original = cli_auth.check_request_code
+
+        async def approved_elsewhere(db, checked_id, typed):
+            checked = await original(db, checked_id, typed)
+            async with self.maker() as other:
+                await other.execute(
+                    update(CliAuthSession)
+                    .where(CliAuthSession.id == checked_id)
+                    .values(user_id=user_id, exchange_code_hash="approved-elsewhere")
+                )
+                await other.commit()
+            return checked
+
+        with patch.object(cli_auth, "check_request_code", approved_elsewhere):
+            return self.bloom_cli_approve(headers, session_id)
+
     def bloom_api_send_through_image(
         self,
         received_from,
@@ -1323,6 +1452,69 @@ class BloomApiInterface(BloomInterface):
                 return SimpleNamespace(value=call(value), status=None)
         except HTTPException as exc:
             return SimpleNamespace(value=None, status=exc.status_code)
+
+    def _cli(self, method, path, headers=None, json=None):
+        return self.bloom_api_send(method, self.parameters.CLI_PREFIX + path, headers, json=json)
+
+    async def _seed_cli_world(self):
+        async with self.maker() as db:
+            user = User(
+                email="cli-reader@example.com",
+                full_name="CLI Reader",
+                hashed_password="unused",
+                role=UserRole.maintainer,
+                is_active=True,
+            )
+            other = User(
+                email="other@example.com",
+                full_name="Other",
+                hashed_password="unused",
+                role=UserRole.external,
+                is_active=True,
+            )
+            project = Project(name="Demo", prefix="PRJ")
+            policy = Policy(name="App reader", scope="app", permissions={"application": ["view"]})
+            db.add_all([user, other, project, policy])
+            await db.flush()
+            db.add(
+                project_access_fixture(
+                    user_id=user.id, project_id=project.id, permissions={"REQ": ["view"]}
+                )
+            )
+            await db.execute(
+                user_application_policies.insert().values(user_id=user.id, policy_id=policy.id)
+            )
+            await db.commit()
+            claims = {"sub": str(user.id), "type": "user", "ver": 1}
+            return SimpleNamespace(
+                headers={"Authorization": "Bearer " + create_access_token(claims)},
+                user_id=user.id,
+                other_id=other.id,
+            )
+
+    async def _approve_with_stale_account(self, user_id):
+        challenge, request_code = self.bloom_cli_challenge()
+        async with self.maker() as db:
+            start = CliStartRequest(
+                client_name="Client", mode="code", code_challenge=challenge, state="state"
+            )
+            session = await cli_auth.start_session(db, start)
+            await db.commit()
+            session_id = session.id
+        async with self.maker() as db:
+            account = await db.get(User, user_id)
+            async with self.maker() as other:
+                await other.execute(
+                    update(User).where(User.id == user_id).values(session_version=2)
+                )
+                await other.commit()
+            try:
+                await cli_auth.approve_session(db, session_id, account, request_code)
+                reason = None
+            except cli_auth.CliAuthorizationError as refused:
+                reason = refused.reason
+        stored = await self._get(CliAuthSession, session_id)
+        return reason, stored.user_id, stored.exchange_code_hash
 
     def _scope(self, peer, *forwarded):
         return {

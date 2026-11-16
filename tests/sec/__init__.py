@@ -9,6 +9,7 @@ SUITES = [
     "tests.sec.BLOOM_audit_log.AuditLogTest",
     "tests.sec.BLOOM_baselines_external_visibility.BaselinesExternalVisibilityTest",
     "tests.sec.BLOOM_campaigns_external_visibility.CampaignsExternalVisibilityTest",
+    "tests.sec.BLOOM_cli_auth_security.CliAuthSecurityTest",
     "tests.sec.BLOOM_controlled_artefacts_external_visibility.ControlledArtefactsExternalVisibilityTest",
     "tests.sec.BLOOM_defect_webhook_security.DefectWebhookSecurityTest",
     "tests.sec.BLOOM_docs_facade_external_visibility.DocsFacadeExternalVisibilityTest",
