@@ -8,13 +8,16 @@
 * @note     Requests go through an ASGI transport; no server is started.
 """
 
+import contextlib
 import csv
+import gzip
 import hashlib
 import hmac
 import io
 import json
 import logging
-from datetime import datetime
+import re
+from datetime import datetime, timedelta
 from logging.handlers import BufferingHandler
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -23,7 +26,12 @@ import httpx
 from cryptography.fernet import Fernet
 from fastapi import FastAPI, HTTPException
 from fastapi.routing import APIRoute
-from sqlalchemy import event, select
+from pydantic import ValidationError
+from slowapi.util import get_remote_address
+from sqlalchemy import event, select, update
+from sqlalchemy.exc import OperationalError
+from starlette.requests import Request
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 import tests.parameters as params
 from app import main
@@ -31,10 +39,12 @@ from app.api import access_requests as access_requests_api
 from app.api import integrations
 from app.core import id_generator
 from app.core.cache import dashboard_stats_cache
-from app.core.config import settings
+from app.core.config import Settings, settings
 from app.core.database import get_db
-from app.core.deps import limiter
+from app.core.deps import limiter, rate_limit_key
+from app.core.observability import CREATED_BODY_LIMIT, CreatedBody, client_address
 from app.core.permissions import DOC_TYPE_RESOURCES
+from app.core.security import create_access_token
 from app.core.service_auth import require_bud_sync_token
 from app.models import (
     ArtefactActivity,
@@ -48,6 +58,7 @@ from app.models import (
     DesignItem,
     Document,
     IntegrationSetting,
+    Notification,
     ProjectVariable,
     Requirement,
     RiskItem,
@@ -61,7 +72,10 @@ from app.models import TestSuiteItem as TestSuiteItemModel
 from app.models.groups import Group, GroupMembership, Policy
 from app.models.project_membership import ProjectAccess
 from app.models.user import User, UserRole
+from app.models.user_token import UserToken, UserTokenPurpose
 from app.schemas.memberships import DEFAULT_EXTERNAL_DOC_TYPES
+from app.services import audit as audit_service
+from app.services.audit import request_outcome, route_template
 from app.services.integration_secrets import (
     ENVELOPE_PREFIX,
     decrypt_integration_secret,
@@ -708,6 +722,196 @@ class BloomApiInterface(BloomInterface):
             }
         )
 
+    def bloom_api_send(self, method, path, headers=None, address=None, errors=True, **fields):
+        headers = {"user-agent": self.parameters.RQA_AGENT, **(headers or {})}
+        return self._run(self._send_from(method, path, headers, address, errors, fields))
+
+    def bloom_api_send_through_image(
+        self,
+        received_from,
+        forwarded=None,
+        trusted=None,
+        method="GET",
+        path="/api/projects",
+        **fields,
+    ):
+        chain = f"{forwarded}, {received_from}" if forwarded else received_from
+        headers = {**fields.pop("headers", {}), "X-Forwarded-For": chain}
+        app = ProxyHeadersMiddleware(self.api, trusted_hosts="127.0.0.1,::1")
+        with patch.object(settings, "TRUSTED_PROXY_NETWORKS", list(trusted or [])):
+            return self._run(
+                self._send_to(app, ("127.0.0.1", 50000), method, path, headers, fields)
+            )
+
+    def bloom_api_send_direct(
+        self, address, forwarded, trusted=None, method="GET", path="/api/projects", **fields
+    ):
+        headers = {**fields.pop("headers", {}), "X-Forwarded-For": forwarded}
+        with patch.object(settings, "TRUSTED_PROXY_NETWORKS", list(trusted or [])):
+            return self._run(
+                self._send_to(self.api, (address, 50000), method, path, headers, fields)
+            )
+
+    def bloom_with_login_limit(self, sends):
+        limiter.reset()
+        try:
+            with patch.object(limiter, "enabled", True):
+                return [send() for send in sends]
+        finally:
+            limiter.reset()
+
+    def bloom_with_refusal_threshold(self, threshold, sends):
+        with patch.object(settings, "AUDIT_REFUSAL_THRESHOLD", threshold):
+            return [send() for send in sends]
+
+    def bloom_client_address(self, trusted, peer, *forwarded):
+        with patch.object(settings, "TRUSTED_PROXY_NETWORKS", list(trusted)):
+            return client_address(self._scope(peer, *forwarded))
+
+    def bloom_rate_limit_keys(self, trusted, peer, *forwarded):
+        with patch.object(settings, "TRUSTED_PROXY_NETWORKS", list(trusted)):
+            request = Request(self._scope(peer, *forwarded))
+            return rate_limit_key(request), get_remote_address(request)
+
+    def bloom_trusted_proxy_setting(self):
+        return settings.TRUSTED_PROXY_NETWORKS
+
+    def bloom_load_trusted_proxies(self, secret, env_value=None, networks=None):
+        fields = {"SECRET_KEY": secret, "_env_file": None}
+        if networks is not None:
+            fields["TRUSTED_PROXY_NETWORKS"] = networks
+        with patch.dict(
+            "os.environ", {} if env_value is None else {"TRUSTED_PROXY_NETWORKS": env_value}
+        ):
+            try:
+                return Settings(**fields).TRUSTED_PROXY_NETWORKS, None
+            except ValidationError as error:
+                return None, type(error).__name__
+
+    def bloom_request_records(self, response=None, **match):
+        found = []
+        for record in self.bloom_list_audit_events(self.parameters.RQA_ACTION):
+            values = {**(record.details or {}), "outcome": record.outcome, "ip": record.ip}
+            if response is not None and record.request_id != response.headers.get("x-request-id"):
+                continue
+            if all(values.get(key) == value for key, value in match.items()):
+                found.append(record)
+        return found
+
+    def bloom_audit_columns(self):
+        return list(AuditEvent.__table__.columns.keys())
+
+    def bloom_list_every_audit_event(self):
+        return self._run(self._all(select(AuditEvent).order_by(AuditEvent.id)))
+
+    def bloom_cli_headers(self, user_id):
+        user = self._run(self._get(User, user_id))
+        refresh = self._run(
+            self._add(
+                UserToken(
+                    user_id=user_id,
+                    purpose=UserTokenPurpose.refresh,
+                    token_hash="c" * 64,
+                    expires_at=datetime.utcnow() + timedelta(days=1),
+                )
+            )
+        )
+        claims = {"sub": str(user_id), "type": "user", "ver": user.session_version}
+        token = create_access_token({**claims, "cli_refresh_id": refresh})
+        return {"Authorization": f"Bearer {token}"}
+
+    def bloom_user_token_headers(self, user_id):
+        user = self._run(self._get(User, user_id))
+        claims = {"sub": str(user_id), "type": "user", "ver": user.session_version}
+        return {"Authorization": f"Bearer {create_access_token(claims)}"}
+
+    def bloom_deactivate(self, user_id):
+        self._run(self._update(update(User).where(User.id == user_id).values(is_active=False)))
+
+    def bloom_add_notification(self, user_id):
+        return self._run(
+            self._add(Notification(user_id=user_id, event_type="comment", title="For the owner"))
+        )
+
+    def bloom_add_old_refusals(self, address, count, minutes):
+        for _ in range(count):
+            self._run(
+                self._add(
+                    AuditEvent(
+                        occurred_at=datetime.utcnow() - timedelta(minutes=minutes),
+                        actor_type="anonymous",
+                        action=self.parameters.RQA_ACTION,
+                        ip=address,
+                        outcome="denied",
+                    )
+                )
+            )
+
+    def bloom_set_refusal_threshold(self, threshold):
+        self.patches.enter_context(patch.object(settings, "AUDIT_REFUSAL_THRESHOLD", threshold))
+
+    def bloom_refusal_window(self):
+        return settings.AUDIT_REFUSAL_THRESHOLD, settings.AUDIT_REFUSAL_WINDOW_MINUTES
+
+    def bloom_cors_origin(self):
+        return settings.CORS_ORIGINS[0]
+
+    def bloom_sign_in_many_times_rate_limited(self, address, count, body):
+        limiter.reset()
+        try:
+            with patch.object(limiter, "enabled", True):
+                return [
+                    self.bloom_api_send("POST", "/api/auth/login", address=address, json=body)
+                    for _ in range(count)
+                ]
+        finally:
+            limiter.reset()
+
+    def bloom_send_while_audit_fails(self, path):
+        async def unavailable(scope):
+            raise OperationalError("INSERT", {}, Exception("database unavailable"))
+
+        root = logging.getLogger()
+        handler = BufferingHandler(self.parameters.LOG_CAPACITY)
+        root.addHandler(handler)
+        try:
+            with patch.object(audit_service, "_open_session", unavailable):
+                answer = self.bloom_api_send("GET", path)
+        finally:
+            root.removeHandler(handler)
+        return answer, "\n".join(record.getMessage() for record in handler.buffer)
+
+    def bloom_add_exploding_route(self, path, message):
+        routes = list(main.app.router.routes)
+
+        @main.app.get(path)
+        async def explode():
+            raise RuntimeError(message)
+
+        self.patches.callback(setattr, main.app.router, "routes", routes)
+
+    def bloom_route_template(self, path):
+        class Route:
+            path_format = "/{project_id}/things/{thing_id}"
+            path_regex = re.compile(r"^/(?P<project_id>[^/]+)/things/(?P<thing_id>[^/]+)$")
+
+        return route_template({"route": Route(), "path": path}), route_template({"path": path})
+
+    def bloom_request_outcomes(self, codes):
+        return [request_outcome(code) for code in codes], request_outcome(404, refused=True)
+
+    def bloom_read_created_bodies(self):
+        plain = CreatedBody(gzipped=False)
+        plain.feed(b'{"id": 4, ')
+        plain.feed(b'"doc_id": "PRJ-DOC-004"}')
+        packed = CreatedBody(gzipped=True)
+        packed.feed(gzip.compress(b'{"id": 5}'))
+        large = CreatedBody(gzipped=False)
+        large.feed(b"x" * (CREATED_BODY_LIMIT + 1))
+        broken = CreatedBody(gzipped=True)
+        broken.feed(b"not gzip")
+        return tuple(body.parsed() for body in (plain, packed, large, broken))
+
     def bloom_api_get_baseline(self, headers, baseline_id):
         return self.bloom_api_call("GET", f"/api/baselines/{baseline_id}", headers)
 
@@ -1119,6 +1323,29 @@ class BloomApiInterface(BloomInterface):
                 return SimpleNamespace(value=call(value), status=None)
         except HTTPException as exc:
             return SimpleNamespace(value=None, status=exc.status_code)
+
+    def _scope(self, peer, *forwarded):
+        return {
+            "type": "http",
+            "client": (peer, 50000) if peer else None,
+            "headers": [(b"x-forwarded-for", value.encode("latin-1")) for value in forwarded],
+        }
+
+    async def _send_to(self, app, origin, method, path, headers, fields):
+        transport = httpx.ASGITransport(app=app, client=origin)
+        async with REAL_CLIENT(transport=transport, base_url=self.parameters.API_BASE) as client:
+            return await client.request(method, path, headers=headers, **fields)
+
+    async def _send_from(self, method, path, headers, address, errors, fields):
+        origin = (address, 4321) if address else ("127.0.0.1", 123)
+        transport = httpx.ASGITransport(app=self.api, client=origin, raise_app_exceptions=errors)
+        async with REAL_CLIENT(transport=transport, base_url=self.parameters.API_BASE) as client:
+            return await client.request(method, path, headers=headers, **fields)
+
+    async def _update(self, statement):
+        async with self.maker() as db:
+            await db.execute(statement)
+            await db.commit()
 
     async def _upload(self, path, headers, files):
         transport = httpx.ASGITransport(app=self.api)

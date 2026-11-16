@@ -25,9 +25,11 @@ SUITES = [
     "tests.sec.BLOOM_project_iam.ProjectIamTest",
     "tests.sec.BLOOM_project_iam_http.ProjectIamHttpTest",
     "tests.sec.BLOOM_project_variables_external_access.ProjectVariablesExternalAccessTest",
+    "tests.sec.BLOOM_request_audit.RequestAuditTest",
     "tests.sec.BLOOM_requirements_external_visibility.RequirementsExternalVisibilityTest",
     "tests.sec.BLOOM_route_auth_matrix.RouteAuthMatrixTest",
     "tests.sec.BLOOM_service_credentials.ServiceCredentialsTest",
     "tests.sec.BLOOM_token_logging.TokenLoggingTest",
     "tests.sec.BLOOM_traceability_external_visibility.TraceabilityExternalVisibilityTest",
+    "tests.sec.BLOOM_trusted_proxy.TrustedProxyTest",
 ]

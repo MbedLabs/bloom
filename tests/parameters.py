@@ -2562,3 +2562,174 @@ MSG_AUDITLOG_NEWEST = "the newest record names the administrator who signed in l
 MSG_AUDITLOG_SORT = "sorted by {field} {direction}, two pages of two hold the four records in order"
 MSG_AUDITLOG_INVALID = "the query {query} is refused with 422"
 MSG_AUDITLOG_READ_ONLY = "every audit endpoint is a GET"
+RQA_ADMIN = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+RQA_MEMBER = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+RQA_FORMER = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+RQA_OWNER = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+RQA_PREFIX = _letters(string.ascii_uppercase, 3, 3)
+RQA_DESIGN = f"{RQA_PREFIX}-DES-001"
+RQA_ACTION = "api.request"
+RQA_AGENT = "audit-test/1.0"
+RQA_TITLE = " ".join(_draw.sample(_WORDS, 2))
+RQA_NEW_TITLE = " ".join(_draw.sample(_WORDS, 2))
+RQA_LONG_DESCRIPTION = "x" * 2000
+RQA_CLIENTS = {"web": "198.51.100.11", "cli": "198.51.100.12"}
+RQA_SERVICE_ADDRESS = "198.51.100.13"
+RQA_REFUSED_ADDRESS = "198.51.100.14"
+RQA_LIMITED_ADDRESS = "198.51.100.15"
+RQA_REPEATED_ADDRESS = "198.51.100.16"
+RQA_WINDOW_ADDRESS = "198.51.100.17"
+RQA_SECRET_ADDRESS = "198.51.100.18"
+RQA_FILTER_ADDRESS = "198.51.100.19"
+RQA_UNKNOWN_ADDRESS = "203.0.113.9"
+RQA_FORGED = {"Authorization": "Bearer forged.token.value"}
+RQA_MISSING_ID = 999999
+RQA_SERVICE_NAME = "Bud sync"
+RQA_RUN = {"bud_run_id": 7, "run_name": "Nightly"}
+RQA_LOGIN_LIMIT = 10
+RQA_WRONG_LOGIN = {"email": "nobody@example.com", "password": "Wrong-1234"}
+RQA_WINDOW_THRESHOLD = 3
+RQA_OLD_REFUSALS = 5
+RQA_OLD_MINUTES = 11
+RQA_WRONG_PASSWORD = "Not-The-Password-9"
+RQA_SEARCH = "confidential-search-text"
+RQA_EXPLODING_PATH = "/api/__audit_boom__"
+RQA_EXPLOSION = "audit boom"
+RQA_SUPPLIED_ID = "report-me-500"
+RQA_QUOTE = "Quote reference report-me-500 when reporting this."
+RQA_FOREIGN_ORIGIN = "https://foreign.example.com"
+RQA_FAILURE_LOG = "api.request could not be recorded"
+RQA_ROUTE_PATH = "/api/projects/3/things/9"
+RQA_ROUTE_TEMPLATE = "/api/projects/{project_id}/things/{thing_id}"
+RQA_OUTCOME_CODES = (200, 302, 401, 403, 404, 429, 500)
+RQA_OUTCOMES = ["success", "success", "denied", "denied", "failure", "denied", "failure"]
+RQA_CREATED_BODIES = ({"id": 4, "doc_id": "PRJ-DOC-004"}, {"id": 5}, None, None)
+MSG_RQA_STATUSES = "the {client} read, create, change and delete are answered 200, 201, 200 and 204"
+MSG_RQA_GZIP = "the created requirement is answered compressed"
+MSG_RQA_ONE_EVENT = "the {what} leaves exactly one api.request record"
+MSG_RQA_CALL = "the {client} {method} is recorded with its actor, client, route, status and target"
+MSG_RQA_CREATED = "the {client} creation is recorded with the new id and requirement id"
+MSG_RQA_PROJECT = "the {client} project read is recorded with the project"
+MSG_RQA_SERVICE_STATUSES = (
+    "the service credential is issued with 201, and its read and publish are answered 200 and 201"
+)
+MSG_RQA_SERVICE = "the service {what} is recorded as the credential, with no user and no client"
+MSG_RQA_SERVICE_QUERY = "the service read is recorded with its query parameter names"
+MSG_RQA_SERVICE_CREATED = "the publish is recorded with the new document id and document number"
+MSG_RQA_ISSUED = "the credential issue is recorded with the credential id and without the token"
+MSG_RQA_REFUSED_STATUSES = "a forged token, a foreign project, a hidden design and a missing design are answered 401, 403, 404 and 404"
+MSG_RQA_DENIED = "the {what} is recorded as denied with the address"
+MSG_RQA_REFUSAL_DETAILS = "the forged token is anonymous, the foreign project names the project, the hidden design names the design"
+MSG_RQA_MISSING = "the missing design is recorded as a failure"
+MSG_RQA_LIMITED = "the first wrong sign-in is answered 401 and the eleventh 429"
+MSG_RQA_LIMITED_DENIED = (
+    "the refused and the rate-limited sign-in are recorded as denied with the address"
+)
+MSG_RQA_BELOW = "refusals below the threshold leave no repeated refusal record"
+MSG_RQA_DETECTED = "the threshold reached leaves one repeated refusal record with the address, the count and the window"
+MSG_RQA_DENIED_COUNT = "every refused request of the address is recorded as denied"
+MSG_RQA_OLD = "refusals older than the window do not count"
+MSG_RQA_WINDOW = "refusals inside the window reach the threshold once"
+MSG_RQA_QUERY_NAMES = "a search is answered 200 and recorded with its parameter name only"
+MSG_RQA_NO_SECRET = "no record holds the {secret}"
+MSG_RQA_PROBE = (
+    "the {route} probe is recorded as anonymous, without credentials, with its status and duration"
+)
+MSG_RQA_WRITE_FAILED = "a request whose record cannot be written is answered 200 with a request id"
+MSG_RQA_NOT_WRITTEN = "no api.request record is written and the failure is logged"
+MSG_RQA_FILTER = "the audit log filtered by {field} holds only matching records"
+MSG_RQA_FILTER_NONE = "the audit log filtered by an unknown address is empty"
+MSG_RQA_TEMPLATE = (
+    "a route is recorded as its template with the prefix, an unknown path as unmatched"
+)
+MSG_RQA_OUTCOMES = "each status maps to its outcome, and a refused 404 is denied"
+MSG_RQA_BODIES = (
+    "a created body is read plain or compressed, and an oversized or broken one is ignored"
+)
+MSG_RQA_DEPENDENCY_ACTOR = "the user a dependency signs in is the actor of the record"
+MSG_RQA_PREFLIGHT = (
+    "an allowed preflight is answered 200 by the CORS layer, with no request id and no record"
+)
+MSG_RQA_REFUSED_PREFLIGHT = (
+    "a preflight from a foreign origin is refused with 403 and recorded as denied"
+)
+MSG_RQA_FOREIGN = (
+    "a request from a foreign origin gets no CORS permission and is recorded as denied"
+)
+MSG_RQA_CORS_ID = (
+    "an allowed origin gets its CORS header and a request id, and the request is recorded"
+)
+MSG_RQA_500 = (
+    "an unhandled error is answered 500 and recorded once as a failure without the error text"
+)
+MSG_RQA_500_ID = "a 500 quotes the supplied request id in its header, body and record"
+MSG_RQA_DEACTIVATED = "a deactivated account is refused with 403 and recorded as that user, denied"
+MSG_RQA_NOTIFICATION = "another user's notification and a missing one are both answered 404"
+MSG_RQA_NOTIFICATION_OUTCOMES = (
+    "another user's notification is recorded as denied and a missing one as a failure"
+)
+MSG_RQA_404_STATUSES = "a scan, an unknown route and a missing row are answered 404"
+MSG_RQA_404 = "the anonymous scan and the unknown route are denied, the missing row of a signed-in user is a failure"
+TPX_NETWORK = "10.0.0.0/8"
+TPX_FORGED = "198.51.100.9"
+TPX_OUTSIDER = "192.0.2.50"
+TPX_POSING_HOP = "10.0.0.3"
+TPX_FORGED_TOKEN = {"Authorization": "Bearer forged"}
+TPX_SECRET = "test-secret-key-for-trusted-proxy-settings-1234567890"
+TPX_FORWARD = ("10.0.1.2", "203.0.113.21")
+TPX_DEFAULT = ("10.0.3.2", "203.0.113.23")
+TPX_COUNTED = ("10.0.4.2", "203.0.113.24", "203.0.113.25")
+TPX_UNCOUNTED = ("10.0.5.2", "203.0.113.26", "203.0.113.27")
+TPX_OWN_LIMITS = ("10.0.6.2", "203.0.113.28", "203.0.113.29")
+TPX_SHARED = ("10.0.8.2", "203.0.113.30", "203.0.113.31")
+TPX_THRESHOLD = 3
+TPX_LOGIN_LIMIT = 10
+TPX_WRONG_LOGIN = {"email": "nobody@example.com", "password": "Wrong-1234"}
+TPX_LIMITED = [401] * 10 + [429]
+TPX_PROXY = "10.0.0.2"
+TPX_CALLER = "203.0.113.7"
+TPX_ADDRESS_CASES = [
+    ((TPX_PROXY,), TPX_PROXY),
+    ((None, TPX_CALLER), None),
+    ((TPX_PROXY, f"{TPX_FORGED}, {TPX_CALLER}, 10.0.0.9"), TPX_CALLER),
+    ((TPX_PROXY, TPX_FORGED, TPX_CALLER), TPX_CALLER),
+    ((TPX_PROXY, f"{TPX_CALLER}:4711"), TPX_CALLER),
+    ((TPX_PROXY, "[2001:db8::7]:4711"), "2001:db8::7"),
+    ((f"::ffff:{TPX_PROXY}", TPX_CALLER), TPX_CALLER),
+    ((TPX_PROXY, f"{TPX_CALLER}, not-an-address, 10.0.0.9"), "10.0.0.9"),
+    ((TPX_PROXY, "10.0.0.8, 10.0.0.9"), "10.0.0.8"),
+    ((TPX_PROXY, ""), TPX_PROXY),
+    ((TPX_OUTSIDER, TPX_CALLER), TPX_OUTSIDER),
+    (("testclient", TPX_CALLER), "testclient"),
+]
+TPX_DEFAULT_KEY_SCOPES = [
+    (TPX_PROXY, TPX_CALLER),
+    (TPX_OUTSIDER, TPX_FORGED),
+    ("testclient",),
+    (None, TPX_CALLER),
+]
+TPX_KEY_CASES = [
+    ((TPX_PROXY, f"{TPX_FORGED}, {TPX_CALLER}"), TPX_CALLER),
+    ((TPX_OUTSIDER, TPX_CALLER), TPX_OUTSIDER),
+    ((None, TPX_CALLER), "127.0.0.1"),
+]
+TPX_ENV_NETWORKS = '["10.1.2.3/8", " 2001:db8::/32 ", "192.0.2.1"]'
+TPX_LOADED_NETWORKS = ["10.0.0.0/8", "2001:db8::/32", "192.0.2.1/32"]
+TPX_NOT_A_NETWORK = ["proxy.example"]
+MSG_TPX_FORWARDED = "behind a trusted proxy the {what} request is refused with 401 and recorded with the caller's address"
+MSG_TPX_IGNORED = "a forwarded header from an untrusted sender is ignored for the {what} request"
+MSG_TPX_EMPTY = "TRUSTED_PROXY_NETWORKS is empty by default"
+MSG_TPX_DIRECT = "with the empty default the {what} request is recorded with the direct peer"
+MSG_TPX_COUNTED = "behind a trusted proxy repeated refusals are counted by the forwarded address"
+MSG_TPX_UNCOUNTED = "without trusted proxies repeated refusals are counted by the proxy"
+MSG_TPX_OWN_LIMIT = "behind a trusted proxy the {who} caller has a login limit of its own"
+MSG_TPX_NO_ESCAPE = "forged headers from an untrusted sender do not escape its login limit"
+MSG_TPX_SHARED = "without trusted proxies the callers behind one proxy share its login limit"
+MSG_TPX_ELSEWHERE = "a caller elsewhere keeps a login limit of its own"
+MSG_TPX_ADDRESS = (
+    "the client address of peer {peer} with forwarded {forwarded} is the right-most untrusted hop"
+)
+MSG_TPX_DEFAULT_KEY = "with the empty default the rate limit key of {scope} is the direct peer"
+MSG_TPX_KEY = "behind a trusted proxy the rate limit key of {scope} is the resolved address"
+MSG_TPX_LOADED = "the setting reads a JSON array and normalises each entry to a network"
+MSG_TPX_REFUSED = "the setting refuses an entry that is not a network"
