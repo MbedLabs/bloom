@@ -18,10 +18,10 @@ class IntegrationSyncReopenedInBloomTest(IntegrationSyncReopenedInBloomBase):
     def setUpClass(self):
         super().setUpClass()
         number = self.parameters.GIT_NUMBERS[0]
-        self.tc_project_id = self.bloom.bloom_create_project()
-        self.tc_setting_id = self.bloom.bloom_create_integration(self.tc_project_id, "github")
-        self.tc_defect_id = self.bloom.bloom_link_defect(
-            self.tc_project_id,
+        self.project_id = self.bloom.bloom_create_project()
+        self.setting_id = self.bloom.bloom_create_integration(self.project_id, "github")
+        self.defect_id = self.bloom.bloom_link_defect(
+            self.project_id,
             "github",
             self.parameters.REPO,
             number,
@@ -30,7 +30,7 @@ class IntegrationSyncReopenedInBloomTest(IntegrationSyncReopenedInBloomBase):
             external_issue_closed=True,
         )
         self.bloom.bloom_serve_issue_list([{"number": number, "state": self.parameters.GIT_CLOSED}])
-        self.tc_synced = self.bloom.bloom_run_sync(self.parameters.NOW)
+        self.synced = self.bloom.bloom_run_sync(self.parameters.NOW)
 
     def tearDownClass(self):
         super().tearDownClass()

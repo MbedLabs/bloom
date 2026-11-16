@@ -22,7 +22,7 @@ class BaselinesExternalVisibilityTest(BaselinesExternalVisibilityBase):
             self.parameters.BASELINE_NAME,
             self.parameters.READER_SNAPSHOT,
         )
-        self.tc_answer = self.bloom.bloom_api_get_baseline(reader.headers, baseline)
+        self.answer = self.bloom.bloom_api_get_baseline(reader.headers, baseline)
 
     def tearDownClass(self):
         super().tearDownClass()

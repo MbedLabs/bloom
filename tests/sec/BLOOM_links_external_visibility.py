@@ -40,8 +40,8 @@ class LinksExternalVisibilityTest(LinksExternalVisibilityBase):
         bloom.bloom_add_artefact_link(project, customer_tc, customer_req)
         bloom.bloom_add_artefact_link(project, customer_tc, internal_req)
         bloom.bloom_add_artefact_link(project, internal_tc, customer_req)
-        self.tc_customer_ends = (customer_tc, customer_req)
-        self.tc_listed = bloom.bloom_api_list_links(reader.headers, project)
+        self.customer_ends = (customer_tc, customer_req)
+        self.listed = bloom.bloom_api_list_links(reader.headers, project)
 
     def tearDownClass(self):
         super().tearDownClass()

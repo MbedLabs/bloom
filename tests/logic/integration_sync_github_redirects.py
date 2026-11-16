@@ -17,34 +17,34 @@ class IntegrationSyncGithubRedirectsBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_moved_repository_defect_is_closed(self):
-        self.print_variables({"defect": self.tc_first_status})
+        self.print_variables({"defect": self.first_status})
         self.assertEqual(
-            self.tc_first_status,
+            self.first_status,
             self.parameters.DEFECT_CLOSED,
             msg=self.parameters.MSG_GIT_DEFECT_CLOSED,
             abort_on_fail=False,
         )
 
     def bud_redirect_on_github_api_is_followed(self):
-        self.print_variables({"followed": self.tc_followed})
+        self.print_variables({"followed": self.followed})
         self.assertEqual(
-            self.tc_followed,
+            self.followed,
             self.parameters.REDIRECTED,
             msg=self.parameters.MSG_REDIRECT_FOLLOWED,
             abort_on_fail=False,
         )
 
     def bud_redirect_to_another_host_is_not_followed(self):
-        self.print_variables({"calls of the second run": self.tc_second_calls})
+        self.print_variables({"calls of the second run": self.second_calls})
         self.assertEqual(
-            self.tc_second_calls,
+            self.second_calls,
             1,
             msg=self.parameters.MSG_FOREIGN_NOT_FOLLOWED,
             abort_on_fail=False,
         )
 
     def bud_run_error_names_the_redirect(self):
-        error = self.bloom.bloom_get_setting(self.tc_setting_id).sync_error
+        error = self.bloom.bloom_get_setting(self.setting_id).sync_error
         self.print_variables({"error": error})
         self.assertEqual(
             error,

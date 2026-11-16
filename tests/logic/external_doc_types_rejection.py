@@ -21,12 +21,12 @@ class ExternalDocTypesRejectionBase(BloomTestCase):
             {
                 "granted": self.parameters.EXTERNAL_GRANTED,
                 "type": self.parameters.EXTERNAL_OTHER_TYPE,
-                "refusal": self.tc_access.status,
-                "detail": self.tc_access.detail,
+                "refusal": self.access.status,
+                "detail": self.access.detail,
             }
         )
         self.assertRegex(
-            self.tc_access.detail,
+            self.access.detail,
             self.parameters.EXTERNAL_REFUSAL_PATTERN,
             msg=self.parameters.MSG_EXTERNAL_OTHER_REFUSED,
             abort_on_fail=False,

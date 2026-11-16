@@ -17,55 +17,55 @@ class BaselineReadOverrideBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_setup_calls_succeed(self):
-        self.print_variables({"setup": self.tc_setup})
+        self.print_variables({"setup": self.setup})
         self.assertEqual(
-            [found for found, _ in self.tc_setup],
-            [expected for _, expected in self.tc_setup],
+            [found for found, _ in self.setup],
+            [expected for _, expected in self.setup],
             msg=self.parameters.MSG_API_SETUP,
             abort_on_fail=True,
         )
 
     def bud_admitted_group_allows_both_reads(self):
-        self.print_variables({"list, detail": self.tc_admitted})
+        self.print_variables({"list, detail": self.admitted})
         self.assertEqual(
-            self.tc_admitted,
+            self.admitted,
             self.parameters.BOTH_READS_ALLOWED,
             msg=self.parameters.MSG_GROUP_ADMITTED_READS,
             abort_on_fail=False,
         )
 
     def bud_override_without_baseline_read_denies_both(self):
-        self.print_variables({"list, detail": self.tc_overridden})
+        self.print_variables({"list, detail": self.overridden})
         self.assertEqual(
-            self.tc_overridden,
+            self.overridden,
             self.parameters.BOTH_READS_DENIED,
             msg=self.parameters.MSG_OVERRIDE_DENIES,
             abort_on_fail=False,
         )
 
     def bud_override_with_baseline_read_allows_both(self):
-        self.print_variables({"allowed": self.tc_allowed})
+        self.print_variables({"allowed": self.allowed})
         self.assertEqual(
-            self.tc_allowed,
-            (self.parameters.BOTH_READS_ALLOWED, True, self.tc_baseline_id),
+            self.allowed,
+            (self.parameters.BOTH_READS_ALLOWED, True, self.baseline_id),
             msg=self.parameters.MSG_OVERRIDE_ALLOWS,
             abort_on_fail=False,
         )
 
     def bud_other_project_stays_denied(self):
-        self.print_variables({"list, detail": self.tc_other})
+        self.print_variables({"list, detail": self.other})
         self.assertEqual(
-            self.tc_other,
+            self.other,
             self.parameters.BOTH_READS_DENIED,
             msg=self.parameters.MSG_OTHER_PROJECT_DENIED,
             abort_on_fail=False,
         )
 
     def bud_group_keeps_its_policy(self):
-        self.print_variables({"group policies": self.tc_group_policies})
+        self.print_variables({"group policies": self.group_policies})
         self.assertEqual(
-            self.tc_group_policies,
-            [self.tc_baseline_policy_id],
+            self.group_policies,
+            [self.baseline_policy_id],
             msg=self.parameters.MSG_GROUP_POLICY_KEPT,
             abort_on_fail=False,
         )

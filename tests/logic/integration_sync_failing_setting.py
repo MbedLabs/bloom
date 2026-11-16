@@ -17,16 +17,16 @@ class IntegrationSyncFailingSettingBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_only_the_other_setting_is_synced(self):
-        self.print_variables({"synced": self.tc_synced})
+        self.print_variables({"synced": self.synced})
         self.assertEqual(
-            self.tc_synced,
-            [self.tc_other_setting_id],
+            self.synced,
+            [self.other_setting_id],
             msg=self.parameters.MSG_OTHER_SETTING_SYNCED,
             abort_on_fail=False,
         )
 
     def bud_failing_setting_records_its_error(self):
-        error = self.bloom.bloom_get_setting(self.tc_failing_setting_id).sync_error
+        error = self.bloom.bloom_get_setting(self.failing_setting_id).sync_error
         self.print_variables({"error": error})
         self.assertEqual(
             error,
@@ -36,7 +36,7 @@ class IntegrationSyncFailingSettingBase(BloomTestCase):
         )
 
     def bud_other_setting_is_synced_at_now(self):
-        synced_at = self.bloom.bloom_get_setting(self.tc_other_setting_id).synced_at
+        synced_at = self.bloom.bloom_get_setting(self.other_setting_id).synced_at
         self.print_variables({"synced at": synced_at})
         self.assertEqual(
             synced_at,

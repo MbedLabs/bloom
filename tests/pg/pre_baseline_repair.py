@@ -17,60 +17,60 @@ class PreBaselineRepairBase(BloomTestCase):
     interface = BloomPgInterface
 
     def bud_migrations_reach_head(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"alembic": self.tc_upgrade[1][-300:]})
+        self.print_variables({"alembic": self.upgrade[1][-300:]})
         self.assertEqual(
-            self.tc_upgrade[0],
+            self.upgrade[0],
             0,
             msg=self.parameters.MSG_REPAIR_UPGRADE,
             abort_on_fail=False,
         )
 
     def bud_repair_runs_a_second_time_without_error(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"second run": self.tc_repair.repeat_error})
+        self.print_variables({"second run": self.repair.repeat_error})
         self.assertEqual(
-            self.tc_repair.repeat_error,
+            self.repair.repeat_error,
             None,
             msg=self.parameters.MSG_REPAIR_REPEAT,
             abort_on_fail=False,
         )
 
     def bud_repair_restores_the_account_email_column(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"columns named account_email": self.tc_repair.column})
+        self.print_variables({"columns named account_email": self.repair.column})
         self.assertEqual(
-            self.tc_repair.column,
+            self.repair.column,
             self.parameters.REPAIR_COLUMN_COUNT,
             msg=self.parameters.MSG_REPAIR_COLUMN,
             abort_on_fail=False,
         )
 
     def bud_repair_restores_the_sync_events_table(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"columns of the table": self.tc_repair.table_columns})
+        self.print_variables({"columns of the table": self.repair.table_columns})
         self.assertEqual(
-            self.tc_repair.table_columns,
+            self.repair.table_columns,
             self.parameters.REPAIR_TABLE_COLUMNS,
             msg=self.parameters.MSG_REPAIR_TABLE,
             abort_on_fail=False,
         )
 
     def bud_repair_restores_the_index(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"indexes": self.tc_repair.index})
+        self.print_variables({"indexes": self.repair.index})
         self.assertEqual(
-            self.tc_repair.index,
+            self.repair.index,
             self.parameters.REPAIR_INDEX_COUNT,
             msg=self.parameters.MSG_REPAIR_INDEX,
             abort_on_fail=False,

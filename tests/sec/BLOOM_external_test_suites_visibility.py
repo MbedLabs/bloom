@@ -35,11 +35,9 @@ class ExternalTestSuitesVisibilityTest(ExternalTestSuitesVisibilityBase):
             project, values.READER_VISIBLE_SUITE, customer, [visible, hidden]
         )
         bloom.bloom_add_test_suite(project, values.READER_HIDDEN_SUITE, internal, [visible])
-        self.tc_listed = bloom.bloom_api_list_test_suites(reader.headers, project)
-        self.tc_hidden = bloom.bloom_api_get_test_suite(reader.headers, values.READER_HIDDEN_SUITE)
-        self.tc_visible = bloom.bloom_api_get_test_suite(
-            reader.headers, values.READER_VISIBLE_SUITE
-        )
+        self.listed = bloom.bloom_api_list_test_suites(reader.headers, project)
+        self.hidden = bloom.bloom_api_get_test_suite(reader.headers, values.READER_HIDDEN_SUITE)
+        self.visible = bloom.bloom_api_get_test_suite(reader.headers, values.READER_VISIBLE_SUITE)
 
     def tearDownClass(self):
         super().tearDownClass()

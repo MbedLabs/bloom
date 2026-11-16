@@ -17,13 +17,13 @@ class LinksExternalVisibilityBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_external_reader_lists_only_the_link_between_customer_artefacts(self):
-        self.print_variables({"status": self.tc_listed.status, "body": self.tc_listed.body})
+        self.print_variables({"status": self.listed.status, "body": self.listed.body})
         self.assertEqual(
             (
-                self.tc_listed.status,
-                [(item["source_id"], item["target_id"]) for item in self.tc_listed.body],
+                self.listed.status,
+                [(item["source_id"], item["target_id"]) for item in self.listed.body],
             ),
-            (self.parameters.STATUS_OK, [self.tc_customer_ends]),
+            (self.parameters.STATUS_OK, [self.customer_ends]),
             msg=self.parameters.MSG_READER_LINKS,
             abort_on_fail=False,
         )

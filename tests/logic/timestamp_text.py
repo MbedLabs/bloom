@@ -17,27 +17,27 @@ class TimestampTextBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_time_stops_at_minutes(self):
-        self.print_variables({"time": self.parameters.STAMP_NAIVE, "text": self.tc_naive})
+        self.print_variables({"time": self.parameters.STAMP_NAIVE, "text": self.naive})
         self.assertEqual(
-            self.tc_naive,
+            self.naive,
             self.parameters.STAMP_TEXT,
             msg=self.parameters.MSG_STAMP_MINUTES,
             abort_on_fail=False,
         )
 
     def bud_missing_time_is_empty(self):
-        self.print_variables({"text": self.tc_none})
+        self.print_variables({"text": self.none})
         self.assertEqual(
-            self.tc_none,
+            self.none,
             self.parameters.STAMP_NONE_TEXT,
             msg=self.parameters.MSG_STAMP_NONE,
             abort_on_fail=False,
         )
 
     def bud_aware_time_is_written_in_utc(self):
-        self.print_variables({"time": self.parameters.STAMP_AWARE, "text": self.tc_aware})
+        self.print_variables({"time": self.parameters.STAMP_AWARE, "text": self.aware})
         self.assertEqual(
-            self.tc_aware,
+            self.aware,
             self.parameters.STAMP_TEXT,
             msg=self.parameters.MSG_STAMP_AWARE,
             abort_on_fail=False,
@@ -48,11 +48,11 @@ class TimestampTextBase(BloomTestCase):
             {
                 "zone": self.parameters.STAMP_SERVER_ZONE,
                 "executed": self.parameters.STAMP_EXECUTED,
-                "stored": self.tc_stored,
+                "stored": self.stored,
             }
         )
         self.assertEqual(
-            self.tc_stored,
+            self.stored,
             self.parameters.STAMP_EXECUTED_STORED,
             msg=self.parameters.MSG_STAMP_EXECUTION_UTC,
             abort_on_fail=False,

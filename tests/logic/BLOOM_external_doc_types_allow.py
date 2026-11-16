@@ -15,7 +15,7 @@ class ExternalDocTypesAllowTest(ExternalDocTypesAllowBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_access = self.bloom.bloom_require_external_doc_type(
+        self.access = self.bloom.bloom_require_external_doc_type(
             self.parameters.EXTERNAL_GRANTED, self.parameters.EXTERNAL_GRANTED_TYPE
         )
 

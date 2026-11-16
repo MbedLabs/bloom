@@ -17,30 +17,30 @@ class RequirementsExternalVisibilityBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_external_reader_lists_only_the_customer_requirement(self):
-        self.print_variables({"status": self.tc_listed.status, "body": self.tc_listed.body})
+        self.print_variables({"status": self.listed.status, "body": self.listed.body})
         self.assertEqual(
-            (self.tc_listed.status, [item["req_id"] for item in self.tc_listed.body["items"]]),
+            (self.listed.status, [item["req_id"] for item in self.listed.body["items"]]),
             (self.parameters.STATUS_OK, [self.parameters.READER_CUSTOMER_REQ]),
             msg=self.parameters.MSG_READER_REQ_LIST,
             abort_on_fail=False,
         )
 
     def bud_internal_requirement_is_hidden_404(self):
-        self.print_variables({"status": self.tc_hidden.status, "body": self.tc_hidden.body})
+        self.print_variables({"status": self.hidden.status, "body": self.hidden.body})
         self.assertEqual(
-            self.tc_hidden.status,
+            self.hidden.status,
             self.parameters.STATUS_NOT_FOUND,
             msg=self.parameters.MSG_READER_REQ_HIDDEN,
             abort_on_fail=False,
         )
 
     def bud_customer_origin_makes_a_requirement_customer_visible(self):
-        self.print_variables({"status": self.tc_created.status, "body": self.tc_created.body})
+        self.print_variables({"status": self.created.status, "body": self.created.body})
         self.assertEqual(
             (
-                self.tc_created.status,
-                self.tc_created.body["req_origin"],
-                self.tc_created.body["visibility"],
+                self.created.status,
+                self.created.body["req_origin"],
+                self.created.body["visibility"],
             ),
             (
                 self.parameters.STATUS_CREATED,
@@ -52,12 +52,12 @@ class RequirementsExternalVisibilityBase(BloomTestCase):
         )
 
     def bud_internal_origin_makes_a_requirement_internal(self):
-        self.print_variables({"status": self.tc_changed.status, "body": self.tc_changed.body})
+        self.print_variables({"status": self.changed.status, "body": self.changed.body})
         self.assertEqual(
             (
-                self.tc_changed.status,
-                self.tc_changed.body["req_origin"],
-                self.tc_changed.body["visibility"],
+                self.changed.status,
+                self.changed.body["req_origin"],
+                self.changed.body["visibility"],
             ),
             (
                 self.parameters.STATUS_OK,

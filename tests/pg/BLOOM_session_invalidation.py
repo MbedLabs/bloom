@@ -15,8 +15,8 @@ class SessionInvalidationTest(SessionInvalidationBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_postgres = self.bloom.bloom_use_postgres()
-        if not self.tc_postgres:
+        self.postgres = self.bloom.bloom_use_postgres()
+        if not self.postgres:
             return
         old, new = self.parameters.SESSION_OLD_PASSWORD, self.parameters.SESSION_NEW_PASSWORD
         role = self.parameters.SESSION_ROLE
@@ -24,16 +24,16 @@ class SessionInvalidationTest(SessionInvalidationBase):
         email = self.parameters.SESSION_CHANGE_EMAIL
         self.bloom.bloom_add_account(email, old, role)
         login = self.bloom.bloom_log_in_for_cookie(email, old)
-        self.tc_change_before = self.bloom.bloom_read_account(login.access_token).status
-        self.tc_change = self.bloom.bloom_change_password(login.access_token, old, new)
-        self.tc_change_after = self.bloom.bloom_probe_sessions(login, email, old, new)
+        self.change_before = self.bloom.bloom_read_account(login.access_token).status
+        self.change = self.bloom.bloom_change_password(login.access_token, old, new)
+        self.change_after = self.bloom.bloom_probe_sessions(login, email, old, new)
         email = self.parameters.SESSION_RESET_EMAIL
         self.bloom.bloom_add_account(email, old, role)
         login = self.bloom.bloom_log_in_for_cookie(email, old)
-        self.tc_reset_before = self.bloom.bloom_read_account(login.access_token).status
-        self.tc_reset_mail = self.bloom.bloom_request_password_reset(email)
-        self.tc_reset = self.bloom.bloom_reset_password(self.tc_reset_mail.token, new)
-        self.tc_reset_after = self.bloom.bloom_probe_sessions(login, email, old, new)
+        self.reset_before = self.bloom.bloom_read_account(login.access_token).status
+        self.reset_mail = self.bloom.bloom_request_password_reset(email)
+        self.reset = self.bloom.bloom_reset_password(self.reset_mail.token, new)
+        self.reset_after = self.bloom.bloom_probe_sessions(login, email, old, new)
 
     def tearDownClass(self):
         super().tearDownClass()

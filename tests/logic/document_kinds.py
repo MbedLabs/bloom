@@ -18,9 +18,9 @@ class DocumentKindsBase(BloomTestCase):
 
     def bud_legacy_kinds_map_to_canonical_codes(self):
         for value, expected in self.parameters.DOC_KIND_LEGACY:
-            self.print_variables({"stored": value, "kind": self.tc_normalized[value]})
+            self.print_variables({"stored": value, "kind": self.normalized[value]})
             self.assertEqual(
-                self.tc_normalized[value],
+                self.normalized[value],
                 expected,
                 msg=self.parameters.MSG_DOC_KIND_LEGACY,
                 abort_on_fail=False,
@@ -28,15 +28,15 @@ class DocumentKindsBase(BloomTestCase):
 
     def bud_public_api_accepts_only_canonical_kinds(self):
         for value in self.parameters.DOC_KIND_ACCEPTED:
-            self.print_variables({"kind": value, "answer": vars(self.tc_required[value])})
+            self.print_variables({"kind": value, "answer": vars(self.required[value])})
             self.assertEqual(
-                self.tc_required[value].kind,
+                self.required[value].kind,
                 value,
                 msg=self.parameters.MSG_DOC_KIND_ACCEPTED,
                 abort_on_fail=False,
             )
         for value in self.parameters.DOC_KIND_REFUSED:
-            answer = self.tc_required[value]
+            answer = self.required[value]
             self.print_variables({"kind": value, "status": answer.status})
             self.assertEqual(
                 answer.status,
@@ -54,18 +54,18 @@ class DocumentKindsBase(BloomTestCase):
 
     def bud_route_slugs_map_to_kinds(self):
         for slug, expected in self.parameters.DOC_KIND_SLUGS:
-            self.print_variables({"slug": slug, "kind": self.tc_slugs[slug]})
+            self.print_variables({"slug": slug, "kind": self.slugs[slug]})
             self.assertEqual(
-                self.tc_slugs[slug],
+                self.slugs[slug],
                 expected,
                 msg=self.parameters.MSG_DOC_KIND_SLUG,
                 abort_on_fail=False,
             )
 
     def bud_link_counts_include_suspect_links_both_ways(self):
-        self.print_variables({"counts": self.tc_links})
+        self.print_variables({"counts": self.links})
         self.assertEqual(
-            self.tc_links,
+            self.links,
             self.parameters.DOC_KIND_LINK_COUNTS,
             msg=self.parameters.MSG_DOC_KIND_LINKS,
             abort_on_fail=False,

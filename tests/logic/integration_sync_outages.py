@@ -22,7 +22,7 @@ class IntegrationSyncOutagesBase(BloomTestCase):
     @parameterized(params.OUTAGE_CASES)
     def bud_rate_limit_or_outage_is_the_run_error(self, index):
         status, headers, body = self.parameters.OUTAGES[index]
-        setting = self.bloom.bloom_get_setting(self.tc_setting_ids[index])
+        setting = self.bloom.bloom_get_setting(self.setting_ids[index])
         found = (setting.sync_error, setting.synced_at, setting.sync_warning)
         self.print_variables(
             {"answer": (status, headers, body), "error, synced at, warning": found}

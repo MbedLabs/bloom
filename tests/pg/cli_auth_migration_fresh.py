@@ -17,29 +17,29 @@ class CliAuthMigrationFreshBase(BloomTestCase):
     interface = BloomPgInterface
 
     def bud_fresh_database_upgrades(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        code, output = self.tc_upgrade
+        code, output = self.upgrade
         if code:
             self.log_info(output)
         self.print_variables({"exit code": code})
         self.assertEqual(code, 0, msg=self.parameters.MSG_FRESH_UPGRADE, abort_on_fail=True)
 
     def bud_migrations_have_one_head(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"heads": self.tc_heads})
+        self.print_variables({"heads": self.heads})
         self.assertEqual(
-            len(self.tc_heads), 1, msg=self.parameters.MSG_SINGLE_HEAD, abort_on_fail=False
+            len(self.heads), 1, msg=self.parameters.MSG_SINGLE_HEAD, abort_on_fail=False
         )
 
     def bud_database_is_at_the_head(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"revision": self.tc_revision, "heads": self.tc_heads})
+        self.print_variables({"revision": self.revision, "heads": self.heads})
         self.assertEqual(
-            [self.tc_revision], self.tc_heads, msg=self.parameters.MSG_AT_HEAD, abort_on_fail=False
+            [self.revision], self.heads, msg=self.parameters.MSG_AT_HEAD, abort_on_fail=False
         )

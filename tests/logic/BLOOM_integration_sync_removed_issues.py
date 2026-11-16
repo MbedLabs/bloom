@@ -16,17 +16,17 @@ class IntegrationSyncRemovedIssuesTest(IntegrationSyncRemovedIssuesBase):
     def setUpClass(self):
         super().setUpClass()
         gone, forbidden = self.parameters.REMOVED_NUMBERS
-        self.tc_gone_key = self.bloom.bloom_jira_key(gone)
-        self.tc_forbidden_key = self.bloom.bloom_jira_key(forbidden)
-        self.tc_project_id = self.bloom.bloom_create_project()
-        self.tc_setting_id = self.bloom.bloom_create_integration(
-            self.tc_project_id, create_defects_on_inbound=False
+        self.gone_key = self.bloom.bloom_jira_key(gone)
+        self.forbidden_key = self.bloom.bloom_jira_key(forbidden)
+        self.project_id = self.bloom.bloom_create_project()
+        self.setting_id = self.bloom.bloom_create_integration(
+            self.project_id, create_defects_on_inbound=False
         )
-        self.tc_defect_id = self.bloom.bloom_link_defect(
-            self.tc_project_id, "jira", self.parameters.JIRA_PROJECT, gone
+        self.defect_id = self.bloom.bloom_link_defect(
+            self.project_id, "jira", self.parameters.JIRA_PROJECT, gone
         )
-        self.tc_change_id = self.bloom.bloom_link_change(
-            self.tc_project_id,
+        self.change_id = self.bloom.bloom_link_change(
+            self.project_id,
             "jira",
             self.parameters.JIRA_PROJECT,
             forbidden,
@@ -35,14 +35,14 @@ class IntegrationSyncRemovedIssuesTest(IntegrationSyncRemovedIssuesBase):
         self.bloom.bloom_check_removals(self.parameters.REMOVAL_CHECKS)
         self.bloom.bloom_serve_jira(
             issue_status={
-                self.tc_gone_key: self.parameters.STATUS_NOT_FOUND,
-                self.tc_forbidden_key: self.parameters.STATUS_FORBIDDEN,
+                self.gone_key: self.parameters.STATUS_NOT_FOUND,
+                self.forbidden_key: self.parameters.STATUS_FORBIDDEN,
             }
         )
         self.bloom.bloom_run_sync(self.parameters.NOW)
-        self.tc_first_reads = list(self.bloom.site.reads)
-        setting = self.bloom.bloom_get_setting(self.tc_setting_id)
-        self.tc_first_cursor = (setting.sync_removal_cursor, setting.sync_updated)
+        self.first_reads = list(self.bloom.site.reads)
+        setting = self.bloom.bloom_get_setting(self.setting_id)
+        self.first_cursor = (setting.sync_removal_cursor, setting.sync_updated)
         self.bloom.bloom_run_sync(self.parameters.NOW + self.parameters.LATER)
 
     def tearDownClass(self):

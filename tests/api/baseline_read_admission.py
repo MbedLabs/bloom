@@ -17,18 +17,18 @@ class BaselineReadAdmissionBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_setup_calls_succeed(self):
-        self.print_variables({"setup": self.tc_setup})
+        self.print_variables({"setup": self.setup})
         self.assertEqual(
-            [found for found, _ in self.tc_setup],
-            [expected for _, expected in self.tc_setup],
+            [found for found, _ in self.setup],
+            [expected for _, expected in self.setup],
             msg=self.parameters.MSG_API_SETUP,
             abort_on_fail=True,
         )
 
     def bud_group_without_admission_denies_both_reads(self):
-        self.print_variables({"list, detail": self.tc_reads})
+        self.print_variables({"list, detail": self.reads})
         self.assertEqual(
-            self.tc_reads,
+            self.reads,
             self.parameters.BOTH_READS_DENIED,
             msg=self.parameters.MSG_GROUP_NEEDS_ADMISSION,
             abort_on_fail=False,

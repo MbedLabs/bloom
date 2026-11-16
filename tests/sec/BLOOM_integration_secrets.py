@@ -17,19 +17,19 @@ class IntegrationSecretsTest(IntegrationSecretsBase):
         super().setUpClass()
         bloom, values = self.bloom, self.parameters
         secret = values.SECRETS_TOKEN
-        self.tc_prefix = bloom.bloom_envelope_prefix()
-        self.tc_envelope = bloom.bloom_encrypt_secret(secret)
-        self.tc_decrypted = bloom.bloom_decrypt_secret(self.tc_envelope.value)
-        self.tc_second_envelope = bloom.bloom_encrypt_secret(secret)
-        self.tc_second_decrypted = bloom.bloom_decrypt_secret(self.tc_second_envelope.value)
-        self.tc_no_key = bloom.bloom_encrypt_secret(secret, key="")
-        self.tc_bad_key = bloom.bloom_encrypt_secret(secret, key=values.SECRETS_MALFORMED_KEY)
-        self.tc_wrong_key = bloom.bloom_decrypt_secret(
-            self.tc_envelope.value, key=bloom.bloom_new_encryption_key()
+        self.prefix = bloom.bloom_envelope_prefix()
+        self.envelope = bloom.bloom_encrypt_secret(secret)
+        self.decrypted = bloom.bloom_decrypt_secret(self.envelope.value)
+        self.second_envelope = bloom.bloom_encrypt_secret(secret)
+        self.second_decrypted = bloom.bloom_decrypt_secret(self.second_envelope.value)
+        self.no_key = bloom.bloom_encrypt_secret(secret, key="")
+        self.bad_key = bloom.bloom_encrypt_secret(secret, key=values.SECRETS_MALFORMED_KEY)
+        self.wrong_key = bloom.bloom_decrypt_secret(
+            self.envelope.value, key=bloom.bloom_new_encryption_key()
         )
-        self.tc_plaintext = bloom.bloom_decrypt_secret(values.SECRETS_PLAINTEXT)
-        self.tc_recognised = (
-            bloom.bloom_is_encrypted(self.tc_envelope.value),
+        self.plaintext = bloom.bloom_decrypt_secret(values.SECRETS_PLAINTEXT)
+        self.recognised = (
+            bloom.bloom_is_encrypted(self.envelope.value),
             bloom.bloom_is_encrypted(values.SECRETS_PLAINTEXT),
             bloom.bloom_is_encrypted(None),
         )
@@ -37,18 +37,18 @@ class IntegrationSecretsTest(IntegrationSecretsBase):
         bloom.bloom_add_admin(values.ADMIN_EMAIL, values.API_PASSWORD)
         headers, _ = bloom.bloom_log_in(values.ADMIN_EMAIL, values.API_PASSWORD)
         project = bloom.bloom_create_project()
-        self.tc_created = bloom.bloom_api_create_setting(
+        self.created = bloom.bloom_api_create_setting(
             headers, project, values.SECRETS_TRACKER, secret, values.SECRETS_WEBHOOK
         )
-        setting = self.tc_created.body["id"]
-        self.tc_stored = bloom.bloom_read_setting_secrets(setting)
-        self.tc_stored_encrypted = tuple(bloom.bloom_is_encrypted(v) for v in self.tc_stored)
-        self.tc_stored_values = tuple(bloom.bloom_decrypt_secret(v).value for v in self.tc_stored)
-        self.tc_rotated = bloom.bloom_api_rotate_setting_token(
+        setting = self.created.body["id"]
+        self.stored = bloom.bloom_read_setting_secrets(setting)
+        self.stored_encrypted = tuple(bloom.bloom_is_encrypted(v) for v in self.stored)
+        self.stored_values = tuple(bloom.bloom_decrypt_secret(v).value for v in self.stored)
+        self.rotated = bloom.bloom_api_rotate_setting_token(
             headers, setting, values.SECRETS_ROTATED
         )
-        self.tc_rotated_stored = bloom.bloom_read_setting_secrets(setting)
-        self.tc_rotated_value = bloom.bloom_decrypt_secret(self.tc_rotated_stored[0]).value
+        self.rotated_stored = bloom.bloom_read_setting_secrets(setting)
+        self.rotated_value = bloom.bloom_decrypt_secret(self.rotated_stored[0]).value
 
     def tearDownClass(self):
         super().tearDownClass()

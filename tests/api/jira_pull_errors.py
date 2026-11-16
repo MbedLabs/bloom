@@ -17,9 +17,7 @@ class JiraPullErrorsBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_pull_without_project_key_is_refused(self):
-        _, error = self.bloom.bloom_try_sync_now(
-            self.tc_env.setting_id, self.parameters.ADMIN_EMAIL
-        )
+        _, error = self.bloom.bloom_try_sync_now(self.env.setting_id, self.parameters.ADMIN_EMAIL)
         self.print_variables({"error": error})
         self.assertEqual(
             (error or (None,))[0],
@@ -42,11 +40,11 @@ class JiraPullErrorsBase(BloomTestCase):
 
     def bud_refused_account_is_a_bad_request_naming_it(self):
         self.bloom.bloom_update_setting(
-            self.tc_env.setting_id, jira_project_key=self.parameters.JIRA_PROJECT
+            self.env.setting_id, jira_project_key=self.parameters.JIRA_PROJECT
         )
         self.bloom.bloom_refuse_with(self.parameters.STATUS_UNAUTHORIZED)
         _, error = self.bloom.bloom_try_sync_now(
-            self.tc_env.setting_id, self.parameters.THIRD_ADMIN_EMAIL
+            self.env.setting_id, self.parameters.THIRD_ADMIN_EMAIL
         )
         self.print_variables({"error": error})
         found = error or (None, "")
@@ -60,7 +58,7 @@ class JiraPullErrorsBase(BloomTestCase):
     def bud_unreachable_jira_is_a_bad_gateway_naming_it(self):
         self.bloom.bloom_make_unreachable()
         _, error = self.bloom.bloom_try_sync_now(
-            self.tc_env.setting_id, self.parameters.FOURTH_ADMIN_EMAIL
+            self.env.setting_id, self.parameters.FOURTH_ADMIN_EMAIL
         )
         self.print_variables({"error": error})
         found = error or (None, "")

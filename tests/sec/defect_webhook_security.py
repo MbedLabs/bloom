@@ -17,38 +17,36 @@ class DefectWebhookSecurityBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_github_delivery_without_a_signature_is_refused_403(self):
-        self.print_variables({"status": self.tc_unsigned.status, "body": self.tc_unsigned.body})
+        self.print_variables({"status": self.unsigned.status, "body": self.unsigned.body})
         self.assertEqual(
-            self.tc_unsigned.status,
+            self.unsigned.status,
             self.parameters.STATUS_FORBIDDEN,
             msg=self.parameters.MSG_HOOK_UNSIGNED,
             abort_on_fail=False,
         )
 
     def bud_github_delivery_with_a_wrong_signature_is_refused_403(self):
-        self.print_variables({"status": self.tc_wrong.status, "body": self.tc_wrong.body})
+        self.print_variables({"status": self.wrong.status, "body": self.wrong.body})
         self.assertEqual(
-            self.tc_wrong.status,
+            self.wrong.status,
             self.parameters.STATUS_FORBIDDEN,
             msg=self.parameters.MSG_HOOK_WRONG,
             abort_on_fail=False,
         )
 
     def bud_signed_github_delivery_without_a_delivery_id_is_refused_400(self):
-        self.print_variables(
-            {"status": self.tc_no_delivery.status, "body": self.tc_no_delivery.body}
-        )
+        self.print_variables({"status": self.no_delivery.status, "body": self.no_delivery.body})
         self.assertEqual(
-            self.tc_no_delivery.status,
+            self.no_delivery.status,
             self.parameters.STATUS_BAD_REQUEST,
             msg=self.parameters.MSG_HOOK_NO_DELIVERY,
             abort_on_fail=False,
         )
 
     def bud_signed_github_delivery_over_1_mib_is_refused_413(self):
-        self.print_variables({"status": self.tc_oversized.status, "body": self.tc_oversized.body})
+        self.print_variables({"status": self.oversized.status, "body": self.oversized.body})
         self.assertEqual(
-            self.tc_oversized.status,
+            self.oversized.status,
             self.parameters.STATUS_TOO_LARGE,
             msg=self.parameters.MSG_HOOK_OVERSIZED,
             abort_on_fail=False,
@@ -56,7 +54,7 @@ class DefectWebhookSecurityBase(BloomTestCase):
 
     def bud_refused_deliveries_leave_the_defect_open(self):
         self.assertEqual(
-            self.tc_status_after_refusals,
+            self.status_after_refusals,
             self.parameters.DEFECT_OPEN,
             msg=self.parameters.MSG_HOOK_UNCHANGED,
             abort_on_fail=False,
@@ -64,16 +62,16 @@ class DefectWebhookSecurityBase(BloomTestCase):
 
     def bud_refused_deliveries_record_no_successful_sync(self):
         self.assertEqual(
-            self.tc_successes_after_refusals,
+            self.successes_after_refusals,
             [],
             msg=self.parameters.MSG_HOOK_NO_EVENT,
             abort_on_fail=False,
         )
 
     def bud_signed_github_delivery_is_processed_200(self):
-        self.print_variables({"status": self.tc_valid.status, "body": self.tc_valid.body})
+        self.print_variables({"status": self.valid.status, "body": self.valid.body})
         self.assertEqual(
-            (self.tc_valid.status, self.tc_valid.body[self.parameters.HOOK_STATUS_KEY]),
+            (self.valid.status, self.valid.body[self.parameters.HOOK_STATUS_KEY]),
             (self.parameters.STATUS_OK, self.parameters.HOOK_PROCESSED),
             msg=self.parameters.MSG_HOOK_PROCESSED,
             abort_on_fail=False,
@@ -81,16 +79,16 @@ class DefectWebhookSecurityBase(BloomTestCase):
 
     def bud_processed_delivery_closes_the_defect(self):
         self.assertEqual(
-            self.tc_status_after_valid,
+            self.status_after_valid,
             self.parameters.DEFECT_CLOSED,
             msg=self.parameters.MSG_HOOK_CLOSED,
             abort_on_fail=False,
         )
 
     def bud_same_delivery_again_is_a_duplicate(self):
-        self.print_variables({"body": self.tc_replay.body})
+        self.print_variables({"body": self.replay.body})
         self.assertEqual(
-            self.tc_replay.body[self.parameters.HOOK_STATUS_KEY],
+            self.replay.body[self.parameters.HOOK_STATUS_KEY],
             self.parameters.HOOK_DUPLICATE,
             msg=self.parameters.MSG_HOOK_REPLAY,
             abort_on_fail=False,
@@ -98,10 +96,10 @@ class DefectWebhookSecurityBase(BloomTestCase):
 
     def bud_gitlab_delivery_without_the_token_is_refused_403(self):
         self.print_variables(
-            {"status": self.tc_gitlab_unsigned.status, "body": self.tc_gitlab_unsigned.body}
+            {"status": self.gitlab_unsigned.status, "body": self.gitlab_unsigned.body}
         )
         self.assertEqual(
-            self.tc_gitlab_unsigned.status,
+            self.gitlab_unsigned.status,
             self.parameters.STATUS_FORBIDDEN,
             msg=self.parameters.MSG_HOOK_GITLAB_UNSIGNED,
             abort_on_fail=False,
@@ -109,20 +107,18 @@ class DefectWebhookSecurityBase(BloomTestCase):
 
     def bud_refused_gitlab_delivery_leaves_the_defect_open(self):
         self.assertEqual(
-            self.tc_gitlab_status,
+            self.gitlab_status,
             self.parameters.DEFECT_OPEN,
             msg=self.parameters.MSG_HOOK_GITLAB_UNCHANGED,
             abort_on_fail=False,
         )
 
     def bud_gitlab_delivery_with_the_token_is_processed_200(self):
-        self.print_variables(
-            {"status": self.tc_gitlab_valid.status, "body": self.tc_gitlab_valid.body}
-        )
+        self.print_variables({"status": self.gitlab_valid.status, "body": self.gitlab_valid.body})
         self.assertEqual(
             (
-                self.tc_gitlab_valid.status,
-                self.tc_gitlab_valid.body[self.parameters.HOOK_STATUS_KEY],
+                self.gitlab_valid.status,
+                self.gitlab_valid.body[self.parameters.HOOK_STATUS_KEY],
             ),
             (self.parameters.STATUS_OK, self.parameters.HOOK_PROCESSED),
             msg=self.parameters.MSG_HOOK_GITLAB_PROCESSED,

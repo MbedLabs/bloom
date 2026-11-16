@@ -17,9 +17,9 @@ class JiraWebhookInboundOffBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_unmatched_issue_is_not_found(self):
-        self.print_variables({"status": self.tc_response.status_code})
+        self.print_variables({"status": self.response.status_code})
         self.assertEqual(
-            self.tc_response.status_code,
+            self.response.status_code,
             self.parameters.STATUS_NOT_FOUND,
             msg=self.parameters.MSG_INBOUND_OFF,
             abort_on_fail=False,

@@ -17,41 +17,41 @@ class DocumentWorkflowMigrationBase(BloomTestCase):
     interface = BloomPgInterface
 
     def bud_migrations_reach_the_revision_before(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"alembic": self.tc_before[1][-300:]})
+        self.print_variables({"alembic": self.before[1][-300:]})
         self.assertEqual(
-            self.tc_before[0],
+            self.before[0],
             0,
             msg=self.parameters.MSG_MIGRATION_BEFORE,
             abort_on_fail=False,
         )
 
     def bud_migrations_reach_head(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"alembic": self.tc_upgrade[1][-300:]})
+        self.print_variables({"alembic": self.upgrade[1][-300:]})
         self.assertEqual(
-            self.tc_upgrade[0],
+            self.upgrade[0],
             0,
             msg=self.parameters.MSG_MIGRATION_HEAD,
             abort_on_fail=False,
         )
 
     def bud_migrated_column_names_equal_the_models(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
         self.print_variables(
             {
-                "compared": self.tc_schema.compared["columns"],
-                "differences": self.tc_schema.found["columns"],
+                "compared": self.schema.compared["columns"],
+                "differences": self.schema.found["columns"],
             }
         )
         self.assertGreater(
-            self.tc_schema.compared["columns"],
+            self.schema.compared["columns"],
             0,
             msg=self.parameters.MSG_WORKFLOW_SCHEMA_COMPARED.format(
                 aspect=self.parameters.WORKFLOW_SCHEMA_ASPECTS["columns"]
@@ -59,7 +59,7 @@ class DocumentWorkflowMigrationBase(BloomTestCase):
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_schema.found["columns"],
+            self.schema.found["columns"],
             [],
             msg=self.parameters.MSG_WORKFLOW_SCHEMA.format(
                 aspect=self.parameters.WORKFLOW_SCHEMA_ASPECTS["columns"]
@@ -68,17 +68,17 @@ class DocumentWorkflowMigrationBase(BloomTestCase):
         )
 
     def bud_migrated_column_types_equal_the_models(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
         self.print_variables(
             {
-                "compared": self.tc_schema.compared["types"],
-                "differences": self.tc_schema.found["types"],
+                "compared": self.schema.compared["types"],
+                "differences": self.schema.found["types"],
             }
         )
         self.assertGreater(
-            self.tc_schema.compared["types"],
+            self.schema.compared["types"],
             0,
             msg=self.parameters.MSG_WORKFLOW_SCHEMA_COMPARED.format(
                 aspect=self.parameters.WORKFLOW_SCHEMA_ASPECTS["types"]
@@ -86,7 +86,7 @@ class DocumentWorkflowMigrationBase(BloomTestCase):
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_schema.found["types"],
+            self.schema.found["types"],
             [],
             msg=self.parameters.MSG_WORKFLOW_SCHEMA.format(
                 aspect=self.parameters.WORKFLOW_SCHEMA_ASPECTS["types"]
@@ -95,17 +95,17 @@ class DocumentWorkflowMigrationBase(BloomTestCase):
         )
 
     def bud_migrated_primary_keys_equal_the_models(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
         self.print_variables(
             {
-                "compared": self.tc_schema.compared["primary"],
-                "differences": self.tc_schema.found["primary"],
+                "compared": self.schema.compared["primary"],
+                "differences": self.schema.found["primary"],
             }
         )
         self.assertGreater(
-            self.tc_schema.compared["primary"],
+            self.schema.compared["primary"],
             0,
             msg=self.parameters.MSG_WORKFLOW_SCHEMA_COMPARED.format(
                 aspect=self.parameters.WORKFLOW_SCHEMA_ASPECTS["primary"]
@@ -113,7 +113,7 @@ class DocumentWorkflowMigrationBase(BloomTestCase):
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_schema.found["primary"],
+            self.schema.found["primary"],
             [],
             msg=self.parameters.MSG_WORKFLOW_SCHEMA.format(
                 aspect=self.parameters.WORKFLOW_SCHEMA_ASPECTS["primary"]
@@ -122,17 +122,17 @@ class DocumentWorkflowMigrationBase(BloomTestCase):
         )
 
     def bud_migrated_unique_constraints_equal_the_models(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
         self.print_variables(
             {
-                "compared": self.tc_schema.compared["unique"],
-                "differences": self.tc_schema.found["unique"],
+                "compared": self.schema.compared["unique"],
+                "differences": self.schema.found["unique"],
             }
         )
         self.assertGreater(
-            self.tc_schema.compared["unique"],
+            self.schema.compared["unique"],
             0,
             msg=self.parameters.MSG_WORKFLOW_SCHEMA_COMPARED.format(
                 aspect=self.parameters.WORKFLOW_SCHEMA_ASPECTS["unique"]
@@ -140,7 +140,7 @@ class DocumentWorkflowMigrationBase(BloomTestCase):
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_schema.found["unique"],
+            self.schema.found["unique"],
             [],
             msg=self.parameters.MSG_WORKFLOW_SCHEMA.format(
                 aspect=self.parameters.WORKFLOW_SCHEMA_ASPECTS["unique"]
@@ -149,17 +149,17 @@ class DocumentWorkflowMigrationBase(BloomTestCase):
         )
 
     def bud_migrated_foreign_keys_equal_the_models(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
         self.print_variables(
             {
-                "compared": self.tc_schema.compared["foreign"],
-                "differences": self.tc_schema.found["foreign"],
+                "compared": self.schema.compared["foreign"],
+                "differences": self.schema.found["foreign"],
             }
         )
         self.assertGreater(
-            self.tc_schema.compared["foreign"],
+            self.schema.compared["foreign"],
             0,
             msg=self.parameters.MSG_WORKFLOW_SCHEMA_COMPARED.format(
                 aspect=self.parameters.WORKFLOW_SCHEMA_ASPECTS["foreign"]
@@ -167,7 +167,7 @@ class DocumentWorkflowMigrationBase(BloomTestCase):
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_schema.found["foreign"],
+            self.schema.found["foreign"],
             [],
             msg=self.parameters.MSG_WORKFLOW_SCHEMA.format(
                 aspect=self.parameters.WORKFLOW_SCHEMA_ASPECTS["foreign"]
@@ -176,17 +176,17 @@ class DocumentWorkflowMigrationBase(BloomTestCase):
         )
 
     def bud_migrated_check_constraints_equal_the_models(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
         self.print_variables(
             {
-                "compared": self.tc_schema.compared["checks"],
-                "differences": self.tc_schema.found["checks"],
+                "compared": self.schema.compared["checks"],
+                "differences": self.schema.found["checks"],
             }
         )
         self.assertGreater(
-            self.tc_schema.compared["checks"],
+            self.schema.compared["checks"],
             0,
             msg=self.parameters.MSG_WORKFLOW_SCHEMA_COMPARED.format(
                 aspect=self.parameters.WORKFLOW_SCHEMA_ASPECTS["checks"]
@@ -194,7 +194,7 @@ class DocumentWorkflowMigrationBase(BloomTestCase):
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_schema.found["checks"],
+            self.schema.found["checks"],
             [],
             msg=self.parameters.MSG_WORKFLOW_SCHEMA.format(
                 aspect=self.parameters.WORKFLOW_SCHEMA_ASPECTS["checks"]
@@ -203,17 +203,17 @@ class DocumentWorkflowMigrationBase(BloomTestCase):
         )
 
     def bud_migrated_pending_request_index_equal_the_models(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
         self.print_variables(
             {
-                "compared": self.tc_schema.compared["pending"],
-                "differences": self.tc_schema.found["pending"],
+                "compared": self.schema.compared["pending"],
+                "differences": self.schema.found["pending"],
             }
         )
         self.assertGreater(
-            self.tc_schema.compared["pending"],
+            self.schema.compared["pending"],
             0,
             msg=self.parameters.MSG_WORKFLOW_SCHEMA_COMPARED.format(
                 aspect=self.parameters.WORKFLOW_SCHEMA_ASPECTS["pending"]
@@ -221,7 +221,7 @@ class DocumentWorkflowMigrationBase(BloomTestCase):
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_schema.found["pending"],
+            self.schema.found["pending"],
             [],
             msg=self.parameters.MSG_WORKFLOW_SCHEMA.format(
                 aspect=self.parameters.WORKFLOW_SCHEMA_ASPECTS["pending"]
@@ -230,17 +230,17 @@ class DocumentWorkflowMigrationBase(BloomTestCase):
         )
 
     def bud_migrated_comment_columns_equal_the_models(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
         self.print_variables(
             {
-                "compared": self.tc_schema.compared["comments"],
-                "differences": self.tc_schema.found["comments"],
+                "compared": self.schema.compared["comments"],
+                "differences": self.schema.found["comments"],
             }
         )
         self.assertGreater(
-            self.tc_schema.compared["comments"],
+            self.schema.compared["comments"],
             0,
             msg=self.parameters.MSG_WORKFLOW_SCHEMA_COMPARED.format(
                 aspect=self.parameters.WORKFLOW_SCHEMA_ASPECTS["comments"]
@@ -248,7 +248,7 @@ class DocumentWorkflowMigrationBase(BloomTestCase):
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_schema.found["comments"],
+            self.schema.found["comments"],
             [],
             msg=self.parameters.MSG_WORKFLOW_SCHEMA.format(
                 aspect=self.parameters.WORKFLOW_SCHEMA_ASPECTS["comments"]
@@ -257,52 +257,52 @@ class DocumentWorkflowMigrationBase(BloomTestCase):
         )
 
     def bud_upgrade_leaves_the_requirement_statuses(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
         self.print_variables(
-            {"before": self.tc_rows_before.requirements, "after": self.tc_rows_after.requirements}
+            {"before": self.rows_before.requirements, "after": self.rows_after.requirements}
         )
         self.assertEqual(
-            self.tc_rows_after.requirements,
-            self.tc_rows_before.requirements,
+            self.rows_after.requirements,
+            self.rows_before.requirements,
             msg=self.parameters.MSG_LEGACY_REQUIREMENTS,
             abort_on_fail=False,
         )
 
     def bud_upgrade_leaves_the_change_request_status(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.tc_rows_after.change})
+        self.print_variables({"status": self.rows_after.change})
         self.assertEqual(
-            self.tc_rows_after.change,
+            self.rows_after.change,
             self.parameters.LEGACY_CHANGE_STATUS,
             msg=self.parameters.MSG_LEGACY_CHANGE,
             abort_on_fail=False,
         )
 
     def bud_upgrade_leaves_the_baseline_snapshot(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
         self.print_variables(
-            {"before": self.tc_rows_before.baseline, "after": self.tc_rows_after.baseline}
+            {"before": self.rows_before.baseline, "after": self.rows_after.baseline}
         )
         self.assertEqual(
-            self.tc_rows_after.baseline,
-            self.tc_rows_before.baseline,
+            self.rows_after.baseline,
+            self.rows_before.baseline,
             msg=self.parameters.MSG_LEGACY_BASELINE,
             abort_on_fail=False,
         )
 
     def bud_upgrade_creates_no_workflow_rows(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"workflows, revisions, requests": self.tc_rows_after.workflows})
+        self.print_variables({"workflows, revisions, requests": self.rows_after.workflows})
         self.assertEqual(
-            self.tc_rows_after.workflows,
+            self.rows_after.workflows,
             [0, 0, 0],
             msg=self.parameters.MSG_LEGACY_NO_WORKFLOWS,
             abort_on_fail=False,

@@ -17,17 +17,17 @@ class UserDeletionBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_plain_user_is_deleted(self):
-        self._assert_deleted(self.tc_plain)
+        self._assert_deleted(self.plain)
 
     def bud_project_member_is_deleted(self):
-        self.print_variables({"member": self.tc_member.member})
+        self.print_variables({"member": self.member.member})
         self.assertIn(
-            self.tc_member.member,
+            self.member.member,
             self.parameters.DELETION_ACCEPTED,
             msg=self.parameters.MSG_DELETION_MEMBER,
             abort_on_fail=False,
         )
-        self._assert_deleted(self.tc_member)
+        self._assert_deleted(self.member)
 
     def _assert_deleted(self, outcome):
         """Assert the user was created, deleted with 204 and is absent from the user list."""

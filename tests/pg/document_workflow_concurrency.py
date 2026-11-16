@@ -17,34 +17,34 @@ class DocumentWorkflowConcurrencyBase(BloomTestCase):
     interface = BloomPgInterface
 
     def bud_both_first_reads_are_answered_200(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"replies": [(reply.status, reply.body) for reply in self.tc_replies]})
+        self.print_variables({"replies": [(reply.status, reply.body) for reply in self.replies]})
         self.assertEqual(
-            [reply.status for reply in self.tc_replies],
+            [reply.status for reply in self.replies],
             [self.parameters.STATUS_OK] * 2,
             msg=self.parameters.MSG_WORKFLOW_RACE_READS,
             abort_on_fail=False,
         )
 
     def bud_one_workflow_is_stored(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"workflows": len(self.tc_workflows)})
+        self.print_variables({"workflows": len(self.workflows)})
         self.assertEqual(
-            len(self.tc_workflows),
+            len(self.workflows),
             1,
             msg=self.parameters.MSG_WORKFLOW_RACE_ONE,
             abort_on_fail=False,
         )
 
     def bud_stored_workflow_is_a_first_draft_of_the_creator(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        stored = self.tc_workflows[0]
+        stored = self.workflows[0]
         self.print_variables(
             {
                 "revision": stored.revision_number,
@@ -57,31 +57,31 @@ class DocumentWorkflowConcurrencyBase(BloomTestCase):
             (
                 self.parameters.WORKFLOW_RACE_FIRST_REVISION,
                 self.parameters.STATUS_DRAFT,
-                self.tc_user_id,
+                self.user_id,
             ),
             msg=self.parameters.MSG_WORKFLOW_RACE_STATE,
             abort_on_fail=False,
         )
 
     def bud_later_read_is_answered_200(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.tc_later.status, "body": self.tc_later.body})
+        self.print_variables({"status": self.later.status, "body": self.later.body})
         self.assertEqual(
-            self.tc_later.status,
+            self.later.status,
             self.parameters.STATUS_OK,
             msg=self.parameters.MSG_WORKFLOW_RACE_LATER,
             abort_on_fail=False,
         )
 
     def bud_later_read_shows_the_revision_of_the_first_reads(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
         key = self.parameters.WORKFLOW_RACE_REVISION_KEY
         self.assertEqual(
-            (self.tc_later.body[key], self.tc_replies[0].body[key]),
+            (self.later.body[key], self.replies[0].body[key]),
             (
                 self.parameters.WORKFLOW_RACE_FIRST_REVISION,
                 self.parameters.WORKFLOW_RACE_FIRST_REVISION,
@@ -91,13 +91,13 @@ class DocumentWorkflowConcurrencyBase(BloomTestCase):
         )
 
     def bud_later_read_names_the_creator(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        creator = self.tc_later.body[self.parameters.WORKFLOW_RACE_CREATOR_KEY]
+        creator = self.later.body[self.parameters.WORKFLOW_RACE_CREATOR_KEY]
         self.assertEqual(
             creator[self.parameters.WORKFLOW_RACE_ID_KEY],
-            self.tc_user_id,
+            self.user_id,
             msg=self.parameters.MSG_WORKFLOW_RACE_CREATOR,
             abort_on_fail=False,
         )

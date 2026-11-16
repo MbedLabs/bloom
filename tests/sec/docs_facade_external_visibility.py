@@ -17,9 +17,9 @@ class DocsFacadeExternalVisibilityBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_external_reader_lists_only_the_customer_documents(self):
-        self.print_variables({"status": self.tc_listed.status, "body": self.tc_listed.body})
+        self.print_variables({"status": self.listed.status, "body": self.listed.body})
         self.assertEqual(
-            (self.tc_listed.status, sorted(row["doc_id"] for row in self.tc_listed.body["items"])),
+            (self.listed.status, sorted(row["doc_id"] for row in self.listed.body["items"])),
             (
                 self.parameters.STATUS_OK,
                 sorted([self.parameters.READER_CUSTOMER_REQ, self.parameters.READER_CUSTOMER_SPEC]),
@@ -30,7 +30,7 @@ class DocsFacadeExternalVisibilityBase(BloomTestCase):
 
     def bud_listed_documents_carry_the_customer_visibility(self):
         self.assertEqual(
-            {row["visibility"] for row in self.tc_listed.body["items"]},
+            {row["visibility"] for row in self.listed.body["items"]},
             {self.parameters.CUSTOMER_VISIBILITY},
             msg=self.parameters.MSG_READER_DOCS_VISIBILITY,
             abort_on_fail=False,
@@ -39,11 +39,11 @@ class DocsFacadeExternalVisibilityBase(BloomTestCase):
     def bud_customer_documents_open_and_internal_ones_are_hidden(self):
         self.print_variables(
             {
-                "customer requirement, internal requirement, customer specification, internal specification": self.tc_details
+                "customer requirement, internal requirement, customer specification, internal specification": self.details
             }
         )
         self.assertEqual(
-            self.tc_details,
+            self.details,
             self.parameters.READER_DETAIL_STATUSES,
             msg=self.parameters.MSG_READER_DOCS_DETAIL,
             abort_on_fail=False,

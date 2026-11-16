@@ -19,7 +19,7 @@ class IntegrationsSettingsRedactionTest(IntegrationsSettingsRedactionBase):
         self.bloom.bloom_create_webhook_integration(
             reader.project_id, tracker=self.parameters.READER_TRACKER
         )
-        self.tc_answer = self.bloom.bloom_api_list_settings(reader.headers, reader.project_id)
+        self.answer = self.bloom.bloom_api_list_settings(reader.headers, reader.project_id)
 
     def tearDownClass(self):
         super().tearDownClass()

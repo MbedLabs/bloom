@@ -17,20 +17,20 @@ class BaselineReadOwnerBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_setup_calls_succeed(self):
-        self.print_variables({"setup": self.tc_setup})
+        self.print_variables({"setup": self.setup})
         self.assertEqual(
-            [found for found, _ in self.tc_setup],
-            [expected for _, expected in self.tc_setup],
+            [found for found, _ in self.setup],
+            [expected for _, expected in self.setup],
             msg=self.parameters.MSG_API_SETUP,
             abort_on_fail=True,
         )
 
     def bud_admin_and_owner_read_the_baseline(self):
-        for actor, reads in self.tc_reads.items():
+        for actor, reads in self.reads.items():
             self.print_variables({"actor": actor, "reads": reads})
             self.assertEqual(
                 reads,
-                (self.parameters.BOTH_READS_ALLOWED, True, self.tc_baseline_id),
+                (self.parameters.BOTH_READS_ALLOWED, True, self.baseline_id),
                 msg=self.parameters.MSG_OWNER_AUTHORITY,
                 abort_on_fail=False,
             )

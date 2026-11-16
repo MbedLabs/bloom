@@ -19,7 +19,7 @@ class E2eImageSmokeScriptBase(BloomTestCase):
     def bud_admin_full_name_is_one_docker_argument(self):
         app_runs = [
             call
-            for call in self.tc_docker_calls
+            for call in self.docker_calls
             if call[:3] == ["run", "-d", "--name"]
             and call[3].startswith(self.parameters.SMOKE_APP_CONTAINER)
         ]
@@ -32,18 +32,18 @@ class E2eImageSmokeScriptBase(BloomTestCase):
         )
 
     def bud_project_payload_is_found(self):
-        self.print_variables({"payload": self.tc_payload})
+        self.print_variables({"payload": self.payload})
         self.assertTrue(
-            self.tc_payload is not None,
+            self.payload is not None,
             msg=self.parameters.MSG_SMOKE_PAYLOAD_FOUND,
             abort_on_fail=True,
         )
 
     def bud_project_payload_passes_the_create_contract(self):
-        self.print_variables({"validated": self.tc_validated})
+        self.print_variables({"validated": self.validated})
         self.assertEqual(
-            self.tc_validated,
-            (self.tc_payload["prefix"], None),
+            self.validated,
+            (self.payload["prefix"], None),
             msg=self.parameters.MSG_SMOKE_PAYLOAD_VALID,
             abort_on_fail=False,
         )

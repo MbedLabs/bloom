@@ -17,47 +17,47 @@ class RequirementTextMigrationBase(BloomTestCase):
     interface = BloomPgInterface
 
     def bud_every_alembic_command_succeeds(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        for code, output in self.tc_commands:
+        for code, output in self.commands:
             if code:
                 self.log_info(output)
-        codes = [code for code, _ in self.tc_commands]
+        codes = [code for code, _ in self.commands]
         self.print_variables({"exit codes": codes})
         self.assertEqual(
             codes, [0] * len(codes), msg=self.parameters.MSG_ALEMBIC_SUCCEEDS, abort_on_fail=True
         )
 
     def bud_upgrade_moves_editor_text_into_descriptions(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"upgraded": self.tc_upgraded})
+        self.print_variables({"upgraded": self.upgraded})
         self._equal(
-            self.tc_upgraded,
+            self.upgraded,
             self.parameters.TEXT_MIGRATION_EXPECTED,
             self.parameters.MSG_TEXT_MIGRATION_UPGRADE,
         )
 
     def bud_downgrade_keeps_the_descriptions(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"downgraded": self.tc_downgraded})
+        self.print_variables({"downgraded": self.downgraded})
         self._equal(
-            self.tc_downgraded,
+            self.downgraded,
             (self.parameters.TEXT_MIGRATION_BEFORE, self.parameters.TEXT_MIGRATION_EXPECTED),
             self.parameters.MSG_TEXT_MIGRATION_DOWNGRADE,
         )
 
     def bud_upgrading_again_keeps_the_descriptions(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"upgraded again": self.tc_reupgraded})
+        self.print_variables({"upgraded again": self.reupgraded})
         self._equal(
-            self.tc_reupgraded,
+            self.reupgraded,
             (self.parameters.TEXT_MIGRATION_REVISION, self.parameters.TEXT_MIGRATION_EXPECTED),
             self.parameters.MSG_TEXT_MIGRATION_REUPGRADE,
         )

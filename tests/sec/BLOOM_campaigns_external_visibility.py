@@ -47,11 +47,9 @@ class CampaignsExternalVisibilityTest(CampaignsExternalVisibilityBase):
             [],
             [(visible_tc, values.READER_CAMPAIGN_PENDING)],
         )
-        self.tc_listed = bloom.bloom_api_list_campaigns(reader.headers, project)
-        self.tc_hidden = bloom.bloom_api_get_campaign(reader.headers, values.READER_HIDDEN_CAMPAIGN)
-        self.tc_visible = bloom.bloom_api_get_campaign(
-            reader.headers, values.READER_VISIBLE_CAMPAIGN
-        )
+        self.listed = bloom.bloom_api_list_campaigns(reader.headers, project)
+        self.hidden = bloom.bloom_api_get_campaign(reader.headers, values.READER_HIDDEN_CAMPAIGN)
+        self.visible = bloom.bloom_api_get_campaign(reader.headers, values.READER_VISIBLE_CAMPAIGN)
         email, password = values.READER_MAINTAINER_EMAIL, values.API_PASSWORD
         member = bloom.bloom_add_account(email, password, values.API_MEMBER_ROLE)
         bloom.bloom_add_internal_member(project, member, values.READER_ALL_PERMISSIONS)
@@ -64,8 +62,8 @@ class CampaignsExternalVisibilityTest(CampaignsExternalVisibilityBase):
             "executed_at": values.READER_SYNC_AT,
             "bud_run_id": values.READER_SYNC_RUN,
         }
-        self.tc_synced = bloom.bloom_api_sync_results(headers, [result])
-        self.tc_after_sync = bloom.bloom_api_get_campaign(headers, values.READER_VISIBLE_CAMPAIGN)
+        self.synced = bloom.bloom_api_sync_results(headers, [result])
+        self.after_sync = bloom.bloom_api_get_campaign(headers, values.READER_VISIBLE_CAMPAIGN)
 
     def tearDownClass(self):
         super().tearDownClass()

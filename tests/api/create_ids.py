@@ -20,7 +20,7 @@ class CreateIdsBase(BloomTestCase):
 
     def bud_creates_assign_public_ids(self):
         prefix = self.parameters.CREATE_ID_PREFIX
-        for type_code, outcome in self.tc_created.items():
+        for type_code, outcome in self.created.items():
             public_id = str(outcome.public_id)
             self.print_variables(
                 {"type": type_code, "status": outcome.status, "public id": public_id}
@@ -33,7 +33,7 @@ class CreateIdsBase(BloomTestCase):
             )
             self.assertRegex(
                 public_id,
-                self.tc_pattern,
+                self.pattern,
                 msg=self.parameters.MSG_CREATE_ID_PATTERN,
                 abort_on_fail=False,
             )

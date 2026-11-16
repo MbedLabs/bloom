@@ -17,7 +17,7 @@ class IntegrationSyncNowBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_sync_now_creates_updates_and_removes_in_one_call(self):
-        found = (self.tc_result.created, self.tc_result.updated, self.tc_result.removed)
+        found = (self.result.created, self.result.updated, self.result.removed)
         self.print_variables({"created, updated, removed": found})
         self.assertEqual(
             found, (1, 1, 0), msg=self.parameters.MSG_SYNC_NOW_COUNTS, abort_on_fail=False
@@ -33,7 +33,7 @@ class IntegrationSyncNowBase(BloomTestCase):
         )
 
     def bud_server_error_leaves_the_change_request_unmarked(self):
-        state = self.bloom.bloom_get_change(self.tc_change_id).external_issue_state
+        state = self.bloom.bloom_get_change(self.change_id).external_issue_state
         self.print_variables({"change request issue state": state})
         self.assertEqual(
             (state,), (None,), msg=self.parameters.MSG_SYNC_NOW_ERROR_UNMARKED, abort_on_fail=False
@@ -52,7 +52,7 @@ class IntegrationSyncNowBase(BloomTestCase):
         )
 
     def bud_setting_records_the_run_cursor_and_counts(self):
-        setting = self.bloom.bloom_get_setting(self.tc_setting_id)
+        setting = self.bloom.bloom_get_setting(self.setting_id)
         found = (
             setting.synced_at is not None,
             setting.sync_removal_cursor,

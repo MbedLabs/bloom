@@ -17,18 +17,18 @@ class ExternalDocTypesAdminBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_admin_sees_every_type(self):
-        self.print_variables({"allowed": self.tc_admin.allowed})
+        self.print_variables({"allowed": self.admin.allowed})
         self.assertEqual(
-            self.tc_admin.allowed,
+            self.admin.allowed,
             self.parameters.EXTERNAL_EVERY_TYPE,
             msg=self.parameters.MSG_EXTERNAL_ADMIN_EVERY_TYPE,
             abort_on_fail=False,
         )
 
     def bud_admin_needs_no_query(self):
-        self.print_variables({"queries": self.tc_admin.queries})
+        self.print_variables({"queries": self.admin.queries})
         self.assertEqual(
-            self.tc_admin.queries,
+            self.admin.queries,
             self.parameters.EXTERNAL_NO_QUERY,
             msg=self.parameters.MSG_EXTERNAL_ADMIN_NO_QUERY,
             abort_on_fail=False,

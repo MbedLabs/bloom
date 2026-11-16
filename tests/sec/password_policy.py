@@ -17,16 +17,16 @@ class PasswordPolicyBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_minimum_length_is_accepted(self):
-        self.print_variables({"length": len(self.tc_minimum_input), "error": self.tc_minimum.error})
+        self.print_variables({"length": len(self.minimum_input), "error": self.minimum.error})
         self.assertEqual(
-            self.tc_minimum.value,
-            self.tc_minimum_input,
+            self.minimum.value,
+            self.minimum_input,
             msg=self.parameters.MSG_PASSWORD_MINIMUM,
             abort_on_fail=False,
         )
 
     def bud_short_passwords_are_refused(self):
-        for label, outcome in self.tc_short.items():
+        for label, outcome in self.short.items():
             self.print_variables({"length": label, "error": outcome.error})
             self.assertRegex(
                 outcome.error,
@@ -37,15 +37,15 @@ class PasswordPolicyBase(BloomTestCase):
 
     def bud_overlong_passwords_are_refused(self):
         self.print_variables(
-            {"characters": len(self.parameters.PASSWORD_MULTIBYTE), "byte limit": self.tc_max_bytes}
+            {"characters": len(self.parameters.PASSWORD_MULTIBYTE), "byte limit": self.max_bytes}
         )
         self.assertLess(
             len(self.parameters.PASSWORD_MULTIBYTE),
-            self.tc_max_bytes,
+            self.max_bytes,
             msg=self.parameters.MSG_PASSWORD_MULTIBYTE_LENGTH,
             abort_on_fail=False,
         )
-        for outcome in (self.tc_overlong, self.tc_multibyte):
+        for outcome in (self.overlong, self.multibyte):
             self.print_variables({"error": outcome.error})
             self.assertRegex(
                 outcome.error,
@@ -55,7 +55,7 @@ class PasswordPolicyBase(BloomTestCase):
             )
 
     def bud_every_entry_point_refuses_a_short_password(self):
-        for schema, outcome in self.tc_schema_short.items():
+        for schema, outcome in self.schema_short.items():
             self.print_variables({"schema": schema, "error": outcome.error})
             self.assertEqual(
                 outcome.error,
@@ -66,7 +66,7 @@ class PasswordPolicyBase(BloomTestCase):
 
     def bud_every_entry_point_keeps_a_valid_password(self):
         for schema, (field, _) in self.parameters.PASSWORD_SCHEMAS.items():
-            outcome = self.tc_schema_valid[schema]
+            outcome = self.schema_valid[schema]
             kept = getattr(outcome.instance, field, None)
             self.print_variables({"schema": schema, "field": field, "error": outcome.error})
             self.assertEqual(

@@ -15,7 +15,7 @@ class JiraPullErrorsTest(JiraPullErrorsBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_env = self.bloom.bloom_create_webhook_environment()
+        self.env = self.bloom.bloom_create_webhook_environment()
 
     def tearDownClass(self):
         super().tearDownClass()

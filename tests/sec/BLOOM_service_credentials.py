@@ -19,17 +19,17 @@ class ServiceCredentialsTest(ServiceCredentialsBase):
             self.parameters.SERVICE_ADMIN_EMAIL, self.parameters.API_PASSWORD
         )
         name = self.parameters.SERVICE_NAME
-        self.tc_credential = self.bloom.bloom_create_service_credential(admin, name)
-        self.tc_authenticated = self.bloom.bloom_authenticate_service_token(self.tc_credential.raw)
-        self.tc_as_user = self.bloom.bloom_sign_in_with_token(self.tc_credential.raw)
-        self.tc_untyped = self.bloom.bloom_sign_in_with_token(
+        self.credential = self.bloom.bloom_create_service_credential(admin, name)
+        self.authenticated = self.bloom.bloom_authenticate_service_token(self.credential.raw)
+        self.as_user = self.bloom.bloom_sign_in_with_token(self.credential.raw)
+        self.untyped = self.bloom.bloom_sign_in_with_token(
             self.bloom.bloom_issue_untyped_token(admin)
         )
-        self.bloom.bloom_revoke_service_credential(self.tc_credential.id)
-        self.tc_revoked = self.bloom.bloom_authenticate_service_token(self.tc_credential.raw)
+        self.bloom.bloom_revoke_service_credential(self.credential.id)
+        self.revoked = self.bloom.bloom_authenticate_service_token(self.credential.raw)
         expiring = self.bloom.bloom_create_service_credential(admin, name)
         self.bloom.bloom_expire_service_credential(expiring.id)
-        self.tc_expired = self.bloom.bloom_authenticate_service_token(expiring.raw)
+        self.expired = self.bloom.bloom_authenticate_service_token(expiring.raw)
 
     def tearDownClass(self):
         super().tearDownClass()

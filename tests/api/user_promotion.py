@@ -17,15 +17,15 @@ class UserPromotionBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_accounts_are_prepared(self):
-        self.print_variables({"sign-ins": self.tc_sign_ins, "created": self.tc_created})
-        for status in self.tc_sign_ins:
+        self.print_variables({"sign-ins": self.sign_ins, "created": self.created})
+        for status in self.sign_ins:
             self.assertEqual(
                 status,
                 self.parameters.STATUS_OK,
                 msg=self.parameters.MSG_PROMOTION_SIGN_IN,
                 abort_on_fail=False,
             )
-        for status in self.tc_created:
+        for status in self.created:
             self.assertIn(
                 status,
                 self.parameters.PROMOTION_CREATED,
@@ -34,10 +34,10 @@ class UserPromotionBase(BloomTestCase):
             )
 
     def bud_initial_admin_promotes_a_maintainer(self):
-        body = self.tc_promoted.body or {}
-        self.print_variables({"status": self.tc_promoted.status, "role": body.get("role")})
+        body = self.promoted.body or {}
+        self.print_variables({"status": self.promoted.status, "role": body.get("role")})
         self.assertEqual(
-            self.tc_promoted.status,
+            self.promoted.status,
             self.parameters.STATUS_OK,
             msg=self.parameters.MSG_PROMOTION_DONE,
             abort_on_fail=False,
@@ -50,10 +50,10 @@ class UserPromotionBase(BloomTestCase):
         )
 
     def bud_other_admin_cannot_promote(self):
-        detail = str((self.tc_other.body or {}).get("detail"))
-        self.print_variables({"status": self.tc_other.status, "detail": detail})
+        detail = str((self.other.body or {}).get("detail"))
+        self.print_variables({"status": self.other.status, "detail": detail})
         self.assertEqual(
-            self.tc_other.status,
+            self.other.status,
             self.parameters.STATUS_FORBIDDEN,
             msg=self.parameters.MSG_PROMOTION_REFUSED,
             abort_on_fail=False,
@@ -66,10 +66,10 @@ class UserPromotionBase(BloomTestCase):
         )
 
     def bud_admin_cannot_be_demoted(self):
-        detail = str((self.tc_demoted.body or {}).get("detail"))
-        self.print_variables({"status": self.tc_demoted.status, "detail": detail})
+        detail = str((self.demoted.body or {}).get("detail"))
+        self.print_variables({"status": self.demoted.status, "detail": detail})
         self.assertEqual(
-            self.tc_demoted.status,
+            self.demoted.status,
             self.parameters.STATUS_BAD_REQUEST,
             msg=self.parameters.MSG_DEMOTION_REFUSED,
             abort_on_fail=False,

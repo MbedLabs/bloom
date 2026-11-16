@@ -20,33 +20,33 @@ class CompanyLogoBase(BloomTestCase):
         png = self.parameters.LOGO_PNG
         self.print_variables(
             {
-                "stored": vars(self.tc_stored),
-                "served": (self.tc_served.status, self.tc_served.media_type),
-                "after delete": self.tc_deleted.status,
+                "stored": vars(self.stored),
+                "served": (self.served.status, self.served.media_type),
+                "after delete": self.deleted.status,
             }
         )
         self._equal(
-            self.tc_stored.content_type,
+            self.stored.content_type,
             self.parameters.LOGO_PNG_TYPE,
             self.parameters.MSG_LOGO_TYPE,
         )
-        self._equal(self.tc_stored.size, len(png), self.parameters.MSG_LOGO_SIZE)
-        self._equal(self.tc_served.body, png, self.parameters.MSG_LOGO_BODY)
+        self._equal(self.stored.size, len(png), self.parameters.MSG_LOGO_SIZE)
+        self._equal(self.served.body, png, self.parameters.MSG_LOGO_BODY)
         self._equal(
-            self.tc_served.media_type, self.parameters.LOGO_PNG_TYPE, self.parameters.MSG_LOGO_MEDIA
+            self.served.media_type, self.parameters.LOGO_PNG_TYPE, self.parameters.MSG_LOGO_MEDIA
         )
-        self._equal(self.tc_report_logo, png, self.parameters.MSG_LOGO_REPORT)
+        self._equal(self.report_logo, png, self.parameters.MSG_LOGO_REPORT)
         self._equal(
-            self.tc_deleted.status,
+            self.deleted.status,
             self.parameters.STATUS_NOT_FOUND,
             self.parameters.MSG_LOGO_DELETED,
         )
-        self._equal(self.tc_report_after, None, self.parameters.MSG_LOGO_REPORT_NONE)
+        self._equal(self.report_after, None, self.parameters.MSG_LOGO_REPORT_NONE)
 
     def bud_non_image_is_refused(self):
-        self.print_variables(vars(self.tc_text))
+        self.print_variables(vars(self.text))
         self._equal(
-            self.tc_text.status,
+            self.text.status,
             self.parameters.STATUS_UNSUPPORTED_MEDIA,
             self.parameters.MSG_LOGO_NOT_IMAGE,
         )
@@ -55,17 +55,17 @@ class CompanyLogoBase(BloomTestCase):
         header = self.parameters.LOGO_PDF_HEADER
         self.print_variables(
             {
-                "without": (self.tc_pdf_plain[:8], len(self.tc_pdf_plain)),
-                "with": (self.tc_pdf_logo[:8], len(self.tc_pdf_logo)),
+                "without": (self.pdf_plain[:8], len(self.pdf_plain)),
+                "with": (self.pdf_logo[:8], len(self.pdf_logo)),
             }
         )
-        self._equal(self.tc_pdf_plain[: len(header)], header, self.parameters.MSG_LOGO_PDF)
-        self._equal(self.tc_pdf_logo[: len(header)], header, self.parameters.MSG_LOGO_PDF)
+        self._equal(self.pdf_plain[: len(header)], header, self.parameters.MSG_LOGO_PDF)
+        self._equal(self.pdf_logo[: len(header)], header, self.parameters.MSG_LOGO_PDF)
         self.assertTrue(
-            len(self.tc_pdf_logo) >= len(self.tc_pdf_plain),
+            len(self.pdf_logo) >= len(self.pdf_plain),
             msg=self.parameters.MSG_LOGO_PDF_SIZE,
-            expected=f">= {len(self.tc_pdf_plain)}",
-            actual=len(self.tc_pdf_logo),
+            expected=f">= {len(self.pdf_plain)}",
+            actual=len(self.pdf_logo),
             abort_on_fail=False,
         )
 

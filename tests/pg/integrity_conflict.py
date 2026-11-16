@@ -17,22 +17,22 @@ class IntegrityConflictBase(BloomTestCase):
     interface = BloomPgInterface
 
     def bud_constraint_violation_is_answered_as_409(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.tc_answer.status, "body": self.tc_answer.body})
+        self.print_variables({"status": self.answer.status, "body": self.answer.body})
         self.assertEqual(
-            self.tc_answer.status,
+            self.answer.status,
             self.parameters.STATUS_CONFLICT,
             msg=self.parameters.MSG_CONFLICT_STATUS,
             abort_on_fail=False,
         )
 
     def bud_detail_says_it_already_exists(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        detail = self.tc_answer.body[self.parameters.CONFLICT_DETAIL_KEY]
+        detail = self.answer.body[self.parameters.CONFLICT_DETAIL_KEY]
         self.print_variables({"detail": detail})
         self.assertIn(
             self.parameters.CONFLICT_PHRASE,
@@ -42,35 +42,35 @@ class IntegrityConflictBase(BloomTestCase):
         )
 
     def bud_answer_carries_a_request_id(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        request_id = self.tc_answer.body[self.parameters.CONFLICT_REQUEST_ID_KEY]
+        request_id = self.answer.body[self.parameters.CONFLICT_REQUEST_ID_KEY]
         self.print_variables({"request id": request_id})
         self.assertTrue(
             request_id, msg=self.parameters.MSG_CONFLICT_REQUEST_ID, abort_on_fail=False
         )
 
     def bud_detail_quotes_the_request_id(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        request_id = self.tc_answer.body[self.parameters.CONFLICT_REQUEST_ID_KEY]
-        detail = self.tc_answer.body[self.parameters.CONFLICT_DETAIL_KEY]
+        request_id = self.answer.body[self.parameters.CONFLICT_REQUEST_ID_KEY]
+        detail = self.answer.body[self.parameters.CONFLICT_DETAIL_KEY]
         self.print_variables({"request id": request_id, "detail": detail})
         self.assertIn(
             request_id, detail, msg=self.parameters.MSG_CONFLICT_QUOTES_ID, abort_on_fail=False
         )
 
     def bud_answer_hides_the_constraint(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"answer": self.tc_answer.text})
+        self.print_variables({"answer": self.answer.text})
         for leak in self.parameters.CONFLICT_LEAKS:
             self.assertNotIn(
                 leak,
-                self.tc_answer.text,
+                self.answer.text,
                 msg=self.parameters.MSG_CONFLICT_NO_LEAK.format(leak=leak),
                 abort_on_fail=False,
             )

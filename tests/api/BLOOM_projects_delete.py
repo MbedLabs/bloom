@@ -19,7 +19,7 @@ class ProjectsDeleteTest(ProjectsDeleteBase):
         super().setUpClass()
         self.bloom.bloom_start_full_api()
         self.bloom.bloom_add_admin(self.parameters.API_ADMIN_EMAIL, self.parameters.API_PASSWORD)
-        admin, self.tc_login = self.bloom.bloom_log_in(
+        admin, self.login = self.bloom.bloom_log_in(
             self.parameters.API_ADMIN_EMAIL, self.parameters.API_PASSWORD
         )
         plain, with_requirement, protected = (
@@ -29,10 +29,10 @@ class ProjectsDeleteTest(ProjectsDeleteBase):
         requirement = self.bloom.bloom_api_create_requirement(
             admin, with_requirement, self.parameters.DELETE_REQUIREMENT_TITLE
         )
-        self.tc_plain = self._delete(admin, plain)
-        self.tc_with_requirement = self._delete(admin, with_requirement)
-        self.tc_with_requirement.requirement = requirement.status_code
-        self.tc_anonymous = self.bloom.bloom_api_delete_project(None, protected).status_code
+        self.plain = self._delete(admin, plain)
+        self.with_requirement = self._delete(admin, with_requirement)
+        self.with_requirement.requirement = requirement.status_code
+        self.anonymous = self.bloom.bloom_api_delete_project(None, protected).status_code
 
     def tearDownClass(self):
         super().tearDownClass()

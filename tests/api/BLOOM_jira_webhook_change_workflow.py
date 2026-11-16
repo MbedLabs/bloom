@@ -15,7 +15,7 @@ class JiraWebhookChangeWorkflowTest(JiraWebhookChangeWorkflowBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_results = []
+        self.results = []
         for index, status in enumerate(self.parameters.CHANGE_WORKFLOW_STATUSES):
             self.bloom.tearDown()
             self.bloom.setUp()
@@ -26,7 +26,7 @@ class JiraWebhookChangeWorkflowTest(JiraWebhookChangeWorkflowBase):
             response = self.bloom.bloom_post_jira_webhook(
                 body, delivery=self.parameters.DELIVERIES[index]
             )
-            self.tc_results.append((response, self.bloom.bloom_get_change(env.change_id).status))
+            self.results.append((response, self.bloom.bloom_get_change(env.change_id).status))
 
     def tearDownClass(self):
         super().tearDownClass()

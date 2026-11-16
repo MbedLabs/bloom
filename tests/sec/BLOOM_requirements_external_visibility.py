@@ -28,12 +28,12 @@ class RequirementsExternalVisibilityTest(RequirementsExternalVisibilityBase):
         )
         bloom.bloom_add_admin(values.ADMIN_EMAIL, values.API_PASSWORD)
         admin, _ = bloom.bloom_log_in(values.ADMIN_EMAIL, values.API_PASSWORD)
-        self.tc_listed = bloom.bloom_api_list_requirements(reader.headers, project)
-        self.tc_hidden = bloom.bloom_api_read_requirement(reader.headers, internal)
-        self.tc_created = bloom.bloom_api_create_requirement_of_origin(
+        self.listed = bloom.bloom_api_list_requirements(reader.headers, project)
+        self.hidden = bloom.bloom_api_read_requirement(reader.headers, internal)
+        self.created = bloom.bloom_api_create_requirement_of_origin(
             admin, project, values.READER_NEW_TITLE, values.READER_CUSTOMER_ORIGIN
         )
-        self.tc_changed = bloom.bloom_api_set_requirement_origin(
+        self.changed = bloom.bloom_api_set_requirement_origin(
             admin, customer, values.READER_INTERNAL_ORIGIN
         )
 

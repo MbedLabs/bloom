@@ -18,7 +18,7 @@ class IntegrationSyncSettingsResponseBase(BloomTestCase):
 
     def bud_sync_times_are_given_in_utc(self):
         expected = self.parameters.NOW.strftime(self.parameters.API_TIME_FORMAT)
-        found = (self.tc_response["synced_at"], self.tc_response["sync_checked_at"])
+        found = (self.response["synced_at"], self.response["sync_checked_at"])
         self.print_variables({"synced at, checked at": found})
         self.assertEqual(
             found, (expected, expected), msg=self.parameters.MSG_RESPONSE_TIMES, abort_on_fail=False
@@ -27,7 +27,7 @@ class IntegrationSyncSettingsResponseBase(BloomTestCase):
     def bud_warning_error_counts_and_own_rate_are_given(self):
         created, updated = self.parameters.PREVIOUS_COUNTS
         keys = ("sync_warning", "sync_error", "sync_created", "sync_updated", "auto_sync_minutes")
-        found = tuple(self.tc_response[key] for key in keys)
+        found = tuple(self.response[key] for key in keys)
         self.print_variables({"warning, error, created, updated, rate": found})
         self.assertEqual(
             found,

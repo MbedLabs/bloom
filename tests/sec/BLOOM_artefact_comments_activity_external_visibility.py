@@ -34,10 +34,10 @@ class ArtefactCommentsActivityExternalVisibilityTest(
         bloom.bloom_add_comment(kind, internal, values.READER_HIDDEN_COMMENT)
         bloom.bloom_add_activity(kind, customer, values.READER_VISIBLE_ACTIVITY)
         bloom.bloom_add_activity(kind, internal, values.READER_HIDDEN_ACTIVITY)
-        self.tc_hidden_comments = bloom.bloom_api_comments(reader.headers, kind, internal)
-        self.tc_hidden_activity = bloom.bloom_api_activity(reader.headers, kind, internal)
-        self.tc_comments = bloom.bloom_api_comments(reader.headers, kind, customer)
-        self.tc_activity = bloom.bloom_api_activity(reader.headers, kind, customer)
+        self.hidden_comments = bloom.bloom_api_comments(reader.headers, kind, internal)
+        self.hidden_activity = bloom.bloom_api_activity(reader.headers, kind, internal)
+        self.comments = bloom.bloom_api_comments(reader.headers, kind, customer)
+        self.activity = bloom.bloom_api_activity(reader.headers, kind, customer)
 
     def tearDownClass(self):
         super().tearDownClass()

@@ -17,9 +17,9 @@ class IntegrationSyncSettingsLeftAloneBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_no_setting_is_synced(self):
-        self.print_variables({"synced": self.tc_synced})
+        self.print_variables({"synced": self.synced})
         self.assertEqual(
-            self.tc_synced, [], msg=self.parameters.MSG_NOTHING_SYNCED, abort_on_fail=False
+            self.synced, [], msg=self.parameters.MSG_NOTHING_SYNCED, abort_on_fail=False
         )
 
     def bud_no_tracker_is_called(self):
@@ -32,7 +32,7 @@ class IntegrationSyncSettingsLeftAloneBase(BloomTestCase):
         )
 
     def bud_setting_checked_recently_keeps_its_check_time(self):
-        checked = self.bloom.bloom_get_setting(self.tc_recent_id).sync_checked_at
+        checked = self.bloom.bloom_get_setting(self.recent_id).sync_checked_at
         self.print_variables({"checked at": checked})
         self.assertEqual(
             checked,
@@ -42,7 +42,7 @@ class IntegrationSyncSettingsLeftAloneBase(BloomTestCase):
         )
 
     def bud_disabled_setting_records_nothing(self):
-        setting = self.bloom.bloom_get_setting(self.tc_disabled_id)
+        setting = self.bloom.bloom_get_setting(self.disabled_id)
         found = (setting.sync_checked_at, setting.sync_error)
         self.print_variables({"checked at, error": found})
         self.assertEqual(
@@ -50,7 +50,7 @@ class IntegrationSyncSettingsLeftAloneBase(BloomTestCase):
         )
 
     def bud_tokenless_setting_records_nothing(self):
-        setting = self.bloom.bloom_get_setting(self.tc_tokenless_id)
+        setting = self.bloom.bloom_get_setting(self.tokenless_id)
         found = (setting.sync_checked_at, setting.sync_error)
         self.print_variables({"checked at, error": found})
         self.assertEqual(

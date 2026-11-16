@@ -28,7 +28,7 @@ class RequirementDescriptionTest(RequirementDescriptionBase):
         spec = bloom.bloom_api_create_artefact(
             admin, parameters.DOCUMENT_KIND, project_id, parameters.DESCRIPTION_SPEC_TITLE
         ).json()
-        self.tc_expected_link = (
+        self.expected_link = (
             parameters.DESCRIPTION_TAG_TYPE,
             spec.get("id"),
             parameters.DESCRIPTION_TAG_ROLE,
@@ -64,32 +64,32 @@ class RequirementDescriptionTest(RequirementDescriptionBase):
             content_html=parameters.DESCRIPTION_BODY_HTML,
         )
         requirement_path = f"{path}/{from_body.body.get('id')}"
-        self.tc_from_body = text_of(from_body.body)
-        self.tc_detail = text_of(bloom.bloom_api_call("GET", requirement_path, admin).body)
+        self.from_body = text_of(from_body.body)
+        self.detail = text_of(bloom.bloom_api_call("GET", requirement_path, admin).body)
         edited = bloom.bloom_api_call(
             "PATCH",
             requirement_path,
             admin,
             json={"content_html": parameters.DESCRIPTION_EDIT_HTML},
         )
-        self.tc_edited = (edited.status, *text_of(edited.body))
+        self.edited = (edited.status, *text_of(edited.body))
 
         tagged = create(
             "Tagged",
             description=f"Follows #{spec.get('doc_id')} and {parameters.DESCRIPTION_UNKNOWN_TAG}.",
         )
-        self.tc_tagged_links = links_of(tagged)
+        self.tagged_links = links_of(tagged)
 
         untagged = create("Untagged", description=parameters.DESCRIPTION_UNTAGGED)
-        self.tc_untagged_links = links_of(untagged)
+        self.untagged_links = links_of(untagged)
         retagged = bloom.bloom_api_call(
             "PATCH",
             f"{path}/{untagged.body.get('id')}",
             admin,
             json={"description": f"Now follows #{spec.get('doc_id')}."},
         )
-        self.tc_retagged_links = (retagged.status, links_of(untagged))
-        self.tc_created = [from_body, tagged, untagged]
+        self.retagged_links = (retagged.status, links_of(untagged))
+        self.created = [from_body, tagged, untagged]
 
     def tearDownClass(self):
         super().tearDownClass()

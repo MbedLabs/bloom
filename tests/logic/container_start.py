@@ -18,22 +18,22 @@ class ContainerStartBase(BloomTestCase):
 
     def bud_start_script_hands_supervisord_to_appuser(self):
         handover = self.parameters.START_HANDOVER
-        self.print_variables({"last line": self.tc_start_lines[-1:]})
+        self.print_variables({"last line": self.start_lines[-1:]})
         self.assertEqual(
-            self.tc_start_lines[-1:],
+            self.start_lines[-1:],
             [handover],
             msg=self.parameters.MSG_START_LAST,
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_start_lines.count(handover),
+            self.start_lines.count(handover),
             self.parameters.START_HANDOVERS,
             msg=self.parameters.MSG_START_ONCE,
             abort_on_fail=False,
         )
         self.assertIn(
             self.parameters.START_APP_USER,
-            self.tc_start_lines,
+            self.start_lines,
             msg=self.parameters.MSG_START_APP_USER,
             abort_on_fail=False,
         )
@@ -44,9 +44,9 @@ class ContainerStartBase(BloomTestCase):
             self.parameters.START_FD_TEST,
             self.parameters.START_FD_CHOWN,
         ):
-            self._assert_contains(self.tc_start, needle, self.parameters.MSG_START_FD)
+            self._assert_contains(self.start, needle, self.parameters.MSG_START_FD)
         self._assert_before(
-            self.tc_start,
+            self.start,
             self.parameters.START_FD_LOOP,
             self.parameters.START_HANDOVER,
             self.parameters.MSG_START_FD_FIRST,
@@ -54,37 +54,37 @@ class ContainerStartBase(BloomTestCase):
 
     def bud_start_script_chowns_cloudron_data_recursively(self):
         recursive = self.parameters.START_DATA_CHOWN
-        self._assert_contains(self.tc_cloudron, recursive, self.parameters.MSG_START_DATA)
+        self._assert_contains(self.cloudron, recursive, self.parameters.MSG_START_DATA)
         for later in (self.parameters.START_SECRETS, self.parameters.START_MIGRATION):
             self._assert_before(
-                self.tc_cloudron, recursive, later, self.parameters.MSG_START_DATA_FIRST
+                self.cloudron, recursive, later, self.parameters.MSG_START_DATA_FIRST
             )
 
     def bud_start_script_keeps_the_local_attachment_chown(self):
         self._assert_contains(
-            self.tc_local, self.parameters.START_ATTACHMENT_CHOWN, self.parameters.MSG_START_LOCAL
+            self.local, self.parameters.START_ATTACHMENT_CHOWN, self.parameters.MSG_START_LOCAL
         )
         self._assert_lacks(
-            self.tc_local, self.parameters.START_RECURSIVE, self.parameters.MSG_START_LOCAL_FLAT
+            self.local, self.parameters.START_RECURSIVE, self.parameters.MSG_START_LOCAL_FLAT
         )
 
     def bud_supervisord_does_not_run_as_root(self):
-        self.print_variables({"lines": self.tc_supervisord[:6]})
+        self.print_variables({"lines": self.supervisord[:6]})
         self.assertNotIn(
             self.parameters.START_ROOT_SETTING,
-            self.tc_supervisord,
+            self.supervisord,
             msg=self.parameters.MSG_START_NOT_ROOT,
             abort_on_fail=False,
         )
         self.assertIn(
             self.parameters.START_PIDFILE,
-            self.tc_supervisord,
+            self.supervisord,
             msg=self.parameters.MSG_START_PIDFILE,
             abort_on_fail=False,
         )
 
     def bud_image_starts_as_root_without_nginx_user(self):
-        user_lines = "\n".join(line for line in self.tc_dockerfile.splitlines() if "USER" in line)
+        user_lines = "\n".join(line for line in self.dockerfile.splitlines() if "USER" in line)
         self.assertRegex(
             user_lines,
             self.parameters.START_USER_ROOT,
@@ -92,12 +92,12 @@ class ContainerStartBase(BloomTestCase):
             abort_on_fail=False,
         )
         self._assert_lacks(
-            self.tc_dockerfile,
+            self.dockerfile,
             self.parameters.START_NGINX_USER,
             self.parameters.MSG_START_NGINX_USER,
         )
         self._assert_contains(
-            self.tc_dockerfile,
+            self.dockerfile,
             self.parameters.START_NGINX_USER_DROP,
             self.parameters.MSG_START_NGINX_DROP,
         )

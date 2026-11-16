@@ -30,15 +30,15 @@ class GroupBulkMembersTest(GroupBulkMembersBase):
         group = self._group(next(groups), [policy["id"]])
         ids = [self._user(next(emails), self.parameters.BULK_EXTERNAL) for _ in range(2)]
         added = self._bulk(group, {"user_ids": ids})
-        self.tc_persist = SimpleNamespace(
+        self.persist = SimpleNamespace(
             added=added.status, ids=ids, policy_id=policy["id"], group=self._read(group)
         )
         group = self._group(next(groups))
         known = self._user(next(emails), self.parameters.BULK_EXTERNAL)
-        self.tc_unknown = self._refused(group, [known, self.parameters.BULK_UNKNOWN_USER])
-        self.tc_invalid = []
+        self.unknown = self._refused(group, [known, self.parameters.BULK_UNKNOWN_USER])
+        self.invalid = []
         for selection in self.parameters.BULK_INVALID_SELECTIONS:
-            self.tc_invalid.append(
+            self.invalid.append(
                 (
                     selection,
                     self._refused(self._group(next(groups)), selection),
@@ -51,7 +51,7 @@ class GroupBulkMembersTest(GroupBulkMembersBase):
         repeated = self._bulk(group, {"user_ids": [first, second]})
         members = sorted(member["user_id"] for member in (repeated.body or {}).get("members", []))
         duplicate = self._bulk(group, {"user_id": first}).status
-        self.tc_existing = SimpleNamespace(
+        self.existing = SimpleNamespace(
             single=single,
             bulk=bulk,
             repeated=repeated.status,
@@ -64,7 +64,7 @@ class GroupBulkMembersTest(GroupBulkMembersBase):
         self._user(actor_email, self.parameters.BULK_MAINTAINER)
         other = self._user(next(emails), self.parameters.BULK_MAINTAINER)
         actor, _ = self.bloom.bloom_log_in(actor_email, self.parameters.API_PASSWORD)
-        self.tc_maintainer = self._refused(group, [other], headers=actor)
+        self.maintainer = self._refused(group, [other], headers=actor)
 
     def tearDownClass(self):
         super().tearDownClass()

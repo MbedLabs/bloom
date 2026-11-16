@@ -27,7 +27,7 @@ class DocsFacadeExternalVisibilityTest(DocsFacadeExternalVisibilityBase):
         bloom.bloom_add_document(
             project, values.READER_INTERNAL_SPEC, values.READER_INTERNAL_SPEC, internal
         )
-        self.tc_listed = bloom.bloom_api_list_docs_of_types(
+        self.listed = bloom.bloom_api_list_docs_of_types(
             reader.headers, prefix, values.READER_DOC_TYPES
         )
         opened = (
@@ -36,7 +36,7 @@ class DocsFacadeExternalVisibilityTest(DocsFacadeExternalVisibilityBase):
             (values.READER_SPECIFICATIONS_SLUG, values.READER_CUSTOMER_SPEC),
             (values.READER_SPECIFICATIONS_SLUG, values.READER_INTERNAL_SPEC),
         )
-        self.tc_details = tuple(
+        self.details = tuple(
             bloom.bloom_api_open_doc(reader.headers, prefix, slug, doc_id).status
             for slug, doc_id in opened
         )

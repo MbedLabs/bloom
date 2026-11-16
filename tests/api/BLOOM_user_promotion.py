@@ -34,15 +34,13 @@ class UserPromotionTest(UserPromotionBase):
         }
         ids = {email: answer.json().get("id") for email, answer in created.items()}
         other, other_login = bloom.bloom_log_in(other_admin, password)
-        self.tc_sign_ins = [seed_login, other_login]
-        self.tc_created = [answer.status_code for answer in created.values()]
-        self.tc_promoted = bloom.bloom_api_set_role(
+        self.sign_ins = [seed_login, other_login]
+        self.created = [answer.status_code for answer in created.values()]
+        self.promoted = bloom.bloom_api_set_role(
             seed, ids[maintainer], self.parameters.PROMOTION_ADMIN
         )
-        self.tc_other = bloom.bloom_api_set_role(
-            other, ids[target], self.parameters.PROMOTION_ADMIN
-        )
-        self.tc_demoted = bloom.bloom_api_set_role(
+        self.other = bloom.bloom_api_set_role(other, ids[target], self.parameters.PROMOTION_ADMIN)
+        self.demoted = bloom.bloom_api_set_role(
             seed, ids[second_admin], self.parameters.PROMOTION_MAINTAINER
         )
 

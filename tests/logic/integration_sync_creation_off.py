@@ -29,7 +29,7 @@ class IntegrationSyncCreationOffBase(BloomTestCase):
         self.assertEqual(count, 1, msg=self.parameters.MSG_ONLY_LINKED, abort_on_fail=False)
 
     def bud_linked_defect_follows_its_closed_issue(self):
-        status = self.bloom.bloom_get_defect(self.tc_linked_defect_id).status
+        status = self.bloom.bloom_get_defect(self.linked_defect_id).status
         self.print_variables({"linked defect": status})
         self.assertEqual(
             status,

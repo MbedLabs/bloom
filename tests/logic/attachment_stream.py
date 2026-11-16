@@ -17,17 +17,17 @@ class AttachmentStreamBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_stream_keeps_content_size_and_checksum(self):
-        stored = self.tc_complete.stored
+        stored = self.complete.stored
         self.print_variables(
             {
-                "content": self.tc_complete.content,
+                "content": self.complete.content,
                 "size": getattr(stored, "size_bytes", None),
                 "sha256": getattr(stored, "sha256", None),
-                "parts": self.tc_complete.parts,
+                "parts": self.complete.parts,
             }
         )
         self.assertEqual(
-            self.tc_complete.content,
+            self.complete.content,
             self.parameters.STREAM_PAYLOAD,
             msg=self.parameters.MSG_STREAM_CONTENT,
             abort_on_fail=False,
@@ -45,7 +45,7 @@ class AttachmentStreamBase(BloomTestCase):
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_complete.parts,
+            self.complete.parts,
             self.parameters.STREAM_NO_FILES,
             msg=self.parameters.MSG_STREAM_NO_PARTS,
             abort_on_fail=False,
@@ -54,32 +54,32 @@ class AttachmentStreamBase(BloomTestCase):
     def bud_oversize_stream_is_refused_and_removed(self):
         self.print_variables(
             {
-                "status": self.tc_oversize.status,
-                "content": self.tc_oversize.content,
-                "files": self.tc_oversize.files,
+                "status": self.oversize.status,
+                "content": self.oversize.content,
+                "files": self.oversize.files,
             }
         )
         self.assertEqual(
-            self.tc_oversize.status,
+            self.oversize.status,
             self.parameters.STATUS_TOO_LARGE,
             msg=self.parameters.MSG_STREAM_TOO_LARGE,
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_oversize.content,
+            self.oversize.content,
             None,
             msg=self.parameters.MSG_STREAM_NO_TARGET,
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_oversize.files,
+            self.oversize.files,
             self.parameters.STREAM_NO_FILES,
             msg=self.parameters.MSG_STREAM_CLEAN,
             abort_on_fail=False,
         )
 
     def bud_interrupted_stream_is_removed(self):
-        for name, outcome in self.tc_interrupted.items():
+        for name, outcome in self.interrupted.items():
             self.print_variables(
                 {"interruption": name, "error": outcome.error, "reads": outcome.reads}
             )

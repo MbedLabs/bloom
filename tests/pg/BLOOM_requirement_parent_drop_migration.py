@@ -17,18 +17,18 @@ class RequirementParentDropMigrationTest(RequirementParentDropMigrationBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_postgres = self.bloom.bloom_use_postgres(tables=False)
-        if not self.tc_postgres:
+        self.postgres = self.bloom.bloom_use_postgres(tables=False)
+        if not self.postgres:
             return
         before = self.parameters.PARENT_BEFORE
-        self.tc_before = self.bloom.bloom_run_alembic("upgrade", before)
+        self.before = self.bloom.bloom_run_alembic("upgrade", before)
         self.bloom.bloom_seed_requirement_with_parent(
             self.parameters.PARENT_PREFIX, self.parameters.PARENT_REQ_IDS
         )
-        self.tc_upgrade = self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
-        self.tc_upgraded = self.bloom.bloom_read_requirement_parent_state()
-        self.tc_downgrade = self.bloom.bloom_run_alembic("downgrade", before)
-        self.tc_downgraded = self.bloom.bloom_read_requirement_parent_state()
+        self.upgrade = self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
+        self.upgraded = self.bloom.bloom_read_requirement_parent_state()
+        self.downgrade = self.bloom.bloom_run_alembic("downgrade", before)
+        self.downgraded = self.bloom.bloom_read_requirement_parent_state()
 
     def tearDownClass(self):
         super().tearDownClass()

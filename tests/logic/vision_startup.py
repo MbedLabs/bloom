@@ -17,9 +17,9 @@ class VisionStartupBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_restart_keeps_vision_and_repairs_unknown_kind(self):
-        self.print_variables({"before": self.parameters.VISION_DOCUMENTS, "after": self.tc_kinds})
+        self.print_variables({"before": self.parameters.VISION_DOCUMENTS, "after": self.kinds})
         self.assertEqual(
-            self.tc_kinds,
+            self.kinds,
             self.parameters.VISION_AFTER_RESTART,
             msg=self.parameters.MSG_VISION_KEPT,
             abort_on_fail=False,

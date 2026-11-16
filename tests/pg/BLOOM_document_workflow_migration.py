@@ -15,18 +15,18 @@ class DocumentWorkflowMigrationTest(DocumentWorkflowMigrationBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_postgres = self.bloom.bloom_use_postgres(tables=False)
-        if not self.tc_postgres:
+        self.postgres = self.bloom.bloom_use_postgres(tables=False)
+        if not self.postgres:
             return
-        self.tc_before = self.bloom.bloom_run_alembic("upgrade", self.parameters.LINK_BEFORE)
+        self.before = self.bloom.bloom_run_alembic("upgrade", self.parameters.LINK_BEFORE)
         project = self.bloom.bloom_seed_requirements(
             self.parameters.LINK_PREFIX, self.parameters.LINK_REQ_IDS
         )
         self.bloom.bloom_seed_legacy_rows(project)
-        self.tc_rows_before = self.bloom.bloom_read_legacy_rows()
-        self.tc_upgrade = self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
-        self.tc_rows_after = self.bloom.bloom_read_legacy_rows(workflows=True)
-        self.tc_schema = self.bloom.bloom_compare_workflow_schema()
+        self.rows_before = self.bloom.bloom_read_legacy_rows()
+        self.upgrade = self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
+        self.rows_after = self.bloom.bloom_read_legacy_rows(workflows=True)
+        self.schema = self.bloom.bloom_compare_workflow_schema()
 
     def tearDownClass(self):
         super().tearDownClass()

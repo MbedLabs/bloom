@@ -17,18 +17,18 @@ class ArtefactsExternalVisibilityBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_related_of_an_internal_requirement_is_hidden_404(self):
-        self.print_variables({"status": self.tc_hidden.status, "body": self.tc_hidden.body})
+        self.print_variables({"status": self.hidden.status, "body": self.hidden.body})
         self.assertEqual(
-            self.tc_hidden.status,
+            self.hidden.status,
             self.parameters.STATUS_NOT_FOUND,
             msg=self.parameters.MSG_READER_RELATED_HIDDEN,
             abort_on_fail=False,
         )
 
     def bud_related_of_a_customer_requirement_is_shown_200(self):
-        self.print_variables({"status": self.tc_visible.status, "body": self.tc_visible.body})
+        self.print_variables({"status": self.visible.status, "body": self.visible.body})
         self.assertEqual(
-            self.tc_visible.status,
+            self.visible.status,
             self.parameters.STATUS_OK,
             msg=self.parameters.MSG_READER_RELATED_SHOWN,
             abort_on_fail=False,

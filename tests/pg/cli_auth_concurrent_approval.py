@@ -17,22 +17,22 @@ class CliAuthConcurrentApprovalBase(BloomTestCase):
     interface = BloomPgInterface
 
     def bud_request_starts(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"start": self.tc_started.status_code})
+        self.print_variables({"start": self.started.status_code})
         self.assertEqual(
-            self.tc_started.status_code,
+            self.started.status_code,
             self.parameters.STATUS_OK,
             msg=self.parameters.MSG_CLI_STARTED,
             abort_on_fail=True,
         )
 
     def bud_approvals_succeed_once(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        statuses = [answer.status_code for answer in self.tc_approved]
+        statuses = [answer.status_code for answer in self.approved]
         self.print_variables({"approvals": statuses})
         self.assertEqual(
             statuses.count(self.parameters.STATUS_OK),
@@ -47,10 +47,10 @@ class CliAuthConcurrentApprovalBase(BloomTestCase):
         )
 
     def bud_exchanges_succeed_once(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        statuses = [answer.status_code for answer in self.tc_exchanged]
+        statuses = [answer.status_code for answer in self.exchanged]
         self.print_variables({"exchanges": statuses})
         self.assertEqual(
             statuses.count(self.parameters.STATUS_OK),
@@ -65,10 +65,10 @@ class CliAuthConcurrentApprovalBase(BloomTestCase):
         )
 
     def bud_refreshes_succeed_once(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        statuses = [answer.status_code for answer in self.tc_refreshed]
+        statuses = [answer.status_code for answer in self.refreshed]
         self.print_variables({"refreshes": statuses})
         self.assertEqual(
             statuses.count(self.parameters.STATUS_OK),

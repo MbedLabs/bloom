@@ -25,7 +25,7 @@ class UserDeletionTest(UserDeletionBase):
         )
         plain_email, member_email = self.parameters.DELETION_EMAILS
         plain = self._create(plain_email)
-        self.tc_plain = self._delete(plain)
+        self.plain = self._delete(plain)
         member = self._create(member_email)
         project = self.bloom.bloom_api_create_project(
             self.admin, self.parameters.DELETION_PREFIX
@@ -40,8 +40,8 @@ class UserDeletionTest(UserDeletionBase):
         added = self.bloom.bloom_api_add_project_member(
             self.admin, project.get("id"), member.json().get("id"), [policy.get("id")]
         )
-        self.tc_member = self._delete(member)
-        self.tc_member.member = added.status_code
+        self.member = self._delete(member)
+        self.member.member = added.status_code
 
     def tearDownClass(self):
         super().tearDownClass()

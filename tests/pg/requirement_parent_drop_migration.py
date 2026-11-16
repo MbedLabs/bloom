@@ -17,60 +17,60 @@ class RequirementParentDropMigrationBase(BloomTestCase):
     interface = BloomPgInterface
 
     def bud_migrations_reach_the_revision_before(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"alembic": self.tc_before[1][-300:]})
+        self.print_variables({"alembic": self.before[1][-300:]})
         self.assertEqual(
-            self.tc_before[0],
+            self.before[0],
             0,
             msg=self.parameters.MSG_MIGRATION_BEFORE,
             abort_on_fail=False,
         )
 
     def bud_migrations_reach_head(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"alembic": self.tc_upgrade[1][-300:]})
+        self.print_variables({"alembic": self.upgrade[1][-300:]})
         self.assertEqual(
-            self.tc_upgrade[0],
+            self.upgrade[0],
             0,
             msg=self.parameters.MSG_MIGRATION_HEAD,
             abort_on_fail=False,
         )
 
     def bud_upgrade_drops_the_parent_and_keeps_the_requirements(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"requirements, parent_id exists": self.tc_upgraded})
+        self.print_variables({"requirements, parent_id exists": self.upgraded})
         self.assertEqual(
-            self.tc_upgraded,
+            self.upgraded,
             (self.parameters.PARENT_REQ_IDS, False),
             msg=self.parameters.MSG_PARENT_DROPPED,
             abort_on_fail=False,
         )
 
     def bud_downgrade_reaches_the_revision_before(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"alembic": self.tc_downgrade[1][-300:]})
+        self.print_variables({"alembic": self.downgrade[1][-300:]})
         self.assertEqual(
-            self.tc_downgrade[0],
+            self.downgrade[0],
             0,
             msg=self.parameters.MSG_MIGRATION_DOWNGRADE,
             abort_on_fail=False,
         )
 
     def bud_downgrade_restores_the_parent_and_keeps_the_requirements(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"requirements, parent_id exists": self.tc_downgraded})
+        self.print_variables({"requirements, parent_id exists": self.downgraded})
         self.assertEqual(
-            self.tc_downgraded,
+            self.downgraded,
             (self.parameters.PARENT_REQ_IDS, True),
             msg=self.parameters.MSG_PARENT_RESTORED,
             abort_on_fail=False,

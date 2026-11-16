@@ -17,19 +17,17 @@ class IntegrationSyncChangeWorkflowTest(IntegrationSyncChangeWorkflowBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_project_id = self.bloom.bloom_create_project()
-        self.tc_setting_id = self.bloom.bloom_create_integration(
-            self.tc_project_id, sync_full_scan=False
-        )
-        self.tc_approved_id = self.bloom.bloom_link_change(
-            self.tc_project_id,
+        self.project_id = self.bloom.bloom_create_project()
+        self.setting_id = self.bloom.bloom_create_integration(self.project_id, sync_full_scan=False)
+        self.approved_id = self.bloom.bloom_link_change(
+            self.project_id,
             "jira",
             self.parameters.JIRA_PROJECT,
             self.parameters.LINKED_NUMBER,
             self.parameters.CHANGE_APPROVED,
         )
-        self.tc_submitted_id = self.bloom.bloom_link_change(
-            self.tc_project_id,
+        self.submitted_id = self.bloom.bloom_link_change(
+            self.project_id,
             "jira",
             self.parameters.JIRA_PROJECT,
             self.parameters.CHANGE_NUMBER,
@@ -48,7 +46,7 @@ class IntegrationSyncChangeWorkflowTest(IntegrationSyncChangeWorkflowBase):
                 ),
             ]
         )
-        self.tc_synced = self.bloom.bloom_run_sync(self.parameters.NOW)
+        self.synced = self.bloom.bloom_run_sync(self.parameters.NOW)
 
     def tearDownClass(self):
         super().tearDownClass()

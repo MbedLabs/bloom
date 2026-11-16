@@ -20,24 +20,22 @@ class CloudronMetadataBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_manifest_names_the_product(self):
-        self.print_variables(
-            {"title": self.tc_manifest["title"], "tagline": self.tc_manifest["tagline"]}
-        )
+        self.print_variables({"title": self.manifest["title"], "tagline": self.manifest["tagline"]})
         self.assertEqual(
-            self.tc_manifest["title"],
+            self.manifest["title"],
             self.parameters.CLOUDRON_TITLE,
             msg=self.parameters.MSG_CLOUDRON_TITLE,
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_manifest["tagline"],
+            self.manifest["tagline"],
             self.parameters.CLOUDRON_TAGLINE,
             msg=self.parameters.MSG_CLOUDRON_TAGLINE,
             abort_on_fail=False,
         )
 
     def bud_description_opens_with_the_positioning(self):
-        first = self.tc_description.strip().splitlines()[0]
+        first = self.description.strip().splitlines()[0]
         self.print_variables({"first line": first})
         self.assertEqual(
             first,
@@ -47,8 +45,8 @@ class CloudronMetadataBase(BloomTestCase):
         )
 
     def bud_wording_avoids_retired_words(self):
-        manifest = json.dumps(self.tc_manifest).lower()
-        description = self.tc_description.strip().lower()
+        manifest = json.dumps(self.manifest).lower()
+        description = self.description.strip().lower()
         embedded, self_hosted = self.parameters.CLOUDRON_RETIRED_WORDS
         self.assertNotIn(
             embedded, manifest, msg=self.parameters.MSG_CLOUDRON_MANIFEST_WORD, abort_on_fail=False
@@ -64,30 +62,30 @@ class CloudronMetadataBase(BloomTestCase):
     def bud_manifest_carries_the_product_version(self):
         self.print_variables(
             {
-                "product": self.tc_version,
-                "version": self.tc_manifest["version"],
-                "upstream": self.tc_manifest["upstreamVersion"],
+                "product": self.version,
+                "version": self.manifest["version"],
+                "upstream": self.manifest["upstreamVersion"],
             }
         )
         self.assertEqual(
-            self.tc_manifest["version"],
-            self.tc_version,
+            self.manifest["version"],
+            self.version,
             msg=self.parameters.MSG_CLOUDRON_VERSION,
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_manifest["upstreamVersion"],
-            self.tc_version,
+            self.manifest["upstreamVersion"],
+            self.version,
             msg=self.parameters.MSG_CLOUDRON_UPSTREAM,
             abort_on_fail=False,
         )
 
     def bud_catalog_entry_matches_the_release(self):
-        current = self.tc_catalog["versions"].get(self.tc_version, {})
+        current = self.catalog["versions"].get(self.version, {})
         manifest = current.get("manifest", {})
         self.print_variables(
             {
-                "product": self.tc_version,
+                "product": self.version,
                 "version": manifest.get("version"),
                 "upstream": manifest.get("upstreamVersion"),
                 "changelog": str(manifest.get("changelog"))[:60],
@@ -96,19 +94,19 @@ class CloudronMetadataBase(BloomTestCase):
         )
         self.assertEqual(
             manifest.get("version"),
-            self.tc_version,
+            self.version,
             msg=self.parameters.MSG_CLOUDRON_CATALOG_VERSION,
             abort_on_fail=False,
         )
         self.assertEqual(
             manifest.get("upstreamVersion"),
-            self.tc_version,
+            self.version,
             msg=self.parameters.MSG_CLOUDRON_CATALOG_UPSTREAM,
             abort_on_fail=False,
         )
         self.assertEqual(
             manifest.get("description"),
-            self.tc_description,
+            self.description,
             msg=self.parameters.MSG_CLOUDRON_CATALOG_DESCRIPTION,
             abort_on_fail=False,
         )
@@ -125,21 +123,21 @@ class CloudronMetadataBase(BloomTestCase):
         )
 
     def bud_changelog_names_the_version(self):
-        headers = [line for line in self.tc_changelog.splitlines() if line.startswith("[")]
-        self.print_variables({"product": self.tc_version, "headers": headers[:5]})
+        headers = [line for line in self.changelog.splitlines() if line.startswith("[")]
+        self.print_variables({"product": self.version, "headers": headers[:5]})
         self.assertTrue(
-            f"[{self.tc_version}]\n" in self.tc_changelog,
+            f"[{self.version}]\n" in self.changelog,
             msg=self.parameters.MSG_CLOUDRON_CHANGELOG_VERSION,
-            expected=f"[{self.tc_version}]",
+            expected=f"[{self.version}]",
             actual=headers[:5],
             abort_on_fail=False,
         )
 
     def bud_changelog_opens_with_the_newest_version(self):
-        top = self.tc_changelog.splitlines()[0]
+        top = self.changelog.splitlines()[0]
         match = re.match(self.parameters.CLOUDRON_HEADER, top)
         newest = tuple(int(part) for part in match.group(1).split(".")) if match else None
-        product = tuple(int(part) for part in self.tc_version.split("."))
+        product = tuple(int(part) for part in self.version.split("."))
         self.print_variables({"top": top, "newest": newest, "product": product})
         self.assertRegex(
             top,

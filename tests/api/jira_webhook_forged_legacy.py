@@ -17,8 +17,8 @@ class JiraWebhookForgedLegacyBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_forged_delivery_is_refused_and_changes_nothing(self):
-        status = self.bloom.bloom_get_change(self.tc_env.change_id).status
-        found = (self.tc_response.status_code, status)
+        status = self.bloom.bloom_get_change(self.env.change_id).status
+        found = (self.response.status_code, status)
         self.print_variables({"answer, status": found})
         self.assertEqual(
             found,

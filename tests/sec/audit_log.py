@@ -18,14 +18,14 @@ class AuditLogBase(BloomTestCase):
 
     def bud_wrong_password_is_refused_401(self):
         self.assertEqual(
-            self.tc_refused_login.status_code,
+            self.refused_login.status_code,
             self.parameters.STATUS_UNAUTHORIZED,
             msg=self.parameters.MSG_AUDITLOG_REFUSED_LOGIN,
             abort_on_fail=False,
         )
 
     def bud_refused_sign_in_is_recorded_as_a_failure(self):
-        event = self.tc_failed_event
+        event = self.failed_event
         self.print_variables(
             {
                 "outcome": event.outcome,
@@ -35,20 +35,20 @@ class AuditLogBase(BloomTestCase):
         )
         self.assertEqual(
             (event.outcome, event.actor_type, event.target_type, event.target_id),
-            (*self.parameters.AUDITLOG_FAILED_LOGIN, str(self.tc_someone)),
+            (*self.parameters.AUDITLOG_FAILED_LOGIN, str(self.someone)),
             msg=self.parameters.MSG_AUDITLOG_FAILURE,
             abort_on_fail=False,
         )
 
     def bud_record_carries_the_request_id_the_user_agent_and_an_address(self):
-        event = self.tc_failed_event
+        event = self.failed_event
         self.print_variables(
             {"request": event.request_id, "agent": event.user_agent, "address": event.ip}
         )
         self.assertEqual(
             (event.request_id, event.user_agent, bool(event.ip)),
             (
-                self.tc_refused_login.headers["x-request-id"],
+                self.refused_login.headers["x-request-id"],
                 self.parameters.AUDITLOG_USER_AGENT,
                 True,
             ),
@@ -59,29 +59,29 @@ class AuditLogBase(BloomTestCase):
     def bud_record_does_not_contain_the_password_tried(self):
         self.assertNotIn(
             self.parameters.HTTP_WRONG_PASSWORD,
-            repr(self.tc_failed_event.details),
+            repr(self.failed_event.details),
             msg=self.parameters.MSG_AUDITLOG_NO_PASSWORD,
             abort_on_fail=False,
         )
 
     def bud_sign_in_is_recorded_as_a_success_by_the_user(self):
-        event = self.tc_login_event
+        event = self.login_event
         self.assertEqual(
             (event.outcome, event.actor_type, event.actor_user_id),
-            ("success", "user", self.tc_member),
+            ("success", "user", self.member),
             msg=self.parameters.MSG_AUDITLOG_SUCCESS,
             abort_on_fail=False,
         )
 
     def bud_role_change_is_recorded_with_both_roles(self):
-        event = self.tc_role_event
+        event = self.role_event
         self.print_variables({"details": event.details})
         self.assertEqual(
-            (self.tc_role_change.status, event.actor_user_id, event.target_id, event.details),
+            (self.role_change.status, event.actor_user_id, event.target_id, event.details),
             (
                 self.parameters.STATUS_OK,
-                self.tc_admin,
-                str(self.tc_demoted),
+                self.admin,
+                str(self.demoted),
                 self.parameters.AUDITLOG_ROLE_CHANGE,
             ),
             msg=self.parameters.MSG_AUDITLOG_ROLE,
@@ -89,9 +89,9 @@ class AuditLogBase(BloomTestCase):
         )
 
     def bud_member_visibility_and_deletion_are_answered(self):
-        self.print_variables({"added, changed, deleted": self.tc_statuses})
+        self.print_variables({"added, changed, deleted": self.statuses})
         self.assertEqual(
-            self.tc_statuses,
+            self.statuses,
             (
                 self.parameters.STATUS_CREATED,
                 self.parameters.STATUS_OK,
@@ -102,16 +102,16 @@ class AuditLogBase(BloomTestCase):
         )
 
     def bud_added_member_is_recorded_with_the_project(self):
-        event = self.tc_member_event
+        event = self.member_event
         self.assertEqual(
             (event.project_id, event.target_id),
-            (self.tc_project, str(self.tc_member)),
+            (self.project, str(self.member)),
             msg=self.parameters.MSG_AUDITLOG_MEMBER,
             abort_on_fail=False,
         )
 
     def bud_visibility_change_is_recorded_with_the_new_visibility(self):
-        event = self.tc_visibility_event
+        event = self.visibility_event
         self.assertEqual(
             (event.target_id, event.details["to"]),
             (self.parameters.AUDITLOG_DESIGN, self.parameters.CUSTOMER_VISIBILITY),
@@ -120,19 +120,19 @@ class AuditLogBase(BloomTestCase):
         )
 
     def bud_deletion_is_recorded_with_the_project_and_the_type(self):
-        event = self.tc_deleted_event
+        event = self.deleted_event
         self.assertEqual(
             (event.project_id, event.target_type),
-            (self.tc_project, "design"),
+            (self.project, "design"),
             msg=self.parameters.MSG_AUDITLOG_DELETED,
             abort_on_fail=False,
         )
 
     def bud_new_token_is_recorded_as_a_changed_field(self):
-        event = self.tc_rotation_event
+        event = self.rotation_event
         self.print_variables({"details": event.details})
         self.assertEqual(
-            (self.tc_rotation.status, "token" in event.details["fields"]),
+            (self.rotation.status, "token" in event.details["fields"]),
             (self.parameters.STATUS_OK, True),
             msg=self.parameters.MSG_AUDITLOG_ROTATED,
             abort_on_fail=False,
@@ -141,42 +141,40 @@ class AuditLogBase(BloomTestCase):
     def bud_record_does_not_contain_the_new_token(self):
         self.assertNotIn(
             self.parameters.AUDITLOG_SECRET,
-            repr(self.tc_rotation_event.details),
+            repr(self.rotation_event.details),
             msg=self.parameters.MSG_AUDITLOG_NO_SECRET,
             abort_on_fail=False,
         )
 
     def bud_members_read_of_the_audit_log_is_refused_403(self):
-        self.print_variables(
-            {"status": self.tc_member_read.status, "body": self.tc_member_read.body}
-        )
+        self.print_variables({"status": self.member_read.status, "body": self.member_read.body})
         self.assertEqual(
-            self.tc_member_read.status,
+            self.member_read.status,
             self.parameters.STATUS_FORBIDDEN,
             msg=self.parameters.MSG_AUDITLOG_MEMBER_REFUSED,
             abort_on_fail=False,
         )
 
     def bud_administrator_reads_every_sign_in_record(self):
-        body = self.tc_page.body
+        body = self.page.body
         self.print_variables({"total": body["total"]})
         self.assertEqual(
-            (self.tc_page.status, body["total"], {item["action"] for item in body["items"]}),
-            (self.parameters.STATUS_OK, self.tc_sign_ins, {self.parameters.AUDITLOG_LOGIN}),
+            (self.page.status, body["total"], {item["action"] for item in body["items"]}),
+            (self.parameters.STATUS_OK, self.sign_ins, {self.parameters.AUDITLOG_LOGIN}),
             msg=self.parameters.MSG_AUDITLOG_FILTERED,
             abort_on_fail=False,
         )
 
     def bud_newest_record_names_the_administrator(self):
         self.assertEqual(
-            self.tc_page.body["items"][0]["actor_name"],
+            self.page.body["items"][0]["actor_name"],
             self.parameters.AUDITLOG_ADMIN_NAME,
             msg=self.parameters.MSG_AUDITLOG_NEWEST,
             abort_on_fail=False,
         )
 
     def bud_sorting_precedes_pagination(self):
-        for (field, direction), hours in self.tc_sorted.items():
+        for (field, direction), hours in self.sorted.items():
             index = self.parameters.AUDITLOG_DIRECTIONS.index(direction)
             self.assertEqual(
                 hours,
@@ -186,7 +184,7 @@ class AuditLogBase(BloomTestCase):
             )
 
     def bud_unknown_sort_field_or_direction_is_refused_422(self):
-        for query, status in zip(self.parameters.AUDITLOG_INVALID, self.tc_invalid):
+        for query, status in zip(self.parameters.AUDITLOG_INVALID, self.invalid):
             self.assertEqual(
                 status,
                 self.parameters.STATUS_UNPROCESSABLE,
@@ -196,7 +194,7 @@ class AuditLogBase(BloomTestCase):
 
     def bud_every_audit_endpoint_is_a_get(self):
         self.assertEqual(
-            self.tc_methods,
+            self.methods,
             ["GET"],
             msg=self.parameters.MSG_AUDITLOG_READ_ONLY,
             abort_on_fail=False,

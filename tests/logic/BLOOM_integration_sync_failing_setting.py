@@ -17,16 +17,16 @@ class IntegrationSyncFailingSettingTest(IntegrationSyncFailingSettingBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_failing_setting_id = self.bloom.bloom_create_integration(
+        self.failing_setting_id = self.bloom.bloom_create_integration(
             self.bloom.bloom_create_project(self.parameters.SYNC_PROJECT_PREFIX)
         )
-        self.tc_other_setting_id = self.bloom.bloom_create_integration(
+        self.other_setting_id = self.bloom.bloom_create_integration(
             self.bloom.bloom_create_project(self.parameters.SYNC_OTHER_PREFIX),
             jira_project_key=self.parameters.JIRA_OTHER_PROJECT,
         )
         self.bloom.bloom_fail_search_of(self.parameters.JIRA_PROJECT, self.parameters.FAILURE_TEXT)
         self.bloom.bloom_serve_jira()
-        self.tc_synced = self.bloom.bloom_run_sync(self.parameters.NOW)
+        self.synced = self.bloom.bloom_run_sync(self.parameters.NOW)
 
     def tearDownClass(self):
         super().tearDownClass()

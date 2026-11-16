@@ -17,9 +17,9 @@ class IntegrationsSettingsRedactionBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_external_reader_lists_the_one_setting_200(self):
-        self.print_variables({"status": self.tc_answer.status, "body": self.tc_answer.body})
+        self.print_variables({"status": self.answer.status, "body": self.answer.body})
         self.assertEqual(
-            (self.tc_answer.status, len(self.tc_answer.body)),
+            (self.answer.status, len(self.answer.body)),
             (self.parameters.STATUS_OK, 1),
             msg=self.parameters.MSG_READER_SETTINGS,
             abort_on_fail=False,
@@ -28,8 +28,7 @@ class IntegrationsSettingsRedactionBase(BloomTestCase):
     def bud_setting_says_the_secrets_are_set(self):
         self.assertEqual(
             tuple(
-                self.tc_answer.body[0][key]
-                for key in ("tracker", "has_token", "has_webhook_secret")
+                self.answer.body[0][key] for key in ("tracker", "has_token", "has_webhook_secret")
             ),
             (self.parameters.READER_TRACKER, True, True),
             msg=self.parameters.MSG_READER_SETTING_FLAGS,
@@ -39,7 +38,7 @@ class IntegrationsSettingsRedactionBase(BloomTestCase):
     def bud_setting_does_not_contain_the_webhook_secret(self):
         self.assertNotIn(
             self.parameters.READER_SECRET_FIELD,
-            self.tc_answer.body[0],
+            self.answer.body[0],
             msg=self.parameters.MSG_READER_NO_SECRET,
             abort_on_fail=False,
         )

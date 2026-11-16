@@ -17,9 +17,9 @@ class BaselinesExternalVisibilityBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_external_reader_reads_the_baseline_200(self):
-        self.print_variables({"status": self.tc_answer.status, "body": self.tc_answer.body})
+        self.print_variables({"status": self.answer.status, "body": self.answer.body})
         self.assertEqual(
-            self.tc_answer.status,
+            self.answer.status,
             self.parameters.STATUS_OK,
             msg=self.parameters.MSG_READER_BASELINE,
             abort_on_fail=False,
@@ -27,7 +27,7 @@ class BaselinesExternalVisibilityBase(BloomTestCase):
 
     def bud_external_reader_gets_no_snapshot(self):
         self.assertEqual(
-            self.tc_answer.body["snapshot"],
+            self.answer.body["snapshot"],
             None,
             msg=self.parameters.MSG_READER_NO_SNAPSHOT,
             abort_on_fail=False,

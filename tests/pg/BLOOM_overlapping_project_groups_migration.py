@@ -17,25 +17,25 @@ class OverlappingProjectGroupsMigrationTest(OverlappingProjectGroupsMigrationBas
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_postgres = self.bloom.bloom_use_postgres(tables=False)
-        if not self.tc_postgres:
+        self.postgres = self.bloom.bloom_use_postgres(tables=False)
+        if not self.postgres:
             return
         before, head = self.parameters.OVERLAP_BEFORE, self.parameters.MIGRATION_HEAD
         snapshot = self.bloom.bloom_snapshot_project_access
-        self.tc_before = self.bloom.bloom_run_alembic("upgrade", before)
+        self.before = self.bloom.bloom_run_alembic("upgrade", before)
         seeded = self.bloom.bloom_seed_overlap_entries()
-        self.tc_state_before = snapshot()
-        self.tc_upgrade = self.bloom.bloom_run_alembic("upgrade", head)
-        self.tc_after = snapshot()
-        self.tc_overlap = self.bloom.bloom_add_overlapping_group(seeded)
-        self.tc_overlapping = snapshot()
-        self.tc_refused = self.bloom.bloom_run_alembic("downgrade", before)
-        self.tc_after_refusal = snapshot()
-        self.bloom.bloom_delete_access_entry(self.tc_overlap.entry)
-        self.tc_downgrade = self.bloom.bloom_run_alembic("downgrade", before)
-        self.tc_downgraded = snapshot()
-        self.tc_upgrade_again = self.bloom.bloom_run_alembic("upgrade", head)
-        self.tc_upgraded_again = snapshot()
+        self.state_before = snapshot()
+        self.upgrade = self.bloom.bloom_run_alembic("upgrade", head)
+        self.after = snapshot()
+        self.overlap = self.bloom.bloom_add_overlapping_group(seeded)
+        self.overlapping = snapshot()
+        self.refused = self.bloom.bloom_run_alembic("downgrade", before)
+        self.after_refusal = snapshot()
+        self.bloom.bloom_delete_access_entry(self.overlap.entry)
+        self.downgrade = self.bloom.bloom_run_alembic("downgrade", before)
+        self.downgraded = snapshot()
+        self.upgrade_again = self.bloom.bloom_run_alembic("upgrade", head)
+        self.upgraded_again = snapshot()
 
     def tearDownClass(self):
         super().tearDownClass()

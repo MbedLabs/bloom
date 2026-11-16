@@ -17,31 +17,31 @@ class ProjectsDeleteBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_admin_signs_in(self):
-        self.print_variables({"login": self.tc_login})
+        self.print_variables({"login": self.login})
         self.assertEqual(
-            self.tc_login,
+            self.login,
             self.parameters.STATUS_OK,
             msg=self.parameters.MSG_DELETE_SIGN_IN,
             abort_on_fail=False,
         )
 
     def bud_deleted_project_is_gone(self):
-        self._assert_deleted(self.tc_plain)
+        self._assert_deleted(self.plain)
 
     def bud_project_with_a_requirement_is_deleted(self):
-        self.print_variables({"requirement": self.tc_with_requirement.requirement})
+        self.print_variables({"requirement": self.with_requirement.requirement})
         self.assertEqual(
-            self.tc_with_requirement.requirement,
+            self.with_requirement.requirement,
             self.parameters.STATUS_CREATED,
             msg=self.parameters.MSG_DELETE_REQUIREMENT,
             abort_on_fail=False,
         )
-        self._assert_deleted(self.tc_with_requirement)
+        self._assert_deleted(self.with_requirement)
 
     def bud_delete_needs_a_signed_in_user(self):
-        self.print_variables({"anonymous delete": self.tc_anonymous})
+        self.print_variables({"anonymous delete": self.anonymous})
         self.assertEqual(
-            self.tc_anonymous,
+            self.anonymous,
             self.parameters.STATUS_UNAUTHORIZED,
             msg=self.parameters.MSG_DELETE_UNAUTHENTICATED,
             abort_on_fail=False,

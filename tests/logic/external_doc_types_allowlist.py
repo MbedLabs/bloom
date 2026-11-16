@@ -18,10 +18,10 @@ class ExternalDocTypesAllowlistBase(BloomTestCase):
 
     def bud_allowlist_is_the_granted_types(self):
         self.print_variables(
-            {"granted": self.parameters.EXTERNAL_ALLOWLIST, "allowed": self.tc_allowed}
+            {"granted": self.parameters.EXTERNAL_ALLOWLIST, "allowed": self.allowed}
         )
         self.assertEqual(
-            self.tc_allowed,
+            self.allowed,
             self.parameters.EXTERNAL_ALLOWLIST_EXPECTED,
             msg=self.parameters.MSG_EXTERNAL_ALLOWLIST,
             abort_on_fail=False,

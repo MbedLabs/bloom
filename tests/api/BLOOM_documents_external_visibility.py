@@ -40,11 +40,11 @@ class DocumentsExternalVisibilityTest(DocumentsExternalVisibilityBase):
             self.parameters.INTERNAL_DOC_TITLE,
             self.parameters.INTERNAL_VISIBILITY,
         )
-        external, self.tc_sign_in = self.bloom.bloom_log_in(
+        external, self.sign_in = self.bloom.bloom_log_in(
             self.parameters.EXTERNAL_EMAIL, self.parameters.API_PASSWORD
         )
-        self.tc_listed = self.bloom.bloom_api_list_documents(external, project_id)
-        self.tc_internal = self.bloom.bloom_api_get_document(external, internal_id)
+        self.listed = self.bloom.bloom_api_list_documents(external, project_id)
+        self.internal = self.bloom.bloom_api_get_document(external, internal_id)
 
     def tearDownClass(self):
         super().tearDownClass()

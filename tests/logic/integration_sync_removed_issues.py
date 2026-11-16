@@ -17,16 +17,16 @@ class IntegrationSyncRemovedIssuesBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_first_run_reads_the_lowest_linked_issue(self):
-        self.print_variables({"reads": self.tc_first_reads})
+        self.print_variables({"reads": self.first_reads})
         self.assertEqual(
-            self.tc_first_reads,
-            [self.tc_gone_key],
+            self.first_reads,
+            [self.gone_key],
             msg=self.parameters.MSG_FIRST_READ,
             abort_on_fail=False,
         )
 
     def bud_gone_issue_marks_its_defect_removed(self):
-        state = self.bloom.bloom_get_defect(self.tc_defect_id).external_issue_state
+        state = self.bloom.bloom_get_defect(self.defect_id).external_issue_state
         self.print_variables({"defect issue state": state})
         self.assertEqual(
             state,
@@ -36,9 +36,9 @@ class IntegrationSyncRemovedIssuesBase(BloomTestCase):
         )
 
     def bud_cursor_stops_at_the_gone_issue(self):
-        self.print_variables({"cursor, updated": self.tc_first_cursor})
+        self.print_variables({"cursor, updated": self.first_cursor})
         self.assertEqual(
-            self.tc_first_cursor,
+            self.first_cursor,
             (self.parameters.REMOVED_NUMBERS[0], 1),
             msg=self.parameters.MSG_CURSOR_FIRST,
             abort_on_fail=False,
@@ -58,14 +58,14 @@ class IntegrationSyncRemovedIssuesBase(BloomTestCase):
         self.print_variables({"reads": self.bloom.site.reads})
         self.assertEqual(
             self.bloom.site.reads,
-            [self.tc_gone_key, self.tc_forbidden_key],
+            [self.gone_key, self.forbidden_key],
             msg=self.parameters.MSG_SECOND_READ,
             abort_on_fail=False,
         )
 
     def bud_forbidden_issue_leaves_the_change_request_unmarked(self):
-        change = self.bloom.bloom_get_change(self.tc_change_id)
-        setting = self.bloom.bloom_get_setting(self.tc_setting_id)
+        change = self.bloom.bloom_get_change(self.change_id)
+        setting = self.bloom.bloom_get_setting(self.setting_id)
         found = (change.external_issue_state, setting.sync_removal_cursor, setting.sync_error)
         self.print_variables({"issue state, cursor, error": found})
         self.assertEqual(

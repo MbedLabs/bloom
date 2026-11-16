@@ -15,20 +15,20 @@ class RefreshFlowTest(RefreshFlowBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_postgres = self.bloom.bloom_use_postgres()
-        if not self.tc_postgres:
+        self.postgres = self.bloom.bloom_use_postgres()
+        if not self.postgres:
             return
         email, password = self.parameters.ADMIN_EMAIL, self.parameters.API_PASSWORD
         self.bloom.bloom_start_main_api()
         self.bloom.bloom_add_admin(email, password)
-        self.tc_login = self.bloom.bloom_log_in_for_cookie(email, password)
-        self.tc_refresh = self.bloom.bloom_refresh(self.tc_login.cookie)
-        self.tc_account = self.bloom.bloom_read_account(self.tc_refresh.access_token)
-        self.tc_without_cookie = self.bloom.bloom_refresh()
-        self.tc_replay = self.bloom.bloom_refresh(self.tc_login.cookie)
-        self.tc_second_login = self.bloom.bloom_log_in_for_cookie(email, password)
-        self.tc_logout = self.bloom.bloom_log_out(self.tc_second_login.cookie)
-        self.tc_after_logout = self.bloom.bloom_refresh(self.tc_second_login.cookie)
+        self.login = self.bloom.bloom_log_in_for_cookie(email, password)
+        self.refresh = self.bloom.bloom_refresh(self.login.cookie)
+        self.account = self.bloom.bloom_read_account(self.refresh.access_token)
+        self.without_cookie = self.bloom.bloom_refresh()
+        self.replay = self.bloom.bloom_refresh(self.login.cookie)
+        self.second_login = self.bloom.bloom_log_in_for_cookie(email, password)
+        self.logout = self.bloom.bloom_log_out(self.second_login.cookie)
+        self.after_logout = self.bloom.bloom_refresh(self.second_login.cookie)
 
     def tearDownClass(self):
         super().tearDownClass()

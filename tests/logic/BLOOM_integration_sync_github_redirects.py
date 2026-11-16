@@ -19,23 +19,23 @@ class IntegrationSyncGithubRedirectsTest(IntegrationSyncGithubRedirectsBase):
         super().setUpClass()
         number = self.parameters.GIT_NUMBERS[0]
         issues = [{"number": number, "state": self.parameters.GIT_CLOSED}]
-        self.tc_project_id = self.bloom.bloom_create_project()
-        self.tc_setting_id = self.bloom.bloom_create_integration(self.tc_project_id, "github")
-        self.tc_defect_id = self.bloom.bloom_link_defect(
-            self.tc_project_id, "github", self.parameters.REPO, number
+        self.project_id = self.bloom.bloom_create_project()
+        self.setting_id = self.bloom.bloom_create_integration(self.project_id, "github")
+        self.defect_id = self.bloom.bloom_link_defect(
+            self.project_id, "github", self.parameters.REPO, number
         )
         self.bloom.bloom_serve_redirect(
             self.parameters.REPO, self.parameters.MOVED, self.parameters.REDIRECTED, issues
         )
         self.bloom.bloom_run_sync(self.parameters.NOW)
-        self.tc_first_status = self.bloom.bloom_get_defect(self.tc_defect_id).status
-        self.tc_followed = str(self.bloom.site.calls[1])
+        self.first_status = self.bloom.bloom_get_defect(self.defect_id).status
+        self.followed = str(self.bloom.site.calls[1])
         first_calls = len(self.bloom.site.calls)
         self.bloom.bloom_serve_redirect(
             self.parameters.REPO, self.parameters.MOVED, self.parameters.FOREIGN, issues
         )
         self.bloom.bloom_run_sync(self.parameters.NOW + self.parameters.LATER)
-        self.tc_second_calls = len(self.bloom.site.calls) - first_calls
+        self.second_calls = len(self.bloom.site.calls) - first_calls
 
     def tearDownClass(self):
         super().tearDownClass()

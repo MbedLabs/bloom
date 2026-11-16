@@ -17,48 +17,48 @@ class DocumentAssigneeMigrationBase(BloomTestCase):
     interface = BloomPgInterface
 
     def bud_migrations_reach_the_revision_before(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"alembic": self.tc_before[1][-300:]})
+        self.print_variables({"alembic": self.before[1][-300:]})
         self.assertEqual(
-            self.tc_before[0],
+            self.before[0],
             0,
             msg=self.parameters.MSG_MIGRATION_BEFORE,
             abort_on_fail=False,
         )
 
     def bud_migrations_reach_head(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"alembic": self.tc_upgrade[1][-300:]})
+        self.print_variables({"alembic": self.upgrade[1][-300:]})
         self.assertEqual(
-            self.tc_upgrade[0],
+            self.upgrade[0],
             0,
             msg=self.parameters.MSG_MIGRATION_HEAD,
             abort_on_fail=False,
         )
 
     def bud_existing_workflow_is_assigned_to_its_revision_creator(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"creator": self.tc_person, "creator and assignee": self.tc_assignees})
+        self.print_variables({"creator": self.person, "creator and assignee": self.assignees})
         self.assertEqual(
-            self.tc_assignees,
-            [(self.tc_person, self.tc_person)],
+            self.assignees,
+            [(self.person, self.person)],
             msg=self.parameters.MSG_ASSIGNEE_IS_CREATOR,
             abort_on_fail=False,
         )
 
     def bud_downgrade_reaches_the_revision_before(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"alembic": self.tc_downgrade[1][-300:]})
+        self.print_variables({"alembic": self.downgrade[1][-300:]})
         self.assertEqual(
-            self.tc_downgrade[0],
+            self.downgrade[0],
             0,
             msg=self.parameters.MSG_MIGRATION_DOWNGRADE,
             abort_on_fail=False,

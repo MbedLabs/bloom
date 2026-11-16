@@ -19,7 +19,7 @@ class VisionStartupTest(VisionStartupBase):
         for doc_id, doc_type, title in self.parameters.VISION_DOCUMENTS:
             self.bloom.bloom_add_document(project_id, doc_id, doc_type, title)
         self.bloom.bloom_normalize_document_kinds()
-        self.tc_kinds = self.bloom.bloom_list_document_kinds()
+        self.kinds = self.bloom.bloom_list_document_kinds()
 
     def tearDownClass(self):
         super().tearDownClass()

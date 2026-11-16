@@ -16,21 +16,21 @@ class PasswordPolicyTest(PasswordPolicyBase):
     def setUpClass(self):
         super().setUpClass()
         check = self.bloom.bloom_check_password
-        minimum, self.tc_max_bytes = self.bloom.bloom_password_limits()
+        minimum, self.max_bytes = self.bloom.bloom_password_limits()
         filler = self.parameters.PASSWORD_FILLER
-        self.tc_minimum_input = filler * minimum
-        self.tc_minimum = check(self.tc_minimum_input)
+        self.minimum_input = filler * minimum
+        self.minimum = check(self.minimum_input)
         lengths = dict(zip(self.parameters.PASSWORD_SHORT_LENGTHS, (0, 1, minimum - 1)))
-        self.tc_short = {label: check(filler * length) for label, length in lengths.items()}
-        self.tc_overlong = check(self.parameters.PASSWORD_OVERLONG * (self.tc_max_bytes + 1))
-        self.tc_multibyte = check(self.parameters.PASSWORD_MULTIBYTE)
-        self.tc_schema_short = {}
-        self.tc_schema_valid = {}
+        self.short = {label: check(filler * length) for label, length in lengths.items()}
+        self.overlong = check(self.parameters.PASSWORD_OVERLONG * (self.max_bytes + 1))
+        self.multibyte = check(self.parameters.PASSWORD_MULTIBYTE)
+        self.schema_short = {}
+        self.schema_valid = {}
         for schema, (field, base) in self.parameters.PASSWORD_SCHEMAS.items():
-            self.tc_schema_short[schema] = self.bloom.bloom_try_auth_schema(
+            self.schema_short[schema] = self.bloom.bloom_try_auth_schema(
                 schema, {**base, field: self.parameters.PASSWORD_SHORT}
             )
-            self.tc_schema_valid[schema] = self.bloom.bloom_try_auth_schema(
+            self.schema_valid[schema] = self.bloom.bloom_try_auth_schema(
                 schema, {**base, field: self.parameters.PASSWORD_VALID}
             )
 

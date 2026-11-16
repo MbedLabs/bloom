@@ -26,17 +26,17 @@ class CompanyLogoTest(CompanyLogoBase):
             **self.parameters.LOGO_REQUIREMENT,
         )
         png = self.parameters.LOGO_PNG
-        self.tc_stored = bloom.bloom_set_logo(png, self.parameters.LOGO_PNG_TYPE)
-        self.tc_served = bloom.bloom_get_logo()
-        self.tc_report_logo = bloom.bloom_report_logo()
+        self.stored = bloom.bloom_set_logo(png, self.parameters.LOGO_PNG_TYPE)
+        self.served = bloom.bloom_get_logo()
+        self.report_logo = bloom.bloom_report_logo()
         bloom.bloom_delete_logo()
-        self.tc_deleted = bloom.bloom_get_logo()
-        self.tc_report_after = bloom.bloom_report_logo()
-        self.tc_text = bloom.bloom_set_logo(
+        self.deleted = bloom.bloom_get_logo()
+        self.report_after = bloom.bloom_report_logo()
+        self.text = bloom.bloom_set_logo(
             self.parameters.LOGO_NOT_IMAGE, self.parameters.LOGO_TEXT_TYPE
         )
-        self.tc_pdf_plain = bloom.bloom_requirements_pdf(None)
-        self.tc_pdf_logo = bloom.bloom_requirements_pdf(png)
+        self.pdf_plain = bloom.bloom_requirements_pdf(None)
+        self.pdf_logo = bloom.bloom_requirements_pdf(png)
 
     def tearDownClass(self):
         super().tearDownClass()

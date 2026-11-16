@@ -15,7 +15,7 @@ class JiraWebhookInboundCreationTest(JiraWebhookInboundCreationBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_env = self.bloom.bloom_create_webhook_environment(
+        self.env = self.bloom.bloom_create_webhook_environment(
             jira_project_key=self.parameters.JIRA_PROJECT, create_defects_on_inbound=True
         )
         to_do = {
@@ -27,10 +27,10 @@ class JiraWebhookInboundCreationTest(JiraWebhookInboundCreationBase):
             status=to_do,
             summary=self.parameters.NEW_SUMMARY,
         )
-        self.tc_response = self.bloom.bloom_post_jira_webhook(
+        self.response = self.bloom.bloom_post_jira_webhook(
             body, delivery=self.parameters.DELIVERIES[10]
         )
-        self.tc_replay = self.bloom.bloom_post_jira_webhook(
+        self.replay = self.bloom.bloom_post_jira_webhook(
             body, delivery=self.parameters.DELIVERIES[10]
         )
 

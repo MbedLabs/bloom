@@ -17,7 +17,7 @@ class RequirementDescriptionBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_requirements_are_created(self):
-        statuses = [answer.status for answer in self.tc_created]
+        statuses = [answer.status for answer in self.created]
         self.print_variables({"statuses": statuses})
         self._equal(
             statuses,
@@ -26,43 +26,43 @@ class RequirementDescriptionBase(BloomTestCase):
         )
 
     def bud_editor_content_on_create_becomes_the_description(self):
-        self.print_variables({"created": self.tc_from_body})
+        self.print_variables({"created": self.from_body})
         self._equal(
-            self.tc_from_body,
+            self.from_body,
             self.parameters.DESCRIPTION_FROM_BODY,
             self.parameters.MSG_DESCRIPTION_FROM_BODY,
         )
 
     def bud_detail_holds_the_description(self):
-        self.print_variables({"detail": self.tc_detail})
+        self.print_variables({"detail": self.detail})
         self._equal(
-            self.tc_detail,
+            self.detail,
             self.parameters.DESCRIPTION_FROM_BODY,
             self.parameters.MSG_DESCRIPTION_DETAIL,
         )
 
     def bud_editor_content_on_edit_follows_the_description(self):
-        self.print_variables({"edited": self.tc_edited})
+        self.print_variables({"edited": self.edited})
         self._equal(
-            self.tc_edited,
+            self.edited,
             (self.parameters.STATUS_OK, *self.parameters.DESCRIPTION_AFTER_EDIT),
             self.parameters.MSG_DESCRIPTION_EDIT,
         )
 
     def bud_tag_in_a_new_description_creates_a_link(self):
-        self.print_variables({"links": self.tc_tagged_links})
+        self.print_variables({"links": self.tagged_links})
         self._equal(
-            self.tc_tagged_links,
-            [self.tc_expected_link],
+            self.tagged_links,
+            [self.expected_link],
             self.parameters.MSG_DESCRIPTION_TAG_CREATE,
         )
 
     def bud_tag_added_on_edit_creates_a_link(self):
-        self.print_variables({"before": self.tc_untagged_links, "after": self.tc_retagged_links})
-        self._equal(self.tc_untagged_links, [], self.parameters.MSG_DESCRIPTION_NO_TAG)
+        self.print_variables({"before": self.untagged_links, "after": self.retagged_links})
+        self._equal(self.untagged_links, [], self.parameters.MSG_DESCRIPTION_NO_TAG)
         self._equal(
-            self.tc_retagged_links,
-            (self.parameters.STATUS_OK, [self.tc_expected_link]),
+            self.retagged_links,
+            (self.parameters.STATUS_OK, [self.expected_link]),
             self.parameters.MSG_DESCRIPTION_TAG_EDIT,
         )
 

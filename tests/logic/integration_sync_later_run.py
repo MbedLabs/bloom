@@ -34,7 +34,7 @@ class IntegrationSyncLaterRunBase(BloomTestCase):
         )
 
     def bud_defect_takes_the_jira_changes(self):
-        defect = self.bloom.bloom_get_defect(self.tc_defect_id)
+        defect = self.bloom.bloom_get_defect(self.defect_id)
         found = (
             defect.status,
             defect.title,
@@ -57,7 +57,7 @@ class IntegrationSyncLaterRunBase(BloomTestCase):
         )
 
     def bud_change_request_is_closed(self):
-        status = self.bloom.bloom_get_change(self.tc_change_id).status
+        status = self.bloom.bloom_get_change(self.change_id).status
         self.print_variables({"change request": status})
         self.assertEqual(
             status,
@@ -67,7 +67,7 @@ class IntegrationSyncLaterRunBase(BloomTestCase):
         )
 
     def bud_run_counts_two_updates(self):
-        updated = self.bloom.bloom_get_setting(self.tc_setting_id).sync_updated
+        updated = self.bloom.bloom_get_setting(self.setting_id).sync_updated
         self.print_variables({"updated": updated})
         self.assertEqual(updated, 2, msg=self.parameters.MSG_TWO_UPDATES, abort_on_fail=False)
 

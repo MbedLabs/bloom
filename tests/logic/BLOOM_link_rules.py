@@ -16,25 +16,25 @@ class LinkRulesTest(LinkRulesBase):
     def setUpClass(self):
         super().setUpClass()
         rule = self.bloom.bloom_link_rule
-        self.tc_normalized = {
+        self.normalized = {
             value: rule("normalize_linkable_type", value)
             for value, _ in self.parameters.LINK_NORMALIZED
         }
-        self.tc_roles = {
+        self.roles = {
             (source, target): rule("get_allowed_link_roles", source, target)
             for source, target, _ in self.parameters.LINK_ROLES
         }
-        self.tc_known = {
+        self.known = {
             kind: rule("is_known_linkable_type", kind) for kind, _ in self.parameters.LINK_KNOWN
         }
-        self.tc_role_checks = {
+        self.role_checks = {
             (source, target, role): rule("is_allowed_link_role", source, target, role)
             for source, target, role, _ in self.parameters.LINK_ROLE_CHECKS
         }
-        self.tc_tag_hosts = {
+        self.tag_hosts = {
             kind: rule("is_tag_host_type", kind) for kind, _ in self.parameters.LINK_TAG_HOSTS
         }
-        self.tc_tag_pairs = {
+        self.tag_pairs = {
             (source, target): rule("is_allowed_tag_pair", source, target)
             for source, target, _ in self.parameters.LINK_TAG_PAIRS
         }

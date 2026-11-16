@@ -15,11 +15,11 @@ class CliAuthRefreshRevocationTest(CliAuthRefreshRevocationBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_postgres = self.bloom.bloom_use_postgres(tables=False)
-        if not self.tc_postgres:
+        self.postgres = self.bloom.bloom_use_postgres(tables=False)
+        if not self.postgres:
             return
-        self.tc_upgrade = self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
-        self.tc_outcome = self.bloom.bloom_refresh_during_revocation(
+        self.upgrade = self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
+        self.outcome = self.bloom.bloom_refresh_during_revocation(
             self.parameters.CLI_REVOCATION_EMAIL, self.parameters.CLI_REFRESH_TOKEN
         )
 

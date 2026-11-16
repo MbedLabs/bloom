@@ -59,11 +59,9 @@ class ExternalVisibilityDirectApisTest(ExternalVisibilityDirectApisBase):
         bloom.bloom_add_artefact_link(project, visible_tc, root)
         bloom.bloom_add_artefact_link(project, visible_tc, hidden_req)
         bloom.bloom_add_artefact_link(project, hidden_tc, root)
-        self.tc_requirement = bloom.bloom_api_read_requirement(reader.headers, root)
-        self.tc_test_case = bloom.bloom_api_get_test_case(reader.headers, visible_tc)
-        self.tc_campaign = bloom.bloom_api_get_campaign(
-            reader.headers, values.READER_VISIBLE_CAMPAIGN
-        )
+        self.requirement = bloom.bloom_api_read_requirement(reader.headers, root)
+        self.test_case = bloom.bloom_api_get_test_case(reader.headers, visible_tc)
+        self.campaign = bloom.bloom_api_get_campaign(reader.headers, values.READER_VISIBLE_CAMPAIGN)
 
     def tearDownClass(self):
         super().tearDownClass()

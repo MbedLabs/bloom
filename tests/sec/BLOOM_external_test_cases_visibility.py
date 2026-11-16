@@ -31,8 +31,8 @@ class ExternalTestCasesVisibilityTest(ExternalTestCasesVisibilityBase):
         )
         bloom.bloom_add_admin(values.ADMIN_EMAIL, values.API_PASSWORD)
         admin, _ = bloom.bloom_log_in(values.ADMIN_EMAIL, values.API_PASSWORD)
-        self.tc_listed = bloom.bloom_api_list_test_cases(reader.headers, reader.project_id)
-        self.tc_read = bloom.bloom_api_get_test_case(admin, customer)
+        self.listed = bloom.bloom_api_list_test_cases(reader.headers, reader.project_id)
+        self.read = bloom.bloom_api_get_test_case(admin, customer)
 
     def tearDownClass(self):
         super().tearDownClass()

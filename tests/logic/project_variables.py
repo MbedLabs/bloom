@@ -17,7 +17,7 @@ class ProjectVariablesBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_update_writes_kind_key_value_and_description(self):
-        outcome = self.tc_updated
+        outcome = self.updated
         self.print_variables(
             {"item": outcome.item, "flushes": outcome.flushes, "refreshes": outcome.refreshed_item}
         )
@@ -49,7 +49,7 @@ class ProjectVariablesBase(BloomTestCase):
         )
 
     def bud_duplicate_kind_and_key_is_refused(self):
-        outcome = self.tc_duplicate
+        outcome = self.duplicate
         self.print_variables(
             {"status": outcome.status, "detail": outcome.detail, "flushes": outcome.flushes}
         )

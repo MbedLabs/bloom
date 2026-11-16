@@ -15,15 +15,15 @@ class DocumentAssigneeMigrationTest(DocumentAssigneeMigrationBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_postgres = self.bloom.bloom_use_postgres(tables=False)
-        if not self.tc_postgres:
+        self.postgres = self.bloom.bloom_use_postgres(tables=False)
+        if not self.postgres:
             return
         before = self.parameters.ASSIGNEE_BEFORE
-        self.tc_before = self.bloom.bloom_run_alembic("upgrade", before)
-        self.tc_person = self.bloom.bloom_seed_workflow_of_a_creator()
-        self.tc_upgrade = self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
-        self.tc_assignees = self.bloom.bloom_read_workflow_assignees()
-        self.tc_downgrade = self.bloom.bloom_run_alembic("downgrade", before)
+        self.before = self.bloom.bloom_run_alembic("upgrade", before)
+        self.person = self.bloom.bloom_seed_workflow_of_a_creator()
+        self.upgrade = self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
+        self.assignees = self.bloom.bloom_read_workflow_assignees()
+        self.downgrade = self.bloom.bloom_run_alembic("downgrade", before)
 
     def tearDownClass(self):
         super().tearDownClass()

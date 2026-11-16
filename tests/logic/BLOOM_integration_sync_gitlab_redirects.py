@@ -17,17 +17,17 @@ class IntegrationSyncGitlabRedirectsTest(IntegrationSyncGitlabRedirectsBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_project_id = self.bloom.bloom_create_project()
-        self.tc_setting_id = self.bloom.bloom_create_integration(
-            self.tc_project_id, "gitlab", base_url=f"https://{self.parameters.GITLAB_HOST}"
+        self.project_id = self.bloom.bloom_create_project()
+        self.setting_id = self.bloom.bloom_create_integration(
+            self.project_id, "gitlab", base_url=f"https://{self.parameters.GITLAB_HOST}"
         )
         self.bloom.bloom_link_defect(
-            self.tc_project_id, "gitlab", self.parameters.REPO, self.parameters.GIT_NUMBERS[0]
+            self.project_id, "gitlab", self.parameters.REPO, self.parameters.GIT_NUMBERS[0]
         )
         self.bloom.bloom_refuse_with(
             self.parameters.MOVED, headers={"location": self.parameters.FOREIGN}
         )
-        self.tc_synced = self.bloom.bloom_run_sync(self.parameters.NOW)
+        self.synced = self.bloom.bloom_run_sync(self.parameters.NOW)
 
     def tearDownClass(self):
         super().tearDownClass()

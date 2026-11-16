@@ -21,11 +21,11 @@ class CampaignPublicIdDuplicatesBase(BloomTestCase):
 
     @parameterized(params.PUBLIC_ID_DUPLICATE_CASES)
     def bud_upgrade_stops_on_duplicate_public_ids(self, index):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
         suites, campaigns, column = self.parameters.PUBLIC_ID_DUPLICATES[index]
-        code, output, revision = self.tc_refusals[index]
+        code, output, revision = self.refusals[index]
         self.print_variables(
             {"suites": suites, "campaigns": campaigns, "exit code": code, "revision": revision}
         )

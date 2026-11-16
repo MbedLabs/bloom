@@ -30,15 +30,15 @@ class TagLinksTest(TagLinksBase):
         def sync(source=kind, content=target, hidden=False):
             return bloom.bloom_sync_tag_links(project_id, source, source_id, content, hidden)
 
-        self.tc_invalid = {}
+        self.invalid = {}
         for source, target_kind in self.parameters.TAG_INVALID_PAIRS:
             outcome = sync(source, bloom.bloom_mention(target_kind, target_id))
-            self.tc_invalid[(source, target_kind)] = (outcome, bloom.bloom_list_links())
-        self.tc_hidden = (sync(hidden=True), bloom.bloom_list_links())
-        self.tc_self = sync(content=bloom.bloom_mention(kind, source_id))
-        self.tc_first = sync()
-        self.tc_links = bloom.bloom_list_links()
-        self.tc_again = sync()
+            self.invalid[(source, target_kind)] = (outcome, bloom.bloom_list_links())
+        self.hidden = (sync(hidden=True), bloom.bloom_list_links())
+        self.self = sync(content=bloom.bloom_mention(kind, source_id))
+        self.first = sync()
+        self.links = bloom.bloom_list_links()
+        self.again = sync()
 
     def tearDownClass(self):
         super().tearDownClass()

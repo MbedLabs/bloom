@@ -18,10 +18,10 @@ class JiraPullMissingDefectsBase(BloomTestCase):
 
     def bud_pull_counts_what_it_saw(self):
         found = (
-            self.tc_result.searched,
-            self.tc_result.created,
-            self.tc_result.already_linked,
-            self.tc_result.skipped,
+            self.result.searched,
+            self.result.created,
+            self.result.already_linked,
+            self.result.skipped,
         )
         self.print_variables({"searched, created, already linked, skipped": found})
         self.assertEqual(
@@ -31,7 +31,7 @@ class JiraPullMissingDefectsBase(BloomTestCase):
             abort_on_fail=False,
         )
         self.assertEqual(
-            (self.tc_result.updated, self.tc_result.removed),
+            (self.result.updated, self.result.removed),
             self.parameters.PULL_UNCHANGED,
             msg=self.parameters.MSG_PULL_COUNTS,
             abort_on_fail=False,
@@ -42,13 +42,13 @@ class JiraPullMissingDefectsBase(BloomTestCase):
             d.defect_id
             for d in self.bloom.bloom_list_defects_linked_to(self.parameters.PULL_NEW_NUMBER)
         ]
-        self.print_variables({"new ids": self.tc_result.new_ids, "pulled": pulled})
+        self.print_variables({"new ids": self.result.new_ids, "pulled": pulled})
         self.assertEqual(
-            self.tc_result.new_ids, pulled, msg=self.parameters.MSG_PULL_NEW_ID, abort_on_fail=False
+            self.result.new_ids, pulled, msg=self.parameters.MSG_PULL_NEW_ID, abort_on_fail=False
         )
 
     def bud_pull_asks_for_open_bugs_and_follows_the_next_page(self):
-        found = (self.tc_seen[0]["jql"], self.tc_seen[1].get("nextPageToken"))
+        found = (self.seen[0]["jql"], self.seen[1].get("nextPageToken"))
         self.print_variables({"first search, second token": found})
         self.assertEqual(
             found,

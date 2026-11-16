@@ -15,7 +15,7 @@ class JiraPullMissingDefectsTest(JiraPullMissingDefectsBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_env = self.bloom.bloom_create_webhook_environment(
+        self.env = self.bloom.bloom_create_webhook_environment(
             jira_project_key=self.parameters.JIRA_PROJECT, create_defects_on_inbound=True
         )
         bug = {"name": self.parameters.BUG}
@@ -45,10 +45,8 @@ class JiraPullMissingDefectsTest(JiraPullMissingDefectsBase):
                 "isLast": True,
             },
         ]
-        self.tc_seen = self.bloom.bloom_serve_jira_pages(pages)
-        self.tc_result = self.bloom.bloom_sync_now(
-            self.tc_env.setting_id, self.parameters.ADMIN_EMAIL
-        )
+        self.seen = self.bloom.bloom_serve_jira_pages(pages)
+        self.result = self.bloom.bloom_sync_now(self.env.setting_id, self.parameters.ADMIN_EMAIL)
 
     def tearDownClass(self):
         super().tearDownClass()

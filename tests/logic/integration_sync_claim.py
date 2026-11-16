@@ -18,21 +18,21 @@ class IntegrationSyncClaimBase(BloomTestCase):
 
     def bud_first_claim_wins(self):
         claimed = self.bloom.bloom_claim(
-            self.tc_setting_id, self.parameters.CLAIM_MINUTES, self.parameters.NOW
+            self.setting_id, self.parameters.CLAIM_MINUTES, self.parameters.NOW
         )
         self.print_variables({"claimed": claimed})
         self.assertEqual(claimed, True, msg=self.parameters.MSG_FIRST_CLAIM, abort_on_fail=False)
 
     def bud_second_claim_within_the_rate_loses(self):
         claimed = self.bloom.bloom_claim(
-            self.tc_setting_id, self.parameters.CLAIM_MINUTES, self.parameters.NOW
+            self.setting_id, self.parameters.CLAIM_MINUTES, self.parameters.NOW
         )
         self.print_variables({"claimed": claimed})
         self.assertEqual(claimed, False, msg=self.parameters.MSG_SECOND_CLAIM, abort_on_fail=False)
 
     def bud_claim_after_the_rate_wins(self):
         claimed = self.bloom.bloom_claim(
-            self.tc_setting_id,
+            self.setting_id,
             self.parameters.CLAIM_MINUTES,
             self.parameters.NOW + self.parameters.LATER,
         )

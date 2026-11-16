@@ -17,67 +17,67 @@ class AccessLabelsBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_setup_calls_succeed(self):
-        self.print_variables({"setup": self.tc_setup})
+        self.print_variables({"setup": self.setup})
         self.assertEqual(
-            [found for found, _ in self.tc_setup],
-            [expected for _, expected in self.tc_setup],
+            [found for found, _ in self.setup],
+            [expected for _, expected in self.setup],
             msg=self.parameters.MSG_API_SETUP,
             abort_on_fail=True,
         )
 
     def bud_database_id_opens_the_document(self):
         found = (
-            self.tc_by_number.status_code,
-            self.tc_by_number.json().get("doc_id"),
-            self.tc_by_number.json().get("id"),
-            self.tc_by_doc_id.json().get("id"),
+            self.by_number.status_code,
+            self.by_number.json().get("doc_id"),
+            self.by_number.json().get("id"),
+            self.by_doc_id.json().get("id"),
         )
         self.print_variables({"status, doc id, id, id by doc id": found})
         self.assertEqual(
             found,
             (
                 self.parameters.STATUS_OK,
-                self.tc_requirement["req_id"],
-                self.tc_requirement["id"],
-                self.tc_requirement["id"],
+                self.requirement["req_id"],
+                self.requirement["id"],
+                self.requirement["id"],
             ),
             msg=self.parameters.MSG_ID_OPENS_DOCUMENT,
             abort_on_fail=False,
         )
 
     def bud_unknown_id_is_not_found(self):
-        self.print_variables({"status": self.tc_missing.status_code})
+        self.print_variables({"status": self.missing.status_code})
         self.assertEqual(
-            self.tc_missing.status_code,
+            self.missing.status_code,
             self.parameters.STATUS_NOT_FOUND,
             msg=self.parameters.MSG_UNKNOWN_ID_NOT_FOUND,
             abort_on_fail=False,
         )
 
     def bud_member_without_read_gets_not_found(self):
-        self.print_variables({"status": self.tc_hidden.status_code})
+        self.print_variables({"status": self.hidden.status_code})
         self.assertEqual(
-            self.tc_hidden.status_code,
+            self.hidden.status_code,
             self.parameters.STATUS_NOT_FOUND,
             msg=self.parameters.MSG_HIDDEN_NOT_FOUND,
             abort_on_fail=False,
         )
 
     def bud_reader_opens_the_document(self):
-        found = (self.tc_reader.status_code, self.tc_reader.json().get("doc_id"))
+        found = (self.reader.status_code, self.reader.json().get("doc_id"))
         self.print_variables({"reader": found})
         self.assertEqual(
             found,
-            (self.parameters.STATUS_OK, self.tc_requirement["req_id"]),
+            (self.parameters.STATUS_OK, self.requirement["req_id"]),
             msg=self.parameters.MSG_READER_OPENS,
             abort_on_fail=False,
         )
 
     def bud_admin_cannot_request_access(self):
         found = (
-            self.tc_admin_request.status_code,
-            self.tc_admin_request.json().get("detail"),
-            self.tc_mail_after_admin,
+            self.admin_request.status_code,
+            self.admin_request.json().get("detail"),
+            self.mail_after_admin,
         )
         self.print_variables({"admin request": found})
         self.assertEqual(
@@ -89,9 +89,9 @@ class AccessLabelsBase(BloomTestCase):
 
     def bud_holders_cannot_request_their_access(self):
         found = [
-            (self.tc_project_request.status_code, self.tc_project_request.json().get("detail")),
-            (self.tc_item_request.status_code, self.tc_item_request.json().get("detail")),
-            self.tc_mail_after_holders,
+            (self.project_request.status_code, self.project_request.json().get("detail")),
+            (self.item_request.status_code, self.item_request.json().get("detail")),
+            self.mail_after_holders,
         ]
         self.print_variables({"holder requests": found})
         self.assertEqual(
@@ -105,9 +105,7 @@ class AccessLabelsBase(BloomTestCase):
                 ),
                 (
                     self.parameters.STATUS_CONFLICT,
-                    self.parameters.ALREADY_HAVE_ACCESS.format(
-                        target=self.tc_requirement["req_id"]
-                    ),
+                    self.parameters.ALREADY_HAVE_ACCESS.format(target=self.requirement["req_id"]),
                 ),
                 0,
             ],
@@ -116,24 +114,24 @@ class AccessLabelsBase(BloomTestCase):
         )
 
     def bud_requests_name_the_document_for_admins_only(self):
-        labels = {row["id"]: row["resource_label"] for row in self.tc_listed.json()}
+        labels = {row["id"]: row["resource_label"] for row in self.listed.json()}
         found = (
-            self.tc_created.status_code,
-            self.tc_created.json().get("resource_label"),
-            self.tc_mine.json().get("resource_label"),
-            self.tc_gone.status_code,
-            labels.get(self.tc_created.json().get("id")),
-            labels.get(self.tc_gone.json().get("id")),
+            self.created.status_code,
+            self.created.json().get("resource_label"),
+            self.mine.json().get("resource_label"),
+            self.gone.status_code,
+            labels.get(self.created.json().get("id")),
+            labels.get(self.gone.json().get("id")),
         )
         self.print_variables({"labels": found})
         self.assertEqual(
             found,
             (
                 self.parameters.STATUS_CREATED,
-                str(self.tc_requirement["id"]),
-                str(self.tc_requirement["id"]),
+                str(self.requirement["id"]),
+                str(self.requirement["id"]),
                 self.parameters.STATUS_CREATED,
-                self.tc_requirement["req_id"],
+                self.requirement["req_id"],
                 self.parameters.DELETED_LABEL.format(ref=self.parameters.MISSING_DOC_NUMBER),
             ),
             msg=self.parameters.MSG_REQUEST_LABELS,
@@ -141,22 +139,22 @@ class AccessLabelsBase(BloomTestCase):
         )
 
     def bud_request_mail_goes_to_others(self):
-        recipients = {mail["to_email"] for mail in self.tc_mail}
+        recipients = {mail["to_email"] for mail in self.mail}
         found = (
             self.parameters.HIDDEN_EMAIL in recipients,
             bool(recipients),
-            self.tc_mail[0].get("resource") if self.tc_mail else None,
+            self.mail[0].get("resource") if self.mail else None,
         )
         self.print_variables({"recipients": sorted(recipients), "found": found})
         self.assertEqual(
             found,
-            (False, True, self.tc_requirement["req_id"]),
+            (False, True, self.requirement["req_id"]),
             msg=self.parameters.MSG_REQUEST_MAIL,
             abort_on_fail=False,
         )
 
     def bud_audit_log_names_targets_and_actors(self):
-        requirement, user, deleted = self.tc_audit
+        requirement, user, deleted = self.audit
         found = (
             (requirement or {}).get("target_label"),
             (requirement or {}).get("actor_label") == (requirement or {}).get("actor_name"),
@@ -167,7 +165,7 @@ class AccessLabelsBase(BloomTestCase):
         self.assertEqual(
             found,
             (
-                self.parameters.AUDIT_REQUIREMENT_LABEL.format(ref=self.tc_requirement["req_id"]),
+                self.parameters.AUDIT_REQUIREMENT_LABEL.format(ref=self.requirement["req_id"]),
                 True,
                 self.parameters.AUDIT_USER_LABEL.format(name=self.parameters.MEMBER_FULL_NAME),
                 self.parameters.AUDIT_REQUIREMENT_LABEL.format(

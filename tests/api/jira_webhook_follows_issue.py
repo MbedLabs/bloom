@@ -17,16 +17,16 @@ class JiraWebhookFollowsIssueBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_edit_is_processed(self):
-        self.print_variables({"answer": self.tc_edit.json()})
+        self.print_variables({"answer": self.edit.json()})
         self.assertEqual(
-            self.tc_edit.json().get("status"),
+            self.edit.json().get("status"),
             self.parameters.ANSWER_PROCESSED,
             msg=self.parameters.MSG_FOLLOWS_ISSUE,
             abort_on_fail=False,
         )
 
     def bud_defect_takes_the_issue_fields_and_stays_open(self):
-        defect = self.tc_after_edit
+        defect = self.after_edit
         found = (
             defect.title,
             defect.description,
@@ -49,7 +49,7 @@ class JiraWebhookFollowsIssueBase(BloomTestCase):
         )
 
     def bud_resolution_closes_the_defect(self):
-        defect = self.bloom.bloom_get_defect(self.tc_env.defect_id)
+        defect = self.bloom.bloom_get_defect(self.env.defect_id)
         found = (defect.status, defect.closed_at is not None)
         self.print_variables({"status, closed": found})
         self.assertEqual(

@@ -16,17 +16,17 @@ class IntegrationSyncReopenRulesTest(IntegrationSyncReopenRulesBase):
     def setUpClass(self):
         super().setUpClass()
         working, reopened, closed_in_bloom, _ = self.parameters.GIT_NUMBERS
-        self.tc_project_id = self.bloom.bloom_create_project()
-        self.tc_setting_id = self.bloom.bloom_create_integration(self.tc_project_id, "github")
-        self.tc_working_id = self.bloom.bloom_link_defect(
-            self.tc_project_id,
+        self.project_id = self.bloom.bloom_create_project()
+        self.setting_id = self.bloom.bloom_create_integration(self.project_id, "github")
+        self.working_id = self.bloom.bloom_link_defect(
+            self.project_id,
             "github",
             self.parameters.REPO,
             working,
             status=self.parameters.DEFECT_IN_PROGRESS,
         )
-        self.tc_reopened_id = self.bloom.bloom_link_defect(
-            self.tc_project_id,
+        self.reopened_id = self.bloom.bloom_link_defect(
+            self.project_id,
             "github",
             self.parameters.REPO,
             reopened,
@@ -34,8 +34,8 @@ class IntegrationSyncReopenRulesTest(IntegrationSyncReopenRulesBase):
             external_issue_state=self.parameters.GIT_CLOSED,
             external_issue_closed=True,
         )
-        self.tc_closed_in_bloom_id = self.bloom.bloom_link_defect(
-            self.tc_project_id,
+        self.closed_in_bloom_id = self.bloom.bloom_link_defect(
+            self.project_id,
             "github",
             self.parameters.REPO,
             closed_in_bloom,
@@ -54,7 +54,7 @@ class IntegrationSyncReopenRulesTest(IntegrationSyncReopenRulesBase):
                 },
             ]
         )
-        self.tc_synced = self.bloom.bloom_run_sync(self.parameters.NOW)
+        self.synced = self.bloom.bloom_run_sync(self.parameters.NOW)
 
     def tearDownClass(self):
         super().tearDownClass()

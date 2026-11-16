@@ -15,10 +15,10 @@ class TimestampTextTest(TimestampTextBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_naive = self.bloom.bloom_minute_utc(self.parameters.STAMP_NAIVE)
-        self.tc_none = self.bloom.bloom_minute_utc(None)
-        self.tc_aware = self.bloom.bloom_minute_utc(self.parameters.STAMP_AWARE)
-        self.tc_stored = self.bloom.bloom_resolve_execution_time_in_zone(
+        self.naive = self.bloom.bloom_minute_utc(self.parameters.STAMP_NAIVE)
+        self.none = self.bloom.bloom_minute_utc(None)
+        self.aware = self.bloom.bloom_minute_utc(self.parameters.STAMP_AWARE)
+        self.stored = self.bloom.bloom_resolve_execution_time_in_zone(
             self.parameters.STAMP_EXECUTED, self.parameters.STAMP_SERVER_ZONE
         )
 

@@ -15,13 +15,13 @@ class IntegrationSyncSaveRescanTest(IntegrationSyncSaveRescanBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_project_id = self.bloom.bloom_create_project()
-        self.tc_setting_id = self.bloom.bloom_create_integration(self.tc_project_id)
+        self.project_id = self.bloom.bloom_create_project()
+        self.setting_id = self.bloom.bloom_create_integration(self.project_id)
         self.bloom.bloom_serve_jira()
         self.bloom.bloom_run_sync(self.parameters.NOW)
-        self.tc_after_run = self.bloom.bloom_get_setting(self.tc_setting_id).sync_full_scan
+        self.after_run = self.bloom.bloom_get_setting(self.setting_id).sync_full_scan
         self.bloom.bloom_save_setting(
-            self.tc_setting_id, self.parameters.ADMIN_EMAIL, jira_label=self.parameters.LABEL
+            self.setting_id, self.parameters.ADMIN_EMAIL, jira_label=self.parameters.LABEL
         )
 
     def tearDownClass(self):

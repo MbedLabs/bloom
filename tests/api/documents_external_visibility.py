@@ -17,18 +17,18 @@ class DocumentsExternalVisibilityBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_external_member_signs_in(self):
-        self.print_variables({"sign-in": self.tc_sign_in})
+        self.print_variables({"sign-in": self.sign_in})
         self.assertEqual(
-            self.tc_sign_in,
+            self.sign_in,
             self.parameters.STATUS_OK,
             msg=self.parameters.MSG_EXTERNAL_SIGNS_IN,
             abort_on_fail=True,
         )
 
     def bud_list_holds_the_customer_document_only(self):
-        doc_ids = {item["doc_id"] for item in self.tc_listed.json().get("items", [])}
+        doc_ids = {item["doc_id"] for item in self.listed.json().get("items", [])}
         found = (
-            self.tc_listed.status_code,
+            self.listed.status_code,
             self.parameters.CUSTOMER_DOC_ID in doc_ids,
             self.parameters.INTERNAL_DOC_ID in doc_ids,
         )
@@ -41,9 +41,9 @@ class DocumentsExternalVisibilityBase(BloomTestCase):
         )
 
     def bud_internal_document_is_not_found(self):
-        self.print_variables({"status": self.tc_internal.status_code})
+        self.print_variables({"status": self.internal.status_code})
         self.assertEqual(
-            self.tc_internal.status_code,
+            self.internal.status_code,
             self.parameters.STATUS_NOT_FOUND,
             msg=self.parameters.MSG_EXTERNAL_DETAIL,
             abort_on_fail=False,

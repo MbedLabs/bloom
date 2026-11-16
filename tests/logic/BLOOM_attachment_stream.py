@@ -18,12 +18,12 @@ class AttachmentStreamTest(AttachmentStreamBase):
     def setUpClass(self):
         super().setUpClass()
         payload = self.parameters.STREAM_PAYLOAD
-        self.tc_complete = self.bloom.bloom_stream_attachment(payload, len(payload))
-        self.tc_oversize = self.bloom.bloom_stream_attachment(
+        self.complete = self.bloom.bloom_stream_attachment(payload, len(payload))
+        self.oversize = self.bloom.bloom_stream_attachment(
             self.parameters.STREAM_OVERSIZE, self.parameters.STREAM_OVERSIZE_LIMIT
         )
         errors = {"OSError": OSError, "CancelledError": asyncio.CancelledError}
-        self.tc_interrupted = {
+        self.interrupted = {
             name: self.bloom.bloom_stream_attachment(
                 self.parameters.STREAM_FIRST_CHUNK,
                 self.parameters.STREAM_INTERRUPT_LIMIT,

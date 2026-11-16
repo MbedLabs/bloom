@@ -18,9 +18,9 @@ class IntegrationSyncSettingsResponseTest(IntegrationSyncSettingsResponseBase):
     def setUpClass(self):
         super().setUpClass()
         created, updated = self.parameters.PREVIOUS_COUNTS
-        self.tc_project_id = self.bloom.bloom_create_project()
-        self.tc_setting_id = self.bloom.bloom_create_integration(
-            self.tc_project_id,
+        self.project_id = self.bloom.bloom_create_project()
+        self.setting_id = self.bloom.bloom_create_integration(
+            self.project_id,
             sync_checked_at=self.parameters.NOW,
             synced_at=self.parameters.NOW,
             sync_warning=self.parameters.WARNING_TEXT,
@@ -28,7 +28,7 @@ class IntegrationSyncSettingsResponseTest(IntegrationSyncSettingsResponseBase):
             sync_updated=updated,
             auto_sync_minutes=self.parameters.SYNC_RATE,
         )
-        self.tc_response = self.bloom.bloom_get_setting_response(self.tc_setting_id)
+        self.response = self.bloom.bloom_get_setting_response(self.setting_id)
 
     def tearDownClass(self):
         super().tearDownClass()

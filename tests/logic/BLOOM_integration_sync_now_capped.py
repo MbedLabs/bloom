@@ -15,8 +15,8 @@ class IntegrationSyncNowCappedTest(IntegrationSyncNowCappedBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_project_id = self.bloom.bloom_create_project()
-        self.tc_setting_id = self.bloom.bloom_create_integration(self.tc_project_id)
+        self.project_id = self.bloom.bloom_create_project()
+        self.setting_id = self.bloom.bloom_create_integration(self.project_id)
         self.bloom.bloom_cap_searches(self.parameters.SYNC_NOW_CAP)
         self.bloom.bloom_serve_jira(
             creation=[
@@ -28,13 +28,13 @@ class IntegrationSyncNowCappedTest(IntegrationSyncNowCappedBase):
                 )
             ]
         )
-        self.bloom.bloom_sync_now(self.tc_setting_id, self.parameters.ADMIN_EMAIL)
-        setting = self.bloom.bloom_get_setting(self.tc_setting_id)
-        self.tc_first_state = (setting.sync_full_scan, setting.sync_scan_from)
-        self.bloom.bloom_sync_now(self.tc_setting_id, self.parameters.OTHER_ADMIN_EMAIL)
-        self.tc_next_creation = [
-            q for q in self.bloom.site.jql if self.parameters.CREATION_MARK in q
-        ][1]
+        self.bloom.bloom_sync_now(self.setting_id, self.parameters.ADMIN_EMAIL)
+        setting = self.bloom.bloom_get_setting(self.setting_id)
+        self.first_state = (setting.sync_full_scan, setting.sync_scan_from)
+        self.bloom.bloom_sync_now(self.setting_id, self.parameters.OTHER_ADMIN_EMAIL)
+        self.next_creation = [q for q in self.bloom.site.jql if self.parameters.CREATION_MARK in q][
+            1
+        ]
 
     def tearDownClass(self):
         super().tearDownClass()

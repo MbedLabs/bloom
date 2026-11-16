@@ -20,11 +20,11 @@ class RouteAuthMatrixBase(BloomTestCase):
         exempt = self.parameters.ROUTE_PUBLIC_ENDPOINTS | self.parameters.ROUTE_SIGNED_WEBHOOKS
         unprotected = [
             f"{route.methods} {route.path} ({route.endpoint})"
-            for route in self.tc_routes
+            for route in self.routes
             if route.endpoint not in exempt
             and route.dependencies.isdisjoint(self.parameters.ROUTE_AUTH_DEPENDENCIES)
         ]
-        self.print_variables({"routes": len(self.tc_routes), "unprotected": unprotected})
+        self.print_variables({"routes": len(self.routes), "unprotected": unprotected})
         self.assertEqual(
             unprotected, [], msg=self.parameters.MSG_ROUTE_BOUNDARY, abort_on_fail=False
         )
@@ -32,7 +32,7 @@ class RouteAuthMatrixBase(BloomTestCase):
     def bud_signed_webhook_allowlist_matches_the_routes(self):
         registered = {
             route.endpoint
-            for route in self.tc_routes
+            for route in self.routes
             if route.endpoint in self.parameters.ROUTE_SIGNED_WEBHOOKS
         }
         self.print_variables({"registered": sorted(registered)})

@@ -21,12 +21,12 @@ class ExternalDocTypesAllowBase(BloomTestCase):
             {
                 "granted": self.parameters.EXTERNAL_GRANTED,
                 "type": self.parameters.EXTERNAL_GRANTED_TYPE,
-                "refusal": self.tc_access.status,
-                "detail": self.tc_access.detail,
+                "refusal": self.access.status,
+                "detail": self.access.detail,
             }
         )
         self.assertEqual(
-            self.tc_access.status,
+            self.access.status,
             self.parameters.EXTERNAL_NOT_REFUSED,
             msg=self.parameters.MSG_EXTERNAL_GRANTED_ALLOWED,
             abort_on_fail=False,

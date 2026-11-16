@@ -17,9 +17,9 @@ class JiraScopedTokenGatewayBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_scoped_token_pulls_through_the_gateway(self):
-        self.print_variables({"created": self.tc_result.created})
+        self.print_variables({"created": self.result.created})
         self.assertEqual(
-            self.tc_result.created, 1, msg=self.parameters.MSG_GATEWAY_CREATED, abort_on_fail=False
+            self.result.created, 1, msg=self.parameters.MSG_GATEWAY_CREATED, abort_on_fail=False
         )
 
     def bud_searches_go_to_the_cloud_gateway(self):

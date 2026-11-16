@@ -29,42 +29,38 @@ class RequirementTextBase(BloomTestCase):
             self._equal(found, expected, self.parameters.MSG_TEXT_DESCRIPTION)
 
     def bud_reqif_import_counts(self):
-        self.print_variables({"counts": self.tc_import_counts})
+        self.print_variables({"counts": self.import_counts})
         self._equal(
-            self.tc_import_counts, self.parameters.REQIF_COUNTS, self.parameters.MSG_REQIF_COUNTS
+            self.import_counts, self.parameters.REQIF_COUNTS, self.parameters.MSG_REQIF_COUNTS
         )
 
     def bud_reqif_text_becomes_the_description(self):
-        self.print_variables({"login": self.tc_imported[1]})
-        self._equal(
-            self.tc_imported[1], self.parameters.REQIF_LOGIN, self.parameters.MSG_REQIF_LOGIN
-        )
+        self.print_variables({"login": self.imported[1]})
+        self._equal(self.imported[1], self.parameters.REQIF_LOGIN, self.parameters.MSG_REQIF_LOGIN)
 
     def bud_reqif_heading_object_is_imported(self):
-        system = self.tc_imported[0]
+        system = self.imported[0]
         found = (system[0], system[1], system[-1])
         self.print_variables({"system": found})
         self._equal(found, self.parameters.REQIF_SYSTEM_SOURCE, self.parameters.MSG_REQIF_SYSTEM)
 
     def bud_reqif_relation_becomes_one_refines_link(self):
-        self.print_variables({"links": self.tc_import_links, "ids": self.tc_import_ids})
-        login_id, system_id = self.tc_import_ids
+        self.print_variables({"links": self.import_links, "ids": self.import_ids})
+        login_id, system_id = self.import_ids
         self._equal(
-            self.tc_import_links,
+            self.import_links,
             [(login_id, system_id, *self.parameters.REQIF_LINK)],
             self.parameters.MSG_REQIF_LINK,
         )
         self._equal(
-            self.tc_legacy_links,
+            self.legacy_links,
             self.parameters.REQIF_NO_REQUIREMENT_LINKS,
             self.parameters.MSG_REQIF_LEGACY,
         )
 
     def bud_copied_requirement_keeps_no_editor_content(self):
-        self.print_variables({"copied": self.tc_copied})
-        self._equal(
-            self.tc_copied, self.parameters.TEXT_COPY_EXPECTED, self.parameters.MSG_TEXT_COPY
-        )
+        self.print_variables({"copied": self.copied})
+        self._equal(self.copied, self.parameters.TEXT_COPY_EXPECTED, self.parameters.MSG_TEXT_COPY)
 
     def _equal(self, actual, expected, message):
         """Assert the actual value equals the expected one."""

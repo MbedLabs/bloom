@@ -47,9 +47,7 @@ class IntegrationSyncGitlabHostsBase(BloomTestCase):
         )
 
     def bud_closed_issues_close_both_defects(self):
-        statuses = [
-            self.bloom.bloom_get_defect(defect_id).status for defect_id in self.tc_defect_ids
-        ]
+        statuses = [self.bloom.bloom_get_defect(defect_id).status for defect_id in self.defect_ids]
         self.print_variables({"defects": statuses})
         self.assertEqual(
             statuses,

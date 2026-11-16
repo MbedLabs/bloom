@@ -17,48 +17,48 @@ class RepeatedRefusalsBase(BloomTestCase):
     interface = BloomPgInterface
 
     def bud_every_forged_request_is_refused_401(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"statuses": sorted(set(self.tc_statuses))})
+        self.print_variables({"statuses": sorted(set(self.statuses))})
         self.assertEqual(
-            self.tc_statuses,
+            self.statuses,
             [self.parameters.STATUS_UNAUTHORIZED] * self.parameters.REFUSAL_REQUESTS,
             msg=self.parameters.MSG_REFUSAL_STATUSES,
             abort_on_fail=False,
         )
 
     def bud_every_refusal_is_recorded_for_the_address(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"denied api.request events": self.tc_denied})
+        self.print_variables({"denied api.request events": self.denied})
         self.assertEqual(
-            self.tc_denied,
+            self.denied,
             self.parameters.REFUSAL_REQUESTS,
             msg=self.parameters.MSG_REFUSAL_RECORDED,
             abort_on_fail=False,
         )
 
     def bud_burst_is_larger_than_the_threshold(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"threshold": self.tc_threshold})
+        self.print_variables({"threshold": self.threshold})
         self.assertGreater(
             self.parameters.REFUSAL_REQUESTS,
-            self.tc_threshold,
+            self.threshold,
             msg=self.parameters.MSG_REFUSAL_OVER_THRESHOLD,
             abort_on_fail=False,
         )
 
     def bud_burst_leaves_one_repeated_refusals_event(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"repeated refusal events": self.tc_detected})
+        self.print_variables({"repeated refusal events": self.detected})
         self.assertEqual(
-            self.tc_detected,
+            self.detected,
             1,
             msg=self.parameters.MSG_REFUSAL_ONE_EVENT,
             abort_on_fail=False,

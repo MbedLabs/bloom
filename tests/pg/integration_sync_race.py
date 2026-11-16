@@ -17,16 +17,16 @@ class IntegrationSyncRaceBase(BloomTestCase):
     interface = BloomPgInterface
 
     def bud_both_runs_searched_before_either_wrote(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"creation searches": len(self.tc_searches)})
+        self.print_variables({"creation searches": len(self.searches)})
         self.assertEqual(
-            len(self.tc_searches), 2, msg=self.parameters.MSG_BOTH_SEARCHED, abort_on_fail=False
+            len(self.searches), 2, msg=self.parameters.MSG_BOTH_SEARCHED, abort_on_fail=False
         )
 
     def bud_one_defect_is_created_for_the_issue(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
         count = self.bloom.bloom_count_defects()

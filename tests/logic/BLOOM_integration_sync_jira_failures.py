@@ -15,19 +15,19 @@ class IntegrationSyncJiraFailuresTest(IntegrationSyncJiraFailuresBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_before = self.parameters.NOW - self.parameters.LAST_SYNC
+        self.before = self.parameters.NOW - self.parameters.LAST_SYNC
         created, updated = self.parameters.PREVIOUS_COUNTS
-        self.tc_project_id = self.bloom.bloom_create_project()
-        self.tc_setting_id = self.bloom.bloom_create_integration(
-            self.tc_project_id,
-            synced_at=self.tc_before,
+        self.project_id = self.bloom.bloom_create_project()
+        self.setting_id = self.bloom.bloom_create_integration(
+            self.project_id,
+            synced_at=self.before,
             sync_created=created,
             sync_updated=updated,
             sync_full_scan=False,
         )
         self.bloom.bloom_refuse_with(self.parameters.STATUS_UNAUTHORIZED)
         self.bloom.bloom_run_sync(self.parameters.NOW)
-        self.tc_refused = self.bloom.bloom_get_setting(self.tc_setting_id)
+        self.refused = self.bloom.bloom_get_setting(self.setting_id)
         self.bloom.bloom_make_unreachable()
         self.bloom.bloom_run_sync(self.parameters.NOW + self.parameters.LATER)
 

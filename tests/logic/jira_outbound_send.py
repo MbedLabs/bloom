@@ -17,9 +17,9 @@ class JiraOutboundSendBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_new_defect_becomes_a_jira_bug(self):
-        sent = self.tc_created[0] if self.tc_created else {}
+        sent = self.created[0] if self.created else {}
         found = ((sent.get("issuetype") or {}).get("name"), sent.get("summary"))
-        self.print_variables({"created issues": len(self.tc_created), "first": found})
+        self.print_variables({"created issues": len(self.created), "first": found})
         self.assertEqual(
             found,
             (self.parameters.BUG, self.parameters.OUTBOUND_SENT_TITLE),
@@ -28,7 +28,7 @@ class JiraOutboundSendBase(BloomTestCase):
         )
 
     def bud_sent_defect_links_to_its_issue(self):
-        defect = self.bloom.bloom_get_defect(self.tc_sent_id)
+        defect = self.bloom.bloom_get_defect(self.sent_id)
         found = (defect.external_tracker, defect.external_issue_number)
         self.print_variables({"tracker, number": found})
         self.assertEqual(
@@ -39,7 +39,7 @@ class JiraOutboundSendBase(BloomTestCase):
         )
 
     def bud_sent_defect_logs_its_issue(self):
-        events = self._events_of(self.tc_sent_id)
+        events = self._events_of(self.sent_id)
         self.print_variables({"events": events})
         self.assertIn(
             self.parameters.OUTBOUND_CREATED_EVENT,
@@ -49,8 +49,8 @@ class JiraOutboundSendBase(BloomTestCase):
         )
 
     def bud_refused_defect_stays_unlinked(self):
-        defect = self.bloom.bloom_get_defect(self.tc_refused_id)
-        events = self._events_of(self.tc_refused_id)
+        defect = self.bloom.bloom_get_defect(self.refused_id)
+        events = self._events_of(self.refused_id)
         found = (defect.external_tracker, self.parameters.OUTBOUND_REFUSED_EVENT in events)
         self.print_variables({"tracker, refusal logged": found, "events": events})
         self.assertEqual(

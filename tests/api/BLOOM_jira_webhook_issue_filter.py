@@ -15,7 +15,7 @@ class JiraWebhookIssueFilterTest(JiraWebhookIssueFilterBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_env = self.bloom.bloom_create_webhook_environment(
+        self.env = self.bloom.bloom_create_webhook_environment(
             jira_project_key=self.parameters.JIRA_PROJECT, create_defects_on_inbound=True
         )
         task, unlabelled, labelled, gone = (
@@ -23,7 +23,7 @@ class JiraWebhookIssueFilterTest(JiraWebhookIssueFilterBase):
         )
         post = self.bloom.bloom_post_jira_webhook
         body = self.bloom.bloom_jira_webhook_body
-        self.tc_task = post(
+        self.task = post(
             body(
                 task,
                 event=self.parameters.ISSUE_CREATED,
@@ -35,8 +35,8 @@ class JiraWebhookIssueFilterTest(JiraWebhookIssueFilterBase):
             ),
             delivery=self.parameters.DELIVERIES[1],
         )
-        self.bloom.bloom_update_setting(self.tc_env.setting_id, jira_label=self.parameters.LABEL)
-        self.tc_unlabelled = post(
+        self.bloom.bloom_update_setting(self.env.setting_id, jira_label=self.parameters.LABEL)
+        self.unlabelled = post(
             body(
                 unlabelled,
                 event=self.parameters.ISSUE_CREATED,
@@ -47,7 +47,7 @@ class JiraWebhookIssueFilterTest(JiraWebhookIssueFilterBase):
             ),
             delivery=self.parameters.DELIVERIES[2],
         )
-        self.tc_labelled = post(
+        self.labelled = post(
             body(
                 labelled,
                 event=self.parameters.ISSUE_CREATED,
@@ -59,7 +59,7 @@ class JiraWebhookIssueFilterTest(JiraWebhookIssueFilterBase):
             ),
             delivery=self.parameters.DELIVERIES[3],
         )
-        self.tc_gone = post(
+        self.gone = post(
             body(
                 gone,
                 event=self.parameters.ISSUE_DELETED,

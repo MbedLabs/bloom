@@ -15,21 +15,21 @@ class DocumentWorkflowConcurrencyTest(DocumentWorkflowConcurrencyBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_postgres = self.bloom.bloom_use_postgres()
-        if not self.tc_postgres:
+        self.postgres = self.bloom.bloom_use_postgres()
+        if not self.postgres:
             return
         self.bloom.bloom_start_main_api()
-        self.tc_user_id = self.bloom.bloom_add_admin(
+        self.user_id = self.bloom.bloom_add_admin(
             self.parameters.WORKFLOW_RACE_EMAIL, self.parameters.API_PASSWORD
         )
         project = self.bloom.bloom_create_project(self.parameters.WORKFLOW_RACE_PREFIX)
         requirement = self.bloom.bloom_add_requirements(
-            project, [self.parameters.WORKFLOW_RACE_REQ_ID], created_by_id=self.tc_user_id
+            project, [self.parameters.WORKFLOW_RACE_REQ_ID], created_by_id=self.user_id
         )[0]
-        self.bloom.bloom_act_as(self.tc_user_id)
-        self.tc_replies = self.bloom.bloom_race_first_workflow_reads(requirement)
-        self.tc_workflows = self.bloom.bloom_list_workflows()
-        self.tc_later = self.bloom.bloom_read_workflow(requirement)
+        self.bloom.bloom_act_as(self.user_id)
+        self.replies = self.bloom.bloom_race_first_workflow_reads(requirement)
+        self.workflows = self.bloom.bloom_list_workflows()
+        self.later = self.bloom.bloom_read_workflow(requirement)
 
     def tearDownClass(self):
         super().tearDownClass()

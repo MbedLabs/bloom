@@ -17,7 +17,7 @@ class ArtefactRichContentBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_schemas_carry_rich_content_fields(self):
-        for schema, fields in self.tc_fields.items():
+        for schema, fields in self.fields.items():
             self.print_variables({"schema": schema, "fields": fields})
             for field in self.parameters.RICH_FIELDS:
                 self.assertIn(
@@ -28,7 +28,7 @@ class ArtefactRichContentBase(BloomTestCase):
                 )
 
     def bud_create_schemas_accept_an_editor_payload(self):
-        for schema, built in self.tc_built.items():
+        for schema, built in self.built.items():
             self.print_variables({"schema": schema, "error": built.error})
             self.assertEqual(
                 built.content_json,

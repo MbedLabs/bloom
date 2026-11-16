@@ -17,31 +17,31 @@ class ArtefactActivityBasicsBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_setup_calls_succeed(self):
-        self.print_variables({"setup": self.tc_setup})
+        self.print_variables({"setup": self.setup})
         self.assertEqual(
-            [found for found, _ in self.tc_setup],
-            [expected for _, expected in self.tc_setup],
+            [found for found, _ in self.setup],
+            [expected for _, expected in self.setup],
             msg=self.parameters.MSG_API_SETUP,
             abort_on_fail=True,
         )
 
     def bud_docs_list_gives_requirement_type_and_origin(self):
-        self.print_variables({"row": self.tc_docs_row})
+        self.print_variables({"row": self.docs_row})
         self.assertEqual(
-            (self.tc_docs_row or {}).get("req_type"),
+            (self.docs_row or {}).get("req_type"),
             self.parameters.REQ_TYPE,
             msg=self.parameters.MSG_DOCS_REQ_METADATA,
             abort_on_fail=False,
         )
         self.assertEqual(
-            (self.tc_docs_row or {}).get("req_origin"),
+            (self.docs_row or {}).get("req_origin"),
             self.parameters.REQ_ORIGIN,
             msg=self.parameters.MSG_DOCS_REQ_METADATA,
             abort_on_fail=False,
         )
 
     def bud_creating_logs_created(self):
-        for kind, events in self.tc_created_events.items():
+        for kind, events in self.created_events.items():
             self.print_variables({"artefact": kind, "events": events})
             self.assertIn(
                 self.parameters.EVENT_CREATED,
@@ -51,10 +51,10 @@ class ArtefactActivityBasicsBase(BloomTestCase):
             )
 
     def bud_editing_a_requirement_logs_updated(self):
-        self.print_variables({"events": self.tc_updated_events})
+        self.print_variables({"events": self.updated_events})
         self.assertIn(
             self.parameters.EVENT_UPDATED,
-            self.tc_updated_events or [],
+            self.updated_events or [],
             msg=self.parameters.MSG_UPDATED_EVENT,
             abort_on_fail=False,
         )

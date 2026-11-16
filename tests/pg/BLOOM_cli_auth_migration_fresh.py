@@ -15,12 +15,12 @@ class CliAuthMigrationFreshTest(CliAuthMigrationFreshBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_postgres = self.bloom.bloom_use_postgres(tables=False)
-        if not self.tc_postgres:
+        self.postgres = self.bloom.bloom_use_postgres(tables=False)
+        if not self.postgres:
             return
-        self.tc_upgrade = self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
-        self.tc_heads = self.bloom.bloom_list_alembic_heads()
-        self.tc_revision = self.bloom.bloom_read_revision()
+        self.upgrade = self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
+        self.heads = self.bloom.bloom_list_alembic_heads()
+        self.revision = self.bloom.bloom_read_revision()
 
     def tearDownClass(self):
         super().tearDownClass()

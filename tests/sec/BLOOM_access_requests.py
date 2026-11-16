@@ -21,57 +21,55 @@ class AccessRequestsTest(AccessRequestsBase):
         events = bloom.bloom_list_audit_events
         bloom.bloom_start_full_api()
         sent = bloom.bloom_capture_access_request_mail()
-        self.tc_admin_id = bloom.bloom_add_admin(values.ARQ_BOSS_EMAIL, password)
+        self.admin_id = bloom.bloom_add_admin(values.ARQ_BOSS_EMAIL, password)
         bloom.bloom_add_admin(values.ARQ_SECOND_EMAIL, password)
-        self.tc_member_id = bloom.bloom_add_account(
+        self.member_id = bloom.bloom_add_account(
             values.ARQ_MEMBER_EMAIL, password, values.API_MEMBER_ROLE
         )
         member, _ = bloom.bloom_log_in(values.ARQ_MEMBER_EMAIL, password)
         admin, _ = bloom.bloom_log_in(values.ARQ_BOSS_EMAIL, password)
 
-        self.tc_first = request(member, kind, values.ARQ_REF, prefix)
-        self.tc_again = request(member, kind, values.ARQ_REF, prefix)
-        self.tc_mails = list(sent)
-        self.tc_requested_events = events(values.ARQ_REQUESTED_ACTION)
+        self.first = request(member, kind, values.ARQ_REF, prefix)
+        self.again = request(member, kind, values.ARQ_REF, prefix)
+        self.mails = list(sent)
+        self.requested_events = events(values.ARQ_REQUESTED_ACTION)
 
-        self.tc_mine_before = bloom.bloom_api_my_access_request(
+        self.mine_before = bloom.bloom_api_my_access_request(
             member, kind, values.ARQ_MINE_REF, prefix
         )
         mine = request(member, kind, values.ARQ_MINE_REF, prefix)
-        self.tc_mine_after = bloom.bloom_api_my_access_request(
+        self.mine_after = bloom.bloom_api_my_access_request(
             member, kind, values.ARQ_MINE_REF, prefix
         )
-        self.tc_unmailed = bloom.bloom_api_request_access_while_mail_fails(
+        self.unmailed = bloom.bloom_api_request_access_while_mail_fails(
             member, kind, values.ARQ_FAILED_MAIL_REF, prefix
         )
-        self.tc_pending_before = [
-            answer.json()["id"] for answer in (self.tc_first, mine, self.tc_unmailed)
-        ]
+        self.pending_before = [answer.json()["id"] for answer in (self.first, mine, self.unmailed)]
 
         decided = request(member, kind, values.ARQ_DECIDED_REF, values.ARQ_DECIDED_PREFIX)
         decided_id = decided.json()["id"]
-        self.tc_listed = bloom.bloom_api_list_access_requests(admin, values.ARQ_DECIDED_PREFIX)
-        self.tc_member_decision = decide(member, decided_id, values.ARQ_GRANTED)
-        self.tc_granted = decide(admin, decided_id, values.ARQ_GRANTED)
-        self.tc_decided_twice = decide(admin, decided_id, values.ARQ_REFUSED)
-        self.tc_granted_events = events(values.ARQ_GRANTED_ACTION)
+        self.listed = bloom.bloom_api_list_access_requests(admin, values.ARQ_DECIDED_PREFIX)
+        self.member_decision = decide(member, decided_id, values.ARQ_GRANTED)
+        self.granted = decide(admin, decided_id, values.ARQ_GRANTED)
+        self.decided_twice = decide(admin, decided_id, values.ARQ_REFUSED)
+        self.granted_events = events(values.ARQ_GRANTED_ACTION)
 
         other_prefix = values.ARQ_OTHER_PREFIX
-        self.tc_refusable = request(member, kind, values.ARQ_REFUSED_REF, other_prefix).json()["id"]
-        self.tc_other = request(member, kind, values.ARQ_PENDING_REF, other_prefix).json()["id"]
-        self.tc_member_list = bloom.bloom_api_list_all_access_requests(member)
-        self.tc_all = bloom.bloom_api_list_all_access_requests(admin)
-        self.tc_refused = decide(admin, self.tc_refusable, values.ARQ_REFUSED)
-        self.tc_pending = bloom.bloom_api_list_all_access_requests(admin)
-        self.tc_history = bloom.bloom_api_list_all_access_requests(admin, values.ARQ_REFUSED)
-        self.tc_refused_twice = decide(admin, self.tc_refusable, values.ARQ_GRANTED)
-        self.tc_refused_events = events(values.ARQ_REFUSED_ACTION)
+        self.refusable = request(member, kind, values.ARQ_REFUSED_REF, other_prefix).json()["id"]
+        self.other = request(member, kind, values.ARQ_PENDING_REF, other_prefix).json()["id"]
+        self.member_list = bloom.bloom_api_list_all_access_requests(member)
+        self.all = bloom.bloom_api_list_all_access_requests(admin)
+        self.refused = decide(admin, self.refusable, values.ARQ_REFUSED)
+        self.pending = bloom.bloom_api_list_all_access_requests(admin)
+        self.history = bloom.bloom_api_list_all_access_requests(admin, values.ARQ_REFUSED)
+        self.refused_twice = decide(admin, self.refusable, values.ARQ_GRANTED)
+        self.refused_events = events(values.ARQ_REFUSED_ACTION)
 
-        self.tc_anonymous = request(None, kind, values.ARQ_REF, prefix)
-        self.tc_invalid = request(member, kind, values.ARQ_INVALID_REF, prefix)
+        self.anonymous = request(None, kind, values.ARQ_REF, prefix)
+        self.invalid = request(member, kind, values.ARQ_INVALID_REF, prefix)
         mails, records = len(sent), len(events(values.ARQ_REQUESTED_ACTION))
-        self.tc_admin_request = request(admin, kind, values.ARQ_ADMIN_REF, prefix)
-        self.tc_admin_silence = (
+        self.admin_request = request(admin, kind, values.ARQ_ADMIN_REF, prefix)
+        self.admin_silence = (
             len(sent) - mails,
             len(events(values.ARQ_REQUESTED_ACTION)) - records,
         )

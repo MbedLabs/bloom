@@ -17,7 +17,7 @@ class ExportsBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_every_pdf_export_is_answered_as_a_pdf(self):
-        for kind, export in zip(self.parameters.EXPORT_PDF_KINDS, self.tc_pdfs):
+        for kind, export in zip(self.parameters.EXPORT_PDF_KINDS, self.pdfs):
             self.print_variables({"kind": kind, "status": export.status})
             self.assertEqual(
                 (export.status, export.content_type, export.is_pdf),
@@ -27,43 +27,43 @@ class ExportsBase(BloomTestCase):
             )
 
     def bud_every_pdf_export_is_recorded(self):
-        self.print_variables({"kinds": self.tc_recorded})
+        self.print_variables({"kinds": self.recorded})
         self.assertEqual(
-            self.tc_recorded,
+            self.recorded,
             self.parameters.EXPORT_AUDIT_KINDS,
             msg=self.parameters.MSG_EXPORT_AUDITED,
             abort_on_fail=False,
         )
 
     def bud_external_exporter_gets_only_the_customer_requirement(self):
-        self.print_variables({"rows": self.tc_requirements.rows})
+        self.print_variables({"rows": self.requirements.rows})
         self.assertEqual(
-            (self.tc_requirements.status, [row["req_id"] for row in self.tc_requirements.rows]),
+            (self.requirements.status, [row["req_id"] for row in self.requirements.rows]),
             (self.parameters.STATUS_OK, [self.parameters.EXPORT_SHOWN_REQ]),
             msg=self.parameters.MSG_EXPORT_REQUIREMENTS,
             abort_on_fail=False,
         )
 
     def bud_external_exporter_gets_only_the_customer_pair(self):
-        self.print_variables({"rows": self.tc_matrix.rows})
+        self.print_variables({"rows": self.matrix.rows})
         self.assertEqual(
-            [(row["req_id"], row["tc_id"]) for row in self.tc_matrix.rows],
+            [(row["req_id"], row["tc_id"]) for row in self.matrix.rows],
             [(self.parameters.EXPORT_SHOWN_REQ, self.parameters.EXPORT_SHOWN_TC)],
             msg=self.parameters.MSG_EXPORT_MATRIX,
             abort_on_fail=False,
         )
 
     def bud_external_exporter_gets_only_the_customer_test_case(self):
-        self.print_variables({"rows": self.tc_tests.rows})
+        self.print_variables({"rows": self.tests.rows})
         self.assertEqual(
-            [row["tc_id"] for row in self.tc_tests.rows],
+            [row["tc_id"] for row in self.tests.rows],
             [self.parameters.EXPORT_SHOWN_TC],
             msg=self.parameters.MSG_EXPORT_TESTS,
             abort_on_fail=False,
         )
 
     def bud_exports_do_not_contain_the_internal_title(self):
-        exports = (self.tc_requirements, self.tc_matrix, self.tc_tests)
+        exports = (self.requirements, self.matrix, self.tests)
         for kind, export in zip(self.parameters.EXPORT_PDF_KINDS, exports):
             self.assertNotIn(
                 self.parameters.EXPORT_HIDDEN_TITLE,
@@ -73,9 +73,9 @@ class ExportsBase(BloomTestCase):
             )
 
     def bud_dossier_is_refused_without_test_case_export_403(self):
-        self.print_variables({"status": self.tc_dossier.status})
+        self.print_variables({"status": self.dossier.status})
         self.assertEqual(
-            self.tc_dossier.status,
+            self.dossier.status,
             self.parameters.STATUS_FORBIDDEN,
             msg=self.parameters.MSG_EXPORT_DOSSIER,
             abort_on_fail=False,

@@ -32,7 +32,7 @@ class DocumentCreateStatusTest(DocumentCreateStatusBase):
                 "POST", path, admin, json={"project_id": project_id, **fields}
             )
 
-        self.tc_page = {
+        self.page = {
             doc_type: create(
                 title=f"{doc_type} from the create page",
                 doc_type=doc_type,
@@ -40,8 +40,8 @@ class DocumentCreateStatusTest(DocumentCreateStatusBase):
             )
             for doc_type in self.parameters.DOC_STATUS_TYPES
         }
-        self.tc_plain = create(**self.parameters.DOC_STATUS_PLAIN)
-        self.tc_refused = {}
+        self.plain = create(**self.parameters.DOC_STATUS_PLAIN)
+        self.refused = {}
         for status in self.parameters.DOC_STATUS_REFUSED:
             created = create(
                 title=f"Specification in {status}",
@@ -50,7 +50,7 @@ class DocumentCreateStatusTest(DocumentCreateStatusBase):
             )
             listed = self.bloom.bloom_api_call("GET", path, admin)
             titles = [item.get("title") for item in (listed.body or {}).get("items", [])]
-            self.tc_refused[status] = (created, listed.status, titles)
+            self.refused[status] = (created, listed.status, titles)
 
     def tearDownClass(self):
         super().tearDownClass()

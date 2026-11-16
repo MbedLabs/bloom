@@ -33,9 +33,9 @@ class TraceabilityExternalVisibilityTest(TraceabilityExternalVisibilityBase):
                 project, tc_id, tc_id, status=status, visibility=visibility
             )
             bloom.bloom_add_artefact_link(project, test_case, internal_requirement)
-        self.tc_matrix = bloom.bloom_api_traceability(reader.headers, project)
-        self.tc_coverage = bloom.bloom_api_coverage_gaps(reader.headers, project)
-        self.tc_impact = bloom.bloom_api_impact(reader.headers, internal_requirement)
+        self.matrix = bloom.bloom_api_traceability(reader.headers, project)
+        self.coverage = bloom.bloom_api_coverage_gaps(reader.headers, project)
+        self.impact = bloom.bloom_api_impact(reader.headers, internal_requirement)
 
     def tearDownClass(self):
         super().tearDownClass()

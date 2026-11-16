@@ -26,22 +26,22 @@ class DefectWebhookSecurityTest(DefectWebhookSecurityBase):
         post = bloom.bloom_post_github_webhook
         body = bloom.bloom_github_issue_body(number, repo)
         oversized = bloom.bloom_oversized_webhook_body()
-        self.tc_unsigned = post(body)
-        self.tc_wrong = post(body, signature=values.HOOK_WRONG_SIGNATURE)
-        self.tc_no_delivery = post(body, signature=bloom.bloom_sign(body))
-        self.tc_oversized = post(
+        self.unsigned = post(body)
+        self.wrong = post(body, signature=values.HOOK_WRONG_SIGNATURE)
+        self.no_delivery = post(body, signature=bloom.bloom_sign(body))
+        self.oversized = post(
             oversized, bloom.bloom_sign(oversized), values.HOOK_OVERSIZED_DELIVERY
         )
-        self.tc_status_after_refusals = bloom.bloom_get_defect(github).status
-        self.tc_successes_after_refusals = [
+        self.status_after_refusals = bloom.bloom_get_defect(github).status
+        self.successes_after_refusals = [
             event.id for event in bloom.bloom_list_defect_events() if event.success
         ]
-        self.tc_valid = post(body, bloom.bloom_sign(body), values.HOOK_DELIVERY)
-        self.tc_status_after_valid = bloom.bloom_get_defect(github).status
-        self.tc_replay = post(body, bloom.bloom_sign(body), values.HOOK_DELIVERY)
-        self.tc_gitlab_unsigned = bloom.bloom_post_gitlab_webhook(values.HOOK_GITLAB_NUMBER, repo)
-        self.tc_gitlab_status = bloom.bloom_get_defect(gitlab).status
-        self.tc_gitlab_valid = bloom.bloom_post_gitlab_webhook(
+        self.valid = post(body, bloom.bloom_sign(body), values.HOOK_DELIVERY)
+        self.status_after_valid = bloom.bloom_get_defect(github).status
+        self.replay = post(body, bloom.bloom_sign(body), values.HOOK_DELIVERY)
+        self.gitlab_unsigned = bloom.bloom_post_gitlab_webhook(values.HOOK_GITLAB_NUMBER, repo)
+        self.gitlab_status = bloom.bloom_get_defect(gitlab).status
+        self.gitlab_valid = bloom.bloom_post_gitlab_webhook(
             values.HOOK_GITLAB_NUMBER, repo, values.WEBHOOK_SECRET, values.HOOK_GITLAB_DELIVERY
         )
 

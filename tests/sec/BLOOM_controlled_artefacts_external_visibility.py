@@ -19,13 +19,13 @@ class ControlledArtefactsExternalVisibilityTest(ControlledArtefactsExternalVisib
         super().setUpClass()
         bloom = self.bloom
         reader = bloom.bloom_create_external_reader_environment(doc_types=None)
-        self.tc_pairs = [
+        self.pairs = [
             bloom.bloom_add_controlled_pair(reader.project_id, kind, code)
             for kind, _, _, code in self.parameters.CONTROLLED_KINDS
         ]
-        self.tc_seen = [
+        self.seen = [
             bloom.bloom_api_probe_controlled(reader.headers, reader.project_id, path, pair)
-            for (_, path, _, _), pair in zip(self.parameters.CONTROLLED_KINDS, self.tc_pairs)
+            for (_, path, _, _), pair in zip(self.parameters.CONTROLLED_KINDS, self.pairs)
         ]
 
     def tearDownClass(self):

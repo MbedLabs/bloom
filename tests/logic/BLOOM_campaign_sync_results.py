@@ -15,13 +15,13 @@ class CampaignSyncResultsTest(CampaignSyncResultsBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_latest = self.bloom.bloom_apply_test_result(
+        self.latest = self.bloom.bloom_apply_test_result(
             self.parameters.SYNC_RESULT_EMPTY_CASE, self.parameters.SYNC_RESULT_FAILED
         )
-        self.tc_older = self.bloom.bloom_apply_test_result(
+        self.older = self.bloom.bloom_apply_test_result(
             self.parameters.SYNC_RESULT_NEWER_CASE, self.parameters.SYNC_RESULT_OLDER
         )
-        self.tc_too_many = self.bloom.bloom_build_sync_request(
+        self.too_many = self.bloom.bloom_build_sync_request(
             self.parameters.SYNC_RESULT_TC_ID,
             self.parameters.SYNC_RESULT_STATUS,
             self.parameters.SYNC_RESULT_TOO_MANY,

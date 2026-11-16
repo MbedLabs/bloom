@@ -17,29 +17,29 @@ class IntegrationSyncJiraFailuresBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_refused_account_is_the_run_error(self):
-        self.print_variables({"error": self.tc_refused.sync_error})
+        self.print_variables({"error": self.refused.sync_error})
         self.assertTrue(
-            (self.tc_refused.sync_error or "").startswith(self.parameters.JIRA_REFUSED_ACCOUNT),
+            (self.refused.sync_error or "").startswith(self.parameters.JIRA_REFUSED_ACCOUNT),
             msg=self.parameters.MSG_REFUSED_ACCOUNT,
             abort_on_fail=False,
         )
 
     def bud_refused_run_keeps_the_last_success_and_counts(self):
         found = (
-            self.tc_refused.synced_at,
-            self.tc_refused.sync_created,
-            self.tc_refused.sync_updated,
+            self.refused.synced_at,
+            self.refused.sync_created,
+            self.refused.sync_updated,
         )
         self.print_variables({"synced at, created, updated": found})
         self.assertEqual(
             found,
-            (self.tc_before, *self.parameters.PREVIOUS_COUNTS),
+            (self.before, *self.parameters.PREVIOUS_COUNTS),
             msg=self.parameters.MSG_LAST_SUCCESS_KEPT,
             abort_on_fail=False,
         )
 
     def bud_unreachable_jira_is_the_run_error(self):
-        setting = self.bloom.bloom_get_setting(self.tc_setting_id)
+        setting = self.bloom.bloom_get_setting(self.setting_id)
         self.print_variables({"error": setting.sync_error})
         self.assertTrue(
             (setting.sync_error or "").startswith(self.parameters.JIRA_UNREACHABLE),
@@ -48,11 +48,11 @@ class IntegrationSyncJiraFailuresBase(BloomTestCase):
         )
 
     def bud_unreachable_run_keeps_the_last_success_and_scan_state(self):
-        setting = self.bloom.bloom_get_setting(self.tc_setting_id)
+        setting = self.bloom.bloom_get_setting(self.setting_id)
         self.print_variables({"synced at": setting.synced_at, "full scan": setting.sync_full_scan})
         self.assertEqual(
             (setting.synced_at, setting.sync_full_scan),
-            (self.tc_before, False),
+            (self.before, False),
             msg=self.parameters.MSG_UNREACHABLE_KEEPS,
             abort_on_fail=False,
         )

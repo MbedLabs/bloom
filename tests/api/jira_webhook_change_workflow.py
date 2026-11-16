@@ -21,7 +21,7 @@ class JiraWebhookChangeWorkflowBase(BloomTestCase):
 
     @parameterized(params.CHANGE_WORKFLOW_CASES)
     def bud_closure_outside_the_workflow_is_refused(self, index):
-        response, status = self.tc_results[index]
+        response, status = self.results[index]
         expected = self.parameters.CHANGE_WORKFLOW_STATUSES[index]
         self.print_variables(
             {"workflow status": expected, "answer": response.status_code, "status after": status}

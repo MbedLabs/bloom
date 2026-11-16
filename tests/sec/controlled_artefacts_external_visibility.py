@@ -18,7 +18,7 @@ class ControlledArtefactsExternalVisibilityBase(BloomTestCase):
 
     def bud_lists_hold_only_the_customer_artefact(self):
         for (kind, _, field, _), pair, seen in zip(
-            self.parameters.CONTROLLED_KINDS, self.tc_pairs, self.tc_seen
+            self.parameters.CONTROLLED_KINDS, self.pairs, self.seen
         ):
             self.print_variables({"kind": kind, "listed": seen.listed.body})
             self.assertEqual(
@@ -30,7 +30,7 @@ class ControlledArtefactsExternalVisibilityBase(BloomTestCase):
 
     def bud_internal_artefacts_are_hidden_404(self):
         for (kind, _, field, _), pair, seen in zip(
-            self.parameters.CONTROLLED_KINDS, self.tc_pairs, self.tc_seen
+            self.parameters.CONTROLLED_KINDS, self.pairs, self.seen
         ):
             self.assertEqual(
                 seen.hidden.status,
@@ -41,7 +41,7 @@ class ControlledArtefactsExternalVisibilityBase(BloomTestCase):
 
     def bud_customer_artefacts_open_with_their_id_and_visibility(self):
         for (kind, _, field, _), pair, seen in zip(
-            self.parameters.CONTROLLED_KINDS, self.tc_pairs, self.tc_seen
+            self.parameters.CONTROLLED_KINDS, self.pairs, self.seen
         ):
             self.assertEqual(
                 (seen.visible.status, seen.visible.body[field], seen.visible.body["visibility"]),

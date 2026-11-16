@@ -36,18 +36,18 @@ class BaselineReadOwnerTest(BaselineReadOwnerBase):
         made_owner = self.bloom.bloom_api_add_project_member(
             admin, project.json()["id"], user.json()["id"], [], owner=True
         )
-        self.tc_baseline_id = baseline.json()["id"]
-        self.tc_reads = {}
+        self.baseline_id = baseline.json()["id"]
+        self.reads = {}
         for actor, headers in (("admin", admin), ("owner", owner)):
             listed, detail = self.bloom.bloom_api_read_baselines(
-                headers, project.json()["id"], self.tc_baseline_id
+                headers, project.json()["id"], self.baseline_id
             )
-            self.tc_reads[actor] = (
+            self.reads[actor] = (
                 [listed.status_code, detail.status_code],
-                self.tc_baseline_id in [item["id"] for item in listed.json()],
+                self.baseline_id in [item["id"] for item in listed.json()],
                 detail.json().get("id"),
             )
-        self.tc_setup = [
+        self.setup = [
             (project.status_code, self.parameters.STATUS_CREATED),
             (baseline.status_code, self.parameters.STATUS_CREATED),
             (user.status_code, self.parameters.STATUS_CREATED),

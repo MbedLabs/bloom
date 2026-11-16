@@ -17,16 +17,16 @@ class TraceabilityExternalVisibilityBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_external_reader_gets_only_the_customer_pair(self):
-        self.print_variables({"status": self.tc_matrix.status, "body": self.tc_matrix.body})
+        self.print_variables({"status": self.matrix.status, "body": self.matrix.body})
         self.assertEqual(
             (
-                self.tc_matrix.status,
+                self.matrix.status,
                 [
                     (
                         item["requirement"]["req_id"],
                         [tc["tc_id"] for tc in item["linked_test_cases"]],
                     )
-                    for item in self.tc_matrix.body["items"]
+                    for item in self.matrix.body["items"]
                 ],
             ),
             (
@@ -38,12 +38,12 @@ class TraceabilityExternalVisibilityBase(BloomTestCase):
         )
 
     def bud_coverage_counts_only_the_customer_requirement(self):
-        self.print_variables({"status": self.tc_coverage.status, "body": self.tc_coverage.body})
+        self.print_variables({"status": self.coverage.status, "body": self.coverage.body})
         self.assertEqual(
             (
-                self.tc_coverage.status,
+                self.coverage.status,
                 tuple(
-                    self.tc_coverage.body[key]
+                    self.coverage.body[key]
                     for key in ("total_requirements", "covered", "uncovered")
                 ),
             ),
@@ -53,9 +53,9 @@ class TraceabilityExternalVisibilityBase(BloomTestCase):
         )
 
     def bud_impact_of_an_internal_requirement_is_hidden_404(self):
-        self.print_variables({"status": self.tc_impact.status, "body": self.tc_impact.body})
+        self.print_variables({"status": self.impact.status, "body": self.impact.body})
         self.assertEqual(
-            self.tc_impact.status,
+            self.impact.status,
             self.parameters.STATUS_NOT_FOUND,
             msg=self.parameters.MSG_READER_IMPACT_HIDDEN,
             abort_on_fail=False,

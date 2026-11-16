@@ -26,8 +26,8 @@ class ProjectVariablesExternalAccessTest(ProjectVariablesExternalAccessBase):
             reader.project_id, values.READER_VARIABLE_KEY, values.READER_VARIABLE_VALUE
         )
         headers, _ = bloom.bloom_log_in(email, password)
-        self.tc_refused = bloom.bloom_api_list_variables(reader.headers, reader.project_id)
-        self.tc_listed = bloom.bloom_api_list_variables(headers, reader.project_id)
+        self.refused = bloom.bloom_api_list_variables(reader.headers, reader.project_id)
+        self.listed = bloom.bloom_api_list_variables(headers, reader.project_id)
 
     def tearDownClass(self):
         super().tearDownClass()

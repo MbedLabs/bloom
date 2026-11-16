@@ -33,7 +33,7 @@ class ArtefactActivityBasicsTest(ArtefactActivityBasicsBase):
         listed = self.bloom.bloom_api_list_docs(
             admin, self.parameters.ACTIVITY_PREFIX, self.parameters.DOCS_TYPE_FILTER
         )
-        self.tc_docs_row = next(
+        self.docs_row = next(
             (
                 row
                 for row in listed.json().get("items", [])
@@ -45,7 +45,7 @@ class ArtefactActivityBasicsTest(ArtefactActivityBasicsBase):
         document = self.bloom.bloom_api_create_artefact(
             admin, self.parameters.DOCUMENT_KIND, project_id, self.parameters.ARTEFACT_TITLE
         )
-        self.tc_created_events = {
+        self.created_events = {
             self.parameters.REQUIREMENT_KIND: self.bloom.bloom_api_activity_types(
                 admin, self.parameters.REQUIREMENT_KIND, typed.json()["id"]
             ),
@@ -59,10 +59,10 @@ class ArtefactActivityBasicsTest(ArtefactActivityBasicsBase):
             typed.json()["id"],
             {"title": self.parameters.RENAMED_TITLE},
         )
-        self.tc_updated_events = self.bloom.bloom_api_activity_types(
+        self.updated_events = self.bloom.bloom_api_activity_types(
             admin, self.parameters.REQUIREMENT_KIND, typed.json()["id"]
         )
-        self.tc_setup = [
+        self.setup = [
             (project.status_code, self.parameters.STATUS_CREATED),
             (typed.status_code, self.parameters.STATUS_CREATED),
             (listed.status_code, self.parameters.STATUS_OK),

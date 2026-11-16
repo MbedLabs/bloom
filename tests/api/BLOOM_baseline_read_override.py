@@ -45,13 +45,13 @@ class BaselineReadOverrideTest(BaselineReadOverrideBase):
         )
         joined = self.bloom.bloom_api_add_group_member(admin, group.json()["id"], user.json()["id"])
         admitted = self.bloom.bloom_api_admit_group(admin, group.json()["id"], project.json()["id"])
-        self.tc_project_id = project.json()["id"]
-        self.tc_baseline_id = baseline.json()["id"]
-        self.tc_baseline_policy_id = baseline_read.json()["id"]
-        self.tc_admitted = [
+        self.project_id = project.json()["id"]
+        self.baseline_id = baseline.json()["id"]
+        self.baseline_policy_id = baseline_read.json()["id"]
+        self.admitted = [
             answer.status_code
             for answer in self.bloom.bloom_api_read_baselines(
-                member, self.tc_project_id, self.tc_baseline_id
+                member, self.project_id, self.baseline_id
             )
         ]
 
@@ -62,39 +62,39 @@ class BaselineReadOverrideTest(BaselineReadOverrideBase):
             self.parameters.REQUIREMENT_TYPES,
         )
         replacement = self.bloom.bloom_api_add_project_member(
-            admin, self.tc_project_id, user.json()["id"], [requirements_read.json()["id"]]
+            admin, self.project_id, user.json()["id"], [requirements_read.json()["id"]]
         )
-        self.tc_overridden = [
+        self.overridden = [
             answer.status_code
             for answer in self.bloom.bloom_api_read_baselines(
-                member, self.tc_project_id, self.tc_baseline_id
+                member, self.project_id, self.baseline_id
             )
         ]
 
         allowed = self.bloom.bloom_api_update_project_member(
             admin,
-            self.tc_project_id,
+            self.project_id,
             replacement.json()["id"],
-            [requirements_read.json()["id"], self.tc_baseline_policy_id],
+            [requirements_read.json()["id"], self.baseline_policy_id],
         )
         listed, detail = self.bloom.bloom_api_read_baselines(
-            member, self.tc_project_id, self.tc_baseline_id
+            member, self.project_id, self.baseline_id
         )
-        self.tc_allowed = (
+        self.allowed = (
             [listed.status_code, detail.status_code],
-            self.tc_baseline_id in [item["id"] for item in listed.json()],
+            self.baseline_id in [item["id"] for item in listed.json()],
             detail.json().get("id"),
         )
-        self.tc_other = [
+        self.other = [
             answer.status_code
             for answer in self.bloom.bloom_api_read_baselines(
                 member, other.json()["id"], other_baseline.json()["id"]
             )
         ]
-        self.tc_group_policies = self.bloom.bloom_api_get_group(admin, group.json()["id"]).json()[
+        self.group_policies = self.bloom.bloom_api_get_group(admin, group.json()["id"]).json()[
             "policy_ids"
         ]
-        self.tc_setup = [
+        self.setup = [
             (project.status_code, self.parameters.STATUS_CREATED),
             (other.status_code, self.parameters.STATUS_CREATED),
             (baseline.status_code, self.parameters.STATUS_CREATED),

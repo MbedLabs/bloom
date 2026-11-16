@@ -27,8 +27,8 @@ class CreateIdsTest(CreateIdsBase):
             .json()
             .get("id")
         )
-        self.tc_pattern = self.bloom.bloom_doc_id_pattern()
-        self.tc_created = {}
+        self.pattern = self.bloom.bloom_doc_id_pattern()
+        self.created = {}
         for path, payload, id_field, type_code in self.parameters.CREATE_ID_CASES:
             answer = self.bloom.bloom_api_call(
                 "POST",
@@ -36,7 +36,7 @@ class CreateIdsTest(CreateIdsBase):
                 admin,
                 json={"project_id": project_id, **payload},
             )
-            self.tc_created[type_code] = SimpleNamespace(
+            self.created[type_code] = SimpleNamespace(
                 status=answer.status, public_id=(answer.body or {}).get(id_field)
             )
 

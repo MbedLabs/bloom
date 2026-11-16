@@ -17,35 +17,35 @@ class GroupBulkMembersBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_bulk_members_persist_without_changing_the_group(self):
-        group = self.tc_persist.group or {}
+        group = self.persist.group or {}
         members = sorted(member["user_id"] for member in group.get("members", []))
-        self.print_variables({"added": self.tc_persist.added, "members": members, "group": group})
+        self.print_variables({"added": self.persist.added, "members": members, "group": group})
         self._equal(
-            self.tc_persist.added, self.parameters.STATUS_CREATED, self.parameters.MSG_BULK_ADDED
+            self.persist.added, self.parameters.STATUS_CREATED, self.parameters.MSG_BULK_ADDED
         )
-        self._equal(members, sorted(self.tc_persist.ids), self.parameters.MSG_BULK_MEMBERS)
+        self._equal(members, sorted(self.persist.ids), self.parameters.MSG_BULK_MEMBERS)
         self._equal(
-            group.get("policy_ids"), [self.tc_persist.policy_id], self.parameters.MSG_BULK_POLICIES
+            group.get("policy_ids"), [self.persist.policy_id], self.parameters.MSG_BULK_POLICIES
         )
         self._equal(
             group.get("grants"), self.parameters.BULK_NO_GRANTS, self.parameters.MSG_BULK_GRANTS
         )
 
     def bud_unknown_user_adds_nobody(self):
-        self.print_variables({"answer": self.tc_unknown.status, "members": self.tc_unknown.members})
+        self.print_variables({"answer": self.unknown.status, "members": self.unknown.members})
         self._equal(
-            self.tc_unknown.status,
+            self.unknown.status,
             self.parameters.STATUS_NOT_FOUND,
             self.parameters.MSG_BULK_UNKNOWN,
         )
         self._equal(
-            self.tc_unknown.members,
+            self.unknown.members,
             self.parameters.BULK_NO_MEMBERS,
             self.parameters.MSG_BULK_NONE_ADDED,
         )
 
     def bud_invalid_selections_are_refused(self):
-        for selection, outcome in self.tc_invalid:
+        for selection, outcome in self.invalid:
             self.print_variables(
                 {"selection": selection, "answer": outcome.status, "members": outcome.members}
             )
@@ -61,7 +61,7 @@ class GroupBulkMembersBase(BloomTestCase):
             )
 
     def bud_existing_member_is_kept_and_single_duplicate_conflicts(self):
-        outcome = self.tc_existing
+        outcome = self.existing
         self.print_variables(vars(outcome))
         self._equal(outcome.single, self.parameters.STATUS_CREATED, self.parameters.MSG_BULK_SINGLE)
         self._equal(outcome.bulk, self.parameters.STATUS_CREATED, self.parameters.MSG_BULK_RETAINED)
@@ -74,16 +74,14 @@ class GroupBulkMembersBase(BloomTestCase):
         )
 
     def bud_bulk_membership_needs_an_administrator(self):
-        self.print_variables(
-            {"answer": self.tc_maintainer.status, "members": self.tc_maintainer.members}
-        )
+        self.print_variables({"answer": self.maintainer.status, "members": self.maintainer.members})
         self._equal(
-            self.tc_maintainer.status,
+            self.maintainer.status,
             self.parameters.STATUS_FORBIDDEN,
             self.parameters.MSG_BULK_ADMIN_ONLY,
         )
         self._equal(
-            self.tc_maintainer.members,
+            self.maintainer.members,
             self.parameters.BULK_NO_MEMBERS,
             self.parameters.MSG_BULK_NONE_ADDED,
         )

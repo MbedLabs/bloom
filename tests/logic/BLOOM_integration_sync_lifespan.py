@@ -15,7 +15,7 @@ class IntegrationSyncLifespanTest(IntegrationSyncLifespanBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_starts = [
+        self.starts = [
             self.bloom.bloom_count_lifespan_starts(minutes)
             for minutes, _ in self.parameters.LIFESPAN_SWITCHES
         ]

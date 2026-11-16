@@ -17,22 +17,22 @@ class IntegrationSyncSettingsLeftAloneTest(IntegrationSyncSettingsLeftAloneBase)
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_recent_id = self.bloom.bloom_create_integration(
+        self.recent_id = self.bloom.bloom_create_integration(
             self.bloom.bloom_create_project(f"{self.parameters.SYNC_PROJECT_PREFIX}R"),
             sync_checked_at=self.parameters.NOW - self.parameters.RECENT_CHECK,
         )
-        self.tc_disabled_id = self.bloom.bloom_create_integration(
+        self.disabled_id = self.bloom.bloom_create_integration(
             self.bloom.bloom_create_project(f"{self.parameters.SYNC_PROJECT_PREFIX}D"),
             enabled=False,
             jira_project_key=self.parameters.JIRA_OTHER_PROJECT,
         )
-        self.tc_tokenless_id = self.bloom.bloom_create_integration(
+        self.tokenless_id = self.bloom.bloom_create_integration(
             self.bloom.bloom_create_project(f"{self.parameters.SYNC_PROJECT_PREFIX}T"),
             "github",
             token_encrypted=None,
         )
         self.bloom.bloom_refuse_with(self.parameters.STATUS_SERVER_ERROR)
-        self.tc_synced = self.bloom.bloom_run_sync(self.parameters.NOW)
+        self.synced = self.bloom.bloom_run_sync(self.parameters.NOW)
 
     def tearDownClass(self):
         super().tearDownClass()

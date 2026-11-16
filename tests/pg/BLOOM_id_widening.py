@@ -18,18 +18,18 @@ class IdWideningTest(IdWideningBase):
         at_boundary, below, other_type = self.parameters.WIDENING_PREFIXES
         project = self.bloom.bloom_create_project(at_boundary)
         self.bloom.bloom_add_requirements(project, self.parameters.WIDENING_AT_BOUNDARY)
-        self.tc_next_at_boundary = self.bloom.bloom_next_requirement_id(project, at_boundary)
-        self.tc_stored_at_boundary = self.bloom.bloom_list_requirement_ids(project)
+        self.next_at_boundary = self.bloom.bloom_next_requirement_id(project, at_boundary)
+        self.stored_at_boundary = self.bloom.bloom_list_requirement_ids(project)
         project = self.bloom.bloom_create_project(below)
         self.bloom.bloom_add_requirements(project, self.parameters.WIDENING_BELOW)
-        self.tc_next_below = self.bloom.bloom_next_requirement_id(project, below)
-        self.tc_stored_below = self.bloom.bloom_list_requirement_ids(project)
+        self.next_below = self.bloom.bloom_next_requirement_id(project, below)
+        self.stored_below = self.bloom.bloom_list_requirement_ids(project)
         project = self.bloom.bloom_create_project(other_type)
         self.bloom.bloom_add_requirements(project, self.parameters.WIDENING_OTHER_TYPE)
         test_case = self.parameters.WIDENING_TEST_CASE
         self.bloom.bloom_add_test_case(project, test_case, test_case)
         self.bloom.bloom_next_requirement_id(project, other_type)
-        self.tc_test_case_ids = self.bloom.bloom_list_test_case_ids()
+        self.test_case_ids = self.bloom.bloom_list_test_case_ids()
 
     def tearDownClass(self):
         super().tearDownClass()

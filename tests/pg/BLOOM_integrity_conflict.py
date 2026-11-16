@@ -15,12 +15,12 @@ class IntegrityConflictTest(IntegrityConflictBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_postgres = self.bloom.bloom_use_postgres()
-        if not self.tc_postgres:
+        self.postgres = self.bloom.bloom_use_postgres()
+        if not self.postgres:
             return
         self.bloom.bloom_start_main_api()
         self.bloom.bloom_add_conflicting_route()
-        self.tc_answer = self.bloom.bloom_api_post(self.parameters.CONFLICT_PATH)
+        self.answer = self.bloom.bloom_api_post(self.parameters.CONFLICT_PATH)
 
     def tearDownClass(self):
         super().tearDownClass()

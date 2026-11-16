@@ -27,21 +27,21 @@ class ExportsTest(ExportsBase):
             project, values.EXPORT_AUTHOR_EMAIL, values.EXPORT_AUTHOR_PERMISSIONS
         )
         admin, _ = bloom.bloom_log_in(values.EXPORT_ADMIN_EMAIL, password)
-        self.tc_pdfs = [
+        self.pdfs = [
             bloom.bloom_api_export(admin, project, kind, pdf=True)
             for kind in values.EXPORT_PDF_KINDS
         ]
-        self.tc_recorded = sorted(
+        self.recorded = sorted(
             details["kind"]
             for details in bloom.bloom_list_audit_details(values.EXPORT_AUDIT_ACTION)
         )
         reader, _ = bloom.bloom_log_in(values.EXPORT_READER_EMAIL, password)
         requirements, matrix, tests = values.EXPORT_PDF_KINDS[:3]
-        self.tc_requirements = bloom.bloom_api_export(reader, project, requirements)
-        self.tc_matrix = bloom.bloom_api_export(reader, project, matrix)
-        self.tc_tests = bloom.bloom_api_export(reader, project, tests)
+        self.requirements = bloom.bloom_api_export(reader, project, requirements)
+        self.matrix = bloom.bloom_api_export(reader, project, matrix)
+        self.tests = bloom.bloom_api_export(reader, project, tests)
         author, _ = bloom.bloom_log_in(values.EXPORT_AUTHOR_EMAIL, password)
-        self.tc_dossier = bloom.bloom_api_export(author, project, values.EXPORT_DOSSIER)
+        self.dossier = bloom.bloom_api_export(author, project, values.EXPORT_DOSSIER)
 
     def tearDownClass(self):
         super().tearDownClass()

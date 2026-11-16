@@ -15,7 +15,7 @@ class JiraWebhookSpoofedEventsTest(JiraWebhookSpoofedEventsBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_env = self.bloom.bloom_create_webhook_environment()
+        self.env = self.bloom.bloom_create_webhook_environment()
         for number, delivery in (
             (self.parameters.LINKED_NUMBER, self.parameters.DELIVERIES[8]),
             (self.parameters.CHANGE_NUMBER, self.parameters.DELIVERIES[9]),

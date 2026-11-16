@@ -20,19 +20,19 @@ class AccessTokenFormatBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_standard_hs256_token_signs_in(self):
-        self.print_variables({"user": self.tc_user_id, "answer": self.tc_standard})
+        self.print_variables({"user": self.user_id, "answer": self.standard})
         self.assertEqual(
-            self.tc_standard,
-            (self.tc_user_id, None),
+            self.standard,
+            (self.user_id, None),
             msg=self.parameters.MSG_TOKEN_STANDARD,
             abort_on_fail=False,
         )
 
     def bud_issued_token_signs_in(self):
-        self.print_variables({"user": self.tc_user_id, "answer": self.tc_issued})
+        self.print_variables({"user": self.user_id, "answer": self.issued})
         self.assertEqual(
-            self.tc_issued,
-            (self.tc_user_id, None),
+            self.issued,
+            (self.user_id, None),
             msg=self.parameters.MSG_TOKEN_ISSUED,
             abort_on_fail=False,
         )
@@ -40,7 +40,7 @@ class AccessTokenFormatBase(BloomTestCase):
     @parameterized(params.TOKEN_REFUSAL_CASES)
     def bud_expired_or_other_algorithm_is_refused(self, index):
         algorithm, minutes = self.parameters.TOKEN_REFUSALS[index]
-        answer = self.tc_refusals[index]
+        answer = self.refusals[index]
         self.print_variables({"algorithm": algorithm, "minutes": minutes, "answer": answer})
         self.assertEqual(
             answer,

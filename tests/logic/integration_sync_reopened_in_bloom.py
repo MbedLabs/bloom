@@ -17,7 +17,7 @@ class IntegrationSyncReopenedInBloomBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_defect_reopened_in_bloom_stays_open(self):
-        status = self.bloom.bloom_get_defect(self.tc_defect_id).status
+        status = self.bloom.bloom_get_defect(self.defect_id).status
         self.print_variables({"defect": status})
         self.assertEqual(
             status,

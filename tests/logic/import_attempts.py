@@ -17,16 +17,16 @@ class ImportAttemptsBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_one_active_import_per_project(self):
-        self.print_variables({"first": vars(self.tc_first), "second": vars(self.tc_second)})
+        self.print_variables({"first": vars(self.first), "second": vars(self.second)})
         self.assertTrue(
-            self.tc_first.id is not None,
+            self.first.id is not None,
             msg=self.parameters.MSG_IMPORT_FIRST,
             expected="an attempt id",
-            actual=self.tc_first.status,
+            actual=self.first.status,
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_second.status,
+            self.second.status,
             self.parameters.STATUS_TOO_MANY,
             msg=self.parameters.MSG_IMPORT_ACTIVE,
             abort_on_fail=False,
@@ -35,29 +35,29 @@ class ImportAttemptsBase(BloomTestCase):
     def bud_import_starts_are_limited_per_user(self):
         self.print_variables(
             {
-                "allowed": [vars(start) for start in self.tc_allowed],
-                "past the limit": vars(self.tc_limited),
-                "recorded": self.tc_recorded,
+                "allowed": [vars(start) for start in self.allowed],
+                "past the limit": vars(self.limited),
+                "recorded": self.recorded,
             }
         )
-        for start in self.tc_allowed:
+        for start in self.allowed:
             self.assertEqual(
                 start.status, None, msg=self.parameters.MSG_IMPORT_STARTS, abort_on_fail=False
             )
         self.assertEqual(
-            self.tc_limited.status,
+            self.limited.status,
             self.parameters.STATUS_TOO_MANY,
             msg=self.parameters.MSG_IMPORT_LIMITED,
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_limited.retry_after,
+            self.limited.retry_after,
             self.parameters.IMPORT_RETRY_SECONDS,
             msg=self.parameters.MSG_IMPORT_RETRY,
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_recorded,
+            self.recorded,
             self.parameters.IMPORT_STARTS_ALLOWED,
             msg=self.parameters.MSG_IMPORT_COUNT,
             abort_on_fail=False,
