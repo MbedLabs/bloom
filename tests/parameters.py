@@ -546,6 +546,83 @@ MSG_LEGACY_REQUIREMENTS = "the upgrade leaves every requirement status as it was
 MSG_LEGACY_CHANGE = "the upgrade leaves the change request status as it was"
 MSG_LEGACY_BASELINE = "the upgrade leaves the baseline snapshot as it was"
 MSG_LEGACY_NO_WORKFLOWS = "the upgrade creates no workflow, revision or request"
+OVERLAP_BEFORE = "8134a1512496"
+OVERLAP_PREFIX = _letters(string.ascii_uppercase, 3, 3)
+OVERLAP_PEOPLE = [
+    f"{_letters(string.ascii_lowercase, 5, 8)}{index}@example.com" for index in range(4)
+]
+OVERLAP_BUNDLE = "Developers"
+OVERLAP_SECOND_BUNDLE = "Testers"
+OVERLAP_POLICY = "Read Customer"
+OVERLAP_KEPT = ("entries", "policies", "roles")
+OVERLAP_REFUSAL = "overlapping project groups"
+MSG_OVERLAP_KEPT = "the upgrade keeps every access entry, entry policy and account role"
+MSG_OVERLAP_STORED = "a second group for a person who holds one in the project is stored"
+MSG_OVERLAP_DUPLICATE = "the same group for the same person a second time is refused"
+MSG_OVERLAP_PLAIN = "a second entry without a group for a person is refused"
+MSG_OVERLAP_REFUSED = "the downgrade is refused while a person holds two groups in a project"
+MSG_OVERLAP_REFUSAL_TEXT = "the refusal names the overlapping project groups"
+MSG_OVERLAP_UNCHANGED = "the refused downgrade changes no row, index or revision"
+MSG_OVERLAP_DOWNGRADED = "after the downgrade the database is as it was before the upgrade"
+MSG_OVERLAP_UPGRADED_AGAIN = "after the second upgrade the database is as it was after the first"
+MSG_MIGRATION_HEAD_AGAIN = "the migrations reach head a second time"
+VISIONS_BEFORE = "d1f6b8a3e572"
+VISIONS_PREFIX = "PRJ"
+VISIONS_DOC_ID = "PRJ-VIS-001"
+VISIONS_POLICY = "Visions"
+VISIONS_KIND = "VIS"
+VISIONS_SPEC_KIND = "SPEC"
+VISIONS_SPEC_POLICY = "Specifications"
+VISIONS_RELEASED_SET = (
+    "Requirements",
+    "Specifications",
+    "Standards",
+    "Designs",
+    "Risks",
+    "Change Requests",
+    "Concepts",
+    "Test Cases",
+    "Suites",
+    "Campaigns",
+    "Defects",
+    "Protocols",
+    "Reports",
+    "Baselines",
+    "Parameters",
+    "Traceability",
+    "Project Management",
+)
+VISIONS_COVERED = (
+    "Read Internal",
+    "Read Customer",
+    "Review Internal",
+    "Review Customer",
+    "Application Administration",
+)
+VISIONS_HOLDERS = {
+    "released": f"{_letters(string.ascii_lowercase, 5, 8)}@example.com",
+    "spec_only": f"{_letters(string.ascii_lowercase, 5, 8)}@example.com",
+}
+VISIONS_GROUP = "Spec Writers"
+VISIONS_OWNERS = "Product Owners"
+VISIONS_EDITABLE = "Hand made"
+VISIONS_UNTOUCHED = ("spec_only", "group", "editable", "group_row")
+VISIONS_DEFAULT = [("document", True)]
+VISIONS_REFUSAL = "Cannot downgrade below 637f976e78e0"
+MSG_VISIONS_ABSENT = "before the upgrade no Visions policy exists"
+MSG_VISIONS_RELEASED = "the entry holding the released maintainer set gains Visions"
+MSG_VISIONS_OWNERS = "the Product Owners group gains Visions"
+MSG_VISIONS_UNTOUCHED = (
+    "the Specifications-only entry, its group and the hand-made policy are as before"
+)
+MSG_VISIONS_DEFAULT = "Visions is one default document policy"
+MSG_VISIONS_COVERED = "the five read, review and administration policies are the ones extended"
+MSG_VISIONS_AS_SPEC = "{policy} gives visions what it gives specifications"
+MSG_VISIONS_REST = "{policy} keeps every other permission it had"
+MSG_VISIONS_REFUSED = "the downgrade is refused while a vision exists"
+MSG_VISIONS_REFUSAL_TEXT = "the refusal names the revision it cannot go below"
+MSG_VISIONS_DOWNGRADED = "after the downgrade every row is as it was before the upgrade"
+MSG_VISIONS_AGAIN = "after the second upgrade the released entry holds the same policies"
 
 CLI_PREFIX = "/api/auth/cli"
 CLI_START = "/start"

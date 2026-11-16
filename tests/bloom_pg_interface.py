@@ -22,6 +22,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 from urllib.parse import urlsplit, urlunsplit
 
+import asyncpg
 import httpx
 from fastapi import Depends, FastAPI
 from sqlalchemy import (
@@ -321,6 +322,52 @@ class BloomPgInterface(BloomInterface):
     def bloom_compare_workflow_schema(self):
         return self._run(self._compare_workflow_schema())
 
+    def bloom_seed_overlap_entries(self):
+        return self._run(self._pg(self._seed_overlap_entries))
+
+    def bloom_snapshot_project_access(self):
+        return self._run(self._pg(self._snapshot_project_access))
+
+    def bloom_add_overlapping_group(self, seeded):
+        async def work(connection):
+            return await self._add_overlapping_group(connection, seeded)
+
+        return self._run(self._pg(work))
+
+    def bloom_delete_access_entry(self, entry):
+        async def work(connection):
+            await connection.execute("DELETE FROM project_access WHERE id = $1", entry)
+
+        self._run(self._pg(work))
+
+    def bloom_seed_visions_holders(self):
+        return self._run(self._pg(self._seed_visions_holders))
+
+    def bloom_read_visions_state(self, seeded):
+        async def work(connection):
+            return await self._read_visions_state(connection, seeded)
+
+        return self._run(self._pg(work))
+
+    def bloom_add_vision(self, project):
+        async def work(connection):
+            return await connection.fetchval(
+                "INSERT INTO documents (project_id, doc_id, doc_type, title, status, version, "
+                "visibility, created_at, updated_at) VALUES ($1, $2, $3, $2, 'Draft', '1', "
+                "'internal', now(), now()) RETURNING id",
+                project,
+                self.parameters.VISIONS_DOC_ID,
+                self.parameters.VISIONS_KIND,
+            )
+
+        return self._run(self._pg(work))
+
+    def bloom_delete_document(self, document):
+        async def work(connection):
+            await connection.execute("DELETE FROM documents WHERE id = $1", document)
+
+        self._run(self._pg(work))
+
     def bloom_seed_workflow_of_a_creator(self):
         return self._run(self._seed_workflow_of_a_creator())
 
@@ -593,6 +640,196 @@ class BloomPgInterface(BloomInterface):
                     self.parameters.RACE_TIMEOUT_SECONDS,
                 )
         return [SimpleNamespace(status=reply.status_code, body=reply.json()) for reply in replies]
+
+    async def _pg(self, work):
+        dsn = self.pg_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+        connection = await asyncpg.connect(dsn)
+        try:
+            return await work(connection)
+        finally:
+            await connection.close()
+
+    async def _insert_person(self, connection, email):
+        return await connection.fetchval(
+            "INSERT INTO users (email, full_name, hashed_password, role, is_active, created_at, "
+            "updated_at) VALUES ($1, $1, 'x', 'maintainer', true, now(), now()) RETURNING id",
+            email,
+        )
+
+    async def _seed_overlap_entries(self, connection):
+        project = await connection.fetchval(
+            "INSERT INTO projects (name, prefix, status, created_at, updated_at) "
+            "VALUES ($1, $1, 'active', now(), now()) RETURNING id",
+            self.parameters.OVERLAP_PREFIX,
+        )
+        people = [
+            await self._insert_person(connection, email) for email in self.parameters.OVERLAP_PEOPLE
+        ]
+        groups = dict(await connection.fetch("SELECT name, id FROM groups"))
+        policy = await connection.fetchval(
+            "SELECT id FROM policies WHERE name = $1", self.parameters.OVERLAP_POLICY
+        )
+        for index, person in enumerate(people):
+            entry = await connection.fetchval(
+                "INSERT INTO project_access (project_id, user_id, owner, inherit_policies, "
+                "policy_group_id, created_at) VALUES ($1, $2, $3, $4, $5, now()) RETURNING id",
+                project,
+                person,
+                index == 0,
+                index == 1,
+                groups[self.parameters.OVERLAP_BUNDLE] if index == 3 else None,
+            )
+            if index == 2:
+                await connection.execute(
+                    "INSERT INTO project_access_policies VALUES ($1, $2)", entry, policy
+                )
+        await connection.execute(
+            "INSERT INTO project_access (project_id, group_id, owner, inherit_policies, "
+            "created_at) VALUES ($1, $2, false, true, now())",
+            project,
+            groups[self.parameters.OVERLAP_SECOND_BUNDLE],
+        )
+        return SimpleNamespace(project=project, people=people, groups=groups)
+
+    async def _snapshot_project_access(self, connection):
+        return {
+            "entries": [
+                dict(row)
+                for row in await connection.fetch("SELECT * FROM project_access ORDER BY id")
+            ],
+            "policies": [
+                tuple(row)
+                for row in await connection.fetch(
+                    "SELECT * FROM project_access_policies ORDER BY access_id, policy_id"
+                )
+            ],
+            "roles": [
+                tuple(row)
+                for row in await connection.fetch("SELECT id, role FROM users ORDER BY id")
+            ],
+            "indexes": [
+                tuple(row)
+                for row in await connection.fetch(
+                    "SELECT indexname, indexdef FROM pg_indexes "
+                    "WHERE tablename = 'project_access' ORDER BY indexname"
+                )
+            ],
+            "revision": await connection.fetchval("SELECT version_num FROM alembic_version"),
+        }
+
+    async def _add_overlapping_group(self, connection, seeded):
+        statement = (
+            "INSERT INTO project_access (project_id, user_id, policy_group_id, owner, "
+            "inherit_policies, created_at) VALUES ($1, $2, $3, false, false, now()) RETURNING id"
+        )
+        second = seeded.groups[self.parameters.OVERLAP_SECOND_BUNDLE]
+
+        async def refused(person, group):
+            try:
+                await connection.fetchval(statement, seeded.project, person, group)
+            except asyncpg.UniqueViolationError:
+                return True
+            return False
+
+        entry = await connection.fetchval(statement, seeded.project, seeded.people[3], second)
+        return SimpleNamespace(
+            entry=entry,
+            duplicate_refused=await refused(seeded.people[3], second),
+            plain_refused=await refused(seeded.people[0], None),
+        )
+
+    async def _seed_visions_holders(self, connection):
+        ids = dict(await connection.fetch("SELECT name, id FROM policies"))
+        project = await connection.fetchval(
+            "INSERT INTO projects (name, prefix, status, created_at, updated_at) "
+            "VALUES ($1, $1, 'Active', now(), now()) RETURNING id",
+            self.parameters.VISIONS_PREFIX,
+        )
+        seeded = {"project": project}
+        held = {
+            "released": self.parameters.VISIONS_RELEASED_SET,
+            "spec_only": (self.parameters.VISIONS_SPEC_POLICY,),
+        }
+        for key, names in held.items():
+            user = await self._insert_person(connection, self.parameters.VISIONS_HOLDERS[key])
+            entry = await connection.fetchval(
+                "INSERT INTO project_access (project_id, user_id, owner, inherit_policies, "
+                "created_at) VALUES ($1, $2, false, false, now()) RETURNING id",
+                project,
+                user,
+            )
+            for name in names:
+                await connection.execute(
+                    "INSERT INTO project_access_policies (access_id, policy_id) VALUES ($1, $2)",
+                    entry,
+                    ids[name],
+                )
+            seeded[key] = entry
+        seeded["group"] = await connection.fetchval(
+            "INSERT INTO groups (name, description, created_at, updated_at) "
+            "VALUES ($1, '', now(), now()) RETURNING id",
+            self.parameters.VISIONS_GROUP,
+        )
+        await connection.execute(
+            "INSERT INTO group_policies (group_id, policy_id) VALUES ($1, $2)",
+            seeded["group"],
+            ids[self.parameters.VISIONS_SPEC_POLICY],
+        )
+        kind = self.parameters.VISIONS_SPEC_KIND
+        seeded["editable"] = await connection.fetchval(
+            "INSERT INTO policies (name, description, scope, permissions, type_tags, is_default, "
+            "created_at, updated_at) VALUES ($1, '', 'document', $2, $3, false, now(), now()) "
+            "RETURNING id",
+            self.parameters.VISIONS_EDITABLE,
+            json.dumps({kind: ["comment", "view"]}),
+            json.dumps({kind: {"all": True, "visibility": [], "tags": []}}),
+        )
+        return seeded
+
+    async def _read_visions_state(self, connection, seeded):
+        async def entry_policies(entry):
+            rows = await connection.fetch(
+                "SELECT p.name FROM policies p JOIN project_access_policies x "
+                "ON x.policy_id = p.id WHERE x.access_id = $1 ORDER BY p.name",
+                entry,
+            )
+            return [row["name"] for row in rows]
+
+        async def group_policies(group):
+            rows = await connection.fetch(
+                "SELECT p.name FROM policies p JOIN group_policies x ON x.policy_id = p.id "
+                "JOIN groups g ON g.id = x.group_id WHERE g.name = $1 ORDER BY p.name",
+                group,
+            )
+            return [row["name"] for row in rows]
+
+        editable = await connection.fetch(
+            "SELECT row_to_json(p)::text AS row FROM policies p WHERE id = $1", seeded["editable"]
+        )
+        group = await connection.fetch(
+            "SELECT row_to_json(g)::text AS row FROM groups g WHERE id = $1", seeded["group"]
+        )
+        covered = await connection.fetch(
+            "SELECT name, permissions::text AS permissions, type_tags::text AS type_tags "
+            "FROM policies WHERE is_default AND name = ANY($1::text[])",
+            list(self.parameters.VISIONS_COVERED),
+        )
+        visions = await connection.fetch(
+            "SELECT scope, is_default FROM policies WHERE name = $1", self.parameters.VISIONS_POLICY
+        )
+        return {
+            "released": await entry_policies(seeded["released"]),
+            "spec_only": await entry_policies(seeded["spec_only"]),
+            "group": await group_policies(self.parameters.VISIONS_GROUP),
+            "product_owners": await group_policies(self.parameters.VISIONS_OWNERS),
+            "editable": [row["row"] for row in editable],
+            "group_row": [row["row"] for row in group],
+            "covered": {
+                row["name"]: (json.loads(row["permissions"]), json.loads(row["type_tags"]))
+                for row in covered
+            },
+            "visions": [tuple(row) for row in visions],
+        }
 
     async def _execute(self, statement, **values):
         async with self.engine.begin() as connection:

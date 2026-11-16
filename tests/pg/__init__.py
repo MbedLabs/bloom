@@ -17,6 +17,7 @@ SUITES = [
     "tests.pg.BLOOM_integration_sync_race.IntegrationSyncRaceTest",
     "tests.pg.BLOOM_integrity_conflict.IntegrityConflictTest",
     "tests.pg.BLOOM_link_rules_enforcement.LinkRulesEnforcementTest",
+    "tests.pg.BLOOM_overlapping_project_groups_migration.OverlappingProjectGroupsMigrationTest",
     "tests.pg.BLOOM_pre_baseline_repair.PreBaselineRepairTest",
     "tests.pg.BLOOM_refresh_flow.RefreshFlowTest",
     "tests.pg.BLOOM_repeated_refusals.RepeatedRefusalsTest",
@@ -24,4 +25,5 @@ SUITES = [
     "tests.pg.BLOOM_requirement_text_migration.RequirementTextMigrationTest",
     "tests.pg.BLOOM_session_invalidation.SessionInvalidationTest",
     "tests.pg.BLOOM_token_concurrency.TokenConcurrencyTest",
+    "tests.pg.BLOOM_visions_migration.VisionsMigrationTest",
 ]
