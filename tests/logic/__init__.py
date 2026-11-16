@@ -6,6 +6,7 @@ SUITES = [
     "tests.logic.BLOOM_access_token_format.AccessTokenFormatTest",
     "tests.logic.BLOOM_alembic_baseline.AlembicBaselineTest",
     "tests.logic.BLOOM_app_policy_scope.AppPolicyScopeTest",
+    "tests.logic.BLOOM_artefact_creator.ArtefactCreatorTest",
     "tests.logic.BLOOM_artefact_public_id_lookup.ArtefactPublicIdLookupTest",
     "tests.logic.BLOOM_artefact_rich_content.ArtefactRichContentTest",
     "tests.logic.BLOOM_attachment_cleanup.AttachmentCleanupTest",

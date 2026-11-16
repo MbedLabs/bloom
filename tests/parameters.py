@@ -3518,3 +3518,22 @@ MSG_STB_SEED = "with only the seed switch on the start seeds the administrator"
 MSG_STB_BOTH = (
     "with both switches on the start runs the repair steps and then seeds the administrator"
 )
+ACR_OLDER = ("PRJ-REQ-900", "Older")
+ACR_SOURCE = ("ABC-REQ-001", "Source")
+ACR_CSV = b"tc_id,title\n,From CSV\n"
+ACR_TESTRAIL = (
+    b"<suite><sections><section><name>Boot</name><cases><case><id>C1</id>"
+    b"<title>From TestRail</title></case></cases></section></sections></suite>"
+)
+ACR_MARKDOWN = b"## [DES] From Markdown\nBody\n"
+ACR_JIRA_ACCOUNTS = [("alpha", "ANN@test.local", True), ("beta", "nobody@test.local", False)]
+ACR_REPORT_RUNS = (41, 42)
+ACR_FIELD = "created_by_id"
+MSG_ACR_CREATE = "a created {kind} records the user who created it"
+MSG_ACR_IMPORT = (
+    "the copied requirement, both imported test cases, the suite and the design record the importer"
+)
+MSG_ACR_JIRA = "a Jira defect records the user of the integration account, or nobody when the account is unknown"
+MSG_ACR_REPORT = "a Bud report records the owner of the credential, or nobody when it has none"
+MSG_ACR_DELETED = "deleting a user clears the creator of their requirement and defect"
+MSG_ACR_HIDDEN = "no response model carries the creator"

@@ -43,6 +43,8 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy import event, func, select, text
 from starlette.datastructures import Headers
 
+import app.api as api_package
+import app.schemas as schemas_package
 from app import audit
 from app import main as main_module
 from app.api import (
@@ -55,11 +57,17 @@ from app.api import (
     integrations,
 )
 from app.api import project_variables as project_variables_api
+from app.api.attachments import publish_test_report
+from app.api.campaigns import create_campaign
+from app.api.changes import create_change_request
+from app.api.defects import create_defect
+from app.api.designs import create_design_item
 from app.api.docs_facade import (
     _related_doc_keys,
     _resolve_doc_by_public_id,
     list_all_docs,
 )
+from app.api.documents import create_document
 from app.api.export import (
     _test_cases_markdown,
     _test_cases_xml,
@@ -77,7 +85,13 @@ from app.api.import_service import (
     testrail_csv_columns,
 )
 from app.api.policies import _apply_rules, _validate_rules, policy_rules
+from app.api.requirements import create_requirement
+from app.api.risks import create_risk_item
 from app.api.search import run_global_search
+from app.api.test_cases import create_test_case
+from app.api.test_concepts import create_test_concept
+from app.api.test_suites import create_suite
+from app.api.users import delete_user
 from app.core import (
     document_kinds,
     id_generator,
@@ -145,7 +159,7 @@ from app.models import (
     user_token,
 )
 from app.models.groups import Group, GroupMembership, Policy
-from app.models.models import ArtefactVisibility, ServiceCredential
+from app.models.models import ARTEFACT_MODELS, ArtefactVisibility, ServiceCredential
 from app.models.project_membership import ProjectAccess
 from app.models.user import User, UserRole
 from app.schemas import ProjectCreate, ProjectVariableUpdate
@@ -378,6 +392,158 @@ class BloomLogicInterface(BloomInterface):
             return id_generator.compute_next_id(existing_ids, prefix, type_code), None
         except ValueError as exc:
             return None, type(exc).__name__
+
+    def bloom_seed_creator_records(self):
+        return self._run(self._seed_creator_records())
+
+    def bloom_add_requirement_without_creator(self, project_id, req_id, title):
+        return self._run(self._add(Requirement(project_id=project_id, req_id=req_id, title=title)))
+
+    def bloom_artefact_kinds(self):
+        return [model.__name__ for model in ARTEFACT_MODELS]
+
+    def bloom_creators(self, kind, project_id=None):
+        model = next(model for model in ARTEFACT_MODELS if model.__name__ == kind)
+        query = select(model.created_by_id).order_by(model.id)
+        if project_id is not None:
+            query = query.where(model.project_id == project_id)
+        return self._run(self._all(query))
+
+    def bloom_create_one_of_each_artefact(self, project_id, user_id):
+        async def work(db):
+            user, common = await db.get(User, user_id), {"project_id": project_id}
+            titled = (
+                (create_requirement, schemas.RequirementCreate, "title"),
+                (create_test_case, schemas.TestCaseCreate, "title"),
+                (create_suite, schemas.TestSuiteCreate, "name"),
+                (create_campaign, schemas.TestCampaignCreate, "name"),
+                (create_defect, schemas.DefectCreate, "title"),
+                (create_design_item, schemas.DesignItemCreate, "title"),
+                (create_risk_item, schemas.RiskItemCreate, "title"),
+                (create_change_request, schemas.ChangeRequestCreate, "title"),
+                (create_test_concept, schemas.TestConceptCreate, "name"),
+            )
+            for create, schema, field in titled:
+                await create(data=schema(**common, **{field: "A"}), db=db, current_user=user)
+            await create_document(
+                project_id=project_id,
+                data=schemas.DocumentCreate(project_id=project_id, title="S"),
+                db=db,
+                current_user=user,
+            )
+            await db.commit()
+
+        self._run(self._with_db(work))
+
+    def bloom_run_every_import(
+        self, user_id, source_id, target_id, requirement_ids, csv, xml, markdown
+    ):
+        async def work(db):
+            user = await db.get(User, user_id)
+            source, target = await db.get(Project, source_id), await db.get(Project, target_id)
+            result = ImportResult(imported=0, skipped=0, new_ids=[], errors=[])
+            await _import_docs(db, user, "REQ", requirement_ids, source, target, result)
+            await import_test_cases_file(
+                project_id=target_id,
+                format="csv",
+                file=UploadFile(file=io.BytesIO(csv)),
+                db=db,
+                current_user=user,
+            )
+            await import_testrail(
+                project_id=target_id,
+                format="xml",
+                file=UploadFile(file=io.BytesIO(xml)),
+                mapping=None,
+                db=db,
+                current_user=user,
+            )
+            await import_service.import_markdown(
+                project_id=target_id,
+                default_type=None,
+                file=UploadFile(file=io.BytesIO(markdown)),
+                collision_actions=json.dumps({}),
+                db=db,
+                current_user=user,
+            )
+            await db.commit()
+
+        self._run(self._with_db(work))
+
+    def bloom_new_jira_defect(self, project_id, account_email):
+        async def work(db):
+            setting = IntegrationSetting(
+                project_id=project_id, tracker="jira", account_email=account_email
+            )
+            db.add(setting)
+            await db.flush()
+            defect = await integrations._new_defect_from_issue(
+                db, setting, "OPS", 7, {"summary": "Crash"}, event_type="pull"
+            )
+            return defect.created_by_id, defect.reporter_id
+
+        return self._run(self._with_db(work))
+
+    def bloom_publish_report_as(self, prefix, run_id, owner_id):
+        async def work(db):
+            await publish_test_report(
+                data=schemas.TestReportPublish(
+                    project_prefix=prefix,
+                    bud_run_id=run_id,
+                    run_name="Nightly",
+                    total_tests=1,
+                    passed_tests=1,
+                    failed_tests=0,
+                    files=[],
+                ),
+                db=db,
+                _service_credential=SimpleNamespace(created_by_user_id=owner_id),
+            )
+            await db.commit()
+
+        self._run(self._with_db(work))
+
+    def bloom_delete_user(self, user_id, admin_id):
+        async def work(db):
+            await delete_user(user_id=user_id, admin=await db.get(User, admin_id), db=db)
+            await db.commit()
+
+        self._run(self._with_db(work))
+
+    def bloom_response_models_with(self, field):
+        carriers = []
+        for package in (api_package, schemas_package):
+            for info in pkgutil.iter_modules(package.__path__):
+                module = importlib.import_module(f"{package.__name__}.{info.name}")
+                for value in vars(module).values():
+                    if (
+                        isinstance(value, type)
+                        and issubclass(value, BaseModel)
+                        and field in value.model_fields
+                    ):
+                        carriers.append(f"{module.__name__}.{value.__name__}")
+        return carriers
+
+    async def _seed_creator_records(self):
+        async with self.maker() as db:
+            alpha, beta = Project(name="Demo", prefix="PRJ"), Project(name="ABC", prefix="ABC")
+            admin = User(
+                email="admin@test.local",
+                full_name="Ada Admin",
+                hashed_password="x",
+                role=UserRole.admin,
+            )
+            ann = User(
+                email="ann@test.local",
+                full_name="Ann Author",
+                hashed_password="x",
+                role=UserRole.admin,
+            )
+            db.add_all([alpha, beta])
+            await db.flush()
+            db.add_all([admin, ann])
+            await db.commit()
+            return SimpleNamespace(alpha=alpha.id, beta=beta.id, admin=admin.id, ann=ann.id)
 
     def bloom_seed_search_records(self):
         return self._run(self._seed_search_records())
