@@ -20,9 +20,11 @@ import importlib
 import inspect
 import io
 import json
+import logging
 import os
 import pkgutil
 import re
+import smtplib
 import subprocess
 import sys
 import tempfile
@@ -1436,6 +1438,64 @@ class BloomLogicInterface(BloomInterface):
 
     def bloom_identity(self):
         return PRODUCT_NAME, PRODUCT_IDENTITY, POWERED_BY
+
+    def bloom_send_through_smtp(self, smtp_settings, message, server="accepts"):
+        made, records = [], []
+
+        class Server:
+            def __init__(self, host, port, timeout):
+                self.host, self.port, self.timeout = host, port, timeout
+                self.started_tls, self.logged_in, self.messages = False, None, []
+                made.append(self)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def starttls(self):
+                if server == "no_starttls":
+                    raise smtplib.SMTPNotSupportedError(
+                        "STARTTLS extension not supported by server."
+                    )
+                self.started_tls = True
+
+            def login(self, username, password):
+                self.logged_in = (username, password)
+
+            def send_message(self, sent):
+                self.messages.append(sent)
+
+        def refused(host, port, timeout):
+            if server == "unreachable":
+                raise OSError("Connection refused")
+            raise smtplib.SMTPException("remote response\nforged log entry")
+
+        handler = logging.Handler(level=logging.INFO)
+        handler.emit = lambda record: records.append(record.getMessage())
+        logger = logging.getLogger(mail_service.__name__)
+        level = logger.level
+        outcome = SimpleNamespace(server=None, error=None)
+        with contextlib.ExitStack() as stack:
+            for name, value in smtp_settings.items():
+                stack.enter_context(patch.object(mail_service.settings, name, value))
+            factory = Server if server in ("accepts", "no_starttls") else refused
+            stack.enter_context(patch.object(mail_service.smtplib, "SMTP", factory))
+            logger.addHandler(handler)
+            logger.setLevel(logging.INFO)
+            stack.callback(logger.setLevel, level)
+            stack.callback(logger.removeHandler, handler)
+            try:
+                mail_service.send_email(**message)
+            except mail_service.MailDeliveryError as failed:
+                outcome.error = str(failed)
+        outcome.server = made[0] if made else None
+        outcome.log = "\n".join(records)
+        return outcome
+
+    def bloom_delivery_error_is_a_configuration_error(self):
+        return issubclass(mail_service.MailDeliveryError, mail_service.MailConfigurationError)
 
     def bloom_capture_mail(self, sender, **fields):
         sent = []

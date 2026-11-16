@@ -65,6 +65,7 @@ SUITES = [
     "tests.logic.BLOOM_jira_inbound.JiraInboundTest",
     "tests.logic.BLOOM_jira_outbound_send.JiraOutboundSendTest",
     "tests.logic.BLOOM_link_rules.LinkRulesTest",
+    "tests.logic.BLOOM_mail_service.MailServiceTest",
     "tests.logic.BLOOM_md_import.MdImportTest",
     "tests.logic.BLOOM_next_doc_id.NextDocIdTest",
     "tests.logic.BLOOM_notifications.NotificationsTest",

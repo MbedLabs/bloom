@@ -3769,3 +3769,184 @@ MSG_ISO_OTHER_SMTP = "another mail port outside the development ports is allowed
 MSG_ISO_DEV_MAILPIT = (
     "a connection to the local development Mailpit on port {port} is refused before the network"
 )
+MLS_SMTP = {
+    "SMTP_ENABLED": True,
+    "SMTP_HOST": "smtp.example.com",
+    "SMTP_PORT": 587,
+    "SMTP_USERNAME": "smtp-user",
+    "SMTP_PASSWORD": "smtp-password",
+    "SMTP_FROM_EMAIL": "noreply@example.com",
+    "SMTP_REPLY_TO": None,
+    "SMTP_STARTTLS": True,
+    "SMTP_SSL": False,
+    "SMTP_TIMEOUT_SECONDS": 9,
+}
+MLS_RELAY = {
+    "SMTP_ENABLED": True,
+    "SMTP_HOST": "mail",
+    "SMTP_PORT": 2525,
+    "SMTP_USERNAME": "",
+    "SMTP_PASSWORD": "",
+    "SMTP_FROM_EMAIL": "noreply@example.com",
+    "SMTP_REPLY_TO": None,
+    "SMTP_STARTTLS": False,
+    "SMTP_SSL": False,
+    "SMTP_TIMEOUT_SECONDS": 9,
+}
+MLS_MESSAGE = {
+    "to_email": "user@example.com",
+    "subject": "Test subject",
+    "text_body": "plain text",
+    "html_body": "<p>plain text</p>",
+}
+MLS_SHORT_MESSAGE = {"to_email": "someone@example.com", "subject": "s", "text_body": "t"}
+MLS_PRIVATE_MESSAGE = {
+    "to_email": "private-recipient@example.com",
+    "subject": "Private subject with an untrusted marker",
+    "text_body": "private message content",
+}
+MLS_SENDER = "Bloom PLM by EmbedLabs <noreply@example.com>"
+MLS_STARTTLS_REPORT = ["mail:2525", "STARTTLS=True", "SMTPNotSupportedError"]
+MLS_PRIVATE_WORDS = ["private-recipient", "untrusted marker", "private message content"]
+MLS_SERVER_WORDS = ["remote response", "forged log entry"]
+MLS_WORKFLOW = {
+    "to_email": "reviewer@example.com",
+    "recipient_name": "Reviewer & partner",
+    "actor_name": "Writer <script>alert(1)</script>",
+    "event_title": "Review requested: PRJ-REQ-001",
+    "document_link": "https://bloom.example.com/projects/PRJ/docs/requirements/PRJ-REQ-001?one=1&two=2",
+}
+MLS_WORKFLOW_NEXT = "View the discussion and document status in Bloom PLM."
+MLS_WORKFLOW_TEXT = [
+    "Reviewer & partner",
+    "Writer <script>alert(1)</script>",
+    "Review requested: PRJ-REQ-001",
+    "Bloom PLM by EmbedLabs",
+    "View the discussion and document status in Bloom PLM.",
+]
+MLS_WORKFLOW_HTML = [
+    "<title>Bloom PLM by EmbedLabs</title>",
+    "background:#8925d0",
+    "background:#ffffff",
+    "Reviewer &amp; partner",
+    "Writer &lt;script&gt;alert(1)&lt;/script&gt;",
+    'one=1&amp;two=2"',
+    "Open document",
+    ">Bloom PLM by EmbedLabs</h1>",
+    "View the discussion and document status in Bloom PLM.",
+]
+MLS_ACCESS = {
+    "to_email": "admin@example.com",
+    "admin_name": "Administrator",
+    "requester_name": "Writer <script>",
+    "requester_email": "writer@example.com",
+    "resource": "PRJ-REQ-001",
+    "project": "PRJ",
+    "requested_at": "2026-10-25T10:00:00Z",
+    "request_id": "42",
+    "review_link": "https://bloom.example.com/access",
+}
+MLS_ACCESS_SUBJECT = "Access requested on Bloom PLM: PRJ-REQ-001"
+MLS_ACCESS_NEXT = "Grant access in Bloom PLM, then mark the request granted or refused."
+MLS_TEXT_HEAD = "Bloom PLM by EmbedLabs\n"
+MLS_LINK = "https://bloom.example.com/link#token"
+MLS_EVERY_MAIL = [
+    (
+        "send_invite_email",
+        {
+            "to_email": "a@example.com",
+            "full_name": "Ada",
+            "invite_link": "https://bloom.example.com/link#token",
+        },
+    ),
+    (
+        "send_verification_email",
+        {
+            "to_email": "a@example.com",
+            "full_name": "Ada",
+            "verification_link": "https://bloom.example.com/link#token",
+        },
+    ),
+    (
+        "send_password_reset_email",
+        {
+            "to_email": "a@example.com",
+            "full_name": "Ada",
+            "reset_link": "https://bloom.example.com/link#token",
+        },
+    ),
+    (
+        "send_admin_welcome_email",
+        {
+            "to_email": "a@example.com",
+            "full_name": "Ada",
+            "login_link": "https://bloom.example.com/link#token",
+        },
+    ),
+    (
+        "send_email_change_email",
+        {
+            "to_email": "a@example.com",
+            "full_name": "Ada",
+            "old_email": "old@example.com",
+            "new_email": "new@example.com",
+            "confirm_link": "https://bloom.example.com/link#token",
+        },
+    ),
+    (
+        "send_email_change_authorization_email",
+        {
+            "to_email": "a@example.com",
+            "full_name": "Ada",
+            "old_email": "old@example.com",
+            "new_email": "new@example.com",
+            "confirm_link": "https://bloom.example.com/link#token",
+        },
+    ),
+    (
+        "send_access_request_email",
+        {
+            "to_email": "a@example.com",
+            "admin_name": "Admin",
+            "requester_name": "Ada",
+            "requester_email": "ada@example.com",
+            "resource": "PRJ-REQ-001",
+            "project": "PRJ",
+            "requested_at": "2026-10-25T10:00:00Z",
+            "request_id": "1",
+            "review_link": "https://bloom.example.com/link#token",
+        },
+    ),
+    (
+        "send_workflow_request_email",
+        {
+            "to_email": "a@example.com",
+            "recipient_name": "Ada",
+            "actor_name": "Writer",
+            "event_title": "Review requested: PRJ-REQ-001",
+            "document_link": "https://bloom.example.com/link#token",
+        },
+    ),
+]
+MLS_HEADING = "<h1[^>]*>(Welcome to )?Bloom PLM by EmbedLabs</h1>"
+MLS_HTML_RIGHTS = "&copy; 2026 EmbedLabs. All rights reserved."
+MLS_TEXT_RIGHTS = "(c) 2026 EmbedLabs. All rights reserved."
+MSG_MLS_SERVER = (
+    "the mail goes to the configured server, with STARTTLS and the login, in one message"
+)
+MSG_MLS_SENDER = "the sender is Bloom PLM by EmbedLabs with the configured address"
+MSG_MLS_STARTTLS = "a refused STARTTLS is reported as a delivery error naming {word}"
+MSG_MLS_SUBCLASS = "a delivery error is a configuration error, so endpoints answer it the same way"
+MSG_MLS_UNREACHABLE = "an unreachable relay is reported as a delivery error naming the relay"
+MSG_MLS_LOG_SENT = "a delivery is logged as sent"
+MSG_MLS_LOG_PRIVATE = "the delivery log leaves out '{word}'"
+MSG_MLS_LOG_ERROR = "a server error is logged by its type and kept in the raised error"
+MSG_MLS_LOG_SERVER = "the error log leaves out '{word}'"
+MSG_MLS_WORKFLOW_HEAD = "the workflow mail goes to the reviewer with the event as subject, once"
+MSG_MLS_WORKFLOW_TEXT = "the workflow text contains '{word}'"
+MSG_MLS_WORKFLOW_HTML = "the workflow HTML contains '{word}'"
+MSG_MLS_WORKFLOW_SAFE = "the workflow HTML has no script tag, one link and no unfilled placeholder, and the text starts with the product"
+MSG_MLS_ACCESS = "the access request mail has the Bloom subject, heading, one link and the same next step in both formats"
+MSG_MLS_ACCESS_ESCAPED = "the requester name is escaped in the HTML and plain in the text"
+MSG_MLS_EVERY_COUNT = "all eight mails are rendered"
+MSG_MLS_EVERY = "the {sender} mail has the product title and heading, one link in both formats, the rights line and no old name"
