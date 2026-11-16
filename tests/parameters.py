@@ -3537,3 +3537,44 @@ MSG_ACR_JIRA = "a Jira defect records the user of the integration account, or no
 MSG_ACR_REPORT = "a Bud report records the owner of the credential, or nobody when it has none"
 MSG_ACR_DELETED = "deleting a user clears the creator of their requirement and defect"
 MSG_ACR_HIDDEN = "no response model carries the creator"
+STATUS_UNAVAILABLE = 503
+OBJ_BUCKET = "bloom-test"
+OBJ_S3_SETTINGS = {
+    "STORAGE_BACKEND": "s3",
+    "STORAGE_LOCAL_MIRROR": True,
+    "S3_BUCKET": OBJ_BUCKET,
+    "S3_REGION": "us-east-1",
+    "S3_PREFIX": "bloom",
+    "S3_ENDPOINT_URL": "",
+}
+OBJ_CONTENT = b"evidence"
+OBJ_LONGER_CONTENT = b"longer evidence"
+OBJ_CLIENT_SETTINGS = {
+    "S3_ENDPOINT_URL": "http://minio.local:9000",
+    "S3_REGION": "eu-central-1",
+    "S3_ACCESS_KEY_ID": "key",
+    "S3_SECRET_ACCESS_KEY": "secret",
+}
+OBJ_MIGRATE = ["migrate", "--to", "s3"]
+MSG_OBJ_PERSIST = "a persisted file stays in the mirror and is in the bucket with its content type"
+MSG_OBJ_READ = "the bucket returns the content, the list, the size and a ready answer; an unknown file has no size"
+MSG_OBJ_REMOVE = "removing deletes the object and the mirror file, and removing again is accepted"
+MSG_OBJ_NO_MIRROR = "without the mirror the local file goes and the object stays"
+MSG_OBJ_REFUSED = "an upload the bucket refuses is a 503, leaves no local file, and the bucket is reported not ready"
+MSG_OBJ_LOCAL = "with local storage the file stays local and the store reports a local copy"
+MSG_OBJ_DOWNLOAD = "a download streams the content from the bucket as an attachment"
+MSG_OBJ_FALLBACK = "when the object is gone the download falls back to the mirror file"
+MSG_OBJ_GONE = "when the object and the mirror file are gone the download is a 503"
+MSG_OBJ_RECONCILE = (
+    "the cleanup keeps the referenced object, removes the orphans and reports the missing file"
+)
+MSG_OBJ_RECONCILE_LATE = "a later orphan in the bucket alone is removed too"
+MSG_OBJ_MIGRATE = "the first migration copies both files and skips the part file"
+MSG_OBJ_MIGRATE_AGAIN = "a second migration copies nothing"
+MSG_OBJ_MIGRATE_SIZE = "a file whose stored size differs is reported as a mismatch"
+MSG_OBJ_COMMAND_OK = "the migrate command prints its counts and exits 0"
+MSG_OBJ_COMMAND_MISMATCH = "the migrate command names a size mismatch and exits 1"
+MSG_OBJ_COMMAND_NO_BUCKET = "the migrate command exits 2 without a bucket"
+MSG_OBJ_NEEDS_BUCKET = "S3 storage without a bucket is refused, and the prefix defaults to bloom"
+MSG_OBJ_CLIENT = "the client takes the endpoint and region from the settings"
+MSG_OBJ_NO_PREFIX = "without a prefix an object key is the file name"

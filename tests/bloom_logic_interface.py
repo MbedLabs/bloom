@@ -39,6 +39,7 @@ from xml.etree import ElementTree
 import httpx
 import yaml
 from fastapi import HTTPException, UploadFile
+from moto import mock_aws
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import event, func, select, text
 from starlette.datastructures import Headers
@@ -47,6 +48,7 @@ import app.api as api_package
 import app.schemas as schemas_package
 from app import audit
 from app import main as main_module
+from app import storage as storage_cli
 from app.api import (
     artefact_utils,
     campaigns,
@@ -57,7 +59,7 @@ from app.api import (
     integrations,
 )
 from app.api import project_variables as project_variables_api
-from app.api.attachments import publish_test_report
+from app.api.attachments import download_attachment, publish_test_report
 from app.api.campaigns import create_campaign
 from app.api.changes import create_change_request
 from app.api.defects import create_defect
@@ -147,6 +149,7 @@ from app.models import (
     AuditEvent,
     Defect,
     Document,
+    DocumentAttachment,
     ImportAttempt,
     IntegrationSetting,
     Project,
@@ -167,11 +170,13 @@ from app.schemas import auth as auth_schemas
 from app.schemas import schemas
 from app.schemas.groups import PolicyRule
 from app.services import (
+    attachment_cleanup,
     attachment_storage,
     import_attempts,
     integration_sync,
     jira_outbound,
     mail_service,
+    object_store,
     rich_text,
     tag_links,
     token_service,
@@ -392,6 +397,181 @@ class BloomLogicInterface(BloomInterface):
             return id_generator.compute_next_id(existing_ids, prefix, type_code), None
         except ValueError as exc:
             return None, type(exc).__name__
+
+    def bloom_new_object_store(self, backend="s3", mirror=True):
+        if getattr(self, "store", None):
+            self.store.close()
+        self.store = contextlib.ExitStack()
+        self.patches.callback(self.store.close)
+        folder = Path(self.store.enter_context(self._temp_dir())) / "attachments"
+        chosen = {"STORAGE_BACKEND": "local"}
+        if backend == "s3":
+            chosen = {**self.parameters.OBJ_S3_SETTINGS, "STORAGE_LOCAL_MIRROR": mirror}
+            keys = {"AWS_ACCESS_KEY_ID": "testing", "AWS_SECRET_ACCESS_KEY": "testing"}
+            self.store.enter_context(patch.dict(os.environ, keys))
+        for name, value in {**chosen, "ATTACHMENT_DIR": str(folder)}.items():
+            self.store.enter_context(patch.object(settings, name, value))
+        self.store.enter_context(patch.object(attachment_storage, "_ROOT", None))
+        object_store.client.cache_clear()
+        self.store.callback(object_store.client.cache_clear)
+        if backend == "s3":
+            self.store.enter_context(mock_aws())
+            object_store.client().create_bucket(Bucket=self.parameters.OBJ_BUCKET)
+
+    def bloom_set_storage(self, **values):
+        for name, value in values.items():
+            self.store.enter_context(patch.object(settings, name, value))
+
+    def bloom_write_local_file(self, name, data=None):
+        path = attachment_storage.ensure_attachment_dir() / name
+        path.write_bytes(self.parameters.OBJ_CONTENT if data is None else data)
+        return path
+
+    def bloom_persist(self, path, name, content_type="text/plain"):
+        try:
+            self._run(attachment_storage.persist(path, name, content_type))
+        except HTTPException as refused:
+            return refused.status_code
+        return None
+
+    def bloom_put_object(self, path, name, content_type="text/plain"):
+        self._run(object_store.put_file(path, name, content_type))
+
+    def bloom_remove_attachment(self, name):
+        return self._run(attachment_storage.remove(name))
+
+    def bloom_bucket_keys(self):
+        listed = object_store.client().list_objects_v2(Bucket=self.parameters.OBJ_BUCKET)
+        return sorted(item["Key"] for item in listed.get("Contents", []))
+
+    def bloom_bucket_content_type(self, key):
+        return object_store.client().head_object(Bucket=self.parameters.OBJ_BUCKET, Key=key)[
+            "ContentType"
+        ]
+
+    def bloom_delete_bucket_object(self, key):
+        object_store.client().delete_object(Bucket=self.parameters.OBJ_BUCKET, Key=key)
+
+    def bloom_fetch_object(self, name):
+        return b"".join(object_store.iter_body(self._run(object_store.fetch(name))))
+
+    def bloom_list_objects(self):
+        return [item.name for item in self._run(object_store.list_objects())]
+
+    def bloom_object_size(self, name):
+        return self._run(object_store.size_of(name))
+
+    def bloom_bucket_answers(self):
+        return self._run(object_store.bucket_answers())
+
+    def bloom_keeps_local_copy(self):
+        return object_store.keeps_local_copy()
+
+    def bloom_object_key(self, name):
+        return object_store.object_key(name), object_store._name_of(object_store.object_key(name))
+
+    def bloom_seed_spec_document(self):
+        async def work(db):
+            project = Project(name="Demo", prefix="PRJ")
+            admin = User(
+                email="a@x.test", full_name="Ada", hashed_password="x", role=UserRole.admin
+            )
+            db.add_all([project, admin])
+            await db.flush()
+            document = Document(
+                project_id=project.id, doc_id="PRJ-SPEC-001", title="Spec", doc_type="SPEC"
+            )
+            db.add(document)
+            await db.commit()
+            return SimpleNamespace(document=document.id, admin=admin.id)
+
+        return self._run(self._with_db(work))
+
+    def bloom_add_attachment_row(self, document_id, name):
+        return self._run(
+            self._add(
+                DocumentAttachment(
+                    document_id=document_id,
+                    filename=name,
+                    original_filename="report.txt",
+                    content_type="text/plain",
+                    size_bytes=8,
+                    sha256="x",
+                    storage_path=name,
+                )
+            )
+        )
+
+    def bloom_download_attachment(self, attachment_id, user_id):
+        async def work(db):
+            answer = SimpleNamespace(status=None, body=None, path=None, disposition=None)
+            try:
+                response = await download_attachment(
+                    attachment_id, db=db, current_user=await db.get(User, user_id)
+                )
+            except HTTPException as refused:
+                answer.status = refused.status_code
+                return answer
+            answer.disposition = response.headers.get("content-disposition")
+            answer.path = getattr(response, "path", None)
+            if answer.path is None:
+                chunks = [
+                    chunk if isinstance(chunk, bytes) else chunk.encode()
+                    async for chunk in response.body_iterator
+                ]
+                answer.body = b"".join(chunks)
+            return answer
+
+        return self._run(self._with_db(work))
+
+    def bloom_reconcile_stored_attachments(self, grace_seconds):
+        return self._run(
+            self._with_db(
+                lambda db: attachment_cleanup.reconcile_attachments(
+                    db, orphan_grace_seconds=grace_seconds
+                )
+            )
+        )
+
+    def bloom_migrate_to_s3(self, wrong_size_for=None):
+        real_size = object_store.size_of
+
+        async def wrong_size(name):
+            return 1 if name == wrong_size_for else await real_size(name)
+
+        with patch.object(object_store, "size_of", wrong_size if wrong_size_for else real_size):
+            return self._run(storage_cli.migrate_to_s3())
+
+    def bloom_storage_command(self, arguments, migrated=None):
+        async def fake():
+            return migrated
+
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.ExitStack() as stack:
+            if migrated is not None:
+                stack.enter_context(patch.object(storage_cli, "migrate_to_s3", fake))
+            stack.enter_context(contextlib.redirect_stdout(out))
+            stack.enter_context(contextlib.redirect_stderr(err))
+            code = storage_cli.main(list(arguments))
+        return code, out.getvalue(), err.getvalue()
+
+    def bloom_s3_settings(self, bucket):
+        try:
+            return (
+                Settings(STORAGE_BACKEND="s3", S3_BUCKET=bucket, SECRET_KEY="x" * 40).S3_PREFIX,
+                None,
+            )
+        except ValueError as refused:
+            return None, str(refused)
+
+    def bloom_object_store_client(self, **values):
+        object_store.client.cache_clear()
+        with contextlib.ExitStack() as stack:
+            for name, value in values.items():
+                stack.enter_context(patch.object(settings, name, value))
+            made = object_store.client()
+        object_store.client.cache_clear()
+        return made.meta.endpoint_url, made.meta.region_name
 
     def bloom_seed_creator_records(self):
         return self._run(self._seed_creator_records())
