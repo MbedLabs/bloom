@@ -84,6 +84,12 @@ from app.core import (
     testrail,
 )
 from app.core.config import Settings, settings
+from app.core.external_issue import (
+    parse_github_url,
+    parse_gitlab_url,
+    parse_issue_url,
+    validate_external_fields,
+)
 from app.core.identity import POWERED_BY, PRODUCT_IDENTITY, PRODUCT_NAME
 from app.core.md_import import (
     Parameter,
@@ -345,6 +351,32 @@ class BloomLogicInterface(BloomInterface):
             return id_generator.compute_next_id(existing_ids, prefix, type_code), None
         except ValueError as exc:
             return None, type(exc).__name__
+
+    def bloom_link_roles(self, source, target):
+        return link_rules.get_allowed_link_roles(source, target)
+
+    def bloom_link_role_allowed(self, source, target, role):
+        return link_rules.is_allowed_link_role(source, target, role)
+
+    def bloom_linkable(self, kind):
+        return link_rules.is_known_linkable_type(kind)
+
+    def bloom_parse_issue_link(self, url, tracker=None):
+        readers = {"github": parse_github_url, "gitlab": parse_gitlab_url, None: parse_issue_url}
+        found = readers[tracker](url)
+        return None if found is None else (found.tracker, found.repo_full_name, found.issue_number)
+
+    def bloom_check_external_fields(self, tracker, url, repo, number):
+        return validate_external_fields(tracker, url, repo, number)
+
+    def bloom_github_signature_accepted(self, body, secret, signature):
+        return integrations._verify_sha256_signature(body, secret, signature)
+
+    def bloom_github_signature(self, body, secret):
+        return "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+    def bloom_gitlab_token_accepted(self, secret, token):
+        return integrations._verify_gitlab_token(secret, token)
 
     def bloom_parse_testrail(self, kind, data, mapping=None, **limits):
         with contextlib.ExitStack() as stack:

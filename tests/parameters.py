@@ -3367,3 +3367,38 @@ MSG_TRL_CSV_REFUSED = "the CSV {what} is refused as {phrase}"
 MSG_TRL_COLUMNS = "the header and the detected step columns are read from the CSV"
 MSG_TRL_ROW_LIMIT = "a CSV with more rows than the limit is refused"
 MSG_TRL_MODEL = "a new case model starts without rows"
+DFX_EXACT_ROLES = [("DEF", "TC"), ("CMP", "DEF"), ("DEF", "CMP"), ("TC", "DEF"), ("RPT", "DEF")]
+DFX_INCLUDED_ROLES = [
+    ("DEF", "REQ", ["impacts", "references"]),
+    ("DEF", "DEF", ["duplicates", "relates_to", "depends_on"]),
+    ("CHG", "DEF", ["implements", "references"]),
+]
+DFX_GITHUB = "https://github.com/octocat/Hello-World/issues/42"
+DFX_GITLAB = "https://gitlab.com/mygroup/myproject/-/issues/7"
+DFX_GITLAB_NESTED = "https://gitlab.example.com/org/sub/project/-/issues/99"
+DFX_ISSUE = "https://github.com/owner/repo/issues/5"
+DFX_MISMATCHES = [
+    ("tracker", ("gitlab", "https://github.com/owner/repo/issues/5", None, None), "github"),
+    ("repository", (None, "https://github.com/owner/repo/issues/5", "other/repo", None), "repo"),
+    ("number", (None, "https://github.com/owner/repo/issues/5", None, 99), "99"),
+    ("unsupported tracker", ("jira", None, None, None), "unsupported"),
+    ("unreadable link", (None, "https://example.com/not-an-issue", None, None), "parse"),
+]
+DFX_SECRET = "my-webhook-secret"
+DFX_BODY = b'{"action":"opened"}'
+MSG_DFX_LINKABLE = "defects and campaigns can be linked"
+MSG_DFX_EXACT = "{source} to {target} allows references only"
+MSG_DFX_INCLUDED = "{source} to {target} allows {roles}"
+MSG_DFX_FORBIDDEN = "a defect cannot be linked to a baseline"
+MSG_DFX_GITHUB = "a GitHub issue link reads as tracker, repository and number"
+MSG_DFX_GITLAB = (
+    "a GitLab issue link reads as tracker, repository and number, nested namespaces included"
+)
+MSG_DFX_NOT_AN_ISSUE = "links that are not issues of that tracker read as nothing"
+MSG_DFX_DETECT = "an issue link is read by the tracker it belongs to"
+MSG_DFX_VALID = "matching or empty external fields are accepted"
+MSG_DFX_MISMATCH = "a {what} mismatch is refused with a message naming it"
+MSG_DFX_SIGNATURE = (
+    "a GitHub signature of the body with the secret is accepted and a wrong one refused"
+)
+MSG_DFX_TOKEN = "a GitLab token equal to the secret is accepted and another refused"
