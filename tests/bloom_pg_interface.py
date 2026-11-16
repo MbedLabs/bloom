@@ -21,17 +21,19 @@ from unittest.mock import patch
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from sqlalchemy import bindparam, event, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app import main
 from app.api import cli_auth as cli_auth_api
 from app.api import integrations
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import limiter
 from app.core.security import create_access_token
+from app.models import Project
 from app.models.cli_auth_session import CliAuthSession
 from app.models.user import User, UserRole
 from app.services import cli_auth, integration_sync
@@ -111,6 +113,33 @@ class BloomPgInterface(BloomInterface):
         self.patches.enter_context(patch.object(limiter, "enabled", False))
         self.patches.enter_context(patch.object(settings, "CLI_CODE_MODE_ENABLED", True))
         self.api = app
+
+    def bloom_start_main_api(self):
+        self.patches.enter_context(patch.dict(main.app.dependency_overrides))
+        main.app.dependency_overrides[get_db] = self._serve_session
+        self.patches.enter_context(patch.object(limiter, "enabled", False))
+        self.api = main.app
+
+    def bloom_add_conflicting_route(self):
+        routes = list(main.app.router.routes)
+        letter = self.parameters.CONFLICT_PREFIX_LETTER
+
+        @main.app.post(self.parameters.CONFLICT_PATH, name=self.parameters.CONFLICT_ROUTE_NAME)
+        async def flush_conflict(db=Depends(get_db)):
+            prefix = f"{letter}{uuid.uuid4().hex[:5].upper()}"
+            db.add(Project(name=f"first {prefix}", prefix=prefix))
+            db.add(Project(name=f"second {prefix}", prefix=prefix))
+            await db.flush()
+
+        self.patches.callback(setattr, main.app.router, "routes", routes)
+
+    def bloom_api_post(self, path):
+        answer = self._run(self._post(path))
+        try:
+            body = answer.json()
+        except ValueError:
+            body = None
+        return SimpleNamespace(status=answer.status_code, body=body, text=answer.text)
 
     def bloom_sign_in(self, email):
         user_id = self._run(
@@ -251,6 +280,11 @@ class BloomPgInterface(BloomInterface):
             return await client.request(
                 method, self.parameters.CLI_PREFIX + path, json=body, headers=headers
             )
+
+    async def _post(self, path):
+        transport = httpx.ASGITransport(app=self.api)
+        async with REAL_CLIENT(transport=transport, base_url=self.parameters.API_BASE) as client:
+            return await client.post(path)
 
     async def _fetch_value(self, statement, **values):
         async with self.engine.connect() as connection:

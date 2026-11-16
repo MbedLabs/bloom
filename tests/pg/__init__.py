@@ -11,5 +11,6 @@ SUITES = [
     "tests.pg.BLOOM_cli_auth_migration_round_trip.CliAuthMigrationRoundTripTest",
     "tests.pg.BLOOM_cli_auth_refresh_revocation.CliAuthRefreshRevocationTest",
     "tests.pg.BLOOM_integration_sync_race.IntegrationSyncRaceTest",
+    "tests.pg.BLOOM_integrity_conflict.IntegrityConflictTest",
     "tests.pg.BLOOM_requirement_text_migration.RequirementTextMigrationTest",
 ]
