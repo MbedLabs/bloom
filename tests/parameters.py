@@ -3290,3 +3290,18 @@ MSG_CAT_MAINTAINER_SET = "the released maintainer set is every document and proj
 MSG_CAT_REVIEWER = (
     "the {name} policy grants review only on every document type for its origin and is in no group"
 )
+RDF_ANCHOR = "PRJ-REQ-001"
+RDF_UNKNOWN = "PRJ-REQ-999"
+RDF_OTHER_PREFIX = "ABC"
+RDF_QUERY_PARAMETERS = ["direction", "related_to", "role"]
+MSG_RDF_RESOLVE = "a readable id resolves to its type and row"
+MSG_RDF_UNKNOWN = "an unknown id resolves to nothing"
+MSG_RDF_BOTH = (
+    "the related artefacts cover links in both directions and leave the unrelated requirement out"
+)
+MSG_RDF_ROLE = "the related artefacts narrow to one role"
+MSG_RDF_DIRECTION = "the {direction} related artefacts are the {expected} test case"
+MSG_RDF_NONE = "a document without links has no related artefacts"
+MSG_RDF_PROJECT = "links do not reach across projects"
+MSG_RDF_PARAMETERS = "the document list takes the related_to, role and direction parameters"
+MSG_RDF_SCOPED = "the project holds its two links"

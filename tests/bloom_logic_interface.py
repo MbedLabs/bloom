@@ -54,6 +54,11 @@ from app.api import (
     integrations,
 )
 from app.api import project_variables as project_variables_api
+from app.api.docs_facade import (
+    _related_doc_keys,
+    _resolve_doc_by_public_id,
+    list_all_docs,
+)
 from app.api.export import (
     _test_cases_markdown,
     _test_cases_xml,
@@ -339,6 +344,79 @@ class BloomLogicInterface(BloomInterface):
             return id_generator.compute_next_id(existing_ids, prefix, type_code), None
         except ValueError as exc:
             return None, type(exc).__name__
+
+    def bloom_seed_related_docs(self):
+        return self._run(self._seed_related_docs())
+
+    def bloom_resolve_doc(self, project_id, public_id):
+        return self._run(
+            self._with_db(lambda db: _resolve_doc_by_public_id(db, project_id, public_id))
+        )
+
+    def bloom_related_keys(self, project_id, key, role=None, direction=None):
+        return self._run(
+            self._with_db(lambda db: _related_doc_keys(db, project_id, key, role, direction))
+        )
+
+    def bloom_docs_list_parameters(self):
+        return sorted(
+            name
+            for name in inspect.signature(list_all_docs).parameters
+            if name in ("related_to", "role", "direction")
+        )
+
+    def bloom_count_project_links(self, project_id):
+        return self._run(
+            self._scalar(
+                select(func.count(ArtefactLink.id)).where(ArtefactLink.project_id == project_id)
+            )
+        )
+
+    async def _with_db(self, call):
+        async with self.maker() as db:
+            return await call(db)
+
+    async def _seed_related_docs(self):
+        async with self.maker() as db:
+            project = Project(name="Demo", prefix="PRJ")
+            db.add(project)
+            await db.flush()
+            anchor = Requirement(project_id=project.id, req_id="PRJ-REQ-001", title="Anchor")
+            other = Requirement(project_id=project.id, req_id="PRJ-REQ-002", title="Unrelated")
+            verifying = TestCase(project_id=project.id, tc_id="PRJ-TC-001", title="Verifies anchor")
+            covering = TestCase(project_id=project.id, tc_id="PRJ-TC-002", title="Covers anchor")
+            db.add_all([anchor, other, verifying, covering])
+            await db.flush()
+            db.add_all(
+                [
+                    ArtefactLink(
+                        project_id=project.id,
+                        source_type="REQ",
+                        source_id=anchor.id,
+                        target_type="TC",
+                        target_id=verifying.id,
+                        role="verifies",
+                        suspect=False,
+                    ),
+                    ArtefactLink(
+                        project_id=project.id,
+                        source_type="TC",
+                        source_id=covering.id,
+                        target_type="REQ",
+                        target_id=anchor.id,
+                        role="covers",
+                        suspect=False,
+                    ),
+                ]
+            )
+            await db.commit()
+            return SimpleNamespace(
+                project=project.id,
+                anchor=anchor.id,
+                other=other.id,
+                verifying=verifying.id,
+                covering=covering.id,
+            )
 
     def bloom_default_catalogue(self):
         return copy.deepcopy(DEFAULT_POLICIES), copy.deepcopy(DEFAULT_GROUPS)
