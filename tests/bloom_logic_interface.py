@@ -59,6 +59,7 @@ from app.api import (
     integrations,
 )
 from app.api import project_variables as project_variables_api
+from app.api.artefacts import create_comment
 from app.api.attachments import download_attachment, publish_test_report
 from app.api.campaigns import create_campaign
 from app.api.changes import create_change_request
@@ -86,8 +87,14 @@ from app.api.import_service import (
     import_testrail,
     testrail_csv_columns,
 )
+from app.api.notifications import (
+    list_notifications,
+    mark_all_read,
+    mark_read,
+    unread_count,
+)
 from app.api.policies import _apply_rules, _validate_rules, policy_rules
-from app.api.requirements import create_requirement
+from app.api.requirements import create_requirement, get_requirement, update_requirement
 from app.api.risks import create_risk_item
 from app.api.search import run_global_search
 from app.api.test_cases import create_test_case
@@ -197,8 +204,9 @@ from app.services.jira_inbound import (
     referenced_tc_ids,
     search_fields,
 )
+from app.services.notification_service import notify, notify_assignment
 from app.services.reqif_worker import ReqIFProcessingTimeout, parse_reqif_in_worker
-from tests.access_fixtures import scenario_type_tags
+from tests.access_fixtures import project_access_fixture, scenario_type_tags
 from tests.bloom_interface import BloomInterface
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -402,6 +410,193 @@ class BloomLogicInterface(BloomInterface):
             return id_generator.compute_next_id(existing_ids, prefix, type_code), None
         except ValueError as exc:
             return None, type(exc).__name__
+
+    def bloom_seed_notification_users(self):
+        async def work(db):
+            project = Project(name="Demo", prefix="PRJ")
+            admin = User(
+                email="admin@test.local",
+                full_name="Ada Admin",
+                hashed_password="x",
+                role=UserRole.admin,
+            )
+            reviewer = User(
+                email="rev@test.local",
+                full_name="Rita Reviewer",
+                hashed_password="x",
+                role=UserRole.maintainer,
+            )
+            db.add_all([project, admin, reviewer])
+            await db.flush()
+            db.add(
+                project_access_fixture(
+                    user_id=reviewer.id, project_id=project.id, permissions={"*": ["*"]}
+                )
+            )
+            await db.commit()
+            return SimpleNamespace(project=project.id, admin=admin.id, reviewer=reviewer.id)
+
+        return self._run(self._with_db(work))
+
+    def bloom_notify(self, user_id, actor_id, title):
+        async def work(db):
+            actor = await db.get(User, actor_id)
+            created = await notify(db, user_id=user_id, event_type="test", title=title, actor=actor)
+            await db.commit()
+            return None if created is None else created.id
+
+        return self._run(self._with_db(work))
+
+    def bloom_notify_same_assignee(self, project_id, assignee_id, actor_id):
+        async def work(db):
+            await notify_assignment(
+                db,
+                assignee_id=assignee_id,
+                previous_assignee_id=assignee_id,
+                role_label="reviewer",
+                artefact_label="requirement PRJ-REQ-001",
+                project_id=project_id,
+                link_path="/x",
+                actor=await db.get(User, actor_id),
+            )
+            await db.commit()
+
+        self._run(self._with_db(work))
+
+    def bloom_list_notification_rows(self):
+        return self._run(self._all(select(Notification).order_by(Notification.id)))
+
+    def bloom_create_requirement_as(self, user_id, **fields):
+        async def work(db):
+            created = await create_requirement(
+                data=schemas.RequirementCreate(**fields),
+                db=db,
+                current_user=await db.get(User, user_id),
+            )
+            await db.commit()
+            return created.id
+
+        return self._run(self._with_db(work))
+
+    def bloom_update_requirement_as(self, user_id, requirement_id, **fields):
+        async def work(db):
+            try:
+                await update_requirement(
+                    requirement_id=requirement_id,
+                    data=schemas.RequirementUpdate(**fields),
+                    db=db,
+                    current_user=await db.get(User, user_id),
+                )
+            except HTTPException as refused:
+                await db.rollback()
+                return refused.status_code, refused.detail
+            await db.commit()
+            return None
+
+        return self._run(self._with_db(work))
+
+    def bloom_list_notifications_as(self, user_id, unread_only=False):
+        async def work(db):
+            return await list_notifications(
+                unread_only=unread_only,
+                limit=20,
+                offset=0,
+                db=db,
+                current_user=await db.get(User, user_id),
+            )
+
+        return self._run(self._with_db(work))
+
+    def bloom_unread_count(self, user_id):
+        async def work(db):
+            return (await unread_count(db=db, current_user=await db.get(User, user_id))).unread
+
+        return self._run(self._with_db(work))
+
+    def bloom_mark_read(self, user_id, notification_id):
+        async def work(db):
+            try:
+                marked = await mark_read(
+                    notification_id=notification_id, db=db, current_user=await db.get(User, user_id)
+                )
+            except HTTPException as refused:
+                return None, refused.status_code
+            await db.commit()
+            return marked.read_at is not None, None
+
+        return self._run(self._with_db(work))
+
+    def bloom_mark_all_read(self, user_id):
+        async def work(db):
+            await mark_all_read(db=db, current_user=await db.get(User, user_id))
+            await db.commit()
+
+        self._run(self._with_db(work))
+
+    def bloom_add_external_assignee_requirement(self, project_id, origin, approver_id):
+        async def work(db):
+            external = User(
+                email="ext@test.local",
+                full_name="Eve External",
+                hashed_password="x",
+                role=UserRole.external,
+            )
+            db.add(external)
+            await db.flush()
+            db.add(
+                project_access_fixture(
+                    user_id=external.id,
+                    project_id=project_id,
+                    permissions={"*": ["view", "comment"]},
+                    visibility="customer",
+                    doc_types=["REQ"],
+                )
+            )
+            requirement = Requirement(
+                project_id=project_id,
+                req_id="PRJ-REQ-009",
+                title="Kept assignment",
+                req_origin=origin,
+                visibility="customer" if origin == "Customer" else "internal",
+                reviewer_id=external.id,
+                approver_id=approver_id,
+            )
+            db.add(requirement)
+            await db.commit()
+            return SimpleNamespace(external=external.id, requirement=requirement.id)
+
+        return self._run(self._with_db(work))
+
+    def bloom_set_requirement_assignees(self, requirement_id, **fields):
+        async def work(db):
+            requirement = await db.get(Requirement, requirement_id)
+            for name, value in fields.items():
+                setattr(requirement, name, value)
+            await db.commit()
+
+        self._run(self._with_db(work))
+
+    def bloom_comment_on_requirement(self, user_id, requirement_id, body):
+        async def work(db):
+            await create_comment(
+                artefact_type="requirement",
+                artefact_id=str(requirement_id),
+                data=schemas.ArtefactCommentCreate(body=body),
+                db=db,
+                current_user=await db.get(User, user_id),
+            )
+            await db.commit()
+
+        self._run(self._with_db(work))
+
+    def bloom_requirement_signers(self, user_id, requirement_id):
+        async def work(db):
+            shown = await get_requirement(
+                requirement_id=requirement_id, db=db, current_user=await db.get(User, user_id)
+            )
+            return shown.reviewer_can_sign, shown.approver_can_sign
+
+        return self._run(self._with_db(work))
 
     def bloom_seed_markdown_project(self):
         async def work(db):

@@ -3652,3 +3652,21 @@ MSG_MDI_TEST_CASE = "a test case section is imported with its id, description an
 MSG_MDI_PERMISSION = (
     "an import needs the import permission on every imported type, and creates nothing without it"
 )
+NTF_REQUIREMENT_LINK = "/docs/requirements/PRJ-REQ-001"
+NTF_HIDDEN_DETAIL = "The reviewer could no longer see PRJ-REQ-009."
+MSG_NTF_CREATED = "a notification for another user is stored for that user"
+MSG_NTF_SELF = "a notification for the acting user is skipped"
+MSG_NTF_SAME_ASSIGNEE = "an assignment that does not change the assignee notifies nobody"
+MSG_NTF_REVIEWER = "creating a requirement with a reviewer sends that reviewer one assignment notification linking to it"
+MSG_NTF_APPROVER = "setting an approver sends that approver one assignment notification"
+MSG_NTF_APPROVER_ONCE = "a later change that keeps the approver sends no second notification"
+MSG_NTF_LIST = "three notifications are listed and counted as unread"
+MSG_NTF_MARK_ONE = "marking one as read leaves two unread"
+MSG_NTF_MARK_ALL = "marking all as read leaves none unread and an empty unread list"
+MSG_NTF_PRIVATE = "another user lists none of them and cannot mark one as read: 404"
+MSG_NTF_VISIBLE_ASSIGNEE = "a comment notifies only the assignee who can see the requirement"
+MSG_NTF_HIDDEN_APPROVER = "an approver who cannot see the requirement receives nothing"
+MSG_NTF_HIDING_REFUSED = (
+    "a change that hides a requirement from its reviewer is refused with 409 naming it"
+)
+MSG_NTF_CANNOT_SIGN = "a kept external reviewer is shown as unable to sign, the approver as able"

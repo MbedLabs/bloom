@@ -66,6 +66,7 @@ SUITES = [
     "tests.logic.BLOOM_link_rules.LinkRulesTest",
     "tests.logic.BLOOM_md_import.MdImportTest",
     "tests.logic.BLOOM_next_doc_id.NextDocIdTest",
+    "tests.logic.BLOOM_notifications.NotificationsTest",
     "tests.logic.BLOOM_object_storage.ObjectStorageTest",
     "tests.logic.BLOOM_permissions.PermissionsTest",
     "tests.logic.BLOOM_policy_action_separation.PolicyActionSeparationTest",
