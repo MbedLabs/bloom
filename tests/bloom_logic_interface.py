@@ -53,13 +53,15 @@ from app.api import (
     integrations,
 )
 from app.api import project_variables as project_variables_api
-from app.api.export import export_test_cases
+from app.api.export import _test_cases_markdown, _test_cases_xml, export_test_cases
 from app.api.import_service import (
     ImportResult,
     _import_docs,
+    _import_rows_from_xml,
     _next_number,
     import_test_cases_file,
 )
+from app.api.policies import _apply_rules, _validate_rules, policy_rules
 from app.core import (
     document_kinds,
     id_generator,
@@ -75,7 +77,15 @@ from app.core.md_import import (
     parameter_name_collisions,
     parse_markdown_document,
 )
+from app.core.permissions import (
+    DOC_TYPE_RESOURCES,
+    EXTERNAL_DENIED_ACTIONS,
+    actions_for_rule,
+    actions_on,
+    rule_of,
+)
 from app.core.security import (
+    _policy_terms,
     create_access_token,
     get_current_user,
     get_external_doc_types,
@@ -85,6 +95,7 @@ from app.core.service_auth import (
     require_bud_sync_token,
     revoke_service_credential,
 )
+from app.core.tc_steps import make_row, rows_to_text, text_to_rows
 from app.models import (
     ArtefactLink,
     AuditEvent,
@@ -99,11 +110,13 @@ from app.models import (
     TestCase,
     user_token,
 )
+from app.models.groups import Policy
 from app.models.models import ServiceCredential
 from app.models.user import User, UserRole
 from app.schemas import ProjectCreate, ProjectVariableUpdate
 from app.schemas import auth as auth_schemas
 from app.schemas import schemas
+from app.schemas.groups import PolicyRule
 from app.services import (
     attachment_storage,
     import_attempts,
@@ -577,6 +590,93 @@ class BloomLogicInterface(BloomInterface):
             )
             await db.commit()
             return result
+
+    def bloom_actions_for_rule(self, resource, *flags, **named):
+        return set(actions_for_rule(resource, *flags, **named))
+
+    def bloom_actions_on(self, matrix, resource):
+        return actions_on(matrix, resource)
+
+    def bloom_rule_of(self, actions):
+        return rule_of(actions)
+
+    def bloom_review_rule_roundtrip(self):
+        policy = Policy(name="Review only", scope="document", permissions={}, type_tags={})
+        _apply_rules(policy, {"REQ": PolicyRule(review=True, visibility=["customer"])})
+        stored = (dict(policy.permissions), dict(policy.type_tags))
+        shown = policy_rules(policy)["REQ"]
+        _apply_rules(policy, {"REQ": shown})
+        flags = (shown.review, shown.read, shown.write, shown.approve, shown.delete)
+        return stored, flags, dict(policy.permissions)
+
+    def bloom_validate_rule(self, resource, scope=None, **rule):
+        try:
+            if scope is None:
+                self._run(_validate_rules(None, {resource: PolicyRule(**rule)}))
+            else:
+                self._run(_validate_rules(None, {resource: PolicyRule(**rule)}, scope))
+        except HTTPException as refused:
+            return refused.detail
+        return None
+
+    def bloom_permission_resources_of_documents(self):
+        return list(DOC_TYPE_RESOURCES)
+
+    def bloom_external_denied_actions(self):
+        return set(EXTERNAL_DENIED_ACTIONS)
+
+    def bloom_external_review_terms(self, permissions, type_tags):
+        policy = Policy(
+            name="Customer reviewer", scope="project", permissions=permissions, type_tags=type_tags
+        )
+        return [
+            (term.permissions, term.customer_only, term.doc_types)
+            for term in _policy_terms(policy, external=True)
+        ]
+
+    def bloom_editor_rows(self, specs):
+        return [
+            make_row(kind, description, expected, indent=indent)
+            for kind, description, expected, indent in specs
+        ]
+
+    def bloom_rows_to_text(self, rows):
+        return rows_to_text(rows)
+
+    def bloom_text_to_rows(self, text):
+        return text_to_rows(text)
+
+    def bloom_row_fields(self, rows):
+        return [
+            (r["row_type"], r["label"], r["indent_level"], r["description"], r["expected_result"])
+            for r in rows
+        ]
+
+    def bloom_step_case(self, **overrides):
+        values = {
+            "tc_id": "PRJ-TC-001",
+            "title": "Boot within budget",
+            "status": "Approved",
+            "visibility": "internal",
+            "preconditions": None,
+            "steps": [],
+            "description": "Measures the cold boot time.",
+            "last_execution_status": None,
+            "created_at": None,
+            "updated_at": None,
+        }
+        values.update(overrides)
+        return SimpleNamespace(**values)
+
+    def bloom_xml_reimport(self, cases):
+        return _import_rows_from_xml(
+            _test_cases_xml(SimpleNamespace(name="Demo", prefix="PRJ"), cases)
+        )
+
+    def bloom_markdown_reimport(self, cases):
+        return parse_markdown_document(
+            _test_cases_markdown(SimpleNamespace(name="Demo", prefix="PRJ"), cases)
+        )
 
     def bloom_revision_sources(self):
         versions = ROOT / "alembic" / "versions"

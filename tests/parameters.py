@@ -3034,3 +3034,61 @@ MSG_ITC_UPDATED = "the updated test case has its new title, stays a draft and ha
 MSG_ITC_NO_APPROVAL = "a CSV import that sets Approved is skipped and changes nothing"
 MSG_ITC_XML = "an XML import creates the test case with its step and a project id"
 MSG_ITC_NO_TITLE = "a row without a title is skipped with its error"
+PAS_PROJECT_RESOURCES = [
+    "baseline",
+    "parameter",
+    "link",
+    "project",
+    "users",
+    "access",
+    "application",
+]
+PAS_NO_APPROVAL = ["STD", "RSK", "CMP"]
+PAS_NO_EXTRA_REVIEW = ["RPT", "STD", "RSK", "CMP"]
+PAS_OTHER_ACTIONS = ["view", "comment", "create", "edit", "approve", "delete"]
+MSG_PAS_WRITE = "write gives create, edit and view but not review, approve or delete"
+MSG_PAS_APPROVE = "approve and delete give review, approve and delete and nothing else"
+MSG_PAS_WRITE_READ = "write includes read and comment without approve, review or delete"
+MSG_PAS_STORED = "a stored edit reads as view, comment and edit without changing the stored matrix"
+MSG_PAS_REVIEW = "review alone on {resource} grants review and no other action"
+MSG_PAS_ROUNDTRIP = "a review rule is stored and shown back as review only"
+MSG_PAS_ORIGIN = "a review rule without a tag is refused"
+MSG_PAS_PROJECT = "review is refused on {resource}"
+MSG_PAS_EXCEPTION = "approve is refused on {resource}"
+MSG_PAS_EXTERNAL = "external readers may review but never approve or delete"
+MSG_PAS_NO_EXTRA = "write and approve on {resource} do not add review"
+MSG_PAS_TERM = "an external review term keeps review and the customer scope only"
+TCS_EDITOR_ROWS = [
+    ("precondition", "device under test powered off through the relay", "", 0),
+    ("loop", "repeat {{BOOT_CYCLES}} times", "", 0),
+    ("step", "switch the relay on", "relay reports closed", 1),
+    (
+        "step",
+        "measure the time from relay on\nto the boot banner",
+        "within {{BOOT_BUDGET_MS}} ms\n+- {{BOOT_TOLERANCE_MS}} ms",
+        1,
+    ),
+]
+TCS_FIRST_LINES = [
+    "- Pre-Condition: device under test powered off through the relay",
+    "- Loop: repeat {{BOOT_CYCLES}} times",
+    "  - Step: switch the relay on => relay reports closed",
+]
+TCS_ROW_KEYS = [
+    "collapsed",
+    "description",
+    "expected_result",
+    "id",
+    "indent_level",
+    "label",
+    "row_type",
+]
+MSG_TCS_TEXT = "editor rows are written as text and read back as the same rows"
+MSG_TCS_CONTRACT = "a row read from text has the editor's fields and starts expanded with an id"
+MSG_TCS_LEGACY_WRITE = "older stored steps are still written as step lines"
+MSG_TCS_LEGACY_READ = "older numbered text is still read as steps"
+MSG_TCS_EMPTY = "empty step text reads as nothing and nothing writes as empty text"
+MSG_TCS_LEADING = "text before the first row becomes a step"
+MSG_TCS_XML = "the XML export reimports with the same rows"
+MSG_TCS_MARKDOWN = "the Markdown export reimports as the same test case"
+MSG_TCS_PRECONDITION = "plain preconditions become a precondition row in the Markdown export"
