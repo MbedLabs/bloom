@@ -411,6 +411,29 @@ class BloomLogicInterface(BloomInterface):
         except ValueError as exc:
             return None, type(exc).__name__
 
+    def bloom_run_test_bootstrap(self, code="", extra_env=None, with_folder=False):
+        kept = {"PATH", "PYTHONPATH", "HOME", "LANG"}
+        env = {key: value for key, value in os.environ.items() if key in kept}
+        for prefix in ("", "BLOOM_"):
+            env.update(
+                {prefix + key: value for key, value in self.parameters.ISO_INHERITED.items()}
+            )
+        env.update(self.parameters.ISO_FLAGS)
+        env.update(extra_env or {})
+        with contextlib.ExitStack() as stack:
+            if with_folder:
+                env["ISOLATION_FOLDER"] = stack.enter_context(self._temp_dir())
+            done = subprocess.run(
+                [sys.executable, "-c", self.parameters.ISO_PRELUDE + code],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+            )
+        return SimpleNamespace(
+            output=done.stdout.strip(), failed=done.returncode != 0, errors=done.stderr
+        )
+
     def bloom_seed_notification_users(self):
         async def work(db):
             project = Project(name="Demo", prefix="PRJ")

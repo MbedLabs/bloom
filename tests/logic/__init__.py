@@ -61,6 +61,7 @@ SUITES = [
     "tests.logic.BLOOM_integration_sync_unchanged_run.IntegrationSyncUnchangedRunTest",
     "tests.logic.BLOOM_integration_sync_unreadable_repository.IntegrationSyncUnreadableRepositoryTest",
     "tests.logic.BLOOM_invites.InvitesTest",
+    "tests.logic.BLOOM_isolation.IsolationTest",
     "tests.logic.BLOOM_jira_inbound.JiraInboundTest",
     "tests.logic.BLOOM_jira_outbound_send.JiraOutboundSendTest",
     "tests.logic.BLOOM_link_rules.LinkRulesTest",

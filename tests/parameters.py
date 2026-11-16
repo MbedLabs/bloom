@@ -3670,3 +3670,102 @@ MSG_NTF_HIDING_REFUSED = (
     "a change that hides a requirement from its reviewer is refused with 409 naming it"
 )
 MSG_NTF_CANNOT_SIGN = "a kept external reviewer is shown as unable to sign, the approver as able"
+ISO_PRELUDE = "\nimport json, os, smtplib, socket, sys\nfrom pathlib import Path\noriginal_read = Path.read_text\ndef safe_read(path, *args, **kwargs):\n    if path.name == '.env':\n        raise PermissionError('Operator dotenv reads are forbidden')\n    return original_read(path, *args, **kwargs)\nPath.read_text = safe_read\nimport tests.config\n"
+ISO_INHERITED = {
+    "SECRET_KEY": "synthetic-inherited-secret-key-at-least-32-characters",
+    "SMTP_HOST": "smtp.example.com",
+    "SMTP_USERNAME": "synthetic-user",
+    "SMTP_PASSWORD": "synthetic-password",
+    "S3_ACCESS_KEY_ID": "synthetic-access",
+    "S3_SECRET_ACCESS_KEY": "synthetic-storage-secret",
+    "ADMIN_PASSWORD": "synthetic-admin-password",
+}
+ISO_FLAGS = {
+    "BLOOM_TESTS_USE_DOTENV": "1",
+    "BLOOM_DOTENV_DISABLED": "0",
+    "BLOOM_DATABASE_URL": "postgresql://synthetic:synthetic@db.example.com/live",
+}
+ISO_REPLACED = {
+    "SECRET_KEY": "test-secret-key-for-ci-at-least-32-characters-long",
+    "SMTP_HOST": "127.0.0.1",
+    "SMTP_USERNAME": "",
+    "SMTP_PASSWORD": "",
+    "S3_ACCESS_KEY_ID": "",
+    "S3_SECRET_ACCESS_KEY": "",
+    "ADMIN_PASSWORD": "ci-admin-password-123",
+}
+ISO_READ_CREDENTIALS = "\nkeys = ['SECRET_KEY', 'SMTP_HOST', 'SMTP_USERNAME', 'SMTP_PASSWORD', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY', 'ADMIN_PASSWORD']\nprint(json.dumps({prefix + key: os.environ.get(prefix + key) for prefix in ('', 'BLOOM_') for key in keys} | {'dotenv': os.environ.get('BLOOM_DOTENV_DISABLED')}))\n"
+ISO_EXTERNAL_SMTP = "\ndef attempted(*args, **kwargs):\n    raise RuntimeError('Network connection was attempted')\nsocket.create_connection = attempted\ntry:\n    smtplib.SMTP('smtp.example.com', 587)\nexcept PermissionError:\n    print('blocked before network')\n"
+ISO_SMTP_AUTH = "\ntry:\n    sys.audit('smtplib.send', smtplib.SMTP(), b'AUTH PLAIN synthetic')\nexcept PermissionError:\n    print('blocked before credentials')\n"
+ISO_MAILPIT = "sys.audit('smtplib.connect', smtplib.SMTP(), '127.0.0.1', 11025); print('allowed')"
+ISO_OTHER_MAILPIT = (
+    "sys.audit('smtplib.connect', smtplib.SMTP(), '127.0.0.1', 21025); print('allowed')"
+)
+ISO_LIVE_DATABASE = "postgresql://synthetic-user:synthetic-password@db.example.com/live"
+ISO_DATABASE_REFUSAL = "Tests require the isolated test database"
+ISO_SMTP_REFUSAL = "dedicated test Mailpit port"
+ISO_DOTENV_READ = "\ntry:\n    sys.audit('open', str(Path.cwd() / '.env'), 'r', 0)\nexcept PermissionError:\n    print('operator dotenv blocked')\n"
+ISO_TEST_DATABASE = "postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom"
+ISO_OVERRIDES = ["?host=db.example.com", "?password=synthetic-password", "#fragment", "?port=5433"]
+ISO_AWS_INHERITED = {
+    "AWS_ACCESS_KEY_ID": "synthetic-inherited-access",
+    "AWS_SECRET_ACCESS_KEY": "synthetic-inherited-secret",
+    "AWS_SESSION_TOKEN": "synthetic-inherited-session",
+}
+ISO_AWS_READ = "\nimport boto3\ncredentials = boto3.Session().get_credentials()\nprint(json.dumps({'access_key': credentials.access_key, 'secret_key': credentials.secret_key, 'source': credentials.method, 'credentials_file': os.environ.get('AWS_SHARED_CREDENTIALS_FILE'), 'config_file': os.environ.get('AWS_CONFIG_FILE'), 'metadata_disabled': os.environ.get('AWS_EC2_METADATA_DISABLED')}))\n"
+ISO_AWS_REPLACED = {
+    "access_key": "test-access-key",
+    "secret_key": "test-secret-key",
+    "source": "env",
+    "credentials_file": "/dev/null",
+    "config_file": "/dev/null",
+    "metadata_disabled": "true",
+}
+ISO_SETTINGS_DOTENV = "\nfrom app.core.config import Settings\npath = Path(os.environ['ISOLATION_FOLDER']) / '.env'\npath.write_text('SECRET_KEY=synthetic-file-secret-key-at-least-32-characters\\n')\noriginal_open = Path.open\ndef guarded_open(path, *args, **kwargs):\n    if path.name == '.env':\n        raise AssertionError('Disabled dotenv source was opened')\n    return original_open(path, *args, **kwargs)\nPath.open = guarded_open\nSettings(_env_file=path)\nprint('dotenv source not opened')\n"
+ISO_LIMITER = "from app.core.deps import limiter; print('limiter loaded safely')"
+ISO_WRONG_DATABASES = [
+    ("a SQLite file", "sqlite+aiosqlite:////srv/operator.db"),
+    (
+        "another PostgreSQL driver",
+        "postgresql+psycopg://test_user:test_password@localhost:15432/test_bloom",
+    ),
+]
+ISO_MIGRATION_DATABASE = (
+    "postgresql+asyncpg://test_user:test_password@localhost:15432/k75_abcdef0123"
+)
+ISO_DEV_POSTGRES_PORTS = [":5432", ":5433", ":5434", ":80", ""]
+ISO_OTHER_PORT_DATABASE = "postgresql+asyncpg://test_user:test_password@127.0.0.1:25432/test_bloom"
+ISO_READ_SERVICES = (
+    "print(json.dumps({'database': os.environ['DATABASE_URL'], 'smtp': os.environ['SMTP_PORT']}))"
+)
+ISO_DEFAULT_SERVICES = {
+    "database": "postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom",
+    "smtp": "11025",
+}
+ISO_DEV_SMTP_PORTS = ["1025", "8025", "25", "587", "465", "2525", "0", "70000", "abc", ""]
+ISO_DEV_MAILPIT_PORTS = [1025, 8025, 25]
+ISO_CONNECT_MAILPIT = "\ntry:\n    smtplib.SMTP('127.0.0.1', {port})\nexcept PermissionError:\n    print('blocked before network')\n"
+MSG_ISO_DOTENV_OFF = "loading the test configuration turns the dotenv file off"
+MSG_ISO_REPLACED = "the inherited {name} is replaced by the test value"
+MSG_ISO_EXTERNAL_SMTP = "an external mail server is refused before any network connection"
+MSG_ISO_SMTP_AUTH = "mail authentication is refused before credentials are sent"
+MSG_ISO_MAILPIT = "the test Mailpit on its dedicated port is allowed"
+MSG_ISO_LIVE_DATABASE = (
+    "a database that is not the test database is refused without showing its address or password"
+)
+MSG_ISO_DOTENV_READ = "opening the operator dotenv file is refused"
+MSG_ISO_OVERRIDE = "the test database address with {suffix} added is refused"
+MSG_ISO_AWS = "inherited AWS credentials are replaced by test credentials from the environment only"
+MSG_ISO_SETTINGS = "the settings do not open a dotenv file"
+MSG_ISO_LIMITER = "the rate limiter loads without the dotenv file"
+MSG_ISO_WRONG_DATABASE = "{what} is refused as database"
+MSG_ISO_MIGRATION_DATABASE = "a temporary migration database with the test credentials is allowed"
+MSG_ISO_MIGRATION_OVERRIDE = "a temporary migration database with a host override is refused"
+MSG_ISO_DEV_POSTGRES = "the test database on local development port '{port}' is refused"
+MSG_ISO_OTHER_POSTGRES = "another PostgreSQL port outside the development ports is allowed"
+MSG_ISO_DEFAULTS = "without a database address the dedicated test database and mail ports are used"
+MSG_ISO_DEV_SMTP = "the mail port '{port}' is refused"
+MSG_ISO_OTHER_SMTP = "another mail port outside the development ports is allowed"
+MSG_ISO_DEV_MAILPIT = (
+    "a connection to the local development Mailpit on port {port} is refused before the network"
+)
