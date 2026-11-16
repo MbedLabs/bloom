@@ -2342,3 +2342,23 @@ MSG_EXPORT_MATRIX = "an external exporter's traceability export holds the custom
 MSG_EXPORT_TESTS = "an external exporter's test case export holds the customer test case only"
 MSG_EXPORT_NO_HIDDEN = "the {kind} export does not contain the internal title"
 MSG_EXPORT_DOSSIER = "the dossier is refused with 403 to an exporter of requirements only"
+READER_CUSTOMER_SPEC = f"{VISIBILITY_PREFIX}-SPEC-001"
+READER_INTERNAL_SPEC = f"{VISIBILITY_PREFIX}-SPEC-002"
+READER_DOC_TYPES = ["REQ", "SPEC"]
+READER_REQUIREMENTS_SLUG = "requirements"
+READER_SPECIFICATIONS_SLUG = "specifications"
+READER_DETAIL_STATUSES = (200, 404, 200, 404)
+READER_CUSTOMER_ORIGIN = "Customer"
+READER_INTERNAL_ORIGIN = "Internal"
+READER_NEW_TITLE = " ".join(_draw.sample(_WORDS, 3))
+MSG_READER_DOCS_LIST = (
+    "an external reader lists the customer requirement and the customer specification only"
+)
+MSG_READER_DOCS_VISIBILITY = "every listed document carries the customer visibility"
+MSG_READER_DOCS_DETAIL = (
+    "the customer documents open with 200 and the internal ones are answered 404"
+)
+MSG_READER_REQ_LIST = "an external reader lists the customer requirement and not the internal one"
+MSG_READER_REQ_HIDDEN = "an internal requirement is answered 404 to an external reader"
+MSG_READER_ORIGIN_CUSTOMER = "a requirement created with the Customer origin is customer-visible"
+MSG_READER_ORIGIN_INTERNAL = "a requirement changed to the Internal origin becomes internal"

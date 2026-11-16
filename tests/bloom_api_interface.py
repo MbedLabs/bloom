@@ -520,6 +520,21 @@ class BloomApiInterface(BloomInterface):
         query = select(AuditEvent).where(AuditEvent.action == action).order_by(AuditEvent.id)
         return [event.details for event in self._run(self._all(query))]
 
+    def bloom_api_list_docs_of_types(self, headers, prefix, types):
+        query = [("type", doc_type) for doc_type in types]
+        return self.bloom_api_call("GET", f"/api/projects/{prefix}/docs", headers, params=query)
+
+    def bloom_api_open_doc(self, headers, prefix, slug, doc_id):
+        return self.bloom_api_call("GET", f"/api/projects/{prefix}/docs/{slug}/{doc_id}", headers)
+
+    def bloom_api_create_requirement_of_origin(self, headers, project_id, title, origin):
+        body = {"project_id": project_id, "title": title, "req_origin": origin}
+        return self.bloom_api_call("POST", "/api/requirements", headers, json=body)
+
+    def bloom_api_set_requirement_origin(self, headers, requirement_id, origin):
+        path = f"/api/requirements/{requirement_id}"
+        return self.bloom_api_call("PATCH", path, headers, json={"req_origin": origin})
+
     def bloom_api_get_baseline(self, headers, baseline_id):
         return self.bloom_api_call("GET", f"/api/baselines/{baseline_id}", headers)
 
