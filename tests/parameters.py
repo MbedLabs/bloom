@@ -4518,3 +4518,31 @@ MSG_SETUP_CLOSED = "after setup the status is closed and a second setup is a 409
 MSG_SETUP_SHORT = "a password below the policy is refused with 422"
 MSG_SETUP_NO_MAIL = "setup succeeds and closes when mail is unavailable"
 MSG_SETUP_MAIL = "setup mails the new administrator a link to the login page"
+PCB_PREFIXES = ("PCA", "PCB", "PCC", "PCD", "PCE", "PCF", "PCG", "PCH", "PCI")
+PCB_COUNT_KEYS = (
+    "requirement_count",
+    "test_case_count",
+    "campaign_count",
+    "design_count",
+    "risk_count",
+    "change_count",
+    "test_concept_count",
+    "test_suite_count",
+    "defect_count",
+    "coverage_percent",
+    "uncovered_requirement_count",
+)
+MSG_PCB_SAME = (
+    "the project list and the project detail report the same {key} for the {project} project"
+)
+MSG_PCB_COUNTS = "the busy project lists 3 requirements and the empty one none"
+MSG_PCB_ISOLATED = "a requirement of one project is counted for that project only"
+MSG_PCB_SCALE = "listing four more projects takes at most two more statements"
+BLK_PREFIXES = ("BLA", "BLB", "BLC", "BLD", "BLE", "BLF")
+BLK_UNKNOWN_SUITE = 987654
+MSG_BLK_UNKNOWN = "a campaign with an unknown suite is refused with 404 naming the suite id"
+MSG_BLK_FOREIGN = (
+    "a campaign with a suite of another project is refused with 404 naming the suite id"
+)
+MSG_BLK_SKIPPED = "a suite keeps its own project's test case and skips the foreign and unknown ones"
+MSG_BLK_SECTIONS = "the document list counts the sections of each document separately"
