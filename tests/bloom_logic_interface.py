@@ -40,6 +40,7 @@ from xml.etree import ElementTree
 
 import httpx
 import yaml
+from cryptography.fernet import Fernet
 from fastapi import HTTPException, Response, UploadFile
 from moto import mock_aws
 from pydantic import BaseModel, ValidationError
@@ -444,6 +445,34 @@ class BloomLogicInterface(BloomInterface):
             return id_generator.compute_next_id(existing_ids, prefix, type_code), None
         except ValueError as exc:
             return None, type(exc).__name__
+
+    def bloom_load_settings(self, env):
+        cleared = [
+            *self.parameters.CFG_ENV_NAMES,
+            "BLOOM_INTEGRATION_ENCRYPTION_KEY",
+            "INTEGRATION_ENCRYPTION_KEY",
+        ]
+        with patch.dict(os.environ):
+            for name in cleared:
+                os.environ.pop(name, None)
+            os.environ.update(env)
+            try:
+                return Settings(_env_file=None), None
+            except ValueError as refused:
+                return None, str(refused)
+
+    def bloom_read_settings(self, loaded, names):
+        plain = (bool, int, list, str, type(None))
+        if loaded is None:
+            return None
+        values = {name: getattr(loaded, name) for name in names}
+        return {
+            name: value if isinstance(value, plain) else str(value)
+            for name, value in values.items()
+        }
+
+    def bloom_new_encryption_key(self):
+        return Fernet.generate_key().decode()
 
     def bloom_seed_workflow_author(self):
         async def work(db):

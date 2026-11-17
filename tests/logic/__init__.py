@@ -17,6 +17,7 @@ SUITES = [
     "tests.logic.BLOOM_campaign_sync_results.CampaignSyncResultsTest",
     "tests.logic.BLOOM_cloudron_metadata.CloudronMetadataTest",
     "tests.logic.BLOOM_company_logo.CompanyLogoTest",
+    "tests.logic.BLOOM_config.ConfigTest",
     "tests.logic.BLOOM_container_start.ContainerStartTest",
     "tests.logic.BLOOM_copy_import.CopyImportTest",
     "tests.logic.BLOOM_default_policy_catalogue.DefaultPolicyCatalogueTest",

@@ -4107,3 +4107,348 @@ MSG_DWF_REVIEW_WRITE = "an unguarded {change} write in review returns the docume
 MSG_DWF_PREPARED = (
     "a prepared scope edit returns a review to Draft and leaves an approved document approved"
 )
+CFG_ENV_NAMES = [
+    "ACCESS_TOKEN_EXPIRE_MINUTES",
+    "ADMIN_EMAIL",
+    "ADMIN_FULL_NAME",
+    "ADMIN_PASSWORD",
+    "AUTO_SEED_ADMIN",
+    "APP_BASE_URL",
+    "BLOOM_ACCESS_TOKEN_EXPIRE_MINUTES",
+    "BLOOM_ADMIN_EMAIL",
+    "BLOOM_ADMIN_FULL_NAME",
+    "BLOOM_ADMIN_PASSWORD",
+    "BLOOM_AUTO_SEED_ADMIN",
+    "BLOOM_APP_BASE_URL",
+    "BLOOM_ATTACHMENT_DIR",
+    "BLOOM_ATTACHMENT_UPLOADS_PER_15_MINUTES",
+    "BLOOM_CLI_CODE_MODE_ENABLED",
+    "BLOOM_CORS_ORIGINS",
+    "BLOOM_DATABASE_URL",
+    "BLOOM_ENV",
+    "BLOOM_EMAIL_VERIFICATION_TOKEN_TTL_HOURS",
+    "BLOOM_ENABLE_DOCS",
+    "BLOOM_FRONTEND_BASE_URL",
+    "BLOOM_INVITE_TOKEN_TTL_HOURS",
+    "BLOOM_MAX_ATTACHMENT_SIZE",
+    "BLOOM_MAX_CONCURRENT_ATTACHMENT_UPLOADS_PER_USER",
+    "BLOOM_MAX_DOCUMENT_ATTACHMENT_BYTES",
+    "BLOOM_MIN_ATTACHMENT_FREE_BYTES",
+    "BLOOM_PASSWORD_RESET_TOKEN_TTL_HOURS",
+    "BLOOM_REQIF_MAX_REQUEST_BYTES",
+    "BLOOM_REQIF_MAX_MEMBER_BYTES",
+    "BLOOM_REQIF_MAX_ARCHIVE_ENTRIES",
+    "BLOOM_REQIF_MAX_COMPRESSION_RATIO",
+    "BLOOM_REQIF_MAX_OBJECTS",
+    "BLOOM_REQIF_MAX_RELATIONS",
+    "BLOOM_REQIF_MAX_HIERARCHY_DEPTH",
+    "BLOOM_REQIF_PROCESSING_TIMEOUT_SECONDS",
+    "BLOOM_REQIF_IMPORTS_PER_15_MINUTES",
+    "BLOOM_REQIF_STREAM_CHUNK_BYTES",
+    "BLOOM_RUN_STARTUP_DATA_REPAIR",
+    "BLOOM_SECRET_KEY",
+    "BLOOM_SERVICE_TOKEN_PEPPER",
+    "BLOOM_SMTP_ENABLED",
+    "BLOOM_SMTP_FROM_EMAIL",
+    "BLOOM_SMTP_FROM_NAME",
+    "BLOOM_SMTP_HOST",
+    "BLOOM_SMTP_PASSWORD",
+    "BLOOM_SMTP_PORT",
+    "BLOOM_SMTP_REPLY_TO",
+    "BLOOM_SMTP_SSL",
+    "BLOOM_SMTP_STARTTLS",
+    "BLOOM_SMTP_TIMEOUT_SECONDS",
+    "BLOOM_SMTP_USERNAME",
+    "BLOOM_TESTSTATION_APP_URL",
+    "CORS_ORIGINS",
+    "DATABASE_URL",
+    "APP_ENV",
+    "ATTACHMENT_DIR",
+    "ATTACHMENT_UPLOADS_PER_15_MINUTES",
+    "CLI_CODE_MODE_ENABLED",
+    "EMAIL_VERIFICATION_TOKEN_TTL_HOURS",
+    "ENABLE_DOCS",
+    "FRONTEND_BASE_URL",
+    "INVITE_TOKEN_TTL_HOURS",
+    "MAX_ATTACHMENT_SIZE",
+    "MAX_CONCURRENT_ATTACHMENT_UPLOADS_PER_USER",
+    "MAX_DOCUMENT_ATTACHMENT_BYTES",
+    "MIN_ATTACHMENT_FREE_BYTES",
+    "PASSWORD_RESET_TOKEN_TTL_HOURS",
+    "REQIF_MAX_REQUEST_BYTES",
+    "REQIF_MAX_MEMBER_BYTES",
+    "REQIF_MAX_ARCHIVE_ENTRIES",
+    "REQIF_MAX_COMPRESSION_RATIO",
+    "REQIF_MAX_OBJECTS",
+    "REQIF_MAX_RELATIONS",
+    "REQIF_MAX_HIERARCHY_DEPTH",
+    "REQIF_PROCESSING_TIMEOUT_SECONDS",
+    "REQIF_IMPORTS_PER_15_MINUTES",
+    "REQIF_STREAM_CHUNK_BYTES",
+    "RUN_STARTUP_DATA_REPAIR",
+    "SECRET_KEY",
+    "SERVICE_TOKEN_PEPPER",
+    "SMTP_ENABLED",
+    "SMTP_FROM_EMAIL",
+    "SMTP_FROM_NAME",
+    "SMTP_HOST",
+    "SMTP_PASSWORD",
+    "SMTP_PORT",
+    "SMTP_REPLY_TO",
+    "SMTP_SSL",
+    "SMTP_STARTTLS",
+    "SMTP_TIMEOUT_SECONDS",
+    "SMTP_USERNAME",
+    "TESTSTATION_APP_URL",
+]
+CFG_PRODUCTION = {
+    "BLOOM_ENV": "production",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ADMIN_EMAIL": "ops@example.com",
+    "BLOOM_ADMIN_PASSWORD": "this-is-a-long-password",
+}
+CFG_REQIF_DEFAULTS = {"BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
+MSG_CFG_REQIF_DEFAULTS = "the ReqIF limits have their public defaults"
+CFG_REQIF_DEFAULTS_EXPECTED = {
+    "REQIF_MAX_REQUEST_BYTES": 26214400,
+    "REQIF_MAX_MEMBER_BYTES": 26214400,
+    "REQIF_MAX_ARCHIVE_ENTRIES": 100,
+    "REQIF_MAX_COMPRESSION_RATIO": 20,
+    "REQIF_MAX_OBJECTS": 999,
+    "REQIF_MAX_RELATIONS": 10000,
+    "REQIF_MAX_HIERARCHY_DEPTH": 100,
+    "REQIF_PROCESSING_TIMEOUT_SECONDS": 60,
+    "REQIF_IMPORTS_PER_15_MINUTES": 5,
+    "REQIF_STREAM_CHUNK_BYTES": 1048576,
+}
+CFG_UPLOAD_DEFAULTS = {"BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
+MSG_CFG_UPLOAD_DEFAULTS = "the attachment upload limits have their public defaults"
+CFG_UPLOAD_DEFAULTS_EXPECTED = {
+    "ATTACHMENT_UPLOADS_PER_15_MINUTES": 10,
+    "MAX_CONCURRENT_ATTACHMENT_UPLOADS_PER_USER": 1,
+}
+CFG_UPLOAD_PREFIXED = {
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ATTACHMENT_UPLOADS_PER_15_MINUTES": "17",
+    "BLOOM_MAX_CONCURRENT_ATTACHMENT_UPLOADS_PER_USER": "1",
+}
+MSG_CFG_UPLOAD_PREFIXED = "the attachment upload limits are read from the BLOOM_ names"
+CFG_UPLOAD_PREFIXED_EXPECTED = {
+    "ATTACHMENT_UPLOADS_PER_15_MINUTES": 17,
+    "MAX_CONCURRENT_ATTACHMENT_UPLOADS_PER_USER": 1,
+}
+CFG_UPLOAD_CONCURRENCY = {
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_MAX_CONCURRENT_ATTACHMENT_UPLOADS_PER_USER": "2",
+}
+MSG_CFG_UPLOAD_CONCURRENCY = "more than one concurrent upload per user is refused"
+CFG_UPLOAD_CONCURRENCY_REFUSAL = ""
+CFG_MEMBER_LIMIT = {
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_REQIF_MAX_MEMBER_BYTES": "26214401",
+}
+MSG_CFG_MEMBER_LIMIT = "a ReqIF member limit above 25 MiB is refused naming the limit"
+CFG_MEMBER_LIMIT_REFUSAL = "25 MiB"
+CFG_PREFIXED = {
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_DATABASE_URL": "postgresql+asyncpg://postgres:postgres@localhost:5432/bloom_db",
+    "BLOOM_ACCESS_TOKEN_EXPIRE_MINUTES": "42",
+    "BLOOM_APP_BASE_URL": "http://localhost:8000",
+    "BLOOM_FRONTEND_BASE_URL": "http://localhost:5173",
+    "BLOOM_TESTSTATION_APP_URL": "http://localhost:5174",
+    "BLOOM_CORS_ORIGINS": '["http://localhost:5173"]',
+    "BLOOM_ENABLE_DOCS": "true",
+    "BLOOM_ADMIN_EMAIL": "admin@example.com",
+    "BLOOM_ADMIN_PASSWORD": "admin-password",
+    "BLOOM_ADMIN_FULL_NAME": "Bloom Admin",
+    "BLOOM_INVITE_TOKEN_TTL_HOURS": "48",
+    "BLOOM_EMAIL_VERIFICATION_TOKEN_TTL_HOURS": "6",
+    "BLOOM_PASSWORD_RESET_TOKEN_TTL_HOURS": "3",
+    "BLOOM_SMTP_ENABLED": "true",
+    "BLOOM_SMTP_HOST": "smtp.example.com",
+    "BLOOM_SMTP_PORT": "2525",
+    "BLOOM_SMTP_USERNAME": "smtp-user",
+    "BLOOM_SMTP_PASSWORD": "smtp-password",
+    "BLOOM_SMTP_FROM_EMAIL": "noreply@example.com",
+    "BLOOM_SMTP_REPLY_TO": "reply@example.com",
+    "BLOOM_SMTP_STARTTLS": "false",
+    "BLOOM_SMTP_SSL": "true",
+    "BLOOM_SMTP_TIMEOUT_SECONDS": "9",
+    "BLOOM_SMTP_FROM_NAME": "Attempted Override",
+}
+MSG_CFG_PREFIXED = "every setting is read from its BLOOM_ name"
+CFG_PREFIXED_EXPECTED = {
+    "SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "DATABASE_URL": "postgresql+asyncpg://postgres:postgres@localhost:5432/bloom_db",
+    "ACCESS_TOKEN_EXPIRE_MINUTES": 42,
+    "APP_BASE_URL": "http://localhost:8000",
+    "FRONTEND_BASE_URL": "http://localhost:5173",
+    "TESTSTATION_APP_URL": "http://localhost:5174",
+    "CORS_ORIGINS": ["http://localhost:5173"],
+    "ENABLE_DOCS": True,
+    "ADMIN_EMAIL": "admin@example.com",
+    "ADMIN_PASSWORD": "admin-password",
+    "ADMIN_FULL_NAME": "Bloom Admin",
+    "INVITE_TOKEN_TTL_HOURS": 48,
+    "EMAIL_VERIFICATION_TOKEN_TTL_HOURS": 6,
+    "PASSWORD_RESET_TOKEN_TTL_HOURS": 3,
+    "SMTP_ENABLED": True,
+    "SMTP_HOST": "smtp.example.com",
+    "SMTP_PORT": 2525,
+    "SMTP_USERNAME": "smtp-user",
+    "SMTP_PASSWORD": "smtp-password",
+    "SMTP_FROM_EMAIL": "noreply@example.com",
+    "SMTP_REPLY_TO": "reply@example.com",
+    "SMTP_STARTTLS": False,
+    "SMTP_SSL": True,
+    "SMTP_TIMEOUT_SECONDS": 9,
+}
+CFG_PLAIN = {
+    "SECRET_KEY": "ssssssssssssssssssssssssssssssss",
+    "SMTP_ENABLED": "true",
+    "SMTP_HOST": "smtp.unprefixed.example.com",
+    "SMTP_FROM_EMAIL": "noreply@example.com",
+}
+MSG_CFG_PLAIN = "settings without a BLOOM_ name are read from the plain name"
+CFG_PLAIN_EXPECTED = {
+    "SECRET_KEY": "ssssssssssssssssssssssssssssssss",
+    "SMTP_ENABLED": True,
+    "SMTP_HOST": "smtp.unprefixed.example.com",
+    "SMTP_FROM_EMAIL": "noreply@example.com",
+}
+CFG_BOTH = {
+    "SECRET_KEY": "ssssssssssssssssssssssssssssssss",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "SMTP_HOST": "smtp.unprefixed.example.com",
+    "BLOOM_SMTP_HOST": "smtp.bloom-prefixed.example.com",
+}
+MSG_CFG_BOTH = "the BLOOM_ name wins over the plain name"
+CFG_BOTH_EXPECTED = {
+    "SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "SMTP_HOST": "smtp.bloom-prefixed.example.com",
+}
+CFG_CLI_DEFAULT = {"SECRET_KEY": "ssssssssssssssssssssssssssssssss"}
+MSG_CFG_CLI_DEFAULT = "CLI code mode is off by default"
+CFG_CLI_DEFAULT_EXPECTED = {"CLI_CODE_MODE_ENABLED": False}
+CFG_CLI_PREFIXED = {
+    "SECRET_KEY": "ssssssssssssssssssssssssssssssss",
+    "BLOOM_CLI_CODE_MODE_ENABLED": "true",
+}
+MSG_CFG_CLI_PREFIXED = "CLI code mode is read from the BLOOM_ name"
+CFG_CLI_PREFIXED_EXPECTED = {"CLI_CODE_MODE_ENABLED": True}
+CFG_CLI_PLAIN = {"SECRET_KEY": "ssssssssssssssssssssssssssssssss", "CLI_CODE_MODE_ENABLED": "true"}
+MSG_CFG_CLI_PLAIN = "CLI code mode is read from the plain name"
+CFG_CLI_PLAIN_EXPECTED = {"CLI_CODE_MODE_ENABLED": True}
+CFG_CLI_BOTH = {
+    "SECRET_KEY": "ssssssssssssssssssssssssssssssss",
+    "CLI_CODE_MODE_ENABLED": "true",
+    "BLOOM_CLI_CODE_MODE_ENABLED": "false",
+}
+MSG_CFG_CLI_BOTH = "for CLI code mode the BLOOM_ name wins"
+CFG_CLI_BOTH_EXPECTED = {"CLI_CODE_MODE_ENABLED": False}
+CFG_PROD_EMAIL = {
+    "BLOOM_ENV": "production",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ADMIN_EMAIL": "admin@example.com",
+    "BLOOM_ADMIN_PASSWORD": "this-is-a-long-password",
+}
+MSG_CFG_PROD_EMAIL = "production refuses the default administrator email"
+CFG_PROD_EMAIL_REFUSAL = "ADMIN_EMAIL"
+CFG_PROD_PASSWORD = {
+    "BLOOM_ENV": "production",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ADMIN_EMAIL": "ops@example.com",
+    "BLOOM_ADMIN_PASSWORD": "changeme123",
+}
+MSG_CFG_PROD_PASSWORD = "production refuses the default administrator password"
+CFG_PROD_PASSWORD_REFUSAL = "ADMIN_PASSWORD"
+CFG_PROD_SHORT = {
+    "BLOOM_ENV": "production",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ADMIN_EMAIL": "ops@example.com",
+    "BLOOM_ADMIN_PASSWORD": "short-password",
+}
+MSG_CFG_PROD_SHORT = "production refuses an administrator password under 16 characters"
+CFG_PROD_SHORT_REFUSAL = "at least 16"
+CFG_DEV_DEFAULTS = {
+    "BLOOM_ENV": "development",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ADMIN_EMAIL": "admin@example.com",
+    "BLOOM_ADMIN_PASSWORD": "changeme123",
+}
+MSG_CFG_DEV_DEFAULTS = "development accepts the default administrator email and password"
+CFG_DEV_DEFAULTS_EXPECTED = {"ADMIN_EMAIL": "admin@example.com", "ADMIN_PASSWORD": "changeme123"}
+CFG_DEV_SWITCHES = {
+    "BLOOM_ENV": "development",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+}
+MSG_CFG_DEV_SWITCHES = "in development the administrator seed and the data repair are on by default"
+CFG_DEV_SWITCHES_EXPECTED = {"AUTO_SEED_ADMIN": True, "RUN_STARTUP_DATA_REPAIR": True}
+CFG_PROD_SWITCHES = {
+    "BLOOM_ENV": "production",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ADMIN_EMAIL": "ops@example.com",
+    "BLOOM_ADMIN_PASSWORD": "this-is-a-long-password",
+}
+MSG_CFG_PROD_SWITCHES = (
+    "in production the administrator seed and the data repair are off by default"
+)
+CFG_PROD_SWITCHES_EXPECTED = {"AUTO_SEED_ADMIN": False, "RUN_STARTUP_DATA_REPAIR": False}
+CFG_PROD_SEED = {
+    "BLOOM_ENV": "production",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ADMIN_EMAIL": "ops@example.com",
+    "BLOOM_ADMIN_PASSWORD": "this-is-a-long-password",
+    "BLOOM_AUTO_SEED_ADMIN": "true",
+}
+MSG_CFG_PROD_SEED = "production can turn the administrator seed on"
+CFG_PROD_SEED_EXPECTED = {"AUTO_SEED_ADMIN": True}
+CFG_PROD_REPAIR = {
+    "BLOOM_ENV": "production",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ADMIN_EMAIL": "ops@example.com",
+    "BLOOM_ADMIN_PASSWORD": "this-is-a-long-password",
+    "BLOOM_RUN_STARTUP_DATA_REPAIR": "true",
+}
+MSG_CFG_PROD_REPAIR = "production can turn the data repair on"
+CFG_PROD_REPAIR_EXPECTED = {"RUN_STARTUP_DATA_REPAIR": True}
+CFG_PROD_NO_KEY = {
+    "BLOOM_ENV": "production",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ADMIN_EMAIL": "ops@example.com",
+    "BLOOM_ADMIN_PASSWORD": "this-is-a-long-password",
+}
+MSG_CFG_PROD_NO_KEY = "production starts without an integration encryption key"
+CFG_PROD_NO_KEY_EXPECTED = {"BLOOM_ENV": "production", "INTEGRATION_ENCRYPTION_KEY": ""}
+CFG_PROD_BAD_KEY = {
+    "BLOOM_ENV": "production",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ADMIN_EMAIL": "ops@example.com",
+    "BLOOM_ADMIN_PASSWORD": "this-is-a-long-password",
+    "BLOOM_INTEGRATION_ENCRYPTION_KEY": "not-a-valid-fernet-key",
+}
+MSG_CFG_PROD_BAD_KEY = (
+    "production starts with an unusable integration key; it is checked when a tracker is used"
+)
+CFG_PROD_BAD_KEY_EXPECTED = {"INTEGRATION_ENCRYPTION_KEY": "not-a-valid-fernet-key"}
+CFG_DEV_NO_KEY = {
+    "BLOOM_ENV": "development",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+}
+MSG_CFG_DEV_NO_KEY = "development starts without an integration encryption key"
+CFG_DEV_NO_KEY_EXPECTED = {"INTEGRATION_ENCRYPTION_KEY": ""}
+CFG_LEGACY_URL = {
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_FRONTEND_BASE_URL": "https://legacy.example.com",
+}
+MSG_CFG_LEGACY_URL = "the frontend address is used when no application address is set"
+CFG_LEGACY_URL_EXPECTED = {"APP_BASE_URL": "https://legacy.example.com"}
+CFG_APP_URL = {
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_APP_BASE_URL": "https://app.example.com",
+    "BLOOM_FRONTEND_BASE_URL": "https://legacy.example.com",
+}
+MSG_CFG_APP_URL = "the application address wins over the frontend address"
+CFG_APP_URL_EXPECTED = {"APP_BASE_URL": "https://app.example.com"}
+MSG_CFG_SENDER_NAME = "the mail sender name is not a setting"
+MSG_CFG_PROD_GOOD_KEY = "production starts with a valid integration encryption key"
