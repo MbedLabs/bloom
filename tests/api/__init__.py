@@ -39,6 +39,7 @@ SUITES = [
     "tests.api.BLOOM_jira_webhook_spoofed_events.JiraWebhookSpoofedEventsTest",
     "tests.api.BLOOM_jira_webhook_status_mapping.JiraWebhookStatusMappingTest",
     "tests.api.BLOOM_perf_traceability.PerfTraceabilityTest",
+    "tests.api.BLOOM_project_access_entries.ProjectAccessEntriesTest",
     "tests.api.BLOOM_project_counts_batched.ProjectCountsBatchedTest",
     "tests.api.BLOOM_projects_delete.ProjectsDeleteTest",
     "tests.api.BLOOM_requirement_description.RequirementDescriptionTest",
@@ -50,6 +51,7 @@ SUITES = [
     "tests.api.BLOOM_sync_results_names_the_suite.SyncResultsNamesTheSuiteTest",
     "tests.api.BLOOM_traceability_coverage.TraceabilityCoverageTest",
     "tests.api.BLOOM_tracker_unreachable.TrackerUnreachableTest",
+    "tests.api.BLOOM_user_access_summary.UserAccessSummaryTest",
     "tests.api.BLOOM_user_deletion.UserDeletionTest",
     "tests.api.BLOOM_user_promotion.UserPromotionTest",
 ]

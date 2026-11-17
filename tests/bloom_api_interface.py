@@ -349,6 +349,21 @@ class BloomApiInterface(BloomInterface):
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
 
+    def bloom_api_new_member(self, headers, name, role="maintainer"):
+        email, password = f"{name}@example.com", self.parameters.API_PASSWORD
+        created = self.bloom_api_create_user(headers, email, password, role).json()
+        signed_in, _ = self.bloom_log_in(email, password)
+        return SimpleNamespace(id=created["id"], email=email, headers=signed_in)
+
+    def bloom_api_new_policy(
+        self, headers, name, permissions=None, visibility="internal", types=None
+    ):
+        permissions = permissions or {"REQ": ["view"]}
+        return self.bloom_api_create_policy(headers, name, permissions, types, visibility).json()
+
+    def bloom_api_new_group(self, headers, name, policy_ids=()):
+        return self.bloom_api_create_group(headers, name, list(policy_ids)).json()
+
     def bloom_api_verify(self, headers, project_id, test_case_id, requirement_id):
         body = {
             "project_id": project_id,

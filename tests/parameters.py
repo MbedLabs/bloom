@@ -4563,3 +4563,34 @@ MSG_TCOV_REPORT = "the gap report counts one uncovered, one partial and one cove
 MSG_TCOV_MATRIX = "the matrix shows each requirement with its coverage state"
 MSG_TCOV_FILTER = "the Uncovered filter returns the one uncovered requirement"
 MSG_TCOV_SORT = "sorting by coverage lists Uncovered, Partial, Covered"
+PAE_PREFIXES = ("PEA", "PEB", "PEC", "PED", "PEE", "PEF")
+PAE_TC_WRITE = {"TC": ["view", "create", "edit"]}
+PAE_EVERYTHING = {"*": ["*"]}
+PAE_OWNER_CAPABILITIES = {"can_edit": True, "can_delete": False, "can_manage_access": False}
+PAE_NO_CAPABILITIES = {"can_edit": False, "can_delete": False, "can_manage_access": False}
+MSG_PAE_ENTRY = "a direct entry is created with its two policies, no owner flag and no role or document type field"
+MSG_PAE_REPORT = (
+    "the member reads the project and the access report shows one direct origin with both policies"
+)
+MSG_PAE_UPDATED = "the entry is reduced to the read policy"
+MSG_PAE_OWNER = "an owner entry gives edit on its project, without delete or access management"
+MSG_PAE_OWNER_SCOPE = (
+    "the owner reaches only the owned project, and neither groups nor the member list"
+)
+MSG_PAE_OWNER_EDIT = "the owner changes the project description"
+MSG_PAE_CONTENT = "a policy over all content gives no project capability and no project edit: 403"
+MSG_PAE_ADMIN = "an administrator has every project capability"
+MSG_PAE_CREATOR = (
+    "the creator of a project gets an owner entry without policies and reaches no user list"
+)
+MSG_PAE_INVALID = "an entry with {what} is refused with 422"
+UAS_PREFIXES = ("UAA", "UAB", "UAC", "UAD")
+MSG_UAS_SUMMARY = (
+    "the summary lists the user's groups and each project with the groups of its access report"
+)
+MSG_UAS_NO_POLICY = "the summary names no policy"
+MSG_UAS_DIRECT = "a direct policy entry is labelled direct, with no group"
+MSG_UAS_EMPTY = "a user without access has empty lists, and an administrator has every project"
+MSG_UAS_ADMIN_ONLY = (
+    "the summary is refused to a non-administrator with 403 and an unknown user is a 404"
+)
