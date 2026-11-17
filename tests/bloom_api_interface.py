@@ -100,7 +100,9 @@ from app.models.user_token import UserToken, UserTokenPurpose
 from app.schemas.cli_auth import CliStartRequest
 from app.schemas.memberships import DEFAULT_EXTERNAL_DOC_TYPES
 from app.services import audit as audit_service
-from app.services import cli_auth, mail_service
+from app.services import cli_auth
+from app.services import coverage as coverage_service
+from app.services import mail_service
 from app.services.audit import request_outcome, route_template
 from app.services.integration_secrets import (
     ENVELOPE_PREFIX,
@@ -364,6 +366,15 @@ class BloomApiInterface(BloomInterface):
             return await original(db, setting, tracker, delivery_id)
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
+
+    def bloom_coverage_status(self, statuses):
+        return coverage_service.coverage_status(statuses)
+
+    def bloom_coverage_percent(self, covered, total):
+        return coverage_service.coverage_percent(covered, total)
+
+    def bloom_clear_dashboard_cache(self):
+        dashboard_stats_cache._store.clear()
 
     def bloom_new_picture_accounts(self):
         self.bloom_new_database()

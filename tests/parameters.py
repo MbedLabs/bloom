@@ -4710,3 +4710,28 @@ MSG_UNH_CONSTRAINT = (
 MSG_UNH_FOREIGN = "a row that is still referenced is a 409 that hides the database message"
 MSG_UNH_LATE = "a commit that fails after the endpoint returned is a 409 with its reference and without the constraint"
 MSG_UNH_COMMIT = "every route with a session commits before its response"
+COVC_PREFIXES = ("CVA", "CVB", "CVC", "CVD")
+COVC_STATES = [
+    ("no test case", [], "Uncovered"),
+    ("one draft test case", ["Draft"], "Partial"),
+    ("two draft test cases", ["Draft", "Draft"], "Partial"),
+    ("one approved test case", ["Approved"], "Covered"),
+    ("a draft and an approved test case", ["Draft", "Approved"], "Covered"),
+]
+COVC_PERCENTAGES = [((1, 3), 33.3), ((2, 4), 50.0), ((0, 0), 0)]
+MSG_COVC_STATE = "a requirement with {what} is {state}"
+MSG_COVC_PERCENT = "{covered} of {total} is {percent} percent"
+MSG_COVC_GAPS = (
+    "the gap report counts one covered, one partial and one uncovered requirement as 66.7 percent"
+)
+MSG_COVC_SAME = "the dashboard and the project card report the same uncovered count and percentage"
+MSG_COVC_MATRIX = (
+    "the matrix shows the verified requirement as Covered and the draft-covered one as Partial"
+)
+MSG_COVC_DRAFT = (
+    "a requirement verified by a draft test case counts as having a test case: 100 percent, partial"
+)
+MSG_COVC_FAN_OUT = (
+    "one approved test case over three of four requirements is 75 percent with one uncovered"
+)
+MSG_COVC_GAP_SHAPE = "a gap names its type and carries no missing link types"
