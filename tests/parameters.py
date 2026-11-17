@@ -4452,3 +4452,43 @@ MSG_CFG_APP_URL = "the application address wins over the frontend address"
 CFG_APP_URL_EXPECTED = {"APP_BASE_URL": "https://app.example.com"}
 MSG_CFG_SENDER_NAME = "the mail sender name is not a setting"
 MSG_CFG_PROD_GOOD_KEY = "production starts with a valid integration encryption key"
+PERF_PREFIXES = ("PTA", "PTB", "PTC")
+PERF_REQUIREMENTS = 15
+PERF_STATEMENT_LIMIT = 10
+MSG_PERF_MATRIX = "the traceability matrix of 15 requirements is read with fewer than 10 statements"
+MSG_PERF_GAPS = "the coverage gaps of 15 requirements are read with fewer than 10 statements"
+MSG_PERF_DETAIL = "a requirement is read with fewer than 10 statements"
+SYNS_PREFIXES = ("SSA", "SSB", "SSC", "SSD")
+MSG_SYNS_NAMED = "the sync names the suite holding the case with its id, name, link and counts"
+MSG_SYNS_COUNTS = "each suite reports how many of its cases were synced and how many it holds"
+MSG_SYNS_NO_SUITE = "a synced case in no suite names no suite"
+MSG_SYNS_UNMATCHED = "a test case id that matches nothing updates nothing and names no suite"
+SYNC_PREFIXES = ("SCA", "SCB", "SCC", "SCD", "SCE")
+MSG_SYNC_NAMED = "the sync names the campaign the result reached with its id, name and link"
+MSG_SYNC_NO_CAMPAIGN = "a synced case in no campaign names no campaign"
+MSG_SYNC_UNMATCHED = "a test case id that matches nothing updates nothing and names no campaign"
+MSG_SYNC_BOTH = "results reaching two campaigns name both"
+REQH_PREFIXES = ("RQA", "RQB")
+REQH_BODY = {
+    "type": "doc",
+    "content": [
+        {
+            "type": "paragraph",
+            "content": [
+                {"type": "text", "text": "boots in "},
+                {
+                    "type": "mention",
+                    "attrs": {"id": "1", "label": "BOOT_BUDGET_MS", "mentionSuggestionChar": "{{"},
+                },
+            ],
+        }
+    ],
+}
+REQH_HTML = "<p>boots in {{BOOT_BUDGET_MS}}</p>"
+MSG_REQH_EMPTY = "a new project lists no requirements"
+MSG_REQH_CREATED = "a created requirement is answered 201 with its title and an id of the project"
+MSG_REQH_READ = "the requirement is listed once and read by its id"
+MSG_REQH_UPDATED = "a title change is answered 200 with the new title"
+MSG_REQH_DELETED = "deleting the requirement is answered 200 or 204"
+MSG_REQH_BODY_CREATED = "a test case is created with its editor body"
+MSG_REQH_BODY_READ = "the editor body comes back in the list and the HTML in the detail"

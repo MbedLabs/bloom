@@ -347,6 +347,65 @@ class BloomApiInterface(BloomInterface):
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
 
+    def bloom_start_api_with_admin(self):
+        self.bloom_start_full_api()
+        self.bloom_add_admin(self.parameters.API_ADMIN_EMAIL, self.parameters.API_PASSWORD)
+        headers, _ = self.bloom_log_in(
+            self.parameters.API_ADMIN_EMAIL, self.parameters.API_PASSWORD
+        )
+        return headers
+
+    def bloom_api_new_project(self, headers, prefix, **fields):
+        body = {"name": f"Project {prefix}", "prefix": prefix, **fields}
+        return self.bloom_api_call("POST", "/api/projects", headers, json=body).body
+
+    def bloom_api_add_requirements(self, headers, project_id, count):
+        for number in range(count):
+            self.bloom_api_call(
+                "POST",
+                "/api/requirements",
+                headers,
+                json={"project_id": project_id, "title": f"Req {number}"},
+            )
+
+    def bloom_api_add_test_case(self, headers, project_id, title, **fields):
+        body = {"project_id": project_id, "title": title, **fields}
+        return self.bloom_api_call("POST", "/api/test-cases", headers, json=body)
+
+    def bloom_api_add_suite(self, headers, project_id, name, cases):
+        body = {
+            "project_id": project_id,
+            "name": name,
+            "test_case_ids": [case["id"] for case in cases],
+        }
+        return self.bloom_api_call("POST", "/api/test-suites", headers, json=body).body
+
+    def bloom_api_add_campaign_with_one_case(self, headers, prefix):
+        project = self.bloom_api_new_project(headers, prefix)
+        case = self.bloom_api_add_test_case(headers, project["id"], f"Case {prefix}").body
+        body = {
+            "project_id": project["id"],
+            "name": f"Campaign {prefix}",
+            "test_case_ids": [case["id"]],
+        }
+        campaign = self.bloom_api_call("POST", "/api/campaigns", headers, json=body).body
+        return SimpleNamespace(project=project, case=case, campaign=campaign)
+
+    def bloom_api_count_statements(self, method, path, headers):
+        skipped = ("SAVEPOINT", "RELEASE SAVEPOINT", "ROLLBACK TO SAVEPOINT", "BEGIN", "COMMIT")
+        counted = []
+
+        def record(conn, cursor, statement, parameters, context, executemany):
+            if not statement.strip().upper().startswith(skipped):
+                counted.append(statement)
+
+        event.listen(self.engine.sync_engine, "before_cursor_execute", record)
+        try:
+            answer = self.bloom_api_call(method, path, headers)
+        finally:
+            event.remove(self.engine.sync_engine, "before_cursor_execute", record)
+        return answer, len(counted)
+
     def bloom_start_full_api(self):
         self.patches.enter_context(patch.dict(main.app.dependency_overrides))
         main.app.dependency_overrides[get_db] = self._serve_session
