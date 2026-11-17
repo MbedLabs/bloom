@@ -5112,3 +5112,55 @@ MSG_TAGH_IMPORT_KEEPS = "an import does not overwrite a test case the importer c
 MSG_TAGH_EXTERNAL_CAP = (
     "an external account has neither approve nor delete, and cannot delete its own requirement: 403"
 )
+ATT_PREFIXES = (
+    "ATA",
+    "ATB",
+    "ATC",
+    "ATD",
+    "ATE",
+    "ATF",
+    "ATG",
+    "ATH",
+    "ATI",
+    "ATJ",
+    "ATK",
+    "ATL",
+    "ATM",
+    "ATN",
+    "ATO",
+    "ATP",
+    "ATQ",
+    "ATR",
+    "ATS",
+    "ATT",
+    "ATU",
+    "ATV",
+)
+ATT_PDF = b"%PDF-1.4 fake report"
+ATT_XML = b"<testsuites><testsuite name='s'/></testsuites>"
+ATT_RUN_URL = "https://bud.test/test-runs/41"
+MSG_ATT_NO_DELETE = (
+    "a writer without delete uploads a file but cannot remove it (403), and it stays listed"
+)
+MSG_ATT_RATE = "a maintainer's third upload start within the window is refused with 429 and retry after 900 seconds"
+MSG_ATT_ONE_ACTIVE = "of two simultaneous uploads by one maintainer one is stored and the other refused with 429, retry after 60"
+MSG_ATT_STORED = "a stored file keeps its name and size and is listed"
+MSG_ATT_BYTES = "the download returns the bytes as an attachment that browsers may not sniff"
+MSG_ATT_NAME = "a supplied path is stripped from the stored name"
+MSG_ATT_TYPE = "a file type that is not allowed is refused with 415"
+MSG_ATT_DIGEST = "the stored file's SHA-256 is recorded"
+MSG_ATT_REMOVED = "removing a file is answered 204 and it is no longer listed"
+MSG_ATT_MISSING = "the files of a missing document are a 404"
+MSG_ATT_ANONYMOUS = "reading files needs a signed-in user: 401"
+MSG_ATT_REPORT = "a published Bud report creates a report document carrying both files"
+MSG_ATT_REGISTRY = "the report is listed as an RPT document"
+MSG_ATT_SUMMARY = "the report description records the outcome, the test case and the run link"
+MSG_ATT_SAME_RUN = "publishing the same run again updates the same document and keeps two files"
+MSG_ATT_OTHER_RUN = "another run gets its own document"
+MSG_ATT_NOT_BASE64 = "a file whose content is not base64 is refused with 422"
+MSG_ATT_REPORT_TYPE = "a report file type that is not allowed is refused with 415"
+MSG_ATT_NO_PROJECT = "a report for an unknown project is a 404"
+MSG_ATT_USER_TOKEN = "a user token cannot publish a report: 401"
+MSG_ATT_NO_TOKEN = "publishing needs a credential: 401"
+MSG_ATT_HIDDEN = "an external user gets a named 404 for {what} of a document they cannot see"
+MSG_ATT_KEPT = "the file stays listed for the administrator"

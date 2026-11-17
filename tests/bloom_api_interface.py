@@ -8,6 +8,7 @@
 * @note     Requests go through an ASGI transport; no server is started.
 """
 
+import asyncio
 import base64
 import contextlib
 import csv
@@ -117,6 +118,7 @@ from app.services.mail_service import MailConfigurationError
 from tests.access_fixtures import (
     allow_doc_types,
     project_access_fixture,
+    scenario_permissions,
     scenario_rules,
     scenario_type_tags,
 )
@@ -369,6 +371,115 @@ class BloomApiInterface(BloomInterface):
             return await original(db, setting, tracker, delivery_id)
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
+
+    def bloom_start_attachment_api(self):
+        self.bloom_start_full_api()
+        folder = Path(self.patches.enter_context(self._temp_dir())).resolve()
+        self.patches.enter_context(
+            patch.object(attachment_storage, "get_attachment_root", lambda: folder)
+        )
+        self.bloom_set_attachment_limit(100)
+
+    def bloom_set_attachment_limit(self, starts):
+        self.patches.enter_context(
+            patch.object(settings, "ATTACHMENT_UPLOADS_PER_15_MINUTES", starts)
+        )
+
+    def bloom_api_service_token(self, headers, name):
+        body = {"name": name, "expires_in_days": 30}
+        return self.bloom_api_call("POST", "/api/service-credentials", headers, json=body).body[
+            "token"
+        ]
+
+    def bloom_api_upload_attachment(self, headers, document_id, name, payload, mime):
+        return self._run(self._upload_attachment(headers, document_id, name, payload, mime))
+
+    def bloom_api_download(self, headers, path):
+        answer = self._run(self._request("GET", path, headers))
+        return SimpleNamespace(
+            status=answer.status_code, headers=answer.headers, content=answer.content
+        )
+
+    def bloom_api_race_two_uploads(self, headers, document_id, payload):
+        original = attachment_storage.write_stream
+
+        async def race():
+            entered, release, calls = asyncio.Event(), asyncio.Event(), []
+
+            async def controlled(file, final_path, *, max_bytes):
+                calls.append(final_path)
+                if len(calls) == 1:
+                    entered.set()
+                    await release.wait()
+                return await original(file, final_path, max_bytes=max_bytes)
+
+            with patch.object(attachment_storage, "write_stream", controlled):
+                first = asyncio.ensure_future(
+                    self._upload_attachment(
+                        headers, document_id, "slow.pdf", payload, "application/pdf"
+                    )
+                )
+                await asyncio.wait_for(entered.wait(), 10)
+                try:
+                    second = await self._upload_attachment(
+                        headers, document_id, "racing.pdf", payload, "application/pdf"
+                    )
+                finally:
+                    release.set()
+                return await first, second
+
+        return self._run(race())
+
+    def bloom_api_publish_bud_report(
+        self, token, prefix, run_id=41, files=None, name="Nightly HIL"
+    ):
+        values = self.parameters
+        if files is None:
+            files = [
+                {
+                    "filename": "bud-run-41.pdf",
+                    "content_type": "application/pdf",
+                    "content_base64": base64.b64encode(values.ATT_PDF).decode(),
+                },
+                {
+                    "filename": "report_junit.xml",
+                    "content_type": "application/xml",
+                    "content_base64": base64.b64encode(values.ATT_XML).decode(),
+                },
+            ]
+        body = {
+            "project_prefix": prefix,
+            "bud_run_id": run_id,
+            "run_name": name,
+            "status": "Completed",
+            "total_tests": 3,
+            "passed_tests": 2,
+            "failed_tests": 1,
+            "run_url": values.ATT_RUN_URL,
+            "tc_ids": ["PRJ-TC-001"],
+            "files": files,
+        }
+        headers = {"Authorization": f"Bearer {token}"} if token else None
+        return self.bloom_api_call("POST", "/api/bud/test-reports", headers, json=body)
+
+    def bloom_api_scenario_member(self, headers, name, policy_name, project_ids, role="maintainer"):
+        permissions = scenario_permissions(policy_name)
+        external_reader = policy_name == "External Reader"
+        types = ["REQ", "TC", "CPT", "CMP"] if external_reader else None
+        rules = scenario_rules(permissions, "customer" if external_reader else "internal", types)
+        policy = self.bloom_api_create_policy_rules(headers, f"{name} {policy_name}", rules).json()
+        statement = update(Policy).where(Policy.id == policy["id"]).values(permissions=permissions)
+        self._run(self._execute_statement(statement))
+        return self.bloom_api_group_member(headers, name, project_ids, [policy["id"]], role)
+
+    async def _upload_attachment(self, headers, document_id, name, payload, mime):
+        transport = httpx.ASGITransport(app=self.api)
+        async with REAL_CLIENT(transport=transport, base_url=self.parameters.API_BASE) as client:
+            path = f"/api/documents/{document_id}/attachments"
+            answer = await client.post(path, headers=headers, files={"file": (name, payload, mime)})
+        return SimpleNamespace(
+            status=answer.status_code, body=answer.json(), headers=answer.headers
+        )
 
     def bloom_api_new_tag(self, headers, name):
         return self.bloom_api_call("POST", "/api/tags", headers, json={"name": name}).body
@@ -645,7 +756,7 @@ class BloomApiInterface(BloomInterface):
 
     def bloom_start_report_request_api(self):
         self.bloom_start_full_api()
-        folder = Path(self.patches.enter_context(self._temp_dir()))
+        folder = Path(self.patches.enter_context(self._temp_dir())).resolve()
         self.patches.enter_context(
             patch.object(settings, "SERVICE_TOKEN_PEPPER", self.parameters.RPQ_PEPPER)
         )
