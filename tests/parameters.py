@@ -4947,3 +4947,26 @@ MSG_MNT_REFUSED = "{who} is refused the list with 403"
 MSG_MNT_ADMIN = "an administrator reads the list of any project"
 MSG_MNT_UNKNOWN = "an unknown project is a 404"
 MSG_MNT_ROUTE = "the mention list is its own route, and is not read as a user id"
+TGL_PREFIXES = ("TGA", "TGB", "TGC", "TGD", "TGE", "TGF", "TGG", "TGH", "TGI", "TGJ")
+TGL_PARAMETER_BODY = {
+    "type": "doc",
+    "content": [
+        {
+            "type": "paragraph",
+            "content": [
+                {
+                    "type": "mention",
+                    "attrs": {"id": "7", "label": "MAX_TEMP", "mentionSuggestionChar": "{{"},
+                }
+            ],
+        }
+    ],
+}
+MSG_TGL_CREATED = "tagging a specification in a requirement creates one references link to it"
+MSG_TGL_BACKLINK = "the tag is read from the tagged document as one incoming references link"
+MSG_TGL_ONCE = "saving the same tag again keeps one link"
+MSG_TGL_SELF = "a requirement tagging itself creates no link"
+MSG_TGL_UNKNOWN = "a tag of an unknown type is refused with 422 naming the type, and neither link nor requirement is stored"
+MSG_TGL_PARAMETER = "a parameter mention creates no link"
+MSG_TGL_PAIR = "a {source} can tag a {target}"
+MSG_TGL_TEST_CASE = "a tag in a test case body creates no link"

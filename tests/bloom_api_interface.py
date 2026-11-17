@@ -369,6 +369,33 @@ class BloomApiInterface(BloomInterface):
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
 
+    def bloom_tag_body(self, kind, artefact_id):
+        attributes = {
+            "id": f"{kind}:{artefact_id}",
+            "label": "TAGGED",
+            "mentionSuggestionChar": "#",
+        }
+        paragraph = {"type": "paragraph", "content": [{"type": "mention", "attrs": attributes}]}
+        return {"type": "doc", "content": [paragraph]}
+
+    def bloom_api_links(self, headers, project_id, **query):
+        found = self.bloom_api_call(
+            "GET", "/api/links", headers, params={"project_id": project_id, **query}
+        ).body
+        return [(link["target_type"], link["target_id"], link["role"]) for link in found]
+
+    def bloom_api_add_to(self, headers, project_id, kind, title, **fields):
+        paths = {"REQ": "/api/requirements", "TC": "/api/test-cases", "DES": "/api/designs"}
+        body = {"project_id": project_id, "title": title, **fields}
+        if kind in paths:
+            return self.bloom_api_call("POST", paths[kind], headers, json=body)
+        return self.bloom_api_call(
+            "POST",
+            f"/api/projects/{project_id}/documents",
+            headers,
+            json={**body, "doc_type": kind},
+        )
+
     def bloom_new_mention_world(self):
         self.bloom_new_database()
         people = {}
