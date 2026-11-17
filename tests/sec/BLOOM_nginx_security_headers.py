@@ -16,9 +16,6 @@ class NginxSecurityHeadersTest(NginxSecurityHeadersBase):
     def setUpClass(self):
         super().setUpClass()
         self.headers = self.bloom.bloom_read_repo_text(self.parameters.NGINX_HEADERS_CONF)
-        self.server_head = self.bloom.bloom_nginx_server_head(self.parameters.NGINX_CONF)
-        self.locations = self.bloom.bloom_nginx_locations(self.parameters.NGINX_CONF)
-        self.dockerfile = self.bloom.bloom_read_repo_text(self.parameters.DOCKERFILE)
 
     def tearDownClass(self):
         super().tearDownClass()

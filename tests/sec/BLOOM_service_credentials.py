@@ -15,21 +15,12 @@ class ServiceCredentialsTest(ServiceCredentialsBase):
 
     def setUpClass(self):
         super().setUpClass()
-        admin = self.bloom.bloom_add_admin(
+        self.admin = self.bloom.bloom_add_admin(
             self.parameters.SERVICE_ADMIN_EMAIL, self.parameters.API_PASSWORD
         )
-        name = self.parameters.SERVICE_NAME
-        self.credential = self.bloom.bloom_create_service_credential(admin, name)
-        self.authenticated = self.bloom.bloom_authenticate_service_token(self.credential.raw)
-        self.as_user = self.bloom.bloom_sign_in_with_token(self.credential.raw)
-        self.untyped = self.bloom.bloom_sign_in_with_token(
-            self.bloom.bloom_issue_untyped_token(admin)
+        self.credential = self.bloom.bloom_create_service_credential(
+            self.admin, self.parameters.SERVICE_NAME
         )
-        self.bloom.bloom_revoke_service_credential(self.credential.id)
-        self.revoked = self.bloom.bloom_authenticate_service_token(self.credential.raw)
-        expiring = self.bloom.bloom_create_service_credential(admin, name)
-        self.bloom.bloom_expire_service_credential(expiring.id)
-        self.expired = self.bloom.bloom_authenticate_service_token(expiring.raw)
 
     def tearDownClass(self):
         super().tearDownClass()

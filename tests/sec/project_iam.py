@@ -17,54 +17,66 @@ class ProjectIamBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_admin_is_admitted_without_membership(self):
+        admin = self.bloom.bloom_require_project_access(self.parameters.IAM_ADMIN)
         self.print_variables(
             {
-                "refusal": self.admin.status,
-                "membership": self.admin.membership,
-                "lookups": self.admin.lookups,
+                "refusal": admin.status,
+                "membership": admin.membership,
+                "lookups": admin.lookups,
             }
         )
         self.assertEqual(
-            self.admin.status,
+            admin.status,
             None,
             msg=self.parameters.MSG_IAM_ADMIN_ADMITTED,
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.admin.membership,
+            admin.membership,
             None,
             msg=self.parameters.MSG_IAM_ADMIN_NO_MEMBERSHIP,
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.admin.lookups,
+            admin.lookups,
             self.parameters.IAM_PROJECT_LOOKUPS,
             msg=self.parameters.MSG_IAM_ADMIN_LOOKUP,
             abort_on_fail=False,
         )
 
     def bud_unassigned_user_is_refused(self):
-        self.print_variables({"refusal": self.unassigned.status})
+        unassigned = self.bloom.bloom_require_project_access(self.parameters.IAM_MAINTAINER)
+        self.print_variables({"refusal": unassigned.status})
         self.assertRegex(
-            self.unassigned.detail,
+            unassigned.detail,
             self.parameters.IAM_NOT_ASSIGNED,
             msg=self.parameters.MSG_IAM_UNASSIGNED,
             abort_on_fail=False,
         )
 
     def bud_missing_action_is_refused(self):
-        self.print_variables({"refusal": self.missing.status})
+        missing = self.bloom.bloom_require_project_access(
+            self.parameters.IAM_MAINTAINER,
+            self.parameters.IAM_VIEW_ONLY,
+            self.parameters.IAM_EDIT_REQUIREMENT,
+        )
+        self.print_variables({"refusal": missing.status})
         self.assertRegex(
-            self.missing.detail,
+            missing.detail,
             self.parameters.IAM_MISSING_PERMISSION,
             msg=self.parameters.MSG_IAM_MISSING_ACTION,
             abort_on_fail=False,
         )
 
     def bud_explicit_action_is_admitted(self):
-        self.print_variables({"refusal": self.granted.status, "detail": self.granted.detail})
+        granted = self.bloom.bloom_require_project_access(
+            self.parameters.IAM_MAINTAINER,
+            self.parameters.IAM_VIEW_AND_EDIT,
+            self.parameters.IAM_EDIT_REQUIREMENT,
+        )
+        self.print_variables({"refusal": granted.status, "detail": granted.detail})
         self.assertEqual(
-            self.granted.status,
+            granted.status,
             None,
             msg=self.parameters.MSG_IAM_EXPLICIT_ACTION,
             abort_on_fail=False,

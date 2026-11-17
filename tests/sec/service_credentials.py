@@ -53,40 +53,57 @@ class ServiceCredentialsBase(BloomTestCase):
         )
 
     def bud_service_token_authenticates_as_its_credential(self):
+        authenticated = self.bloom.bloom_authenticate_service_token(self.credential.raw)
+        self.print_variables({"credential": self.credential.id, "authenticated": authenticated})
         self.assertEqual(
-            self.authenticated,
+            authenticated,
             (self.credential.id, None),
             msg=self.parameters.MSG_SERVICE_AUTHENTICATES,
             abort_on_fail=False,
         )
 
     def bud_service_token_is_refused_as_a_user_sign_in(self):
+        as_user = self.bloom.bloom_sign_in_with_token(self.credential.raw)
+        self.print_variables({"sign-in": as_user})
         self.assertEqual(
-            self.as_user,
+            as_user,
             self.parameters.SERVICE_REFUSED,
             msg=self.parameters.MSG_SERVICE_NOT_A_USER,
             abort_on_fail=False,
         )
 
     def bud_user_token_without_a_type_is_refused(self):
+        untyped = self.bloom.bloom_sign_in_with_token(
+            self.bloom.bloom_issue_untyped_token(self.admin)
+        )
+        self.print_variables({"sign-in": untyped})
         self.assertEqual(
-            self.untyped,
+            untyped,
             self.parameters.SERVICE_REFUSED,
             msg=self.parameters.MSG_SERVICE_UNTYPED,
             abort_on_fail=False,
         )
 
     def bud_token_of_a_revoked_credential_is_refused(self):
+        self.bloom.bloom_revoke_service_credential(self.credential.id)
+        revoked = self.bloom.bloom_authenticate_service_token(self.credential.raw)
+        self.print_variables({"authenticated": revoked})
         self.assertEqual(
-            self.revoked,
+            revoked,
             self.parameters.SERVICE_REFUSED,
             msg=self.parameters.MSG_SERVICE_REVOKED,
             abort_on_fail=False,
         )
 
     def bud_token_of_an_expired_credential_is_refused(self):
+        expiring = self.bloom.bloom_create_service_credential(
+            self.admin, self.parameters.SERVICE_NAME
+        )
+        self.bloom.bloom_expire_service_credential(expiring.id)
+        expired = self.bloom.bloom_authenticate_service_token(expiring.raw)
+        self.print_variables({"authenticated": expired})
         self.assertEqual(
-            self.expired,
+            expired,
             self.parameters.SERVICE_REFUSED,
             msg=self.parameters.MSG_SERVICE_EXPIRED,
             abort_on_fail=False,

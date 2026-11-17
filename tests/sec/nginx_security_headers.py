@@ -36,13 +36,13 @@ class NginxSecurityHeadersBase(BloomTestCase):
 
     def bud_server_block_includes_the_shared_file(self):
         self._assert_contains(
-            self.server_head,
+            self.bloom.bloom_nginx_server_head(self.parameters.NGINX_CONF),
             self.parameters.NGINX_INCLUDE,
             self.parameters.MSG_NGINX_SERVER_INCLUDE,
         )
 
     def bud_locations_with_own_headers_include_the_shared_file(self):
-        for location, body in self.locations:
+        for location, body in self.bloom.bloom_nginx_locations(self.parameters.NGINX_CONF):
             if "add_header" in body:
                 self.print_variables({"location": location})
                 self._assert_contains(
@@ -81,7 +81,9 @@ class NginxSecurityHeadersBase(BloomTestCase):
 
     def bud_image_ships_the_shared_file(self):
         self._assert_contains(
-            self.dockerfile, self.parameters.NGINX_IMAGE_COPY, self.parameters.MSG_NGINX_IMAGE
+            self.bloom.bloom_read_repo_text(self.parameters.DOCKERFILE),
+            self.parameters.NGINX_IMAGE_COPY,
+            self.parameters.MSG_NGINX_IMAGE,
         )
 
     def _assert_contains(self, text, needle, message):
