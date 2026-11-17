@@ -48,6 +48,7 @@ SUITES = [
     "tests.api.BLOOM_project_member_retention.ProjectMemberRetentionTest",
     "tests.api.BLOOM_projects_delete.ProjectsDeleteTest",
     "tests.api.BLOOM_public_id_paths.PublicIdPathsTest",
+    "tests.api.BLOOM_report_requests.ReportRequestsTest",
     "tests.api.BLOOM_requirement_description.RequirementDescriptionTest",
     "tests.api.BLOOM_requirement_workflow_activity.RequirementWorkflowActivityTest",
     "tests.api.BLOOM_requirements_http.RequirementsHttpTest",

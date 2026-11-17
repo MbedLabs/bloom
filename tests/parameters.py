@@ -4785,3 +4785,32 @@ MSG_VISH_AUTHOR = "a {who} creates and edits a vision"
 MSG_VISH_REVIEW = (
     "a Review Internal holder is assigned, comments and hands the vision on for approval"
 )
+RPQ_KINDS = ["test-case", "test-suite", "requirement", "campaign"]
+RPQ_READER_PERMISSIONS = {
+    "TC": ["view"],
+    "TS": ["view"],
+    "REQ": ["view"],
+    "CMP": ["view"],
+    "RPT": ["view"],
+}
+RPQ_RUN = 41
+RPQ_PEPPER = "test-report-request-pepper-32-characters"
+RPQ_PDF = b"%PDF-1.4 report"
+MSG_RPQ_GUARDED = "a {kind} report request needs a signed-in reader who sees the source and the run: 401, 404, 404"
+MSG_RPQ_ONE = (
+    "a repeated request for the {kind} is the same pending request, hidden from other users"
+)
+MSG_RPQ_MAILBOX = (
+    "the mailbox is closed to users (401) and shows the machine the one request with its requester"
+)
+MSG_RPQ_BLANK_REASON = "a refusal without a reason is refused with 422"
+MSG_RPQ_REFUSED = "the reader sees the refusal and its reason, without the publisher"
+MSG_RPQ_ATTRIBUTED = "the refusal is audited as a service action naming the Bud publisher"
+MSG_RPQ_BAD_FILE = "a report with an unreadable file is a 422 and the request stays pending"
+MSG_RPQ_OTHER_RUN = "a report of another run is stored and the request stays pending"
+MSG_RPQ_DELIVERED = "the report of the requested run delivers the request with its document id"
+MSG_RPQ_LATE_REFUSAL = "a delivered request cannot be refused: 409"
+MSG_RPQ_DELETION = (
+    "deleting the {target} with a pending request is answered 204 and empties the mailbox"
+)
+MSG_RPQ_HISTORY = "deleting a delivered report keeps the request as delivered without a document id"

@@ -3068,9 +3068,6 @@ class BloomLogicInterface(BloomInterface):
                     unmarked.append(f"{qualified}.{field}")
         return unmarked
 
-    def _temp_dir(self):
-        return tempfile.TemporaryDirectory()
-
     def bloom_stream_attachment(self, payload, max_bytes, interrupt=None):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

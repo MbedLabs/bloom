@@ -10,6 +10,7 @@
 
 import asyncio
 import contextlib
+import tempfile
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -239,6 +240,9 @@ class BloomInterface:
             return await integrations.pull_jira_issues(setting_id, db=db, current_user=admin)
 
         return self._run(self._as_admin(admin_email, pull))
+
+    def _temp_dir(self):
+        return tempfile.TemporaryDirectory()
 
     def _run(self, coroutine):
         return self.loop.run_until_complete(coroutine)

@@ -21,6 +21,7 @@ import re
 import struct
 from datetime import datetime, timedelta
 from logging.handlers import BufferingHandler
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
@@ -67,7 +68,7 @@ from app.core.security import (
     create_access_token,
     get_current_user,
 )
-from app.core.service_auth import require_bud_sync_token
+from app.core.service_auth import create_service_credential, require_bud_sync_token
 from app.models import (
     ArtefactActivity,
     ArtefactComment,
@@ -99,6 +100,7 @@ from app.models.user import User, UserRole
 from app.models.user_token import UserToken, UserTokenPurpose
 from app.schemas.cli_auth import CliStartRequest
 from app.schemas.memberships import DEFAULT_EXTERNAL_DOC_TYPES
+from app.services import attachment_storage
 from app.services import audit as audit_service
 from app.services import cli_auth
 from app.services import coverage as coverage_service
@@ -366,6 +368,89 @@ class BloomApiInterface(BloomInterface):
             return await original(db, setting, tracker, delivery_id)
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
+
+    def bloom_new_report_request_world(self):
+        self.bloom_new_database()
+        self.bloom_enforce_foreign_keys()
+        values = self.parameters
+        admin, reader, outsider = (
+            self.bloom_add_record(
+                "User",
+                email=f"reader-{number}@example.com",
+                full_name=f"Reader {number}",
+                role=role,
+                hashed_password="unused",
+            )
+            for number, role in enumerate(
+                [UserRole.admin, UserRole.maintainer, UserRole.maintainer]
+            )
+        )
+        project = self.bloom_add_record("Project", name="Demo", prefix="PRJ")
+        self.bloom_add_internal_member(project, reader, values.RPQ_READER_PERMISSIONS)
+        run = values.RPQ_RUN
+        case = self.bloom_add_record(
+            "TestCase",
+            project_id=project,
+            tc_id="PRJ-TC-001",
+            title="Check",
+            last_bud_run_id=run,
+            last_executed_at=datetime.utcnow(),
+        )
+        suite = self.bloom_add_record(
+            "TestSuite", project_id=project, suite_id="PRJ-TS-001", name="Suite"
+        )
+        requirement = self.bloom_add_record(
+            "Requirement", project_id=project, req_id="PRJ-REQ-001", title="Requirement"
+        )
+        campaign = self.bloom_add_record(
+            "TestCampaign",
+            project_id=project,
+            campaign_id="PRJ-CMP-001",
+            name="Campaign",
+            bud_run_id=run,
+        )
+        self.bloom_add_record("TestSuiteItem", suite_id=suite, test_case_id=case, order=0)
+        self.bloom_add_record("TestRunLink", requirement_id=requirement, test_run_id=run)
+
+        async def credential():
+            async with self.maker() as db:
+                _, token = await create_service_credential(db, created_by_user_id=admin, name="Bud")
+                await db.commit()
+                return token
+
+        return SimpleNamespace(
+            admin=self.bloom_user_token_headers(admin),
+            reader=self.bloom_user_token_headers(reader),
+            outsider=self.bloom_user_token_headers(outsider),
+            reader_id=reader,
+            machine={"Authorization": f"Bearer {self._run(credential())}"},
+            sources={
+                "test-case": case,
+                "test-suite": suite,
+                "requirement": requirement,
+                "campaign": campaign,
+            },
+            project=project,
+        )
+
+    def bloom_start_report_request_api(self):
+        self.bloom_start_full_api()
+        folder = Path(self.patches.enter_context(self._temp_dir()))
+        self.patches.enter_context(
+            patch.object(settings, "SERVICE_TOKEN_PEPPER", self.parameters.RPQ_PEPPER)
+        )
+        self.patches.enter_context(
+            patch.object(attachment_storage, "get_attachment_root", lambda: folder)
+        )
+
+    def bloom_api_publish_report(self, headers, run_id, content):
+        file = {
+            "filename": "report.pdf",
+            "content_type": "application/pdf",
+            "content_base64": content,
+        }
+        body = {"project_prefix": "PRJ", "bud_run_id": run_id, "run_name": "Run", "files": [file]}
+        return self.bloom_api_call("POST", "/api/bud/test-reports", headers, json=body)
 
     def bloom_api_built_in_policy(self, headers, name):
         policies = self.bloom_api_call("GET", "/api/policies", headers).body
