@@ -369,6 +369,26 @@ class BloomApiInterface(BloomInterface):
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
 
+    def bloom_new_external_dashboard_reader(self, doc_types):
+        self.bloom_new_database()
+        values = self.parameters
+        external = self.bloom_add_record(
+            "User",
+            email="external@example.com",
+            full_name="External User",
+            hashed_password="unused",
+            role=UserRole.external,
+            is_active=True,
+        )
+        project = self.bloom_add_record(
+            "Project", name="Demo", prefix="PRJ", description="Visibility"
+        )
+        self.bloom_add_external_member(project, external, values.DASH_READER, "customer", doc_types)
+        for kind, fields in values.DASH_RECORDS:
+            self.bloom_add_record(kind, project_id=project, **fields)
+        self.bloom_clear_dashboard_cache()
+        return self.bloom_user_token_headers(external)
+
     def bloom_new_report_request_world(self):
         self.bloom_new_database()
         self.bloom_enforce_foreign_keys()

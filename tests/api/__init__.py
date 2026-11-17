@@ -12,6 +12,7 @@ SUITES = [
     "tests.api.BLOOM_batched_lookups.BatchedLookupsTest",
     "tests.api.BLOOM_coverage_consistency.CoverageConsistencyTest",
     "tests.api.BLOOM_create_ids.CreateIdsTest",
+    "tests.api.BLOOM_dashboard_http.DashboardHttpTest",
     "tests.api.BLOOM_docs_facade_bud_links.DocsFacadeBudLinksTest",
     "tests.api.BLOOM_document_create_status.DocumentCreateStatusTest",
     "tests.api.BLOOM_documents_external_visibility.DocumentsExternalVisibilityTest",

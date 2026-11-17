@@ -4814,3 +4814,82 @@ MSG_RPQ_DELETION = (
     "deleting the {target} with a pending request is answered 204 and empties the mailbox"
 )
 MSG_RPQ_HISTORY = "deleting a delivered report keeps the request as delivered without a document id"
+DASH_KEYS = (
+    "total_projects",
+    "total_requirements",
+    "total_test_cases",
+    "coverage_percent",
+    "projects",
+)
+DASH_READER = {"*": ["view", "comment"]}
+DASH_RECORDS = [
+    (
+        "Requirement",
+        {
+            "req_id": "PRJ-REQ-001",
+            "title": "Customer requirement",
+            "status": "Draft",
+            "visibility": "customer",
+            "priority": "Medium",
+            "req_type": "Functional",
+            "req_origin": "Customer",
+        },
+    ),
+    (
+        "Requirement",
+        {
+            "req_id": "PRJ-REQ-002",
+            "title": "Internal requirement",
+            "status": "Draft",
+            "visibility": "internal",
+            "priority": "Medium",
+            "req_type": "Functional",
+            "req_origin": "Internal",
+        },
+    ),
+    (
+        "TestCase",
+        {
+            "tc_id": "PRJ-TC-001",
+            "title": "Customer test case",
+            "status": "Draft",
+            "visibility": "customer",
+        },
+    ),
+    (
+        "TestCase",
+        {
+            "tc_id": "PRJ-TC-002",
+            "title": "Internal test case",
+            "status": "Draft",
+            "visibility": "internal",
+        },
+    ),
+    (
+        "TestCampaign",
+        {
+            "campaign_id": "PRJ-CMP-001",
+            "name": "Customer campaign",
+            "status": "Planned",
+            "visibility": "customer",
+        },
+    ),
+    (
+        "TestCampaign",
+        {
+            "campaign_id": "PRJ-CMP-002",
+            "name": "Internal campaign",
+            "status": "Planned",
+            "visibility": "internal",
+        },
+    ),
+]
+DASH_CASES = [
+    ("requirements, test cases and campaigns", ["REQ", "TC", "CMP"], (1, 1, 1, 1)),
+    ("campaigns only", ["CMP"], (0, 0, 1, 0)),
+]
+MSG_DASH_SHAPE = "the dashboard answers 200 with its totals and a project list, and a second read reports the same projects"
+MSG_DASH_TOTALS = "an external reader allowed {types} sees the customer records of those types only in the dashboard totals"
+MSG_DASH_PROJECT = (
+    "the dashboard project row and the project list report the same counts for {types}"
+)
