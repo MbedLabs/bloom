@@ -5260,3 +5260,49 @@ MSG_CLIA_CHECK_STATE = "checking the code of {what} request is refused with 400"
 MSG_CLIA_CHECK_GUARD = "checking needs a signed-in user (401) and code mode (403)"
 MSG_CLIA_APPROVE_CODE = "approving without the code is a 422, with a wrong one a 400 that keeps the request, with the right one it signs in"
 MSG_CLIA_DENY_NO_CODE = "denying with a request code is a 422, without one a 200"
+REG_PREFIXES = ("RGA", "RGB", "RGC", "RGD")
+REG_REVIEWER = "Grace Hopper"
+REG_LINK_STATES = [
+    ("linked", ["alpha", "charlie", "delta"]),
+    ("unlinked", ["bravo"]),
+    ("incoming", ["alpha", "delta"]),
+    ("outgoing", ["charlie"]),
+    ("suspect", ["alpha", "charlie"]),
+    ("clean", ["bravo", "delta"]),
+]
+MSG_REG_ALL = "the registry returns the four documents of the project"
+MSG_REG_COLUMNS = "a row carries the columns the registry shows"
+MSG_REG_NO_BODY = "no row carries the document body"
+MSG_REG_LINK_COUNTS = "links are counted in both directions"
+MSG_REG_SUSPECT = "a suspect link counts against both of its ends"
+MSG_REG_SKIP_COUNTS = "link counts can be left out"
+MSG_REG_FILTER = "the {what} filter returns {expected}"
+MSG_REG_BAD_REVIEWER = "a reviewer that is not a user id is refused with 422"
+MSG_REG_DATES = "a one-day range includes that day's rows, and a range in the future returns none"
+MSG_REG_SEARCH = "searching '{term}' returns {expected}"
+MSG_REG_NOTHING = "a term matching nothing returns no row and a total of 0"
+MSG_REG_DEFAULT_ORDER = "rows come most recently updated first"
+MSG_REG_ID_ORDER = "sorting by id works both ways"
+MSG_REG_TITLE_ORDER = "sorting by title ignores case"
+MSG_REG_REVIEWER_ORDER = "sorting by reviewer puts the unreviewed rows first"
+MSG_REG_ORIGIN_ORDER = "sorting by a column only requirements have puts test cases first"
+MSG_REG_BAD_SORT = "sorting by a column the registry cannot sort is refused with 422 naming it"
+MSG_REG_PAGE = "a page of two reports the whole count of four"
+MSG_REG_PAGES = "two pages of two cover the four rows without repeating one"
+MSG_REG_FILTERED_PAGE = "a page of a filtered set counts the filtered set"
+MSG_REG_PAST_END = "a page past the end is empty with the whole count"
+MSG_REG_SUMMARY = "the type summary counts two requirements and two test cases"
+MSG_REG_SUMMARY_AGREES = (
+    "the type summary agrees with the listing on counts and suspect links per type"
+)
+MSG_REG_EDGES = "the summary reports suite and campaign membership as edges"
+MSG_REG_OTHER_PROJECT = "the summary of another project is empty"
+MSG_REG_SUMMARY_ANONYMOUS = "the summary needs a signed-in user: 401"
+MSG_REG_KEYS = "asking for named rows returns only those rows"
+MSG_REG_KEYS_TYPES = "named rows of two types are returned together"
+MSG_REG_KEYS_WRONG_TYPE = "a row id under another type returns nothing"
+MSG_REG_KEYS_UNKNOWN = "an unknown row id is simply absent"
+MSG_REG_KEYS_RELATED = "named rows combined with related_to give the intersection"
+MSG_REG_KEYS_REFUSED = "{what} is refused with 422"
+MSG_REG_KEYS_PROJECT = "a row of another project cannot be read by naming it"
+MSG_REG_KEYS_SPEC = "a specification is returned by naming it"

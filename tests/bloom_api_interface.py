@@ -374,6 +374,83 @@ class BloomApiInterface(BloomInterface):
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
 
+    def bloom_api_seed_registry(self, headers, prefix):
+        values = self.parameters
+        project = self.bloom_api_new_project(headers, prefix)
+        email, password = "registry-reviewer@example.com", values.API_PASSWORD
+        reviewer = self.bloom_api_create_user(
+            headers, email, password, "maintainer", values.REG_REVIEWER
+        ).json()
+        policy = self.bloom_api_new_policy(headers, "Registry reviewer", {"*": ["*"]})
+        self.bloom_api_admit(headers, project["id"], reviewer["id"], policy_ids=[policy["id"]])
+
+        def post(path, **fields):
+            return self.bloom_api_call(
+                "POST", path, headers, json={"project_id": project["id"], **fields}
+            ).body
+
+        alpha = post(
+            "/api/requirements",
+            title="Alpha boot timing",
+            status="Draft",
+            priority="High",
+            req_type="Functional",
+            req_origin="Customer",
+            reviewer_id=reviewer["id"],
+        )
+        bravo = post(
+            "/api/requirements", title="Bravo shutdown sequence", status="Draft", priority="Low"
+        )
+        charlie = post("/api/test-cases", title="Charlie cold start", status="Draft")
+        delta = post(
+            "/api/test-cases", title="Delta brownout", status="Draft", reviewer_id=reviewer["id"]
+        )
+        links = (
+            (charlie, "TC", alpha, "REQ", "verifies", True),
+            (charlie, "TC", delta, "TC", "relates_to", False),
+        )
+        for source, source_type, target, target_type, role, suspect in links:
+            post(
+                "/api/links",
+                source_type=source_type,
+                source_id=source["id"],
+                target_type=target_type,
+                target_id=target["id"],
+                role=role,
+                suspect=suspect,
+            )
+        alpha_path = f"/api/artefacts/requirement/{alpha['id']}"
+        for path in (alpha_path, f"/api/artefacts/test-case/{charlie['id']}"):
+            self.bloom_api_call("POST", path + "/requests", headers, json={"kind": "review"})
+        reviewer_headers, _ = self.bloom_log_in(email, password)
+        self.bloom_api_call(
+            "POST",
+            alpha_path + "/comments",
+            reviewer_headers,
+            json={"body": "Reviewed the requested requirement."},
+        )
+        self.bloom_api_call(
+            "POST", alpha_path + "/requests", reviewer_headers, json={"kind": "approval"}
+        )
+        signed = self.bloom_api_call(
+            "POST", alpha_path + "/sign-off", headers, json={"step": "approve"}
+        )
+        return SimpleNamespace(
+            project=project,
+            prefix=project["prefix"],
+            reviewer=reviewer,
+            signed=signed,
+            names={
+                "alpha": alpha["req_id"],
+                "bravo": bravo["req_id"],
+                "charlie": charlie["tc_id"],
+                "delta": delta["tc_id"],
+            },
+        )
+
+    def bloom_api_registry(self, headers, prefix, **query):
+        return self.bloom_api_call("GET", f"/api/projects/{prefix}/docs", headers, params=query)
+
     def bloom_api_assign_bundle(self, headers, group_id, project_id, user_ids):
         body = {"project_id": project_id, "user_ids": list(user_ids)}
         return self.bloom_api_call(
