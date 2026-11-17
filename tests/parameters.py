@@ -4970,3 +4970,24 @@ MSG_TGL_UNKNOWN = "a tag of an unknown type is refused with 422 naming the type,
 MSG_TGL_PARAMETER = "a parameter mention creates no link"
 MSG_TGL_PAIR = "a {source} can tag a {target}"
 MSG_TGL_TEST_CASE = "a tag in a test case body creates no link"
+GOP_PREFIXES = ("GOA", "GOB", "GOC", "GOD", "GOE", "GOF", "GOG", "GOH", "GOI")
+MSG_GOP_GROUP = "a group is created with both policies, no members and no grants"
+MSG_GOP_REDUCED = "the group is reduced to one policy, and a policy in use cannot be deleted: 409"
+MSG_GOP_ACTIONS = "a write rule gives create and edit without sign-off, and an approve rule gives review and approve without writing"
+MSG_GOP_AUTHOR = "the author creates and requests review but cannot sign: 403"
+MSG_GOP_SIGNER = (
+    "the signer cannot edit (403 naming the permission), and comments, reviews and approves"
+)
+MSG_GOP_APPROVED = "the requirement is Approved, reviewed and approved by the signer; the author's approval is refused with 403"
+MSG_GOP_UNSUPPORTED = "an approve rule on a kind without approval is refused with 400"
+MSG_GOP_SCOPE = "a policy assigned to a project cannot become an app policy: 409, and it stays a document policy"
+MSG_GOP_ORIGINS = "a rule for all origins covers a requirement tagged after the assignment: read, listed and edited"
+MSG_GOP_OVERRIDE = "inherited group policies allow creating in the first project; the explicit read policy refuses it in the second: 403"
+MSG_GOP_NOT_ADMITTED = "the explicit entry lists no create permission, and a project without an entry is refused with 403"
+MSG_GOP_EXTERNAL = "an external account keeps review and loses approve and delete"
+MSG_GOP_EXTERNAL_REVIEW = (
+    "an external account comments only once assigned as reviewer, and cannot be made approver: 422"
+)
+MSG_GOP_EXTERNAL_LIMITS = "an external account cannot delete (403 naming the permission) or reach an internal requirement (404)"
+MSG_GOP_NARROW = "a read for all origins lends no edit to a write limited to customer content: read 200, edit 403"
+MSG_GOP_APP = "an app policy cannot be used in a project entry: 400"

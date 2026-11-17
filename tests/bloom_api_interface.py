@@ -369,6 +369,18 @@ class BloomApiInterface(BloomInterface):
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
 
+    def bloom_api_rule_policy(self, headers, name, resource, scope="document", **rule):
+        rules = {resource: {"read": True, "all_origins": True, **rule}}
+        return self.bloom_api_call(
+            "POST", "/api/policies", headers, json={"name": name, "scope": scope, "rules": rules}
+        )
+
+    def bloom_api_admit(self, headers, project_id, user_id, **entry):
+        body = {"user_id": user_id, **entry}
+        return self.bloom_api_call(
+            "POST", f"/api/projects/{project_id}/members", headers, json=body
+        )
+
     def bloom_tag_body(self, kind, artefact_id):
         attributes = {
             "id": f"{kind}:{artefact_id}",
