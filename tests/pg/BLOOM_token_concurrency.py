@@ -18,37 +18,8 @@ class TokenConcurrencyTest(TokenConcurrencyBase):
         self.postgres = self.bloom.bloom_use_postgres()
         if not self.postgres:
             return
-        password, role = self.parameters.API_PASSWORD, self.parameters.SESSION_ROLE
-        new_password = self.parameters.SESSION_NEW_PASSWORD
         self.bloom.bloom_start_main_api()
-        self.bloom.bloom_add_admin(self.parameters.ADMIN_EMAIL, password)
-        admin = self.bloom.bloom_log_in_for_cookie(self.parameters.ADMIN_EMAIL, password)
-        self.refresh_token = admin.cookie
-        self.refresh_statuses = self.bloom.bloom_race_requests(
-            "/api/auth/refresh", cookie=admin.cookie
-        )
-        admin = self.bloom.bloom_log_in_for_cookie(self.parameters.ADMIN_EMAIL, password)
-        email = self.parameters.TOKEN_RACE_RESET_EMAIL
-        self.bloom.bloom_add_account(email, password, role)
-        self.reset_token = self.bloom.bloom_request_password_reset(email).token
-        self.reset_statuses = self.bloom.bloom_race_requests(
-            "/api/auth/reset-password",
-            json={"token": self.reset_token, "new_password": new_password},
-        )
-        self.invite_token = self.bloom.bloom_invite(
-            admin.access_token, self.parameters.TOKEN_RACE_INVITE_EMAIL, role
-        ).token
-        self.invite_statuses = self.bloom.bloom_race_requests(
-            "/api/auth/accept-invite",
-            json={"token": self.invite_token, "password": new_password},
-        )
-        email = self.parameters.TOKEN_RACE_VERIFY_EMAIL
-        self.bloom.bloom_add_account(email, password, role)
-        member = self.bloom.bloom_log_in_for_cookie(email, password)
-        self.verify_token = self.bloom.bloom_request_verification(member.access_token).token
-        self.verify_statuses = self.bloom.bloom_race_requests(
-            "/api/auth/verify-email", json={"token": self.verify_token}
-        )
+        self.bloom.bloom_add_admin(self.parameters.ADMIN_EMAIL, self.parameters.API_PASSWORD)
 
     def tearDownClass(self):
         super().tearDownClass()

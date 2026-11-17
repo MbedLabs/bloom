@@ -16,162 +16,116 @@ class TokenConcurrencyBase(BloomTestCase):
 
     interface = BloomPgInterface
 
-    def bud_refresh_token_is_issued(self):
+    def bud_a_refresh_token_works_once_under_concurrent_use(self):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
+        values = self.parameters
+        token = self.bloom.bloom_log_in_for_cookie(values.ADMIN_EMAIL, values.API_PASSWORD).cookie
+        statuses = self.bloom.bloom_race_requests("/api/auth/refresh", cookie=token)
+        values = self.parameters
+        name = values.TOKEN_RACE_USE["refresh"]
+        self.print_variables({"statuses": statuses})
         self.assertTrue(
-            self.refresh_token,
-            msg=self.parameters.MSG_TOKEN_RACE_ISSUED.format(
-                token=self.parameters.TOKEN_RACE_USE["refresh"]
-            ),
-            abort_on_fail=False,
+            token, msg=values.MSG_TOKEN_RACE_ISSUED.format(token=name), abort_on_fail=False
         )
-
-    def bud_one_use_of_the_refresh_token_succeeds(self):
-        if not self.postgres:
-            self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
-            return
-        self.print_variables({"statuses": self.refresh_statuses})
         self.assertEqual(
-            self.refresh_statuses.count(self.parameters.STATUS_OK),
+            statuses.count(values.STATUS_OK),
             1,
-            msg=self.parameters.MSG_TOKEN_RACE_ONE.format(
-                token=self.parameters.TOKEN_RACE_USE["refresh"]
-            ),
+            msg=values.MSG_TOKEN_RACE_ONE.format(token=name),
             abort_on_fail=False,
         )
-
-    def bud_every_other_use_of_the_refresh_token_is_refused(self):
-        if not self.postgres:
-            self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
-            return
         self.assertEqual(
-            sorted(set(self.refresh_statuses)),
-            [self.parameters.STATUS_OK, self.parameters.STATUS_UNAUTHORIZED],
-            msg=self.parameters.MSG_TOKEN_RACE_OTHERS.format(
-                token=self.parameters.TOKEN_RACE_USE["refresh"],
-                status=self.parameters.STATUS_UNAUTHORIZED,
-            ),
+            sorted(set(statuses)),
+            [values.STATUS_OK, values.STATUS_UNAUTHORIZED],
+            msg=values.MSG_TOKEN_RACE_OTHERS.format(token=name, status=values.STATUS_UNAUTHORIZED),
             abort_on_fail=False,
         )
 
-    def bud_reset_token_is_issued(self):
+    def bud_a_reset_token_works_once_under_concurrent_use(self):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
+        values = self.parameters
+        email = values.TOKEN_RACE_RESET_EMAIL
+        self.bloom.bloom_add_account(email, values.API_PASSWORD, values.SESSION_ROLE)
+        token = self.bloom.bloom_request_password_reset(email).token
+        body = {"token": token, "new_password": values.SESSION_NEW_PASSWORD}
+        statuses = self.bloom.bloom_race_requests("/api/auth/reset-password", json=body)
+        values = self.parameters
+        name = values.TOKEN_RACE_USE["reset"]
+        self.print_variables({"statuses": statuses})
         self.assertTrue(
-            self.reset_token,
-            msg=self.parameters.MSG_TOKEN_RACE_ISSUED.format(
-                token=self.parameters.TOKEN_RACE_USE["reset"]
-            ),
-            abort_on_fail=False,
+            token, msg=values.MSG_TOKEN_RACE_ISSUED.format(token=name), abort_on_fail=False
         )
-
-    def bud_one_use_of_the_reset_token_succeeds(self):
-        if not self.postgres:
-            self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
-            return
-        self.print_variables({"statuses": self.reset_statuses})
         self.assertEqual(
-            self.reset_statuses.count(self.parameters.STATUS_OK),
+            statuses.count(values.STATUS_OK),
             1,
-            msg=self.parameters.MSG_TOKEN_RACE_ONE.format(
-                token=self.parameters.TOKEN_RACE_USE["reset"]
-            ),
+            msg=values.MSG_TOKEN_RACE_ONE.format(token=name),
             abort_on_fail=False,
         )
-
-    def bud_every_other_use_of_the_reset_token_is_refused(self):
-        if not self.postgres:
-            self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
-            return
         self.assertEqual(
-            sorted(set(self.reset_statuses)),
-            [self.parameters.STATUS_OK, self.parameters.STATUS_BAD_REQUEST],
-            msg=self.parameters.MSG_TOKEN_RACE_OTHERS.format(
-                token=self.parameters.TOKEN_RACE_USE["reset"],
-                status=self.parameters.STATUS_BAD_REQUEST,
-            ),
+            sorted(set(statuses)),
+            [values.STATUS_OK, values.STATUS_BAD_REQUEST],
+            msg=values.MSG_TOKEN_RACE_OTHERS.format(token=name, status=values.STATUS_BAD_REQUEST),
             abort_on_fail=False,
         )
 
-    def bud_invite_token_is_issued(self):
+    def bud_an_invite_token_works_once_under_concurrent_use(self):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
+        values = self.parameters
+        admin = self.bloom.bloom_log_in_for_cookie(values.ADMIN_EMAIL, values.API_PASSWORD)
+        token = self.bloom.bloom_invite(
+            admin.access_token, values.TOKEN_RACE_INVITE_EMAIL, values.SESSION_ROLE
+        ).token
+        body = {"token": token, "password": values.SESSION_NEW_PASSWORD}
+        statuses = self.bloom.bloom_race_requests("/api/auth/accept-invite", json=body)
+        values = self.parameters
+        name = values.TOKEN_RACE_USE["invite"]
+        self.print_variables({"statuses": statuses})
         self.assertTrue(
-            self.invite_token,
-            msg=self.parameters.MSG_TOKEN_RACE_ISSUED.format(
-                token=self.parameters.TOKEN_RACE_USE["invite"]
-            ),
-            abort_on_fail=False,
+            token, msg=values.MSG_TOKEN_RACE_ISSUED.format(token=name), abort_on_fail=False
         )
-
-    def bud_one_use_of_the_invite_token_succeeds(self):
-        if not self.postgres:
-            self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
-            return
-        self.print_variables({"statuses": self.invite_statuses})
         self.assertEqual(
-            self.invite_statuses.count(self.parameters.STATUS_OK),
+            statuses.count(values.STATUS_OK),
             1,
-            msg=self.parameters.MSG_TOKEN_RACE_ONE.format(
-                token=self.parameters.TOKEN_RACE_USE["invite"]
-            ),
+            msg=values.MSG_TOKEN_RACE_ONE.format(token=name),
             abort_on_fail=False,
         )
-
-    def bud_every_other_use_of_the_invite_token_is_refused(self):
-        if not self.postgres:
-            self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
-            return
         self.assertEqual(
-            sorted(set(self.invite_statuses)),
-            [self.parameters.STATUS_OK, self.parameters.STATUS_BAD_REQUEST],
-            msg=self.parameters.MSG_TOKEN_RACE_OTHERS.format(
-                token=self.parameters.TOKEN_RACE_USE["invite"],
-                status=self.parameters.STATUS_BAD_REQUEST,
-            ),
+            sorted(set(statuses)),
+            [values.STATUS_OK, values.STATUS_BAD_REQUEST],
+            msg=values.MSG_TOKEN_RACE_OTHERS.format(token=name, status=values.STATUS_BAD_REQUEST),
             abort_on_fail=False,
         )
 
-    def bud_verify_token_is_issued(self):
+    def bud_a_verification_token_works_once_under_concurrent_use(self):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
+        values = self.parameters
+        email = values.TOKEN_RACE_VERIFY_EMAIL
+        self.bloom.bloom_add_account(email, values.API_PASSWORD, values.SESSION_ROLE)
+        member = self.bloom.bloom_log_in_for_cookie(email, values.API_PASSWORD)
+        token = self.bloom.bloom_request_verification(member.access_token).token
+        statuses = self.bloom.bloom_race_requests("/api/auth/verify-email", json={"token": token})
+        values = self.parameters
+        name = values.TOKEN_RACE_USE["verify"]
+        self.print_variables({"statuses": statuses})
         self.assertTrue(
-            self.verify_token,
-            msg=self.parameters.MSG_TOKEN_RACE_ISSUED.format(
-                token=self.parameters.TOKEN_RACE_USE["verify"]
-            ),
-            abort_on_fail=False,
+            token, msg=values.MSG_TOKEN_RACE_ISSUED.format(token=name), abort_on_fail=False
         )
-
-    def bud_one_use_of_the_verify_token_succeeds(self):
-        if not self.postgres:
-            self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
-            return
-        self.print_variables({"statuses": self.verify_statuses})
         self.assertEqual(
-            self.verify_statuses.count(self.parameters.STATUS_OK),
+            statuses.count(values.STATUS_OK),
             1,
-            msg=self.parameters.MSG_TOKEN_RACE_ONE.format(
-                token=self.parameters.TOKEN_RACE_USE["verify"]
-            ),
+            msg=values.MSG_TOKEN_RACE_ONE.format(token=name),
             abort_on_fail=False,
         )
-
-    def bud_every_other_use_of_the_verify_token_is_refused(self):
-        if not self.postgres:
-            self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
-            return
         self.assertEqual(
-            sorted(set(self.verify_statuses)),
-            [self.parameters.STATUS_OK, self.parameters.STATUS_BAD_REQUEST],
-            msg=self.parameters.MSG_TOKEN_RACE_OTHERS.format(
-                token=self.parameters.TOKEN_RACE_USE["verify"],
-                status=self.parameters.STATUS_BAD_REQUEST,
-            ),
+            sorted(set(statuses)),
+            [values.STATUS_OK, values.STATUS_BAD_REQUEST],
+            msg=values.MSG_TOKEN_RACE_OTHERS.format(token=name, status=values.STATUS_BAD_REQUEST),
             abort_on_fail=False,
         )
