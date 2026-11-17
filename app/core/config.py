@@ -388,7 +388,7 @@ class Settings(BaseSettings):
     def settings_customise_sources(
         cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings
     ):
-        """Let CI/pytest bypass workspace `.env` when injecting `DATABASE_URL` / secrets via the shell."""
+        """Let CI and the test suites bypass workspace `.env` when injecting `DATABASE_URL` / secrets via the shell."""
         dotenv = () if os.environ.get("BLOOM_DOTENV_DISABLED") == "1" else (dotenv_settings,)
         return (init_settings, env_settings, *dotenv, file_secret_settings)
 
