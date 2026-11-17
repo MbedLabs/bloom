@@ -4625,3 +4625,21 @@ MSG_VIST_TAGS = (
 )
 MSG_VIST_NAMES = "the Markdown types vis and Vision both mean VIS"
 MSG_VIST_IMPORT = "a VIS section is imported as a draft vision with a vision id"
+OBS_TRACE = "trace-me-123"
+OBS_METRICS = ["http_requests_total", "http_request_duration_seconds", 'path="/api/ping"']
+MSG_OBS_PING_EVENT = (
+    "a request leaves one anonymous, successful api.request event with its request id and route"
+)
+MSG_OBS_QUERY = "the event keeps the names of the query parameters and none of their values"
+MSG_OBS_UNMATCHED = "a request to no route is a 404 recorded as unmatched and denied"
+MSG_OBS_GENERATED = "an answer carries a generated request id of at least 16 characters"
+MSG_OBS_PROPAGATED = "a request id sent by the caller is returned unchanged"
+MSG_OBS_METRICS = "the metrics page is plain text in the Prometheus format"
+MSG_OBS_METRIC = "the metrics page contains {name}"
+MSG_OBS_DISABLED = "with metrics turned off the metrics page is a 404"
+MSG_OBS_JSON = "a log record is formatted as JSON with message, level, logger and request id"
+MSG_OBS_LOGGING = "setting up logging twice leaves one handler with the JSON formatter"
+LNK_PREFIXES = ("LKA", "LKB")
+MSG_LNK_FORBIDDEN = "a test case cannot reference a requirement: 422 saying the role is not allowed"
+MSG_LNK_LEGACY = "a link stored under the old concept code is listed under the current code"
+MSG_LNK_DUPLICATE = "creating the same link again is refused with 400 as already existing"

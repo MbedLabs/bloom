@@ -48,7 +48,16 @@ from app.core.cache import dashboard_stats_cache
 from app.core.config import Settings, settings
 from app.core.database import get_db
 from app.core.deps import limiter, rate_limit_key
-from app.core.observability import CREATED_BODY_LIMIT, CreatedBody, client_address
+from app.core.observability import (
+    CREATED_BODY_LIMIT,
+    CreatedBody,
+    JsonLogFormatter,
+    RequestObservabilityMiddleware,
+    client_address,
+    metrics_router,
+    request_id_var,
+    setup_logging,
+)
 from app.core.permissions import DOC_TYPE_RESOURCES
 from app.core.security import (
     accessible_project_ids,
@@ -352,6 +361,47 @@ class BloomApiInterface(BloomInterface):
             return await original(db, setting, tracker, delivery_id)
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
+
+    def bloom_start_observed_api(self):
+        app = FastAPI()
+        app.add_middleware(RequestObservabilityMiddleware)
+        app.include_router(metrics_router, prefix="/api")
+        app.dependency_overrides[get_db] = self._serve_session
+
+        @app.get("/api/ping")
+        async def ping():
+            return {"ok": True}
+
+        self.api = app
+
+    def bloom_api_raw(self, method, path, headers=None, params=None):
+        answer = self._run(self._request(method, path, headers, params=params))
+        return SimpleNamespace(status=answer.status_code, headers=answer.headers, text=answer.text)
+
+    def bloom_api_metrics(self, enabled=True):
+        with patch.object(settings, "ENABLE_METRICS", enabled):
+            return self.bloom_api_raw("GET", "/api/metrics")
+
+    def bloom_format_log_record(self, message, arguments, request_id):
+        token = request_id_var.set(request_id)
+        try:
+            record = logging.LogRecord(
+                "bloom.test", logging.INFO, __file__, 1, message, arguments, None
+            )
+            return json.loads(JsonLogFormatter().format(record))
+        finally:
+            request_id_var.reset(token)
+
+    def bloom_set_up_logging_twice(self):
+        root = logging.getLogger()
+        handlers, level = list(root.handlers), root.level
+        try:
+            setup_logging(level="INFO", json_logs=True)
+            setup_logging(level="INFO", json_logs=True)
+            return len(root.handlers), isinstance(root.handlers[0].formatter, JsonLogFormatter)
+        finally:
+            root.handlers[:] = handlers
+            root.setLevel(level)
 
     def bloom_start_workflow_api(self):
         self.bloom_start_full_api()

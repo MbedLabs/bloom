@@ -38,6 +38,8 @@ SUITES = [
     "tests.api.BLOOM_jira_webhook_signatures.JiraWebhookSignaturesTest",
     "tests.api.BLOOM_jira_webhook_spoofed_events.JiraWebhookSpoofedEventsTest",
     "tests.api.BLOOM_jira_webhook_status_mapping.JiraWebhookStatusMappingTest",
+    "tests.api.BLOOM_links_http.LinksHttpTest",
+    "tests.api.BLOOM_observability.ObservabilityTest",
     "tests.api.BLOOM_perf_traceability.PerfTraceabilityTest",
     "tests.api.BLOOM_project_access_entries.ProjectAccessEntriesTest",
     "tests.api.BLOOM_project_counts_batched.ProjectCountsBatchedTest",
