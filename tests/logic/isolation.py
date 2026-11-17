@@ -74,10 +74,9 @@ class IsolationBase(BloomTestCase):
             (
                 run.failed,
                 values.ISO_DATABASE_REFUSAL in run.errors,
-                "synthetic-password" in run.errors,
-                "db.example.com" in run.errors,
+                [secret for secret in values.ISO_LIVE_SECRETS if run.errors.count(secret)],
             ),
-            (True, True, False, False),
+            (True, True, []),
             msg=values.MSG_ISO_LIVE_DATABASE,
             abort_on_fail=False,
         )

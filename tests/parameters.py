@@ -3709,7 +3709,8 @@ ISO_MAILPIT = "sys.audit('smtplib.connect', smtplib.SMTP(), '127.0.0.1', 11025);
 ISO_OTHER_MAILPIT = (
     "sys.audit('smtplib.connect', smtplib.SMTP(), '127.0.0.1', 21025); print('allowed')"
 )
-ISO_LIVE_DATABASE = "postgresql://synthetic-user:synthetic-password@db.example.com/live"
+ISO_LIVE_SECRETS = ("synthetic-password", "db.example.com")
+ISO_LIVE_DATABASE = f"postgresql://synthetic-user:{ISO_LIVE_SECRETS[0]}@{ISO_LIVE_SECRETS[1]}/live"
 ISO_DATABASE_REFUSAL = "Tests require the isolated test database"
 ISO_SMTP_REFUSAL = "dedicated test Mailpit port"
 ISO_DOTENV_READ = "\ntry:\n    sys.audit('open', str(Path.cwd() / '.env'), 'r', 0)\nexcept PermissionError:\n    print('operator dotenv blocked')\n"
