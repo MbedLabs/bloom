@@ -114,39 +114,6 @@ jobs:
           alembic upgrade head
           alembic current | grep -q "(head)" || { echo "database is not at alembic head" >&2; exit 1; }
 
-      - name: Run backend tests
-        env:
-          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          ENABLE_DOCS: "false"
-          BLOOM_DOTENV_DISABLED: "1"
-          BLOOM_DISABLE_RATE_LIMIT: "1"
-        run: |
-          pytest --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=78 tests/api tests/logic tests/sec -v
-
-      - name: Postgres tests
-        env:
-          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          ENABLE_DOCS: "false"
-          BLOOM_DOTENV_DISABLED: "1"
-          BLOOM_DISABLE_RATE_LIMIT: "1"
-        run: |
-          pytest tests/pg -v
-
-      - name: Postgres tests again on the same database
-        env:
-          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
-          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
-          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
-          ENABLE_DOCS: "false"
-          BLOOM_DOTENV_DISABLED: "1"
-          BLOOM_DISABLE_RATE_LIMIT: "1"
-        run: |
-          pytest tests/pg -q
-
       - name: Generate the integration encryption key
         run: |
           echo "INTEGRATION_ENCRYPTION_KEY=$(python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")" >> "$GITHUB_ENV"
@@ -160,6 +127,16 @@ jobs:
           INTEGRATION_SYNC_MINUTES: "0"
           PYTHONPATH: ${{ github.workspace }}
         run: bud-runner run-tests -t tests.pg.SUITES --no-upload -o "$RUNNER_TEMP/tests-pg-junit.xml"
+
+      - name: Run the tests in tests/pg again on the same database
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom
+          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
+          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
+          BLOOM_DOTENV_DISABLED: "1"
+          INTEGRATION_SYNC_MINUTES: "0"
+          PYTHONPATH: ${{ github.workspace }}
+        run: bud-runner run-tests -t tests.pg.SUITES --no-upload -o "$RUNNER_TEMP/tests-pg-again-junit.xml"
 
       - name: Run the tests in tests/logic
         env:
@@ -180,6 +157,16 @@ jobs:
           INTEGRATION_SYNC_MINUTES: "0"
           PYTHONPATH: ${{ github.workspace }}
         run: bud-runner run-tests -t tests.api.SUITES --no-upload -o "$RUNNER_TEMP/tests-api-junit.xml"
+
+      - name: Run the tests in tests/sec
+        env:
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          SECRET_KEY: test-secret-key-for-ci-at-least-32-characters-long
+          SERVICE_TOKEN_PEPPER: test-service-token-pepper-for-ci-at-least-32-characters-long
+          BLOOM_DOTENV_DISABLED: "1"
+          INTEGRATION_SYNC_MINUTES: "0"
+          PYTHONPATH: ${{ github.workspace }}
+        run: bud-runner run-tests -t tests.sec.SUITES --no-upload -o "$RUNNER_TEMP/tests-sec-junit.xml"
 
       - name: Run UI checks
         run: |

@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import secrets
 
 import asyncpg
 
@@ -17,7 +18,11 @@ from app.core.permissions import (
 )
 from app.models.groups import Policy
 from app.models.project_membership import ProjectAccess
-from tests.conftest import unique_name
+
+
+def unique_name(stem):
+    """A name unique to this call."""
+    return f"{stem} {secrets.token_hex(4)}"
 
 
 def scenario_permissions(name):
