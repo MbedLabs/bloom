@@ -4492,3 +4492,29 @@ MSG_REQH_UPDATED = "a title change is answered 200 with the new title"
 MSG_REQH_DELETED = "deleting the requirement is answered 200 or 204"
 MSG_REQH_BODY_CREATED = "a test case is created with its editor body"
 MSG_REQH_BODY_READ = "the editor body comes back in the list and the HTML in the detail"
+TRK_PREFIXES = ("TKA", "TKB", "TKC", "TKD", "TKE", "TKF")
+TRK_UNREACHABLE = [
+    ("no route", 502),
+    ("read timeout", 504),
+    ("connect timeout", 504),
+    ("unreadable answer", 502),
+]
+MSG_TRK_UNREACHABLE = "a tracker failing with {failure} is answered {status} with a detail"
+MSG_TRK_NAMED = "the error names the tracker and shows neither the address nor the exception"
+MSG_TRK_REFUSED = "a tracker that refuses with 401 is a 502 naming the 401"
+SETUP_PASSWORD = "a-sufficiently-long-passphrase"
+SETUP_OWNER = {
+    "email": "owner@example.com",
+    "password": SETUP_PASSWORD,
+    "full_name": "Instance Owner",
+}
+SETUP_SQUATTER = {**SETUP_OWNER, "email": "squatter@example.com"}
+SETUP_SHORT = {**SETUP_OWNER, "password": "short"}
+MSG_SETUP_REQUIRED = "an instance without users reports that setup is required"
+MSG_SETUP_CREATED = (
+    "setup is answered 201 and stores one active administrator with a hashed password"
+)
+MSG_SETUP_CLOSED = "after setup the status is closed and a second setup is a 409 that adds no user"
+MSG_SETUP_SHORT = "a password below the policy is refused with 422"
+MSG_SETUP_NO_MAIL = "setup succeeds and closes when mail is unavailable"
+MSG_SETUP_MAIL = "setup mails the new administrator a link to the login page"

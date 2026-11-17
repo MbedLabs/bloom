@@ -41,9 +41,11 @@ SUITES = [
     "tests.api.BLOOM_requirement_description.RequirementDescriptionTest",
     "tests.api.BLOOM_requirement_workflow_activity.RequirementWorkflowActivityTest",
     "tests.api.BLOOM_requirements_http.RequirementsHttpTest",
+    "tests.api.BLOOM_setup_api.SetupApiTest",
     "tests.api.BLOOM_sign_off_activity.SignOffActivityTest",
     "tests.api.BLOOM_sync_results_names_the_campaign.SyncResultsNamesTheCampaignTest",
     "tests.api.BLOOM_sync_results_names_the_suite.SyncResultsNamesTheSuiteTest",
+    "tests.api.BLOOM_tracker_unreachable.TrackerUnreachableTest",
     "tests.api.BLOOM_user_deletion.UserDeletionTest",
     "tests.api.BLOOM_user_promotion.UserPromotionTest",
 ]

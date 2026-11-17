@@ -40,7 +40,9 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 import tests.parameters as params
 from app import main
 from app.api import access_requests as access_requests_api
+from app.api import defects as defects_api
 from app.api import integrations
+from app.api import setup as setup_api
 from app.core import id_generator
 from app.core.cache import dashboard_stats_cache
 from app.core.config import Settings, settings
@@ -346,6 +348,59 @@ class BloomApiInterface(BloomInterface):
             return await original(db, setting, tracker, delivery_id)
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
+
+    def bloom_api_add_tracked_defect(self, headers, prefix):
+        project = self.bloom_api_new_project(headers, prefix)
+        body = {
+            "project_id": project["id"],
+            "title": f"Defect {prefix}",
+            "external_tracker": "github",
+            "external_repo_full_name": "MbedLabs/bloom",
+            "external_issue_number": 7,
+            "external_issue_url": "https://github.com/MbedLabs/bloom/issues/7",
+        }
+        return self.bloom_api_call("POST", "/api/defects", headers, json=body).body
+
+    def bloom_api_refresh_defect_while_tracker_fails(self, headers, defect_id, failure):
+        refusal = httpx.HTTPStatusError(
+            "401",
+            request=httpx.Request("GET", "https://api.github.com"),
+            response=httpx.Response(401),
+        )
+        failures = {
+            "no route": httpx.ConnectError("no route to host"),
+            "no route to an address": httpx.ConnectError("no route to host 10.0.0.5"),
+            "read timeout": httpx.ReadTimeout("timed out"),
+            "connect timeout": httpx.ConnectTimeout("timed out"),
+            "unreadable answer": ValueError("not json"),
+            "refusal": refusal,
+        }
+
+        async def fail(*args, **kwargs):
+            raise failures[failure]
+
+        path, body = f"/api/defects/{defect_id}/refresh-external", {
+            "token": "a-token-the-test-never-uses"
+        }
+        with patch.object(defects_api, "_fetch_github_issue", fail):
+            answer = self._run(self._request("POST", path, headers, json=body))
+        return SimpleNamespace(status=answer.status_code, body=answer.json(), text=answer.text)
+
+    def bloom_api_setup(self, body, mail="recorded"):
+        sent = {}
+
+        def record(**fields):
+            if mail == "unavailable":
+                raise MailConfigurationError("SMTP is disabled")
+            sent.update(fields)
+
+        with patch.object(setup_api, "send_admin_welcome_email", record):
+            answer = self.bloom_api_call("POST", "/api/setup", json=body)
+        return answer, sent
+
+    def bloom_list_accounts(self):
+        rows = self._run(self._all(select(User).order_by(User.id)))
+        return [(row.email, row.role.value, row.is_active, row.hashed_password) for row in rows]
 
     def bloom_start_api_with_admin(self):
         self.bloom_start_full_api()
