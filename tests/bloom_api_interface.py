@@ -369,6 +369,56 @@ class BloomApiInterface(BloomInterface):
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
 
+    def bloom_new_identity_world(self):
+        self.bloom_new_database()
+        values = self.parameters
+        people = []
+        for number, role in enumerate([UserRole.admin, UserRole.maintainer, UserRole.external]):
+            picture = io.BytesIO()
+            Image.new("RGB", (32, 32), values.IDP_COLOURS[number]).save(picture, "PNG")
+            person = self.bloom_add_record(
+                "User",
+                email=f"identity-{number}@example.com",
+                full_name=f"Person {number}",
+                role=role,
+                hashed_password="unused",
+                profile_picture=picture.getvalue(),
+            )
+            people.append(person)
+        admin, member, outsider = people
+        project = self.bloom_add_record("Project", name="Demo", prefix="PRJ")
+        hidden = self.bloom_add_record("Project", name="ABC", prefix="ABC")
+        self.bloom_add_internal_member(project, member, values.IDP_REVIEW)
+        requirement = self.bloom_add_record(
+            "Requirement",
+            project_id=project,
+            reviewer_id=member,
+            approver_id=admin,
+            **values.IDP_REQUIREMENT,
+        )
+        self.bloom_add_record(
+            "AuditEvent", actor_user_id=member, actor_type="user", action="identity.read"
+        )
+        self.bloom_add_record(
+            "AccessRequest",
+            user_id=member,
+            resource_type="project",
+            resource_ref="PRJ",
+            project_prefix="PRJ",
+        )
+        return SimpleNamespace(
+            admin=self.bloom_user_token_headers(admin),
+            member=self.bloom_user_token_headers(member),
+            outsider=self.bloom_user_token_headers(outsider),
+            project=project,
+            hidden=hidden,
+            requirement=requirement,
+        )
+
+    def bloom_picture_of(self, url):
+        prefix = "data:image/png;base64,"
+        return base64.b64decode(url[len(prefix) :]) if url and url.startswith(prefix) else None
+
     def bloom_new_external_dashboard_reader(self, doc_types):
         self.bloom_new_database()
         values = self.parameters

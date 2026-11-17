@@ -4893,3 +4893,38 @@ MSG_DASH_TOTALS = "an external reader allowed {types} sees the customer records 
 MSG_DASH_PROJECT = (
     "the dashboard project row and the project list report the same counts for {types}"
 )
+IDP_COLOURS = ["purple", "green", "blue"]
+IDP_REVIEW = {"REQ": ["view", "review"]}
+IDP_REQUIREMENT = {
+    "req_id": "PRJ-REQ-001",
+    "title": "Requirement",
+    "status": "Draft",
+    "visibility": "internal",
+    "req_type": "Functional",
+    "req_origin": "Internal",
+    "priority": "Medium",
+}
+MSG_IDP_DIRECTORY = "the user list gives each of the three people a different picture"
+MSG_IDP_MENTIONS = "the people who can be mentioned in the project carry the same pictures"
+MSG_IDP_GUARDS = (
+    "the user list and the mention list keep their guards: 403, hidden project, outsider, 401"
+)
+MSG_IDP_ROSTER = "the project members and the audit list show the picture of the same person"
+MSG_IDP_AUTHOR_FIELD = "a comment naming another author is refused with 422"
+MSG_IDP_COMMENT = "a new comment carries the signed-in author and their picture"
+MSG_IDP_COMMENT_KEPT = (
+    "after a name change the comment keeps its author and picture, and an outsider cannot read it"
+)
+MSG_IDP_COMMENT_REMOVED = "after the picture is removed the comment shows none"
+MSG_IDP_REPLACED = "a replaced picture shows in the user list"
+MSG_IDP_REMOVED = "a removed picture shows as none in the user list"
+MSG_IDP_REQUEST = (
+    "an access request shows its requester's name and picture to the administrator only"
+)
+MSG_IDP_REQUEST_REMOVED = "after the picture is removed the access request shows none"
+MSG_IDP_ACTIVITY = "the activity entry and the notification name the real actor with their picture"
+MSG_IDP_NOTICE_GUARD = (
+    "an outsider has no notifications, cannot mark this one and cannot read the activity"
+)
+MSG_IDP_ACTOR_RENAMED = "the activity shows the actor's new name"
+MSG_IDP_ACTOR_REMOVED = "after the picture is removed the activity and the notification show none"

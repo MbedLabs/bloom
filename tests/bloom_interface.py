@@ -33,7 +33,6 @@ from app.models import (
     IntegrationSetting,
     Project,
 )
-from app.models import workflow as workflow_models
 from app.models.user import User, UserRole
 from app.services.integration_secrets import encrypt_integration_secret
 from tests.access_fixtures import allow_doc_types, project_access_fixture
@@ -227,9 +226,9 @@ class BloomInterface:
         return self._run(read())
 
     def _model(self, kind):
-        for module in (bloom_models, workflow_models):
-            if hasattr(module, kind):
-                return getattr(module, kind)
+        for mapper in Base.registry.mappers:
+            if mapper.class_.__name__ == kind:
+                return mapper.class_
         raise KeyError(kind)
 
     def bloom_list_defects(self):
