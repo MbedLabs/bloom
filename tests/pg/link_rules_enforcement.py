@@ -22,53 +22,45 @@ class LinkRulesEnforcementBase(BloomTestCase):
             return
         self.print_variables({"alembic": self.before[1][-300:]})
         self.assertEqual(
-            self.before[0],
-            0,
-            msg=self.parameters.MSG_MIGRATION_BEFORE,
-            abort_on_fail=False,
+            self.before[0], 0, msg=self.parameters.MSG_MIGRATION_BEFORE, abort_on_fail=False
         )
 
     def bud_migrations_reach_head(self):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"alembic": self.upgrade[1][-300:]})
-        self.assertEqual(
-            self.upgrade[0],
-            0,
-            msg=self.parameters.MSG_MIGRATION_HEAD,
-            abort_on_fail=False,
-        )
+        code, output = self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
+        self.print_variables({"alembic": output[-300:]})
+        self.assertEqual(code, 0, msg=self.parameters.MSG_MIGRATION_HEAD, abort_on_fail=False)
 
     def bud_upgrade_leaves_the_constraint_unvalidated(self):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"validated": self.validated_after_upgrade})
+        validated = self.bloom.bloom_link_constraint_validated()
+        self.print_variables({"validated": validated})
         self.assertEqual(
-            self.validated_after_upgrade,
-            False,
-            msg=self.parameters.MSG_LINK_UNVALIDATED,
-            abort_on_fail=False,
+            validated, False, msg=self.parameters.MSG_LINK_UNVALIDATED, abort_on_fail=False
         )
 
     def bud_upgrade_keeps_the_forbidden_link(self):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"link before": self.old_link, "link after": self.kept_link})
+        kept = self.bloom.bloom_first_link_id()
+        self.print_variables({"link before": self.old_link, "link after": kept})
         self.assertEqual(
-            self.kept_link,
-            self.old_link,
-            msg=self.parameters.MSG_LINK_KEPT,
-            abort_on_fail=False,
+            kept, self.old_link, msg=self.parameters.MSG_LINK_KEPT, abort_on_fail=False
         )
 
     def bud_new_forbidden_triples_are_refused_by_the_constraint(self):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        for triple, error in zip(self.parameters.LINK_REJECTED, self.rejected):
+        for triple in self.parameters.LINK_REJECTED:
+            error = self.bloom.bloom_insert_link(
+                self.project, *triple, self.parameters.LINK_NEW_ENDS, keep=False
+            ).error
             self.print_variables({"triple": triple, "error": (error or "")[:160]})
             self.assertIn(
                 self.parameters.LINK_CONSTRAINT,
@@ -81,7 +73,10 @@ class LinkRulesEnforcementBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        for triple, link_id in zip(self.parameters.LINK_ACCEPTED, self.accepted):
+        for triple in self.parameters.LINK_ACCEPTED:
+            link_id = self.bloom.bloom_insert_link(
+                self.project, *triple, self.parameters.LINK_NEW_ENDS, keep=False
+            ).id
             self.assertTrue(
                 link_id,
                 msg=self.parameters.MSG_LINK_ACCEPTED.format(triple=triple),
@@ -92,15 +87,17 @@ class LinkRulesEnforcementBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
+        table_triples = self.bloom.bloom_read_allowed_link_triples()
+        code_triples = self.bloom.bloom_code_link_triples()
         self.print_variables(
             {
-                "triples in the database": len(self.table_triples),
-                "triples in the code": len(self.code_triples),
+                "triples in the database": len(table_triples),
+                "triples in the code": len(code_triples),
             }
         )
         self.assertEqual(
-            self.table_triples,
-            self.code_triples,
+            table_triples,
+            code_triples,
             msg=self.parameters.MSG_LINK_TABLE_IS_CODE,
             abort_on_fail=False,
         )
@@ -109,9 +106,10 @@ class LinkRulesEnforcementBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"report": self.refused_check.report})
+        check = self.bloom.bloom_check_link_rules()
+        self.print_variables({"report": check.report})
         self.assertEqual(
-            self.refused_check.exit_code,
+            check.exit_code,
             self.parameters.LINK_CHECK_REFUSED,
             msg=self.parameters.MSG_LINK_CHECK_REFUSED,
             abort_on_fail=False,
@@ -122,7 +120,11 @@ class LinkRulesEnforcementBase(BloomTestCase):
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
         key = self.parameters.LINK_REPORT_TABLE_KEY
-        rows = [row for row in self.refused_check.report if row[key] == self.parameters.LINK_TABLE]
+        rows = [
+            row
+            for row in self.bloom.bloom_check_link_rules().report
+            if row[key] == self.parameters.LINK_TABLE
+        ]
         self.assertEqual(
             [(row["id"], row["role"]) for row in rows],
             [(self.old_link, self.parameters.LINK_FORBIDDEN[2])],
@@ -135,8 +137,11 @@ class LinkRulesEnforcementBase(BloomTestCase):
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
         key = self.parameters.LINK_REPORT_TABLE_KEY
-        table = self.parameters.LINK_LEGACY_TABLE
-        rows = [row for row in self.refused_check.report if row[key] == table]
+        rows = [
+            row
+            for row in self.bloom.bloom_check_link_rules().report
+            if row[key] == self.parameters.LINK_LEGACY_TABLE
+        ]
         self.assertEqual(
             [(row["link_type"], row["mapped_role"]) for row in rows],
             [self.parameters.LINK_LEGACY],
@@ -149,7 +154,7 @@ class LinkRulesEnforcementBase(BloomTestCase):
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
         self.assertEqual(
-            self.validated_after_refusal,
+            self.bloom.bloom_link_constraint_validated(),
             False,
             msg=self.parameters.MSG_LINK_STILL_UNVALIDATED,
             abort_on_fail=False,
@@ -159,9 +164,11 @@ class LinkRulesEnforcementBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"report": self.passed_check.report})
+        self.bloom.bloom_set_link_role(self.old_link, self.parameters.LINK_CORRECTED_ROLE)
+        check = self.bloom.bloom_check_link_rules()
+        self.print_variables({"report": check.report})
         self.assertEqual(
-            self.passed_check.exit_code,
+            check.exit_code,
             self.parameters.LINK_CHECK_PASSED,
             msg=self.parameters.MSG_LINK_CHECK_PASSED,
             abort_on_fail=False,
@@ -172,7 +179,7 @@ class LinkRulesEnforcementBase(BloomTestCase):
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
         self.assertEqual(
-            self.validated_after_pass,
+            self.bloom.bloom_link_constraint_validated(),
             True,
             msg=self.parameters.MSG_LINK_VALIDATED,
             abort_on_fail=False,
@@ -182,10 +189,6 @@ class LinkRulesEnforcementBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"requirement links, artefact links": self.link_counts})
-        self.assertEqual(
-            self.link_counts,
-            (1, 1),
-            msg=self.parameters.MSG_LINK_COUNTS,
-            abort_on_fail=False,
-        )
+        counts = self.bloom.bloom_count_links()
+        self.print_variables({"requirement links, artefact links": counts})
+        self.assertEqual(counts, (1, 1), msg=self.parameters.MSG_LINK_COUNTS, abort_on_fail=False)
