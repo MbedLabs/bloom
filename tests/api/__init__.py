@@ -79,4 +79,5 @@ SUITES = [
     "tests.api.BLOOM_user_promotion.UserPromotionTest",
     "tests.api.BLOOM_visions_http.VisionsHttpTest",
     "tests.api.BLOOM_visions_workflow.VisionsWorkflowTest",
+    "tests.api.BLOOM_docs_facade_lookups.DocsFacadeLookupsTest",
 ]

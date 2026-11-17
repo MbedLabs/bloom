@@ -5685,3 +5685,25 @@ MSG_AEM_ALL_TYPES = (
 MSG_AEM_READ_TAGS = "the read-only policy covers internal and customer content"
 MSG_AEM_FULL = "the maintainer's policies add up to every document and project right"
 MSG_AEM_SUITE = "the {suite} suite passes on the migrated database"
+
+LKP_PREFIX = "LKP"
+LKP_REQUIREMENT = {
+    "title": "Supply voltage stays within range",
+    "status": "Draft",
+    "priority": "High",
+    "req_type": "Functional",
+    "req_origin": "Customer",
+}
+LKP_SPECIFICATION = "Power supply specification"
+LKP_STANDARD = "Supply standard"
+LKP_LINK_ROLE = "references"
+LKP_MISSING_SPEC = f"{LKP_PREFIX}-SPEC-999"
+LKP_REQUIREMENT_SLUG = "requirements"
+
+MSG_LKP_LINKS = "the requirement is linked to the specification and the standard"
+MSG_LKP_RELATED_SPEC = "related_to a specification lists the requirement linked to it"
+MSG_LKP_RELATED_STD = "related_to a standard lists the requirement linked to it"
+MSG_LKP_RELATED_REQ = "related_to a requirement still lists the documents linked to it"
+MSG_LKP_RELATED_MISSING = "related_to a document ID that does not exist answers 404"
+MSG_LKP_DETAIL_TYPE = "the detail of a requirement carries the req_type and req_origin of the list"
+MSG_LKP_ANY_CASE = "the detail route finds a document by its document ID in lower case"
