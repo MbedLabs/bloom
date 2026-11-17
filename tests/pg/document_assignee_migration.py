@@ -32,9 +32,10 @@ class DocumentAssigneeMigrationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"alembic": self.upgrade[1][-300:]})
+        code, output = self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
+        self.print_variables({"alembic": output[-300:]})
         self.assertEqual(
-            self.upgrade[0],
+            code,
             0,
             msg=self.parameters.MSG_MIGRATION_HEAD,
             abort_on_fail=False,
@@ -44,9 +45,10 @@ class DocumentAssigneeMigrationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"creator": self.person, "creator and assignee": self.assignees})
+        assignees = self.bloom.bloom_read_workflow_assignees()
+        self.print_variables({"creator": self.person, "creator and assignee": assignees})
         self.assertEqual(
-            self.assignees,
+            assignees,
             [(self.person, self.person)],
             msg=self.parameters.MSG_ASSIGNEE_IS_CREATOR,
             abort_on_fail=False,
@@ -56,9 +58,10 @@ class DocumentAssigneeMigrationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"alembic": self.downgrade[1][-300:]})
+        code, output = self.bloom.bloom_run_alembic("downgrade", self.parameters.ASSIGNEE_BEFORE)
+        self.print_variables({"alembic": output[-300:]})
         self.assertEqual(
-            self.downgrade[0],
+            code,
             0,
             msg=self.parameters.MSG_MIGRATION_DOWNGRADE,
             abort_on_fail=False,

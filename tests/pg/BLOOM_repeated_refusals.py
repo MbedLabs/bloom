@@ -18,14 +18,8 @@ class RepeatedRefusalsTest(RepeatedRefusalsBase):
         self.postgres = self.bloom.bloom_use_postgres()
         if not self.postgres:
             return
-        address = self.parameters.REFUSAL_ADDRESS
         self.bloom.bloom_start_main_api()
         self.statuses = self.bloom.bloom_burst_forged_requests()
-        self.denied = self.bloom.bloom_count_audit_events(
-            self.parameters.AUDIT_REQUEST_ACTION, address, self.parameters.REFUSAL_OUTCOME
-        )
-        self.detected = self.bloom.bloom_count_audit_events(self.parameters.REFUSAL_ACTION, address)
-        self.threshold = self.bloom.bloom_refusal_threshold()
 
     def tearDownClass(self):
         super().tearDownClass()

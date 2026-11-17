@@ -32,9 +32,10 @@ class RequirementParentDropMigrationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"alembic": self.upgrade[1][-300:]})
+        code, output = self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
+        self.print_variables({"alembic": output[-300:]})
         self.assertEqual(
-            self.upgrade[0],
+            code,
             0,
             msg=self.parameters.MSG_MIGRATION_HEAD,
             abort_on_fail=False,
@@ -44,9 +45,10 @@ class RequirementParentDropMigrationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"requirements, parent_id exists": self.upgraded})
+        upgraded = self.bloom.bloom_read_requirement_parent_state()
+        self.print_variables({"requirements, parent_id exists": upgraded})
         self.assertEqual(
-            self.upgraded,
+            upgraded,
             (self.parameters.PARENT_REQ_IDS, False),
             msg=self.parameters.MSG_PARENT_DROPPED,
             abort_on_fail=False,
@@ -56,9 +58,10 @@ class RequirementParentDropMigrationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"alembic": self.downgrade[1][-300:]})
+        code, output = self.bloom.bloom_run_alembic("downgrade", self.parameters.PARENT_BEFORE)
+        self.print_variables({"alembic": output[-300:]})
         self.assertEqual(
-            self.downgrade[0],
+            code,
             0,
             msg=self.parameters.MSG_MIGRATION_DOWNGRADE,
             abort_on_fail=False,
@@ -68,9 +71,10 @@ class RequirementParentDropMigrationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"requirements, parent_id exists": self.downgraded})
+        downgraded = self.bloom.bloom_read_requirement_parent_state()
+        self.print_variables({"requirements, parent_id exists": downgraded})
         self.assertEqual(
-            self.downgraded,
+            downgraded,
             (self.parameters.PARENT_REQ_IDS, True),
             msg=self.parameters.MSG_PARENT_RESTORED,
             abort_on_fail=False,

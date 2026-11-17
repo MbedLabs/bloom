@@ -32,9 +32,14 @@ class RepeatedRefusalsBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"denied api.request events": self.denied})
+        denied = self.bloom.bloom_count_audit_events(
+            self.parameters.AUDIT_REQUEST_ACTION,
+            self.parameters.REFUSAL_ADDRESS,
+            self.parameters.REFUSAL_OUTCOME,
+        )
+        self.print_variables({"denied api.request events": denied})
         self.assertEqual(
-            self.denied,
+            denied,
             self.parameters.REFUSAL_REQUESTS,
             msg=self.parameters.MSG_REFUSAL_RECORDED,
             abort_on_fail=False,
@@ -44,10 +49,11 @@ class RepeatedRefusalsBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"threshold": self.threshold})
+        threshold = self.bloom.bloom_refusal_threshold()
+        self.print_variables({"threshold": threshold})
         self.assertGreater(
             self.parameters.REFUSAL_REQUESTS,
-            self.threshold,
+            threshold,
             msg=self.parameters.MSG_REFUSAL_OVER_THRESHOLD,
             abort_on_fail=False,
         )
@@ -56,9 +62,12 @@ class RepeatedRefusalsBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"repeated refusal events": self.detected})
+        detected = self.bloom.bloom_count_audit_events(
+            self.parameters.REFUSAL_ACTION, self.parameters.REFUSAL_ADDRESS
+        )
+        self.print_variables({"repeated refusal events": detected})
         self.assertEqual(
-            self.detected,
+            detected,
             1,
             msg=self.parameters.MSG_REFUSAL_ONE_EVENT,
             abort_on_fail=False,

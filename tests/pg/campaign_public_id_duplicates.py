@@ -25,7 +25,13 @@ class CampaignPublicIdDuplicatesBase(BloomTestCase):
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
         suites, campaigns, column = self.parameters.PUBLIC_ID_DUPLICATES[index]
-        code, output, revision = self.refusals[index]
+        self.bloom.bloom_use_postgres(tables=False)
+        self.bloom.bloom_run_alembic("upgrade", self.parameters.PUBLIC_ID_BEFORE)
+        self.bloom.bloom_seed_public_id_pairs(
+            self.parameters.CAMPAIGN_PREFIXES[:2], suites, campaigns
+        )
+        code, output = self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
+        revision = self.bloom.bloom_read_revision()
         self.print_variables(
             {"suites": suites, "campaigns": campaigns, "exit code": code, "revision": revision}
         )

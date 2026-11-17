@@ -20,7 +20,7 @@ class CliAuthMigrationFreshBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        code, output = self.upgrade
+        code, output = self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
         if code:
             self.log_info(output)
         self.print_variables({"exit code": code})
@@ -39,7 +39,8 @@ class CliAuthMigrationFreshBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"revision": self.revision, "heads": self.heads})
+        revision = self.bloom.bloom_read_revision()
+        self.print_variables({"revision": revision, "heads": self.heads})
         self.assertEqual(
-            [self.revision], self.heads, msg=self.parameters.MSG_AT_HEAD, abort_on_fail=False
+            [revision], self.heads, msg=self.parameters.MSG_AT_HEAD, abort_on_fail=False
         )
