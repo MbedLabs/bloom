@@ -10,6 +10,7 @@ SUITES = [
     "tests.api.BLOOM_baseline_read_owner.BaselineReadOwnerTest",
     "tests.api.BLOOM_baseline_snapshot_reader.BaselineSnapshotReaderTest",
     "tests.api.BLOOM_batched_lookups.BatchedLookupsTest",
+    "tests.api.BLOOM_cli_auth.CliAuthTest",
     "tests.api.BLOOM_coverage_consistency.CoverageConsistencyTest",
     "tests.api.BLOOM_create_ids.CreateIdsTest",
     "tests.api.BLOOM_dashboard_http.DashboardHttpTest",

@@ -30,13 +30,14 @@ from uuid import UUID, uuid4
 
 import asyncpg
 import httpx
+import jwt
 from cryptography.fernet import Fernet
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.routing import APIRoute
 from PIL import Image, PngImagePlugin
 from pydantic import ValidationError
 from slowapi.util import get_remote_address
-from sqlalchemy import event, select, update
+from sqlalchemy import event, select, text, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from starlette.requests import Request
@@ -115,6 +116,7 @@ from app.services.integration_secrets import (
     is_encrypted,
 )
 from app.services.mail_service import MailConfigurationError
+from app.services.token_service import create_user_token, invalidate_all_refresh_tokens
 from tests.access_fixtures import (
     allow_doc_types,
     project_access_fixture,
@@ -1728,6 +1730,70 @@ class BloomApiInterface(BloomInterface):
         self.bloom_enforce_foreign_keys()
         self.patches.enter_context(patch.object(settings, "CLI_CODE_MODE_ENABLED", True))
         return self._run(self._seed_cli_world())
+
+    def bloom_cli_secret_state(self):
+        async def read():
+            async with self.maker() as db:
+                query = text(
+                    "SELECT exchange_code_hash, consumed_at, approved_session_version FROM cli_auth_sessions"
+                )
+                row = (await db.execute(query)).one()
+                tokens = (await db.scalars(select(UserToken))).all()
+                return tuple(row), [(token.id, token.purpose, token.token_hash) for token in tokens]
+
+        return self._run(read())
+
+    def bloom_same_project_access(self, first_token, second_token):
+        async def compare():
+            async with self.maker() as db:
+                first = await get_current_user(first_token, db)
+                second = await get_current_user(second_token, db)
+                return first.access_map == second.access_map
+
+        return self._run(compare())
+
+    def bloom_decode_access_token(self, token):
+        return jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+
+    def bloom_revoke_refresh_tokens(self, user_id):
+        async def revoke():
+            async with self.maker() as db:
+                await invalidate_all_refresh_tokens(db, user_id)
+                await db.commit()
+
+        self._run(revoke())
+
+    def bloom_new_browser_refresh_token(self, user_id):
+        async def create():
+            async with self.maker() as db:
+                token = await create_user_token(
+                    db,
+                    user_id=user_id,
+                    purpose=UserTokenPurpose.refresh,
+                    ttl_hours=24,
+                    invalidate_existing=False,
+                )
+                await db.commit()
+                return token
+
+        return self._run(create())
+
+    def bloom_browser_refresh(self, refresh_token):
+        async def send():
+            transport = httpx.ASGITransport(app=self.api)
+            cookies = {"bloom_refresh_token": refresh_token}
+            async with REAL_CLIENT(
+                transport=transport, base_url=self.parameters.API_BASE, cookies=cookies
+            ) as client:
+                return await client.post("/api/auth/refresh")
+
+        return self._run(send())
+
+    def bloom_refresh_purpose(self):
+        return UserTokenPurpose.refresh
+
+    def bloom_cli_request_code(self, challenge):
+        return cli_auth.request_code(challenge)
 
     def bloom_set_code_mode(self, enabled):
         self.patches.enter_context(patch.object(settings, "CLI_CODE_MODE_ENABLED", enabled))

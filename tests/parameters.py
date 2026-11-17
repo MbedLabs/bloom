@@ -5197,3 +5197,66 @@ MSG_PBA_INDEPENDENT = "a failed batch changes nothing, and an assignment on one 
 MSG_PBA_CONCURRENT = "simultaneous assignments of {what} keep one entry per bundle"
 MSG_PBA_LEGACY = "the first bundle replaces an owner entry, and the second adds its own entry and keeps the first"
 MSG_PBA_AUDIT = "the audit records each added, changed and removed bundle entry with its ids"
+CLIA_RFC_VERIFIER = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+CLIA_RFC_CHALLENGE = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+CLIA_RFC_REQUEST_CODE = "BUUZ-WHVV"
+CLIA_SESSION_FIELDS = {
+    "session_id",
+    "client_name",
+    "mode",
+    "redirect_uri",
+    "expires_at",
+    "consumed",
+    "created_at",
+}
+CLIA_HIDDEN_FIELDS = {"code", "exchange_code_hash", "code_challenge", "state", "user_id"}
+CLIA_TOKEN_FIELDS = {"access_token", "refresh_token", "token_type", "user"}
+CLIA_STATE = "state with & and + and ="
+CLIA_CALLBACKS = [
+    "http://127.0.0.1:8123/callback",
+    "http://localhost:8123/callback?existing=a%20b",
+    "http://[::1]:8123/callback",
+    "http://127.0.0.1:8123/callback?x=a;state=b",
+]
+CLIA_TYPED_RIGHT = ["BUUZ-WHVV", "buuz-whvv", "BUUZWHVV", "BUUZ WHVV"]
+CLIA_TYPED_WRONG = ["BUUZ-WHVW", "BUUZ-WHV", "BUUZ-WHVVA", "BUUZ-WHV1", ""]
+MSG_CLIA_STARTED = (
+    "a started request expires in ten minutes and points to the sign-in page with its session id"
+)
+MSG_CLIA_LOOKUP = "the request shows its public fields only, uncached"
+MSG_CLIA_APPROVED = "an approval returns an exchange code and its expiry"
+MSG_CLIA_EXCHANGED = (
+    "the exchange returns uncached bearer tokens and the same account as the browser"
+)
+MSG_CLIA_CLAIMS = "the access token names the user, the user type and the session version"
+MSG_CLIA_STORED = (
+    "only hashes are stored, the request is consumed at version 1, and one refresh token is kept"
+)
+MSG_CLIA_ACCESS = "the CLI token resolves to the same project access as the browser token"
+MSG_CLIA_AUDIT = "the {action} audit event names the user and the request and holds no secret"
+MSG_CLIA_REUSED = (
+    "a second exchange of the code is refused with 400 and audited as a failure, without a cookie"
+)
+MSG_CLIA_CALLBACK = "a callback approval to {uri} keeps its address and query and adds the state and one usable code"
+MSG_CLIA_ROTATED = "a refresh returns new tokens without a cookie and is audited for the user"
+MSG_CLIA_REVOKED = "the old refresh token and access token stop working; revoking every refresh token ends the new ones too"
+MSG_CLIA_REFRESH_AUDIT = "the refresh audit holds one success and two failures"
+MSG_CLIA_SHARED = "a browser refresh token works for the CLI, and a CLI refresh token for the browser, then no longer for the CLI"
+MSG_CLIA_ONCE = "reading or approving needs a signed-in user (401), and a second approval is a 400 audited as not pending"
+MSG_CLIA_VERSION = "a code approved before the session version changed is refused with 400, audited, and issues no token"
+MSG_CLIA_CLEANUP = (
+    "a new request deletes the expired and consumed requests and keeps the pending one"
+)
+MSG_CLIA_VECTOR = "the request code of the RFC 7636 challenge is BUUZ-WHVV, and another challenge gives another code"
+MSG_CLIA_TIMES = "a {mode} request shows when it was made and expires ten minutes later, without its code or challenge"
+MSG_CLIA_DENY_CALLBACK = "denying a callback request to {uri} redirects with access_denied and the state, deletes it and is audited"
+MSG_CLIA_DENY_CODE = "denying a code request answers empty, deletes it and is audited"
+MSG_CLIA_DENIED = (
+    "a denied {mode} request answers 400 to reading, approving, exchanging and denying"
+)
+MSG_CLIA_CHECK_RIGHT = "the typed code '{typed}' is accepted (204, uncached) and approves nothing"
+MSG_CLIA_CHECK_WRONG = "the typed code '{typed}' is refused with 400 and the request stays"
+MSG_CLIA_CHECK_STATE = "checking the code of {what} request is refused with 400"
+MSG_CLIA_CHECK_GUARD = "checking needs a signed-in user (401) and code mode (403)"
+MSG_CLIA_APPROVE_CODE = "approving without the code is a 422, with a wrong one a 400 that keeps the request, with the right one it signs in"
+MSG_CLIA_DENY_NO_CODE = "denying with a request code is a 422, without one a 200"
