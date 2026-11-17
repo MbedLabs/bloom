@@ -372,6 +372,40 @@ class BloomApiInterface(BloomInterface):
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
 
+    def bloom_api_assign_bundle(self, headers, group_id, project_id, user_ids):
+        body = {"project_id": project_id, "user_ids": list(user_ids)}
+        return self.bloom_api_call(
+            "POST", f"/api/groups/{group_id}/assignments", headers, json=body
+        )
+
+    def bloom_api_assign_bundles_at_once(self, headers, project_id, user_id, group_ids):
+        async def assign_all():
+            calls = [
+                self._request(
+                    "POST",
+                    f"/api/groups/{group}/assignments",
+                    headers,
+                    json={"project_id": project_id, "user_ids": [user_id]},
+                )
+                for group in group_ids
+            ]
+            return [answer.json()[0] for answer in await asyncio.gather(*calls)]
+
+        return self._run(assign_all())
+
+    def bloom_api_set_application_policies(self, headers, user_id, policy_ids):
+        body = {"policy_ids": list(policy_ids)}
+        return self.bloom_api_call(
+            "PUT", f"/api/users/{user_id}/application-policies", headers, json=body
+        )
+
+    def bloom_api_default_named(self, headers, kind, name):
+        return next(
+            row
+            for row in self.bloom_api_call("GET", f"/api/{kind}", headers).body
+            if row["name"] == name
+        )
+
     def bloom_start_attachment_api(self):
         self.bloom_start_full_api()
         folder = Path(self.patches.enter_context(self._temp_dir())).resolve()

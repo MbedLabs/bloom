@@ -49,6 +49,7 @@ SUITES = [
     "tests.api.BLOOM_perf_traceability.PerfTraceabilityTest",
     "tests.api.BLOOM_profile_picture.ProfilePictureTest",
     "tests.api.BLOOM_project_access_entries.ProjectAccessEntriesTest",
+    "tests.api.BLOOM_project_bundle_assignments.ProjectBundleAssignmentsTest",
     "tests.api.BLOOM_project_counts_batched.ProjectCountsBatchedTest",
     "tests.api.BLOOM_project_member_retention.ProjectMemberRetentionTest",
     "tests.api.BLOOM_project_policy_grants.ProjectPolicyGrantsTest",

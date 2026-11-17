@@ -5164,3 +5164,36 @@ MSG_ATT_USER_TOKEN = "a user token cannot publish a report: 401"
 MSG_ATT_NO_TOKEN = "publishing needs a credential: 401"
 MSG_ATT_HIDDEN = "an external user gets a named 404 for {what} of a document they cannot see"
 MSG_ATT_KEPT = "the file stays listed for the administrator"
+PBA_PREFIXES = tuple(f"PB{letter}" for letter in "ABCDEFGHIJKLMNOPQRSTU")
+PBA_MISSING = 2147483647
+MSG_PBA_TWO_BUNDLES = "one user holds a writing bundle on one project and a reading bundle on the other, and the bundles gain no members"
+MSG_PBA_CREATE = "the user creates in the writing project (201) and not in the reading one (403)"
+MSG_PBA_BUNDLE_CHANGED = "changing the bundle's policies changes the user's rights on that project"
+MSG_PBA_MANAGER_BEFORE = "without the application policy the manager cannot read tags: 403"
+MSG_PBA_MANAGER_REACH = (
+    "Access Management lets the manager read tags and assignment options, not users or the project"
+)
+MSG_PBA_ATOMIC = "an assignment naming an unknown user is a 404 and adds nobody"
+MSG_PBA_ASSIGNED = "the manager assigns two people with the bundle, and still reaches neither the project nor users"
+MSG_PBA_ADMINISTRATORS = (
+    "the Administrators bundle edits its project only and gives no group, user or delete rights"
+)
+MSG_PBA_CONTENT_APP = (
+    "a content policy cannot be an application policy (400) and the account keeps its role"
+)
+MSG_PBA_VIEWER = "an external account with Access Management edits access without delete, reads options, has no project and keeps its role"
+MSG_PBA_MIXED = "a bundle entry with an owner flag (422), an unknown bundle (404), a valid entry (201) and a mixed change (422, unchanged)"
+MSG_PBA_APP_SCOPE = "an assigned application policy cannot change scope (409) and stays assignable"
+MSG_PBA_ROSTER = (
+    "the Administrators bundle is assigned to {who} on each project, editing that project only"
+)
+MSG_PBA_ROSTER_KEPT = "the bundle gains no members and the account administrator keeps the role"
+MSG_PBA_OVERLAP = "two bundles give one user two entries with both rights, reported with both group names; a repeated one is the same entry"
+MSG_PBA_OVERLAP_REMOVED = (
+    "removing one entry removes its rights only, and the role and the other bundle are unchanged"
+)
+MSG_PBA_DUPLICATES = "changing a bundle entry into a duplicate, owner or inherited one is a 409, and a duplicate entry is a 409"
+MSG_PBA_INDEPENDENT = "a failed batch changes nothing, and an assignment on one project leaves the other project's entry"
+MSG_PBA_CONCURRENT = "simultaneous assignments of {what} keep one entry per bundle"
+MSG_PBA_LEGACY = "the first bundle replaces an owner entry, and the second adds its own entry and keeps the first"
+MSG_PBA_AUDIT = "the audit records each added, changed and removed bundle entry with its ids"
