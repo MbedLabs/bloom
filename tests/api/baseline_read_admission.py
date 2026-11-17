@@ -26,9 +26,15 @@ class BaselineReadAdmissionBase(BloomTestCase):
         )
 
     def bud_group_without_admission_denies_both_reads(self):
-        self.print_variables({"list, detail": self.reads})
+        reads = [
+            answer.status_code
+            for answer in self.bloom.bloom_api_read_baselines(
+                self.member, self.project_id, self.baseline_id
+            )
+        ]
+        self.print_variables({"list, detail": reads})
         self.assertEqual(
-            self.reads,
+            reads,
             self.parameters.BOTH_READS_DENIED,
             msg=self.parameters.MSG_GROUP_NEEDS_ADMISSION,
             abort_on_fail=False,

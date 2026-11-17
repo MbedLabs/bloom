@@ -26,7 +26,6 @@ class JiraScopedTokenGatewayTest(JiraScopedTokenGatewayBase):
             },
         }
         self.bloom.bloom_serve_atlassian_gateway(self.parameters.CLOUD_ID, [issue])
-        self.result = self.bloom.bloom_sync_now(self.env.setting_id, self.parameters.ADMIN_EMAIL)
 
     def tearDownClass(self):
         super().tearDownClass()

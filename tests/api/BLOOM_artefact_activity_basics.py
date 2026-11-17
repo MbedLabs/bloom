@@ -17,13 +17,13 @@ class ArtefactActivityBasicsTest(ArtefactActivityBasicsBase):
         super().setUpClass()
         self.bloom.bloom_start_full_api()
         self.bloom.bloom_add_admin(self.parameters.API_ADMIN_EMAIL, self.parameters.API_PASSWORD)
-        admin, _ = self.bloom.bloom_log_in(
+        self.admin, _ = self.bloom.bloom_log_in(
             self.parameters.API_ADMIN_EMAIL, self.parameters.API_PASSWORD
         )
-        project = self.bloom.bloom_api_create_project(admin, self.parameters.ACTIVITY_PREFIX)
+        project = self.bloom.bloom_api_create_project(self.admin, self.parameters.ACTIVITY_PREFIX)
         project_id = project.json()["id"]
         typed = self.bloom.bloom_api_create_artefact(
-            admin,
+            self.admin,
             self.parameters.REQUIREMENT_KIND,
             project_id,
             self.parameters.ARTEFACT_TITLE,
@@ -31,7 +31,7 @@ class ArtefactActivityBasicsTest(ArtefactActivityBasicsBase):
             req_origin=self.parameters.REQ_ORIGIN,
         )
         listed = self.bloom.bloom_api_list_docs(
-            admin, self.parameters.ACTIVITY_PREFIX, self.parameters.DOCS_TYPE_FILTER
+            self.admin, self.parameters.ACTIVITY_PREFIX, self.parameters.DOCS_TYPE_FILTER
         )
         self.docs_row = next(
             (
@@ -43,25 +43,23 @@ class ArtefactActivityBasicsTest(ArtefactActivityBasicsBase):
             None,
         )
         document = self.bloom.bloom_api_create_artefact(
-            admin, self.parameters.DOCUMENT_KIND, project_id, self.parameters.ARTEFACT_TITLE
+            self.admin, self.parameters.DOCUMENT_KIND, project_id, self.parameters.ARTEFACT_TITLE
         )
         self.created_events = {
             self.parameters.REQUIREMENT_KIND: self.bloom.bloom_api_activity_types(
-                admin, self.parameters.REQUIREMENT_KIND, typed.json()["id"]
+                self.admin, self.parameters.REQUIREMENT_KIND, typed.json()["id"]
             ),
             self.parameters.DOCUMENT_KIND: self.bloom.bloom_api_activity_types(
-                admin, self.parameters.DOCUMENT_KIND, document.json()["id"]
+                self.admin, self.parameters.DOCUMENT_KIND, document.json()["id"]
             ),
         }
         updated = self.bloom.bloom_api_update_artefact(
-            admin,
+            self.admin,
             self.parameters.REQUIREMENT_KIND,
             typed.json()["id"],
             {"title": self.parameters.RENAMED_TITLE},
         )
-        self.updated_events = self.bloom.bloom_api_activity_types(
-            admin, self.parameters.REQUIREMENT_KIND, typed.json()["id"]
-        )
+        self.typed_id = typed.json()["id"]
         self.setup = [
             (project.status_code, self.parameters.STATUS_CREATED),
             (typed.status_code, self.parameters.STATUS_CREATED),

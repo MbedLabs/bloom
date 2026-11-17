@@ -17,16 +17,6 @@ class JiraPushDirectionTest(JiraPushDirectionBase):
         super().setUpClass()
         self.env = self.bloom.bloom_create_webhook_environment()
         self.pushed = self.bloom.bloom_record_pushes()
-        self.bloom.bloom_push_edits(
-            self.env.defect_id, self.env.change_id, {"title": self.parameters.CHANGED_TITLE}
-        )
-        self.before = list(self.pushed)
-        self.bloom.bloom_update_setting(
-            self.env.setting_id, direction=self.parameters.DIRECTION_BOTH
-        )
-        self.bloom.bloom_push_edits(
-            self.env.defect_id, self.env.change_id, {"title": self.parameters.CHANGED_TITLE}
-        )
 
     def tearDownClass(self):
         super().tearDownClass()

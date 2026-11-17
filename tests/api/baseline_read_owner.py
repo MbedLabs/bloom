@@ -26,7 +26,15 @@ class BaselineReadOwnerBase(BloomTestCase):
         )
 
     def bud_admin_and_owner_read_the_baseline(self):
-        for actor, reads in self.reads.items():
+        for actor, headers in (("admin", self.admin), ("owner", self.owner)):
+            listed, detail = self.bloom.bloom_api_read_baselines(
+                headers, self.project_id, self.baseline_id
+            )
+            reads = (
+                [listed.status_code, detail.status_code],
+                self.baseline_id in [item["id"] for item in listed.json()],
+                detail.json().get("id"),
+            )
             self.print_variables({"actor": actor, "reads": reads})
             self.assertEqual(
                 reads,

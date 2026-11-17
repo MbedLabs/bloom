@@ -17,7 +17,11 @@ class JiraWebhookClosesDefectBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_signed_update_answers_for_the_defect(self):
-        found = (self.response.status_code, self.response.json().get("target"))
+        body = self.bloom.bloom_jira_webhook_body(
+            self.bloom.bloom_jira_key(self.parameters.LINKED_NUMBER)
+        )
+        response = self.bloom.bloom_post_jira_webhook(body, delivery=self.parameters.DELIVERIES[0])
+        found = (response.status_code, response.json().get("target"))
         self.print_variables({"status, target": found})
         self.assertEqual(
             found,

@@ -51,10 +51,13 @@ class ArtefactActivityBasicsBase(BloomTestCase):
             )
 
     def bud_editing_a_requirement_logs_updated(self):
-        self.print_variables({"events": self.updated_events})
+        updated_events = self.bloom.bloom_api_activity_types(
+            self.admin, self.parameters.REQUIREMENT_KIND, self.typed_id
+        )
+        self.print_variables({"events": updated_events})
         self.assertIn(
             self.parameters.EVENT_UPDATED,
-            self.updated_events or [],
+            updated_events or [],
             msg=self.parameters.MSG_UPDATED_EVENT,
             abort_on_fail=False,
         )

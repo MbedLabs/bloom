@@ -17,7 +17,10 @@ class JiraWebhookClosesChangeBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_signed_update_answers_for_the_change_request(self):
-        found = (self.response.status_code, self.response.json().get("target"))
+        response = self.bloom.bloom_post_jira_webhook(
+            self.body, delivery=self.parameters.DELIVERIES[1]
+        )
+        found = (response.status_code, response.json().get("target"))
         self.print_variables({"status, target": found})
         self.assertEqual(
             found,
@@ -37,7 +40,10 @@ class JiraWebhookClosesChangeBase(BloomTestCase):
         )
 
     def bud_same_delivery_again_is_a_duplicate(self):
-        found = (self.repeat.status_code, self.repeat.json().get("status"))
+        repeat = self.bloom.bloom_post_jira_webhook(
+            self.body, delivery=self.parameters.DELIVERIES[1]
+        )
+        found = (repeat.status_code, repeat.json().get("status"))
         self.print_variables({"status, answer": found})
         self.assertEqual(
             found,

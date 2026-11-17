@@ -44,27 +44,44 @@ class BaselineReadOverrideBase(BloomTestCase):
         )
 
     def bud_override_with_baseline_read_allows_both(self):
-        self.print_variables({"allowed": self.allowed})
+        listed, detail = self.bloom.bloom_api_read_baselines(
+            self.member, self.project_id, self.baseline_id
+        )
+        allowed = (
+            [listed.status_code, detail.status_code],
+            self.baseline_id in [item["id"] for item in listed.json()],
+            detail.json().get("id"),
+        )
+        self.print_variables({"allowed": allowed})
         self.assertEqual(
-            self.allowed,
+            allowed,
             (self.parameters.BOTH_READS_ALLOWED, True, self.baseline_id),
             msg=self.parameters.MSG_OVERRIDE_ALLOWS,
             abort_on_fail=False,
         )
 
     def bud_other_project_stays_denied(self):
-        self.print_variables({"list, detail": self.other})
+        other = [
+            answer.status_code
+            for answer in self.bloom.bloom_api_read_baselines(
+                self.member, self.other_project_id, self.other_baseline_id
+            )
+        ]
+        self.print_variables({"list, detail": other})
         self.assertEqual(
-            self.other,
+            other,
             self.parameters.BOTH_READS_DENIED,
             msg=self.parameters.MSG_OTHER_PROJECT_DENIED,
             abort_on_fail=False,
         )
 
     def bud_group_keeps_its_policy(self):
-        self.print_variables({"group policies": self.group_policies})
+        group_policies = self.bloom.bloom_api_get_group(self.admin, self.group_id).json()[
+            "policy_ids"
+        ]
+        self.print_variables({"group policies": group_policies})
         self.assertEqual(
-            self.group_policies,
+            group_policies,
             [self.baseline_policy_id],
             msg=self.parameters.MSG_GROUP_POLICY_KEPT,
             abort_on_fail=False,

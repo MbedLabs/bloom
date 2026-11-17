@@ -20,20 +20,27 @@ class CreateIdsBase(BloomTestCase):
 
     def bud_creates_assign_public_ids(self):
         prefix = self.parameters.CREATE_ID_PREFIX
-        for type_code, outcome in self.created.items():
-            public_id = str(outcome.public_id)
+        pattern = self.bloom.bloom_doc_id_pattern()
+        for path, payload, id_field, type_code in self.parameters.CREATE_ID_CASES:
+            answer = self.bloom.bloom_api_call(
+                "POST",
+                path.format(project_id=self.project_id),
+                self.admin,
+                json={"project_id": self.project_id, **payload},
+            )
+            public_id = str((answer.body or {}).get(id_field))
             self.print_variables(
-                {"type": type_code, "status": outcome.status, "public id": public_id}
+                {"type": type_code, "status": answer.status, "public id": public_id}
             )
             self.assertEqual(
-                outcome.status,
+                answer.status,
                 self.parameters.STATUS_CREATED,
                 msg=self.parameters.MSG_CREATE_ID_CREATED,
                 abort_on_fail=False,
             )
             self.assertRegex(
                 public_id,
-                self.pattern,
+                pattern,
                 msg=self.parameters.MSG_CREATE_ID_PATTERN,
                 abort_on_fail=False,
             )

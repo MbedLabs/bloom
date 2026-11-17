@@ -1,11 +1,11 @@
 """
 * @file     ${tests/api/BLOOM_baseline_read_owner.py}
 * @copyright © EmbedLabs, Aachen ${2026} - all rights reserved
-* @brief    The admin and a project owner keep the baseline list and detail reads.
+* @brief    The self.admin and a project owner keep the baseline list and detail reads.
 * @author   Amine El Omari
 * @date     2026-11-07
 * @version  1.0.0
-* @note     This module tests the admin and a maintainer added as project owner with no policy.
+* @note     This module tests the self.admin and a maintainer added as project owner with no policy.
 """
 
 from tests.api.baseline_read_owner import BaselineReadOwnerBase
@@ -17,36 +17,27 @@ class BaselineReadOwnerTest(BaselineReadOwnerBase):
         super().setUpClass()
         self.bloom.bloom_start_full_api()
         self.bloom.bloom_add_admin(self.parameters.API_ADMIN_EMAIL, self.parameters.API_PASSWORD)
-        admin, _ = self.bloom.bloom_log_in(
+        self.admin, _ = self.bloom.bloom_log_in(
             self.parameters.API_ADMIN_EMAIL, self.parameters.API_PASSWORD
         )
-        project = self.bloom.bloom_api_create_project(admin, self.parameters.OWNED_PREFIX)
+        project = self.bloom.bloom_api_create_project(self.admin, self.parameters.OWNED_PREFIX)
         baseline = self.bloom.bloom_api_create_baseline(
-            admin, project.json()["id"], self.parameters.BASELINE_NAME
+            self.admin, project.json()["id"], self.parameters.BASELINE_NAME
         )
         user = self.bloom.bloom_api_create_user(
-            admin,
+            self.admin,
             self.parameters.BASELINE_MEMBER_EMAIL,
             self.parameters.API_PASSWORD,
             self.parameters.API_MEMBER_ROLE,
         )
-        owner, _ = self.bloom.bloom_log_in(
+        self.owner, _ = self.bloom.bloom_log_in(
             self.parameters.BASELINE_MEMBER_EMAIL, self.parameters.API_PASSWORD
         )
         made_owner = self.bloom.bloom_api_add_project_member(
-            admin, project.json()["id"], user.json()["id"], [], owner=True
+            self.admin, project.json()["id"], user.json()["id"], [], owner=True
         )
         self.baseline_id = baseline.json()["id"]
-        self.reads = {}
-        for actor, headers in (("admin", admin), ("owner", owner)):
-            listed, detail = self.bloom.bloom_api_read_baselines(
-                headers, project.json()["id"], self.baseline_id
-            )
-            self.reads[actor] = (
-                [listed.status_code, detail.status_code],
-                self.baseline_id in [item["id"] for item in listed.json()],
-                detail.json().get("id"),
-            )
+        self.project_id = project.json()["id"]
         self.setup = [
             (project.status_code, self.parameters.STATUS_CREATED),
             (baseline.status_code, self.parameters.STATUS_CREATED),

@@ -16,12 +16,6 @@ class JiraWebhookClosesDefectTest(JiraWebhookClosesDefectBase):
     def setUpClass(self):
         super().setUpClass()
         self.env = self.bloom.bloom_create_webhook_environment()
-        body = self.bloom.bloom_jira_webhook_body(
-            self.bloom.bloom_jira_key(self.parameters.LINKED_NUMBER)
-        )
-        self.response = self.bloom.bloom_post_jira_webhook(
-            body, delivery=self.parameters.DELIVERIES[0]
-        )
 
     def tearDownClass(self):
         super().tearDownClass()

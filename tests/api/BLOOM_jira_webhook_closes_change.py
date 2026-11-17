@@ -16,14 +16,8 @@ class JiraWebhookClosesChangeTest(JiraWebhookClosesChangeBase):
     def setUpClass(self):
         super().setUpClass()
         self.env = self.bloom.bloom_create_webhook_environment()
-        body = self.bloom.bloom_jira_webhook_body(
+        self.body = self.bloom.bloom_jira_webhook_body(
             self.bloom.bloom_jira_key(self.parameters.CHANGE_NUMBER)
-        )
-        self.response = self.bloom.bloom_post_jira_webhook(
-            body, delivery=self.parameters.DELIVERIES[1]
-        )
-        self.repeat = self.bloom.bloom_post_jira_webhook(
-            body, delivery=self.parameters.DELIVERIES[1]
         )
 
     def tearDownClass(self):
