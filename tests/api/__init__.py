@@ -61,5 +61,6 @@ SUITES = [
     "tests.api.BLOOM_user_access_summary.UserAccessSummaryTest",
     "tests.api.BLOOM_user_deletion.UserDeletionTest",
     "tests.api.BLOOM_user_promotion.UserPromotionTest",
+    "tests.api.BLOOM_visions_http.VisionsHttpTest",
     "tests.api.BLOOM_visions_workflow.VisionsWorkflowTest",
 ]

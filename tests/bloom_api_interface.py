@@ -367,6 +367,49 @@ class BloomApiInterface(BloomInterface):
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
 
+    def bloom_api_built_in_policy(self, headers, name):
+        policies = self.bloom_api_call("GET", "/api/policies", headers).body
+        return next(
+            policy["id"] for policy in policies if policy["is_default"] and policy["name"] == name
+        )
+
+    def bloom_api_group_member(self, headers, name, project_ids, policy_ids, role="maintainer"):
+        member = self.bloom_api_new_member(headers, name, role)
+        for number, policy_id in enumerate(policy_ids):
+            group = self.bloom_api_new_group(headers, f"{name} group {number}", [policy_id])
+            for project_id in project_ids:
+                self.bloom_api_admit_group(headers, group["id"], project_id)
+            self.bloom_api_add_group_member(headers, group["id"], member.id)
+        return member
+
+    def bloom_api_holder(self, headers, name, project_id, *policy_names):
+        policy_ids = [self.bloom_api_built_in_policy(headers, policy) for policy in policy_names]
+        return self.bloom_api_group_member(headers, name, [project_id], policy_ids)
+
+    def bloom_api_policy_user(
+        self, headers, name, permissions, *project_ids, role="maintainer", scope=None
+    ):
+        visibility = "customer" if role == "external" else "internal"
+        policy = self.bloom_api_new_policy(
+            headers, f"{name} policy", permissions, visibility, scope
+        )
+        statement = update(Policy).where(Policy.id == policy["id"]).values(permissions=permissions)
+        self._run(self._execute_statement(statement))
+        return self.bloom_api_group_member(headers, name, project_ids, [policy["id"]], role)
+
+    def bloom_api_add_typed_document(
+        self, headers, project_id, doc_type, title, visibility="internal"
+    ):
+        body = {
+            "project_id": project_id,
+            "doc_type": doc_type,
+            "title": title,
+            "visibility": visibility,
+        }
+        return self.bloom_api_call(
+            "POST", f"/api/projects/{project_id}/documents", headers, json=body
+        )
+
     def bloom_coverage_status(self, statuses):
         return coverage_service.coverage_status(statuses)
 

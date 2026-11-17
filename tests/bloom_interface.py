@@ -22,6 +22,7 @@ from app import models as bloom_models
 from app.api import integrations
 from app.core.database import Base
 from app.core.permissions import DOC_TYPE_RESOURCES
+from app.core.policy_seed import DEFAULT_GROUPS, DEFAULT_POLICIES
 from app.core.security import get_password_hash
 from app.models import (
     ChangeRequest,
@@ -177,6 +178,33 @@ class BloomInterface:
                 )
             )
         )
+
+    def bloom_seed_default_catalogue(self):
+        async def seed():
+            async with self.maker() as db:
+                policies = {}
+                for spec in DEFAULT_POLICIES:
+                    policies[spec["name"]] = bloom_models.Policy(
+                        name=spec["name"],
+                        description=spec.get("description", ""),
+                        scope=spec["scope"],
+                        permissions=spec["permissions"],
+                        type_tags=spec["type_tags"],
+                        is_default=True,
+                    )
+                db.add_all(policies.values())
+                for spec in DEFAULT_GROUPS:
+                    members = [policies[name] for name in spec["policy_names"]]
+                    db.add(
+                        bloom_models.Group(
+                            name=spec["name"],
+                            description=spec.get("description", ""),
+                            policies=members,
+                        )
+                    )
+                await db.commit()
+
+        self._run(seed())
 
     def bloom_add_record(self, kind, **fields):
         return self._run(self._add(self._model(kind)(**fields)))

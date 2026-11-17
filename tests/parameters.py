@@ -4735,3 +4735,53 @@ MSG_COVC_FAN_OUT = (
     "one approved test case over three of four requirements is 75 percent with one uncovered"
 )
 MSG_COVC_GAP_SHAPE = "a gap names its type and carries no missing link types"
+VISH_PREFIXES = ("VHA", "VHB", "VHC", "VHD", "VHE")
+VISH_OTHER_GROUPS = ("Developers", "Testers", "Administrators", "Customers")
+VISH_ALLOWED_LINKS = [
+    ("REQ", "requirements", "VIS", "vision", "derives_from"),
+    ("SPEC", "spec", "VIS", "vision", "refines"),
+    ("CHG", "changes", "VIS", "vision", "impacts"),
+    ("RSK", "risks", "VIS", "vision", "impacts"),
+    ("VIS", "vision", "STD", "standard", "references"),
+]
+VISH_REFUSED_LINKS = [
+    ("DES", "designs", "VIS", "vision", "satisfies"),
+    ("VIS", "vision", "REQ", "requirements", "derives_from"),
+    ("RSK", "risks", "VIS", "vision", "mitigates"),
+]
+VISH_RELEASED_MAINTAINER_SET = (
+    "Requirements",
+    "Specifications",
+    "Standards",
+    "Designs",
+    "Risks",
+    "Change Requests",
+    "Concepts",
+    "Test Cases",
+    "Suites",
+    "Campaigns",
+    "Defects",
+    "Protocols",
+    "Reports",
+    "Baselines",
+    "Parameters",
+    "Traceability",
+    "Project Management",
+)
+MSG_VISH_OWNERS = (
+    "the Product Owners group holds the Visions policy and no other default group does"
+)
+MSG_VISH_CREATED = "a Visions holder creates a draft vision with the first vision id and edits it"
+MSG_VISH_LISTED = "the vision is listed under its type and opened with the edit and approve actions"
+MSG_VISH_READER = "a Read Internal holder reads the vision and cannot edit it: 403"
+MSG_VISH_REVIEWER = "a Review Internal holder may review the vision"
+MSG_VISH_CUSTOMER = "a Read Customer holder lists the customer vision only"
+MSG_VISH_SPEC_ONLY = (
+    "a user with rights on specifications alone lists no vision and cannot read one"
+)
+MSG_VISH_LINK_ALLOWED = "a {source} may link to a {target} as {role}"
+MSG_VISH_LINK_REFUSED = "a {source} cannot link to a {target} as {role}"
+MSG_VISH_AUTHOR = "a {who} creates and edits a vision"
+MSG_VISH_REVIEW = (
+    "a Review Internal holder is assigned, comments and hands the vision on for approval"
+)
