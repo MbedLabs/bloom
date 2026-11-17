@@ -17,74 +17,84 @@ class ContainerStartBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_start_script_hands_supervisord_to_appuser(self):
+        start_lines = self.bloom.bloom_read_repo_lines(self.parameters.START_SCRIPT)
         handover = self.parameters.START_HANDOVER
-        self.print_variables({"last line": self.start_lines[-1:]})
+        self.print_variables({"last line": start_lines[-1:]})
         self.assertEqual(
-            self.start_lines[-1:],
+            start_lines[-1:],
             [handover],
             msg=self.parameters.MSG_START_LAST,
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.start_lines.count(handover),
+            start_lines.count(handover),
             self.parameters.START_HANDOVERS,
             msg=self.parameters.MSG_START_ONCE,
             abort_on_fail=False,
         )
         self.assertIn(
             self.parameters.START_APP_USER,
-            self.start_lines,
+            start_lines,
             msg=self.parameters.MSG_START_APP_USER,
             abort_on_fail=False,
         )
 
     def bud_start_script_makes_output_writable_for_appuser(self):
+        start = self.bloom.bloom_read_repo_text(self.parameters.START_SCRIPT)
         for needle in (
             self.parameters.START_FD_LOOP,
             self.parameters.START_FD_TEST,
             self.parameters.START_FD_CHOWN,
         ):
-            self._assert_contains(self.start, needle, self.parameters.MSG_START_FD)
+            self._assert_contains(start, needle, self.parameters.MSG_START_FD)
         self._assert_before(
-            self.start,
+            start,
             self.parameters.START_FD_LOOP,
             self.parameters.START_HANDOVER,
             self.parameters.MSG_START_FD_FIRST,
         )
 
     def bud_start_script_chowns_cloudron_data_recursively(self):
+        cloudron = self.bloom.bloom_read_repo_block(
+            self.parameters.START_SCRIPT,
+            self.parameters.START_CLOUDRON_IF,
+            self.parameters.START_ELSE,
+        )
         recursive = self.parameters.START_DATA_CHOWN
-        self._assert_contains(self.cloudron, recursive, self.parameters.MSG_START_DATA)
+        self._assert_contains(cloudron, recursive, self.parameters.MSG_START_DATA)
         for later in (self.parameters.START_SECRETS, self.parameters.START_MIGRATION):
-            self._assert_before(
-                self.cloudron, recursive, later, self.parameters.MSG_START_DATA_FIRST
-            )
+            self._assert_before(cloudron, recursive, later, self.parameters.MSG_START_DATA_FIRST)
 
     def bud_start_script_keeps_the_local_attachment_chown(self):
+        local = self.bloom.bloom_read_repo_block(
+            self.parameters.START_SCRIPT, self.parameters.START_ELSE, self.parameters.START_FI
+        )
         self._assert_contains(
-            self.local, self.parameters.START_ATTACHMENT_CHOWN, self.parameters.MSG_START_LOCAL
+            local, self.parameters.START_ATTACHMENT_CHOWN, self.parameters.MSG_START_LOCAL
         )
         self._assert_lacks(
-            self.local, self.parameters.START_RECURSIVE, self.parameters.MSG_START_LOCAL_FLAT
+            local, self.parameters.START_RECURSIVE, self.parameters.MSG_START_LOCAL_FLAT
         )
 
     def bud_supervisord_does_not_run_as_root(self):
-        self.print_variables({"lines": self.supervisord[:6]})
+        supervisord = self.bloom.bloom_read_repo_lines(self.parameters.SUPERVISORD_CONF)
+        self.print_variables({"lines": supervisord[:6]})
         self.assertNotIn(
             self.parameters.START_ROOT_SETTING,
-            self.supervisord,
+            supervisord,
             msg=self.parameters.MSG_START_NOT_ROOT,
             abort_on_fail=False,
         )
         self.assertIn(
             self.parameters.START_PIDFILE,
-            self.supervisord,
+            supervisord,
             msg=self.parameters.MSG_START_PIDFILE,
             abort_on_fail=False,
         )
 
     def bud_image_starts_as_root_without_nginx_user(self):
-        user_lines = "\n".join(line for line in self.dockerfile.splitlines() if "USER" in line)
+        dockerfile = self.bloom.bloom_read_repo_text(self.parameters.DOCKERFILE)
+        user_lines = "\n".join(line for line in dockerfile.splitlines() if "USER" in line)
         self.assertRegex(
             user_lines,
             self.parameters.START_USER_ROOT,
@@ -92,12 +102,12 @@ class ContainerStartBase(BloomTestCase):
             abort_on_fail=False,
         )
         self._assert_lacks(
-            self.dockerfile,
+            dockerfile,
             self.parameters.START_NGINX_USER,
             self.parameters.MSG_START_NGINX_USER,
         )
         self._assert_contains(
-            self.dockerfile,
+            dockerfile,
             self.parameters.START_NGINX_USER_DROP,
             self.parameters.MSG_START_NGINX_DROP,
         )

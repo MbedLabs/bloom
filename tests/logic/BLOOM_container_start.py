@@ -15,17 +15,6 @@ class ContainerStartTest(ContainerStartBase):
 
     def setUpClass(self):
         super().setUpClass()
-        script = self.parameters.START_SCRIPT
-        self.start = self.bloom.bloom_read_repo_text(script)
-        self.start_lines = self.bloom.bloom_read_repo_lines(script)
-        self.cloudron = self.bloom.bloom_read_repo_block(
-            script, self.parameters.START_CLOUDRON_IF, self.parameters.START_ELSE
-        )
-        self.local = self.bloom.bloom_read_repo_block(
-            script, self.parameters.START_ELSE, self.parameters.START_FI
-        )
-        self.supervisord = self.bloom.bloom_read_repo_lines(self.parameters.SUPERVISORD_CONF)
-        self.dockerfile = self.bloom.bloom_read_repo_text(self.parameters.DOCKERFILE)
 
     def tearDownClass(self):
         super().tearDownClass()

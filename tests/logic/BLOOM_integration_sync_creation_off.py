@@ -36,7 +36,7 @@ class IntegrationSyncCreationOffTest(IntegrationSyncCreationOffBase):
                 )
             ],
         )
-        self.synced = self.bloom.bloom_run_sync(self.parameters.NOW)
+        self.bloom.bloom_run_sync(self.parameters.NOW)
 
     def tearDownClass(self):
         super().tearDownClass()

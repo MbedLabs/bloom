@@ -19,38 +19,59 @@ class ArtefactPublicIdLookupBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_resolves_by_public_id(self):
-        self.print_variables(vars(self.by_public))
+        by_public = self.bloom.bloom_lookup_artefact(
+            self.parameters.LOOKUP_TEST_CASE_TYPE,
+            self.parameters.LOOKUP_TEST_CASE["tc_id"],
+            self.parameters.LOOKUP_TEST_CASE_FIELD,
+        )
+        self.print_variables(vars(by_public))
         self.assertEqual(
-            self.by_public.public_id,
+            by_public.public_id,
             self.parameters.LOOKUP_TEST_CASE["tc_id"],
             msg=self.parameters.MSG_LOOKUP_PUBLIC,
             abort_on_fail=False,
         )
 
     def bud_resolves_by_database_id(self):
-        self.print_variables({**vars(self.by_database), "database id": self.test_case_id})
+        by_database = self.bloom.bloom_lookup_artefact(
+            self.parameters.LOOKUP_TEST_CASE_TYPE,
+            str(self.test_case_id),
+            self.parameters.LOOKUP_TEST_CASE_FIELD,
+        )
+        self.print_variables({**vars(by_database), "database id": self.test_case_id})
         self.assertEqual(
-            self.by_database.id,
+            by_database.id,
             self.test_case_id,
             msg=self.parameters.MSG_LOOKUP_DATABASE,
             abort_on_fail=False,
         )
 
     def bud_unknown_public_id_is_not_found(self):
-        self.print_variables(vars(self.unknown))
+        unknown = self.bloom.bloom_lookup_artefact(
+            self.parameters.LOOKUP_TEST_CASE_TYPE,
+            self.parameters.LOOKUP_UNKNOWN,
+            self.parameters.LOOKUP_TEST_CASE_FIELD,
+        )
+        self.print_variables(vars(unknown))
         self.assertEqual(
-            self.unknown.status,
+            unknown.status,
             self.parameters.STATUS_NOT_FOUND,
             msg=self.parameters.MSG_LOOKUP_UNKNOWN,
             abort_on_fail=False,
         )
 
     def bud_backlinks_match_by_public_and_database_id(self):
-        by_public = json.dumps(self.related_public, default=str)
+        related_public = self.bloom.bloom_related_artefacts(
+            self.parameters.LOOKUP_DEFECT_TYPE, self.parameters.LOOKUP_DEFECT["defect_id"]
+        )
+        related_database = self.bloom.bloom_related_artefacts(
+            self.parameters.LOOKUP_DEFECT_TYPE, str(self.defect_id)
+        )
+        by_public = json.dumps(related_public, default=str)
         self.print_variables({"by public id": by_public[:200]})
         self.assertEqual(
-            self.related_public,
-            self.related_database,
+            related_public,
+            related_database,
             msg=self.parameters.MSG_LOOKUP_SAME_BACKLINKS,
             abort_on_fail=False,
         )

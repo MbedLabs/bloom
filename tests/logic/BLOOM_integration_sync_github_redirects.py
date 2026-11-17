@@ -29,7 +29,6 @@ class IntegrationSyncGithubRedirectsTest(IntegrationSyncGithubRedirectsBase):
         )
         self.bloom.bloom_run_sync(self.parameters.NOW)
         self.first_status = self.bloom.bloom_get_defect(self.defect_id).status
-        self.followed = str(self.bloom.site.calls[1])
         first_calls = len(self.bloom.site.calls)
         self.bloom.bloom_serve_redirect(
             self.parameters.REPO, self.parameters.MOVED, self.parameters.FOREIGN, issues

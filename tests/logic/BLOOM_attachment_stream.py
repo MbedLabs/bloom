@@ -8,8 +8,6 @@
 * @note     This module tests a complete, an oversize and two interrupted streams.
 """
 
-import asyncio
-
 from tests.logic.attachment_stream import AttachmentStreamBase
 
 
@@ -17,20 +15,6 @@ class AttachmentStreamTest(AttachmentStreamBase):
 
     def setUpClass(self):
         super().setUpClass()
-        payload = self.parameters.STREAM_PAYLOAD
-        self.complete = self.bloom.bloom_stream_attachment(payload, len(payload))
-        self.oversize = self.bloom.bloom_stream_attachment(
-            self.parameters.STREAM_OVERSIZE, self.parameters.STREAM_OVERSIZE_LIMIT
-        )
-        errors = {"OSError": OSError, "CancelledError": asyncio.CancelledError}
-        self.interrupted = {
-            name: self.bloom.bloom_stream_attachment(
-                self.parameters.STREAM_FIRST_CHUNK,
-                self.parameters.STREAM_INTERRUPT_LIMIT,
-                interrupt=errors[name],
-            )
-            for name in self.parameters.STREAM_INTERRUPTIONS
-        }
 
     def tearDownClass(self):
         super().tearDownClass()

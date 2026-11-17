@@ -15,7 +15,6 @@ class ExternalDocTypesAllowlistTest(ExternalDocTypesAllowlistBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.allowed = self.bloom.bloom_external_doc_types(self.parameters.EXTERNAL_ALLOWLIST)
 
     def tearDownClass(self):
         super().tearDownClass()

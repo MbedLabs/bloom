@@ -65,10 +65,13 @@ class AttachmentDeploymentContractBase(BloomTestCase):
         )
 
     def bud_example_documents_the_directory(self):
+        example = self.bloom.bloom_read_repo_lines_with(
+            self.parameters.ENV_EXAMPLE, self.parameters.ATTACHMENT_WORDS
+        )
         self.print_variables({"line": self.parameters.ATTACHMENT_EXAMPLE_LINE})
         self.assertIn(
             self.parameters.ATTACHMENT_EXAMPLE_LINE,
-            self.example,
+            example,
             msg=self.parameters.MSG_ATTACHMENT_EXAMPLE,
             abort_on_fail=False,
         )

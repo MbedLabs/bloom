@@ -17,16 +17,19 @@ class ExternalDocTypesRejectionBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_other_type_is_refused(self):
+        access = self.bloom.bloom_require_external_doc_type(
+            self.parameters.EXTERNAL_GRANTED, self.parameters.EXTERNAL_OTHER_TYPE
+        )
         self.print_variables(
             {
                 "granted": self.parameters.EXTERNAL_GRANTED,
                 "type": self.parameters.EXTERNAL_OTHER_TYPE,
-                "refusal": self.access.status,
-                "detail": self.access.detail,
+                "refusal": access.status,
+                "detail": access.detail,
             }
         )
         self.assertRegex(
-            self.access.detail,
+            access.detail,
             self.parameters.EXTERNAL_REFUSAL_PATTERN,
             msg=self.parameters.MSG_EXTERNAL_OTHER_REFUSED,
             abort_on_fail=False,

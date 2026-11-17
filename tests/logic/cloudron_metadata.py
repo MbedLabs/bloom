@@ -81,7 +81,8 @@ class CloudronMetadataBase(BloomTestCase):
         )
 
     def bud_catalog_entry_matches_the_release(self):
-        current = self.catalog["versions"].get(self.version, {})
+        catalog = self.bloom.bloom_read_repo_json(self.parameters.CLOUDRON_CATALOG)
+        current = catalog["versions"].get(self.version, {})
         manifest = current.get("manifest", {})
         self.print_variables(
             {

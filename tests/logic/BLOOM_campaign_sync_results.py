@@ -15,17 +15,6 @@ class CampaignSyncResultsTest(CampaignSyncResultsBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.latest = self.bloom.bloom_apply_test_result(
-            self.parameters.SYNC_RESULT_EMPTY_CASE, self.parameters.SYNC_RESULT_FAILED
-        )
-        self.older = self.bloom.bloom_apply_test_result(
-            self.parameters.SYNC_RESULT_NEWER_CASE, self.parameters.SYNC_RESULT_OLDER
-        )
-        self.too_many = self.bloom.bloom_build_sync_request(
-            self.parameters.SYNC_RESULT_TC_ID,
-            self.parameters.SYNC_RESULT_STATUS,
-            self.parameters.SYNC_RESULT_TOO_MANY,
-        )
 
     def tearDownClass(self):
         super().tearDownClass()

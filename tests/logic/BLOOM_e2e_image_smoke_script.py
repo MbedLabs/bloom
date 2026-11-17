@@ -15,13 +15,7 @@ class E2eImageSmokeScriptTest(E2eImageSmokeScriptBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.docker_calls = self.bloom.bloom_run_smoke_script_with_fake_docker(
-            self.parameters.SMOKE_IMAGE
-        )
         self.payload = self.bloom.bloom_read_smoke_project_payload()
-        self.validated = (
-            self.bloom.bloom_validate_project_payload(self.payload) if self.payload else None
-        )
 
     def tearDownClass(self):
         super().tearDownClass()

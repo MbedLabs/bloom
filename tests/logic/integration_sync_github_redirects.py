@@ -26,9 +26,10 @@ class IntegrationSyncGithubRedirectsBase(BloomTestCase):
         )
 
     def bud_redirect_on_github_api_is_followed(self):
-        self.print_variables({"followed": self.followed})
+        followed = str(self.bloom.site.calls[1])
+        self.print_variables({"followed": followed})
         self.assertEqual(
-            self.followed,
+            followed,
             self.parameters.REDIRECTED,
             msg=self.parameters.MSG_REDIRECT_FOLLOWED,
             abort_on_fail=False,

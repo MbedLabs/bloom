@@ -19,9 +19,6 @@ class AttachmentDeploymentContractTest(AttachmentDeploymentContractBase):
         self.dockerfile = self.bloom.bloom_read_repo_lines_with(
             self.parameters.DOCKERFILE, self.parameters.ATTACHMENT_WORDS
         )
-        self.example = self.bloom.bloom_read_repo_lines_with(
-            self.parameters.ENV_EXAMPLE, self.parameters.ATTACHMENT_WORDS
-        )
 
     def tearDownClass(self):
         super().tearDownClass()

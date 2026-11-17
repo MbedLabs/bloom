@@ -18,7 +18,6 @@ class CloudronMetadataTest(CloudronMetadataBase):
         self.version = self.bloom.bloom_project_version()
         self.manifest = self.bloom.bloom_read_repo_json(self.parameters.CLOUDRON_MANIFEST)
         self.description = self.bloom.bloom_read_repo_text(self.parameters.CLOUDRON_DESCRIPTION)
-        self.catalog = self.bloom.bloom_read_repo_json(self.parameters.CLOUDRON_CATALOG)
         self.changelog = self.bloom.bloom_read_repo_text(self.parameters.CLOUDRON_CHANGELOG)
 
     def tearDownClass(self):

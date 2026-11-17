@@ -17,8 +17,6 @@ class AuditPruneTest(AuditPruneBase):
         super().setUpClass()
         for action, age_days in self.parameters.AUDIT_EVENTS:
             self.bloom.bloom_add_audit_event(action, age_days)
-        self.removed = self.bloom.bloom_prune_audit(self.parameters.AUDIT_RETENTION_DAYS)
-        self.left = self.bloom.bloom_list_audit_actions()
 
     def tearDownClass(self):
         super().tearDownClass()

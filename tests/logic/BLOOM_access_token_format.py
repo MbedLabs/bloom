@@ -18,20 +18,6 @@ class AccessTokenFormatTest(AccessTokenFormatBase):
         self.user_id = self.bloom.bloom_add_user(
             self.parameters.TOKEN_EMAIL, self.bloom.bloom_maintainer_role()
         )
-        self.standard = self.bloom.bloom_sign_in_with_token(
-            self.bloom.bloom_forge_token(
-                self.user_id, self.parameters.TOKEN_STANDARD, self.parameters.TOKEN_VALID_MINUTES
-            )
-        )
-        self.issued = self.bloom.bloom_sign_in_with_token(
-            self.bloom.bloom_issue_token(self.user_id)
-        )
-        self.refusals = [
-            self.bloom.bloom_sign_in_with_token(
-                self.bloom.bloom_forge_token(self.user_id, algorithm, minutes)
-            )
-            for algorithm, minutes in self.parameters.TOKEN_REFUSALS
-        ]
 
     def tearDownClass(self):
         super().tearDownClass()
