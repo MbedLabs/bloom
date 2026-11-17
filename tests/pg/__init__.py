@@ -3,6 +3,7 @@
 import tests.config  # noqa: F401
 
 SUITES = [
+    "tests.pg.BLOOM_access_entries_migration.AccessEntriesMigrationTest",
     "tests.pg.BLOOM_campaign_public_id_duplicates.CampaignPublicIdDuplicatesTest",
     "tests.pg.BLOOM_campaign_public_id_migration.CampaignPublicIdMigrationTest",
     "tests.pg.BLOOM_cli_auth_concurrent_approval.CliAuthConcurrentApprovalTest",

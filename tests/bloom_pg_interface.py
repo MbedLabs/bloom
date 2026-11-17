@@ -48,6 +48,8 @@ from app.core.database import get_db
 from app.core.deps import limiter
 from app.core.id_generator import next_doc_id
 from app.core.link_rules import allowed_link_triples
+from app.core.permissions import DOC_TYPE_RESOURCES, RESOURCE_ACTIONS
+from app.core.policy_seed import DEFAULT_GROUPS, DEFAULT_POLICIES
 from app.core.security import create_access_token, get_current_user
 from app.models import (
     ArtefactComment,
@@ -98,6 +100,130 @@ class BloomPgInterface(BloomInterface):
             self._run(self._create_tables())
         self.maker = async_sessionmaker(self.engine, expire_on_commit=False)
         return True
+
+    def bloom_new_migration_database(self):
+        self._run(self.engine.dispose())
+        parts = urlsplit(os.environ[self.parameters.DATABASE_SETTING])
+        self.pg_admin_url = urlunsplit(parts._replace(path=f"/{self.parameters.PG_ADMIN_DATABASE}"))
+        self.pg_database = f"k75_{uuid.uuid4().hex[:10]}"
+        self._run(self._create_postgres_database())
+        self.pg_url = urlunsplit(parts._replace(path=f"/{self.pg_database}"))
+        self.engine = create_async_engine(self.pg_url)
+        self.maker = async_sessionmaker(self.engine, expire_on_commit=False)
+
+    def bloom_seed_released_memberships(self):
+        return self._run(self._with_asyncpg(self._seed_released_memberships))
+
+    def bloom_access_state(self):
+        return self._run(self._with_asyncpg(self._access_state))
+
+    def bloom_public_tables(self):
+        async def tables(conn):
+            rows = await conn.fetch(
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
+            )
+            return {row["table_name"] for row in rows}
+
+        return self._run(self._with_asyncpg(tables))
+
+    def bloom_default_specs(self):
+        return DEFAULT_POLICIES, DEFAULT_GROUPS
+
+    def bloom_document_resources(self):
+        return set(DOC_TYPE_RESOURCES)
+
+    def bloom_resource_action_sets(self):
+        return {resource: set(actions) for resource, actions in RESOURCE_ACTIONS.items()}
+
+    def bloom_run_suite_on_migrated_database(self, suite):
+        module, name = suite.rsplit(".", 1)
+        env = {
+            **os.environ,
+            self.parameters.DATABASE_SETTING: self.pg_url,
+            "BLOOM_SUITE_DATABASE": self.pg_url,
+        }
+        env["BLOOM_DOTENV_DISABLED"] = "1"
+        env.pop("BLOOM_DATABASE_URL", None)
+        code = f"import sys; from {module} import {name}; sys.exit(0 if {name}().run() else 1)"
+        done = subprocess.run(
+            [sys.executable, "-c", code], cwd=ROOT, env=env, capture_output=True, text=True
+        )
+        return done.returncode, (done.stdout + done.stderr)[-3000:]
+
+    async def _with_asyncpg(self, work):
+        conn = await asyncpg.connect(
+            self.pg_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+        )
+        try:
+            return await work(conn)
+        finally:
+            await conn.close()
+
+    async def _seed_released_memberships(self, conn):
+        values = self.parameters
+        ids = {}
+        for key, role in values.AEM_USERS:
+            ids[key] = await conn.fetchval(
+                "INSERT INTO users (email, full_name, hashed_password, role, is_active, created_at, updated_at) "
+                "VALUES ($1, $2, 'x', $3, true, now(), now()) RETURNING id",
+                f"{key}@access-migration.example.com",
+                key,
+                role,
+            )
+        ids["project"] = await conn.fetchval(
+            "INSERT INTO projects (name, prefix, status, created_at, updated_at) VALUES ('Alpha', 'ALP', 'active', now(), now()) RETURNING id"
+        )
+        for user, role, types in values.AEM_MEMBERSHIPS:
+            membership = await conn.fetchval(
+                "INSERT INTO project_memberships (user_id, project_id, role, created_at, updated_at) "
+                "VALUES ($1, $2, $3, now(), now()) RETURNING id",
+                ids[user],
+                ids["project"],
+                role,
+            )
+            for doc_type in list(DOC_TYPE_RESOURCES) if types is None else types:
+                await conn.execute(
+                    "INSERT INTO project_external_doc_types (membership_id, doc_type) VALUES ($1, $2)",
+                    membership,
+                    doc_type,
+                )
+        return ids
+
+    async def _access_state(self, conn):
+        policies = {
+            row["name"]: dict(row)
+            for row in await conn.fetch(
+                "SELECT name, description, scope, is_default, permissions::text AS permissions, type_tags::text AS type_tags FROM policies"
+            )
+        }
+        entries = {
+            row["user_id"]: (row["owner"], list(row["names"]))
+            for row in await conn.fetch(
+                "SELECT a.user_id, a.owner, array_agg(p.name ORDER BY p.name) AS names "
+                "FROM project_access a JOIN project_access_policies ap ON ap.access_id = a.id "
+                "JOIN policies p ON p.id = ap.policy_id GROUP BY a.id"
+            )
+        }
+        groups = {
+            row["name"]: list(row["names"])
+            for row in await conn.fetch(
+                "SELECT g.name, array_agg(p.name ORDER BY p.name) AS names "
+                "FROM groups g JOIN group_policies gp ON gp.group_id = g.id "
+                "JOIN policies p ON p.id = gp.policy_id GROUP BY g.id"
+            )
+        }
+        return {
+            "policies": policies,
+            "entries": entries,
+            "groups": groups,
+            "members": await conn.fetchval("SELECT count(*) FROM group_memberships"),
+            "roles": {
+                row["id"]: row["role"] for row in await conn.fetch("SELECT id, role FROM users")
+            },
+            "creator": await conn.fetchval(
+                "SELECT count(*) FROM information_schema.columns WHERE table_name = 'requirements' AND column_name = 'created_by_id'"
+            ),
+        }
 
     def bloom_run_alembic(self, *args):
         self._run(self.engine.dispose())

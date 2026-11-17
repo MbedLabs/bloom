@@ -11,11 +11,13 @@
 import asyncio
 import contextlib
 import tempfile
+import uuid
 from types import SimpleNamespace
 from unittest.mock import patch
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 import tests.parameters as params
@@ -46,7 +48,8 @@ class BloomInterface:
         self.parameters = params
         self.loop = asyncio.new_event_loop()
         self.patches = contextlib.ExitStack()
-        self.engine = create_async_engine(self.parameters.SYNC_DATABASE)
+        self.suite_copy = None
+        self.engine = create_async_engine(self._suite_database())
         self._run(self._create_tables())
         self.maker = async_sessionmaker(self.engine, expire_on_commit=False)
         self.site = SimpleNamespace(jql=[], reads=[], calls=[])
@@ -54,15 +57,44 @@ class BloomInterface:
     def tearDown(self):
         self.patches.close()
         self._run(self.engine.dispose())
+        self._drop_suite_copy()
         self._release_database()
         self.loop.close()
+
+    def _suite_database(self):
+        source = self.parameters.SYNC_DATABASE
+        if not source.startswith(self.parameters.POSTGRES_SCHEME):
+            return source
+        parts = urlsplit(source)
+        self.suite_copy = f"{self.parameters.PG_DATABASE_PREFIX}{uuid.uuid4().hex[:12]}"
+        template = parts.path.lstrip("/")
+        self._run(
+            self._on_postgres_server(
+                source, f'CREATE DATABASE "{self.suite_copy}" TEMPLATE "{template}"'
+            )
+        )
+        return urlunsplit(parts._replace(path=f"/{self.suite_copy}"))
+
+    def _drop_suite_copy(self):
+        if self.suite_copy:
+            statement = f'DROP DATABASE IF EXISTS "{self.suite_copy}" WITH (FORCE)'
+            self._run(self._on_postgres_server(self.parameters.SYNC_DATABASE, statement))
+            self.suite_copy = None
+
+    async def _on_postgres_server(self, url, statement):
+        admin_url = urlunsplit(urlsplit(url)._replace(path=f"/{self.parameters.PG_ADMIN_DATABASE}"))
+        admin = create_async_engine(admin_url, isolation_level="AUTOCOMMIT")
+        async with admin.connect() as connection:
+            await connection.execute(text(statement))
+        await admin.dispose()
 
     def _release_database(self):
         pass
 
     def bloom_new_database(self):
         self._run(self.engine.dispose())
-        self.engine = create_async_engine(self.parameters.SYNC_DATABASE)
+        self._drop_suite_copy()
+        self.engine = create_async_engine(self._suite_database())
         self._run(self._create_tables())
         self.maker = async_sessionmaker(self.engine, expire_on_commit=False)
 
@@ -182,6 +214,13 @@ class BloomInterface:
     def bloom_seed_default_catalogue(self):
         async def seed():
             async with self.maker() as db:
+                seeded = await db.scalar(
+                    select(func.count())
+                    .select_from(bloom_models.Policy)
+                    .where(bloom_models.Policy.is_default)
+                )
+                if seeded:
+                    return
                 policies = {}
                 for spec in DEFAULT_POLICIES:
                     policies[spec["name"]] = bloom_models.Policy(

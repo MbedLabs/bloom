@@ -2603,6 +2603,9 @@ class BloomApiInterface(BloomInterface):
         return listed.status, [row["id"] for row in rows]
 
     def bloom_enforce_foreign_keys(self):
+        if not str(self.engine.url).startswith("sqlite"):
+            return
+
         async def enforce():
             async with self.engine.connect() as conn:
                 await conn.exec_driver_sql(self.parameters.SQLITE_FOREIGN_KEYS)

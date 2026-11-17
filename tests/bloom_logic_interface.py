@@ -2403,7 +2403,7 @@ class BloomLogicInterface(BloomInterface):
                 )
                 bundles = [
                     Group(name="Readers", policies=[first]),
-                    Group(name="Testers", policies=[second]),
+                    Group(name="Test bundle", policies=[second]),
                 ]
                 db.add_all(bundles)
                 await db.flush()

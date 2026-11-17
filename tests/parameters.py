@@ -5615,3 +5615,65 @@ MSG_GP_NESTED_VIEW = "nested test cases and their counts are left out without vi
 MSG_GP_COUNTS_VIEW = "project counts, search and dashboard leave out a type without view"
 MSG_GP_TRACE_VIEW = "traceability, gaps and impact follow the view right"
 MSG_GP_EXPORT_VIEW = "an export leaves out the test cases the exporter cannot view"
+AEM_BEFORE = "e1a7c3f9b204"
+AEM_USERS = [
+    ("maintainer", "maintainer"),
+    ("viewer", "maintainer"),
+    ("chosen", "external"),
+    ("every", "external"),
+    ("empty", "external"),
+    ("admin", "admin"),
+]
+AEM_MEMBERSHIPS = [
+    ("maintainer", "maintainer", []),
+    ("viewer", "external", []),
+    ("chosen", "external", ["REQ", "TC"]),
+    ("every", "external", None),
+    ("empty", "external", []),
+    ("admin", "maintainer", []),
+]
+AEM_NOT_MAINTAINER = {
+    "Read Internal",
+    "Read Customer",
+    "Review Internal",
+    "Review Customer",
+    "Access Management",
+    "Application Administration",
+}
+AEM_RELEASED = {
+    "viewer": "Released Read-only",
+    "every": "Released Read (all document types)",
+    "chosen": "Released Read (REQ, TC)",
+    "empty": "Released Read (no document types)",
+}
+AEM_NO_REVIEW = {"CMP", "RPT", "RSK", "STD"}
+AEM_APPLICATION = {"users", "access", "application"}
+AEM_SUITES = [
+    "tests.api.BLOOM_group_owned_policies.GroupOwnedPoliciesTest",
+    "tests.api.BLOOM_groups_http.GroupsHttpTest",
+    "tests.api.BLOOM_group_permissions_http.GroupPermissionsHttpTest",
+    "tests.api.BLOOM_project_policy_grants.ProjectPolicyGrantsTest",
+    "tests.api.BLOOM_project_access_entries.ProjectAccessEntriesTest",
+    "tests.logic.BLOOM_entitlements.EntitlementsTest",
+    "tests.logic.BLOOM_app_policy_scope.AppPolicyScopeTest",
+    "tests.logic.BLOOM_policy_action_separation.PolicyActionSeparationTest",
+    "tests.api.BLOOM_document_attachments.DocumentAttachmentsTest",
+    "tests.api.BLOOM_group_bulk_members.GroupBulkMembersTest",
+]
+MSG_AEM_ROUND_TRIP = "a downgrade removes the access tables and an upgrade restores the same state"
+MSG_AEM_DEFAULTS = "the migration seeds the 24 default policies"
+MSG_AEM_DEFAULT_SPEC = "the default policy {name} is stored as specified"
+MSG_AEM_GROUPS = "the default groups are seeded with their policies and no members, and requirements record their creator"
+MSG_AEM_MAINTAINER = "a 1.1.0 maintainer gets one entry with every document and project policy"
+MSG_AEM_RELEASED = "a 1.1.0 {who} membership becomes one entry with the {policy} policy"
+MSG_AEM_ADMIN = "an administrator's membership becomes no entry"
+MSG_AEM_ROLES = "the account roles are kept"
+MSG_AEM_READ_ONLY = "the {policy} policy is custom, reads and comments only, and covers no parameters or every origin"
+MSG_AEM_CHOSEN = "the chosen-types policy covers customer requirements and test cases only"
+MSG_AEM_NO_TYPES = "the no-types policy covers baselines, links and the project only"
+MSG_AEM_ALL_TYPES = (
+    "the all-types policy covers every document type except visions, for customer content"
+)
+MSG_AEM_READ_TAGS = "the read-only policy covers internal and customer content"
+MSG_AEM_FULL = "the maintainer's policies add up to every document and project right"
+MSG_AEM_SUITE = "the {suite} suite passes on the migrated database"
