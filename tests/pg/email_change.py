@@ -43,12 +43,13 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"account": self.self_pending.body})
+        self_pending = self.bloom.bloom_read_account(self.self_login.access_token)
+        self.print_variables({"account": self_pending.body})
         self.assertEqual(
             (
-                self.self_pending.body["email"],
-                self.self_pending.body["pending_email"],
-                self.self_pending.body["email_change_status"],
+                self_pending.body["email"],
+                self_pending.body["pending_email"],
+                self_pending.body["email_change_status"],
             ),
             (
                 self.parameters.EMAIL_SELF_OLD,
@@ -77,6 +78,9 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
+        self.self_authorized = self.bloom.bloom_confirm_email_change(
+            self.bloom.bloom_mail_token(self.self_request.mails[0])
+        )
         self.print_variables(
             {"status": self.self_authorized.status, "body": self.self_authorized.body}
         )
@@ -102,11 +106,13 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
+        self_waiting = self.bloom.bloom_read_account(self.self_login.access_token)
+        self.print_variables({"account": self_waiting.body})
         self.assertEqual(
             (
-                self.self_waiting.status,
-                self.self_waiting.body["email"],
-                self.self_waiting.body["email_change_status"],
+                self_waiting.status,
+                self_waiting.body["email"],
+                self_waiting.body["email_change_status"],
             ),
             (
                 self.parameters.STATUS_OK,
@@ -135,11 +141,12 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables(
-            {"status": self.self_confirmed.status, "body": self.self_confirmed.body}
+        self_confirmed = self.bloom.bloom_confirm_email_change(
+            self.bloom.bloom_mail_token(self.self_authorized.mails[0])
         )
+        self.print_variables({"status": self_confirmed.status, "body": self_confirmed.body})
         self.assertEqual(
-            self.self_confirmed.status,
+            self_confirmed.status,
             self.parameters.STATUS_OK,
             msg=self.parameters.MSG_EMAIL_CONFIRMED,
             abort_on_fail=False,
@@ -149,9 +156,15 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"old token, old cookie, old email, new email": self.self_after})
+        self_after = self.bloom.bloom_probe_email_sessions(
+            self.self_login,
+            self.parameters.EMAIL_SELF_OLD,
+            self.parameters.EMAIL_SELF_NEW,
+            self.parameters.API_PASSWORD,
+        )
+        self.print_variables({"old token, old cookie, old email, new email": self_after})
         self.assertEqual(
-            self.self_after,
+            self_after,
             self.parameters.EMAIL_MOVED,
             msg=self.parameters.MSG_EMAIL_MOVED,
             abort_on_fail=False,
@@ -186,8 +199,10 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
+        member_pending = self.bloom.bloom_read_account(self.member_login.access_token)
+        self.print_variables({"account": member_pending.body})
         self.assertEqual(
-            self.member_pending.body["email_change_status"],
+            member_pending.body["email_change_status"],
             self.parameters.EMAIL_REQUESTED,
             msg=self.parameters.MSG_EMAIL_REQUESTED,
             abort_on_fail=False,
@@ -197,6 +212,7 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
+        self.member_approved = self.bloom.bloom_approve_email_change(self.admin, self.member_id)
         self.print_variables(
             {"status": self.member_approved.status, "body": self.member_approved.body}
         )
@@ -231,12 +247,14 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
+        member_waiting = self.bloom.bloom_read_account(self.member_login.access_token)
+        self.print_variables({"account": member_waiting.body})
         self.assertEqual(
             (
-                self.member_waiting.status,
-                self.member_waiting.body["email"],
-                self.member_waiting.body["pending_email"],
-                self.member_waiting.body["email_change_status"],
+                member_waiting.status,
+                member_waiting.body["email"],
+                member_waiting.body["pending_email"],
+                member_waiting.body["email_change_status"],
             ),
             (
                 self.parameters.STATUS_OK,
@@ -252,9 +270,13 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"new email, old email": self.member_not_yet})
+        member_not_yet = tuple(
+            self.bloom.bloom_log_in_for_cookie(email, self.parameters.API_PASSWORD).status
+            for email in (self.parameters.EMAIL_MEMBER_NEW, self.parameters.EMAIL_MEMBER_OLD)
+        )
+        self.print_variables({"new email, old email": member_not_yet})
         self.assertEqual(
-            self.member_not_yet,
+            member_not_yet,
             (self.parameters.STATUS_UNAUTHORIZED, self.parameters.STATUS_OK),
             msg=self.parameters.MSG_EMAIL_NOT_YET,
             abort_on_fail=False,
@@ -264,11 +286,12 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables(
-            {"status": self.member_confirmed.status, "body": self.member_confirmed.body}
+        member_confirmed = self.bloom.bloom_confirm_email_change(
+            self.bloom.bloom_mail_token(self.member_approved.mails[0])
         )
+        self.print_variables({"status": member_confirmed.status, "body": member_confirmed.body})
         self.assertEqual(
-            self.member_confirmed.status,
+            member_confirmed.status,
             self.parameters.STATUS_OK,
             msg=self.parameters.MSG_EMAIL_CONFIRMED,
             abort_on_fail=False,
@@ -278,9 +301,15 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"old token, old cookie, old email, new email": self.member_after})
+        member_after = self.bloom.bloom_probe_email_sessions(
+            self.member_login,
+            self.parameters.EMAIL_MEMBER_OLD,
+            self.parameters.EMAIL_MEMBER_NEW,
+            self.parameters.API_PASSWORD,
+        )
+        self.print_variables({"old token, old cookie, old email, new email": member_after})
         self.assertEqual(
-            self.member_after,
+            member_after,
             self.parameters.EMAIL_MOVED,
             msg=self.parameters.MSG_EMAIL_MOVED,
             abort_on_fail=False,
@@ -290,6 +319,10 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
+        login = self.bloom.bloom_log_in_for_cookie(
+            self.parameters.EMAIL_MEMBER_NEW, self.parameters.API_PASSWORD
+        )
+        self.member_account = self.bloom.bloom_read_account(login.access_token)
         self.print_variables({"account": self.member_account.body})
         self.assertEqual(
             (
@@ -316,11 +349,10 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables(
-            {"status": self.stale_confirmed.status, "body": self.stale_confirmed.body}
-        )
+        stale_confirmed = self.bloom.bloom_confirm_email_change(self.stale_token)
+        self.print_variables({"status": stale_confirmed.status, "body": stale_confirmed.body})
         self.assertEqual(
-            self.stale_confirmed.status,
+            stale_confirmed.status,
             self.parameters.STATUS_BAD_REQUEST,
             msg=self.parameters.MSG_EMAIL_STALE,
             abort_on_fail=False,
@@ -330,9 +362,17 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"old, approved, other": self.stale_logins})
+        stale_logins = tuple(
+            self.bloom.bloom_log_in_for_cookie(email, self.parameters.API_PASSWORD).status
+            for email in (
+                self.parameters.EMAIL_STALE_OLD,
+                self.parameters.EMAIL_STALE_APPROVED,
+                self.parameters.EMAIL_STALE_OTHER,
+            )
+        )
+        self.print_variables({"old, approved, other": stale_logins})
         self.assertEqual(
-            self.stale_logins,
+            stale_logins,
             (
                 self.parameters.STATUS_OK,
                 self.parameters.STATUS_UNAUTHORIZED,
@@ -346,9 +386,14 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.guard_request.status, "body": self.guard_request.body})
+        guard_request = self.bloom.bloom_request_email_change(
+            self.guard_login.access_token,
+            self.parameters.HTTP_WRONG_PASSWORD,
+            self.parameters.EMAIL_GUARD_NEW,
+        )
+        self.print_variables({"status": guard_request.status, "body": guard_request.body})
         self.assertEqual(
-            self.guard_request.status,
+            guard_request.status,
             self.parameters.STATUS_BAD_REQUEST,
             msg=self.parameters.MSG_EMAIL_WRONG_PASSWORD,
             abort_on_fail=False,
@@ -358,8 +403,10 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
+        guard_account = self.bloom.bloom_read_account(self.guard_login.access_token)
+        self.print_variables({"account": guard_account.body})
         self.assertEqual(
-            self.guard_account.body["pending_email"],
+            guard_account.body["pending_email"],
             None,
             msg=self.parameters.MSG_EMAIL_NOT_STARTED,
             abort_on_fail=False,
@@ -369,9 +416,12 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.admin_bypass.status, "body": self.admin_bypass.body})
+        admin_bypass = self.bloom.bloom_update_account_email(
+            self.admin, self.admin_member, self.parameters.EMAIL_ADMIN_NEW
+        )
+        self.print_variables({"status": admin_bypass.status, "body": admin_bypass.body})
         self.assertEqual(
-            self.admin_bypass.status,
+            admin_bypass.status,
             self.parameters.STATUS_UNPROCESSABLE,
             msg=self.parameters.MSG_EMAIL_BYPASS,
             abort_on_fail=False,
@@ -381,6 +431,9 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
+        self.admin_started = self.bloom.bloom_start_email_change_for(
+            self.admin, self.admin_member, self.parameters.EMAIL_ADMIN_NEW
+        )
         self.print_variables({"status": self.admin_started.status, "body": self.admin_started.body})
         self.assertEqual(
             (
@@ -401,11 +454,12 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables(
-            {"status": self.admin_confirmed.status, "body": self.admin_confirmed.body}
+        admin_confirmed = self.bloom.bloom_confirm_email_change(
+            self.bloom.bloom_mail_token(self.admin_started.mails[0])
         )
+        self.print_variables({"status": admin_confirmed.status, "body": admin_confirmed.body})
         self.assertEqual(
-            self.admin_confirmed.status,
+            admin_confirmed.status,
             self.parameters.STATUS_OK,
             msg=self.parameters.MSG_EMAIL_CONFIRMED,
             abort_on_fail=False,
@@ -415,9 +469,13 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"old email, new email": self.admin_logins})
+        admin_logins = tuple(
+            self.bloom.bloom_log_in_for_cookie(email, self.parameters.API_PASSWORD).status
+            for email in (self.parameters.EMAIL_ADMIN_OLD, self.parameters.EMAIL_ADMIN_NEW)
+        )
+        self.print_variables({"old email, new email": admin_logins})
         self.assertEqual(
-            self.admin_logins,
+            admin_logins,
             (self.parameters.STATUS_UNAUTHORIZED, self.parameters.STATUS_OK),
             msg=self.parameters.MSG_EMAIL_ADMIN_MOVED,
             abort_on_fail=False,
@@ -427,13 +485,14 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables(
-            {"status": self.invite_accepted.status, "body": self.invite_accepted.body}
+        invite_accepted = self.bloom.bloom_accept_invitation(
+            self.bloom.bloom_mail_token(self.invitation.mails[0]), self.parameters.API_PASSWORD
         )
+        self.print_variables({"status": invite_accepted.status, "body": invite_accepted.body})
         self.assertEqual(
             (
-                self.invite_accepted.status,
-                self.invite_accepted.body["requires_email_verification"],
+                invite_accepted.status,
+                invite_accepted.body["requires_email_verification"],
             ),
             (self.parameters.STATUS_OK, False),
             msg=self.parameters.MSG_EMAIL_INVITED,
@@ -444,8 +503,12 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
+        self.invite_login = self.bloom.bloom_log_in_for_cookie(
+            self.parameters.EMAIL_INVITED, self.parameters.API_PASSWORD
+        )
+        self.print_variables({"status": self.invite_login.status})
         self.assertEqual(
-            self.invite_login,
+            self.invite_login.status,
             self.parameters.STATUS_OK,
             msg=self.parameters.MSG_EMAIL_INVITED_SIGN_IN,
             abort_on_fail=False,
@@ -455,8 +518,10 @@ class EmailChangeBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
+        invite_account = self.bloom.bloom_read_account(self.invite_login.access_token)
+        self.print_variables({"account": invite_account.body})
         self.assertTrue(
-            self.invite_account.body["email_verified_at"],
+            invite_account.body["email_verified_at"],
             msg=self.parameters.MSG_EMAIL_INVITED_VERIFIED,
             abort_on_fail=False,
         )
