@@ -16,25 +16,27 @@ class CampaignPublicIdMigrationBase(BloomTestCase):
 
     interface = BloomPgInterface
 
-    def bud_every_alembic_command_succeeds(self):
+    def bud_the_database_starts_before_the_public_ids(self):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        for code, output in self.commands:
-            if code:
-                self.log_info(output)
-        codes = [code for code, _ in self.commands]
-        self.print_variables({"exit codes": codes})
+        if self.prepared[0]:
+            self.log_info(self.prepared[1])
         self.assertEqual(
-            codes, [0] * len(codes), msg=self.parameters.MSG_ALEMBIC_SUCCEEDS, abort_on_fail=True
+            self.prepared[0], 0, msg=self.parameters.MSG_ALEMBIC_SUCCEEDS, abort_on_fail=True
         )
 
     def bud_missing_public_ids_get_the_next_free_number(self):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
+        code, output = self.bloom.bloom_run_alembic("upgrade", self.parameters.PUBLIC_ID_REVISION)
+        if code:
+            self.log_info(output)
+        self.assertEqual(code, 0, msg=self.parameters.MSG_ALEMBIC_SUCCEEDS, abort_on_fail=True)
+        public_ids = self.bloom.bloom_read_campaign_public_ids()
         for prefix, expected in self.parameters.CAMPAIGN_EXPECTED.items():
-            found = [self.public_ids[row_id] for row_id in self.ids[prefix]]
+            found = [public_ids[row_id] for row_id in self.ids[prefix]]
             self.print_variables(
                 {"seeded": self.parameters.CAMPAIGN_SEEDS[prefix], "public IDs": found}
             )
@@ -46,9 +48,10 @@ class CampaignPublicIdMigrationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"shape": self.upgraded_shape})
+        shape = self.bloom.bloom_read_public_id_shape()
+        self.print_variables({"shape": shape})
         self.assertEqual(
-            self.upgraded_shape,
+            shape,
             {
                 "nullable": self.parameters.NOT_NULLABLE,
                 "indexes": self.parameters.PUBLIC_ID_INDEXES,
@@ -62,9 +65,14 @@ class CampaignPublicIdMigrationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"refusals": self.violations})
+        violations = self.bloom.bloom_try_public_id_inserts(
+            self.parameters.TAKEN_PREFIX,
+            self.parameters.DUPLICATE_SUITE_ID,
+            self.parameters.CAMPAIGN_EXPECTED[self.parameters.TAKEN_PREFIX][1],
+        )
+        self.print_variables({"refusals": violations})
         self.assertEqual(
-            self.violations,
+            violations,
             [
                 self.parameters.UNIQUE_VIOLATION,
                 self.parameters.UNIQUE_VIOLATION,
@@ -78,16 +86,27 @@ class CampaignPublicIdMigrationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"shape": self.downgraded_shape})
+        code, output = self.bloom.bloom_run_alembic("downgrade", self.parameters.PUBLIC_ID_BEFORE)
+        if code:
+            self.log_info(output)
+        self.assertEqual(code, 0, msg=self.parameters.MSG_ALEMBIC_SUCCEEDS, abort_on_fail=True)
+        shape = self.bloom.bloom_read_public_id_shape()
+        public_ids = self.bloom.bloom_read_campaign_public_ids()
+        assigned = {
+            row_id: public_id
+            for prefix, expected in self.parameters.CAMPAIGN_EXPECTED.items()
+            for row_id, public_id in zip(self.ids[prefix], expected)
+        }
+        self.print_variables({"shape": shape})
         self.assertEqual(
-            (self.downgraded_shape, self.downgraded_ids),
+            (shape, {row_id: public_ids[row_id] for row_id in assigned}),
             (
                 {
                     "nullable": self.parameters.NULLABLE,
                     "indexes": [],
                     "revision": self.parameters.PUBLIC_ID_BEFORE,
                 },
-                self.public_ids,
+                assigned,
             ),
             msg=self.parameters.MSG_PUBLIC_ID_DOWNGRADE,
             abort_on_fail=False,
@@ -97,9 +116,14 @@ class CampaignPublicIdMigrationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"indexes": self.reupgraded_shape["indexes"]})
+        code, output = self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
+        if code:
+            self.log_info(output)
+        self.assertEqual(code, 0, msg=self.parameters.MSG_ALEMBIC_SUCCEEDS, abort_on_fail=True)
+        indexes = self.bloom.bloom_read_public_id_shape()["indexes"]
+        self.print_variables({"indexes": indexes})
         self.assertEqual(
-            self.reupgraded_shape["indexes"],
+            indexes,
             self.parameters.PUBLIC_ID_INDEXES,
             msg=self.parameters.MSG_PUBLIC_ID_REUPGRADE,
             abort_on_fail=False,
