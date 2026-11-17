@@ -15,14 +15,6 @@ class ProjectVariablesTest(ProjectVariablesBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.updated = self.bloom.bloom_update_project_variable(
-            self.parameters.VARIABLE_ITEM, self.parameters.VARIABLE_UPDATE
-        )
-        self.duplicate = self.bloom.bloom_update_project_variable(
-            self.parameters.VARIABLE_ITEM,
-            self.parameters.VARIABLE_DUPLICATE_UPDATE,
-            self.parameters.VARIABLE_DUPLICATE,
-        )
 
     def tearDownClass(self):
         super().tearDownClass()

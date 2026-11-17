@@ -45,22 +45,33 @@ class RequirementTextBase(BloomTestCase):
         self._equal(found, self.parameters.REQIF_SYSTEM_SOURCE, self.parameters.MSG_REQIF_SYSTEM)
 
     def bud_reqif_relation_becomes_one_refines_link(self):
-        self.print_variables({"links": self.import_links, "ids": self.import_ids})
-        login_id, system_id = self.import_ids
+        ids = dict(self.bloom.bloom_requirement_rows(("req_id", "id"), self.project_id))
+        import_ids = (
+            ids[self.parameters.REQIF_LOGIN[0]],
+            ids[self.parameters.REQIF_SYSTEM_SOURCE[0]],
+        )
+        import_links = self.bloom.bloom_list_link_ends()
+        legacy_links = self.bloom.bloom_count_requirement_links()
+        self.print_variables({"links": import_links, "ids": import_ids})
+        login_id, system_id = import_ids
         self._equal(
-            self.import_links,
+            import_links,
             [(login_id, system_id, *self.parameters.REQIF_LINK)],
             self.parameters.MSG_REQIF_LINK,
         )
         self._equal(
-            self.legacy_links,
+            legacy_links,
             self.parameters.REQIF_NO_REQUIREMENT_LINKS,
             self.parameters.MSG_REQIF_LEGACY,
         )
 
     def bud_copied_requirement_keeps_no_editor_content(self):
-        self.print_variables({"copied": self.copied})
-        self._equal(self.copied, self.parameters.TEXT_COPY_EXPECTED, self.parameters.MSG_TEXT_COPY)
+        self.bloom.bloom_copy_requirements(self.source_id, self.target_id)
+        copied = self.bloom.bloom_requirement_rows(
+            ("req_id", "title", "description", "content_json", "content_html"), self.target_id
+        )
+        self.print_variables({"copied": copied})
+        self._equal(copied, self.parameters.TEXT_COPY_EXPECTED, self.parameters.MSG_TEXT_COPY)
 
     def _equal(self, actual, expected, message):
         """Assert the actual value equals the expected one."""

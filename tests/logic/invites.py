@@ -28,19 +28,21 @@ class InvitesBase(BloomTestCase):
         )
 
     def bud_different_tokens_hash_differently(self):
-        self.print_variables({"hash": self.hash, "other": self.other_hash})
+        other_hash = self.bloom.bloom_hash_token(self.parameters.INVITE_OTHER_TOKEN)
+        self.print_variables({"hash": self.hash, "other": other_hash})
         self.assertNotEqual(
             self.hash,
-            self.other_hash,
+            other_hash,
             msg=self.parameters.MSG_INVITE_HASH_DIFFERS,
             abort_on_fail=False,
         )
 
     def bud_purposes_keep_their_values(self):
+        purposes = self.bloom.bloom_token_purpose_values()
         for name, value in self.parameters.INVITE_PURPOSES.items():
-            self.print_variables({"purpose": name, "value": self.purposes.get(name)})
+            self.print_variables({"purpose": name, "value": purposes.get(name)})
             self.assertEqual(
-                self.purposes.get(name),
+                purposes.get(name),
                 value,
                 msg=self.parameters.MSG_INVITE_PURPOSE,
                 abort_on_fail=False,

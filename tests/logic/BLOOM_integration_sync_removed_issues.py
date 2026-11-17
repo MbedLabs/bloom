@@ -40,10 +40,6 @@ class IntegrationSyncRemovedIssuesTest(IntegrationSyncRemovedIssuesBase):
             }
         )
         self.bloom.bloom_run_sync(self.parameters.NOW)
-        self.first_reads = list(self.bloom.site.reads)
-        setting = self.bloom.bloom_get_setting(self.setting_id)
-        self.first_cursor = (setting.sync_removal_cursor, setting.sync_updated)
-        self.bloom.bloom_run_sync(self.parameters.NOW + self.parameters.LATER)
 
     def tearDownClass(self):
         super().tearDownClass()

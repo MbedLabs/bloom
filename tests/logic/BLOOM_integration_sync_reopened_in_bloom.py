@@ -30,7 +30,6 @@ class IntegrationSyncReopenedInBloomTest(IntegrationSyncReopenedInBloomBase):
             external_issue_closed=True,
         )
         self.bloom.bloom_serve_issue_list([{"number": number, "state": self.parameters.GIT_CLOSED}])
-        self.synced = self.bloom.bloom_run_sync(self.parameters.NOW)
 
     def tearDownClass(self):
         super().tearDownClass()

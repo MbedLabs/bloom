@@ -17,9 +17,10 @@ class IntegrationSyncSaveDuringScanBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_save_during_a_full_scan_keeps_the_rescan(self):
+        synced = self.bloom.bloom_run_sync(self.parameters.NOW)
         setting = self.bloom.bloom_get_setting(self.setting_id)
         found = (setting.synced_at, setting.sync_full_scan)
-        self.print_variables({"synced at, full scan": found})
+        self.print_variables({"synced": synced, "synced at, full scan": found})
         self.assertEqual(
             found,
             (self.parameters.NOW, True),

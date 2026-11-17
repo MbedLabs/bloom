@@ -16,29 +16,14 @@ class TagLinksTest(TagLinksBase):
     def setUpClass(self):
         super().setUpClass()
         bloom = self.bloom
-        project_id = bloom.bloom_create_project(self.parameters.TAG_PREFIX)
+        self.project_id = bloom.bloom_create_project(self.parameters.TAG_PREFIX)
         bloom.bloom_add_user(
             self.parameters.TAG_ADMIN, bloom.bloom_role(self.parameters.TAG_ADMIN_ROLE)
         )
-        kind = self.parameters.TAG_KIND
-        source_id, target_id = (
-            bloom.bloom_add_artefact(kind, project_id=project_id, **fields)
+        self.source_id, self.target_id = (
+            bloom.bloom_add_artefact(self.parameters.TAG_KIND, project_id=self.project_id, **fields)
             for fields in self.parameters.TAG_REQUIREMENTS
         )
-        target = bloom.bloom_mention(kind, target_id)
-
-        def sync(source=kind, content=target, hidden=False):
-            return bloom.bloom_sync_tag_links(project_id, source, source_id, content, hidden)
-
-        self.invalid = {}
-        for source, target_kind in self.parameters.TAG_INVALID_PAIRS:
-            outcome = sync(source, bloom.bloom_mention(target_kind, target_id))
-            self.invalid[(source, target_kind)] = (outcome, bloom.bloom_list_links())
-        self.hidden = (sync(hidden=True), bloom.bloom_list_links())
-        self.self = sync(content=bloom.bloom_mention(kind, source_id))
-        self.first = sync()
-        self.links = bloom.bloom_list_links()
-        self.again = sync()
 
     def tearDownClass(self):
         super().tearDownClass()

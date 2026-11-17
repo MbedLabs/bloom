@@ -26,17 +26,12 @@ class IntegrationSyncUnreadableRepositoryTest(IntegrationSyncUnreadableRepositor
         self.bloom.bloom_link_defect(
             self.project_id, "github", self.parameters.OTHER_REPO, unreadable
         )
-        issues = [{"number": readable, "state": self.parameters.GIT_CLOSED}]
         self.bloom.bloom_serve_issue_list(
-            issues,
+            [{"number": readable, "state": self.parameters.GIT_CLOSED}],
             unreadable_repo=self.parameters.OTHER_REPO,
             unreadable_status=self.parameters.STATUS_NOT_FOUND,
         )
         self.bloom.bloom_run_sync(self.parameters.NOW)
-        self.readable_status = self.bloom.bloom_get_defect(self.readable_id).status
-        self.first_run = self.bloom.bloom_get_setting(self.setting_id)
-        self.bloom.bloom_serve_issue_list(issues)
-        self.bloom.bloom_run_sync(self.parameters.NOW + self.parameters.LATER)
 
     def tearDownClass(self):
         super().tearDownClass()

@@ -30,8 +30,6 @@ class IntegrationSyncUnchangedRunTest(IntegrationSyncUnchangedRunBase):
             ]
         )
         self.bloom.bloom_run_sync(self.parameters.NOW)
-        self.first_events = len(self.bloom.bloom_list_defect_events())
-        self.bloom.bloom_run_sync(self.parameters.NOW + self.parameters.LATER)
 
     def tearDownClass(self):
         super().tearDownClass()

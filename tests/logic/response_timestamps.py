@@ -36,9 +36,10 @@ class ResponseTimestampsBase(BloomTestCase):
         )
 
     def bud_every_response_timestamp_is_utc(self):
-        self.print_variables({"unmarked": self.unmarked})
+        unmarked = self.bloom.bloom_unmarked_timestamps(self.models)
+        self.print_variables({"unmarked": unmarked})
         self.assertEqual(
-            self.unmarked,
+            unmarked,
             self.parameters.RESPONSE_NONE_UNMARKED,
             msg=self.parameters.MSG_RESPONSE_UTC,
             abort_on_fail=False,

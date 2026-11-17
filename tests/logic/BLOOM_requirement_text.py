@@ -19,34 +19,20 @@ class RequirementTextTest(RequirementTextBase):
         parameters = self.parameters
         bloom.bloom_add_user(parameters.TEXT_ADMIN, bloom.bloom_role(parameters.TEXT_ADMIN_ROLE))
 
-        project_id = bloom.bloom_create_project(parameters.TEXT_PREFIX)
-        result = bloom.bloom_import_reqif(project_id, parameters.REQIF_SAMPLE)
+        self.project_id = bloom.bloom_create_project(parameters.TEXT_PREFIX)
+        result = bloom.bloom_import_reqif(self.project_id, parameters.REQIF_SAMPLE)
         self.import_counts = (
             result.imported,
             result.links_created,
             result.specifications,
             result.new_ids,
         )
-        self.imported = bloom.bloom_requirement_rows(parameters.REQIF_FIELDS, project_id)
-        ids = {
-            req_id: row_id
-            for req_id, row_id in bloom.bloom_requirement_rows(("req_id", "id"), project_id)
-        }
-        self.import_ids = (
-            ids[parameters.REQIF_LOGIN[0]],
-            ids[parameters.REQIF_SYSTEM_SOURCE[0]],
-        )
-        self.import_links = bloom.bloom_list_link_ends()
-        self.legacy_links = bloom.bloom_count_requirement_links()
+        self.imported = bloom.bloom_requirement_rows(parameters.REQIF_FIELDS, self.project_id)
 
-        source_id, target_id = (
+        self.source_id, self.target_id = (
             bloom.bloom_create_project(prefix) for prefix in parameters.TEXT_COPY_PREFIXES
         )
-        bloom.bloom_add_artefact("REQ", project_id=source_id, **parameters.TEXT_COPY_SOURCE)
-        bloom.bloom_copy_requirements(source_id, target_id)
-        self.copied = bloom.bloom_requirement_rows(
-            ("req_id", "title", "description", "content_json", "content_html"), target_id
-        )
+        bloom.bloom_add_artefact("REQ", project_id=self.source_id, **parameters.TEXT_COPY_SOURCE)
 
     def tearDownClass(self):
         super().tearDownClass()

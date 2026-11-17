@@ -16,7 +16,6 @@ class ResponseTimestampsTest(ResponseTimestampsBase):
     def setUpClass(self):
         super().setUpClass()
         self.models = self.bloom.bloom_response_models()
-        self.unmarked = self.bloom.bloom_unmarked_timestamps(self.models)
 
     def tearDownClass(self):
         super().tearDownClass()

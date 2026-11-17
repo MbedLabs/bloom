@@ -25,7 +25,6 @@ class IntegrationSyncSaveDuringScanTest(IntegrationSyncSaveDuringScanBase):
             self.parameters.NOW + self.parameters.SAVE_OFFSET,
         )
         self.bloom.bloom_serve_jira()
-        self.synced = self.bloom.bloom_run_sync(self.parameters.NOW)
 
     def tearDownClass(self):
         super().tearDownClass()

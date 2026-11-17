@@ -15,29 +15,6 @@ class LinkRulesTest(LinkRulesBase):
 
     def setUpClass(self):
         super().setUpClass()
-        rule = self.bloom.bloom_link_rule
-        self.normalized = {
-            value: rule("normalize_linkable_type", value)
-            for value, _ in self.parameters.LINK_NORMALIZED
-        }
-        self.roles = {
-            (source, target): rule("get_allowed_link_roles", source, target)
-            for source, target, _ in self.parameters.LINK_ROLES
-        }
-        self.known = {
-            kind: rule("is_known_linkable_type", kind) for kind, _ in self.parameters.LINK_KNOWN
-        }
-        self.role_checks = {
-            (source, target, role): rule("is_allowed_link_role", source, target, role)
-            for source, target, role, _ in self.parameters.LINK_ROLE_CHECKS
-        }
-        self.tag_hosts = {
-            kind: rule("is_tag_host_type", kind) for kind, _ in self.parameters.LINK_TAG_HOSTS
-        }
-        self.tag_pairs = {
-            (source, target): rule("is_allowed_tag_pair", source, target)
-            for source, target, _ in self.parameters.LINK_TAG_PAIRS
-        }
 
     def tearDownClass(self):
         super().tearDownClass()

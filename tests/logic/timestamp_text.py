@@ -17,42 +17,48 @@ class TimestampTextBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_time_stops_at_minutes(self):
-        self.print_variables({"time": self.parameters.STAMP_NAIVE, "text": self.naive})
+        naive = self.bloom.bloom_minute_utc(self.parameters.STAMP_NAIVE)
+        self.print_variables({"time": self.parameters.STAMP_NAIVE, "text": naive})
         self.assertEqual(
-            self.naive,
+            naive,
             self.parameters.STAMP_TEXT,
             msg=self.parameters.MSG_STAMP_MINUTES,
             abort_on_fail=False,
         )
 
     def bud_missing_time_is_empty(self):
-        self.print_variables({"text": self.none})
+        none = self.bloom.bloom_minute_utc(None)
+        self.print_variables({"text": none})
         self.assertEqual(
-            self.none,
+            none,
             self.parameters.STAMP_NONE_TEXT,
             msg=self.parameters.MSG_STAMP_NONE,
             abort_on_fail=False,
         )
 
     def bud_aware_time_is_written_in_utc(self):
-        self.print_variables({"time": self.parameters.STAMP_AWARE, "text": self.aware})
+        aware = self.bloom.bloom_minute_utc(self.parameters.STAMP_AWARE)
+        self.print_variables({"time": self.parameters.STAMP_AWARE, "text": aware})
         self.assertEqual(
-            self.aware,
+            aware,
             self.parameters.STAMP_TEXT,
             msg=self.parameters.MSG_STAMP_AWARE,
             abort_on_fail=False,
         )
 
     def bud_execution_time_is_stored_in_utc(self):
+        stored = self.bloom.bloom_resolve_execution_time_in_zone(
+            self.parameters.STAMP_EXECUTED, self.parameters.STAMP_SERVER_ZONE
+        )
         self.print_variables(
             {
                 "zone": self.parameters.STAMP_SERVER_ZONE,
                 "executed": self.parameters.STAMP_EXECUTED,
-                "stored": self.stored,
+                "stored": stored,
             }
         )
         self.assertEqual(
-            self.stored,
+            stored,
             self.parameters.STAMP_EXECUTED_STORED,
             msg=self.parameters.MSG_STAMP_EXECUTION_UTC,
             abort_on_fail=False,

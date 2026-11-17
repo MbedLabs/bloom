@@ -19,10 +19,6 @@ class IntegrationSyncSaveRescanTest(IntegrationSyncSaveRescanBase):
         self.setting_id = self.bloom.bloom_create_integration(self.project_id)
         self.bloom.bloom_serve_jira()
         self.bloom.bloom_run_sync(self.parameters.NOW)
-        self.after_run = self.bloom.bloom_get_setting(self.setting_id).sync_full_scan
-        self.bloom.bloom_save_setting(
-            self.setting_id, self.parameters.ADMIN_EMAIL, jira_label=self.parameters.LABEL
-        )
 
     def tearDownClass(self):
         super().tearDownClass()

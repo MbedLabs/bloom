@@ -16,8 +16,6 @@ class InvitesTest(InvitesBase):
     def setUpClass(self):
         super().setUpClass()
         self.hash = self.bloom.bloom_hash_token(self.parameters.INVITE_TOKEN)
-        self.other_hash = self.bloom.bloom_hash_token(self.parameters.INVITE_OTHER_TOKEN)
-        self.purposes = self.bloom.bloom_token_purpose_values()
         self.token = self.bloom.bloom_new_invite_token(self.parameters.INVITE_VALID_HOURS)
 
     def tearDownClass(self):

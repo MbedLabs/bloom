@@ -15,12 +15,6 @@ class TimestampTextTest(TimestampTextBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.naive = self.bloom.bloom_minute_utc(self.parameters.STAMP_NAIVE)
-        self.none = self.bloom.bloom_minute_utc(None)
-        self.aware = self.bloom.bloom_minute_utc(self.parameters.STAMP_AWARE)
-        self.stored = self.bloom.bloom_resolve_execution_time_in_zone(
-            self.parameters.STAMP_EXECUTED, self.parameters.STAMP_SERVER_ZONE
-        )
 
     def tearDownClass(self):
         super().tearDownClass()

@@ -29,12 +29,6 @@ class IntegrationSyncNowCappedTest(IntegrationSyncNowCappedBase):
             ]
         )
         self.bloom.bloom_sync_now(self.setting_id, self.parameters.ADMIN_EMAIL)
-        setting = self.bloom.bloom_get_setting(self.setting_id)
-        self.first_state = (setting.sync_full_scan, setting.sync_scan_from)
-        self.bloom.bloom_sync_now(self.setting_id, self.parameters.OTHER_ADMIN_EMAIL)
-        self.next_creation = [q for q in self.bloom.site.jql if self.parameters.CREATION_MARK in q][
-            1
-        ]
 
     def tearDownClass(self):
         super().tearDownClass()
