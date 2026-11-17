@@ -89,6 +89,7 @@ from app.api.import_service import (
     import_testrail,
     testrail_csv_columns,
 )
+from app.api.link_read_utils import iter_req_req_outgoing_neighbors
 from app.api.notifications import (
     list_notifications,
     mark_all_read,
@@ -136,7 +137,13 @@ from app.core.permissions import (
     rule_of,
 )
 from app.core.policy_seed import DEFAULT_GROUPS, DEFAULT_POLICIES
-from app.core.reqif import ReqIFParseError, parse_reqif
+from app.core.reqif import (
+    FOREIGN_ID_HINTS,
+    TEXT_ATTRIBUTE_HINTS,
+    TITLE_ATTRIBUTE_HINTS,
+    ReqIFParseError,
+    parse_reqif,
+)
 from app.core.reqif_policy import _validate_member, read_reqif_upload
 from app.core.search_registry import rank_match
 from app.core.security import (
@@ -418,6 +425,54 @@ class BloomLogicInterface(BloomInterface):
             return id_generator.compute_next_id(existing_ids, prefix, type_code), None
         except ValueError as exc:
             return None, type(exc).__name__
+
+    def bloom_reqif_attribute(self, parsed, kind):
+        hints = {
+            "title": TITLE_ATTRIBUTE_HINTS,
+            "text": TEXT_ATTRIBUTE_HINTS,
+            "foreign id": FOREIGN_ID_HINTS,
+        }
+        return parsed.first_attr(hints[kind])
+
+    def bloom_reqif_html(self, parsed):
+        return parsed.first_html(TEXT_ATTRIBUTE_HINTS)
+
+    def bloom_try_import_reqif(self, project_id, data, without_link_rules=False):
+        with contextlib.ExitStack() as stack:
+            if without_link_rules:
+                stack.enter_context(patch.object(link_rules, "LINK_RULE_ROWS", ()))
+            try:
+                return self.bloom_import_reqif(project_id, data), None
+            except HTTPException as refused:
+                return None, (refused.status_code, refused.detail)
+
+    def bloom_outgoing_requirement_neighbors(self, requirement_id, project_id):
+        async def work(db):
+            return [
+                edge
+                async for edge in iter_req_req_outgoing_neighbors(requirement_id, project_id, db)
+            ]
+
+        return self._run(self._with_db(work))
+
+    def bloom_add_sourced_requirement(self, project_id, req_id, title, source_ref):
+        return self._run(
+            self._add(
+                Requirement(
+                    project_id=project_id, req_id=req_id, title=title, source_ref=source_ref
+                )
+            )
+        )
+
+    def bloom_add_legacy_requirement_link(self, source_id, target_id, link_type):
+        return self._run(
+            self._add(
+                RequirementLink(source_id=source_id, target_id=target_id, link_type=link_type)
+            )
+        )
+
+    def bloom_list_legacy_link_ids(self):
+        return self._run(self._all(select(RequirementLink.id).order_by(RequirementLink.id)))
 
     def bloom_seed_entitlement_user(self, role="maintainer"):
         async def work(db):

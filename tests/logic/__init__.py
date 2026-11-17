@@ -77,6 +77,7 @@ SUITES = [
     "tests.logic.BLOOM_project_naming.ProjectNamingTest",
     "tests.logic.BLOOM_project_variables.ProjectVariablesTest",
     "tests.logic.BLOOM_related_docs_filter.RelatedDocsFilterTest",
+    "tests.logic.BLOOM_reqif_import.ReqifImportTest",
     "tests.logic.BLOOM_reqif_limits.ReqifLimitsTest",
     "tests.logic.BLOOM_requirement_text.RequirementTextTest",
     "tests.logic.BLOOM_response_timestamps.ResponseTimestampsTest",

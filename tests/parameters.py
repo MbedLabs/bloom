@@ -3983,3 +3983,43 @@ MSG_ENT_WRITE_SCOPE = (
 MSG_ENT_BUNDLES = "overlapping bundles keep their own origins for {who}"
 MSG_ENT_BUNDLE_CAPS = "internal reading, approval and deletion are {state} for {who}"
 MSG_ENT_TAG_SCOPE = "a write limited to one tag does not borrow the unrestricted read's tag scope"
+RQI_EXTRA_OBJECT = (
+    b"</SPEC-OBJECTS>",
+    b'<SPEC-OBJECT IDENTIFIER="OBJ-3"><VALUES/></SPEC-OBJECT></SPEC-OBJECTS>',
+)
+RQI_RELATION_NAME = b'LONG-NAME="Refines"'
+RQI_RELATION_ROLES = [
+    ("Refines", "refines"),
+    ("Derives", "derives_from"),
+    ("Depends", "depends_on"),
+    ("Satisfies", "relates_to"),
+    ("Copies", "duplicates"),
+]
+RQI_UNREADABLE = [
+    ("an empty file", b""),
+    ("text that is not XML", b"this is not xml at all"),
+    ("XML without ReqIF content", b"<html><body>nope</body></html>"),
+]
+RQI_LEGACY_ROWS = [("PRJ-REQ-001", "Parent", "OBJ-1"), ("PRJ-REQ-002", "Child", "OBJ-2")]
+MSG_RQI_OBJECTS = "both objects of the document are parsed"
+MSG_RQI_TITLES = "the title comes from the chapter name attribute"
+MSG_RQI_BODY = "the body is kept as HTML with its emphasis and as plain text"
+MSG_RQI_ENUM = "an enumeration value reads as its long name"
+MSG_RQI_FOREIGN_ID = "the foreign id attribute is read"
+MSG_RQI_ORDER = "objects follow the order of the specification"
+MSG_RQI_RELATION = "the relation is parsed with its ends and type name"
+MSG_RQI_ARCHIVE = "a ReqIFZ archive is opened and parsed"
+MSG_RQI_OUTSIDE = "an object outside the hierarchy is kept"
+MSG_RQI_UNREADABLE = "{what} is refused"
+MSG_RQI_FIRST = "the first import creates two requirements and one link"
+MSG_RQI_AGAIN = "a second import creates nothing, skips both and leaves two requirements"
+MSG_RQI_NO_PROJECT = "an import into a project that does not exist is a 404"
+MSG_RQI_NOT_REQIF = "an upload that is not ReqIF is a 422"
+MSG_RQI_ROLE = "a {name} relation is stored as a {role} link and read as that neighbour"
+MSG_RQI_UNKNOWN = (
+    "an unknown relation type is a 422 naming the relation and the type, and nothing is imported"
+)
+MSG_RQI_REMOVED_ROLE = (
+    "a relation whose role is no longer allowed is a 422 naming it, and no link is stored"
+)
+MSG_RQI_LEGACY = "an import that matches an existing legacy link creates no second link"
