@@ -176,11 +176,15 @@ from app.core.service_auth import (
 from app.core.tc_steps import make_row, rows_to_text, text_to_rows
 from app.models import (
     ArtefactLink,
+    ArtefactTag,
     AuditEvent,
+    Baseline,
+    ChangeRequest,
     Defect,
     DesignItem,
     Document,
     DocumentAttachment,
+    DocumentSection,
     ImportAttempt,
     IntegrationSetting,
     Notification,
@@ -189,8 +193,11 @@ from app.models import (
     ProjectVariable,
     Requirement,
     RequirementLink,
+    RiskItem,
     SystemMarker,
+    Tag,
     TestCase,
+    TestConcept,
     TestSuite,
     TestSuiteItem,
     user_token,
@@ -199,6 +206,7 @@ from app.models.groups import Group, GroupMembership, Policy
 from app.models.models import ARTEFACT_MODELS, ArtefactVisibility, ServiceCredential
 from app.models.project_membership import ProjectAccess
 from app.models.user import User, UserRole
+from app.models.workflow import ArtefactRequest, ArtefactRevisionFile, ArtefactWorkflow
 from app.schemas import ProjectCreate, ProjectVariableUpdate
 from app.schemas import auth as auth_schemas
 from app.schemas import schemas
@@ -206,6 +214,7 @@ from app.schemas.groups import PolicyRule
 from app.services import (
     attachment_cleanup,
     attachment_storage,
+    document_workflow,
     import_attempts,
     integration_sync,
     jira_outbound,
@@ -216,6 +225,7 @@ from app.services import (
     token_service,
 )
 from app.services.attachment_cleanup import reconcile_attachments
+from app.services.audit import audit_actor_var
 from app.services.jira_inbound import (
     adf_to_text,
     bloom_level,
@@ -434,6 +444,365 @@ class BloomLogicInterface(BloomInterface):
             return id_generator.compute_next_id(existing_ids, prefix, type_code), None
         except ValueError as exc:
             return None, type(exc).__name__
+
+    def bloom_seed_workflow_author(self):
+        async def work(db):
+            author = User(
+                email="workflow@example.com",
+                full_name="Workflow Author",
+                hashed_password="x",
+                role=UserRole.admin,
+            )
+            db.add_all([Project(name="Demo", prefix="PRJ"), author])
+            await db.commit()
+
+        self._run(self._with_db(work))
+
+    def bloom_overwrite_approved(self, kind):
+        async def work(db):
+            row = await self._saved(db, kind)
+            setattr(row, "name" if kind in {"TS", "CPT"} else "title", "Overwritten")
+            return await self._flush_refusal(db)
+
+        return self._run(self._with_db(work))
+
+    def bloom_approve_without_workflow(self):
+        async def work(db):
+            row = await self._saved(db, "REQ", "Draft")
+            row.status = "Approved"
+            return await self._flush_refusal(db)
+
+        return self._run(self._with_db(work))
+
+    def bloom_new_change_request_status(self):
+        async def work(db):
+            row = ChangeRequest(project_id=1, change_id="PRJ-CHG-001", title="Draft proposal")
+            db.add(row)
+            await db.flush()
+            return row.status
+
+        return self._run(self._with_db(work))
+
+    def bloom_add_child_to_approved(self, child):
+        async def work(db):
+            if child == "suite-item":
+                parent = await self._saved(db, "TS")
+                case = await self._saved(db, "TC", "Draft")
+                db.add(TestSuiteItem(suite_id=parent.id, test_case_id=case.id))
+            else:
+                parent = await self._saved(db, "SPEC")
+                if child == "section":
+                    db.add(DocumentSection(document_id=parent.id, title="Unexpected"))
+                else:
+                    db.add(self._proof_file(parent.id, "unexpected.txt", "approved/file"))
+            return await self._flush_refusal(db)
+
+        return self._run(self._with_db(work))
+
+    def bloom_snapshot_draft_document(self):
+        async def work(db):
+            row = await self._saved(db, "SPEC", "Draft")
+            row.description = "Approved body"
+            db.add(Tag(name="original"))
+            await db.flush()
+            db.add(
+                ArtefactTag(tag_id=1, artefact_type="document", artefact_id=row.id, project_id=1)
+            )
+            db.add(DocumentSection(document_id=row.id, title="Section", content="Section body"))
+            db.add(self._proof_file(row.id, "proof.txt", "approved/proof", uploaded_by_id=1))
+            await db.flush()
+            workflow = await document_workflow.get_workflow(db, row)
+            snapshot = await document_workflow.content_snapshot(db, row)
+            return (
+                snapshot["fields"]["description"],
+                snapshot["fields"]["visibility"],
+                snapshot["tag_ids"],
+                snapshot["sections"][0]["content"],
+                snapshot["attachments"][0]["storage_path"],
+                snapshot["signoffs"]["approved_by_id"],
+                workflow.phase,
+            )
+
+        return self._run(self._with_db(work))
+
+    def bloom_execution_result_changes_hash(self):
+        async def work(db):
+            case = await self._saved(db, "TC")
+            before = await self._content_hash(db, case)
+            case.last_execution_status = "Passed"
+            case.last_bud_run_id = 123
+            await db.flush()
+            return await self._content_hash(db, case) != before
+
+        return self._run(self._with_db(work))
+
+    def bloom_capture_revision_twice(self):
+        async def work(db):
+            row = await self._saved(db, "SPEC", "Draft")
+            db.add(self._proof_file(row.id, "proof.txt", "approved/proof"))
+            await db.flush()
+            workflow = await document_workflow.get_workflow(db, row)
+            with document_workflow.permit_workflow_write(db, row):
+                row.status = "Approved"
+                workflow.phase = "Approved"
+                await db.flush()
+            revision = await document_workflow.capture_revision(db, row, workflow)
+            again = await document_workflow.capture_revision(db, row, workflow)
+            file = (await db.execute(select(ArtefactRevisionFile))).scalar_one()
+            captured = (
+                again is revision,
+                revision.approved_by_id,
+                revision.approved_at,
+                revision.content_snapshot["signoffs"]["approved_by_id"],
+                file.storage_path,
+            )
+            file.storage_path = "overwritten"
+            return captured, await self._flush_refusal(db)
+
+        return self._run(self._with_db(work))
+
+    def bloom_change_approved_archive(self, operation):
+        async def work(db):
+            row = await self._saved(db, "REQ")
+            workflow = await document_workflow.get_workflow(db, row)
+            revision = await document_workflow.capture_revision(db, row, workflow)
+            if operation == "edit":
+                revision.content_snapshot = {"fields": {"title": "Rewritten"}}
+            else:
+                await db.delete(revision)
+            return await self._flush_refusal(db)
+
+        return self._run(self._with_db(work))
+
+    def bloom_edit_content_in_review(self):
+        async def work(db):
+            row = await self._saved(db, "REQ", "Review")
+            workflow = await document_workflow.get_workflow(db, row)
+            request = await self._pending_review(db, row, workflow)
+            author = await db.get(User, 1)
+            await document_workflow.prepare_content_write(db, row, author, {"title": "Changed"})
+            row.title = "Changed"
+            await db.flush()
+            return (
+                row.status,
+                workflow.phase,
+                request.status,
+                request.decided_by_id,
+                request.decided_at is not None,
+                workflow.review_content_hash,
+            )
+
+        return self._run(self._with_db(work))
+
+    def bloom_revise_approved_requirement(self):
+        async def work(db):
+            row = await self._saved(db, "REQ")
+            db.add(Baseline(project_id=1, name="Original", snapshot={"title": "Frozen baseline"}))
+            await db.flush()
+            workflow = await document_workflow.get_workflow(db, row)
+            revision = await document_workflow.capture_revision(db, row, workflow)
+            with document_workflow.permit_workflow_write(db, row):
+                row.status = "Draft"
+                workflow.phase = "Draft"
+                workflow.revision_number += 1
+                workflow.revision_creator_id = 1
+                await db.flush()
+            row.title = "Next draft"
+            await db.flush()
+            baseline = (await db.execute(select(Baseline))).scalar_one()
+            return row.title, revision.content_snapshot["fields"]["title"], baseline.snapshot
+
+        return self._run(self._with_db(work))
+
+    def bloom_reopen_approved_change_with_permit(self):
+        async def work(db):
+            row = await self._saved(db, "CHG")
+            with document_workflow.permit_workflow_write(db, row):
+                row.status = "Draft"
+                return await self._flush_refusal(db)
+
+        return self._run(self._with_db(work))
+
+    def bloom_workflow_of_unsupported_status(self, kind, status):
+        async def work(db):
+            row = await self._saved(db, kind, status)
+            try:
+                await document_workflow.get_workflow(db, row)
+                refusal = None
+            except HTTPException as refused:
+                refusal = refused.status_code
+            workflows = await db.scalar(select(ArtefactWorkflow))
+            kept = row.status
+            row.title = "Still working legacy proposal"
+            return refusal, workflows, kept, await self._flush_refusal(db)
+
+        return self._run(self._with_db(work))
+
+    def bloom_update_risk_record(self):
+        async def work(db):
+            row = RiskItem(
+                project_id=1, risk_id="PRJ-RSK-001", title="Operational", status="Closed"
+            )
+            db.add(row)
+            await db.commit()
+            row.status = "Open"
+            row.title = "Updated operational record"
+            return await self._flush_refusal(db), row.status
+
+        return self._run(self._with_db(work))
+
+    def bloom_change_scope_in_review(self, scope):
+        async def work(db):
+            row = await self._saved(db, "REQ", "Review")
+            workflow = await document_workflow.get_workflow(db, row)
+            request = await self._pending_review(db, row, workflow)
+            if scope == "tag":
+                db.add(Tag(name="changed-scope"))
+                await db.flush()
+                db.add(
+                    ArtefactTag(
+                        tag_id=1, artefact_type="requirement", artefact_id=row.id, project_id=1
+                    )
+                )
+            else:
+                setattr(row, scope, "customer" if scope == "visibility" else "External")
+            await db.flush()
+            return row.status, workflow.phase, request.status, request.decided_at is not None
+
+        return self._run(self._with_db(work))
+
+    def bloom_change_scope_of_approved(self):
+        async def work(db):
+            row = await self._saved(db, "REQ")
+            workflow = await document_workflow.get_workflow(db, row)
+            revision = await document_workflow.capture_revision(db, row, workflow)
+            row.visibility = "customer"
+            row.req_origin = "External"
+            await db.flush()
+            archived = revision.content_snapshot["fields"]
+            change = await self._saved(db, "CHG")
+            before = await self._content_hash(db, change)
+            change.external_issue_state = "closed"
+            change.external_last_event_at = None
+            await db.flush()
+            unchanged = await self._content_hash(db, change) == before
+            return (archived["visibility"], archived["req_origin"]), unchanged
+
+        return self._run(self._with_db(work))
+
+    def bloom_legacy_identities(self):
+        concept = TestConcept(project_id=1, concept_id="PRJ-TCO-001", name="Legacy concept")
+        protocol = Document(
+            project_id=1, doc_id="PRJ-PROT-001", doc_type="PROT", title="Legacy protocol"
+        )
+        return (
+            document_workflow.artefact_identity(concept),
+            document_workflow.artefact_identity(protocol),
+            bool(document_workflow.controlled(concept)),
+            bool(document_workflow.controlled(protocol)),
+        )
+
+    def bloom_change_kind_of_approved_document(self):
+        async def work(db):
+            row = await self._saved(db, "SPEC")
+            row.doc_type = "RPT"
+            row.description = "Bypass"
+            return await self._flush_refusal(db)
+
+        return self._run(self._with_db(work))
+
+    def bloom_write_in_review_without_workflow(self, change):
+        async def work(db):
+            row = await self._saved(db, "SPEC", "Review")
+            workflow = await document_workflow.get_workflow(db, row)
+            request = await self._pending_review(db, row, workflow)
+            token = audit_actor_var.set(("user", 1))
+            try:
+                if change == "body":
+                    row.description = "Changed body"
+                else:
+                    db.add(DocumentSection(document_id=row.id, title="Changed section"))
+                await db.flush()
+            finally:
+                audit_actor_var.reset(token)
+            return row.status, workflow.phase, request.status, request.decided_by_id
+
+        return self._run(self._with_db(work))
+
+    def bloom_prepared_scope_edits(self):
+        async def work(db):
+            author = await db.get(User, 1)
+            row = await self._saved(db, "REQ", "Review")
+            workflow = await document_workflow.get_workflow(db, row)
+            await document_workflow.prepare_content_write(
+                db, row, author, {"req_origin": "External"}
+            )
+            row.req_origin = "External"
+            await db.flush()
+            approved = await self._saved(db, "SPEC")
+            await document_workflow.prepare_content_write(
+                db, approved, author, {"visibility": "customer"}
+            )
+            approved.visibility = "customer"
+            await db.flush()
+            return row.status, workflow.phase, approved.status
+
+        return self._run(self._with_db(work))
+
+    async def _saved(self, db, kind, status="Approved"):
+        values = dict(project_id=1, status=status, created_by_id=1)
+        if kind == "REQ":
+            row = Requirement(req_id="PRJ-REQ-001", title="Original", **values)
+        elif kind == "TC":
+            row = TestCase(tc_id="PRJ-TC-001", title="Original", **values)
+        elif kind in {"SPEC", "PRT"}:
+            row = Document(doc_id=f"PRJ-{kind}-001", doc_type=kind, title="Original", **values)
+        elif kind == "DES":
+            row = DesignItem(design_id="PRJ-DES-001", title="Original", **values)
+        elif kind == "CPT":
+            row = TestConcept(concept_id="PRJ-CPT-001", name="Original", **values)
+        elif kind == "TS":
+            row = TestSuite(suite_id="PRJ-TS-001", name="Original", **values)
+        else:
+            row = ChangeRequest(change_id="PRJ-CHG-001", title="Original", **values)
+        db.add(row)
+        await db.commit()
+        return row
+
+    async def _flush_refusal(self, db):
+        try:
+            await db.flush()
+        except HTTPException as refused:
+            return refused.status_code
+        return None
+
+    async def _content_hash(self, db, row):
+        return document_workflow.content_hash(await document_workflow.content_snapshot(db, row))
+
+    async def _pending_review(self, db, row, workflow):
+        request = ArtefactRequest(
+            workflow_id=workflow.id,
+            revision_number=1,
+            kind="review",
+            requester_id=1,
+            content_hash=await self._content_hash(db, row),
+            status="pending",
+        )
+        db.add(request)
+        await db.flush()
+        return request
+
+    def _proof_file(self, document_id, name, path, **fields):
+        return DocumentAttachment(
+            document_id=document_id,
+            filename=name,
+            original_filename=name,
+            content_type="text/plain",
+            size_bytes=3,
+            storage_path=path,
+            sha256="a" * 64,
+            **fields,
+        )
 
     def bloom_delete_user_on_a_recording_session(self, own_account=False, blocked=False):
         admin = self._account(1, "admin@example.com", UserRole.admin)

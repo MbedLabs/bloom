@@ -4066,3 +4066,44 @@ MSG_AUW_BAD_TOKEN = "a reset with '{detail}' is refused with 400 and changes not
 MSG_AUW_PROMOTE = "the initial administrator promotes a user to administrator"
 MSG_AUW_PROMOTE_REFUSED = "another administrator cannot promote a user to administrator: 403"
 MSG_AUW_DEMOTE_REFUSED = "an administrator role cannot be changed: 400"
+DWF_CONTROLLED_KINDS = ["REQ", "SPEC", "TC", "DES", "CPT", "PRT", "TS", "CHG"]
+DWF_CHILDREN = ["section", "attachment", "suite-item"]
+DWF_ARCHIVE_OPERATIONS = ["edit", "delete"]
+DWF_UNSUPPORTED = [("CHG", "Implemented"), ("REQ", "Verified")]
+DWF_SCOPES = ["visibility", "req_origin", "tag"]
+DWF_REVIEW_WRITES = ["body", "section"]
+MSG_DWF_OVERWRITE = "an unguarded write to an approved {kind} is refused with 409"
+MSG_DWF_DIRECT_APPROVAL = "setting a draft to Approved without the workflow is refused with 409"
+MSG_DWF_CHANGE_DEFAULT = "a new change request starts as Draft"
+MSG_DWF_CHILD = "adding a {child} to an approved parent without the workflow is refused with 409"
+MSG_DWF_SNAPSHOT = (
+    "the snapshot keeps the body, visibility, tags, sections, files and sign-offs of a draft"
+)
+MSG_DWF_EXECUTION = "an execution result does not change the content hash of a test case"
+MSG_DWF_CAPTURE = (
+    "capturing twice returns the same revision, with empty approval fields and the file reference"
+)
+MSG_DWF_FILE_REF = "the file reference of a revision cannot be overwritten: 409"
+MSG_DWF_ARCHIVE = "an approved archive refuses {operation} with 409"
+MSG_DWF_REVIEW_EDIT = (
+    "a content edit in review returns the document to Draft and supersedes the request"
+)
+MSG_DWF_REVISION = "a new revision changes the working row and keeps the archive and the baseline"
+MSG_DWF_CHANGE_FROZEN = "an approved change request stays frozen even with a workflow permit: 409"
+MSG_DWF_UNSUPPORTED = (
+    "a {kind} in status {status} gets no workflow (409), keeps its status and stays writable"
+)
+MSG_DWF_RISK = "a risk record takes status and authored writes without a workflow"
+MSG_DWF_SCOPE = (
+    "changing the {scope} in review returns the requirement to Draft and supersedes the request"
+)
+MSG_DWF_APPROVED_SCOPE = (
+    "an approved requirement may change scope while its archive keeps the approved scope"
+)
+MSG_DWF_TRANSPORT = "tracker transport fields do not change the content hash of a change request"
+MSG_DWF_ALIASES = "legacy concept and protocol ids are controlled under their current kinds"
+MSG_DWF_KIND = "an approved document cannot leave the guard by changing its kind: 409"
+MSG_DWF_REVIEW_WRITE = "an unguarded {change} write in review returns the document to Draft and supersedes the request by the actor"
+MSG_DWF_PREPARED = (
+    "a prepared scope edit returns a review to Draft and leaves an approved document approved"
+)
