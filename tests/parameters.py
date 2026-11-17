@@ -4991,3 +4991,45 @@ MSG_GOP_EXTERNAL_REVIEW = (
 MSG_GOP_EXTERNAL_LIMITS = "an external account cannot delete (403 naming the permission) or reach an internal requirement (404)"
 MSG_GOP_NARROW = "a read for all origins lends no edit to a write limited to customer content: read 200, edit 403"
 MSG_GOP_APP = "an app policy cannot be used in a project entry: 400"
+PPG_PREFIXES = ("PGA", "PGB", "PGC", "PGD", "PGE", "PGF", "PGG", "PGH", "PGI", "PGJ")
+PPG_CUSTOMER_READ_RULES = {
+    "REQ": {
+        "read": True,
+        "write": False,
+        "review": False,
+        "approve": False,
+        "delete": False,
+        "all_origins": False,
+        "visibility": ["customer"],
+        "tags": [],
+        "actions": ["comment", "view"],
+    }
+}
+PPG_TC_WRITE = {"TC": ["view", "create", "edit"]}
+PPG_INVALID_RULES = [
+    ({"widget": {"read": True}}, "Unknown resources"),
+    ({"REQ": {"read": True}}, "Choose at least one tag for REQ."),
+    ({"link": {"read": True, "visibility": ["internal"]}}, "link takes no tags."),
+    ({"REQ": {"read": True, "tags": [987654]}}, "Unknown tags"),
+]
+MSG_PPG_CONTRACT = (
+    "a policy answers with its rules and tags, without a base role, and a copy has the same rules"
+)
+MSG_PPG_GROUP = "a group grant carries the group's two policies and no policy of its own"
+MSG_PPG_REACH = (
+    "the member reaches the granted project only, with read on requirements and write on test cases"
+)
+MSG_PPG_IN_USE = "a policy in use cannot be deleted: 409"
+MSG_PPG_REDUCED = "removing the write policy from the group removes test case rights"
+MSG_PPG_REVOKED = "removing the grant removes the project: 403"
+MSG_PPG_ADMISSION = "a grant {what} is refused with 422"
+MSG_PPG_LEGACY = "a group with a single policy field is refused with 422, and no grant was stored"
+MSG_PPG_CREATE = "creating an internal requirement is refused (403) when only the customer policy allows creating; a customer one is created"
+MSG_PPG_CREATED_ROWS = "only the customer requirement is stored"
+MSG_PPG_RULES = "rules with {detail} are refused with 400"
+MSG_PPG_APPROVAL = "approving the {origin} requirement is answered {status}, leaving it {state}"
+MSG_PPG_ASSIGNEE = "a reviewer who cannot see an internal requirement cannot be assigned (422); a customer one is accepted"
+MSG_PPG_REASSIGN = "assigning the reviewer while changing a {origin} requirement to internal is refused with 422 and changes nothing"
+MSG_PPG_DEFECT = "a defect reviewer with a review policy on defects is accepted"
+MSG_PPG_LINKS = "a customer reader {how} link read is answered {status}"
+MSG_PPG_LINK_ROWS = "the reader sees only the link to the customer requirement"

@@ -62,7 +62,7 @@ from app.core.observability import (
     request_id_var,
     setup_logging,
 )
-from app.core.permissions import DOC_TYPE_RESOURCES
+from app.core.permissions import DOC_TYPE_RESOURCES, RESOURCE_ACTIONS
 from app.core.security import (
     accessible_project_ids,
     create_access_token,
@@ -368,6 +368,9 @@ class BloomApiInterface(BloomInterface):
             return await original(db, setting, tracker, delivery_id)
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
+
+    def bloom_resource_actions_of(self, resource):
+        return set(RESOURCE_ACTIONS[resource])
 
     def bloom_api_rule_policy(self, headers, name, resource, scope="document", **rule):
         rules = {resource: {"read": True, "all_origins": True, **rule}}

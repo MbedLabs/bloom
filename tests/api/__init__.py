@@ -49,6 +49,7 @@ SUITES = [
     "tests.api.BLOOM_project_access_entries.ProjectAccessEntriesTest",
     "tests.api.BLOOM_project_counts_batched.ProjectCountsBatchedTest",
     "tests.api.BLOOM_project_member_retention.ProjectMemberRetentionTest",
+    "tests.api.BLOOM_project_policy_grants.ProjectPolicyGrantsTest",
     "tests.api.BLOOM_projects_delete.ProjectsDeleteTest",
     "tests.api.BLOOM_public_id_paths.PublicIdPathsTest",
     "tests.api.BLOOM_report_requests.ReportRequestsTest",
