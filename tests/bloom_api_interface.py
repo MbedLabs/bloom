@@ -46,9 +46,11 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 import tests.parameters as params
 from app import main
 from app.api import access_requests as access_requests_api
+from app.api import artefacts as artefacts_api
 from app.api import defects as defects_api
 from app.api import integrations
 from app.api import setup as setup_api
+from app.api.workflow import _set_assignee, may_change_assignee
 from app.core import database, id_generator
 from app.core.cache import dashboard_stats_cache
 from app.core.config import Settings, settings
@@ -101,6 +103,7 @@ from app.models.groups import Group, GroupMembership, Policy, user_application_p
 from app.models.project_membership import ProjectAccess
 from app.models.user import User, UserRole
 from app.models.user_token import UserToken, UserTokenPurpose
+from app.models.workflow import ArtefactWorkflow
 from app.schemas.cli_auth import CliStartRequest
 from app.schemas.memberships import DEFAULT_EXTERNAL_DOC_TYPES
 from app.services import attachment_storage
@@ -1222,6 +1225,86 @@ class BloomApiInterface(BloomInterface):
         finally:
             root.handlers[:] = handlers
             root.setLevel(level)
+
+    def bloom_change_record(self, kind, row_id, **fields):
+        async def change():
+            async with self.maker() as db:
+                row = await db.get(self._model(kind), row_id)
+                for name, value in fields.items():
+                    setattr(row, name, value)
+                await db.commit()
+
+        self._run(change())
+
+    def bloom_list_records(self, kind, **match):
+        model = self._model(kind)
+        query = select(model).order_by(*model.__table__.primary_key.columns)
+        for name, value in match.items():
+            query = query.where(getattr(model, name) == value)
+        return self._run(self._all(query))
+
+    def bloom_set_account_role(self, user_id, role):
+        self.bloom_change_record("User", user_id, role=UserRole(role))
+
+    def bloom_add_access_entry(
+        self, user_id, project_id, permissions, visibility="internal", owner=False
+    ):
+        async def add():
+            async with self.maker() as db:
+                entry = project_access_fixture(
+                    user_id=user_id,
+                    project_id=project_id,
+                    permissions=permissions,
+                    visibility=visibility,
+                )
+                entry.owner = owner
+                db.add(entry)
+                await db.commit()
+                return entry.policies[0].id
+
+        return self._run(add())
+
+    def bloom_set_policy_permissions(self, policy_id, permissions):
+        self.bloom_change_record("Policy", policy_id, permissions=permissions)
+
+    def bloom_list_audit_events_like(self, prefix):
+        query = (
+            select(AuditEvent).where(AuditEvent.action.like(prefix + "%")).order_by(AuditEvent.id)
+        )
+        return [(event.action, event.actor_user_id) for event in self._run(self._all(query))]
+
+    def bloom_hidden_from(self, user_ids):
+        original = artefacts_api.row_visible_to
+
+        async def visible(db, person, artefact, type_code):
+            return person.id not in user_ids and await original(db, person, artefact, type_code)
+
+        return patch.object(artefacts_api, "row_visible_to", visible)
+
+    def bloom_may_change_assignee(self, user_id, created_by, assignee, manages):
+        return may_change_assignee(
+            User(id=user_id),
+            Requirement(created_by_id=created_by),
+            ArtefactWorkflow(assignee_id=assignee),
+            manages,
+        )
+
+    def bloom_outsider_sets_assignee(self, requirement_id, assignee_id):
+        async def attempt():
+            async with self.maker() as db:
+                row = await db.get(Requirement, requirement_id)
+                query = select(ArtefactWorkflow).where(
+                    ArtefactWorkflow.artefact_id == requirement_id
+                )
+                state = await db.scalar(query)
+                outsider = User(id=9, full_name="Outsider", role=UserRole.external, is_active=True)
+                try:
+                    await _set_assignee(db, row, state, outsider, assignee_id)
+                except HTTPException as refused:
+                    return refused.status_code
+                return None
+
+        return self._run(attempt())
 
     def bloom_start_workflow_api(self):
         self.bloom_start_full_api()

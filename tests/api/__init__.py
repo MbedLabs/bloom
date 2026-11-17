@@ -19,6 +19,7 @@ SUITES = [
     "tests.api.BLOOM_docs_facade_registry.DocsFacadeRegistryTest",
     "tests.api.BLOOM_document_attachments.DocumentAttachmentsTest",
     "tests.api.BLOOM_document_create_status.DocumentCreateStatusTest",
+    "tests.api.BLOOM_document_workflow_http.DocumentWorkflowHttpTest",
     "tests.api.BLOOM_documents_external_visibility.DocumentsExternalVisibilityTest",
     "tests.api.BLOOM_group_bulk_members.GroupBulkMembersTest",
     "tests.api.BLOOM_group_owned_policies.GroupOwnedPoliciesTest",

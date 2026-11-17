@@ -5350,3 +5350,149 @@ MSG_CRUD_MEMBER_REMOVED = "a removed member is no longer listed"
 MSG_CRUD_MEMBER_UNKNOWN_USER = "adding an unknown user is refused"
 MSG_CRUD_MEMBER_UNKNOWN = "reading or removing an unknown entry is a 404"
 MSG_CRUD_ANONYMOUS = "{method} {path} refuses an anonymous caller with 401"
+DWH_KINDS = [
+    (
+        "requirement",
+        "Requirement",
+        {"req_id": "PRJ-REQ-001", "title": "Requirement"},
+        "requirements",
+        "REQ",
+    ),
+    ("test-case", "TestCase", {"tc_id": "PRJ-TC-001", "title": "Test case"}, "test-cases", "TC"),
+    (
+        "document",
+        "Document",
+        {"doc_id": "PRJ-SPEC-001", "doc_type": "SPEC", "title": "Spec"},
+        "documents",
+        "SPEC",
+    ),
+    (
+        "document",
+        "Document",
+        {"doc_id": "PRJ-PRT-001", "doc_type": "PRT", "title": "Protocol"},
+        "documents",
+        "PRT",
+    ),
+    ("design", "DesignItem", {"design_id": "PRJ-DES-001", "title": "Design"}, "designs", "DES"),
+    (
+        "test-concept",
+        "TestConcept",
+        {"concept_id": "PRJ-CPT-001", "name": "Concept"},
+        "test-concepts",
+        "CPT",
+    ),
+    ("test-suite", "TestSuite", {"suite_id": "PRJ-TS-001", "name": "Suite"}, "test-suites", "TS"),
+    ("change", "ChangeRequest", {"change_id": "PRJ-CHG-001", "title": "Change"}, "changes", "CHG"),
+]
+DWH_CREATE_ROUTES = [
+    ("/api/requirements", {"title": "Requirement"}, "requirement"),
+    ("/api/test-cases", {"title": "Case"}, "test-case"),
+    ("/api/designs", {"title": "Design"}, "design"),
+    ("/api/test-concepts", {"name": "Concept"}, "test-concept"),
+    ("/api/changes", {"title": "Change"}, "change"),
+    ("/api/test-suites", {"name": "Suite"}, "test-suite"),
+]
+DWH_DOCUMENT_ROUTES = [
+    ("/api/projects/1/documents", {"title": "Specification", "doc_type": "SPEC"}, "document"),
+    ("/api/projects/1/documents", {"title": "Protocol", "doc_type": "PRT"}, "document"),
+]
+DWH_OPERATIONAL = [
+    ("document", "Document", {"doc_id": "PRJ-RPT-001", "doc_type": "RPT", "title": "Report"}),
+    ("document", "Document", {"doc_id": "PRJ-STD-001", "doc_type": "STD", "title": "Standard"}),
+    ("risk", "RiskItem", {"risk_id": "PRJ-RSK-001", "title": "Risk"}),
+    ("defect", "Defect", {"defect_id": "PRJ-DEF-001", "title": "Defect"}),
+    ("campaign", "TestCampaign", {"campaign_id": "PRJ-CMP-001", "name": "Campaign"}),
+]
+DWH_ANCHOR = {"exact": "the sensor", "prefix": "Check ", "suffix": " twice"}
+DWH_REQUIREMENT_LINK = "/projects/PRJ/docs/requirements/{req_id}"
+MSG_DWH_CONTROLLED = "a draft {kind} has a controlled workflow with its creator as assignee who may comment and request review"
+MSG_DWH_READING_ADMIN = "an administrator who is not assigned cannot comment (403); the assigned reviewer can, under their own id"
+MSG_DWH_CREATE_DRAFT = "creating an approved {route} skips the draft and is refused with 422"
+MSG_DWH_DIRECT_APPROVAL = (
+    "approving without a request is refused with 409 and leaves the requirement unapproved"
+)
+MSG_DWH_REVIEW = "the {kind} goes to Review once and records one review request"
+MSG_DWH_APPROVAL = (
+    "the {kind} reaches Approval after the reviewer's comment and is listed in that phase"
+)
+MSG_DWH_APPROVED = (
+    "the {kind} is approved by the approver only, signed by both, with the archived content"
+)
+MSG_DWH_REVISED = "an approved change of the {kind} opens revision 2 and keeps revision 1"
+MSG_DWH_CHANGE_FROZEN = "an approved change request cannot be edited: 409"
+MSG_DWH_SUPERSEDED = "an edit during review returns to Draft and supersedes the request by the editor; approval is refused"
+MSG_DWH_UNASSIGNED_REVIEW = "an unassigned review reaches every administrator, who may decline but not comment until assigned"
+MSG_DWH_FALLBACK = (
+    "a review for an inactive reviewer reaches the other administrators, who may decline it"
+)
+MSG_DWH_APPROVER_FALLBACK = (
+    "an approval for an inactive approver can be answered by another administrator"
+)
+MSG_DWH_EXTERNAL_READ = "an external reviewer without view cannot see the requirement (404), with view may comment, cannot reach internal ones, and loses comments when review is removed"
+MSG_DWH_PROJECT_DELETION = "deleting the project keeps the workflow without its project and the archived content, and hides the revision"
+MSG_DWH_EXTERNAL_OWNER = "an external owner comments only with a review policy and while assigned"
+MSG_DWH_CREATED = "a {kind} created over HTTP is a draft owned by its creator"
+MSG_DWH_NOTIFICATIONS = (
+    "a maintainer cannot delete the project (403); deleting it removes only its notifications"
+)
+MSG_DWH_REQUESTER_DELETED = (
+    "deleting the requester removes their request and keeps the signed revision and its identities"
+)
+MSG_DWH_PENDING = "an external reviewer lists only visible pending requests of their project, and none once review is removed"
+MSG_DWH_DELIVERY = "a review request mails the reviewer once, a repeat sends nothing, and a decline mails the requester"
+MSG_DWH_DELIVERY_AUDIT = "the request and the decline are audited under their real actors"
+MSG_DWH_OPERATIONAL = (
+    "a {kind} keeps its own status and takes comments only from its assigned reviewer"
+)
+MSG_DWH_CORRECTION = "a correction of an approved {kind} reopens revision 1 under the corrector and keeps the version"
+MSG_DWH_REAPPROVED = (
+    "the corrected {kind} is approved again as revision 1 with the archive unchanged"
+)
+MSG_DWH_USED_CHANGE = "a used change authorises one revision; later corrections and approvals stay on it until another change"
+MSG_DWH_UNAPPROVED_CHANGE = (
+    "a change that is not approved cannot authorise a revision: 409, nothing changes"
+)
+MSG_DWH_VERSION = (
+    "the version of an approved document cannot be changed without an authorised revision: 409"
+)
+MSG_DWH_HANDOVER = (
+    "the creator hands the work to another person, who is notified and may request review"
+)
+MSG_DWH_ASSIGNEE_REFUSED = "an assignee who cannot edit, none and an unknown one are refused with 422, and so is one on a defect"
+MSG_DWH_MAY_CHANGE = "the creator, the assignee and a manager may change the assignee; nobody else"
+MSG_DWH_DISCUSSION = "the creator, assignee, reviewer and approver comment on a draft and each comment notifies the other three"
+MSG_DWH_AFTER_APPROVAL = "after approval only the reviewer may still comment"
+MSG_DWH_NEW_WORKFLOW = "a new workflow starts with the creator as assignee"
+MSG_DWH_ASSIGNEE_RECORDED = (
+    "an assignee change is recorded in activity and audit and refused to an outsider: 403"
+)
+MSG_DWH_PHASE_COMMENT = "the creator comments during {phase}"
+MSG_DWH_REVIEW_EDITED = "a review edited without a workflow gets a draft workflow for the creator"
+MSG_DWH_THREADS = (
+    "a comment quotes a passage, replies gather under the thread, and a general note has no quote"
+)
+MSG_DWH_THREAD_REFUSED = (
+    "a reply with a quote, a reply on another document and a quote on a suite are refused with 422"
+)
+MSG_DWH_RESOLVE = "on a {status} requirement the creator, reviewer and approver resolve and reopen a thread; others cannot, nor resolve a reply"
+MSG_DWH_REPLY_NOTICE = "a reply notifies the earlier writers who still see the document"
+MSG_DWH_REVIEWER_REPLY = "a reviewer's reply counts as the review"
+MSG_DWH_FORMER_REVIEWER = (
+    "a reply reaches a former reviewer who wrote in the thread, unless hidden from them"
+)
+MSG_DWH_ASSIGNEE_RESOLVES = "a separate assignee resolves a thread"
+MSG_DWH_ADMIN_REQUEST = "an administrator requests review and declines in their own name"
+MSG_DWH_ADMIN_NO_APPROVE = "the administrator cannot approve for the approver; the approver does"
+DWH_RISK_STATUSES = ["Accepted", "Mitigated", "Closed", "Monitoring"]
+DWH_UNSUPPORTED_STATUSES = ["Implemented", "Verified", "Active"]
+DWH_LEGACY_CHANGE_STATUSES = ["Submitted", "Closed"]
+MSG_DWH_RISK_STATUS = (
+    "a risk in status {status} keeps it, is listed and opened under it, and gets no workflow"
+)
+MSG_DWH_UNSUPPORTED = "a requirement in status {status} shows no phase or revision, gets no workflow and is not listed as a draft"
+MSG_DWH_DRAFTED = (
+    "a requirement in status {status} is turned into a draft at revision 1 with its content kept"
+)
+MSG_DWH_LEGACY_CHANGE = (
+    "a change request in status {status} stays visible and filterable without a workflow"
+)
