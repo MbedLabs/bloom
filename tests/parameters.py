@@ -5072,3 +5072,43 @@ MSG_GRP_IN_USE = (
     "a policy used by a granted group cannot be deleted (409) until the group is deleted"
 )
 MSG_GRP_ADMIN_ONLY = "groups and policies are refused to a non-administrator: 403"
+TAG_HTTP_PREFIXES = ("THA", "THB", "THC", "THD", "THE", "THF", "THG", "THH", "THI", "THJ", "THK")
+TAG_HTTP_TESTRAIL = (
+    b"<suite><sections><section><name>Boot</name><cases><case><id>C1</id>"
+    b"<title>Cold boot</title></case></cases></section></sections></suite>"
+)
+TAG_HTTP_OUTSIDE = "Only tags your policies tick can be added or removed."
+TAG_HTTP_INSIDE = "The artefact must stay inside your policies."
+TAG_HTTP_NO_CREATE = "No create policy covers this artefact."
+TAG_HTTP_GIVEN = "Only tags your policies tick can be given."
+TAG_HTTP_NO_EDIT = "No edit policy covers this visibility."
+MSG_TAGH_RENAMED = "an administrator renames a tag, and a second tag of that name is a 409"
+MSG_TAGH_ADMIN_ONLY = (
+    "a maintainer cannot create a tag (403), and a policy naming an unknown tag is a 400"
+)
+MSG_TAGH_EXTERNAL_LIST = "an external reader lists only the requirement carrying their tag"
+MSG_TAGH_EXTERNAL_HIDDEN = "the requirement with another tag and the untagged one are a 404"
+MSG_TAGH_EXTERNAL_TAGS = "the reader sees their tag on the requirement, is offered only that tag, and cannot change tags: 403"
+MSG_TAGH_EDITOR_ADDED = "an editor adds the tags their policy ticks"
+MSG_TAGH_EDITOR_REFUSED = (
+    "an editor cannot add a tag outside their policy, nor leave the artefact outside it: 403"
+)
+MSG_TAGH_EDITOR_NARROWED = "narrowing changes only the editor's tags and keeps the others"
+MSG_TAGH_CUSTOMER = "a policy ticking customer shows customer requirements only"
+MSG_TAGH_CREATE_REFUSED = (
+    "a scoped user cannot create without one of their tags or with a tag outside them: 403"
+)
+MSG_TAGH_CREATED = "a scoped user creates with one of their tags, lists it, and it carries that tag"
+MSG_TAGH_FREE = "an unscoped user creates with {what}"
+MSG_TAGH_UNKNOWN = "creating with an unknown tag is a 400"
+MSG_TAGH_SCOPE = "the create form is limited to a scoped user's tags and open to an administrator"
+MSG_TAGH_IMPORT_REFUSED = (
+    "an import by a scoped user without a tag creates nothing and names the case"
+)
+MSG_TAGH_IMPORTED = "an import with one of the user's tags creates the case carrying that tag"
+MSG_TAGH_VISIBILITY = "a visibility change needs a write policy ticking the new visibility: 403 for a narrow one, 200 for a wide one"
+MSG_TAGH_READ_TAG = "a tag only a read policy ticks cannot be added: 403"
+MSG_TAGH_IMPORT_KEEPS = "an import does not overwrite a test case the importer cannot edit"
+MSG_TAGH_EXTERNAL_CAP = (
+    "an external account has neither approve nor delete, and cannot delete its own requirement: 403"
+)

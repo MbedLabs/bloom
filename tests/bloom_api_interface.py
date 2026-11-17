@@ -370,6 +370,54 @@ class BloomApiInterface(BloomInterface):
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
 
+    def bloom_api_new_tag(self, headers, name):
+        return self.bloom_api_call("POST", "/api/tags", headers, json={"name": name}).body
+
+    def bloom_api_tag(self, headers, kind, artefact_id, tag_ids):
+        path = f"/api/artefacts/{kind}/{artefact_id}/tags"
+        return self.bloom_api_call("PUT", path, headers, json={"tag_ids": tag_ids})
+
+    def bloom_api_tags_of(self, headers, kind, artefact_id):
+        return [
+            tag["id"]
+            for tag in self.bloom_api_call(
+                "GET", f"/api/artefacts/{kind}/{artefact_id}/tags", headers
+            ).body
+        ]
+
+    def bloom_api_ruled_member(self, headers, name, project_id, role, *rule_sets):
+        policies = [
+            self.bloom_api_call(
+                "POST",
+                "/api/policies",
+                headers,
+                json={"name": f"{name} policy {number}", "rules": rules},
+            ).body["id"]
+            for number, rules in enumerate(rule_sets)
+        ]
+        member = self.bloom_api_new_member(headers, name, role)
+        group = self.bloom_api_new_group(headers, f"{name} group", policies)
+        self.bloom_api_admit_group(headers, group["id"], project_id)
+        self.bloom_api_add_group_member(headers, group["id"], member.id)
+        return member
+
+    def bloom_limit_reqif_imports(self, starts):
+        self.patches.enter_context(patch.object(settings, "REQIF_IMPORTS_PER_15_MINUTES", starts))
+
+    def bloom_api_import_file(self, headers, project_id, kind, name, content, mime, **params):
+        async def send():
+            transport = httpx.ASGITransport(app=self.api)
+            async with REAL_CLIENT(
+                transport=transport, base_url=self.parameters.API_BASE
+            ) as client:
+                path = f"/api/projects/{project_id}/import/{kind}"
+                return await client.post(
+                    path, headers=headers, params=params, files={"file": (name, content, mime)}
+                )
+
+        answer = self._run(send())
+        return SimpleNamespace(status=answer.status_code, body=answer.json())
+
     def bloom_api_rules_policy(self, headers, name, doc_types=("REQ",), external=False):
         shown = ["customer"] if external else ["internal", "customer"]
         rules = {doc_type: {"read": True, "visibility": shown} for doc_type in doc_types}

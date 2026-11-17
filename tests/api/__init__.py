@@ -62,6 +62,7 @@ SUITES = [
     "tests.api.BLOOM_sync_results_names_the_campaign.SyncResultsNamesTheCampaignTest",
     "tests.api.BLOOM_sync_results_names_the_suite.SyncResultsNamesTheSuiteTest",
     "tests.api.BLOOM_tag_links_http.TagLinksHttpTest",
+    "tests.api.BLOOM_tags_http.TagsHttpTest",
     "tests.api.BLOOM_traceability_coverage.TraceabilityCoverageTest",
     "tests.api.BLOOM_tracker_unreachable.TrackerUnreachableTest",
     "tests.api.BLOOM_unhandled_errors.UnhandledErrorsTest",
