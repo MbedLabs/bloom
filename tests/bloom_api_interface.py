@@ -369,6 +369,42 @@ class BloomApiInterface(BloomInterface):
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
 
+    def bloom_new_mention_world(self):
+        self.bloom_new_database()
+        people = {}
+        for key, name, role, active in self.parameters.MNT_PEOPLE:
+            people[key] = self.bloom_add_record(
+                "User",
+                email=f"{key}@example.com",
+                full_name=name,
+                hashed_password="unused",
+                role=UserRole(role),
+                is_active=active,
+            )
+        project = self.bloom_add_record(
+            "Project", name="Demo", prefix="PRJ", description="The project"
+        )
+        other = self.bloom_add_record(
+            "Project", name="ABC", prefix="ABC", description="A different project"
+        )
+        for key in ("grace", "alan", "retired"):
+            self.bloom_add_internal_member(project, people[key], {"*": ["*"]})
+        self.bloom_add_external_member(
+            project, people["customer"], {"*": ["view", "comment"]}, "customer", []
+        )
+        self.bloom_add_internal_member(other, people["elsewhere"], {"*": ["*"]})
+        headers = {
+            key: self.bloom_user_token_headers(user)
+            for key, user in people.items()
+            if key != "retired"
+        }
+        return SimpleNamespace(project=project, other=other, **headers)
+
+    def bloom_api_mentionable(self, headers, project_id):
+        return self.bloom_api_call(
+            "GET", "/api/users/mentionable", headers, params={"project_id": project_id}
+        )
+
     def bloom_new_identity_world(self):
         self.bloom_new_database()
         values = self.parameters

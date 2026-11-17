@@ -4928,3 +4928,22 @@ MSG_IDP_NOTICE_GUARD = (
 )
 MSG_IDP_ACTOR_RENAMED = "the activity shows the actor's new name"
 MSG_IDP_ACTOR_REMOVED = "after the picture is removed the activity and the notification show none"
+MNT_PEOPLE = [
+    ("admin", "Ada Admin", "admin", True),
+    ("grace", "Grace Hopper", "maintainer", True),
+    ("alan", "Alan Turing", "maintainer", True),
+    ("elsewhere", "Elsewhere Maintainer", "maintainer", True),
+    ("outsider", "Unassigned Maintainer", "maintainer", True),
+    ("retired", "Retired Member", "maintainer", False),
+    ("customer", "Customer Contact", "external", True),
+]
+MNT_OFFERED = ["Ada Admin", "Alan Turing", "Customer Contact", "Grace Hopper"]
+MNT_FIELDS = {"id", "full_name", "profile_picture_url"}
+MSG_MNT_LIST = (
+    "a member is offered the active project members and the administrators, and nobody else"
+)
+MSG_MNT_FIELDS = "each person is disclosed by id, name and picture only"
+MSG_MNT_REFUSED = "{who} is refused the list with 403"
+MSG_MNT_ADMIN = "an administrator reads the list of any project"
+MSG_MNT_UNKNOWN = "an unknown project is a 404"
+MSG_MNT_ROUTE = "the mention list is its own route, and is not read as a user id"
