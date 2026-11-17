@@ -4674,3 +4674,39 @@ MSG_RET_ROWS = (
 )
 MSG_RET_OPTION = "the author is still offered for assignment under the same id"
 MSG_RET_RESTORED = "after the assignment is restored the author reads the content and the attachment again, and no row changed"
+PIC_REJECTED = [
+    ("a malformed picture", b"broken", "image/png", 422),
+    ("an empty picture", b"", "image/png", 422),
+    ("an SVG", b"<svg/>", "image/svg+xml", 415),
+    ("an oversized picture", b"x" * 2_000_001, "image/png", 413),
+]
+MSG_PIC_NONE = "an account without a picture answers 404"
+MSG_PIC_UPLOADED = "an upload is answered 200 with the picture flag and without the picture itself"
+MSG_PIC_STORED = "the stored picture is a private PNG scaled to 256 by 128 without its metadata"
+MSG_PIC_SCOPED = "the picture belongs to its account: the other account has none, and its own upload changes nothing here"
+MSG_PIC_REPLACED = "a new upload replaces the picture"
+MSG_PIC_REJECTED = "{what} is refused with {status} and the saved picture stays"
+MSG_PIC_ANONYMOUS = "reading, uploading and removing a picture need a signed-in account: 401"
+MSG_PIC_REMOVED = "removing answers 200 without the picture flag, keeps the other account fields, and the picture is gone"
+MSG_PIC_OTHER_KEPT = "the other account and its picture are unchanged"
+MSG_PIC_REPEAT = "removing again answers 200 and a new upload is accepted"
+MSG_PIC_FORMAT = "a picture sent under another format is a 415, one beyond the size bounds a 422, and nothing is stored"
+MSG_PIC_TURNED = "a rotated JPEG is stored upright at 128 by 256 without EXIF"
+MSG_PIC_FIRST_TAG = "a JPEG with a repeated orientation tag is turned by the first tag"
+MSG_PIC_MPF = "a JPEG whose multi-picture header repeats the image count is refused with 415 and nothing is stored"
+UNH_PATHS = {
+    "error": "/api/__boom__",
+    "unique": "/api/__conflict__",
+    "reference": "/api/__fk__",
+    "late": "/api/__late_conflict__",
+}
+MSG_UNH_REFERENCE = "a 500 carries a 32-character reference in the header, the body and the detail"
+MSG_UNH_QUOTE = "the detail asks to quote that reference"
+MSG_UNH_HIDDEN = "a 500 shows neither the message, the exception type nor a traceback"
+MSG_UNH_CONFLICT = "a lost race is a 409 with its reference, saying the record already exists"
+MSG_UNH_CONSTRAINT = (
+    "the conflict shows neither the constraint, the statement nor the exception type"
+)
+MSG_UNH_FOREIGN = "a row that is still referenced is a 409 that hides the database message"
+MSG_UNH_LATE = "a commit that fails after the endpoint returned is a 409 with its reference and without the constraint"
+MSG_UNH_COMMIT = "every route with a session commits before its response"

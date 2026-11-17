@@ -18,6 +18,7 @@ import io
 import json
 import logging
 import re
+import struct
 from datetime import datetime, timedelta
 from logging.handlers import BufferingHandler
 from types import SimpleNamespace
@@ -25,14 +26,16 @@ from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 from uuid import UUID, uuid4
 
+import asyncpg
 import httpx
 from cryptography.fernet import Fernet
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.routing import APIRoute
+from PIL import Image, PngImagePlugin
 from pydantic import ValidationError
 from slowapi.util import get_remote_address
 from sqlalchemy import event, select, update
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from starlette.requests import Request
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
@@ -43,7 +46,7 @@ from app.api import access_requests as access_requests_api
 from app.api import defects as defects_api
 from app.api import integrations
 from app.api import setup as setup_api
-from app.core import id_generator
+from app.core import database, id_generator
 from app.core.cache import dashboard_stats_cache
 from app.core.config import Settings, settings
 from app.core.database import get_db
@@ -361,6 +364,173 @@ class BloomApiInterface(BloomInterface):
             return await original(db, setting, tracker, delivery_id)
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
+
+    def bloom_new_picture_accounts(self):
+        self.bloom_new_database()
+        accounts = []
+        for number in range(2):
+            fields = {
+                "full_name": f"Picture User {number}",
+                "hashed_password": "unused",
+                "role": UserRole.external,
+            }
+            user = self.bloom_add_record("User", email=f"picture-{number}@example.com", **fields)
+            accounts.append(self.bloom_user_token_headers(user))
+        return accounts
+
+    def bloom_picture(self, color="purple", size=(600, 300), mode="RGB"):
+        buffer, metadata = io.BytesIO(), PngImagePlugin.PngInfo()
+        metadata.add_text("Author", "Metadata must not be retained")
+        Image.new(mode, size, color if mode == "RGB" else 0).save(
+            buffer, format="PNG", pnginfo=metadata
+        )
+        return buffer.getvalue()
+
+    def bloom_rotated_jpeg(self):
+        buffer, exif = io.BytesIO(), Image.Exif()
+        exif[274] = 6
+        Image.new("RGB", (600, 300), "orange").save(buffer, format="JPEG", exif=exif)
+        return buffer.getvalue()
+
+    def bloom_jpeg_with_repeated(self, what):
+        if what == "orientation":
+            entries = struct.pack("<HHIHH", 274, 3, 1, 6, 0) + struct.pack(
+                "<HHIHH", 274, 3, 1, 1, 0
+            )
+            payload = (
+                b"Exif\x00\x00II*\x00" + struct.pack("<IH", 8, 2) + entries + struct.pack("<I", 0)
+            )
+            marker = b"\xff\xe1"
+        else:
+            directory = (
+                struct.pack("<H", 3)
+                + struct.pack("<HHII", 0xB001, 4, 1, 2)
+                + struct.pack("<HHII", 0xB001, 4, 1, 1)
+                + struct.pack("<HHII", 0xB002, 7, 32, 50)
+                + struct.pack("<I", 0)
+            )
+            entries = struct.pack("<LLLHH", 0x20030000, 0, 0, 0, 0) + struct.pack(
+                "<LLLHH", 0x00010001, 0, 0, 0, 0
+            )
+            payload = b"MPF\x00II*\x00" + struct.pack("<I", 8) + directory + entries
+            marker = b"\xff\xe2"
+        base = io.BytesIO()
+        Image.new("RGB", (600, 300), "orange").save(base, format="JPEG")
+        data = base.getvalue()
+        return data[:2] + marker + struct.pack(">H", len(payload) + 2) + payload + data[2:]
+
+    def bloom_picture_facts(self, content):
+        with Image.open(io.BytesIO(content)) as image:
+            return image.size, "Author" in image.info, bool(image.getexif())
+
+    def bloom_api_put_picture(self, headers, data, mime="image/png"):
+        async def put():
+            transport = httpx.ASGITransport(app=self.api)
+            async with REAL_CLIENT(
+                transport=transport, base_url=self.parameters.API_BASE
+            ) as client:
+                files = {"file": ("picture.png", data, mime)}
+                return await client.put("/api/auth/me/picture", headers=headers, files=files)
+
+        answer = self._run(put())
+        body = (
+            answer.json()
+            if answer.headers.get("content-type", "").startswith("application/json")
+            else None
+        )
+        return SimpleNamespace(status=answer.status_code, body=body)
+
+    def bloom_api_picture(self, headers=None, method="GET"):
+        answer = self._run(self._request(method, "/api/auth/me/picture", headers))
+        return SimpleNamespace(
+            status=answer.status_code, headers=answer.headers, content=answer.content
+        )
+
+    def bloom_start_plain_api(self):
+        async def skip(*args, **kwargs):
+            return None
+
+        self.patches.enter_context(patch.object(audit_service, "record_request_event", skip))
+        self.api = main.app
+
+    def bloom_add_failing_routes(self):
+        routes, paths = list(main.app.router.routes), self.parameters.UNH_PATHS
+        unique = asyncpg.exceptions.UniqueViolationError("duplicate key value: projects_prefix_key")
+
+        @main.app.get(paths["error"])
+        async def boom():
+            raise RuntimeError("something went bang")
+
+        @main.app.get(paths["unique"])
+        async def conflict():
+            raise IntegrityError("INSERT INTO projects ...", {}, unique)
+
+        @main.app.get(paths["reference"])
+        async def reference():
+            still = asyncpg.exceptions.ForeignKeyViolationError("still referenced")
+            raise IntegrityError("DELETE FROM projects ...", {}, still)
+
+        class FailingCommit:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc_info):
+                return False
+
+            async def commit(self):
+                raise IntegrityError("INSERT INTO projects ...", {}, unique)
+
+            async def rollback(self):
+                return None
+
+            async def close(self):
+                return None
+
+        self.patches.enter_context(patch.object(database, "async_session_maker", FailingCommit))
+
+        @main.app.get(paths["late"])
+        async def late(db=Depends(get_db, scope="function")):
+            return {"ok": True}
+
+        self.patches.callback(setattr, main.app.router, "routes", routes)
+
+    def bloom_api_get_unhandled(self, path):
+        answer = self.bloom_api_send("GET", path, errors=False)
+        return SimpleNamespace(
+            status=answer.status_code,
+            body=answer.json(),
+            text=answer.text,
+            reference=answer.headers["x-request-id"],
+        )
+
+    def bloom_session_routes(self):
+        def sessions(dependant):
+            for sub in dependant.dependencies:
+                if sub.call is get_db:
+                    yield sub
+                yield from sessions(sub)
+
+        def api_routes(routes):
+            for route in routes:
+                if isinstance(route, APIRoute):
+                    yield route
+                included = getattr(route, "original_router", None)
+                if included is not None:
+                    yield from api_routes(included.routes)
+
+        found = [
+            (route, dependency)
+            for route in api_routes(main.app.routes)
+            for dependency in sessions(route.dependant)
+        ]
+        late = sorted(
+            {
+                f"{sorted(route.methods)} {route.path}"
+                for route, dependency in found
+                if dependency.scope != "function"
+            }
+        )
+        return len(found), late
 
     def bloom_new_retention_world(self):
         self.bloom_new_database()
