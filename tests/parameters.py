@@ -4023,3 +4023,46 @@ MSG_RQI_REMOVED_ROLE = (
     "a relation whose role is no longer allowed is a 422 naming it, and no link is stored"
 )
 MSG_RQI_LEGACY = "an import that matches an existing legacy link creates no second link"
+AUW_CLEANED_TABLES = [
+    "user_tokens",
+    "users",
+    "requirements",
+    "test_cases",
+    "project_external_doc_types",
+    "project_memberships",
+    "notifications",
+    "import_attempts",
+    "service_credentials",
+    "defects",
+    "document_attachments",
+]
+AUW_SELF_DELETE = "Admin users cannot delete their own account"
+AUW_STILL_REFERENCED = (
+    "User could not be deleted because related records still reference this account"
+)
+AUW_GENERIC_ANSWER = "If the account exists, a password reset email has been sent"
+AUW_RESET_ANSWER = "Password reset successfully"
+AUW_NEW_PASSWORD = "new-password-123"
+AUW_TOKEN_ERRORS = ["Invalid token", "Token has expired", "Token has already been used"]
+AUW_PROMOTION_REFUSED = "Only the initial administrator can promote users to admin"
+AUW_DEMOTION_REFUSED = "Admin role cannot be changed"
+MSG_AUW_CLEANED = "deleting a user touches the {table} table"
+MSG_AUW_ORDER = "the allowed document types are removed before the memberships"
+MSG_AUW_DELETED = "the user is deleted once and the change is flushed once"
+MSG_AUW_SELF = (
+    "an administrator deleting their own account is refused with 400 before anything is deleted"
+)
+MSG_AUW_CONFLICT = "a delete that other records still block is a 409 and deletes nothing"
+MSG_AUW_KNOWN = (
+    "a reset request for a known account answers generically, creates one token and sends one mail"
+)
+MSG_AUW_UNKNOWN = (
+    "a reset request for an unknown account answers the same and creates and sends nothing"
+)
+MSG_AUW_RESET = (
+    "a reset stores the new password, raises the session version and ends the refresh tokens"
+)
+MSG_AUW_BAD_TOKEN = "a reset with '{detail}' is refused with 400 and changes nothing"
+MSG_AUW_PROMOTE = "the initial administrator promotes a user to administrator"
+MSG_AUW_PROMOTE_REFUSED = "another administrator cannot promote a user to administrator: 403"
+MSG_AUW_DEMOTE_REFUSED = "an administrator role cannot be changed: 400"

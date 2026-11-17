@@ -13,6 +13,7 @@ SUITES = [
     "tests.logic.BLOOM_attachment_deployment_contract.AttachmentDeploymentContractTest",
     "tests.logic.BLOOM_attachment_stream.AttachmentStreamTest",
     "tests.logic.BLOOM_audit_prune.AuditPruneTest",
+    "tests.logic.BLOOM_auth_user_workflows.AuthUserWorkflowsTest",
     "tests.logic.BLOOM_campaign_sync_results.CampaignSyncResultsTest",
     "tests.logic.BLOOM_cloudron_metadata.CloudronMetadataTest",
     "tests.logic.BLOOM_company_logo.CompanyLogoTest",

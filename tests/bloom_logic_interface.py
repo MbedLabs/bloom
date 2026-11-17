@@ -35,16 +35,18 @@ import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from xml.etree import ElementTree
 
 import httpx
 import yaml
-from fastapi import HTTPException, UploadFile
+from fastapi import HTTPException, Response, UploadFile
 from moto import mock_aws
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import event, func, select, text
+from sqlalchemy.exc import IntegrityError
 from starlette.datastructures import Headers
+from starlette.requests import Request
 
 import app.api as api_package
 import app.schemas as schemas_package
@@ -53,6 +55,9 @@ from app import main as main_module
 from app import storage as storage_cli
 from app.api import (
     artefact_utils,
+)
+from app.api import auth as auth_api
+from app.api import (
     campaigns,
     company_logo,
     docs_facade,
@@ -61,6 +66,7 @@ from app.api import (
     integrations,
 )
 from app.api import project_variables as project_variables_api
+from app.api import users as users_api
 from app.api.artefacts import create_comment
 from app.api.attachments import download_attachment, publish_test_report
 from app.api.campaigns import create_campaign
@@ -156,9 +162,11 @@ from app.core.security import (
     effective_permissions,
     get_current_user,
     get_external_doc_types,
+    get_password_hash,
     require_role,
     row_allows,
     user_can_access_project,
+    verify_password,
 )
 from app.core.service_auth import (
     create_service_credential,
@@ -221,6 +229,7 @@ from app.services.jira_inbound import (
 )
 from app.services.notification_service import notify, notify_assignment
 from app.services.reqif_worker import ReqIFProcessingTimeout, parse_reqif_in_worker
+from app.services.token_service import TokenValidationError
 from tests.access_fixtures import project_access_fixture, scenario_type_tags
 from tests.bloom_interface import BloomInterface
 
@@ -425,6 +434,134 @@ class BloomLogicInterface(BloomInterface):
             return id_generator.compute_next_id(existing_ids, prefix, type_code), None
         except ValueError as exc:
             return None, type(exc).__name__
+
+    def bloom_delete_user_on_a_recording_session(self, own_account=False, blocked=False):
+        admin = self._account(1, "admin@example.com", UserRole.admin)
+        target = admin if own_account else self._account(2, "target@example.com", UserRole.external)
+        answers = [self._found(target)] + [None] * 40
+        if blocked:
+            answers = [self._found(target), IntegrityError("stmt", {}, Exception("fk failure"))]
+        db = SimpleNamespace(
+            execute=AsyncMock(side_effect=answers), delete=AsyncMock(), flush=AsyncMock()
+        )
+        outcome = SimpleNamespace(refusal=None)
+        with self._without_audit_rows():
+            try:
+                self._run(users_api.delete_user(user_id=target.id, admin=admin, db=db))
+            except HTTPException as refused:
+                outcome.refusal = (refused.status_code, refused.detail)
+        outcome.statements = [str(call.args[0]) for call in db.execute.await_args_list]
+        outcome.deleted = [call.args[0] is target for call in db.delete.await_args_list]
+        outcome.flushes = db.flush.await_count
+        return outcome
+
+    def bloom_request_password_reset_on_a_recording_session(self, known):
+        user = self._account(3, "reviewer@example.com", UserRole.external) if known else None
+        db = SimpleNamespace(execute=AsyncMock(return_value=self._found(user)), flush=AsyncMock())
+        create_token, send_email = AsyncMock(return_value="reset-token"), MagicMock()
+        request = Request(
+            {
+                "type": "http",
+                "method": "POST",
+                "path": "/api/auth/forgot-password",
+                "headers": [],
+                "client": ("testclient", 50000),
+                "server": ("testserver", 80),
+                "scheme": "http",
+                "http_version": "1.1",
+            }
+        )
+        email = user.email if known else "missing@example.com"
+        with self._without_audit_rows(), contextlib.ExitStack() as stack:
+            stack.enter_context(patch.object(auth_api, "create_user_token", create_token))
+            stack.enter_context(patch.object(auth_api, "send_password_reset_email", send_email))
+            answer = self._run(
+                auth_api.forgot_password(
+                    request=request, data=auth_schemas.ForgotPasswordRequest(email=email), db=db
+                )
+            )
+        return answer.message, create_token.await_count, send_email.call_count, db.flush.await_count
+
+    def bloom_reset_password_on_a_recording_session(self, new_password, token_error=None):
+        user = self._account(5, "dev@example.com", UserRole.maintainer, "old-password")
+        user.session_version = 1
+        claim = AsyncMock(return_value=SimpleNamespace(id=1, user_id=user.id))
+        if token_error:
+            claim = AsyncMock(side_effect=TokenValidationError(token_error))
+        invalidate = AsyncMock()
+        db = SimpleNamespace(get=AsyncMock(return_value=user), flush=AsyncMock())
+        outcome = SimpleNamespace(message=None, refusal=None)
+        with self._without_audit_rows(), contextlib.ExitStack() as stack:
+            stack.enter_context(patch.object(auth_api, "claim_token", claim))
+            stack.enter_context(patch.object(auth_api, "invalidate_all_refresh_tokens", invalidate))
+            data = auth_schemas.ResetPasswordRequest(token="a-token", new_password=new_password)
+            try:
+                outcome.message = self._run(
+                    auth_api.reset_password(data=data, response=Response(), db=db)
+                ).message
+            except HTTPException as refused:
+                outcome.refusal = (refused.status_code, refused.detail)
+        outcome.password_stored = verify_password(new_password, user.hashed_password)
+        outcome.password_dated = user.password_set_at is not None
+        outcome.session_version = user.session_version
+        outcome.claims = claim.await_count
+        outcome.ended_tokens_of_user = [
+            call.args[1] == user.id for call in invalidate.await_args_list
+        ]
+        outcome.reads, outcome.flushes = db.get.await_count, db.flush.await_count
+        return outcome
+
+    def bloom_change_role_on_a_recording_session(self, current_role, new_role, by_initial_admin):
+        now = datetime.now(timezone.utc)
+        user = User(
+            id=42,
+            email="dev@example.com",
+            full_name="Dev User",
+            role=UserRole(current_role),
+            is_active=True,
+        )
+        admin_email = settings.ADMIN_EMAIL if by_initial_admin else "other-admin@example.com"
+        admin = User(
+            id=1, email=admin_email, full_name="Admin", role=UserRole.admin, is_active=True
+        )
+        for account in (user, admin):
+            account.created_at = account.updated_at = now
+        db = SimpleNamespace(
+            execute=AsyncMock(return_value=self._found(user)),
+            flush=AsyncMock(),
+            refresh=AsyncMock(),
+        )
+        outcome = SimpleNamespace(answered=None, refusal=None)
+        with self._without_audit_rows():
+            try:
+                data = auth_schemas.UserUpdate(role=UserRole(new_role))
+                answer = self._run(users_api.update_user(user_id=42, data=data, admin=admin, db=db))
+                outcome.answered = answer.role.value
+            except HTTPException as refused:
+                outcome.refusal = (refused.status_code, refused.detail)
+        outcome.stored = user.role.value
+        return outcome
+
+    def _account(self, user_id, email, role, password="a-password"):
+        return User(
+            id=user_id,
+            email=email,
+            full_name=email,
+            hashed_password=get_password_hash(password),
+            role=role,
+            is_active=True,
+        )
+
+    def _found(self, value):
+        return SimpleNamespace(scalar_one_or_none=lambda: value)
+
+    def _without_audit_rows(self):
+        stack = contextlib.ExitStack()
+        for module in (auth_api, users_api):
+            for name in ("record_audit_event", "record_audit_failure"):
+                if hasattr(module, name):
+                    stack.enter_context(patch.object(module, name, AsyncMock()))
+        return stack
 
     def bloom_reqif_attribute(self, parsed, kind):
         hints = {
