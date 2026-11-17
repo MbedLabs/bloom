@@ -19,41 +19,9 @@ class CliAuthConcurrentApprovalTest(CliAuthConcurrentApprovalBase):
         if not self.postgres:
             return
         self.bloom.bloom_start_cli_api()
-        headers = self.bloom.bloom_sign_in(self.parameters.CLI_ADMIN_EMAIL)
-        copies = self.parameters.CLI_RACE_COPIES
+        self.headers = self.bloom.bloom_sign_in(self.parameters.CLI_ADMIN_EMAIL)
         self.started = self.bloom.bloom_start_cli_code_session(self.parameters.CLI_STATE)
-        session_id = self.started.json().get("session_id", "")
-
-        approve = self.bloom.bloom_cli_approve_body(session_id)
-        self.approved = self.bloom.bloom_race_cli(
-            [(self.parameters.CLI_APPROVE, approve, headers)] * copies
-        )
-        code = next(
-            (
-                answer.json()["exchange_code"]
-                for answer in self.approved
-                if answer.status_code == self.parameters.STATUS_OK
-            ),
-            self.parameters.CLI_DENIED_CODE,
-        )
-
-        exchange = self.bloom.bloom_cli_exchange_body(session_id, code)
-        self.exchanged = self.bloom.bloom_race_cli(
-            [(self.parameters.CLI_EXCHANGE, exchange, None)] * copies
-        )
-        refresh_token = next(
-            (
-                answer.json()["refresh_token"]
-                for answer in self.exchanged
-                if answer.status_code == self.parameters.STATUS_OK
-            ),
-            self.parameters.CLI_REFRESH_TOKEN,
-        )
-
-        refresh = {"refresh_token": refresh_token}
-        self.refreshed = self.bloom.bloom_race_cli(
-            [(self.parameters.CLI_REFRESH, refresh, None)] * copies
-        )
+        self.session_id = self.started.json().get("session_id", "")
 
     def tearDownClass(self):
         super().tearDownClass()

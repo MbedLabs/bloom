@@ -32,7 +32,21 @@ class CliAuthDenyApproveRaceBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        statuses = [answer.status_code for answer in self.answers]
+        bodies = {
+            self.parameters.CLI_DENY: {"session_id": self.session_id},
+            self.parameters.CLI_APPROVE: self.bloom.bloom_cli_approve_body(self.session_id),
+        }
+        paths = list(self.parameters.CLI_DENY_APPROVE_ORDER)
+        answers = self.bloom.bloom_race_cli([(path, bodies[path], self.headers) for path in paths])
+        self.winner, self.winning_answer = next(
+            (
+                (path, answer)
+                for path, answer in zip(paths, answers)
+                if answer.status_code == self.parameters.STATUS_OK
+            ),
+            (None, None),
+        )
+        statuses = [answer.status_code for answer in answers]
         self.print_variables({"order": self.parameters.CLI_DENY_APPROVE_ORDER, "answers": statuses})
         self.assertEqual(
             statuses.count(self.parameters.STATUS_OK),
@@ -50,9 +64,10 @@ class CliAuthDenyApproveRaceBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"lookup": self.lookup.status_code})
+        lookup = self.bloom.bloom_get_cli_session(self.session_id, self.headers)
+        self.print_variables({"lookup": lookup.status_code})
         self.assertEqual(
-            self.lookup.status_code,
+            lookup.status_code,
             self.parameters.STATUS_BAD_REQUEST,
             msg=self.parameters.MSG_ENDED_NOT_PENDING,
             abort_on_fail=False,
@@ -62,7 +77,11 @@ class CliAuthDenyApproveRaceBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"winner": self.winner, "exchange": self.exchanged.status_code})
+        code = self.parameters.CLI_DENIED_CODE
+        if self.winner == self.parameters.CLI_APPROVE:
+            code = self.winning_answer.json()["exchange_code"]
+        exchanged = self.bloom.bloom_cli_exchange(self.session_id, code)
+        self.print_variables({"winner": self.winner, "exchange": exchanged.status_code})
         if self.winner == self.parameters.CLI_DENY:
             self.assertEqual(
                 self.winning_answer.json(),
@@ -71,14 +90,14 @@ class CliAuthDenyApproveRaceBase(BloomTestCase):
                 abort_on_fail=False,
             )
             self.assertEqual(
-                self.exchanged.status_code,
+                exchanged.status_code,
                 self.parameters.STATUS_BAD_REQUEST,
                 msg=self.parameters.MSG_DENIED_NO_EXCHANGE,
                 abort_on_fail=False,
             )
             return
         self.assertEqual(
-            self.exchanged.status_code,
+            exchanged.status_code,
             self.parameters.STATUS_OK,
             msg=self.parameters.MSG_APPROVED_EXCHANGES,
             abort_on_fail=False,

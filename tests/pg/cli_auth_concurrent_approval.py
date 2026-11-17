@@ -32,7 +32,19 @@ class CliAuthConcurrentApprovalBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        statuses = [answer.status_code for answer in self.approved]
+        approve = self.bloom.bloom_cli_approve_body(self.session_id)
+        approved = self.bloom.bloom_race_cli(
+            [(self.parameters.CLI_APPROVE, approve, self.headers)] * self.parameters.CLI_RACE_COPIES
+        )
+        self.code = next(
+            (
+                answer.json()["exchange_code"]
+                for answer in approved
+                if answer.status_code == self.parameters.STATUS_OK
+            ),
+            self.parameters.CLI_DENIED_CODE,
+        )
+        statuses = [answer.status_code for answer in approved]
         self.print_variables({"approvals": statuses})
         self.assertEqual(
             statuses.count(self.parameters.STATUS_OK),
@@ -50,7 +62,19 @@ class CliAuthConcurrentApprovalBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        statuses = [answer.status_code for answer in self.exchanged]
+        exchange = self.bloom.bloom_cli_exchange_body(self.session_id, self.code)
+        exchanged = self.bloom.bloom_race_cli(
+            [(self.parameters.CLI_EXCHANGE, exchange, None)] * self.parameters.CLI_RACE_COPIES
+        )
+        self.refresh_token = next(
+            (
+                answer.json()["refresh_token"]
+                for answer in exchanged
+                if answer.status_code == self.parameters.STATUS_OK
+            ),
+            self.parameters.CLI_REFRESH_TOKEN,
+        )
+        statuses = [answer.status_code for answer in exchanged]
         self.print_variables({"exchanges": statuses})
         self.assertEqual(
             statuses.count(self.parameters.STATUS_OK),
@@ -68,7 +92,11 @@ class CliAuthConcurrentApprovalBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        statuses = [answer.status_code for answer in self.refreshed]
+        refresh = {"refresh_token": self.refresh_token}
+        refreshed = self.bloom.bloom_race_cli(
+            [(self.parameters.CLI_REFRESH, refresh, None)] * self.parameters.CLI_RACE_COPIES
+        )
+        statuses = [answer.status_code for answer in refreshed]
         self.print_variables({"refreshes": statuses})
         self.assertEqual(
             statuses.count(self.parameters.STATUS_OK),
