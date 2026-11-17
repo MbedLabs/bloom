@@ -17,45 +17,55 @@ class IdWideningBase(BloomTestCase):
     interface = BloomPgInterface
 
     def bud_id_after_999_is_1000(self):
-        self.print_variables({"next id": self.next_at_boundary})
+        next_id = self.bloom.bloom_next_requirement_id(
+            self.at_boundary, self.parameters.WIDENING_PREFIXES[0]
+        )
+        self.print_variables({"next id": next_id})
         self.assertEqual(
-            self.next_at_boundary,
+            next_id,
             self.parameters.WIDENING_NEXT_AT_BOUNDARY,
             msg=self.parameters.MSG_WIDENING_NEXT,
             abort_on_fail=False,
         )
 
     def bud_stored_ids_are_rewritten_with_four_digits(self):
-        self.print_variables({"stored": self.stored_at_boundary})
+        stored = self.bloom.bloom_list_requirement_ids(self.at_boundary)
+        self.print_variables({"stored": stored})
         self.assertEqual(
-            self.stored_at_boundary,
+            stored,
             self.parameters.WIDENING_WIDENED,
             msg=self.parameters.MSG_WIDENING_STORED,
             abort_on_fail=False,
         )
 
     def bud_below_999_the_next_id_keeps_three_digits(self):
-        self.print_variables({"next id": self.next_below})
+        next_id = self.bloom.bloom_next_requirement_id(
+            self.below, self.parameters.WIDENING_PREFIXES[1]
+        )
+        self.print_variables({"next id": next_id})
         self.assertEqual(
-            self.next_below,
+            next_id,
             self.parameters.WIDENING_NEXT_BELOW,
             msg=self.parameters.MSG_WIDENING_BELOW_NEXT,
             abort_on_fail=False,
         )
 
     def bud_below_999_stored_ids_are_not_rewritten(self):
-        self.print_variables({"stored": self.stored_below})
+        stored = self.bloom.bloom_list_requirement_ids(self.below)
+        self.print_variables({"stored": stored})
         self.assertEqual(
-            self.stored_below,
+            stored,
             self.parameters.WIDENING_BELOW,
             msg=self.parameters.MSG_WIDENING_BELOW_STORED,
             abort_on_fail=False,
         )
 
     def bud_widening_leaves_the_test_case_id_alone(self):
-        self.print_variables({"test case ids": self.test_case_ids})
+        self.bloom.bloom_next_requirement_id(self.other_type, self.parameters.WIDENING_PREFIXES[2])
+        ids = self.bloom.bloom_list_test_case_ids()
+        self.print_variables({"test case ids": ids})
         self.assertEqual(
-            self.test_case_ids,
+            ids,
             [self.parameters.WIDENING_TEST_CASE],
             msg=self.parameters.MSG_WIDENING_OTHER_TYPE,
             abort_on_fail=False,
