@@ -21,21 +21,12 @@ class OverlappingProjectGroupsMigrationTest(OverlappingProjectGroupsMigrationBas
         if not self.postgres:
             return
         before, head = self.parameters.OVERLAP_BEFORE, self.parameters.MIGRATION_HEAD
-        snapshot = self.bloom.bloom_snapshot_project_access
         self.before = self.bloom.bloom_run_alembic("upgrade", before)
         seeded = self.bloom.bloom_seed_overlap_entries()
-        self.state_before = snapshot()
+        self.state_before = self.bloom.bloom_snapshot_project_access()
         self.upgrade = self.bloom.bloom_run_alembic("upgrade", head)
-        self.after = snapshot()
+        self.after = self.bloom.bloom_snapshot_project_access()
         self.overlap = self.bloom.bloom_add_overlapping_group(seeded)
-        self.overlapping = snapshot()
-        self.refused = self.bloom.bloom_run_alembic("downgrade", before)
-        self.after_refusal = snapshot()
-        self.bloom.bloom_delete_access_entry(self.overlap.entry)
-        self.downgrade = self.bloom.bloom_run_alembic("downgrade", before)
-        self.downgraded = snapshot()
-        self.upgrade_again = self.bloom.bloom_run_alembic("upgrade", head)
-        self.upgraded_again = snapshot()
 
     def tearDownClass(self):
         super().tearDownClass()

@@ -84,37 +84,24 @@ class OverlappingProjectGroupsMigrationBase(BloomTestCase):
             abort_on_fail=False,
         )
 
-    def bud_downgrade_over_an_overlap_is_refused(self):
+    def bud_downgrade_over_an_overlap_is_refused_and_changes_nothing(self):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"alembic": self.refused[1][-300:]})
-        self.assertNotEqual(
-            self.refused[0],
-            0,
-            msg=self.parameters.MSG_OVERLAP_REFUSED,
-            abort_on_fail=False,
-        )
-
-    def bud_refusal_names_the_overlapping_groups(self):
-        if not self.postgres:
-            self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
-            return
+        overlapping = self.bloom.bloom_snapshot_project_access()
+        code, output = self.bloom.bloom_run_alembic("downgrade", self.parameters.OVERLAP_BEFORE)
+        after_refusal = self.bloom.bloom_snapshot_project_access()
+        self.print_variables({"alembic": output[-300:], "revision": after_refusal["revision"]})
+        self.assertNotEqual(code, 0, msg=self.parameters.MSG_OVERLAP_REFUSED, abort_on_fail=False)
         self.assertIn(
             self.parameters.OVERLAP_REFUSAL,
-            self.refused[1].lower(),
+            output.lower(),
             msg=self.parameters.MSG_OVERLAP_REFUSAL_TEXT,
             abort_on_fail=False,
         )
-
-    def bud_refused_downgrade_changes_nothing(self):
-        if not self.postgres:
-            self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
-            return
-        self.print_variables({"revision": self.after_refusal["revision"]})
         self.assertEqual(
-            self.after_refusal,
-            self.overlapping,
+            after_refusal,
+            overlapping,
             msg=self.parameters.MSG_OVERLAP_UNCHANGED,
             abort_on_fail=False,
         )
@@ -123,21 +110,19 @@ class OverlappingProjectGroupsMigrationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"alembic": self.downgrade[1][-300:]})
-        self.assertEqual(
-            self.downgrade[0],
-            0,
-            msg=self.parameters.MSG_MIGRATION_DOWNGRADE,
-            abort_on_fail=False,
-        )
+        self.bloom.bloom_delete_access_entry(self.overlap.entry)
+        code, output = self.bloom.bloom_run_alembic("downgrade", self.parameters.OVERLAP_BEFORE)
+        self.print_variables({"alembic": output[-300:]})
+        self.assertEqual(code, 0, msg=self.parameters.MSG_MIGRATION_DOWNGRADE, abort_on_fail=False)
 
     def bud_downgrade_restores_the_state_before(self):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"revision": self.downgraded["revision"]})
+        downgraded = self.bloom.bloom_snapshot_project_access()
+        self.print_variables({"revision": downgraded["revision"]})
         self.assertEqual(
-            self.downgraded,
+            downgraded,
             self.state_before,
             msg=self.parameters.MSG_OVERLAP_DOWNGRADED,
             abort_on_fail=False,
@@ -147,22 +132,16 @@ class OverlappingProjectGroupsMigrationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"alembic": self.upgrade_again[1][-300:]})
-        self.assertEqual(
-            self.upgrade_again[0],
-            0,
-            msg=self.parameters.MSG_MIGRATION_HEAD_AGAIN,
-            abort_on_fail=False,
-        )
+        code, output = self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
+        self.print_variables({"alembic": output[-300:]})
+        self.assertEqual(code, 0, msg=self.parameters.MSG_MIGRATION_HEAD_AGAIN, abort_on_fail=False)
 
     def bud_second_upgrade_restores_the_state_after(self):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"revision": self.upgraded_again["revision"]})
+        again = self.bloom.bloom_snapshot_project_access()
+        self.print_variables({"revision": again["revision"]})
         self.assertEqual(
-            self.upgraded_again,
-            self.after,
-            msg=self.parameters.MSG_OVERLAP_UPGRADED_AGAIN,
-            abort_on_fail=False,
+            again, self.after, msg=self.parameters.MSG_OVERLAP_UPGRADED_AGAIN, abort_on_fail=False
         )
