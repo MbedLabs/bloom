@@ -2535,6 +2535,13 @@ AUDITLOG_DIRECTIONS = ("asc", "desc")
 AUDITLOG_PAGE = 2
 AUDITLOG_INVALID = [{"sort": "details"}, {"dir": "sideways"}]
 AUDITLOG_MODULE = "app.api.audit"
+AUDITLOG_ROLE_CHANGED = "user.role_changed"
+AUDITLOG_MEMBER_ADDED = "project_member.added"
+AUDITLOG_VISIBILITY_CHANGED = "artefact.visibility_changed"
+AUDITLOG_DELETED = "artefact.deleted"
+AUDITLOG_INTEGRATION_UPDATED = "integration.updated"
+AUDITLOG_MEMBER_SORT = {"sort": "actor", "dir": "asc"}
+SECRETS_NO_KEY = ""
 MSG_AUDITLOG_REFUSED_LOGIN = "a sign-in with a wrong password is refused with 401"
 MSG_AUDITLOG_FAILURE = (
     "the refused sign-in is recorded as a failure by an anonymous actor on the account"

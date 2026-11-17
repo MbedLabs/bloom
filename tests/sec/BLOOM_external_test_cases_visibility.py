@@ -16,23 +16,21 @@ class ExternalTestCasesVisibilityTest(ExternalTestCasesVisibilityBase):
     def setUpClass(self):
         super().setUpClass()
         bloom, values = self.bloom, self.parameters
-        reader = bloom.bloom_create_external_reader_environment(doc_types=None)
-        customer = bloom.bloom_add_test_case(
-            reader.project_id,
+        self.reader = bloom.bloom_create_external_reader_environment(doc_types=None)
+        self.customer = bloom.bloom_add_test_case(
+            self.reader.project_id,
             values.READER_CUSTOMER_TC,
             values.READER_CUSTOMER_TC,
             visibility=values.CUSTOMER_VISIBILITY,
         )
         bloom.bloom_add_test_case(
-            reader.project_id,
+            self.reader.project_id,
             values.READER_INTERNAL_TC,
             values.READER_INTERNAL_TC,
             visibility=values.INTERNAL_VISIBILITY,
         )
         bloom.bloom_add_admin(values.ADMIN_EMAIL, values.API_PASSWORD)
-        admin, _ = bloom.bloom_log_in(values.ADMIN_EMAIL, values.API_PASSWORD)
-        self.listed = bloom.bloom_api_list_test_cases(reader.headers, reader.project_id)
-        self.read = bloom.bloom_api_get_test_case(admin, customer)
+        self.admin, _ = bloom.bloom_log_in(values.ADMIN_EMAIL, values.API_PASSWORD)
 
     def tearDownClass(self):
         super().tearDownClass()

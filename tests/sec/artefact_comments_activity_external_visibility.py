@@ -17,40 +17,48 @@ class ArtefactCommentsActivityExternalVisibilityBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_comments_of_an_internal_requirement_are_hidden_404(self):
-        self.print_variables(
-            {"status": self.hidden_comments.status, "body": self.hidden_comments.body}
+        hidden_comments = self.bloom.bloom_api_comments(
+            self.reader.headers, self.parameters.READER_REQUIREMENT_KIND, self.internal
         )
+        self.print_variables({"status": hidden_comments.status, "body": hidden_comments.body})
         self.assertEqual(
-            self.hidden_comments.status,
+            hidden_comments.status,
             self.parameters.STATUS_NOT_FOUND,
             msg=self.parameters.MSG_READER_COMMENTS_HIDDEN,
             abort_on_fail=False,
         )
 
     def bud_activity_of_an_internal_requirement_is_hidden_404(self):
-        self.print_variables(
-            {"status": self.hidden_activity.status, "body": self.hidden_activity.body}
+        hidden_activity = self.bloom.bloom_api_activity(
+            self.reader.headers, self.parameters.READER_REQUIREMENT_KIND, self.internal
         )
+        self.print_variables({"status": hidden_activity.status, "body": hidden_activity.body})
         self.assertEqual(
-            self.hidden_activity.status,
+            hidden_activity.status,
             self.parameters.STATUS_NOT_FOUND,
             msg=self.parameters.MSG_READER_ACTIVITY_HIDDEN,
             abort_on_fail=False,
         )
 
     def bud_comments_of_a_customer_requirement_are_shown(self):
-        self.print_variables({"status": self.comments.status, "body": self.comments.body})
+        comments = self.bloom.bloom_api_comments(
+            self.reader.headers, self.parameters.READER_REQUIREMENT_KIND, self.customer
+        )
+        self.print_variables({"status": comments.status, "body": comments.body})
         self.assertEqual(
-            (self.comments.status, [item["body"] for item in self.comments.body]),
+            (comments.status, [item["body"] for item in comments.body]),
             (self.parameters.STATUS_OK, [self.parameters.READER_VISIBLE_COMMENT]),
             msg=self.parameters.MSG_READER_COMMENTS_SHOWN,
             abort_on_fail=False,
         )
 
     def bud_activity_of_a_customer_requirement_is_shown(self):
-        self.print_variables({"status": self.activity.status, "body": self.activity.body})
+        activity = self.bloom.bloom_api_activity(
+            self.reader.headers, self.parameters.READER_REQUIREMENT_KIND, self.customer
+        )
+        self.print_variables({"status": activity.status, "body": activity.body})
         self.assertEqual(
-            (self.activity.status, [item["summary"] for item in self.activity.body]),
+            (activity.status, [item["summary"] for item in activity.body]),
             (self.parameters.STATUS_OK, [self.parameters.READER_VISIBLE_ACTIVITY]),
             msg=self.parameters.MSG_READER_ACTIVITY_SHOWN,
             abort_on_fail=False,

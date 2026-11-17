@@ -17,18 +17,20 @@ class ExternalTestCasesVisibilityBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_external_reader_lists_only_the_customer_test_case(self):
-        self.print_variables({"status": self.listed.status, "body": self.listed.body})
+        listed = self.bloom.bloom_api_list_test_cases(self.reader.headers, self.reader.project_id)
+        self.print_variables({"status": listed.status, "body": listed.body})
         self.assertEqual(
-            (self.listed.status, [item["tc_id"] for item in self.listed.body["items"]]),
+            (listed.status, [item["tc_id"] for item in listed.body["items"]]),
             (self.parameters.STATUS_OK, [self.parameters.READER_CUSTOMER_TC]),
             msg=self.parameters.MSG_READER_TC_LIST,
             abort_on_fail=False,
         )
 
     def bud_test_case_carries_its_visibility(self):
-        self.print_variables({"status": self.read.status, "body": self.read.body})
+        read = self.bloom.bloom_api_get_test_case(self.admin, self.customer)
+        self.print_variables({"status": read.status, "body": read.body})
         self.assertEqual(
-            (self.read.status, self.read.body["visibility"]),
+            (read.status, read.body["visibility"]),
             (self.parameters.STATUS_OK, self.parameters.CUSTOMER_VISIBILITY),
             msg=self.parameters.MSG_READER_TC_VISIBILITY,
             abort_on_fail=False,

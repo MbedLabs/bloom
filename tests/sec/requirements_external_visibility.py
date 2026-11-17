@@ -17,30 +17,38 @@ class RequirementsExternalVisibilityBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_external_reader_lists_only_the_customer_requirement(self):
-        self.print_variables({"status": self.listed.status, "body": self.listed.body})
+        listed = self.bloom.bloom_api_list_requirements(self.reader.headers, self.reader.project_id)
+        self.print_variables({"status": listed.status, "body": listed.body})
         self.assertEqual(
-            (self.listed.status, [item["req_id"] for item in self.listed.body["items"]]),
+            (listed.status, [item["req_id"] for item in listed.body["items"]]),
             (self.parameters.STATUS_OK, [self.parameters.READER_CUSTOMER_REQ]),
             msg=self.parameters.MSG_READER_REQ_LIST,
             abort_on_fail=False,
         )
 
     def bud_internal_requirement_is_hidden_404(self):
-        self.print_variables({"status": self.hidden.status, "body": self.hidden.body})
+        hidden = self.bloom.bloom_api_read_requirement(self.reader.headers, self.internal)
+        self.print_variables({"status": hidden.status, "body": hidden.body})
         self.assertEqual(
-            self.hidden.status,
+            hidden.status,
             self.parameters.STATUS_NOT_FOUND,
             msg=self.parameters.MSG_READER_REQ_HIDDEN,
             abort_on_fail=False,
         )
 
     def bud_customer_origin_makes_a_requirement_customer_visible(self):
-        self.print_variables({"status": self.created.status, "body": self.created.body})
+        created = self.bloom.bloom_api_create_requirement_of_origin(
+            self.admin,
+            self.reader.project_id,
+            self.parameters.READER_NEW_TITLE,
+            self.parameters.READER_CUSTOMER_ORIGIN,
+        )
+        self.print_variables({"status": created.status, "body": created.body})
         self.assertEqual(
             (
-                self.created.status,
-                self.created.body["req_origin"],
-                self.created.body["visibility"],
+                created.status,
+                created.body["req_origin"],
+                created.body["visibility"],
             ),
             (
                 self.parameters.STATUS_CREATED,
@@ -52,12 +60,15 @@ class RequirementsExternalVisibilityBase(BloomTestCase):
         )
 
     def bud_internal_origin_makes_a_requirement_internal(self):
-        self.print_variables({"status": self.changed.status, "body": self.changed.body})
+        changed = self.bloom.bloom_api_set_requirement_origin(
+            self.admin, self.customer, self.parameters.READER_INTERNAL_ORIGIN
+        )
+        self.print_variables({"status": changed.status, "body": changed.body})
         self.assertEqual(
             (
-                self.changed.status,
-                self.changed.body["req_origin"],
-                self.changed.body["visibility"],
+                changed.status,
+                changed.body["req_origin"],
+                changed.body["visibility"],
             ),
             (
                 self.parameters.STATUS_OK,

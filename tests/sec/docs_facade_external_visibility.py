@@ -37,13 +37,26 @@ class DocsFacadeExternalVisibilityBase(BloomTestCase):
         )
 
     def bud_customer_documents_open_and_internal_ones_are_hidden(self):
+        values = self.parameters
+        opened = (
+            (values.READER_REQUIREMENTS_SLUG, values.READER_CUSTOMER_REQ),
+            (values.READER_REQUIREMENTS_SLUG, values.READER_INTERNAL_REQ),
+            (values.READER_SPECIFICATIONS_SLUG, values.READER_CUSTOMER_SPEC),
+            (values.READER_SPECIFICATIONS_SLUG, values.READER_INTERNAL_SPEC),
+        )
+        details = tuple(
+            self.bloom.bloom_api_open_doc(
+                self.reader.headers, values.VISIBILITY_PREFIX, slug, doc_id
+            ).status
+            for slug, doc_id in opened
+        )
         self.print_variables(
             {
-                "customer requirement, internal requirement, customer specification, internal specification": self.details
+                "customer requirement, internal requirement, customer specification, internal specification": details
             }
         )
         self.assertEqual(
-            self.details,
+            details,
             self.parameters.READER_DETAIL_STATUSES,
             msg=self.parameters.MSG_READER_DOCS_DETAIL,
             abort_on_fail=False,

@@ -39,9 +39,12 @@ class ExternalTestSuitesVisibilityBase(BloomTestCase):
         )
 
     def bud_internal_suite_is_hidden_404(self):
-        self.print_variables({"status": self.hidden.status, "body": self.hidden.body})
+        hidden = self.bloom.bloom_api_get_test_suite(
+            self.reader.headers, self.parameters.READER_HIDDEN_SUITE
+        )
+        self.print_variables({"status": hidden.status, "body": hidden.body})
         self.assertEqual(
-            self.hidden.status,
+            hidden.status,
             self.parameters.STATUS_NOT_FOUND,
             msg=self.parameters.MSG_READER_SUITE_HIDDEN,
             abort_on_fail=False,

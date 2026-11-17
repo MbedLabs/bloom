@@ -156,11 +156,12 @@ class AuditLogBase(BloomTestCase):
         )
 
     def bud_administrator_reads_every_sign_in_record(self):
+        sign_ins = len(self.bloom.bloom_list_audit_events(self.parameters.AUDITLOG_LOGIN))
         body = self.page.body
-        self.print_variables({"total": body["total"]})
+        self.print_variables({"total": body["total"], "sign-ins": sign_ins})
         self.assertEqual(
             (self.page.status, body["total"], {item["action"] for item in body["items"]}),
-            (self.parameters.STATUS_OK, self.sign_ins, {self.parameters.AUDITLOG_LOGIN}),
+            (self.parameters.STATUS_OK, sign_ins, {self.parameters.AUDITLOG_LOGIN}),
             msg=self.parameters.MSG_AUDITLOG_FILTERED,
             abort_on_fail=False,
         )
@@ -174,7 +175,20 @@ class AuditLogBase(BloomTestCase):
         )
 
     def bud_sorting_precedes_pagination(self):
-        for (field, direction), hours in self.sorted.items():
+        values = self.parameters
+        ordered = {}
+        for field in values.AUDITLOG_SORTED:
+            for direction in values.AUDITLOG_DIRECTIONS:
+                pages = self.bloom.bloom_api_audit_pages(
+                    self.admin_headers, values.AUDITLOG_SORT_FILTER, field, direction
+                )
+                ordered[(field, direction)] = (
+                    [self.hour_of[event_id] for event_id in pages]
+                    if isinstance(pages, list)
+                    else pages
+                )
+        self.print_variables({"hours": ordered})
+        for (field, direction), hours in ordered.items():
             index = self.parameters.AUDITLOG_DIRECTIONS.index(direction)
             self.assertEqual(
                 hours,
@@ -184,7 +198,12 @@ class AuditLogBase(BloomTestCase):
             )
 
     def bud_unknown_sort_field_or_direction_is_refused_422(self):
-        for query, status in zip(self.parameters.AUDITLOG_INVALID, self.invalid):
+        invalid = [
+            self.bloom.bloom_api_audit(self.admin_headers, **query).status
+            for query in self.parameters.AUDITLOG_INVALID
+        ]
+        self.print_variables({"statuses": invalid})
+        for query, status in zip(self.parameters.AUDITLOG_INVALID, invalid):
             self.assertEqual(
                 status,
                 self.parameters.STATUS_UNPROCESSABLE,
@@ -193,8 +212,10 @@ class AuditLogBase(BloomTestCase):
             )
 
     def bud_every_audit_endpoint_is_a_get(self):
+        methods = self.bloom.bloom_route_methods_of(self.parameters.AUDITLOG_MODULE)
+        self.print_variables({"methods": methods})
         self.assertEqual(
-            self.methods,
+            methods,
             ["GET"],
             msg=self.parameters.MSG_AUDITLOG_READ_ONLY,
             abort_on_fail=False,

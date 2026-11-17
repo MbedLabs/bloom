@@ -16,18 +16,15 @@ class ArtefactsExternalVisibilityTest(ArtefactsExternalVisibilityBase):
     def setUpClass(self):
         super().setUpClass()
         bloom, values = self.bloom, self.parameters
-        reader = bloom.bloom_create_external_reader_environment(
+        self.reader = bloom.bloom_create_external_reader_environment(
             bloom.bloom_default_external_doc_types()
         )
-        customer = bloom.bloom_add_requirement(
-            reader.project_id, values.READER_CUSTOMER_REQ, values.CUSTOMER_VISIBILITY
+        self.customer = bloom.bloom_add_requirement(
+            self.reader.project_id, values.READER_CUSTOMER_REQ, values.CUSTOMER_VISIBILITY
         )
-        internal = bloom.bloom_add_requirement(
-            reader.project_id, values.READER_INTERNAL_REQ, values.INTERNAL_VISIBILITY
+        self.internal = bloom.bloom_add_requirement(
+            self.reader.project_id, values.READER_INTERNAL_REQ, values.INTERNAL_VISIBILITY
         )
-        kind = values.READER_REQUIREMENT_KIND
-        self.hidden = bloom.bloom_api_related(reader.headers, kind, internal)
-        self.visible = bloom.bloom_api_related(reader.headers, kind, customer)
 
     def tearDownClass(self):
         super().tearDownClass()

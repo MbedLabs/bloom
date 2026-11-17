@@ -16,8 +16,8 @@ class CampaignsExternalVisibilityTest(CampaignsExternalVisibilityBase):
     def setUpClass(self):
         super().setUpClass()
         bloom, values = self.bloom, self.parameters
-        reader = bloom.bloom_create_external_reader_environment(doc_types=None)
-        project = reader.project_id
+        self.reader = bloom.bloom_create_external_reader_environment(doc_types=None)
+        project = self.reader.project_id
         customer, internal = values.CUSTOMER_VISIBILITY, values.INTERNAL_VISIBILITY
         visible_tc = bloom.bloom_add_test_case(
             project, values.READER_CUSTOMER_TC, values.READER_CUSTOMER_TC, visibility=customer
@@ -47,9 +47,10 @@ class CampaignsExternalVisibilityTest(CampaignsExternalVisibilityBase):
             [],
             [(visible_tc, values.READER_CAMPAIGN_PENDING)],
         )
-        self.listed = bloom.bloom_api_list_campaigns(reader.headers, project)
-        self.hidden = bloom.bloom_api_get_campaign(reader.headers, values.READER_HIDDEN_CAMPAIGN)
-        self.visible = bloom.bloom_api_get_campaign(reader.headers, values.READER_VISIBLE_CAMPAIGN)
+        self.listed = bloom.bloom_api_list_campaigns(self.reader.headers, project)
+        self.visible = bloom.bloom_api_get_campaign(
+            self.reader.headers, values.READER_VISIBLE_CAMPAIGN
+        )
         email, password = values.READER_MAINTAINER_EMAIL, values.API_PASSWORD
         member = bloom.bloom_add_account(email, password, values.API_MEMBER_ROLE)
         bloom.bloom_add_internal_member(project, member, values.READER_ALL_PERMISSIONS)

@@ -73,9 +73,12 @@ class ExportsBase(BloomTestCase):
             )
 
     def bud_dossier_is_refused_without_test_case_export_403(self):
-        self.print_variables({"status": self.dossier.status})
+        dossier = self.bloom.bloom_api_export(
+            self.author, self.project, self.parameters.EXPORT_DOSSIER
+        )
+        self.print_variables({"status": dossier.status})
         self.assertEqual(
-            self.dossier.status,
+            dossier.status,
             self.parameters.STATUS_FORBIDDEN,
             msg=self.parameters.MSG_EXPORT_DOSSIER,
             abort_on_fail=False,

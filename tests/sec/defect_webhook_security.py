@@ -17,108 +17,142 @@ class DefectWebhookSecurityBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_github_delivery_without_a_signature_is_refused_403(self):
-        self.print_variables({"status": self.unsigned.status, "body": self.unsigned.body})
+        unsigned = self.bloom.bloom_post_github_webhook(self.body)
+        self.print_variables({"status": unsigned.status, "body": unsigned.body})
         self.assertEqual(
-            self.unsigned.status,
+            unsigned.status,
             self.parameters.STATUS_FORBIDDEN,
             msg=self.parameters.MSG_HOOK_UNSIGNED,
             abort_on_fail=False,
         )
 
     def bud_github_delivery_with_a_wrong_signature_is_refused_403(self):
-        self.print_variables({"status": self.wrong.status, "body": self.wrong.body})
+        wrong = self.bloom.bloom_post_github_webhook(
+            self.body, signature=self.parameters.HOOK_WRONG_SIGNATURE
+        )
+        self.print_variables({"status": wrong.status, "body": wrong.body})
         self.assertEqual(
-            self.wrong.status,
+            wrong.status,
             self.parameters.STATUS_FORBIDDEN,
             msg=self.parameters.MSG_HOOK_WRONG,
             abort_on_fail=False,
         )
 
     def bud_signed_github_delivery_without_a_delivery_id_is_refused_400(self):
-        self.print_variables({"status": self.no_delivery.status, "body": self.no_delivery.body})
+        no_delivery = self.bloom.bloom_post_github_webhook(
+            self.body, signature=self.bloom.bloom_sign(self.body)
+        )
+        self.print_variables({"status": no_delivery.status, "body": no_delivery.body})
         self.assertEqual(
-            self.no_delivery.status,
+            no_delivery.status,
             self.parameters.STATUS_BAD_REQUEST,
             msg=self.parameters.MSG_HOOK_NO_DELIVERY,
             abort_on_fail=False,
         )
 
     def bud_signed_github_delivery_over_1_mib_is_refused_413(self):
-        self.print_variables({"status": self.oversized.status, "body": self.oversized.body})
+        body = self.bloom.bloom_oversized_webhook_body()
+        oversized = self.bloom.bloom_post_github_webhook(
+            body, self.bloom.bloom_sign(body), self.parameters.HOOK_OVERSIZED_DELIVERY
+        )
+        self.print_variables({"status": oversized.status, "body": oversized.body})
         self.assertEqual(
-            self.oversized.status,
+            oversized.status,
             self.parameters.STATUS_TOO_LARGE,
             msg=self.parameters.MSG_HOOK_OVERSIZED,
             abort_on_fail=False,
         )
 
     def bud_refused_deliveries_leave_the_defect_open(self):
+        status_after_refusals = self.bloom.bloom_get_defect(self.github).status
+        self.print_variables({"status": status_after_refusals})
         self.assertEqual(
-            self.status_after_refusals,
+            status_after_refusals,
             self.parameters.DEFECT_OPEN,
             msg=self.parameters.MSG_HOOK_UNCHANGED,
             abort_on_fail=False,
         )
 
     def bud_refused_deliveries_record_no_successful_sync(self):
+        successes_after_refusals = [
+            event.id for event in self.bloom.bloom_list_defect_events() if event.success
+        ]
+        self.print_variables({"successes": successes_after_refusals})
         self.assertEqual(
-            self.successes_after_refusals,
+            successes_after_refusals,
             [],
             msg=self.parameters.MSG_HOOK_NO_EVENT,
             abort_on_fail=False,
         )
 
     def bud_signed_github_delivery_is_processed_200(self):
-        self.print_variables({"status": self.valid.status, "body": self.valid.body})
+        valid = self.bloom.bloom_post_github_webhook(
+            self.body, self.bloom.bloom_sign(self.body), self.parameters.HOOK_DELIVERY
+        )
+        self.print_variables({"status": valid.status, "body": valid.body})
         self.assertEqual(
-            (self.valid.status, self.valid.body[self.parameters.HOOK_STATUS_KEY]),
+            (valid.status, valid.body[self.parameters.HOOK_STATUS_KEY]),
             (self.parameters.STATUS_OK, self.parameters.HOOK_PROCESSED),
             msg=self.parameters.MSG_HOOK_PROCESSED,
             abort_on_fail=False,
         )
 
     def bud_processed_delivery_closes_the_defect(self):
+        status_after_valid = self.bloom.bloom_get_defect(self.github).status
+        self.print_variables({"status": status_after_valid})
         self.assertEqual(
-            self.status_after_valid,
+            status_after_valid,
             self.parameters.DEFECT_CLOSED,
             msg=self.parameters.MSG_HOOK_CLOSED,
             abort_on_fail=False,
         )
 
     def bud_same_delivery_again_is_a_duplicate(self):
-        self.print_variables({"body": self.replay.body})
+        replay = self.bloom.bloom_post_github_webhook(
+            self.body, self.bloom.bloom_sign(self.body), self.parameters.HOOK_DELIVERY
+        )
+        self.print_variables({"body": replay.body})
         self.assertEqual(
-            self.replay.body[self.parameters.HOOK_STATUS_KEY],
+            replay.body[self.parameters.HOOK_STATUS_KEY],
             self.parameters.HOOK_DUPLICATE,
             msg=self.parameters.MSG_HOOK_REPLAY,
             abort_on_fail=False,
         )
 
     def bud_gitlab_delivery_without_the_token_is_refused_403(self):
-        self.print_variables(
-            {"status": self.gitlab_unsigned.status, "body": self.gitlab_unsigned.body}
+        gitlab_unsigned = self.bloom.bloom_post_gitlab_webhook(
+            self.parameters.HOOK_GITLAB_NUMBER, self.parameters.REPO
         )
+        self.print_variables({"status": gitlab_unsigned.status, "body": gitlab_unsigned.body})
         self.assertEqual(
-            self.gitlab_unsigned.status,
+            gitlab_unsigned.status,
             self.parameters.STATUS_FORBIDDEN,
             msg=self.parameters.MSG_HOOK_GITLAB_UNSIGNED,
             abort_on_fail=False,
         )
 
     def bud_refused_gitlab_delivery_leaves_the_defect_open(self):
+        gitlab_status = self.bloom.bloom_get_defect(self.gitlab).status
+        self.print_variables({"status": gitlab_status})
         self.assertEqual(
-            self.gitlab_status,
+            gitlab_status,
             self.parameters.DEFECT_OPEN,
             msg=self.parameters.MSG_HOOK_GITLAB_UNCHANGED,
             abort_on_fail=False,
         )
 
     def bud_gitlab_delivery_with_the_token_is_processed_200(self):
-        self.print_variables({"status": self.gitlab_valid.status, "body": self.gitlab_valid.body})
+        gitlab_valid = self.bloom.bloom_post_gitlab_webhook(
+            self.parameters.HOOK_GITLAB_NUMBER,
+            self.parameters.REPO,
+            self.parameters.WEBHOOK_SECRET,
+            self.parameters.HOOK_GITLAB_DELIVERY,
+        )
+        self.print_variables({"status": gitlab_valid.status, "body": gitlab_valid.body})
         self.assertEqual(
             (
-                self.gitlab_valid.status,
-                self.gitlab_valid.body[self.parameters.HOOK_STATUS_KEY],
+                gitlab_valid.status,
+                gitlab_valid.body[self.parameters.HOOK_STATUS_KEY],
             ),
             (self.parameters.STATUS_OK, self.parameters.HOOK_PROCESSED),
             msg=self.parameters.MSG_HOOK_GITLAB_PROCESSED,

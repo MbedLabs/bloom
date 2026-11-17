@@ -16,13 +16,13 @@ class ExternalVisibilityDirectApisTest(ExternalVisibilityDirectApisBase):
     def setUpClass(self):
         super().setUpClass()
         bloom, values = self.bloom, self.parameters
-        reader = bloom.bloom_create_external_reader_environment(doc_types=None)
-        project, status = reader.project_id, values.STATUS_APPROVED
+        self.reader = bloom.bloom_create_external_reader_environment(doc_types=None)
+        project, status = self.reader.project_id, values.STATUS_APPROVED
         customer, internal = values.CUSTOMER_VISIBILITY, values.INTERNAL_VISIBILITY
         pending = values.READER_CAMPAIGN_PENDING
-        root = bloom.bloom_add_requirement(project, values.READER_CUSTOMER_REQ, customer)
+        self.root = bloom.bloom_add_requirement(project, values.READER_CUSTOMER_REQ, customer)
         hidden_req = bloom.bloom_add_requirement(project, values.READER_INTERNAL_REQ, internal)
-        visible_tc = bloom.bloom_add_test_case(
+        self.visible_tc = bloom.bloom_add_test_case(
             project,
             values.READER_CUSTOMER_TC,
             values.READER_CUSTOMER_TC,
@@ -37,31 +37,28 @@ class ExternalVisibilityDirectApisTest(ExternalVisibilityDirectApisBase):
             visibility=internal,
         )
         visible_suite = bloom.bloom_add_test_suite(
-            project, values.READER_VISIBLE_SUITE, customer, [visible_tc]
+            project, values.READER_VISIBLE_SUITE, customer, [self.visible_tc]
         )
         hidden_suite = bloom.bloom_add_test_suite(
-            project, values.READER_HIDDEN_SUITE, internal, [visible_tc, hidden_tc]
+            project, values.READER_HIDDEN_SUITE, internal, [self.visible_tc, hidden_tc]
         )
         bloom.bloom_add_campaign(
             project,
             values.READER_VISIBLE_CAMPAIGN,
             customer,
             [visible_suite],
-            [(visible_tc, pending)],
+            [(self.visible_tc, pending)],
         )
         bloom.bloom_add_campaign(
             project,
             values.READER_HIDDEN_CAMPAIGN,
             internal,
             [hidden_suite],
-            [(visible_tc, pending), (hidden_tc, pending)],
+            [(self.visible_tc, pending), (hidden_tc, pending)],
         )
-        bloom.bloom_add_artefact_link(project, visible_tc, root)
-        bloom.bloom_add_artefact_link(project, visible_tc, hidden_req)
-        bloom.bloom_add_artefact_link(project, hidden_tc, root)
-        self.requirement = bloom.bloom_api_read_requirement(reader.headers, root)
-        self.test_case = bloom.bloom_api_get_test_case(reader.headers, visible_tc)
-        self.campaign = bloom.bloom_api_get_campaign(reader.headers, values.READER_VISIBLE_CAMPAIGN)
+        bloom.bloom_add_artefact_link(project, self.visible_tc, self.root)
+        bloom.bloom_add_artefact_link(project, self.visible_tc, hidden_req)
+        bloom.bloom_add_artefact_link(project, hidden_tc, self.root)
 
     def tearDownClass(self):
         super().tearDownClass()

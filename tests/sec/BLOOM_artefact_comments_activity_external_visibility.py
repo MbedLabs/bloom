@@ -21,23 +21,19 @@ class ArtefactCommentsActivityExternalVisibilityTest(
         super().setUpClass()
         bloom, values = self.bloom, self.parameters
         kind = values.READER_REQUIREMENT_KIND
-        reader = bloom.bloom_create_external_reader_environment(
+        self.reader = bloom.bloom_create_external_reader_environment(
             bloom.bloom_default_external_doc_types()
         )
-        customer = bloom.bloom_add_requirement(
-            reader.project_id, values.READER_CUSTOMER_REQ, values.CUSTOMER_VISIBILITY
+        self.customer = bloom.bloom_add_requirement(
+            self.reader.project_id, values.READER_CUSTOMER_REQ, values.CUSTOMER_VISIBILITY
         )
-        internal = bloom.bloom_add_requirement(
-            reader.project_id, values.READER_INTERNAL_REQ, values.INTERNAL_VISIBILITY
+        self.internal = bloom.bloom_add_requirement(
+            self.reader.project_id, values.READER_INTERNAL_REQ, values.INTERNAL_VISIBILITY
         )
-        bloom.bloom_add_comment(kind, customer, values.READER_VISIBLE_COMMENT)
-        bloom.bloom_add_comment(kind, internal, values.READER_HIDDEN_COMMENT)
-        bloom.bloom_add_activity(kind, customer, values.READER_VISIBLE_ACTIVITY)
-        bloom.bloom_add_activity(kind, internal, values.READER_HIDDEN_ACTIVITY)
-        self.hidden_comments = bloom.bloom_api_comments(reader.headers, kind, internal)
-        self.hidden_activity = bloom.bloom_api_activity(reader.headers, kind, internal)
-        self.comments = bloom.bloom_api_comments(reader.headers, kind, customer)
-        self.activity = bloom.bloom_api_activity(reader.headers, kind, customer)
+        bloom.bloom_add_comment(kind, self.customer, values.READER_VISIBLE_COMMENT)
+        bloom.bloom_add_comment(kind, self.internal, values.READER_HIDDEN_COMMENT)
+        bloom.bloom_add_activity(kind, self.customer, values.READER_VISIBLE_ACTIVITY)
+        bloom.bloom_add_activity(kind, self.internal, values.READER_HIDDEN_ACTIVITY)
 
     def tearDownClass(self):
         super().tearDownClass()

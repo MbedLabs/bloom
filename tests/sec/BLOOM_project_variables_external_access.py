@@ -18,16 +18,16 @@ class ProjectVariablesExternalAccessTest(ProjectVariablesExternalAccessBase):
     def setUpClass(self):
         super().setUpClass()
         bloom, values = self.bloom, self.parameters
-        reader = bloom.bloom_create_external_reader_environment()
+        self.reader = bloom.bloom_create_external_reader_environment()
         email, password = values.READER_MAINTAINER_EMAIL, values.API_PASSWORD
         member = bloom.bloom_add_account(email, password, values.API_MEMBER_ROLE)
-        bloom.bloom_add_internal_member(reader.project_id, member, values.READER_ALL_PERMISSIONS)
-        bloom.bloom_add_project_variable(
-            reader.project_id, values.READER_VARIABLE_KEY, values.READER_VARIABLE_VALUE
+        bloom.bloom_add_internal_member(
+            self.reader.project_id, member, values.READER_ALL_PERMISSIONS
         )
-        headers, _ = bloom.bloom_log_in(email, password)
-        self.refused = bloom.bloom_api_list_variables(reader.headers, reader.project_id)
-        self.listed = bloom.bloom_api_list_variables(headers, reader.project_id)
+        bloom.bloom_add_project_variable(
+            self.reader.project_id, values.READER_VARIABLE_KEY, values.READER_VARIABLE_VALUE
+        )
+        self.member, _ = bloom.bloom_log_in(email, password)
 
     def tearDownClass(self):
         super().tearDownClass()

@@ -16,10 +16,10 @@ class LinksExternalVisibilityTest(LinksExternalVisibilityBase):
     def setUpClass(self):
         super().setUpClass()
         bloom, values = self.bloom, self.parameters
-        reader = bloom.bloom_create_external_reader_environment(
+        self.reader = bloom.bloom_create_external_reader_environment(
             bloom.bloom_default_external_doc_types()
         )
-        project, status = reader.project_id, values.STATUS_APPROVED
+        project, status = self.reader.project_id, values.STATUS_APPROVED
         customer, internal = values.CUSTOMER_VISIBILITY, values.INTERNAL_VISIBILITY
         customer_req = bloom.bloom_add_requirement(project, values.READER_CUSTOMER_REQ, customer)
         internal_req = bloom.bloom_add_requirement(project, values.READER_INTERNAL_REQ, internal)
@@ -41,7 +41,6 @@ class LinksExternalVisibilityTest(LinksExternalVisibilityBase):
         bloom.bloom_add_artefact_link(project, customer_tc, internal_req)
         bloom.bloom_add_artefact_link(project, internal_tc, customer_req)
         self.customer_ends = (customer_tc, customer_req)
-        self.listed = bloom.bloom_api_list_links(reader.headers, project)
 
     def tearDownClass(self):
         super().tearDownClass()

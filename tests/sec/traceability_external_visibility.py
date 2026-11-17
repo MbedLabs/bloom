@@ -17,16 +17,17 @@ class TraceabilityExternalVisibilityBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_external_reader_gets_only_the_customer_pair(self):
-        self.print_variables({"status": self.matrix.status, "body": self.matrix.body})
+        matrix = self.bloom.bloom_api_traceability(self.reader.headers, self.reader.project_id)
+        self.print_variables({"status": matrix.status, "body": matrix.body})
         self.assertEqual(
             (
-                self.matrix.status,
+                matrix.status,
                 [
                     (
                         item["requirement"]["req_id"],
                         [tc["tc_id"] for tc in item["linked_test_cases"]],
                     )
-                    for item in self.matrix.body["items"]
+                    for item in matrix.body["items"]
                 ],
             ),
             (
@@ -38,14 +39,12 @@ class TraceabilityExternalVisibilityBase(BloomTestCase):
         )
 
     def bud_coverage_counts_only_the_customer_requirement(self):
-        self.print_variables({"status": self.coverage.status, "body": self.coverage.body})
+        coverage = self.bloom.bloom_api_coverage_gaps(self.reader.headers, self.reader.project_id)
+        self.print_variables({"status": coverage.status, "body": coverage.body})
         self.assertEqual(
             (
-                self.coverage.status,
-                tuple(
-                    self.coverage.body[key]
-                    for key in ("total_requirements", "covered", "uncovered")
-                ),
+                coverage.status,
+                tuple(coverage.body[key] for key in ("total_requirements", "covered", "uncovered")),
             ),
             (self.parameters.STATUS_OK, self.parameters.READER_COVERAGE),
             msg=self.parameters.MSG_READER_COVERAGE,
@@ -53,9 +52,10 @@ class TraceabilityExternalVisibilityBase(BloomTestCase):
         )
 
     def bud_impact_of_an_internal_requirement_is_hidden_404(self):
-        self.print_variables({"status": self.impact.status, "body": self.impact.body})
+        impact = self.bloom.bloom_api_impact(self.reader.headers, self.internal_requirement)
+        self.print_variables({"status": impact.status, "body": impact.body})
         self.assertEqual(
-            self.impact.status,
+            impact.status,
             self.parameters.STATUS_NOT_FOUND,
             msg=self.parameters.MSG_READER_IMPACT_HIDDEN,
             abort_on_fail=False,

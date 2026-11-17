@@ -17,38 +17,17 @@ class IntegrationSecretsTest(IntegrationSecretsBase):
         super().setUpClass()
         bloom, values = self.bloom, self.parameters
         secret = values.SECRETS_TOKEN
-        self.prefix = bloom.bloom_envelope_prefix()
         self.envelope = bloom.bloom_encrypt_secret(secret)
         self.decrypted = bloom.bloom_decrypt_secret(self.envelope.value)
-        self.second_envelope = bloom.bloom_encrypt_secret(secret)
-        self.second_decrypted = bloom.bloom_decrypt_secret(self.second_envelope.value)
-        self.no_key = bloom.bloom_encrypt_secret(secret, key="")
-        self.bad_key = bloom.bloom_encrypt_secret(secret, key=values.SECRETS_MALFORMED_KEY)
-        self.wrong_key = bloom.bloom_decrypt_secret(
-            self.envelope.value, key=bloom.bloom_new_encryption_key()
-        )
-        self.plaintext = bloom.bloom_decrypt_secret(values.SECRETS_PLAINTEXT)
-        self.recognised = (
-            bloom.bloom_is_encrypted(self.envelope.value),
-            bloom.bloom_is_encrypted(values.SECRETS_PLAINTEXT),
-            bloom.bloom_is_encrypted(None),
-        )
         bloom.bloom_start_full_api()
         bloom.bloom_add_admin(values.ADMIN_EMAIL, values.API_PASSWORD)
-        headers, _ = bloom.bloom_log_in(values.ADMIN_EMAIL, values.API_PASSWORD)
+        self.headers, _ = bloom.bloom_log_in(values.ADMIN_EMAIL, values.API_PASSWORD)
         project = bloom.bloom_create_project()
         self.created = bloom.bloom_api_create_setting(
-            headers, project, values.SECRETS_TRACKER, secret, values.SECRETS_WEBHOOK
+            self.headers, project, values.SECRETS_TRACKER, secret, values.SECRETS_WEBHOOK
         )
-        setting = self.created.body["id"]
-        self.stored = bloom.bloom_read_setting_secrets(setting)
-        self.stored_encrypted = tuple(bloom.bloom_is_encrypted(v) for v in self.stored)
-        self.stored_values = tuple(bloom.bloom_decrypt_secret(v).value for v in self.stored)
-        self.rotated = bloom.bloom_api_rotate_setting_token(
-            headers, setting, values.SECRETS_ROTATED
-        )
-        self.rotated_stored = bloom.bloom_read_setting_secrets(setting)
-        self.rotated_value = bloom.bloom_decrypt_secret(self.rotated_stored[0]).value
+        self.setting = self.created.body["id"]
+        self.stored = bloom.bloom_read_setting_secrets(self.setting)
 
     def tearDownClass(self):
         super().tearDownClass()

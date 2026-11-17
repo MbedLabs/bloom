@@ -19,9 +19,9 @@ class ProjectIamHttpTest(ProjectIamHttpBase):
         password = values.API_PASSWORD
         bloom.bloom_start_full_api()
         self.allowed = bloom.bloom_create_project(values.IAMHTTP_ALLOWED_PREFIX)
-        blocked = bloom.bloom_create_project(values.IAMHTTP_BLOCKED_PREFIX)
-        requirement = bloom.bloom_add_requirement(
-            blocked, values.IAMHTTP_BLOCKED_REQ, values.INTERNAL_VISIBILITY
+        self.blocked = bloom.bloom_create_project(values.IAMHTTP_BLOCKED_PREFIX)
+        self.requirement = bloom.bloom_add_requirement(
+            self.blocked, values.IAMHTTP_BLOCKED_REQ, values.INTERNAL_VISIBILITY
         )
         member = bloom.bloom_add_account(
             values.IAMHTTP_MAINTAINER_EMAIL, password, values.API_MEMBER_ROLE
@@ -35,17 +35,8 @@ class ProjectIamHttpTest(ProjectIamHttpBase):
             values.CUSTOMER_VISIBILITY,
             doc_types=(),
         )
-        headers, _ = bloom.bloom_log_in(values.IAMHTTP_MAINTAINER_EMAIL, password)
-        self.projects = bloom.bloom_api_list_projects(headers)
-        self.blocked_list = bloom.bloom_api_list_requirements(headers, blocked)
-        self.blocked_read = bloom.bloom_api_read_requirement(headers, requirement)
-        self.blocked_traceability = bloom.bloom_api_traceability(headers, blocked)
-        self.dashboard = bloom.bloom_api_dashboard_stats(headers)
-        self.blocked_import = bloom.bloom_api_import_from(
-            headers, self.allowed, blocked, values.IAMHTTP_DOC_TYPE, [requirement]
-        )
-        reader, _ = bloom.bloom_log_in(values.EXTERNAL_EMAIL, password)
-        self.reqif = bloom.bloom_api_upload_reqif(reader, self.allowed, values.IAMHTTP_REQIF)
+        self.member, _ = bloom.bloom_log_in(values.IAMHTTP_MAINTAINER_EMAIL, password)
+        self.reader, _ = bloom.bloom_log_in(values.EXTERNAL_EMAIL, password)
 
     def tearDownClass(self):
         super().tearDownClass()

@@ -35,7 +35,7 @@ class AuditLogTest(AuditLogBase):
         admin, _ = bloom.bloom_log_in(values.AUDITLOG_ADMIN, password)
         self.demoted = bloom.bloom_add_account(values.AUDITLOG_DEMOTED, password, role)
         self.role_change = bloom.bloom_api_set_role(admin, self.demoted, values.EXTERNAL_ROLE)
-        self.role_event = last("user.role_changed")
+        self.role_event = last(values.AUDITLOG_ROLE_CHANGED)
 
         self.project = bloom.bloom_create_project(values.AUDITLOG_PREFIX)
         design = bloom.bloom_add_design(self.project, values.AUDITLOG_DESIGN)
@@ -48,18 +48,17 @@ class AuditLogTest(AuditLogBase):
         changed = bloom.bloom_api_set_design_visibility(admin, design, values.CUSTOMER_VISIBILITY)
         deleted = bloom.bloom_api_delete_design(admin, design)
         self.statuses = (added.status_code, changed.status, deleted.status)
-        self.member_event = last("project_member.added")
-        self.visibility_event = last("artefact.visibility_changed")
-        self.deleted_event = last("artefact.deleted")
+        self.member_event = last(values.AUDITLOG_MEMBER_ADDED)
+        self.visibility_event = last(values.AUDITLOG_VISIBILITY_CHANGED)
+        self.deleted_event = last(values.AUDITLOG_DELETED)
 
         setting = bloom.bloom_create_integration(self.project)
         self.rotation = bloom.bloom_api_rotate_setting_token(admin, setting, values.AUDITLOG_SECRET)
-        self.rotation_event = last("integration.updated")
+        self.rotation_event = last(values.AUDITLOG_INTEGRATION_UPDATED)
 
-        self.member_read = bloom.bloom_api_audit(member, sort="actor", dir="asc")
-        admin, _ = bloom.bloom_log_in(values.AUDITLOG_ADMIN, password)
-        self.sign_ins = len(bloom.bloom_list_audit_events(values.AUDITLOG_LOGIN))
-        self.page = bloom.bloom_api_audit(admin, action=values.AUDITLOG_AUTH_FILTER)
+        self.member_read = bloom.bloom_api_audit(member, **values.AUDITLOG_MEMBER_SORT)
+        self.admin_headers, _ = bloom.bloom_log_in(values.AUDITLOG_ADMIN, password)
+        self.page = bloom.bloom_api_audit(self.admin_headers, action=values.AUDITLOG_AUTH_FILTER)
 
         actors = {
             "ada": bloom.bloom_add_account(
@@ -70,22 +69,9 @@ class AuditLogTest(AuditLogBase):
             ),
         }
         hours = values.AUDITLOG_SORT_HOURS
-        hour_of = dict(
+        self.hour_of = dict(
             zip(bloom.bloom_add_audit_events(hours, values.AUDITLOG_SORT_ROWS, actors), hours)
         )
-        self.sorted = {}
-        for field in values.AUDITLOG_SORTED:
-            for direction in values.AUDITLOG_DIRECTIONS:
-                pages = bloom.bloom_api_audit_pages(
-                    admin, values.AUDITLOG_SORT_FILTER, field, direction
-                )
-                self.sorted[(field, direction)] = (
-                    [hour_of[event_id] for event_id in pages] if isinstance(pages, list) else pages
-                )
-        self.invalid = [
-            bloom.bloom_api_audit(admin, **query).status for query in values.AUDITLOG_INVALID
-        ]
-        self.methods = bloom.bloom_route_methods_of(values.AUDITLOG_MODULE)
 
     def tearDownClass(self):
         super().tearDownClass()

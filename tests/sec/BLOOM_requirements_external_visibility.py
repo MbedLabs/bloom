@@ -18,24 +18,16 @@ class RequirementsExternalVisibilityTest(RequirementsExternalVisibilityBase):
     def setUpClass(self):
         super().setUpClass()
         bloom, values = self.bloom, self.parameters
-        reader = bloom.bloom_create_external_reader_environment(doc_types=None)
-        project = reader.project_id
-        customer = bloom.bloom_add_requirement(
+        self.reader = bloom.bloom_create_external_reader_environment(doc_types=None)
+        project = self.reader.project_id
+        self.customer = bloom.bloom_add_requirement(
             project, values.READER_CUSTOMER_REQ, values.CUSTOMER_VISIBILITY
         )
-        internal = bloom.bloom_add_requirement(
+        self.internal = bloom.bloom_add_requirement(
             project, values.READER_INTERNAL_REQ, values.INTERNAL_VISIBILITY
         )
         bloom.bloom_add_admin(values.ADMIN_EMAIL, values.API_PASSWORD)
-        admin, _ = bloom.bloom_log_in(values.ADMIN_EMAIL, values.API_PASSWORD)
-        self.listed = bloom.bloom_api_list_requirements(reader.headers, project)
-        self.hidden = bloom.bloom_api_read_requirement(reader.headers, internal)
-        self.created = bloom.bloom_api_create_requirement_of_origin(
-            admin, project, values.READER_NEW_TITLE, values.READER_CUSTOMER_ORIGIN
-        )
-        self.changed = bloom.bloom_api_set_requirement_origin(
-            admin, customer, values.READER_INTERNAL_ORIGIN
-        )
+        self.admin, _ = bloom.bloom_log_in(values.ADMIN_EMAIL, values.API_PASSWORD)
 
     def tearDownClass(self):
         super().tearDownClass()

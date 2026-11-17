@@ -38,9 +38,12 @@ class CampaignsExternalVisibilityBase(BloomTestCase):
         )
 
     def bud_internal_campaign_is_hidden_404(self):
-        self.print_variables({"status": self.hidden.status, "body": self.hidden.body})
+        hidden = self.bloom.bloom_api_get_campaign(
+            self.reader.headers, self.parameters.READER_HIDDEN_CAMPAIGN
+        )
+        self.print_variables({"status": hidden.status, "body": hidden.body})
         self.assertEqual(
-            self.hidden.status,
+            hidden.status,
             self.parameters.STATUS_NOT_FOUND,
             msg=self.parameters.MSG_READER_CAMPAIGN_HIDDEN,
             abort_on_fail=False,

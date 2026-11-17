@@ -16,8 +16,8 @@ class DocsFacadeExternalVisibilityTest(DocsFacadeExternalVisibilityBase):
     def setUpClass(self):
         super().setUpClass()
         bloom, values = self.bloom, self.parameters
-        reader = bloom.bloom_create_external_reader_environment(values.READER_DOC_TYPES)
-        project, prefix = reader.project_id, values.VISIBILITY_PREFIX
+        self.reader = bloom.bloom_create_external_reader_environment(values.READER_DOC_TYPES)
+        project, prefix = self.reader.project_id, values.VISIBILITY_PREFIX
         customer, internal = values.CUSTOMER_VISIBILITY, values.INTERNAL_VISIBILITY
         bloom.bloom_add_requirement(project, values.READER_CUSTOMER_REQ, customer)
         bloom.bloom_add_requirement(project, values.READER_INTERNAL_REQ, internal)
@@ -28,17 +28,7 @@ class DocsFacadeExternalVisibilityTest(DocsFacadeExternalVisibilityBase):
             project, values.READER_INTERNAL_SPEC, values.READER_INTERNAL_SPEC, internal
         )
         self.listed = bloom.bloom_api_list_docs_of_types(
-            reader.headers, prefix, values.READER_DOC_TYPES
-        )
-        opened = (
-            (values.READER_REQUIREMENTS_SLUG, values.READER_CUSTOMER_REQ),
-            (values.READER_REQUIREMENTS_SLUG, values.READER_INTERNAL_REQ),
-            (values.READER_SPECIFICATIONS_SLUG, values.READER_CUSTOMER_SPEC),
-            (values.READER_SPECIFICATIONS_SLUG, values.READER_INTERNAL_SPEC),
-        )
-        self.details = tuple(
-            bloom.bloom_api_open_doc(reader.headers, prefix, slug, doc_id).status
-            for slug, doc_id in opened
+            self.reader.headers, prefix, values.READER_DOC_TYPES
         )
 
     def tearDownClass(self):

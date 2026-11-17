@@ -18,17 +18,17 @@ class ExportsTest(ExportsBase):
         bloom, values = self.bloom, self.parameters
         password = values.API_PASSWORD
         bloom.bloom_start_full_api()
-        project = bloom.bloom_create_export_project()
+        self.project = bloom.bloom_create_export_project()
         bloom.bloom_add_admin(values.EXPORT_ADMIN_EMAIL, password)
         bloom.bloom_add_group_exporter(
-            project, values.EXPORT_READER_EMAIL, values.EXPORT_READER_PERMISSIONS
+            self.project, values.EXPORT_READER_EMAIL, values.EXPORT_READER_PERMISSIONS
         )
         bloom.bloom_add_group_exporter(
-            project, values.EXPORT_AUTHOR_EMAIL, values.EXPORT_AUTHOR_PERMISSIONS
+            self.project, values.EXPORT_AUTHOR_EMAIL, values.EXPORT_AUTHOR_PERMISSIONS
         )
         admin, _ = bloom.bloom_log_in(values.EXPORT_ADMIN_EMAIL, password)
         self.pdfs = [
-            bloom.bloom_api_export(admin, project, kind, pdf=True)
+            bloom.bloom_api_export(admin, self.project, kind, pdf=True)
             for kind in values.EXPORT_PDF_KINDS
         ]
         self.recorded = sorted(
@@ -37,11 +37,10 @@ class ExportsTest(ExportsBase):
         )
         reader, _ = bloom.bloom_log_in(values.EXPORT_READER_EMAIL, password)
         requirements, matrix, tests = values.EXPORT_PDF_KINDS[:3]
-        self.requirements = bloom.bloom_api_export(reader, project, requirements)
-        self.matrix = bloom.bloom_api_export(reader, project, matrix)
-        self.tests = bloom.bloom_api_export(reader, project, tests)
-        author, _ = bloom.bloom_log_in(values.EXPORT_AUTHOR_EMAIL, password)
-        self.dossier = bloom.bloom_api_export(author, project, values.EXPORT_DOSSIER)
+        self.requirements = bloom.bloom_api_export(reader, self.project, requirements)
+        self.matrix = bloom.bloom_api_export(reader, self.project, matrix)
+        self.tests = bloom.bloom_api_export(reader, self.project, tests)
+        self.author, _ = bloom.bloom_log_in(values.EXPORT_AUTHOR_EMAIL, password)
 
     def tearDownClass(self):
         super().tearDownClass()

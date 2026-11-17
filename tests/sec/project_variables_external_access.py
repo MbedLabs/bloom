@@ -17,18 +17,20 @@ class ProjectVariablesExternalAccessBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_external_reader_is_refused_the_parameters_403(self):
-        self.print_variables({"status": self.refused.status, "body": self.refused.body})
+        refused = self.bloom.bloom_api_list_variables(self.reader.headers, self.reader.project_id)
+        self.print_variables({"status": refused.status, "body": refused.body})
         self.assertEqual(
-            self.refused.status,
+            refused.status,
             self.parameters.STATUS_FORBIDDEN,
             msg=self.parameters.MSG_READER_VARIABLES_REFUSED,
             abort_on_fail=False,
         )
 
     def bud_member_with_every_permission_lists_the_parameter(self):
-        self.print_variables({"status": self.listed.status, "body": self.listed.body})
+        listed = self.bloom.bloom_api_list_variables(self.member, self.reader.project_id)
+        self.print_variables({"status": listed.status, "body": listed.body})
         self.assertEqual(
-            (self.listed.status, [item["key"] for item in self.listed.body]),
+            (listed.status, [item["key"] for item in listed.body]),
             (self.parameters.STATUS_OK, [self.parameters.READER_VARIABLE_KEY]),
             msg=self.parameters.MSG_READER_VARIABLES_SHOWN,
             abort_on_fail=False,
