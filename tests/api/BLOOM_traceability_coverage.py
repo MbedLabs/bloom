@@ -25,12 +25,11 @@ class TraceabilityCoverageTest(TraceabilityCoverageBase):
         draft = self.bloom.bloom_api_add_test_case(
             self.admin, self.project, "Draft TC", status="Draft"
         ).body["id"]
-        approved = self.bloom.bloom_api_add_test_case(
+        self.approved_id = self.bloom.bloom_api_add_test_case(
             self.admin, self.project, "Approved TC", status="Draft"
         ).body["id"]
         self.bloom.bloom_api_verify(self.admin, self.project, draft, partial)
-        self.bloom.bloom_api_verify(self.admin, self.project, approved, covered)
-        self.creator, self.signed = self.bloom.bloom_api_approve_test_case(self.admin, approved)
+        self.bloom.bloom_api_verify(self.admin, self.project, self.approved_id, covered)
 
     def tearDownClass(self):
         super().tearDownClass()

@@ -27,25 +27,6 @@ class JiraWebhookCopiesIssueTest(JiraWebhookCopiesIssueBase):
         )
         self.description = f"{self.parameters.DESCRIPTION_TEXT} {tc_id}"
         self.key = self.bloom.bloom_jira_key(self.parameters.WEBHOOK_NEW_NUMBER)
-        description = {
-            "type": "doc",
-            "content": [
-                {"type": "paragraph", "content": [{"type": "text", "text": self.description}]}
-            ],
-        }
-        body = self.bloom.bloom_jira_webhook_body(
-            self.key,
-            event=self.parameters.ISSUE_CREATED,
-            status={
-                "name": self.parameters.JIRA_TO_DO,
-                "statusCategory": {"key": self.parameters.JIRA_NEW},
-            },
-            description=description,
-            priority={"name": self.parameters.JIRA_HIGHEST},
-        )
-        self.response = self.bloom.bloom_post_jira_webhook(
-            body, delivery=self.parameters.DELIVERIES[0]
-        )
 
     def tearDownClass(self):
         super().tearDownClass()

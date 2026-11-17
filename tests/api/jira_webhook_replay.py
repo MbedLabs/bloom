@@ -17,9 +17,13 @@ class JiraWebhookReplayBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_replay_answers_duplicate(self):
-        self.print_variables({"replay": self.replay.json()})
+        body = self.bloom.bloom_jira_webhook_body(
+            self.bloom.bloom_jira_key(self.parameters.LINKED_NUMBER)
+        )
+        replay = self.bloom.bloom_post_jira_webhook(body, delivery=self.parameters.DELIVERIES[4])
+        self.print_variables({"replay": replay.json()})
         self.assertEqual(
-            self.replay.json().get("status"),
+            replay.json().get("status"),
             self.parameters.ANSWER_DUPLICATE,
             msg=self.parameters.MSG_REPLAY_DUPLICATE,
             abort_on_fail=False,

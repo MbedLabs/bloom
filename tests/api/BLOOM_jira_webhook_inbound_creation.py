@@ -22,16 +22,10 @@ class JiraWebhookInboundCreationTest(JiraWebhookInboundCreationBase):
             "name": self.parameters.JIRA_TO_DO,
             "statusCategory": {"key": self.parameters.JIRA_NEW},
         }
-        body = self.bloom.bloom_jira_webhook_body(
+        self.body = self.bloom.bloom_jira_webhook_body(
             self.bloom.bloom_jira_key(self.parameters.WEBHOOK_NEW_NUMBER),
             status=to_do,
             summary=self.parameters.NEW_SUMMARY,
-        )
-        self.response = self.bloom.bloom_post_jira_webhook(
-            body, delivery=self.parameters.DELIVERIES[10]
-        )
-        self.replay = self.bloom.bloom_post_jira_webhook(
-            body, delivery=self.parameters.DELIVERIES[10]
         )
 
     def tearDownClass(self):

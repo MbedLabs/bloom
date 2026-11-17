@@ -16,18 +16,6 @@ class JiraWebhookDeletedIssueTest(JiraWebhookDeletedIssueBase):
     def setUpClass(self):
         super().setUpClass()
         self.env = self.bloom.bloom_create_webhook_environment()
-        defect_gone = self.bloom.bloom_jira_webhook_body(
-            self.bloom.bloom_jira_key(self.parameters.LINKED_NUMBER),
-            event=self.parameters.ISSUE_DELETED,
-        )
-        change_gone = self.bloom.bloom_jira_webhook_body(
-            self.bloom.bloom_jira_key(self.parameters.CHANGE_NUMBER),
-            event=self.parameters.ISSUE_DELETED,
-        )
-        self.response = self.bloom.bloom_post_jira_webhook(
-            defect_gone, delivery=self.parameters.DELIVERIES[7]
-        )
-        self.bloom.bloom_post_jira_webhook(change_gone, delivery=self.parameters.DELIVERIES[8])
 
     def tearDownClass(self):
         super().tearDownClass()

@@ -17,9 +17,26 @@ class JiraWebhookCopiesIssueBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_issue_creates_a_defect(self):
-        self.print_variables({"answer": self.response.json()})
+        description = {
+            "type": "doc",
+            "content": [
+                {"type": "paragraph", "content": [{"type": "text", "text": self.description}]}
+            ],
+        }
+        body = self.bloom.bloom_jira_webhook_body(
+            self.key,
+            event=self.parameters.ISSUE_CREATED,
+            status={
+                "name": self.parameters.JIRA_TO_DO,
+                "statusCategory": {"key": self.parameters.JIRA_NEW},
+            },
+            description=description,
+            priority={"name": self.parameters.JIRA_HIGHEST},
+        )
+        response = self.bloom.bloom_post_jira_webhook(body, delivery=self.parameters.DELIVERIES[0])
+        self.print_variables({"answer": response.json()})
         self.assertEqual(
-            self.response.json().get("status"),
+            response.json().get("status"),
             self.parameters.ANSWER_CREATED,
             msg=self.parameters.MSG_INBOUND_CREATED,
             abort_on_fail=False,

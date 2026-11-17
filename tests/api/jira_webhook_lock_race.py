@@ -17,7 +17,16 @@ class JiraWebhookLockRaceBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_delivery_is_processed(self):
-        found = (self.response.status_code, self.response.json().get("status"))
+        body = self.bloom.bloom_jira_webhook_body(
+            self.bloom.bloom_jira_key(self.parameters.RACE_NUMBER),
+            status={
+                "name": self.parameters.JIRA_TO_DO,
+                "statusCategory": {"key": self.parameters.JIRA_NEW},
+            },
+            summary=self.parameters.NEW_SUMMARY,
+        )
+        response = self.bloom.bloom_post_jira_webhook(body, delivery=self.parameters.DELIVERIES[9])
+        found = (response.status_code, response.json().get("status"))
         self.print_variables({"status, answer": found})
         self.assertEqual(
             found,

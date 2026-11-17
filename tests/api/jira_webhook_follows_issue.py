@@ -17,16 +17,27 @@ class JiraWebhookFollowsIssueBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_edit_is_processed(self):
-        self.print_variables({"answer": self.edit.json()})
+        body = self.bloom.bloom_jira_webhook_body(
+            self.bloom.bloom_jira_key(self.parameters.LINKED_NUMBER),
+            status={
+                "name": self.parameters.JIRA_TO_DO,
+                "statusCategory": {"key": self.parameters.JIRA_NEW},
+            },
+            summary=self.parameters.CHANGED_TITLE,
+            description=self.parameters.CHANGED_DESCRIPTION,
+            priority={"name": self.parameters.JIRA_PRIORITY},
+        )
+        edit = self.bloom.bloom_post_jira_webhook(body, delivery=self.parameters.DELIVERIES[5])
+        self.print_variables({"answer": edit.json()})
         self.assertEqual(
-            self.edit.json().get("status"),
+            edit.json().get("status"),
             self.parameters.ANSWER_PROCESSED,
             msg=self.parameters.MSG_FOLLOWS_ISSUE,
             abort_on_fail=False,
         )
 
     def bud_defect_takes_the_issue_fields_and_stays_open(self):
-        defect = self.after_edit
+        defect = self.bloom.bloom_get_defect(self.env.defect_id)
         found = (
             defect.title,
             defect.description,
@@ -49,6 +60,15 @@ class JiraWebhookFollowsIssueBase(BloomTestCase):
         )
 
     def bud_resolution_closes_the_defect(self):
+        resolved = self.bloom.bloom_jira_webhook_body(
+            self.bloom.bloom_jira_key(self.parameters.LINKED_NUMBER),
+            status={
+                "name": self.parameters.JIRA_IN_REVIEW,
+                "statusCategory": {"key": self.parameters.JIRA_IN_PROGRESS_CATEGORY},
+            },
+            resolution={"name": self.parameters.JIRA_FIXED},
+        )
+        self.bloom.bloom_post_jira_webhook(resolved, delivery=self.parameters.DELIVERIES[6])
         defect = self.bloom.bloom_get_defect(self.env.defect_id)
         found = (defect.status, defect.closed_at is not None)
         self.print_variables({"status, closed": found})

@@ -16,12 +16,6 @@ class JiraWebhookForgedLegacyTest(JiraWebhookForgedLegacyBase):
     def setUpClass(self):
         super().setUpClass()
         self.env = self.bloom.bloom_create_webhook_environment()
-        body = self.bloom.bloom_jira_webhook_body(
-            self.bloom.bloom_jira_key(self.parameters.CHANGE_NUMBER)
-        )
-        self.response = self.bloom.bloom_post_jira_webhook(
-            body, signature=self.parameters.FORGED_SIGNATURE, delivery=self.parameters.DELIVERIES[2]
-        )
 
     def tearDownClass(self):
         super().tearDownClass()

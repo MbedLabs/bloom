@@ -8,8 +8,6 @@
 * @note     This module tests the project delete route of the full app in-process.
 """
 
-from types import SimpleNamespace
-
 from tests.api.projects_delete import ProjectsDeleteBase
 
 
@@ -19,29 +17,19 @@ class ProjectsDeleteTest(ProjectsDeleteBase):
         super().setUpClass()
         self.bloom.bloom_start_full_api()
         self.bloom.bloom_add_admin(self.parameters.API_ADMIN_EMAIL, self.parameters.API_PASSWORD)
-        admin, self.login = self.bloom.bloom_log_in(
+        self.admin, self.login = self.bloom.bloom_log_in(
             self.parameters.API_ADMIN_EMAIL, self.parameters.API_PASSWORD
         )
-        plain, with_requirement, protected = (
-            self.bloom.bloom_api_create_project(admin, prefix).json().get("id")
+        self.plain_id, self.with_requirement_id, self.protected_id = (
+            self.bloom.bloom_api_create_project(self.admin, prefix).json().get("id")
             for prefix in self.parameters.DELETE_PREFIXES
         )
-        requirement = self.bloom.bloom_api_create_requirement(
-            admin, with_requirement, self.parameters.DELETE_REQUIREMENT_TITLE
+        self.requirement = self.bloom.bloom_api_create_requirement(
+            self.admin, self.with_requirement_id, self.parameters.DELETE_REQUIREMENT_TITLE
         )
-        self.plain = self._delete(admin, plain)
-        self.with_requirement = self._delete(admin, with_requirement)
-        self.with_requirement.requirement = requirement.status_code
-        self.anonymous = self.bloom.bloom_api_delete_project(None, protected).status_code
 
     def tearDownClass(self):
         super().tearDownClass()
-
-    def _delete(self, headers, project_id):
-        """Delete the project and read it back, returning both answers' status codes."""
-        delete = self.bloom.bloom_api_delete_project(headers, project_id)
-        read = self.bloom.bloom_api_get_project(headers, project_id)
-        return SimpleNamespace(delete=delete.status_code, read=read.status_code)
 
 
 if __name__ == "__main__":

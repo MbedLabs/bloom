@@ -21,9 +21,6 @@ class JiraWebhookReplayTest(JiraWebhookReplayBase):
         )
         self.bloom.bloom_post_jira_webhook(body, delivery=self.parameters.DELIVERIES[4])
         self.bloom.bloom_set_defect_status(self.env.defect_id, self.parameters.DEFECT_OPEN)
-        self.replay = self.bloom.bloom_post_jira_webhook(
-            body, delivery=self.parameters.DELIVERIES[4]
-        )
 
     def tearDownClass(self):
         super().tearDownClass()

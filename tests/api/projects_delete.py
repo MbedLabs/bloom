@@ -8,6 +8,8 @@
 * @note     Base class containing the bud methods of the project delete.
 """
 
+from types import SimpleNamespace
+
 from tests.bloom_api_interface import BloomApiInterface
 from tests.bloom_test_base import BloomTestCase
 
@@ -26,26 +28,33 @@ class ProjectsDeleteBase(BloomTestCase):
         )
 
     def bud_deleted_project_is_gone(self):
-        self._assert_deleted(self.plain)
+        self._assert_deleted(self._delete(self.admin, self.plain_id))
 
     def bud_project_with_a_requirement_is_deleted(self):
-        self.print_variables({"requirement": self.with_requirement.requirement})
+        self.print_variables({"requirement": self.requirement.status_code})
         self.assertEqual(
-            self.with_requirement.requirement,
+            self.requirement.status_code,
             self.parameters.STATUS_CREATED,
             msg=self.parameters.MSG_DELETE_REQUIREMENT,
             abort_on_fail=False,
         )
-        self._assert_deleted(self.with_requirement)
+        self._assert_deleted(self._delete(self.admin, self.with_requirement_id))
 
     def bud_delete_needs_a_signed_in_user(self):
-        self.print_variables({"anonymous delete": self.anonymous})
+        anonymous = self.bloom.bloom_api_delete_project(None, self.protected_id).status_code
+        self.print_variables({"anonymous delete": anonymous})
         self.assertEqual(
-            self.anonymous,
+            anonymous,
             self.parameters.STATUS_UNAUTHORIZED,
             msg=self.parameters.MSG_DELETE_UNAUTHENTICATED,
             abort_on_fail=False,
         )
+
+    def _delete(self, headers, project_id):
+        """Delete the project and read it back, returning both answers' status codes."""
+        delete = self.bloom.bloom_api_delete_project(headers, project_id)
+        read = self.bloom.bloom_api_get_project(headers, project_id)
+        return SimpleNamespace(delete=delete.status_code, read=read.status_code)
 
     def _assert_deleted(self, outcome):
         """Assert the delete answered 204 and the project then answers 404."""

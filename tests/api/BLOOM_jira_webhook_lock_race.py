@@ -21,17 +21,6 @@ class JiraWebhookLockRaceTest(JiraWebhookLockRaceBase):
         self.bloom.bloom_link_defect_before_reserving(
             self.env.project_id, self.parameters.RACE_NUMBER, self.parameters.OLD_TITLE
         )
-        body = self.bloom.bloom_jira_webhook_body(
-            self.bloom.bloom_jira_key(self.parameters.RACE_NUMBER),
-            status={
-                "name": self.parameters.JIRA_TO_DO,
-                "statusCategory": {"key": self.parameters.JIRA_NEW},
-            },
-            summary=self.parameters.NEW_SUMMARY,
-        )
-        self.response = self.bloom.bloom_post_jira_webhook(
-            body, delivery=self.parameters.DELIVERIES[9]
-        )
 
     def tearDownClass(self):
         super().tearDownClass()

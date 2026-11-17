@@ -26,9 +26,18 @@ class RequirementWorkflowActivityBase(BloomTestCase):
         )
 
     def bud_review_fields_in_an_edit_are_refused(self):
-        self.print_variables({"status": self.refused.status_code})
+        refused = self.bloom.bloom_api_update_artefact(
+            self.admin,
+            self.parameters.REQUIREMENT_KIND,
+            self.requirement_id,
+            {
+                "reviewed_by_id": self.admin_id,
+                "reviewed_at": self.parameters.FORGED_REVIEWED_AT,
+            },
+        )
+        self.print_variables({"status": refused.status_code})
         self.assertEqual(
-            self.refused.status_code,
+            refused.status_code,
             self.parameters.STATUS_UNPROCESSABLE,
             msg=self.parameters.MSG_REVIEW_FIELDS_REFUSED,
             abort_on_fail=False,
@@ -87,10 +96,19 @@ class RequirementWorkflowActivityBase(BloomTestCase):
         )
 
     def bud_edit_under_an_approved_change_starts_a_revision(self):
-        events = self.revision_events or []
+        edited = self.bloom.bloom_api_update_artefact(
+            self.admin,
+            self.parameters.REQUIREMENT_KIND,
+            self.requirement_id,
+            {"title": self.parameters.RENAMED_TITLE},
+        )
+        revision_events = self.bloom.bloom_api_activity_types(
+            self.admin, self.parameters.REQUIREMENT_KIND, self.requirement_id
+        )
+        events = revision_events or []
         found = (
-            self.edited.status_code,
-            self.edited.json().get("status"),
+            edited.status_code,
+            edited.json().get("status"),
             self.parameters.EVENT_UPDATED in events,
             self.parameters.EVENT_REVISION in events,
         )

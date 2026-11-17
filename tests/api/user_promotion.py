@@ -34,10 +34,13 @@ class UserPromotionBase(BloomTestCase):
             )
 
     def bud_initial_admin_promotes_a_maintainer(self):
-        body = self.promoted.body or {}
-        self.print_variables({"status": self.promoted.status, "role": body.get("role")})
+        promoted = self.bloom.bloom_api_set_role(
+            self.seed, self.maintainer_id, self.parameters.PROMOTION_ADMIN
+        )
+        body = promoted.body or {}
+        self.print_variables({"status": promoted.status, "role": body.get("role")})
         self.assertEqual(
-            self.promoted.status,
+            promoted.status,
             self.parameters.STATUS_OK,
             msg=self.parameters.MSG_PROMOTION_DONE,
             abort_on_fail=False,
@@ -50,10 +53,13 @@ class UserPromotionBase(BloomTestCase):
         )
 
     def bud_other_admin_cannot_promote(self):
-        detail = str((self.other.body or {}).get("detail"))
-        self.print_variables({"status": self.other.status, "detail": detail})
+        other = self.bloom.bloom_api_set_role(
+            self.other_admin, self.target_id, self.parameters.PROMOTION_ADMIN
+        )
+        detail = str((other.body or {}).get("detail"))
+        self.print_variables({"status": other.status, "detail": detail})
         self.assertEqual(
-            self.other.status,
+            other.status,
             self.parameters.STATUS_FORBIDDEN,
             msg=self.parameters.MSG_PROMOTION_REFUSED,
             abort_on_fail=False,
@@ -66,10 +72,13 @@ class UserPromotionBase(BloomTestCase):
         )
 
     def bud_admin_cannot_be_demoted(self):
-        detail = str((self.demoted.body or {}).get("detail"))
-        self.print_variables({"status": self.demoted.status, "detail": detail})
+        demoted = self.bloom.bloom_api_set_role(
+            self.seed, self.second_admin_id, self.parameters.PROMOTION_MAINTAINER
+        )
+        detail = str((demoted.body or {}).get("detail"))
+        self.print_variables({"status": demoted.status, "detail": detail})
         self.assertEqual(
-            self.demoted.status,
+            demoted.status,
             self.parameters.STATUS_BAD_REQUEST,
             msg=self.parameters.MSG_DEMOTION_REFUSED,
             abort_on_fail=False,

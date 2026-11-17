@@ -59,9 +59,18 @@ class SignOffActivityBase(BloomTestCase):
         )
 
     def bud_test_case_review_fields_in_an_edit_are_refused(self):
-        self.print_variables({"status": self.refused})
+        refused = self.bloom.bloom_api_update_artefact(
+            self.admin,
+            self.parameters.TEST_CASE_KIND,
+            self.test_case_id,
+            {
+                "reviewed_by_id": self.admin_id,
+                "reviewed_at": self.parameters.FORGED_REVIEWED_AT,
+            },
+        ).status_code
+        self.print_variables({"status": refused})
         self.assertEqual(
-            self.refused,
+            refused,
             self.parameters.STATUS_UNPROCESSABLE,
             msg=self.parameters.MSG_REVIEW_FIELDS_REFUSED,
             abort_on_fail=False,
@@ -77,9 +86,14 @@ class SignOffActivityBase(BloomTestCase):
         )
 
     def bud_test_case_status_only_edit_logs_approved(self):
-        self.print_variables({"status": self.status_only, "events": self.status_events})
+        kind = self.parameters.TEST_CASE_KIND
+        status_only = self.bloom.bloom_api_update_artefact(
+            self.admin, kind, self.test_case_id, {"status": self.parameters.STATUS_APPROVED}
+        ).status_code
+        status_events = self.bloom.bloom_api_activity_types(self.admin, kind, self.test_case_id)
+        self.print_variables({"status": status_only, "events": status_events})
         self.assertEqual(
-            (self.status_only, self.parameters.EVENT_APPROVED in (self.status_events or [])),
+            (status_only, self.parameters.EVENT_APPROVED in (status_events or [])),
             (self.parameters.STATUS_OK, True),
             msg=self.parameters.MSG_STATUS_ONLY_APPROVED,
             abort_on_fail=False,

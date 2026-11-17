@@ -2129,6 +2129,7 @@ MSG_REQIF_LINK = "the ReqIF relation becomes one refines link from login to syst
 MSG_REQIF_LEGACY = "the import writes no legacy requirement links"
 
 DESCRIPTION_PREFIX = _letters(string.ascii_uppercase, 3, 3)
+DESCRIPTION_TEXT_FIELDS = ("description", "content_json", "content_html")
 DESCRIPTION_BODY = {
     "type": "doc",
     "content": [

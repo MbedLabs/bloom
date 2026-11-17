@@ -17,11 +17,11 @@ class TraceabilityCoverageBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_the_test_case_is_approved_by_its_creator(self):
-        signed = self.signed
+        creator, signed = self.bloom.bloom_api_approve_test_case(self.admin, self.approved_id)
         self.print_variables({"signed": signed.body})
         self.assertEqual(
             (signed.status, signed.body.get("reviewed_by_id"), signed.body.get("approved_by_id")),
-            (self.parameters.STATUS_OK, self.creator, self.creator),
+            (self.parameters.STATUS_OK, creator, creator),
             msg=self.parameters.MSG_TCOV_APPROVED,
             abort_on_fail=False,
         )
