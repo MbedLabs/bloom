@@ -230,7 +230,10 @@ async def _count_links(
 async def _resolve_doc_by_public_id(
     db: AsyncSession, project_id: int, public_id: str
 ) -> tuple[str, int] | None:
-    """Resolve a document ID such as ``PRJ-REQ-001`` to its type code and row id."""
+    """Resolve a document ID such as ``PRJ-REQ-001`` to its type code and row id.
+
+    A row of the shared Document table resolves to its document kind.
+    """
     for type_code, (model, id_col_name, _slug) in TYPE_MAP.items():
         row_id = (
             await db.execute(
@@ -242,6 +245,17 @@ async def _resolve_doc_by_public_id(
         ).scalar_one_or_none()
         if row_id is not None:
             return type_code, row_id
+    document = (
+        await db.execute(
+            select(Document.id, Document.doc_type).where(
+                Document.project_id == project_id,
+                Document.doc_id == public_id,
+                Document.doc_type.in_(CANONICAL_DOCUMENT_KINDS),
+            )
+        )
+    ).one_or_none()
+    if document is not None:
+        return document.doc_type, document.id
     return None
 
 
@@ -927,11 +941,11 @@ PUBLIC_ID_ONLY_TYPES = frozenset({"TS", "CMP"})
 async def _reference_query(
     db: AsyncSession, model, id_col, project_id: int, ref: str, *conditions, by_number=True
 ):
-    """The unfiltered query for one item of a kind in a project by its document ID, or, with
-    by_number, by its database id when the reference is a number that no item of that kind has
-    as document ID."""
+    """The unfiltered query for one item of a kind in a project by its document ID in any
+    letter case, or, with by_number, by its database id when the reference is a number that no
+    item of that kind has as document ID."""
     base = select(model).where(model.project_id == project_id, *conditions)
-    by_doc_id = base.where(id_col == ref)
+    by_doc_id = base.where(func.upper(id_col) == ref.upper())
     if by_number and ref.isdigit():
         found = (await db.execute(by_doc_id.with_only_columns(model.id))).first()
         if found is None:
@@ -1070,6 +1084,8 @@ async def get_doc_by_kind_and_string_id(
         status=await current_status(db, row),
         visibility=getattr(row, "visibility", ArtefactVisibility.internal.value),
         priority=_get_priority(model, row),
+        req_type=getattr(row, "req_type", None),
+        req_origin=getattr(row, "req_origin", None),
         project_id=project.id,
         reviewer_id=_get_reviewer_id(model, row),
         incoming_links=link_data["incoming"],
