@@ -5496,3 +5496,122 @@ MSG_DWH_DRAFTED = (
 MSG_DWH_LEGACY_CHANGE = (
     "a change request in status {status} stays visible and filterable without a workflow"
 )
+GP_REQIF = REQIF_SAMPLE.encode() if isinstance(REQIF_SAMPLE, str) else REQIF_SAMPLE
+GP_LIST_KINDS = {
+    "requirements": ("REQ", "title"),
+    "test-cases": ("TC", "title"),
+    "test-suites": ("TS", "name"),
+    "campaigns": ("CMP", "name"),
+    "defects": ("DEF", "title"),
+    "designs": ("DES", "title"),
+    "risks": ("RSK", "title"),
+    "changes": ("CHG", "title"),
+    "test-concepts": ("CPT", "name"),
+}
+GP_EXTERNAL_AUTHOR = ("Requirements Author", "Test Author", "Design Author")
+GP_ONLY_OWN = "External users change only what they created."
+MSG_GP_READ_ONLY = "a read-only group reads requirements and cannot create one: 403"
+MSG_GP_EXTERNAL_ROLE = "an external test author creates test cases and not requirements"
+MSG_GP_CONTENT_GRANT = "a content grant creates content and lists no member right"
+MSG_GP_MANAGE_ACCESS = "{method} {path} needs an application permission: 403"
+MSG_GP_ADMIN_MANAGES = "an administrator reads the members and the access report"
+MSG_GP_NO_ACCESS = (
+    "a user without access is refused and has no permissions; the administrator has all"
+)
+MSG_GP_RULES_CHECKED = "unknown resources and a rule without a tag are refused with 400"
+MSG_GP_ACCESS_REPORT = "the report shows the direct entry alone for a replaced group, the group for the other user, nothing elsewhere"
+MSG_GP_DOCUMENT_TYPE = "edit rights follow the document type, including a change of type"
+MSG_GP_UNSEEN_UNCHANGED = (
+    "an external user gets 404 changing or deleting internal rows, which stay unchanged"
+)
+MSG_GP_OUTSIDE = "a user outside the project gets 404 for a requirement by id"
+MSG_GP_OWN_CAMPAIGN = "an external author creates a campaign of their own"
+MSG_GP_HIDDEN_BY_ID = "{method} {path} answers a named 404 to an external user"
+MSG_GP_OWN_ROWS = "an external user renames their own test case and not a shared one: 403"
+MSG_GP_HIDDEN_CAMPAIGN = "an item of a hidden campaign is a 404"
+MSG_GP_BODY_REACH = (
+    "a suite keeps only visible test cases, and a campaign naming a hidden suite is a 404"
+)
+MSG_GP_KEEPS_HIDDEN_SUITES = "a campaign update keeps the suites the editor cannot see"
+MSG_GP_EMPTY_SUITES = "an empty suite list keeps suites outside the allowed types"
+MSG_GP_COPY_HIDDEN = "a copy leaves out the source row the user cannot see"
+MSG_GP_IMPORT_CREATE_ONLY = "a creator imports the new row and is refused the existing one"
+MSG_GP_IMPORT_EDIT_ONLY = "an editor changes the existing row and is refused the new one"
+MSG_GP_IMPORT_HIDDEN_NEW = "an import treats a hidden test case as new and leaves it unchanged"
+MSG_GP_TESTRAIL_HIDDEN = (
+    "a TestRail import by an external user neither reuses nor links hidden rows"
+)
+MSG_GP_REQIF_HIDDEN = "a ReqIF import by an external user does not reuse hidden requirements"
+MSG_GP_MARKDOWN_HIDDEN = "a Markdown import does not count hidden rows as duplicates"
+MSG_GP_COPY_RIGHT = "a copy without create is refused per row"
+MSG_GP_REQIF_RIGHT = "a ReqIF import without create is refused per object"
+MSG_GP_REQIF_LINK_RIGHT = (
+    "a ReqIF import without link rights imports the objects and refuses the relation"
+)
+MSG_GP_TESTRAIL_RIGHT = "a TestRail import without link or suite rights creates the case, reports both and keeps the reference"
+MSG_GP_MARKDOWN_RIGHT = "a Markdown import without create is refused per section"
+MSG_GP_TESTRAIL_SUITE_RIGHT = (
+    "a TestRail import reports a suite it may not create and cases it may not create"
+)
+MSG_GP_MARKDOWN_SCOPE = "a Markdown import of a type outside the policy scope is refused with 403"
+MSG_GP_CAMPAIGN_ITEM = "adding a test case to a campaign returns the stored item"
+MSG_GP_EXTERNAL_CREATES = "an external user's creations are customer rows in their first status"
+MSG_GP_EXTERNAL_CREATE_REFUSED = "an external user may not {message}: 403"
+MSG_GP_EXTERNAL_DRAFT_ONLY = "an external user keeps customer visibility, moves to review only by request, and sets no other status"
+MSG_GP_OTHERS_ROWS = "{method} {path} on another's row is refused with 403"
+MSG_GP_OTHERS_ATTACHMENT = "a file cannot be added to another's document: 403"
+MSG_GP_ALLOWLIST_FIRST = "a type outside the allowlist answers 404 before a missing right"
+MSG_GP_DESIGN_REQUEST = (
+    "a review request needs a visible design the user is assigned to, and no direct transition"
+)
+MSG_GP_DESIGN_REVIEW = "an external creator comments and reviews when assigned, and never approves"
+MSG_GP_ALLOWED_ACTIONS = "the detail read names the changes each reader may make"
+MSG_GP_EXTERNAL_IMPORT = "an external import creates customer rows and touches only its own"
+MSG_GP_EXTERNAL_DOCUMENT = (
+    "an external user's document is a customer draft, and an internal one is refused"
+)
+MSG_GP_EXTERNAL_COPY = "an external copy, ReqIF and Markdown import create customer drafts"
+MSG_GP_INTERNAL_ACTIONS = "the detail read follows an internal user's permissions"
+MSG_GP_STATUS_HANDOFF = "a status edit goes through the workflow and the author cannot sign"
+MSG_GP_SEPARATE_SIGNOFF = "the reviewer and the approver sign with their own rights only"
+MSG_GP_OTHER_STATUSES = (
+    "document and design statuses go through the workflow, and a defect status needs approve"
+)
+MSG_GP_CREATED_DRAFT = "a requirement is created as a draft"
+MSG_GP_CREATED_NOT_DRAFT = "creating in status {status} is refused with 422"
+MSG_GP_APPROVER_STILL_DRAFT = "an approver still creates drafts only, and a reader creates nothing"
+MSG_GP_REVIEW_SIGNED = "the review is signed only by the assigned reviewer after a review comment"
+MSG_GP_APPROVAL_SIGNED = (
+    "the approval is signed by the assigned approver, never by an external account"
+)
+MSG_GP_IMPORT_STATUSES = "an import with approve {with_approve} creates and edits drafts only"
+MSG_GP_HANDOFF_KIND = "a {kind} is approved through the workflow by the signer only"
+MSG_GP_CAMPAIGN_STATUS = "a campaign author moves the campaign on but cannot approve it"
+MSG_GP_CREATE_NO_EDIT = "a creator's import adds a draft only and changes no existing row"
+MSG_GP_LINK_ENDS = "an external user links their own visible rows only"
+MSG_GP_LINK_DELETE = (
+    "a link with a hidden end is a 404, another's is a 403, and one with a deleted end can go"
+)
+MSG_GP_TAG_VISIBLE = "a tag links only a visible requirement of the same project"
+MSG_GP_IMPORT_LINKS = "an external import links only rows the importer created"
+MSG_GP_HIDDEN_LINK_FIRST = "a hidden link is a 404 before a missing delete right"
+MSG_GP_VIEW_BY_ID = "{path} needs the view right"
+MSG_GP_COMMENT_READERS = "a reader cannot comment: 403"
+MSG_GP_COMMENT_REVIEWER = "a reviewer comments only when they see the requirement and are assigned"
+MSG_GP_ASSIGN_APPROVER = "an approver can review a requirement"
+MSG_GP_ASSIGN_REFUSED = "a reviewer without the right or the sight is refused with 422"
+MSG_GP_ASSIGN_OTHER_KINDS = (
+    "an external approver of a test case or defect and an author as approver are refused with 422"
+)
+MSG_GP_UNSEEN_CHANGES = (
+    "a user who cannot view requirements cannot change, comment, link or delete one: 404"
+)
+MSG_GP_LIST_VIEW = "the {kind} list is empty without view and holds the row with it"
+MSG_GP_REGISTRY_VIEW = (
+    "the registry, the summary, link counts and the next id leave out a type without view"
+)
+MSG_GP_LINK_LIST_VIEW = "the link list leaves out links to a type without view"
+MSG_GP_NESTED_VIEW = "nested test cases and their counts are left out without view"
+MSG_GP_COUNTS_VIEW = "project counts, search and dashboard leave out a type without view"
+MSG_GP_TRACE_VIEW = "traceability, gaps and impact follow the view right"
+MSG_GP_EXPORT_VIEW = "an export leaves out the test cases the exporter cannot view"

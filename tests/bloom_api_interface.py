@@ -1226,6 +1226,64 @@ class BloomApiInterface(BloomInterface):
             root.handlers[:] = handlers
             root.setLevel(level)
 
+    def bloom_api_next_name(self, stem):
+        self._serial = getattr(self, "_serial", 0) + 1
+        return f"{stem} {self._serial}"
+
+    def bloom_api_next_project(self, headers):
+        self._projects = getattr(self, "_projects", 0) + 1
+        number = self._projects
+        prefix = "G" + chr(65 + number // 26 % 26) + chr(65 + number % 26)
+        return self.bloom_api_new_project(headers, prefix)
+
+    def bloom_api_make(self, headers, kind, project_id, **fields):
+        named = {"test-suites", "campaigns", "test-concepts"}
+        field = "name" if kind in named else "title"
+        body = {"project_id": project_id, field: self.bloom_api_next_name(kind), **fields}
+        path = f"/api/projects/{project_id}/documents" if kind == "documents" else f"/api/{kind}"
+        return self.bloom_api_call("POST", path, headers, json=body)
+
+    def bloom_api_grant_scenario(self, headers, policy_name, user_id, project_id):
+        permissions = scenario_permissions(policy_name)
+        external_reader = policy_name == "External Reader"
+        types = ["REQ", "TC", "CPT", "CMP"] if external_reader else None
+        rules = scenario_rules(permissions, "customer" if external_reader else "internal", types)
+        name = self.bloom_api_next_name(policy_name)
+        policy = self.bloom_api_create_policy_rules(headers, name, rules).json()
+        statement = update(Policy).where(Policy.id == policy["id"]).values(permissions=permissions)
+        self._run(self._execute_statement(statement))
+        group = self.bloom_api_new_group(headers, self.bloom_api_next_name("Group"), [policy["id"]])
+        self.bloom_api_admit_group(headers, group["id"], project_id)
+        self.bloom_api_add_group_member(headers, group["id"], user_id)
+
+    def bloom_api_scenario_user(self, headers, role, project_ids, *policy_names):
+        member = self.bloom_api_new_member(
+            headers, self.bloom_api_next_name("person").replace(" ", "-"), role
+        )
+        for project_id in project_ids:
+            for policy_name in policy_names:
+                self.bloom_api_grant_scenario(headers, policy_name, member.id, project_id)
+        return member
+
+    def bloom_api_permission_user(
+        self, headers, permissions, *project_ids, role="maintainer", scope=None
+    ):
+        name = self.bloom_api_next_name("permission-user").replace(" ", "-")
+        return self.bloom_api_policy_user(
+            headers, name, permissions, *project_ids, role=role, scope=scope
+        )
+
+    def bloom_api_link_ends(self, headers, project_id, source, target, role="verifies"):
+        body = {
+            "project_id": project_id,
+            "source_type": source[0],
+            "source_id": source[1],
+            "target_type": target[0],
+            "target_id": target[1],
+            "role": role,
+        }
+        return self.bloom_api_call("POST", "/api/links", headers, json=body)
+
     def bloom_change_record(self, kind, row_id, **fields):
         async def change():
             async with self.maker() as db:

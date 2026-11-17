@@ -23,6 +23,7 @@ SUITES = [
     "tests.api.BLOOM_documents_external_visibility.DocumentsExternalVisibilityTest",
     "tests.api.BLOOM_group_bulk_members.GroupBulkMembersTest",
     "tests.api.BLOOM_group_owned_policies.GroupOwnedPoliciesTest",
+    "tests.api.BLOOM_group_permissions_http.GroupPermissionsHttpTest",
     "tests.api.BLOOM_groups_http.GroupsHttpTest",
     "tests.api.BLOOM_http_api.HttpApiTest",
     "tests.api.BLOOM_jira_filter_validation.JiraFilterValidationTest",
