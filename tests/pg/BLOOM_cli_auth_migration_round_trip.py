@@ -18,38 +18,11 @@ class CliAuthMigrationRoundTripTest(CliAuthMigrationRoundTripBase):
         self.postgres = self.bloom.bloom_use_postgres(tables=False)
         if not self.postgres:
             return
-        self.commands = [
-            self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_BEFORE_CLI)
-        ]
+        self.prepared = self.bloom.bloom_run_alembic(
+            "upgrade", self.parameters.MIGRATION_BEFORE_CLI
+        )
         self.ids = self.bloom.bloom_seed_retained_rows()
-        self.before_revision = self.bloom.bloom_read_revision()
         self.before_rows = self.bloom.bloom_read_retained_rows(self.ids)
-        self.before_table = self.bloom.bloom_read_cli_session_table()
-
-        self.commands.append(
-            self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
-        )
-        self.heads = self.bloom.bloom_list_alembic_heads()
-        self.upgraded_revision = self.bloom.bloom_read_revision()
-        self.upgraded_rows = self.bloom.bloom_read_retained_rows(self.ids)
-        self.upgraded_table = self.bloom.bloom_read_cli_session_table()
-
-        self.bloom.bloom_add_cli_sessions(self.ids["user"])
-        self.stored_sessions = self.bloom.bloom_read_cli_session_table()["sessions"]
-
-        self.commands.append(
-            self.bloom.bloom_run_alembic("downgrade", self.parameters.MIGRATION_BEFORE_CLI)
-        )
-        self.downgraded_revision = self.bloom.bloom_read_revision()
-        self.downgraded_rows = self.bloom.bloom_read_retained_rows(self.ids)
-        self.downgraded_table = self.bloom.bloom_read_cli_session_table()
-
-        self.commands.append(
-            self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
-        )
-        self.reupgraded_revision = self.bloom.bloom_read_revision()
-        self.reupgraded_rows = self.bloom.bloom_read_retained_rows(self.ids)
-        self.reupgraded_table = self.bloom.bloom_read_cli_session_table()
 
     def tearDownClass(self):
         super().tearDownClass()
