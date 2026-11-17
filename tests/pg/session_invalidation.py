@@ -20,9 +20,10 @@ class SessionInvalidationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.change_before})
+        status = self.bloom.bloom_read_account(self.change_login.access_token).status
+        self.print_variables({"status": status})
         self.assertEqual(
-            self.change_before,
+            status,
             self.parameters.STATUS_OK,
             msg=self.parameters.MSG_SESSION_BEFORE.format(event=self.parameters.SESSION_CHANGE),
             abort_on_fail=False,
@@ -32,11 +33,15 @@ class SessionInvalidationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.change})
+        values = self.parameters
+        status = self.bloom.bloom_change_password(
+            self.change_login.access_token, values.SESSION_OLD_PASSWORD, values.SESSION_NEW_PASSWORD
+        )
+        self.print_variables({"status": status})
         self.assertEqual(
-            self.change,
-            self.parameters.STATUS_OK,
-            msg=self.parameters.MSG_SESSION_DONE.format(event=self.parameters.SESSION_CHANGE),
+            status,
+            values.STATUS_OK,
+            msg=values.MSG_SESSION_DONE.format(event=values.SESSION_CHANGE),
             abort_on_fail=False,
         )
 
@@ -44,9 +49,10 @@ class SessionInvalidationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.change_after.account})
+        status = self.bloom.bloom_read_account(self.change_login.access_token).status
+        self.print_variables({"status": status})
         self.assertEqual(
-            self.change_after.account,
+            status,
             self.parameters.STATUS_UNAUTHORIZED,
             msg=self.parameters.MSG_SESSION_ACCESS.format(event=self.parameters.SESSION_CHANGE),
             abort_on_fail=False,
@@ -56,9 +62,10 @@ class SessionInvalidationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.change_after.refresh})
+        status = self.bloom.bloom_refresh(self.change_login.cookie).status
+        self.print_variables({"status": status})
         self.assertEqual(
-            self.change_after.refresh,
+            status,
             self.parameters.STATUS_UNAUTHORIZED,
             msg=self.parameters.MSG_SESSION_REFRESH.format(event=self.parameters.SESSION_CHANGE),
             abort_on_fail=False,
@@ -68,9 +75,12 @@ class SessionInvalidationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.change_after.old_password})
+        status = self.bloom.bloom_log_in_for_cookie(
+            self.parameters.SESSION_CHANGE_EMAIL, self.parameters.SESSION_OLD_PASSWORD
+        ).status
+        self.print_variables({"status": status})
         self.assertEqual(
-            self.change_after.old_password,
+            status,
             self.parameters.STATUS_UNAUTHORIZED,
             msg=self.parameters.MSG_SESSION_OLD_PASSWORD.format(
                 event=self.parameters.SESSION_CHANGE
@@ -82,9 +92,12 @@ class SessionInvalidationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.change_after.new_password})
+        status = self.bloom.bloom_log_in_for_cookie(
+            self.parameters.SESSION_CHANGE_EMAIL, self.parameters.SESSION_NEW_PASSWORD
+        ).status
+        self.print_variables({"status": status})
         self.assertEqual(
-            self.change_after.new_password,
+            status,
             self.parameters.STATUS_OK,
             msg=self.parameters.MSG_SESSION_NEW_PASSWORD.format(
                 event=self.parameters.SESSION_CHANGE
@@ -96,31 +109,28 @@ class SessionInvalidationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.reset_before})
+        status = self.bloom.bloom_read_account(self.reset_login.access_token).status
+        self.print_variables({"status": status})
         self.assertEqual(
-            self.reset_before,
+            status,
             self.parameters.STATUS_OK,
             msg=self.parameters.MSG_SESSION_BEFORE.format(event=self.parameters.SESSION_RESET),
             abort_on_fail=False,
         )
 
-    def bud_reset_mail_carries_a_token(self):
+    def bud_a_reset_mail_carries_a_token_and_the_reset_is_answered_200(self):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.assertTrue(
-            self.reset_mail.token, msg=self.parameters.MSG_SESSION_MAIL, abort_on_fail=False
-        )
-
-    def bud_password_reset_is_answered_200(self):
-        if not self.postgres:
-            self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
-            return
-        self.print_variables({"status": self.reset})
+        values = self.parameters
+        mail = self.bloom.bloom_request_password_reset(values.SESSION_RESET_EMAIL)
+        self.assertTrue(mail.token, msg=values.MSG_SESSION_MAIL, abort_on_fail=True)
+        status = self.bloom.bloom_reset_password(mail.token, values.SESSION_NEW_PASSWORD)
+        self.print_variables({"status": status})
         self.assertEqual(
-            self.reset,
-            self.parameters.STATUS_OK,
-            msg=self.parameters.MSG_SESSION_DONE.format(event=self.parameters.SESSION_RESET),
+            status,
+            values.STATUS_OK,
+            msg=values.MSG_SESSION_DONE.format(event=values.SESSION_RESET),
             abort_on_fail=False,
         )
 
@@ -128,9 +138,10 @@ class SessionInvalidationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.reset_after.account})
+        status = self.bloom.bloom_read_account(self.reset_login.access_token).status
+        self.print_variables({"status": status})
         self.assertEqual(
-            self.reset_after.account,
+            status,
             self.parameters.STATUS_UNAUTHORIZED,
             msg=self.parameters.MSG_SESSION_ACCESS.format(event=self.parameters.SESSION_RESET),
             abort_on_fail=False,
@@ -140,9 +151,10 @@ class SessionInvalidationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.reset_after.refresh})
+        status = self.bloom.bloom_refresh(self.reset_login.cookie).status
+        self.print_variables({"status": status})
         self.assertEqual(
-            self.reset_after.refresh,
+            status,
             self.parameters.STATUS_UNAUTHORIZED,
             msg=self.parameters.MSG_SESSION_REFRESH.format(event=self.parameters.SESSION_RESET),
             abort_on_fail=False,
@@ -152,9 +164,12 @@ class SessionInvalidationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.reset_after.old_password})
+        status = self.bloom.bloom_log_in_for_cookie(
+            self.parameters.SESSION_RESET_EMAIL, self.parameters.SESSION_OLD_PASSWORD
+        ).status
+        self.print_variables({"status": status})
         self.assertEqual(
-            self.reset_after.old_password,
+            status,
             self.parameters.STATUS_UNAUTHORIZED,
             msg=self.parameters.MSG_SESSION_OLD_PASSWORD.format(
                 event=self.parameters.SESSION_RESET
@@ -166,9 +181,12 @@ class SessionInvalidationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"status": self.reset_after.new_password})
+        status = self.bloom.bloom_log_in_for_cookie(
+            self.parameters.SESSION_RESET_EMAIL, self.parameters.SESSION_NEW_PASSWORD
+        ).status
+        self.print_variables({"status": status})
         self.assertEqual(
-            self.reset_after.new_password,
+            status,
             self.parameters.STATUS_OK,
             msg=self.parameters.MSG_SESSION_NEW_PASSWORD.format(
                 event=self.parameters.SESSION_RESET
