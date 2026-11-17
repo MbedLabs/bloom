@@ -4643,3 +4643,34 @@ LNK_PREFIXES = ("LKA", "LKB")
 MSG_LNK_FORBIDDEN = "a test case cannot reference a requirement: 422 saying the role is not allowed"
 MSG_LNK_LEGACY = "a link stored under the old concept code is listed under the current code"
 MSG_LNK_DUPLICATE = "creating the same link again is refused with 400 as already existing"
+PID_PREFIXES = ("PIA", "PIB", "PIC", "PID", "PIE", "PIF")
+MSG_PID_SUITE_ID = "a suite gets a public id of its project and is read by it"
+MSG_PID_SUITE_NUMBER = "{method} of a suite by its database id is a 404 Test suite not found"
+MSG_PID_SUITE_CHANGED = "the suite is renamed and deleted by its public id, and then gone"
+MSG_PID_ITEM_NUMBER = "adding a test case by its database id is a 404"
+MSG_PID_ITEM_ADDED = "a test case is added by its public id once; a second time is a 400"
+MSG_PID_ITEM_REMOVED = "an item is removed by the test case public id only, and then gone"
+MSG_PID_FOREIGN = "a test case of another project is refused with 404 naming the suite project"
+MSG_PID_CAMPAIGN_ID = "a campaign gets a public id of its project and is read by it"
+MSG_PID_CAMPAIGN_NUMBER = "{method} of a campaign by its database id is a 404 Campaign not found"
+MSG_PID_CAMPAIGN_ITEM = (
+    "a campaign item is added, commented and removed by the test case public id only"
+)
+MSG_PID_CAMPAIGN_DELETED = "the campaign is deleted by its public id, and then gone"
+MSG_PID_ADDRESS = (
+    "the document address opens the {slug} by public id and answers 404 for the database id"
+)
+MSG_PID_CASE_ADDRESS = "a test case is still opened by its database id"
+RET_POLICY = {
+    "name": "Project content",
+    "permissions": {"REQ": ["view", "create", "edit"], "RPT": ["view", "create", "edit"]},
+    "type_tags": {"REQ": {"all": True}, "RPT": {"all": True}},
+}
+RET_ASSIGNMENTS = ["bundle", "individual"]
+MSG_RET_BEFORE = "with a {assignment} assignment the author reads the project and the requirement"
+MSG_RET_REMOVED = "after removal the author is refused the project (403) and the requirement (404), and keeps the other project"
+MSG_RET_ROWS = (
+    "removing the {assignment} assignment changes no stored row outside the access tables"
+)
+MSG_RET_OPTION = "the author is still offered for assignment under the same id"
+MSG_RET_RESTORED = "after the assignment is restored the author reads the content and the attachment again, and no row changed"

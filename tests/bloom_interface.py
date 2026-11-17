@@ -31,6 +31,7 @@ from app.models import (
     IntegrationSetting,
     Project,
 )
+from app.models import workflow as workflow_models
 from app.models.user import User, UserRole
 from app.services.integration_secrets import encrypt_integration_secret
 from tests.access_fixtures import allow_doc_types, project_access_fixture
@@ -178,10 +179,29 @@ class BloomInterface:
         )
 
     def bloom_add_record(self, kind, **fields):
-        return self._run(self._add(getattr(bloom_models, kind)(**fields)))
+        return self._run(self._add(self._model(kind)(**fields)))
 
     def bloom_read_record(self, kind, row_id):
-        return self._run(self._get(getattr(bloom_models, kind), row_id))
+        return self._run(self._get(self._model(kind), row_id))
+
+    def bloom_stored_rows(self, excluded=()):
+        async def read():
+            async with self.maker() as db:
+                return {
+                    table.name: (
+                        await db.execute(select(table).order_by(*table.primary_key.columns))
+                    ).all()
+                    for table in Base.metadata.sorted_tables
+                    if table.name not in excluded
+                }
+
+        return self._run(read())
+
+    def _model(self, kind):
+        for module in (bloom_models, workflow_models):
+            if hasattr(module, kind):
+                return getattr(module, kind)
+        raise KeyError(kind)
 
     def bloom_list_defects(self):
         return self._run(self._all(select(Defect).order_by(Defect.id)))

@@ -362,6 +362,83 @@ class BloomApiInterface(BloomInterface):
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
 
+    def bloom_new_retention_world(self):
+        self.bloom_new_database()
+        self.bloom_enforce_foreign_keys()
+        self.bloom_add_record("Project", id=1, name="Demo", prefix="PRJ")
+        self.bloom_add_record("Project", id=2, name="ABC", prefix="ABC")
+        people = (
+            (1, "admin@example.com", "Admin", UserRole.admin),
+            (2, "author@example.com", "Author", UserRole.maintainer),
+        )
+        for number, email, name, role in people:
+            self.bloom_add_record(
+                "User", id=number, email=email, full_name=name, hashed_password="x", role=role
+            )
+        return self.bloom_user_token_headers(1), self.bloom_user_token_headers(2)
+
+    def bloom_add_authored_content(self, project_id, author_id, approver_id):
+        requirement = self.bloom_add_record(
+            "Requirement",
+            project_id=project_id,
+            req_id="PRJ-REQ-001",
+            title="Authored content",
+            created_by_id=author_id,
+            reviewer_id=author_id,
+        )
+        document = self.bloom_add_record(
+            "Document",
+            project_id=project_id,
+            doc_id="PRJ-RPT-001",
+            doc_type="RPT",
+            title="Authored report",
+            created_by_id=author_id,
+        )
+        workflow = self.bloom_add_record(
+            "ArtefactWorkflow",
+            project_id=project_id,
+            artefact_type="requirement",
+            artefact_id=requirement,
+            revision_creator_id=author_id,
+            reviewer_id=author_id,
+        )
+        about = {"artefact_type": "requirement", "artefact_id": requirement}
+        self.bloom_add_record(
+            "ArtefactComment",
+            **about,
+            author_name="Author",
+            author_user_id=author_id,
+            body="Recorded review comment",
+        )
+        self.bloom_add_record(
+            "ArtefactActivity",
+            **about,
+            event_type="created",
+            summary="Author created the requirement",
+            actor_user_id=author_id,
+        )
+        self.bloom_add_record(
+            "ArtefactRevision",
+            workflow_id=workflow,
+            revision_number=1,
+            content_snapshot={"title": "Preserved earlier revision"},
+            content_hash="a" * 64,
+            reviewed_by_id=author_id,
+            approved_by_id=approver_id,
+        )
+        self.bloom_add_record(
+            "DocumentAttachment",
+            document_id=document,
+            filename="retained.txt",
+            original_filename="retained.txt",
+            storage_path="retained.txt",
+            content_type="text/plain",
+            size_bytes=4,
+            sha256="b" * 64,
+            uploaded_by_id=author_id,
+        )
+        return requirement, document
+
     def bloom_start_observed_api(self):
         app = FastAPI()
         app.add_middleware(RequestObservabilityMiddleware)
