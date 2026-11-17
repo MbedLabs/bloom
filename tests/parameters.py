@@ -5033,3 +5033,42 @@ MSG_PPG_REASSIGN = "assigning the reviewer while changing a {origin} requirement
 MSG_PPG_DEFECT = "a defect reviewer with a review policy on defects is accepted"
 MSG_PPG_LINKS = "a customer reader {how} link read is answered {status}"
 MSG_PPG_LINK_ROWS = "the reader sees only the link to the customer requirement"
+GRP_PREFIXES = ("GRA", "GRB", "GRC", "GRD", "GRE")
+GRP_REVIEW_RULE = {
+    "read": False,
+    "write": False,
+    "review": True,
+    "approve": False,
+    "delete": False,
+    "visibility": ["customer"],
+}
+GRP_READ_ONLY = "Default policies are read-only; duplicate one to change it."
+MSG_GRP_LISTED = (
+    "the 24 default policies are listed, without a base role, with their origins and no tags"
+)
+MSG_GRP_REVIEW_CREATED = (
+    "a review-only policy is stored with its customer origin and the review action only"
+)
+MSG_GRP_REVIEW_UPDATED = (
+    "the review-only policy changes to internal and keeps the review action only"
+)
+MSG_GRP_REVIEW_UNSCOPED = "a review rule without an origin is refused with 400"
+MSG_GRP_REVIEW_DEFAULTS = (
+    "the {name} default reviews every document type{origin}, with no other right"
+)
+MSG_GRP_NEW = "a new group has no members, no grants and no single policy field"
+MSG_GRP_MEMBER = "a member is added once with their email; a second time is a 409"
+MSG_GRP_GRANT = "a project is granted once; a second time is a 409"
+MSG_GRP_READ = "the group shows one member and one grant and is listed"
+MSG_GRP_EMPTIED = "removing the grant and the member empties the group, and a deleted group is gone"
+MSG_GRP_ACCESS = "a group grant gives its member the granted project only, until the member leaves"
+MSG_GRP_EXTERNAL = "a group grant admits an external account to the project"
+MSG_GRP_UNKNOWN_TYPE = "a policy with an unknown document type is refused with 400 naming it"
+MSG_GRP_DEFAULT_DELETE = "a default policy cannot be deleted: 400"
+MSG_GRP_DEFAULT_CHANGE = "changing the {field} of a default policy is refused with 403"
+MSG_GRP_COPIES = "copies of a default policy are numbered, editable, deletable and keep its rules"
+MSG_GRP_CUSTOM = "a custom policy is changed and deleted"
+MSG_GRP_IN_USE = (
+    "a policy used by a granted group cannot be deleted (409) until the group is deleted"
+)
+MSG_GRP_ADMIN_ONLY = "groups and policies are refused to a non-administrator: 403"

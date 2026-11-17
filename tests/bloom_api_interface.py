@@ -63,6 +63,7 @@ from app.core.observability import (
     setup_logging,
 )
 from app.core.permissions import DOC_TYPE_RESOURCES, RESOURCE_ACTIONS
+from app.core.policy_seed import DEFAULT_POLICIES
 from app.core.security import (
     accessible_project_ids,
     create_access_token,
@@ -368,6 +369,19 @@ class BloomApiInterface(BloomInterface):
             return await original(db, setting, tracker, delivery_id)
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
+
+    def bloom_api_rules_policy(self, headers, name, doc_types=("REQ",), external=False):
+        shown = ["customer"] if external else ["internal", "customer"]
+        rules = {doc_type: {"read": True, "visibility": shown} for doc_type in doc_types}
+        return self.bloom_api_call(
+            "POST", "/api/policies", headers, json={"name": name, "rules": rules}
+        ).body
+
+    def bloom_default_policy_names(self):
+        return {spec["name"] for spec in DEFAULT_POLICIES}
+
+    def bloom_document_types(self):
+        return set(DOC_TYPE_RESOURCES)
 
     def bloom_resource_actions_of(self, resource):
         return set(RESOURCE_ACTIONS[resource])
