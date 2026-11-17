@@ -5306,3 +5306,47 @@ MSG_REG_KEYS_RELATED = "named rows combined with related_to give the intersectio
 MSG_REG_KEYS_REFUSED = "{what} is refused with 422"
 MSG_REG_KEYS_PROJECT = "a row of another project cannot be read by naming it"
 MSG_REG_KEYS_SPEC = "a specification is returned by naming it"
+CRUD_PREFIX = "CRD"
+CRUD_ANONYMOUS = [
+    ("GET", "/api/defects?project_id=1"),
+    ("POST", "/api/defects"),
+    ("GET", "/api/defects/1"),
+    ("PATCH", "/api/defects/1"),
+    ("DELETE", "/api/defects/1"),
+    ("GET", "/api/changes?project_id=1"),
+    ("POST", "/api/changes"),
+    ("GET", "/api/risks?project_id=1"),
+    ("POST", "/api/risks"),
+    ("GET", "/api/baselines"),
+    ("POST", "/api/baselines"),
+    ("GET", "/api/projects/1/members"),
+    ("POST", "/api/projects/1/members"),
+]
+MSG_CRUD_DEFECT_CREATED = "a defect is created with an id of its project and its severity"
+MSG_CRUD_DEFECT_IDS = "two defects get different ids"
+MSG_CRUD_UNKNOWN_PROJECT = "creating a {kind} in an unknown project is a 404"
+MSG_CRUD_DEFECT_SEVERITY = "the severity filter returns critical defects only"
+MSG_CRUD_DEFECT_STATUS = "the status filter returns open defects only"
+MSG_CRUD_DEFECT_READ = "a defect is read by its id, and an unknown one is a 404"
+MSG_CRUD_DEFECT_PATCHED = "a defect's title and severity are changed"
+MSG_CRUD_DEFECT_CLOSED = "closing a defect stamps its closing time and reopening clears it"
+MSG_CRUD_DEFECT_TRACKER = "{what} is refused with 422"
+MSG_CRUD_DEFECT_UNKNOWN = "changing or deleting an unknown defect is a 404"
+MSG_CRUD_DEFECT_DELETED = "a deleted defect is gone"
+MSG_CRUD_DEFECT_REFRESH = "refreshing a defect without an issue link is a 422 asking for one"
+MSG_CRUD_CHANGE_CREATED = "a change request is created with an id of its project"
+MSG_CRUD_LISTED = "the {kind} list of the project holds the new one"
+MSG_CRUD_CHANGE_ROUND = "a change request is read, changed while staying a draft, and deleted"
+MSG_CRUD_UNKNOWN = "reading, changing or deleting an unknown {kind} is a 404"
+MSG_CRUD_RISK_CREATED = "a risk is created with an id of its project and its severity"
+MSG_CRUD_RISK_ROUND = "a risk is read, mitigated and deleted"
+MSG_CRUD_BASELINE_CREATED = "a baseline is created with its name"
+MSG_CRUD_BASELINE_LISTED = "the baseline is listed, and the project filter keeps that project only"
+MSG_CRUD_BASELINE_ROUND = "a baseline is read, renamed and deleted"
+MSG_CRUD_MEMBER_ADDED = "a member is added, listed and read by the entry id"
+MSG_CRUD_MEMBER_OWNER = "a member becomes owner without policies"
+MSG_CRUD_MEMBER_ROLE = "an entry with a viewer role is refused with 422"
+MSG_CRUD_MEMBER_REMOVED = "a removed member is no longer listed"
+MSG_CRUD_MEMBER_UNKNOWN_USER = "adding an unknown user is refused"
+MSG_CRUD_MEMBER_UNKNOWN = "reading or removing an unknown entry is a 404"
+MSG_CRUD_ANONYMOUS = "{method} {path} refuses an anonymous caller with 401"

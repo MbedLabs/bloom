@@ -5,6 +5,7 @@ import tests.config  # noqa: F401
 SUITES = [
     "tests.api.BLOOM_access_labels.AccessLabelsTest",
     "tests.api.BLOOM_artefact_activity_basics.ArtefactActivityBasicsTest",
+    "tests.api.BLOOM_artefact_crud.ArtefactCrudTest",
     "tests.api.BLOOM_baseline_read_admission.BaselineReadAdmissionTest",
     "tests.api.BLOOM_baseline_read_override.BaselineReadOverrideTest",
     "tests.api.BLOOM_baseline_read_owner.BaselineReadOwnerTest",
