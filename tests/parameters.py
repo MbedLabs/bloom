@@ -3592,7 +3592,7 @@ MDI_LIMIT = b"## [REQ] Limit\nStay under {{parameter: limit, value: 5}}\n"
 MDI_FRESH = (
     b"## [REQ] Fresh\nUses {{parameter: FRESH_A, value: 1}} and {{parameter: FRESH_B, value: 2}}\n"
 )
-MDI_TEST_CASE = (
+MDI_RELAY_TEST_CASE = (
     b"## [TC] Relay boot\n"
     b"Checks the relay-driven boot.\n"
     b"- Pre-Condition: relay open\n"
@@ -3648,7 +3648,7 @@ MSG_MDI_REFUSED = "{what} is refused with 422"
 MSG_MDI_BROKEN = "collision actions that are not JSON are refused, and nothing is imported"
 MSG_MDI_FRESH = "an import without a collision creates every parameter"
 MSG_MDI_REWRITE = "renaming rewrites the declaration and the reference of that parameter only"
-MSG_MDI_TEST_CASE = "a test case section is imported with its id, description and step rows"
+MSG_MDI_RELAY_TEST_CASE = "a test case section is imported with its id, description and step rows"
 MSG_MDI_PERMISSION = (
     "an import needs the import permission on every imported type, and creates nothing without it"
 )

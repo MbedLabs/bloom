@@ -184,7 +184,7 @@ class ImportMarkdownBase(BloomTestCase):
         records = self.bloom.bloom_seed_markdown_project()
         values = self.parameters
         result, _ = self.bloom.bloom_import_markdown(
-            records.project, records.admin, values.MDI_TEST_CASE
+            records.project, records.admin, values.MDI_RELAY_TEST_CASE
         )
         case = self.bloom.bloom_test_case_titled("Relay boot")
         self.assertEqual(
@@ -198,7 +198,7 @@ class ImportMarkdownBase(BloomTestCase):
                 ],
             ),
             (1, True, "Checks the relay-driven boot.", values.MDI_STEP_ROWS),
-            msg=values.MSG_MDI_TEST_CASE,
+            msg=values.MSG_MDI_RELAY_TEST_CASE,
             abort_on_fail=False,
         )
 
