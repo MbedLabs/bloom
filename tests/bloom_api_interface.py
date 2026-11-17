@@ -50,7 +50,11 @@ from app.core.database import get_db
 from app.core.deps import limiter, rate_limit_key
 from app.core.observability import CREATED_BODY_LIMIT, CreatedBody, client_address
 from app.core.permissions import DOC_TYPE_RESOURCES
-from app.core.security import create_access_token
+from app.core.security import (
+    accessible_project_ids,
+    create_access_token,
+    get_current_user,
+)
 from app.core.service_auth import require_bud_sync_token
 from app.models import (
     ArtefactActivity,
@@ -84,7 +88,7 @@ from app.models.user_token import UserToken, UserTokenPurpose
 from app.schemas.cli_auth import CliStartRequest
 from app.schemas.memberships import DEFAULT_EXTERNAL_DOC_TYPES
 from app.services import audit as audit_service
-from app.services import cli_auth
+from app.services import cli_auth, mail_service
 from app.services.audit import request_outcome, route_template
 from app.services.integration_secrets import (
     ENVELOPE_PREFIX,
@@ -348,6 +352,60 @@ class BloomApiInterface(BloomInterface):
             return await original(db, setting, tracker, delivery_id)
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
+
+    def bloom_start_workflow_api(self):
+        self.bloom_start_full_api()
+        self.actor, self.deliveries = 1, []
+        main.app.dependency_overrides[get_current_user] = self._acting_user
+        record = lambda **message: self.deliveries.append(message)
+        self.patches.enter_context(patch.object(mail_service, "send_email", record))
+
+    def bloom_new_workflow_world(self):
+        self.bloom_new_database()
+        self.bloom_enforce_foreign_keys()
+        self.actor = 1
+        self.deliveries.clear()
+        self._run(self._seed_workflow_world())
+
+    def bloom_act_as(self, user_id):
+        self.actor = user_id
+
+    def bloom_list_deliveries(self):
+        return list(self.deliveries)
+
+    def bloom_api_approve_as_three_people(self, path):
+        assignees = {"reviewer_id": 2, "approver_id": 3}
+        self.bloom_api_call("PUT", path + "/workflow/assignees", json=assignees)
+        self.bloom_api_call("POST", path + "/requests", json={"kind": "review"})
+        self.bloom_act_as(2)
+        self.bloom_api_call("POST", path + "/comments", json={"body": "Reviewed"})
+        self.bloom_api_call("POST", path + "/requests", json={"kind": "approval"})
+        self.bloom_act_as(3)
+        signed = self.bloom_api_call("POST", path + "/sign-off", json={"step": "approve"})
+        self.bloom_act_as(1)
+        return signed
+
+    async def _acting_user(self):
+        async with self.maker() as db:
+            user = await db.get(User, self.actor)
+            await accessible_project_ids(db, user)
+            return user
+
+    async def _seed_workflow_world(self):
+        async with self.maker() as db:
+            db.add(Project(id=1, name="Demo", prefix="PRJ"))
+            for number in range(1, 5):
+                db.add(
+                    User(
+                        id=number,
+                        email=f"person{number}@example.com",
+                        full_name=f"Person {number}",
+                        hashed_password="x",
+                        role=UserRole.admin,
+                        is_active=True,
+                    )
+                )
+            await db.commit()
 
     def bloom_api_new_member(self, headers, name, role="maintainer"):
         email, password = f"{name}@example.com", self.parameters.API_PASSWORD

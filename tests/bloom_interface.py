@@ -18,6 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 import tests.parameters as params
+from app import models as bloom_models
 from app.api import integrations
 from app.core.database import Base
 from app.core.permissions import DOC_TYPE_RESOURCES
@@ -175,6 +176,12 @@ class BloomInterface:
                 )
             )
         )
+
+    def bloom_add_record(self, kind, **fields):
+        return self._run(self._add(getattr(bloom_models, kind)(**fields)))
+
+    def bloom_read_record(self, kind, row_id):
+        return self._run(self._get(getattr(bloom_models, kind), row_id))
 
     def bloom_list_defects(self):
         return self._run(self._all(select(Defect).order_by(Defect.id)))

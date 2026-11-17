@@ -91,4 +91,5 @@ SUITES = [
     "tests.logic.BLOOM_testrail.TestrailTest",
     "tests.logic.BLOOM_timestamp_text.TimestampTextTest",
     "tests.logic.BLOOM_vision_startup.VisionStartupTest",
+    "tests.logic.BLOOM_vision_tags.VisionTagsTest",
 ]

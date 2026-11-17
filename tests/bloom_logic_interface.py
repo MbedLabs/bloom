@@ -130,6 +130,7 @@ from app.core.external_issue import (
 from app.core.identity import POWERED_BY, PRODUCT_IDENTITY, PRODUCT_NAME
 from app.core.md_import import (
     Parameter,
+    normalize_type,
     parameter_name_collisions,
     parse_markdown_document,
     rename_parameters,
@@ -3347,6 +3348,9 @@ class BloomLogicInterface(BloomInterface):
         text = self.bloom_read_repo_text(name)
         first = re.search(r"^\s*location[^\n{]*\{", text, re.MULTILINE)
         return text[: first.start()] if first else text
+
+    def bloom_markdown_type(self, name):
+        return normalize_type(name)
 
     def bloom_mention(self, kind, identifier):
         return {

@@ -4594,3 +4594,34 @@ MSG_UAS_EMPTY = "a user without access has empty lists, and an administrator has
 MSG_UAS_ADMIN_ONLY = (
     "the summary is refused to a non-administrator with 403 and an unknown user is a 404"
 )
+VISW_VISION = {
+    "project_id": 1,
+    "doc_id": "PRJ-VIS-001",
+    "doc_type": "VIS",
+    "title": "Idea",
+    "status": "Draft",
+    "version": "1",
+    "created_by_id": 1,
+}
+VISW_CHANGE = {
+    "project_id": 1,
+    "change_id": "PRJ-CHG-001",
+    "title": "Next vision",
+    "status": "Approved",
+}
+MSG_VISW_DRAFT = "a new vision is controlled, in Draft, without revisions"
+MSG_VISW_APPROVED = "after review and approval the vision is Approved with revision 1"
+MSG_VISW_CORRECTED = (
+    "a correction returns the vision to Draft at revision 1 and keeps the archived revision"
+)
+MSG_VISW_REVISED = (
+    "an edit authorised by an approved change opens revision 2 naming the change, as version 2"
+)
+VIST_VISION = {"doc_id": "PRJ-VIS-001", "doc_type": "VIS", "title": "Vision"}
+VIST_REQUIREMENT = {"req_id": "PRJ-REQ-001", "title": "Requirement"}
+VIST_MARKDOWN = b"## [VIS] North star\nWhere the product goes\n"
+MSG_VIST_TAGS = (
+    "a vision tags a requirement and a requirement tags a vision, each as a references link"
+)
+MSG_VIST_NAMES = "the Markdown types vis and Vision both mean VIS"
+MSG_VIST_IMPORT = "a VIS section is imported as a draft vision with a vision id"
