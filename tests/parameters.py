@@ -4546,3 +4546,20 @@ MSG_BLK_FOREIGN = (
 )
 MSG_BLK_SKIPPED = "a suite keeps its own project's test case and skips the foreign and unknown ones"
 MSG_BLK_SECTIONS = "the document list counts the sections of each document separately"
+BUDL_PREFIX = "BDL"
+BUDL_MEMBER = "maintainer-docs@example.com"
+BUDL_CASE = {
+    "status": "Draft",
+    "visibility": "customer",
+    "last_execution_status": "Passed",
+    "last_executed_at": datetime(2026, 7, 4, 9, 30, 0),
+    "last_bud_run_id": 987,
+}
+MSG_BUDL_RUN = "the document list shows the test case with the id of its last Bud run"
+TCOV_PREFIX = "TCV"
+TCOV_TITLES = ("Uncovered", "Partial", "Covered")
+MSG_TCOV_APPROVED = "the test case is approved through review and approval by its creator"
+MSG_TCOV_REPORT = "the gap report counts one uncovered, one partial and one covered requirement: 66.7 percent, two gaps"
+MSG_TCOV_MATRIX = "the matrix shows each requirement with its coverage state"
+MSG_TCOV_FILTER = "the Uncovered filter returns the one uncovered requirement"
+MSG_TCOV_SORT = "sorting by coverage lists Uncovered, Partial, Covered"

@@ -349,6 +349,30 @@ class BloomApiInterface(BloomInterface):
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
 
+    def bloom_api_verify(self, headers, project_id, test_case_id, requirement_id):
+        body = {
+            "project_id": project_id,
+            "source_type": "TC",
+            "source_id": test_case_id,
+            "target_type": "REQ",
+            "target_id": requirement_id,
+            "role": "verifies",
+        }
+        return self.bloom_api_call("POST", "/api/links", headers, json=body)
+
+    def bloom_api_approve_test_case(self, headers, test_case_id):
+        path = f"/api/artefacts/test-case/{test_case_id}"
+        actor = self.bloom_api_call("GET", path + "/workflow", headers).body["creator"]["id"]
+        self.bloom_api_call(
+            "PUT", path + "/workflow/assignees", headers, json={"reviewer_id": actor}
+        )
+        self.bloom_api_call("POST", path + "/requests", headers, json={"kind": "review"})
+        comment = {"body": "Reviewed the requested test case."}
+        self.bloom_api_call("POST", path + "/comments", headers, json=comment)
+        self.bloom_api_call("POST", path + "/requests", headers, json={"kind": "approval"})
+        signed = self.bloom_api_call("POST", path + "/sign-off", headers, json={"step": "approve"})
+        return actor, signed
+
     def bloom_api_add_tracked_defect(self, headers, prefix):
         project = self.bloom_api_new_project(headers, prefix)
         body = {
