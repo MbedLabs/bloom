@@ -20,17 +20,11 @@ class VisionsMigrationTest(VisionsMigrationBase):
             return
         before, head = self.parameters.VISIONS_BEFORE, self.parameters.MIGRATION_HEAD
         self.before = self.bloom.bloom_run_alembic("upgrade", before)
-        seeded = self.bloom.bloom_seed_visions_holders()
-        self.state_before = self.bloom.bloom_read_visions_state(seeded)
+        self.seeded = self.bloom.bloom_seed_visions_holders()
+        self.state_before = self.bloom.bloom_read_visions_state(self.seeded)
         self.upgrade = self.bloom.bloom_run_alembic("upgrade", head)
-        self.after = self.bloom.bloom_read_visions_state(seeded)
-        vision = self.bloom.bloom_add_vision(seeded["project"])
-        self.refused = self.bloom.bloom_run_alembic("downgrade", before)
-        self.bloom.bloom_delete_document(vision)
-        self.downgrade = self.bloom.bloom_run_alembic("downgrade", before)
-        self.downgraded = self.bloom.bloom_read_visions_state(seeded)
-        self.upgrade_again = self.bloom.bloom_run_alembic("upgrade", head)
-        self.upgraded_again = self.bloom.bloom_read_visions_state(seeded)
+        self.after = self.bloom.bloom_read_visions_state(self.seeded)
+        self.vision = self.bloom.bloom_add_vision(self.seeded["project"])
 
     def tearDownClass(self):
         super().tearDownClass()

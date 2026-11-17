@@ -142,25 +142,16 @@ class VisionsMigrationBase(BloomTestCase):
                 abort_on_fail=False,
             )
 
-    def bud_downgrade_over_a_vision_is_refused(self):
+    def bud_downgrade_over_a_vision_is_refused_naming_the_revision(self):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"alembic": self.refused[1][-300:]})
-        self.assertNotEqual(
-            self.refused[0],
-            0,
-            msg=self.parameters.MSG_VISIONS_REFUSED,
-            abort_on_fail=False,
-        )
-
-    def bud_refusal_names_the_revision(self):
-        if not self.postgres:
-            self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
-            return
+        code, output = self.bloom.bloom_run_alembic("downgrade", self.parameters.VISIONS_BEFORE)
+        self.print_variables({"alembic": output[-300:]})
+        self.assertNotEqual(code, 0, msg=self.parameters.MSG_VISIONS_REFUSED, abort_on_fail=False)
         self.assertIn(
             self.parameters.VISIONS_REFUSAL,
-            self.refused[1],
+            output,
             msg=self.parameters.MSG_VISIONS_REFUSAL_TEXT,
             abort_on_fail=False,
         )
@@ -169,20 +160,17 @@ class VisionsMigrationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"alembic": self.downgrade[1][-300:]})
-        self.assertEqual(
-            self.downgrade[0],
-            0,
-            msg=self.parameters.MSG_MIGRATION_DOWNGRADE,
-            abort_on_fail=False,
-        )
+        self.bloom.bloom_delete_document(self.vision)
+        code, output = self.bloom.bloom_run_alembic("downgrade", self.parameters.VISIONS_BEFORE)
+        self.print_variables({"alembic": output[-300:]})
+        self.assertEqual(code, 0, msg=self.parameters.MSG_MIGRATION_DOWNGRADE, abort_on_fail=False)
 
     def bud_downgrade_restores_every_row(self):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
         self.assertEqual(
-            self.downgraded,
+            self.bloom.bloom_read_visions_state(self.seeded),
             self.state_before,
             msg=self.parameters.MSG_VISIONS_DOWNGRADED,
             abort_on_fail=False,
@@ -192,20 +180,17 @@ class VisionsMigrationBase(BloomTestCase):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"alembic": self.upgrade_again[1][-300:]})
-        self.assertEqual(
-            self.upgrade_again[0],
-            0,
-            msg=self.parameters.MSG_MIGRATION_HEAD_AGAIN,
-            abort_on_fail=False,
-        )
+        code, output = self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
+        self.print_variables({"alembic": output[-300:]})
+        self.assertEqual(code, 0, msg=self.parameters.MSG_MIGRATION_HEAD_AGAIN, abort_on_fail=False)
 
     def bud_second_upgrade_gives_the_released_entry_the_same_policies(self):
         if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
+        again = self.bloom.bloom_read_visions_state(self.seeded)
         self.assertEqual(
-            self.upgraded_again["released"],
+            again["released"],
             self.after["released"],
             msg=self.parameters.MSG_VISIONS_AGAIN,
             abort_on_fail=False,
