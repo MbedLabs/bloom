@@ -20,7 +20,7 @@ class UserPromotionTest(UserPromotionBase):
         bloom.bloom_start_full_api()
         seed_email = bloom.bloom_seed_admin_email()
         bloom.bloom_add_admin(seed_email, password)
-        seed, seed_login = bloom.bloom_log_in(seed_email, password)
+        self.seed, seed_login = bloom.bloom_log_in(seed_email, password)
         maintainer, other_admin, target, second_admin = self.parameters.PROMOTION_EMAILS
         roles = {
             maintainer: self.parameters.PROMOTION_MAINTAINER,
@@ -29,22 +29,16 @@ class UserPromotionTest(UserPromotionBase):
             second_admin: self.parameters.PROMOTION_ADMIN,
         }
         created = {
-            email: bloom.bloom_api_create_user(seed, email, password, role)
+            email: bloom.bloom_api_create_user(self.seed, email, password, role)
             for email, role in roles.items()
         }
         ids = {email: answer.json().get("id") for email, answer in created.items()}
-        other, other_login = bloom.bloom_log_in(other_admin, password)
-        self.tc_sign_ins = [seed_login, other_login]
-        self.tc_created = [answer.status_code for answer in created.values()]
-        self.tc_promoted = bloom.bloom_api_set_role(
-            seed, ids[maintainer], self.parameters.PROMOTION_ADMIN
-        )
-        self.tc_other = bloom.bloom_api_set_role(
-            other, ids[target], self.parameters.PROMOTION_ADMIN
-        )
-        self.tc_demoted = bloom.bloom_api_set_role(
-            seed, ids[second_admin], self.parameters.PROMOTION_MAINTAINER
-        )
+        self.maintainer_id = ids[maintainer]
+        self.target_id = ids[target]
+        self.second_admin_id = ids[second_admin]
+        self.other_admin, other_login = bloom.bloom_log_in(other_admin, password)
+        self.sign_ins = [seed_login, other_login]
+        self.created = [answer.status_code for answer in created.values()]
 
     def tearDownClass(self):
         super().tearDownClass()

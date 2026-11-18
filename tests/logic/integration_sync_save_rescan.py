@@ -17,13 +17,17 @@ class IntegrationSyncSaveRescanBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_first_run_clears_the_full_scan(self):
-        self.print_variables({"full scan after the run": self.tc_after_run})
+        after_run = self.bloom.bloom_get_setting(self.setting_id).sync_full_scan
+        self.print_variables({"full scan after the run": after_run})
         self.assertEqual(
-            self.tc_after_run, False, msg=self.parameters.MSG_FULL_SCAN_CLEARED, abort_on_fail=False
+            after_run, False, msg=self.parameters.MSG_FULL_SCAN_CLEARED, abort_on_fail=False
         )
 
     def bud_save_asks_for_a_full_scan_from_the_start(self):
-        setting = self.bloom.bloom_get_setting(self.tc_setting_id)
+        self.bloom.bloom_save_setting(
+            self.setting_id, self.parameters.ADMIN_EMAIL, jira_label=self.parameters.LABEL
+        )
+        setting = self.bloom.bloom_get_setting(self.setting_id)
         found = (setting.sync_full_scan, setting.sync_scan_from)
         self.print_variables({"full scan, scan from": found})
         self.assertEqual(

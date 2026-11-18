@@ -15,15 +15,6 @@ class ProjectIamTest(ProjectIamBase):
 
     def setUpClass(self):
         super().setUpClass()
-        edit = self.parameters.IAM_EDIT_REQUIREMENT
-        self.tc_admin = self.bloom.bloom_require_project_access(self.parameters.IAM_ADMIN)
-        self.tc_unassigned = self.bloom.bloom_require_project_access(self.parameters.IAM_MAINTAINER)
-        self.tc_missing = self.bloom.bloom_require_project_access(
-            self.parameters.IAM_MAINTAINER, self.parameters.IAM_VIEW_ONLY, edit
-        )
-        self.tc_granted = self.bloom.bloom_require_project_access(
-            self.parameters.IAM_MAINTAINER, self.parameters.IAM_VIEW_AND_EDIT, edit
-        )
 
     def tearDownClass(self):
         super().tearDownClass()

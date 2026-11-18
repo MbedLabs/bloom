@@ -10,16 +10,23 @@
 
 import asyncio
 import contextlib
+import tempfile
+import uuid
 from types import SimpleNamespace
 from unittest.mock import patch
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 import tests.parameters as params
+from app import models as bloom_models
 from app.api import integrations
 from app.core.database import Base
+from app.core.permissions import DOC_TYPE_RESOURCES
+from app.core.policy_seed import DEFAULT_GROUPS, DEFAULT_POLICIES
+from app.core.security import get_password_hash
 from app.models import (
     ChangeRequest,
     ChangeRequestSyncEvent,
@@ -30,6 +37,7 @@ from app.models import (
 )
 from app.models.user import User, UserRole
 from app.services.integration_secrets import encrypt_integration_secret
+from tests.access_fixtures import allow_doc_types, project_access_fixture
 
 REAL_CLIENT = httpx.AsyncClient
 
@@ -40,7 +48,8 @@ class BloomInterface:
         self.parameters = params
         self.loop = asyncio.new_event_loop()
         self.patches = contextlib.ExitStack()
-        self.engine = create_async_engine(self.parameters.SYNC_DATABASE)
+        self.suite_copy = None
+        self.engine = create_async_engine(self._suite_database())
         self._run(self._create_tables())
         self.maker = async_sessionmaker(self.engine, expire_on_commit=False)
         self.site = SimpleNamespace(jql=[], reads=[], calls=[])
@@ -48,11 +57,46 @@ class BloomInterface:
     def tearDown(self):
         self.patches.close()
         self._run(self.engine.dispose())
+        self._drop_suite_copy()
         self._release_database()
         self.loop.close()
 
+    def _suite_database(self):
+        source = self.parameters.SYNC_DATABASE
+        if not source.startswith(self.parameters.POSTGRES_SCHEME):
+            return source
+        parts = urlsplit(source)
+        self.suite_copy = f"{self.parameters.PG_DATABASE_PREFIX}{uuid.uuid4().hex[:12]}"
+        template = parts.path.lstrip("/")
+        self._run(
+            self._on_postgres_server(
+                source, f'CREATE DATABASE "{self.suite_copy}" TEMPLATE "{template}"'
+            )
+        )
+        return urlunsplit(parts._replace(path=f"/{self.suite_copy}"))
+
+    def _drop_suite_copy(self):
+        if self.suite_copy:
+            statement = f'DROP DATABASE IF EXISTS "{self.suite_copy}" WITH (FORCE)'
+            self._run(self._on_postgres_server(self.parameters.SYNC_DATABASE, statement))
+            self.suite_copy = None
+
+    async def _on_postgres_server(self, url, statement):
+        admin_url = urlunsplit(urlsplit(url)._replace(path=f"/{self.parameters.PG_ADMIN_DATABASE}"))
+        admin = create_async_engine(admin_url, isolation_level="AUTOCOMMIT")
+        async with admin.connect() as connection:
+            await connection.execute(text(statement))
+        await admin.dispose()
+
     def _release_database(self):
         pass
+
+    def bloom_new_database(self):
+        self._run(self.engine.dispose())
+        self._drop_suite_copy()
+        self.engine = create_async_engine(self._suite_database())
+        self._run(self._create_tables())
+        self.maker = async_sessionmaker(self.engine, expire_on_commit=False)
 
     def bloom_create_project(self, prefix=None):
         prefix = prefix or self.parameters.SYNC_PROJECT_PREFIX
@@ -135,6 +179,97 @@ class BloomInterface:
             self._add(User(email=email, full_name=email, hashed_password=email, role=role))
         )
 
+    def bloom_add_admin(self, email, password):
+        return self.bloom_add_account(email, password, UserRole.admin.value)
+
+    def bloom_add_account(self, email, password, role, full_name=None):
+        return self._run(
+            self._add(
+                User(
+                    email=email,
+                    full_name=full_name or email,
+                    hashed_password=get_password_hash(password),
+                    role=UserRole(role),
+                    is_active=True,
+                )
+            )
+        )
+
+    def bloom_add_external_member(
+        self, project_id, user_id, permissions, visibility, doc_types=None
+    ):
+        self._run(
+            self._add_external_member(project_id, user_id, permissions, visibility, doc_types)
+        )
+
+    def bloom_add_internal_member(self, project_id, user_id, permissions):
+        self._run(
+            self._add(
+                project_access_fixture(
+                    user_id=user_id, project_id=project_id, permissions=permissions
+                )
+            )
+        )
+
+    def bloom_seed_default_catalogue(self):
+        async def seed():
+            async with self.maker() as db:
+                seeded = await db.scalar(
+                    select(func.count())
+                    .select_from(bloom_models.Policy)
+                    .where(bloom_models.Policy.is_default)
+                )
+                if seeded:
+                    return
+                policies = {}
+                for spec in DEFAULT_POLICIES:
+                    policies[spec["name"]] = bloom_models.Policy(
+                        name=spec["name"],
+                        description=spec.get("description", ""),
+                        scope=spec["scope"],
+                        permissions=spec["permissions"],
+                        type_tags=spec["type_tags"],
+                        is_default=True,
+                    )
+                db.add_all(policies.values())
+                for spec in DEFAULT_GROUPS:
+                    members = [policies[name] for name in spec["policy_names"]]
+                    db.add(
+                        bloom_models.Group(
+                            name=spec["name"],
+                            description=spec.get("description", ""),
+                            policies=members,
+                        )
+                    )
+                await db.commit()
+
+        self._run(seed())
+
+    def bloom_add_record(self, kind, **fields):
+        return self._run(self._add(self._model(kind)(**fields)))
+
+    def bloom_read_record(self, kind, row_id):
+        return self._run(self._get(self._model(kind), row_id))
+
+    def bloom_stored_rows(self, excluded=()):
+        async def read():
+            async with self.maker() as db:
+                return {
+                    table.name: (
+                        await db.execute(select(table).order_by(*table.primary_key.columns))
+                    ).all()
+                    for table in Base.metadata.sorted_tables
+                    if table.name not in excluded
+                }
+
+        return self._run(read())
+
+    def _model(self, kind):
+        for mapper in Base.registry.mappers:
+            if mapper.class_.__name__ == kind:
+                return mapper.class_
+        raise KeyError(kind)
+
     def bloom_list_defects(self):
         return self._run(self._all(select(Defect).order_by(Defect.id)))
 
@@ -143,6 +278,9 @@ class BloomInterface:
             return await integrations.pull_jira_issues(setting_id, db=db, current_user=admin)
 
         return self._run(self._as_admin(admin_email, pull))
+
+    def _temp_dir(self):
+        return tempfile.TemporaryDirectory()
 
     def _run(self, coroutine):
         return self.loop.run_until_complete(coroutine)
@@ -169,6 +307,21 @@ class BloomInterface:
             except Exception:
                 await session.rollback()
                 raise
+
+    async def _add_external_member(self, project_id, user_id, permissions, visibility, doc_types):
+        async with self.maker() as db:
+            membership = project_access_fixture(
+                user_id=user_id,
+                project_id=project_id,
+                permissions=permissions,
+                visibility=visibility,
+                doc_types=[],
+            )
+            db.add(membership)
+            await db.flush()
+            for doc_type in DOC_TYPE_RESOURCES if doc_types is None else doc_types:
+                allow_doc_types(membership.policies[0], [doc_type])
+            await db.commit()
 
     async def _scalar(self, query):
         async with self.maker() as db:

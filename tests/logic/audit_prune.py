@@ -17,20 +17,22 @@ class AuditPruneBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_prune_removes_the_old_event(self):
+        removed = self.bloom.bloom_prune_audit(self.parameters.AUDIT_RETENTION_DAYS)
         self.print_variables(
-            {"retention": self.parameters.AUDIT_RETENTION_DAYS, "removed": self.tc_removed}
+            {"retention": self.parameters.AUDIT_RETENTION_DAYS, "removed": removed}
         )
         self.assertEqual(
-            self.tc_removed,
+            removed,
             self.parameters.AUDIT_REMOVED,
             msg=self.parameters.MSG_AUDIT_REMOVED,
             abort_on_fail=False,
         )
 
     def bud_prune_keeps_the_recent_event(self):
-        self.print_variables({"left": self.tc_left})
+        left = self.bloom.bloom_list_audit_actions()
+        self.print_variables({"left": left})
         self.assertEqual(
-            self.tc_left,
+            left,
             self.parameters.AUDIT_LEFT,
             msg=self.parameters.MSG_AUDIT_LEFT,
             abort_on_fail=False,

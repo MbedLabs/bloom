@@ -1,0 +1,41 @@
+"""
+* @file     ${tests/sec/artefacts_external_visibility.py}
+* @copyright © EmbedLabs, Aachen ${2026} - all rights reserved
+* @brief    This module tests which requirements' related artefacts an external reader gets.
+* @author   Amine El Omari
+* @date     2026-11-16
+* @version  1.0.0
+* @note     Base class containing the bud methods of the related artefacts an external reader reads.
+"""
+
+from tests.bloom_api_interface import BloomApiInterface
+from tests.bloom_test_base import BloomTestCase
+
+
+class ArtefactsExternalVisibilityBase(BloomTestCase):
+
+    interface = BloomApiInterface
+
+    def bud_related_of_an_internal_requirement_is_hidden_404(self):
+        hidden = self.bloom.bloom_api_related(
+            self.reader.headers, self.parameters.READER_REQUIREMENT_KIND, self.internal
+        )
+        self.print_variables({"status": hidden.status, "body": hidden.body})
+        self.assertEqual(
+            hidden.status,
+            self.parameters.STATUS_NOT_FOUND,
+            msg=self.parameters.MSG_READER_RELATED_HIDDEN,
+            abort_on_fail=False,
+        )
+
+    def bud_related_of_a_customer_requirement_is_shown_200(self):
+        visible = self.bloom.bloom_api_related(
+            self.reader.headers, self.parameters.READER_REQUIREMENT_KIND, self.customer
+        )
+        self.print_variables({"status": visible.status, "body": visible.body})
+        self.assertEqual(
+            visible.status,
+            self.parameters.STATUS_OK,
+            msg=self.parameters.MSG_READER_RELATED_SHOWN,
+            abort_on_fail=False,
+        )

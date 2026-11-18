@@ -15,7 +15,7 @@ class RouteAuthMatrixTest(RouteAuthMatrixBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_routes = self.bloom.bloom_api_routes()
+        self.routes = self.bloom.bloom_api_routes()
 
     def tearDownClass(self):
         super().tearDownClass()

@@ -17,7 +17,7 @@ class RequirementDescriptionBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_requirements_are_created(self):
-        statuses = [answer.status for answer in self.tc_created]
+        statuses = [answer.status for answer in (self.from_body, self.tagged, self.untagged)]
         self.print_variables({"statuses": statuses})
         self._equal(
             statuses,
@@ -26,45 +26,90 @@ class RequirementDescriptionBase(BloomTestCase):
         )
 
     def bud_editor_content_on_create_becomes_the_description(self):
-        self.print_variables({"created": self.tc_from_body})
+        from_body = self._text_of(self.from_body.body)
+        self.print_variables({"created": from_body})
         self._equal(
-            self.tc_from_body,
+            from_body,
             self.parameters.DESCRIPTION_FROM_BODY,
             self.parameters.MSG_DESCRIPTION_FROM_BODY,
         )
 
     def bud_detail_holds_the_description(self):
-        self.print_variables({"detail": self.tc_detail})
+        detail = self._text_of(
+            self.bloom.bloom_api_call("GET", self._path_of(self.from_body), self.admin).body
+        )
+        self.print_variables({"detail": detail})
         self._equal(
-            self.tc_detail,
+            detail,
             self.parameters.DESCRIPTION_FROM_BODY,
             self.parameters.MSG_DESCRIPTION_DETAIL,
         )
 
     def bud_editor_content_on_edit_follows_the_description(self):
-        self.print_variables({"edited": self.tc_edited})
+        answer = self.bloom.bloom_api_call(
+            "PATCH",
+            self._path_of(self.from_body),
+            self.admin,
+            json={"content_html": self.parameters.DESCRIPTION_EDIT_HTML},
+        )
+        edited = (answer.status, *self._text_of(answer.body))
+        self.print_variables({"edited": edited})
         self._equal(
-            self.tc_edited,
+            edited,
             (self.parameters.STATUS_OK, *self.parameters.DESCRIPTION_AFTER_EDIT),
             self.parameters.MSG_DESCRIPTION_EDIT,
         )
 
     def bud_tag_in_a_new_description_creates_a_link(self):
-        self.print_variables({"links": self.tc_tagged_links})
+        tagged_links = self._links_of(self.tagged)
+        self.print_variables({"links": tagged_links})
         self._equal(
-            self.tc_tagged_links,
-            [self.tc_expected_link],
+            tagged_links,
+            [self.expected_link],
             self.parameters.MSG_DESCRIPTION_TAG_CREATE,
         )
 
     def bud_tag_added_on_edit_creates_a_link(self):
-        self.print_variables({"before": self.tc_untagged_links, "after": self.tc_retagged_links})
-        self._equal(self.tc_untagged_links, [], self.parameters.MSG_DESCRIPTION_NO_TAG)
+        untagged_links = self._links_of(self.untagged)
+        retagged = self.bloom.bloom_api_call(
+            "PATCH",
+            self._path_of(self.untagged),
+            self.admin,
+            json={"description": f"Now follows #{self.spec.get('doc_id')}."},
+        )
+        retagged_links = (retagged.status, self._links_of(self.untagged))
+        self.print_variables({"before": untagged_links, "after": retagged_links})
+        self._equal(untagged_links, [], self.parameters.MSG_DESCRIPTION_NO_TAG)
         self._equal(
-            self.tc_retagged_links,
-            (self.parameters.STATUS_OK, [self.tc_expected_link]),
+            retagged_links,
+            (self.parameters.STATUS_OK, [self.expected_link]),
             self.parameters.MSG_DESCRIPTION_TAG_EDIT,
         )
+
+    def _path_of(self, requirement):
+        """Return the API path of the created requirement."""
+        path = self.parameters.ARTEFACT_PATHS[self.parameters.REQUIREMENT_KIND]
+        return f"{path}/{requirement.body.get('id')}"
+
+    def _text_of(self, body):
+        """Return the description and editor content fields of an answer body."""
+        return tuple((body or {}).get(name) for name in self.parameters.DESCRIPTION_TEXT_FIELDS)
+
+    def _links_of(self, requirement):
+        """List the links whose source is the created requirement."""
+        listed = self.bloom.bloom_api_call(
+            "GET",
+            "/api/links",
+            self.admin,
+            params={
+                "project_id": self.project_id,
+                "source_type": "REQ",
+                "source_id": (requirement.body or {}).get("id"),
+            },
+        )
+        return [
+            (link["target_type"], link["target_id"], link["role"]) for link in listed.body or []
+        ]
 
     def _equal(self, actual, expected, message):
         """Assert the actual value equals the expected one."""

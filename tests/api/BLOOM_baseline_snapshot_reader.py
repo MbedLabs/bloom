@@ -54,12 +54,12 @@ class BaselineSnapshotReaderTest(BaselineSnapshotReaderBase):
         reader, _ = self.bloom.bloom_log_in(
             self.parameters.SNAPSHOT_READER_EMAIL, self.parameters.API_PASSWORD
         )
-        self.tc_requirement = requirement.json()
-        self.tc_baseline_id = baseline.json()["id"]
-        self.tc_listed, self.tc_detail = self.bloom.bloom_api_read_baselines(
-            reader, project_id, self.tc_baseline_id
+        self.requirement = requirement.json()
+        self.baseline_id = baseline.json()["id"]
+        self.listed, self.detail = self.bloom.bloom_api_read_baselines(
+            reader, project_id, self.baseline_id
         )
-        self.tc_setup = [
+        self.setup = [
             (project.status_code, self.parameters.STATUS_CREATED),
             (requirement.status_code, self.parameters.STATUS_CREATED),
             (document.status_code, self.parameters.STATUS_CREATED),

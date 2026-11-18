@@ -17,10 +17,10 @@ class TokenLoggingBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_request_reaches_the_log(self):
-        self.print_variables({"path": self.parameters.INVITE_INFO_PATH, "logs": self.tc_logs})
+        self.print_variables({"path": self.parameters.INVITE_INFO_PATH, "logs": self.logs})
         self.assertIn(
             self.parameters.INVITE_INFO_PATH,
-            self.tc_logs,
+            self.logs,
             msg=self.parameters.MSG_TOKEN_REQUEST_LOGGED,
             abort_on_fail=False,
         )
@@ -29,7 +29,7 @@ class TokenLoggingBase(BloomTestCase):
         self.print_variables({"token": self.parameters.ONE_TIME_TOKEN})
         self.assertNotIn(
             self.parameters.ONE_TIME_TOKEN,
-            self.tc_logs,
+            self.logs,
             msg=self.parameters.MSG_TOKEN_NOT_LOGGED,
             abort_on_fail=False,
         )

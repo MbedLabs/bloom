@@ -22,9 +22,6 @@ class IntegrationSyncLifespanBase(BloomTestCase):
     @parameterized(params.LIFESPAN_CASES)
     def bud_sync_loop_starts_unless_the_sync_is_switched_off(self, index):
         minutes, expected = self.parameters.LIFESPAN_SWITCHES[index]
-        self.print_variables(
-            {"INTEGRATION_SYNC_MINUTES": minutes, "loop starts": self.tc_starts[index]}
-        )
-        self.assertEqual(
-            self.tc_starts[index], expected, msg=self.parameters.MSG_LIFESPAN, abort_on_fail=False
-        )
+        starts = self.bloom.bloom_count_lifespan_starts(minutes)
+        self.print_variables({"INTEGRATION_SYNC_MINUTES": minutes, "loop starts": starts})
+        self.assertEqual(starts, expected, msg=self.parameters.MSG_LIFESPAN, abort_on_fail=False)

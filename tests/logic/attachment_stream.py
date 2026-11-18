@@ -8,6 +8,8 @@
 * @note     Base class containing the bud methods of the attachment stream.
 """
 
+import asyncio
+
 from tests.bloom_logic_interface import BloomLogicInterface
 from tests.bloom_test_base import BloomTestCase
 
@@ -17,17 +19,19 @@ class AttachmentStreamBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_stream_keeps_content_size_and_checksum(self):
-        stored = self.tc_complete.stored
+        payload = self.parameters.STREAM_PAYLOAD
+        complete = self.bloom.bloom_stream_attachment(payload, len(payload))
+        stored = complete.stored
         self.print_variables(
             {
-                "content": self.tc_complete.content,
+                "content": complete.content,
                 "size": getattr(stored, "size_bytes", None),
                 "sha256": getattr(stored, "sha256", None),
-                "parts": self.tc_complete.parts,
+                "parts": complete.parts,
             }
         )
         self.assertEqual(
-            self.tc_complete.content,
+            complete.content,
             self.parameters.STREAM_PAYLOAD,
             msg=self.parameters.MSG_STREAM_CONTENT,
             abort_on_fail=False,
@@ -45,41 +49,53 @@ class AttachmentStreamBase(BloomTestCase):
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_complete.parts,
+            complete.parts,
             self.parameters.STREAM_NO_FILES,
             msg=self.parameters.MSG_STREAM_NO_PARTS,
             abort_on_fail=False,
         )
 
     def bud_oversize_stream_is_refused_and_removed(self):
+        oversize = self.bloom.bloom_stream_attachment(
+            self.parameters.STREAM_OVERSIZE, self.parameters.STREAM_OVERSIZE_LIMIT
+        )
         self.print_variables(
             {
-                "status": self.tc_oversize.status,
-                "content": self.tc_oversize.content,
-                "files": self.tc_oversize.files,
+                "status": oversize.status,
+                "content": oversize.content,
+                "files": oversize.files,
             }
         )
         self.assertEqual(
-            self.tc_oversize.status,
+            oversize.status,
             self.parameters.STATUS_TOO_LARGE,
             msg=self.parameters.MSG_STREAM_TOO_LARGE,
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_oversize.content,
+            oversize.content,
             None,
             msg=self.parameters.MSG_STREAM_NO_TARGET,
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_oversize.files,
+            oversize.files,
             self.parameters.STREAM_NO_FILES,
             msg=self.parameters.MSG_STREAM_CLEAN,
             abort_on_fail=False,
         )
 
     def bud_interrupted_stream_is_removed(self):
-        for name, outcome in self.tc_interrupted.items():
+        errors = {"OSError": OSError, "CancelledError": asyncio.CancelledError}
+        interrupted = {
+            name: self.bloom.bloom_stream_attachment(
+                self.parameters.STREAM_FIRST_CHUNK,
+                self.parameters.STREAM_INTERRUPT_LIMIT,
+                interrupt=errors[name],
+            )
+            for name in self.parameters.STREAM_INTERRUPTIONS
+        }
+        for name, outcome in interrupted.items():
             self.print_variables(
                 {"interruption": name, "error": outcome.error, "reads": outcome.reads}
             )

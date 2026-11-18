@@ -17,20 +17,18 @@ class IntegrationSyncUnreadableRepositoryBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_readable_repository_is_still_synced(self):
-        self.print_variables({"readable defect": self.tc_readable_status})
+        readable_status = self.bloom.bloom_get_defect(self.readable_id).status
+        self.print_variables({"readable defect": readable_status})
         self.assertEqual(
-            self.tc_readable_status,
+            readable_status,
             self.parameters.DEFECT_CLOSED,
             msg=self.parameters.MSG_READABLE_SYNCED,
             abort_on_fail=False,
         )
 
     def bud_run_succeeds_with_a_warning_naming_the_repository(self):
-        found = (
-            self.tc_first_run.synced_at,
-            self.tc_first_run.sync_warning,
-            self.tc_first_run.sync_error,
-        )
+        first_run = self.bloom.bloom_get_setting(self.setting_id)
+        found = (first_run.synced_at, first_run.sync_warning, first_run.sync_error)
         self.print_variables({"synced at, warning, error": found})
         self.assertEqual(
             found,
@@ -44,7 +42,11 @@ class IntegrationSyncUnreadableRepositoryBase(BloomTestCase):
         )
 
     def bud_warning_clears_once_the_repository_reads_again(self):
-        warning = self.bloom.bloom_get_setting(self.tc_setting_id).sync_warning
+        self.bloom.bloom_serve_issue_list(
+            [{"number": self.parameters.GIT_NUMBERS[0], "state": self.parameters.GIT_CLOSED}]
+        )
+        self.bloom.bloom_run_sync(self.parameters.NOW + self.parameters.LATER)
+        warning = self.bloom.bloom_get_setting(self.setting_id).sync_warning
         self.print_variables({"warning after the next run": warning})
         self.assertEqual(
             (warning,), (None,), msg=self.parameters.MSG_WARNING_CLEARED, abort_on_fail=False

@@ -17,7 +17,12 @@ class DocumentCreateStatusBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_create_page_body_creates_a_draft(self):
-        for doc_type, created in self.tc_page.items():
+        for doc_type in self.parameters.DOC_STATUS_TYPES:
+            created = self._create(
+                title=f"{doc_type} from the create page",
+                doc_type=doc_type,
+                **self.parameters.DOC_STATUS_PAGE_BODY,
+            )
             body = created.body or {}
             self.print_variables({"kind": doc_type, "status": created.status, "body": body})
             self._equal(
@@ -33,10 +38,11 @@ class DocumentCreateStatusBase(BloomTestCase):
             )
 
     def bud_create_without_status_is_a_draft(self):
-        body = self.tc_plain.body or {}
-        self.print_variables({"status": self.tc_plain.status, "body": body})
+        plain = self._create(**self.parameters.DOC_STATUS_PLAIN)
+        body = plain.body or {}
+        self.print_variables({"status": plain.status, "body": body})
         self._equal(
-            self.tc_plain.status,
+            plain.status,
             self.parameters.STATUS_CREATED,
             self.parameters.MSG_DOC_STATUS_CREATED,
         )
@@ -47,7 +53,15 @@ class DocumentCreateStatusBase(BloomTestCase):
         )
 
     def bud_other_first_status_is_refused(self):
-        for status, (created, listed, titles) in self.tc_refused.items():
+        for status in self.parameters.DOC_STATUS_REFUSED:
+            created = self._create(
+                title=f"Specification in {status}",
+                doc_type=self.parameters.DOC_STATUS_REFUSED_TYPE,
+                status=status,
+            )
+            answer = self.bloom.bloom_api_call("GET", self.path, self.admin)
+            listed = answer.status
+            titles = [item.get("title") for item in (answer.body or {}).get("items", [])]
             detail = (created.body or {}).get("detail") or [{}]
             location = detail[0].get("loc") if isinstance(detail, list) else None
             self.print_variables(
@@ -68,6 +82,12 @@ class DocumentCreateStatusBase(BloomTestCase):
                 msg=self.parameters.MSG_DOC_STATUS_NOTHING,
                 abort_on_fail=False,
             )
+
+    def _create(self, **fields):
+        """Create a document in the project with the given fields."""
+        return self.bloom.bloom_api_call(
+            "POST", self.path, self.admin, json={"project_id": self.project_id, **fields}
+        )
 
     def _equal(self, actual, expected, message):
         """Assert the actual value equals the expected one."""

@@ -35,7 +35,7 @@ class IntegrationSyncGithubStateBase(BloomTestCase):
         )
 
     def bud_defect_of_a_closed_issue_is_closed(self):
-        defect = self.bloom.bloom_get_defect(self.tc_defect_id)
+        defect = self.bloom.bloom_get_defect(self.defect_id)
         found = (defect.external_issue_state, defect.status)
         self.print_variables({"issue state, status": found})
         self.assertEqual(
@@ -46,7 +46,7 @@ class IntegrationSyncGithubStateBase(BloomTestCase):
         )
 
     def bud_change_request_takes_the_state_and_keeps_its_status(self):
-        change = self.bloom.bloom_get_change(self.tc_change_id)
+        change = self.bloom.bloom_get_change(self.change_id)
         found = (change.external_issue_state, change.status)
         self.print_variables({"issue state, status": found})
         self.assertEqual(
@@ -57,7 +57,7 @@ class IntegrationSyncGithubStateBase(BloomTestCase):
         )
 
     def bud_run_counts_two_updates_and_ignores_the_pull_request(self):
-        setting = self.bloom.bloom_get_setting(self.tc_setting_id)
+        setting = self.bloom.bloom_get_setting(self.setting_id)
         found = (setting.sync_updated, setting.synced_at)
         self.print_variables({"updated, synced at": found})
         self.assertEqual(

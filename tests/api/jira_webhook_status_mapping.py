@@ -17,11 +17,9 @@ class JiraWebhookStatusMappingBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_other_jira_status_keeps_the_bloom_status(self):
-        self.bloom.bloom_set_defect_status(self.tc_env.defect_id, self.parameters.DEFECT_VERIFIED)
-        self.bloom.bloom_post_jira_webhook(
-            self.tc_in_review, delivery=self.parameters.DELIVERIES[0]
-        )
-        status = self.bloom.bloom_get_defect(self.tc_env.defect_id).status
+        self.bloom.bloom_set_defect_status(self.env.defect_id, self.parameters.DEFECT_VERIFIED)
+        self.bloom.bloom_post_jira_webhook(self.in_review, delivery=self.parameters.DELIVERIES[0])
+        status = self.bloom.bloom_get_defect(self.env.defect_id).status
         self.print_variables({"defect": status})
         self.assertEqual(
             status,
@@ -31,8 +29,11 @@ class JiraWebhookStatusMappingBase(BloomTestCase):
         )
 
     def bud_done_closes_the_defect(self):
-        self.bloom.bloom_post_jira_webhook(self.tc_done, delivery=self.parameters.DELIVERIES[1])
-        status = self.bloom.bloom_get_defect(self.tc_env.defect_id).status
+        done = self.bloom.bloom_jira_webhook_body(
+            self.bloom.bloom_jira_key(self.parameters.LINKED_NUMBER)
+        )
+        self.bloom.bloom_post_jira_webhook(done, delivery=self.parameters.DELIVERIES[1])
+        status = self.bloom.bloom_get_defect(self.env.defect_id).status
         self.print_variables({"defect": status})
         self.assertEqual(
             status,
@@ -42,10 +43,8 @@ class JiraWebhookStatusMappingBase(BloomTestCase):
         )
 
     def bud_leaving_done_reopens_a_defect_jira_closed(self):
-        self.bloom.bloom_post_jira_webhook(
-            self.tc_in_review, delivery=self.parameters.DELIVERIES[2]
-        )
-        status = self.bloom.bloom_get_defect(self.tc_env.defect_id).status
+        self.bloom.bloom_post_jira_webhook(self.in_review, delivery=self.parameters.DELIVERIES[2])
+        status = self.bloom.bloom_get_defect(self.env.defect_id).status
         self.print_variables({"defect": status})
         self.assertEqual(
             status,
@@ -55,11 +54,19 @@ class JiraWebhookStatusMappingBase(BloomTestCase):
         )
 
     def bud_defect_closed_in_bloom_stays_closed(self):
-        self.bloom.bloom_set_defect_status(self.tc_env.defect_id, self.parameters.DEFECT_CLOSED)
-        self.bloom.bloom_post_jira_webhook(
-            self.tc_in_review_renamed, delivery=self.parameters.DELIVERIES[3]
+        self.bloom.bloom_set_defect_status(self.env.defect_id, self.parameters.DEFECT_CLOSED)
+        in_review_renamed = self.bloom.bloom_jira_webhook_body(
+            self.bloom.bloom_jira_key(self.parameters.LINKED_NUMBER),
+            status={
+                "name": self.parameters.JIRA_IN_REVIEW,
+                "statusCategory": {"key": self.parameters.JIRA_IN_PROGRESS_CATEGORY},
+            },
+            summary=self.parameters.SAME_SUMMARY,
         )
-        status = self.bloom.bloom_get_defect(self.tc_env.defect_id).status
+        self.bloom.bloom_post_jira_webhook(
+            in_review_renamed, delivery=self.parameters.DELIVERIES[3]
+        )
+        status = self.bloom.bloom_get_defect(self.env.defect_id).status
         self.print_variables({"defect": status})
         self.assertEqual(
             status,

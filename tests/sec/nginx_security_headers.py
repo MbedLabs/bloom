@@ -19,11 +19,11 @@ class NginxSecurityHeadersBase(BloomTestCase):
     def bud_shared_file_sets_all_four_headers(self):
         for header in self.parameters.NGINX_REQUIRED_HEADERS:
             self._assert_contains(
-                self.tc_headers, f"add_header {header} ", self.parameters.MSG_NGINX_HEADER
+                self.headers, f"add_header {header} ", self.parameters.MSG_NGINX_HEADER
             )
 
     def bud_every_header_is_marked_always(self):
-        for line in self.tc_headers.splitlines():
+        for line in self.headers.splitlines():
             if line.strip().startswith("add_header"):
                 self.print_variables({"line": line.strip()[:80]})
                 self.assertTrue(
@@ -36,13 +36,13 @@ class NginxSecurityHeadersBase(BloomTestCase):
 
     def bud_server_block_includes_the_shared_file(self):
         self._assert_contains(
-            self.tc_server_head,
+            self.bloom.bloom_nginx_server_head(self.parameters.NGINX_CONF),
             self.parameters.NGINX_INCLUDE,
             self.parameters.MSG_NGINX_SERVER_INCLUDE,
         )
 
     def bud_locations_with_own_headers_include_the_shared_file(self):
-        for location, body in self.tc_locations:
+        for location, body in self.bloom.bloom_nginx_locations(self.parameters.NGINX_CONF):
             if "add_header" in body:
                 self.print_variables({"location": location})
                 self._assert_contains(
@@ -53,7 +53,7 @@ class NginxSecurityHeadersBase(BloomTestCase):
         csp = next(
             (
                 line
-                for line in self.tc_headers.splitlines()
+                for line in self.headers.splitlines()
                 if "Content-Security-Policy" in line and "add_header" in line
             ),
             "",
@@ -81,7 +81,9 @@ class NginxSecurityHeadersBase(BloomTestCase):
 
     def bud_image_ships_the_shared_file(self):
         self._assert_contains(
-            self.tc_dockerfile, self.parameters.NGINX_IMAGE_COPY, self.parameters.MSG_NGINX_IMAGE
+            self.bloom.bloom_read_repo_text(self.parameters.DOCKERFILE),
+            self.parameters.NGINX_IMAGE_COPY,
+            self.parameters.MSG_NGINX_IMAGE,
         )
 
     def _assert_contains(self, text, needle, message):

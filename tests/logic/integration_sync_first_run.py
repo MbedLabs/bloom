@@ -17,10 +17,10 @@ class IntegrationSyncFirstRunBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_due_setting_is_synced(self):
-        self.print_variables({"synced": self.tc_synced, "setting": self.tc_setting_id})
+        self.print_variables({"synced": self.synced, "setting": self.setting_id})
         self.assertEqual(
-            self.tc_synced,
-            [self.tc_setting_id],
+            self.synced,
+            [self.setting_id],
             msg=self.parameters.MSG_SETTING_SYNCED,
             abort_on_fail=False,
         )
@@ -55,13 +55,13 @@ class IntegrationSyncFirstRunBase(BloomTestCase):
         self.print_variables({"new defect": found})
         self.assertEqual(
             found,
-            [(self.parameters.NEW_SUMMARY, self.tc_project_id, self.parameters.DEFECT_OPEN)],
+            [(self.parameters.NEW_SUMMARY, self.project_id, self.parameters.DEFECT_OPEN)],
             msg=self.parameters.MSG_NEW_DEFECT_CONTENT,
             abort_on_fail=False,
         )
 
     def bud_full_scan_is_cleared(self):
-        setting = self.bloom.bloom_get_setting(self.tc_setting_id)
+        setting = self.bloom.bloom_get_setting(self.setting_id)
         self.print_variables({"full scan": setting.sync_full_scan})
         self.assertEqual(
             setting.sync_full_scan,
@@ -71,7 +71,7 @@ class IntegrationSyncFirstRunBase(BloomTestCase):
         )
 
     def bud_run_is_stamped_at_now(self):
-        setting = self.bloom.bloom_get_setting(self.tc_setting_id)
+        setting = self.bloom.bloom_get_setting(self.setting_id)
         self.print_variables(
             {"synced at": setting.synced_at, "checked at": setting.sync_checked_at}
         )
@@ -83,7 +83,7 @@ class IntegrationSyncFirstRunBase(BloomTestCase):
         )
 
     def bud_run_counts_one_created_and_no_error(self):
-        setting = self.bloom.bloom_get_setting(self.tc_setting_id)
+        setting = self.bloom.bloom_get_setting(self.setting_id)
         counts = (setting.sync_created, setting.sync_updated, setting.sync_error)
         self.print_variables({"created, updated, error": counts})
         self.assertEqual(

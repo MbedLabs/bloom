@@ -24,29 +24,18 @@ class ArtefactPublicIdLookupTest(ArtefactPublicIdLookupBase):
         requirement_id = bloom.bloom_add_artefact(
             requirement, project_id=project_id, **self.parameters.LOOKUP_REQUIREMENT
         )
-        self.tc_test_case_id = bloom.bloom_add_artefact(
+        self.test_case_id = bloom.bloom_add_artefact(
             test_case, project_id=project_id, **self.parameters.LOOKUP_TEST_CASE
         )
-        defect_id = bloom.bloom_add_artefact(
+        self.defect_id = bloom.bloom_add_artefact(
             defect_kind, project_id=project_id, **self.parameters.LOOKUP_DEFECT
         )
         bloom.bloom_add_link(
             project_id,
-            (defect_kind, defect_id),
+            (defect_kind, self.defect_id),
             (requirement, requirement_id),
             self.parameters.LOOKUP_ROLE,
         )
-        kind, field = self.parameters.LOOKUP_TEST_CASE_TYPE, self.parameters.LOOKUP_TEST_CASE_FIELD
-        self.tc_by_public = bloom.bloom_lookup_artefact(
-            kind, self.parameters.LOOKUP_TEST_CASE["tc_id"], field
-        )
-        self.tc_by_database = bloom.bloom_lookup_artefact(kind, str(self.tc_test_case_id), field)
-        self.tc_unknown = bloom.bloom_lookup_artefact(kind, self.parameters.LOOKUP_UNKNOWN, field)
-        defect = self.parameters.LOOKUP_DEFECT_TYPE
-        self.tc_related_public = bloom.bloom_related_artefacts(
-            defect, self.parameters.LOOKUP_DEFECT["defect_id"]
-        )
-        self.tc_related_database = bloom.bloom_related_artefacts(defect, str(defect_id))
 
     def tearDownClass(self):
         super().tearDownClass()

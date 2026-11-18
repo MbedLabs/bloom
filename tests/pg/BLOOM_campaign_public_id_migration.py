@@ -15,35 +15,11 @@ class CampaignPublicIdMigrationTest(CampaignPublicIdMigrationBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_postgres = self.bloom.bloom_use_postgres(tables=False)
-        if not self.tc_postgres:
+        self.postgres = self.bloom.bloom_use_postgres(tables=False)
+        if not self.postgres:
             return
-        self.tc_commands = [
-            self.bloom.bloom_run_alembic("upgrade", self.parameters.PUBLIC_ID_BEFORE)
-        ]
-        self.tc_ids = self.bloom.bloom_seed_campaigns(self.parameters.CAMPAIGN_SEEDS)
-
-        self.tc_commands.append(
-            self.bloom.bloom_run_alembic("upgrade", self.parameters.PUBLIC_ID_REVISION)
-        )
-        self.tc_public_ids = self.bloom.bloom_read_campaign_public_ids()
-        self.tc_upgraded_shape = self.bloom.bloom_read_public_id_shape()
-        self.tc_violations = self.bloom.bloom_try_public_id_inserts(
-            self.parameters.TAKEN_PREFIX,
-            self.parameters.DUPLICATE_SUITE_ID,
-            self.parameters.CAMPAIGN_EXPECTED[self.parameters.TAKEN_PREFIX][1],
-        )
-
-        self.tc_commands.append(
-            self.bloom.bloom_run_alembic("downgrade", self.parameters.PUBLIC_ID_BEFORE)
-        )
-        self.tc_downgraded_shape = self.bloom.bloom_read_public_id_shape()
-        self.tc_downgraded_ids = self.bloom.bloom_read_campaign_public_ids()
-
-        self.tc_commands.append(
-            self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
-        )
-        self.tc_reupgraded_shape = self.bloom.bloom_read_public_id_shape()
+        self.prepared = self.bloom.bloom_run_alembic("upgrade", self.parameters.PUBLIC_ID_BEFORE)
+        self.ids = self.bloom.bloom_seed_campaigns(self.parameters.CAMPAIGN_SEEDS)
 
     def tearDownClass(self):
         super().tearDownClass()

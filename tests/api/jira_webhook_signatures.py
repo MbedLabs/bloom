@@ -18,7 +18,7 @@ class JiraWebhookSignaturesBase(BloomTestCase):
 
     def bud_missing_signature_is_refused(self):
         response = self.bloom.bloom_post_jira_webhook(
-            self.tc_body, delivery=self.parameters.DELIVERIES[0], signed=False
+            self.body, delivery=self.parameters.DELIVERIES[0], signed=False
         )
         self.print_variables({"status": response.status_code})
         self.assertEqual(
@@ -30,7 +30,7 @@ class JiraWebhookSignaturesBase(BloomTestCase):
 
     def bud_wrong_signature_is_refused(self):
         response = self.bloom.bloom_post_jira_webhook(
-            self.tc_body,
+            self.body,
             signature=self.parameters.FORGED_SIGNATURE,
             delivery=self.parameters.DELIVERIES[1],
         )
@@ -47,7 +47,7 @@ class JiraWebhookSignaturesBase(BloomTestCase):
             self.bloom.bloom_jira_key(self.parameters.UNLINKED_NUMBER)
         )
         response = self.bloom.bloom_post_jira_webhook(
-            self.tc_body,
+            self.body,
             signature=self.bloom.bloom_sign(other),
             delivery=self.parameters.DELIVERIES[2],
         )
@@ -60,7 +60,7 @@ class JiraWebhookSignaturesBase(BloomTestCase):
         )
 
     def bud_missing_delivery_identifier_is_refused(self):
-        response = self.bloom.bloom_post_jira_webhook(self.tc_body)
+        response = self.bloom.bloom_post_jira_webhook(self.body)
         self.print_variables({"status": response.status_code})
         self.assertEqual(
             response.status_code,

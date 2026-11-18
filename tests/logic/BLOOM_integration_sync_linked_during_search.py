@@ -17,9 +17,9 @@ class IntegrationSyncLinkedDuringSearchTest(IntegrationSyncLinkedDuringSearchBas
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_project_id = self.bloom.bloom_create_project()
-        self.tc_setting_id = self.bloom.bloom_create_integration(self.tc_project_id)
-        self.bloom.bloom_link_defect_during_search(self.tc_project_id, self.parameters.NEW_NUMBER)
+        self.project_id = self.bloom.bloom_create_project()
+        self.setting_id = self.bloom.bloom_create_integration(self.project_id)
+        self.bloom.bloom_link_defect_during_search(self.project_id, self.parameters.NEW_NUMBER)
         self.bloom.bloom_serve_jira(
             creation=[
                 self.bloom.bloom_build_jira_issue(
@@ -27,7 +27,7 @@ class IntegrationSyncLinkedDuringSearchTest(IntegrationSyncLinkedDuringSearchBas
                 )
             ]
         )
-        self.tc_synced = self.bloom.bloom_run_sync(self.parameters.NOW)
+        self.synced = self.bloom.bloom_run_sync(self.parameters.NOW)
 
     def tearDownClass(self):
         super().tearDownClass()

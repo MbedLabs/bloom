@@ -16,13 +16,13 @@ class IntegrationSyncGithubStateTest(IntegrationSyncGithubStateBase):
     def setUpClass(self):
         super().setUpClass()
         defect_number, change_number, pull_number, _ = self.parameters.GIT_NUMBERS
-        self.tc_project_id = self.bloom.bloom_create_project()
-        self.tc_setting_id = self.bloom.bloom_create_integration(self.tc_project_id, "github")
-        self.tc_defect_id = self.bloom.bloom_link_defect(
-            self.tc_project_id, "github", self.parameters.REPO, defect_number
+        self.project_id = self.bloom.bloom_create_project()
+        self.setting_id = self.bloom.bloom_create_integration(self.project_id, "github")
+        self.defect_id = self.bloom.bloom_link_defect(
+            self.project_id, "github", self.parameters.REPO, defect_number
         )
-        self.tc_change_id = self.bloom.bloom_link_change(
-            self.tc_project_id,
+        self.change_id = self.bloom.bloom_link_change(
+            self.project_id,
             "github",
             self.parameters.REPO,
             change_number,
@@ -39,7 +39,7 @@ class IntegrationSyncGithubStateTest(IntegrationSyncGithubStateBase):
                 {"number": pull_number, "state": self.parameters.GIT_CLOSED, "pull_request": {}},
             ]
         )
-        self.tc_synced = self.bloom.bloom_run_sync(self.parameters.NOW)
+        self.synced = self.bloom.bloom_run_sync(self.parameters.NOW)
 
     def tearDownClass(self):
         super().tearDownClass()

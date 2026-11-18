@@ -16,69 +16,55 @@ class CliAuthMigrationRoundTripBase(BloomTestCase):
 
     interface = BloomPgInterface
 
-    def bud_every_alembic_command_succeeds(self):
-        if not self.tc_postgres:
+    def bud_the_database_starts_before_the_cli_sessions(self):
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        for code, output in self.tc_commands:
-            if code:
-                self.log_info(output)
-        codes = [code for code, _ in self.tc_commands]
-        self.print_variables({"exit codes": codes})
+        revision = self.bloom.bloom_read_revision()
+        table = self.bloom.bloom_read_cli_session_table()
+        self.print_variables({"prepared": self.prepared, "revision": revision, "table": table})
         self.assertEqual(
-            codes, [0] * len(codes), msg=self.parameters.MSG_ALEMBIC_SUCCEEDS, abort_on_fail=True
+            self.prepared[0], 0, msg=self.parameters.MSG_ALEMBIC_SUCCEEDS, abort_on_fail=True
         )
-
-    def bud_old_revision_has_no_session_table(self):
-        if not self.tc_postgres:
-            self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
-            return
-        self.print_variables({"revision": self.tc_before_revision, "table": self.tc_before_table})
         self.assertEqual(
-            self.tc_before_revision,
+            revision,
             self.parameters.MIGRATION_BEFORE_CLI,
             msg=self.parameters.MSG_OLD_HEAD,
             abort_on_fail=False,
         )
         self.assertEqual(
-            (self.tc_before_table,),
-            (None,),
-            msg=self.parameters.MSG_OLD_NO_TABLE,
-            abort_on_fail=False,
+            (table,), (None,), msg=self.parameters.MSG_OLD_NO_TABLE, abort_on_fail=False
         )
 
     def bud_upgrade_keeps_existing_rows(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"before": self.tc_before_rows, "upgraded": self.tc_upgraded_rows})
+        code, output = self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
+        rows = self.bloom.bloom_read_retained_rows(self.ids)
+        self.print_variables({"exit code": code, "before": self.before_rows, "upgraded": rows})
+        if code:
+            self.log_info(output)
+        self.assertEqual(code, 0, msg=self.parameters.MSG_ALEMBIC_SUCCEEDS, abort_on_fail=True)
         self.assertEqual(
-            self.tc_upgraded_rows,
-            self.tc_before_rows,
-            msg=self.parameters.MSG_UPGRADE_KEEPS_ROWS,
-            abort_on_fail=False,
+            rows, self.before_rows, msg=self.parameters.MSG_UPGRADE_KEEPS_ROWS, abort_on_fail=False
         )
 
     def bud_upgrade_reaches_the_single_head(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"heads": self.tc_heads, "revision": self.tc_upgraded_revision})
-        self.assertEqual(
-            len(self.tc_heads), 1, msg=self.parameters.MSG_SINGLE_HEAD, abort_on_fail=False
-        )
-        self.assertEqual(
-            [self.tc_upgraded_revision],
-            self.tc_heads,
-            msg=self.parameters.MSG_AT_HEAD,
-            abort_on_fail=False,
-        )
+        heads = self.bloom.bloom_list_alembic_heads()
+        revision = self.bloom.bloom_read_revision()
+        self.print_variables({"heads": heads, "revision": revision})
+        self.assertEqual(len(heads), 1, msg=self.parameters.MSG_SINGLE_HEAD, abort_on_fail=False)
+        self.assertEqual([revision], heads, msg=self.parameters.MSG_AT_HEAD, abort_on_fail=False)
 
     def bud_session_table_matches_the_model(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        table = self.tc_upgraded_table or {}
+        table = self.bloom.bloom_read_cli_session_table() or {}
         self.print_variables({"table": table})
         self.assertEqual(
             table.get("columns"),
@@ -106,52 +92,85 @@ class CliAuthMigrationRoundTripBase(BloomTestCase):
         )
 
     def bud_sessions_are_stored(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"sessions": self.tc_stored_sessions})
+        self.bloom.bloom_add_cli_sessions(self.ids["user"])
+        sessions = self.bloom.bloom_read_cli_session_table()["sessions"]
+        self.print_variables({"sessions": sessions})
         self.assertEqual(
-            self.tc_stored_sessions,
+            sessions,
             self.parameters.CLI_ADDED_SESSIONS,
             msg=self.parameters.MSG_SESSIONS_STORED,
             abort_on_fail=False,
         )
 
     def bud_downgrade_drops_the_table_and_keeps_rows(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables(
-            {
-                "revision": self.tc_downgraded_revision,
-                "table": self.tc_downgraded_table,
-                "rows": self.tc_downgraded_rows,
-            }
+        code, output = self.bloom.bloom_run_alembic(
+            "downgrade", self.parameters.MIGRATION_BEFORE_CLI
         )
+        revision = self.bloom.bloom_read_revision()
+        table = self.bloom.bloom_read_cli_session_table()
+        rows = self.bloom.bloom_read_retained_rows(self.ids)
+        self.print_variables(
+            {"exit code": code, "revision": revision, "table": table, "rows": rows}
+        )
+        if code:
+            self.log_info(output)
+        self.assertEqual(code, 0, msg=self.parameters.MSG_ALEMBIC_SUCCEEDS, abort_on_fail=True)
         self.assertEqual(
-            self.tc_downgraded_revision,
+            revision,
             self.parameters.MIGRATION_BEFORE_CLI,
             msg=self.parameters.MSG_DOWNGRADE_REVISION,
             abort_on_fail=False,
         )
         self.assertEqual(
-            (self.tc_downgraded_table,),
-            (None,),
-            msg=self.parameters.MSG_DOWNGRADE_DROPS,
-            abort_on_fail=False,
+            (table,), (None,), msg=self.parameters.MSG_DOWNGRADE_DROPS, abort_on_fail=False
         )
         self.assertEqual(
-            self.tc_downgraded_rows,
-            self.tc_before_rows,
+            rows,
+            self.before_rows,
             msg=self.parameters.MSG_DOWNGRADE_KEEPS_ROWS,
             abort_on_fail=False,
         )
 
     def bud_upgrading_again_matches_the_first_upgrade(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        again = (self.tc_reupgraded_revision, self.tc_reupgraded_table, self.tc_reupgraded_rows)
-        first = (self.tc_upgraded_revision, self.tc_upgraded_table, self.tc_before_rows)
-        self.print_variables({"again": again, "first": first})
-        self.assertEqual(again, first, msg=self.parameters.MSG_REUPGRADE_SAME, abort_on_fail=False)
+        code, output = self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
+        heads = self.bloom.bloom_list_alembic_heads()
+        revision = self.bloom.bloom_read_revision()
+        table = self.bloom.bloom_read_cli_session_table() or {}
+        rows = self.bloom.bloom_read_retained_rows(self.ids)
+        self.print_variables(
+            {"exit code": code, "revision": revision, "table": table, "rows": rows}
+        )
+        if code:
+            self.log_info(output)
+        self.assertEqual(code, 0, msg=self.parameters.MSG_ALEMBIC_SUCCEEDS, abort_on_fail=True)
+        self.assertEqual(
+            (
+                [revision],
+                table.get("columns"),
+                table.get("indexes"),
+                table.get("cascade"),
+                table.get("check"),
+                table.get("sessions"),
+                rows,
+            ),
+            (
+                heads,
+                self.bloom.bloom_cli_session_model_columns(),
+                self.parameters.CLI_SESSION_INDEXES,
+                self.parameters.CLI_SESSION_CASCADE,
+                1,
+                0,
+                self.before_rows,
+            ),
+            msg=self.parameters.MSG_REUPGRADE_SAME,
+            abort_on_fail=False,
+        )

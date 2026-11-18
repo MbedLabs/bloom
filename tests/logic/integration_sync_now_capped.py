@@ -17,19 +17,23 @@ class IntegrationSyncNowCappedBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_capped_sync_now_keeps_the_full_scan_from_the_last_created_issue(self):
-        self.print_variables({"full scan, scan from": self.tc_first_state})
+        setting = self.bloom.bloom_get_setting(self.setting_id)
+        first_state = (setting.sync_full_scan, setting.sync_scan_from)
+        self.print_variables({"full scan, scan from": first_state})
         self.assertEqual(
-            self.tc_first_state,
+            first_state,
             (True, self.parameters.FIRST_CREATED),
             msg=self.parameters.MSG_SYNC_NOW_CAPPED,
             abort_on_fail=False,
         )
 
     def bud_next_sync_now_continues_by_creation_time(self):
-        self.print_variables({"next creation search": self.tc_next_creation})
+        self.bloom.bloom_sync_now(self.setting_id, self.parameters.OTHER_ADMIN_EMAIL)
+        next_creation = [q for q in self.bloom.site.jql if self.parameters.CREATION_MARK in q][1]
+        self.print_variables({"next creation search": next_creation})
         self.assertIn(
             member=self.parameters.CREATED_WINDOW,
-            container=self.tc_next_creation,
+            container=next_creation,
             msg=self.parameters.MSG_NEXT_SEARCH_BY_CREATION,
             abort_on_fail=False,
         )

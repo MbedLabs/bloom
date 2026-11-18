@@ -15,11 +15,11 @@ class IntegrationSyncRaceTest(IntegrationSyncRaceBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_postgres = self.bloom.bloom_use_postgres()
-        if not self.tc_postgres:
+        self.postgres = self.bloom.bloom_use_postgres()
+        if not self.postgres:
             return
-        self.tc_project_id = self.bloom.bloom_create_project()
-        self.tc_setting_id = self.bloom.bloom_create_integration(self.tc_project_id)
+        self.project_id = self.bloom.bloom_create_project()
+        self.setting_id = self.bloom.bloom_create_integration(self.project_id)
         issue = {
             "key": self.bloom.bloom_jira_key(self.parameters.RACE_ISSUE_NUMBER),
             "fields": {
@@ -27,9 +27,9 @@ class IntegrationSyncRaceTest(IntegrationSyncRaceBase):
                 "summary": self.parameters.NEW_SUMMARY,
             },
         }
-        self.tc_searches = self.bloom.bloom_serve_jira_holding_creation(issue)
+        self.searches = self.bloom.bloom_serve_jira_holding_creation(issue)
         self.bloom.bloom_race_sync_now_and_scheduled(
-            self.tc_setting_id, self.parameters.ADMIN_EMAIL, self.parameters.NOW
+            self.setting_id, self.parameters.ADMIN_EMAIL, self.parameters.NOW
         )
 
     def tearDownClass(self):

@@ -17,16 +17,19 @@ class ExternalDocTypesAllowBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_granted_type_is_allowed(self):
+        access = self.bloom.bloom_require_external_doc_type(
+            self.parameters.EXTERNAL_GRANTED, self.parameters.EXTERNAL_GRANTED_TYPE
+        )
         self.print_variables(
             {
                 "granted": self.parameters.EXTERNAL_GRANTED,
                 "type": self.parameters.EXTERNAL_GRANTED_TYPE,
-                "refusal": self.tc_access.status,
-                "detail": self.tc_access.detail,
+                "refusal": access.status,
+                "detail": access.detail,
             }
         )
         self.assertEqual(
-            self.tc_access.status,
+            access.status,
             self.parameters.EXTERNAL_NOT_REFUSED,
             msg=self.parameters.MSG_EXTERNAL_GRANTED_ALLOWED,
             abort_on_fail=False,

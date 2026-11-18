@@ -17,47 +17,58 @@ class ImportAttemptsBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_one_active_import_per_project(self):
-        self.print_variables({"first": vars(self.tc_first), "second": vars(self.tc_second)})
+        first = self.bloom.bloom_begin_import(self.busy_user, self.busy_project)
+        second = self.bloom.bloom_begin_import(self.busy_user, self.busy_project)
+        self.bloom.bloom_finish_import(first.id, self.parameters.IMPORT_COMPLETED)
+        self.print_variables({"first": vars(first), "second": vars(second)})
         self.assertTrue(
-            self.tc_first.id is not None,
+            first.id is not None,
             msg=self.parameters.MSG_IMPORT_FIRST,
             expected="an attempt id",
-            actual=self.tc_first.status,
+            actual=first.status,
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_second.status,
+            second.status,
             self.parameters.STATUS_TOO_MANY,
             msg=self.parameters.MSG_IMPORT_ACTIVE,
             abort_on_fail=False,
         )
 
     def bud_import_starts_are_limited_per_user(self):
+        self.bloom.bloom_limit_imports(self.parameters.IMPORT_STARTS_ALLOWED)
+        allowed = []
+        for _ in range(self.parameters.IMPORT_STARTS_ALLOWED):
+            start = self.bloom.bloom_begin_import(self.limited_user, self.limited_project)
+            allowed.append(start)
+            self.bloom.bloom_finish_import(start.id, self.parameters.IMPORT_COMPLETED)
+        limited = self.bloom.bloom_begin_import(self.limited_user, self.limited_project)
+        recorded = self.bloom.bloom_count_imports(self.limited_user)
         self.print_variables(
             {
-                "allowed": [vars(start) for start in self.tc_allowed],
-                "past the limit": vars(self.tc_limited),
-                "recorded": self.tc_recorded,
+                "allowed": [vars(start) for start in allowed],
+                "past the limit": vars(limited),
+                "recorded": recorded,
             }
         )
-        for start in self.tc_allowed:
+        for start in allowed:
             self.assertEqual(
                 start.status, None, msg=self.parameters.MSG_IMPORT_STARTS, abort_on_fail=False
             )
         self.assertEqual(
-            self.tc_limited.status,
+            limited.status,
             self.parameters.STATUS_TOO_MANY,
             msg=self.parameters.MSG_IMPORT_LIMITED,
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_limited.retry_after,
+            limited.retry_after,
             self.parameters.IMPORT_RETRY_SECONDS,
             msg=self.parameters.MSG_IMPORT_RETRY,
             abort_on_fail=False,
         )
         self.assertEqual(
-            self.tc_recorded,
+            recorded,
             self.parameters.IMPORT_STARTS_ALLOWED,
             msg=self.parameters.MSG_IMPORT_COUNT,
             abort_on_fail=False,

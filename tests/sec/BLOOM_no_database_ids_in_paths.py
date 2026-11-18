@@ -15,13 +15,13 @@ class NoDatabaseIdsInPathsTest(NoDatabaseIdsInPathsBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_integer_routes = {
+        self.integer_routes = {
             f"{method} {route.path}"
             for route in self.bloom.bloom_api_routes()
             if route.integer_path
             for method in route.method_list
         }
-        self.tc_allowlisted = set().union(*self.parameters.DATABASE_ID_ROUTES.values())
+        self.allowlisted = set().union(*self.parameters.DATABASE_ID_ROUTES.values())
 
     def tearDownClass(self):
         super().tearDownClass()

@@ -17,16 +17,26 @@ class JiraPushDirectionBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_no_push_from_jira_to_bloom(self):
-        self.print_variables({"pushed": self.tc_before})
+        self.bloom.bloom_push_edits(
+            self.env.defect_id, self.env.change_id, {"title": self.parameters.CHANGED_TITLE}
+        )
+        before = list(self.pushed)
+        self.print_variables({"pushed": before})
         self.assertEqual(
-            self.tc_before, [], msg=self.parameters.MSG_NO_PUSH_JIRA_TO_BLOOM, abort_on_fail=False
+            before, [], msg=self.parameters.MSG_NO_PUSH_JIRA_TO_BLOOM, abort_on_fail=False
         )
 
     def bud_push_when_direction_includes_bloom_to_jira(self):
-        self.print_variables({"pushed": self.tc_pushed})
+        self.bloom.bloom_update_setting(
+            self.env.setting_id, direction=self.parameters.DIRECTION_BOTH
+        )
+        self.bloom.bloom_push_edits(
+            self.env.defect_id, self.env.change_id, {"title": self.parameters.CHANGED_TITLE}
+        )
+        self.print_variables({"pushed": self.pushed})
         self.assertEqual(
-            self.tc_pushed,
-            [self.tc_env.defect_id, self.tc_env.change_id],
+            self.pushed,
+            [self.env.defect_id, self.env.change_id],
             msg=self.parameters.MSG_PUSH_BOTH,
             abort_on_fail=False,
         )

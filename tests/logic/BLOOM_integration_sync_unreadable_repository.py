@@ -18,25 +18,20 @@ class IntegrationSyncUnreadableRepositoryTest(IntegrationSyncUnreadableRepositor
     def setUpClass(self):
         super().setUpClass()
         readable, unreadable, _, _ = self.parameters.GIT_NUMBERS
-        self.tc_project_id = self.bloom.bloom_create_project()
-        self.tc_setting_id = self.bloom.bloom_create_integration(self.tc_project_id, "github")
-        self.tc_readable_id = self.bloom.bloom_link_defect(
-            self.tc_project_id, "github", self.parameters.REPO, readable
+        self.project_id = self.bloom.bloom_create_project()
+        self.setting_id = self.bloom.bloom_create_integration(self.project_id, "github")
+        self.readable_id = self.bloom.bloom_link_defect(
+            self.project_id, "github", self.parameters.REPO, readable
         )
         self.bloom.bloom_link_defect(
-            self.tc_project_id, "github", self.parameters.OTHER_REPO, unreadable
+            self.project_id, "github", self.parameters.OTHER_REPO, unreadable
         )
-        issues = [{"number": readable, "state": self.parameters.GIT_CLOSED}]
         self.bloom.bloom_serve_issue_list(
-            issues,
+            [{"number": readable, "state": self.parameters.GIT_CLOSED}],
             unreadable_repo=self.parameters.OTHER_REPO,
             unreadable_status=self.parameters.STATUS_NOT_FOUND,
         )
         self.bloom.bloom_run_sync(self.parameters.NOW)
-        self.tc_readable_status = self.bloom.bloom_get_defect(self.tc_readable_id).status
-        self.tc_first_run = self.bloom.bloom_get_setting(self.tc_setting_id)
-        self.bloom.bloom_serve_issue_list(issues)
-        self.bloom.bloom_run_sync(self.parameters.NOW + self.parameters.LATER)
 
     def tearDownClass(self):
         super().tearDownClass()

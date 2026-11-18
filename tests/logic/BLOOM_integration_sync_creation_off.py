@@ -15,12 +15,12 @@ class IntegrationSyncCreationOffTest(IntegrationSyncCreationOffBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_project_id = self.bloom.bloom_create_project()
-        self.tc_setting_id = self.bloom.bloom_create_integration(
-            self.tc_project_id, create_defects_on_inbound=False
+        self.project_id = self.bloom.bloom_create_project()
+        self.setting_id = self.bloom.bloom_create_integration(
+            self.project_id, create_defects_on_inbound=False
         )
-        self.tc_linked_defect_id = self.bloom.bloom_link_defect(
-            self.tc_project_id, "jira", self.parameters.JIRA_PROJECT, self.parameters.LINKED_NUMBER
+        self.linked_defect_id = self.bloom.bloom_link_defect(
+            self.project_id, "jira", self.parameters.JIRA_PROJECT, self.parameters.LINKED_NUMBER
         )
         self.bloom.bloom_serve_jira(
             creation=[
@@ -36,7 +36,7 @@ class IntegrationSyncCreationOffTest(IntegrationSyncCreationOffBase):
                 )
             ],
         )
-        self.tc_synced = self.bloom.bloom_run_sync(self.parameters.NOW)
+        self.bloom.bloom_run_sync(self.parameters.NOW)
 
     def tearDownClass(self):
         super().tearDownClass()

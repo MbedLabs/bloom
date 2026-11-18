@@ -17,7 +17,7 @@ class AttachmentDeploymentContractBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_compose_sets_the_attachment_directory(self):
-        environment = self.tc_compose.service["environment"]
+        environment = self.compose.service["environment"]
         self.print_variables({"environment": environment})
         self.assertEqual(
             environment.get(self.parameters.ATTACHMENT_DIR_VARIABLE),
@@ -27,7 +27,7 @@ class AttachmentDeploymentContractBase(BloomTestCase):
         )
 
     def bud_compose_mounts_the_attachment_volume(self):
-        volumes = self.tc_compose.service["volumes"]
+        volumes = self.compose.service["volumes"]
         self.print_variables({"volumes": volumes})
         self.assertIn(
             self.parameters.ATTACHMENT_MOUNT,
@@ -37,7 +37,7 @@ class AttachmentDeploymentContractBase(BloomTestCase):
         )
 
     def bud_compose_declares_the_attachment_volume(self):
-        declared = list(self.tc_compose.volumes)
+        declared = list(self.compose.volumes)
         self.print_variables({"declared": declared})
         self.assertIn(
             self.parameters.ATTACHMENT_VOLUME,
@@ -50,7 +50,7 @@ class AttachmentDeploymentContractBase(BloomTestCase):
         self.print_variables({"line": self.parameters.ATTACHMENT_MKDIR})
         self.assertIn(
             self.parameters.ATTACHMENT_MKDIR,
-            self.tc_dockerfile,
+            self.dockerfile,
             msg=self.parameters.MSG_ATTACHMENT_MKDIR,
             abort_on_fail=False,
         )
@@ -59,16 +59,19 @@ class AttachmentDeploymentContractBase(BloomTestCase):
         self.print_variables({"line": self.parameters.ATTACHMENT_CHOWN})
         self.assertIn(
             self.parameters.ATTACHMENT_CHOWN,
-            self.tc_dockerfile,
+            self.dockerfile,
             msg=self.parameters.MSG_ATTACHMENT_CHOWN,
             abort_on_fail=False,
         )
 
     def bud_example_documents_the_directory(self):
+        example = self.bloom.bloom_read_repo_lines_with(
+            self.parameters.ENV_EXAMPLE, self.parameters.ATTACHMENT_WORDS
+        )
         self.print_variables({"line": self.parameters.ATTACHMENT_EXAMPLE_LINE})
         self.assertIn(
             self.parameters.ATTACHMENT_EXAMPLE_LINE,
-            self.tc_example,
+            example,
             msg=self.parameters.MSG_ATTACHMENT_EXAMPLE,
             abort_on_fail=False,
         )

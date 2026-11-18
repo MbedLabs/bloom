@@ -366,6 +366,321 @@ RACE_ISSUE_NUMBER = _draw.randrange(40_000, 50_000)
 MSG_NEEDS_POSTGRES = "this test needs PostgreSQL in DATABASE_URL"
 MSG_BOTH_SEARCHED = "Sync now and the scheduled run both searched before either wrote"
 MSG_RACE_ONE_DEFECT = "Sync now and a scheduled run at once create one defect for the issue"
+CONFLICT_PATH = "/api/__flush_conflict__"
+CONFLICT_ROUTE_NAME = "_flush_conflict"
+CONFLICT_PREFIX_LETTER = "X"
+CONFLICT_PHRASE = "already exists"
+CONFLICT_DETAIL_KEY = "detail"
+CONFLICT_REQUEST_ID_KEY = "request_id"
+CONFLICT_LEAKS = ("projects_prefix_key", "INSERT INTO", "UniqueViolationError")
+MSG_CONFLICT_STATUS = "two projects of one prefix flushed in one request are answered 409"
+MSG_CONFLICT_PHRASE = "the detail says that it already exists"
+MSG_CONFLICT_REQUEST_ID = "the answer carries a request id"
+MSG_CONFLICT_QUOTES_ID = "the detail quotes the request id of the answer"
+MSG_CONFLICT_NO_LEAK = "the answer does not contain {leak}"
+REFRESH_COOKIE = "bloom_refresh_token"
+REFRESH_COOKIE_FLAG = "HttpOnly"
+REFRESH_COOKIE_PATH = "Path=/api/auth"
+REFRESH_EMAIL_KEY = "email"
+MSG_REFRESH_LOGIN = "the sign-in is answered 200"
+MSG_REFRESH_COOKIE_SET = "the sign-in sets the refresh cookie"
+MSG_REFRESH_HTTP_ONLY = "the refresh cookie is HttpOnly"
+MSG_REFRESH_PATH = "the refresh cookie is limited to /api/auth"
+MSG_REFRESH_OK = "a refresh with the cookie is answered 200"
+MSG_REFRESH_ACCOUNT = "the refreshed access token reads the signed-in account"
+MSG_REFRESH_NO_COOKIE = "a refresh without the cookie is refused with 401"
+MSG_REFRESH_NEW_COOKIE = "a refresh sets a refresh cookie"
+MSG_REFRESH_ROTATED = "the cookie after a refresh differs from the cookie before it"
+MSG_REFRESH_REPLAY = "the cookie from before the refresh is refused with 401"
+MSG_REFRESH_LOGOUT = "the sign-out is answered 200"
+MSG_REFRESH_AFTER_LOGOUT = "the cookie of a signed-out session is refused with 401"
+REPAIR_MIGRATION = "e1a7c3f9b204_repair_pre_baseline_schema.py"
+REPAIR_COLUMN_COUNT = 1
+REPAIR_TABLE_COLUMNS = 10
+REPAIR_INDEX_COUNT = 1
+MSG_REPAIR_UPGRADE = "the migrations reach head on a new database"
+MSG_REPAIR_REPEAT = "the repair statements run a second time without an error"
+MSG_REPAIR_COLUMN = "the repair restores integration_settings.account_email"
+MSG_REPAIR_TABLE = "the repair restores change_request_sync_events with its 10 columns"
+MSG_REPAIR_INDEX = "the repair restores the index on change_request_id"
+REFUSAL_REQUESTS = 30
+REFUSAL_ADDRESS = f"2001:db8::{_draw.randrange(1, 0xFFFF):x}:{_draw.randrange(1, 0xFFFF):x}"
+REFUSAL_PORT = 4321
+REFUSAL_PATH = "/api/projects"
+REFUSAL_HEADERS = {"Authorization": "Bearer forged"}
+REFUSAL_OUTCOME = "denied"
+REFUSAL_ACTION = "security.repeated_refusals"
+MSG_REFUSAL_STATUSES = "every request with a forged token is refused with 401"
+MSG_REFUSAL_RECORDED = "every refused request is recorded as a denied api.request of the address"
+MSG_REFUSAL_OVER_THRESHOLD = "the burst is larger than the refusal threshold"
+MSG_REFUSAL_ONE_EVENT = "the burst leaves one security.repeated_refusals event for the address"
+ASSIGNEE_BEFORE = "b7d3e91f4a26"
+ASSIGNEE_PREFIX = _letters(string.ascii_uppercase, 3, 3)
+ASSIGNEE_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+MSG_MIGRATION_BEFORE = "the migrations reach the revision before the one under test"
+MSG_MIGRATION_HEAD = "the migrations reach head from the revision before"
+MSG_MIGRATION_DOWNGRADE = "the downgrade reaches the revision before again"
+MSG_ASSIGNEE_IS_CREATOR = "the existing workflow is assigned to its revision creator"
+PARENT_BEFORE = "c4e8a2f6b1d3"
+PARENT_PREFIX = _letters(string.ascii_uppercase, 3, 3)
+PARENT_REQ_IDS = [f"{PARENT_PREFIX}-REQ-001", f"{PARENT_PREFIX}-REQ-002"]
+MSG_PARENT_DROPPED = "after the upgrade both requirements remain and parent_id is gone"
+MSG_PARENT_RESTORED = "after the downgrade both requirements remain and parent_id is back"
+WIDENING_KIND = "REQ"
+WIDENING_PREFIXES = ("PRJ", "ABC", "XYZ")
+WIDENING_AT_BOUNDARY = ["PRJ-REQ-001", "PRJ-REQ-042", "PRJ-REQ-999"]
+WIDENING_NEXT_AT_BOUNDARY = "PRJ-REQ-1000"
+WIDENING_WIDENED = ["PRJ-REQ-0001", "PRJ-REQ-0042", "PRJ-REQ-0999"]
+WIDENING_BELOW = ["ABC-REQ-001", "ABC-REQ-002"]
+WIDENING_NEXT_BELOW = "ABC-REQ-003"
+WIDENING_OTHER_TYPE = ["XYZ-REQ-999"]
+WIDENING_TEST_CASE = "XYZ-TC-001"
+MSG_WIDENING_NEXT = "the id after 999 is 1000"
+MSG_WIDENING_STORED = "the ids already stored are rewritten with four digits"
+MSG_WIDENING_BELOW_NEXT = "below 999 the next id keeps three digits"
+MSG_WIDENING_BELOW_STORED = "below 999 the stored ids are not rewritten"
+MSG_WIDENING_OTHER_TYPE = "widening the requirements leaves the test case id of the project alone"
+SESSION_ROLE = "external"
+SESSION_CHANGE_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+SESSION_RESET_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+SESSION_OLD_PASSWORD = _letters(string.ascii_letters + string.digits, 16, 24)
+SESSION_NEW_PASSWORD = _letters(string.ascii_letters + string.digits, 16, 24)
+SESSION_CHANGE = "change"
+SESSION_RESET = "reset"
+MSG_SESSION_BEFORE = "before the password {event} the access token reads the account"
+MSG_SESSION_DONE = "the password {event} is answered 200"
+MSG_SESSION_MAIL = "the reset mail carries a token"
+MSG_SESSION_ACCESS = "the access token from before the password {event} is refused with 401"
+MSG_SESSION_REFRESH = "the refresh cookie from before the password {event} is refused with 401"
+MSG_SESSION_OLD_PASSWORD = "after the password {event} the old password is refused with 401"
+MSG_SESSION_NEW_PASSWORD = "after the password {event} the new password signs in"
+WORKFLOW_RACE_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+WORKFLOW_RACE_PREFIX = _letters(string.ascii_uppercase, 3, 3)
+WORKFLOW_RACE_REQ_ID = f"{WORKFLOW_RACE_PREFIX}-REQ-001"
+WORKFLOW_RACE_PATH = "/api/artefacts/requirement/{id}/workflow"
+WORKFLOW_RACE_LOOKUP = "SELECT artefact_workflows."
+WORKFLOW_RACE_WAIT = 0.25
+WORKFLOW_RACE_FIRST_REVISION = 1
+WORKFLOW_RACE_REVISION_KEY = "revision_number"
+WORKFLOW_RACE_CREATOR_KEY = "creator"
+WORKFLOW_RACE_ID_KEY = "id"
+MSG_WORKFLOW_RACE_READS = "both first reads of the workflow are answered 200"
+MSG_WORKFLOW_RACE_ONE = "two first reads at once store one workflow"
+MSG_WORKFLOW_RACE_STATE = "the stored workflow is revision 1, a draft of the requirement's creator"
+MSG_WORKFLOW_RACE_LATER = "a later read is answered 200"
+MSG_WORKFLOW_RACE_REVISION = "the later read and the first reads show revision 1"
+MSG_WORKFLOW_RACE_CREATOR = "the later read names the requirement's creator"
+TOKEN_RACE_USES = 6
+TOKEN_RACE_RESET_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+TOKEN_RACE_INVITE_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+TOKEN_RACE_VERIFY_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+TOKEN_RACE_USE = {
+    "refresh": "refresh cookie",
+    "reset": "password reset token",
+    "invite": "invitation token",
+    "verify": "verification token",
+}
+MSG_TOKEN_RACE_ISSUED = "the {token} is issued"
+MSG_TOKEN_RACE_ONE = "of six uses of one {token} at once, one is answered 200"
+MSG_TOKEN_RACE_OTHERS = "every other use of the {token} is refused with {status}"
+LINK_BEFORE = "e1a7c3f9b204"
+LINK_PREFIX = "PRJ"
+LINK_REQ_IDS = ["PRJ-REQ-001", "PRJ-REQ-002"]
+LINK_CONSTRAINT = "fk_artefact_links_allowed_triple"
+LINK_FORBIDDEN = ("REQ", "REQ", "forbidden")
+LINK_CORRECTED_ROLE = "refines"
+LINK_OLD_ENDS = (1, 2)
+LINK_NEW_ENDS = (2, 1)
+LINK_REJECTED = [
+    ("REQ", "REQ", "forbidden"),
+    ("TC", "REQ", "references"),
+    ("UNKNOWN", "REQ", "refines"),
+]
+LINK_ACCEPTED = [
+    ("TCO", "PROT", "references"),
+    ("PROT", "TCO", "implements"),
+    ("REQ", "REQ", "references"),
+    ("REQ", "REQ", "refines"),
+]
+LINK_LEGACY = ("derived_from", "derives_from")
+LINK_TABLE = "artefact_links"
+LINK_LEGACY_TABLE = "requirement_links"
+LINK_REPORT_TABLE_KEY = "table"
+LINK_CHECK_REFUSED = 1
+LINK_CHECK_PASSED = 0
+MSG_LINK_UNVALIDATED = "after the upgrade the link constraint is not validated"
+MSG_LINK_KEPT = "the upgrade keeps the link with the forbidden triple"
+MSG_LINK_REJECTED = "a new link {triple} is refused by the constraint"
+MSG_LINK_ACCEPTED = "a new link {triple} is stored"
+MSG_LINK_TABLE_IS_CODE = "the allowed triples in the database are the triples of the code"
+MSG_LINK_CHECK_REFUSED = "the check answers 1 while a forbidden link exists"
+MSG_LINK_REPORT_INVALID = "the report names the forbidden link with its role"
+MSG_LINK_REPORT_LEGACY = "the report maps the legacy requirement link to its new role"
+MSG_LINK_STILL_UNVALIDATED = "the refused check leaves the constraint not validated"
+MSG_LINK_CHECK_PASSED = "the check answers 0 once the link has an allowed role"
+MSG_LINK_VALIDATED = "the passed check validates the constraint"
+MSG_LINK_COUNTS = "one requirement link and one artefact link remain"
+LEGACY_CHANGE_ID = "PRJ-CHG-001"
+LEGACY_CHANGE_STATUS = "Implemented"
+LEGACY_REQUIREMENT_STATUS = "Approved"
+LEGACY_BASELINE_NAME = "Frozen"
+LEGACY_SNAPSHOT = '{"legacy": true}'
+WORKFLOW_SCHEMA_ASPECTS = {
+    "columns": "column names",
+    "types": "column types and nullability",
+    "primary": "primary keys",
+    "unique": "unique constraints",
+    "foreign": "foreign keys",
+    "checks": "check constraints",
+    "pending": "pending-request index",
+    "comments": "comment columns and their request key",
+}
+WORKFLOW_PENDING_INDEX = "uq_artefact_requests_pending_cycle"
+WORKFLOW_PENDING_COLUMNS = ["workflow_id", "revision_number", "kind"]
+WORKFLOW_PENDING_WHERE = "status='pending'"
+WORKFLOW_COMMENT_COLUMNS = ("revision_number", "content_hash", "review_request_id")
+WORKFLOW_COMMENT_KEY = (["review_request_id"], "artefact_requests", "SET NULL")
+MSG_WORKFLOW_SCHEMA_COMPARED = "the {aspect} of the workflow tables were compared"
+MSG_WORKFLOW_SCHEMA = "the migrated {aspect} equal the models"
+MSG_LEGACY_REQUIREMENTS = "the upgrade leaves every requirement status as it was"
+MSG_LEGACY_CHANGE = "the upgrade leaves the change request status as it was"
+MSG_LEGACY_BASELINE = "the upgrade leaves the baseline snapshot as it was"
+MSG_LEGACY_NO_WORKFLOWS = "the upgrade creates no workflow, revision or request"
+OVERLAP_BEFORE = "8134a1512496"
+OVERLAP_PREFIX = _letters(string.ascii_uppercase, 3, 3)
+OVERLAP_PEOPLE = [
+    f"{_letters(string.ascii_lowercase, 5, 8)}{index}@example.com" for index in range(4)
+]
+OVERLAP_BUNDLE = "Developers"
+OVERLAP_SECOND_BUNDLE = "Testers"
+OVERLAP_POLICY = "Read Customer"
+OVERLAP_KEPT = ("entries", "policies", "roles")
+OVERLAP_REFUSAL = "overlapping project groups"
+MSG_OVERLAP_KEPT = "the upgrade keeps every access entry, entry policy and account role"
+MSG_OVERLAP_STORED = "a second group for a person who holds one in the project is stored"
+MSG_OVERLAP_DUPLICATE = "the same group for the same person a second time is refused"
+MSG_OVERLAP_PLAIN = "a second entry without a group for a person is refused"
+MSG_OVERLAP_REFUSED = "the downgrade is refused while a person holds two groups in a project"
+MSG_OVERLAP_REFUSAL_TEXT = "the refusal names the overlapping project groups"
+MSG_OVERLAP_UNCHANGED = "the refused downgrade changes no row, index or revision"
+MSG_OVERLAP_DOWNGRADED = "after the downgrade the database is as it was before the upgrade"
+MSG_OVERLAP_UPGRADED_AGAIN = "after the second upgrade the database is as it was after the first"
+MSG_MIGRATION_HEAD_AGAIN = "the migrations reach head a second time"
+VISIONS_BEFORE = "d1f6b8a3e572"
+VISIONS_PREFIX = "PRJ"
+VISIONS_DOC_ID = "PRJ-VIS-001"
+VISIONS_POLICY = "Visions"
+VISIONS_KIND = "VIS"
+VISIONS_SPEC_KIND = "SPEC"
+VISIONS_SPEC_POLICY = "Specifications"
+VISIONS_RELEASED_SET = (
+    "Requirements",
+    "Specifications",
+    "Standards",
+    "Designs",
+    "Risks",
+    "Change Requests",
+    "Concepts",
+    "Test Cases",
+    "Suites",
+    "Campaigns",
+    "Defects",
+    "Protocols",
+    "Reports",
+    "Baselines",
+    "Parameters",
+    "Traceability",
+    "Project Management",
+)
+VISIONS_COVERED = (
+    "Read Internal",
+    "Read Customer",
+    "Review Internal",
+    "Review Customer",
+    "Application Administration",
+)
+VISIONS_HOLDERS = {
+    "released": f"{_letters(string.ascii_lowercase, 5, 8)}@example.com",
+    "spec_only": f"{_letters(string.ascii_lowercase, 5, 8)}@example.com",
+}
+VISIONS_GROUP = "Spec Writers"
+VISIONS_OWNERS = "Product Owners"
+VISIONS_EDITABLE = "Hand made"
+VISIONS_UNTOUCHED = ("spec_only", "group", "editable", "group_row")
+VISIONS_DEFAULT = [("document", True)]
+VISIONS_REFUSAL = "Cannot downgrade below 637f976e78e0"
+MSG_VISIONS_ABSENT = "before the upgrade no Visions policy exists"
+MSG_VISIONS_RELEASED = "the entry holding the released maintainer set gains Visions"
+MSG_VISIONS_OWNERS = "the Product Owners group gains Visions"
+MSG_VISIONS_UNTOUCHED = (
+    "the Specifications-only entry, its group and the hand-made policy are as before"
+)
+MSG_VISIONS_DEFAULT = "Visions is one default document policy"
+MSG_VISIONS_COVERED = "the five read, review and administration policies are the ones extended"
+MSG_VISIONS_AS_SPEC = "{policy} gives visions what it gives specifications"
+MSG_VISIONS_REST = "{policy} keeps every other permission it had"
+MSG_VISIONS_REFUSED = "the downgrade is refused while a vision exists"
+MSG_VISIONS_REFUSAL_TEXT = "the refusal names the revision it cannot go below"
+MSG_VISIONS_DOWNGRADED = "after the downgrade every row is as it was before the upgrade"
+MSG_VISIONS_AGAIN = "after the second upgrade the released entry holds the same policies"
+EMAIL_SELF_OLD = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+EMAIL_SELF_NEW = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+EMAIL_MEMBER_OLD = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+EMAIL_MEMBER_NEW = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+EMAIL_STALE_OLD = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+EMAIL_STALE_APPROVED = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+EMAIL_STALE_OTHER = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+EMAIL_GUARD = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+EMAIL_GUARD_NEW = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+EMAIL_ADMIN_OLD = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+EMAIL_ADMIN_NEW = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+EMAIL_INVITED = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+EMAIL_ADMIN_ROLE = "admin"
+EMAIL_AUTHORIZATION_SENDER = "send_email_change_authorization_email"
+EMAIL_CHANGE_SENDER = "send_email_change_email"
+EMAIL_INVITE_SENDER = "send_invite_email"
+EMAIL_SENDER_KEY = "sender"
+EMAIL_TO_KEY = "to_email"
+EMAIL_AWAITING_CURRENT = "awaiting_current_confirmation"
+EMAIL_AWAITING = "awaiting_confirmation"
+EMAIL_REQUESTED = "requested"
+EMAIL_CURRENT_PHRASE = "current email"
+EMAIL_NEW_PHRASE = "new email"
+EMAIL_MOVED = (401, 401, 401, 200)
+MSG_EMAIL_REQUEST = "the email change request is answered 200"
+MSG_EMAIL_SELF_PHRASE = "the answer tells the administrator to confirm from the current email"
+MSG_EMAIL_SELF_PENDING = "the account keeps its email and waits for the current mailbox"
+MSG_EMAIL_SELF_MAIL = "one mail goes out, to the current address, asking to authorize the change"
+MSG_EMAIL_AUTHORIZED = "the confirmation from the current mailbox is answered 200"
+MSG_EMAIL_NEW_PHRASE = "the answer tells the administrator to confirm from the new email"
+MSG_EMAIL_SELF_WAITING = "the account keeps its email and waits for the new mailbox"
+MSG_EMAIL_NEW_MAIL = "one mail goes out, to the new address, after the current mailbox confirmed"
+MSG_EMAIL_CONFIRMED = "the confirmation from the new mailbox is answered 200"
+MSG_EMAIL_MOVED = (
+    "the old access token, refresh cookie and email are refused, and the new email signs in"
+)
+MSG_EMAIL_NO_MAIL = "a member's request sends no mail before an administrator approves"
+MSG_EMAIL_REQUESTED = "the member's change waits as requested"
+MSG_EMAIL_APPROVED = "the administrator's approval is answered 200"
+MSG_EMAIL_APPROVAL_MAIL = "the approval mails the confirmation naming the old and the new address"
+MSG_EMAIL_AWAITING = "after the approval the account keeps its email and waits for confirmation"
+MSG_EMAIL_NOT_YET = "before the confirmation the new email is refused and the old one signs in"
+MSG_EMAIL_AFTER = "after the confirmation the account has the new email and no pending change"
+MSG_EMAIL_VERIFIED = "the confirmed address is recorded as verified"
+MSG_EMAIL_STALE = (
+    "a token approved for one address is refused with 400 once another address is pending"
+)
+MSG_EMAIL_STALE_LOGINS = "after the refused token only the old email signs in"
+MSG_EMAIL_WRONG_PASSWORD = "a request with a wrong current password is refused with 400"
+MSG_EMAIL_NOT_STARTED = "the refused request leaves no pending email"
+MSG_EMAIL_BYPASS = "the general account update refuses an email with 422"
+MSG_EMAIL_ADMIN_STARTED = (
+    "an administrator's change is answered 200, keeps the email and waits for confirmation"
+)
+MSG_EMAIL_ADMIN_MOVED = "after the confirmation the old email is refused and the new one signs in"
+MSG_EMAIL_INVITED = "the invitation is accepted with 200 and asks for no email verification"
+MSG_EMAIL_INVITED_SIGN_IN = "the invited account signs in"
+MSG_EMAIL_INVITED_VERIFIED = "the invited account's address is recorded as verified"
 
 CLI_PREFIX = "/api/auth/cli"
 CLI_START = "/start"
@@ -1814,6 +2129,7 @@ MSG_REQIF_LINK = "the ReqIF relation becomes one refines link from login to syst
 MSG_REQIF_LEGACY = "the import writes no legacy requirement links"
 
 DESCRIPTION_PREFIX = _letters(string.ascii_uppercase, 3, 3)
+DESCRIPTION_TEXT_FIELDS = ("description", "content_json", "content_html")
 DESCRIPTION_BODY = {
     "type": "doc",
     "content": [
@@ -1868,3 +2184,3527 @@ TEXT_MIGRATION_EXPECTED = {
 MSG_TEXT_MIGRATION_UPGRADE = "the upgrade moves each requirement's editor text into its description"
 MSG_TEXT_MIGRATION_DOWNGRADE = "the downgrade keeps the descriptions and restores no editor content"
 MSG_TEXT_MIGRATION_REUPGRADE = "upgrading again leaves the descriptions as they are"
+SERVICE_ADMIN_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+SERVICE_NAME = "Bud"
+SERVICE_TOKEN_PREFIX = "blm_sync_"
+SERVICE_SCOPE = "test-results:write"
+SERVICE_LIFETIME = timedelta(days=90, seconds=5)
+SERVICE_REFUSED = (None, 401)
+MSG_SERVICE_PREFIX = "a service token starts with blm_sync_"
+MSG_SERVICE_SCOPE = "a service credential is scoped to writing test results"
+MSG_SERVICE_HASH = "the stored hash does not contain the token"
+MSG_SERVICE_LIFETIME = "a service credential expires within 90 days"
+MSG_SERVICE_AUTHENTICATES = "the token authenticates as the credential it was issued for"
+MSG_SERVICE_NOT_A_USER = "a service token is refused as a user sign-in with 401"
+MSG_SERVICE_UNTYPED = "a user token without a type is refused with 401"
+MSG_SERVICE_REVOKED = "the token of a revoked credential is refused with 401"
+MSG_SERVICE_EXPIRED = "the token of an expired credential is refused with 401"
+SECRETS_TOKEN = f"ghp_{_letters(string.ascii_letters + string.digits, 24, 32)}"
+SECRETS_WEBHOOK = _letters(string.ascii_letters + string.digits, 24, 32)
+SECRETS_ROTATED = f"ghp_{_letters(string.ascii_letters + string.digits, 24, 32)}"
+SECRETS_PLAINTEXT = _letters(string.ascii_letters, 16, 24)
+SECRETS_MALFORMED_KEY = "not-a-valid-fernet-key"
+SECRETS_TRACKER = "github"
+SECRETS_UNAVAILABLE = 503
+MSG_SECRETS_PREFIX = "an encrypted secret starts with the envelope prefix"
+MSG_SECRETS_HIDDEN = "the envelope does not contain the secret"
+MSG_SECRETS_ROUND_TRIP = "the envelope decrypts to the secret"
+MSG_SECRETS_DISTINCT = "the same secret encrypts to a different envelope each time"
+MSG_SECRETS_BOTH_DECRYPT = "both envelopes decrypt to the secret"
+MSG_SECRETS_NO_KEY = "without a key encrypting is refused with 503"
+MSG_SECRETS_BAD_KEY = "with a malformed key encrypting is refused with 503"
+MSG_SECRETS_WRONG_KEY = "with another key decrypting is refused with 503"
+MSG_SECRETS_PLAINTEXT = "a stored value that is not an envelope is refused with 503"
+MSG_SECRETS_RECOGNISED = "an envelope counts as encrypted, plaintext and nothing do not"
+MSG_SECRETS_CREATED = "the setting is created with 201"
+MSG_SECRETS_REPORTED = "the answer says a token and a webhook secret are set"
+MSG_SECRETS_NOT_SHOWN = "the answer does not contain the {secret}"
+MSG_SECRETS_STORED = "the token and the webhook secret are stored as envelopes"
+MSG_SECRETS_STORED_VALUES = "the stored envelopes decrypt to the token and the webhook secret sent"
+MSG_SECRETS_ROTATED = "sending a new token is answered 200"
+MSG_SECRETS_NEW_ENVELOPE = "the rotation stores another envelope"
+MSG_SECRETS_NEW_VALUE = "the stored envelope decrypts to the new token"
+HOOK_GITHUB_PATH = "/api/integrations/github/webhook"
+HOOK_GITLAB_PATH = "/api/integrations/gitlab/webhook"
+HOOK_GITHUB_NUMBER = _draw.randrange(50_000, 60_000)
+HOOK_GITLAB_NUMBER = _draw.randrange(60_000, 70_000)
+HOOK_WRONG_SIGNATURE = "sha256=" + "0" * 64
+HOOK_OVERSIZED_BYTES = 1024 * 1024 + 1
+HOOK_DELIVERY = f"delivery-{_letters(string.ascii_lowercase, 6, 10)}"
+HOOK_OVERSIZED_DELIVERY = f"delivery-{_letters(string.ascii_lowercase, 6, 10)}"
+HOOK_GITLAB_DELIVERY = f"delivery-{_letters(string.ascii_lowercase, 6, 10)}"
+HOOK_PROCESSED = "processed"
+HOOK_DUPLICATE = "duplicate"
+HOOK_STATUS_KEY = "status"
+MSG_HOOK_UNSIGNED = "a GitHub delivery without a signature is refused with 403"
+MSG_HOOK_WRONG = "a GitHub delivery with a wrong signature is refused with 403"
+MSG_HOOK_NO_DELIVERY = "a signed GitHub delivery without a delivery id is refused with 400"
+MSG_HOOK_OVERSIZED = "a signed GitHub delivery over 1 MiB is refused with 413"
+MSG_HOOK_UNCHANGED = "after the refused deliveries the defect is still open"
+MSG_HOOK_NO_EVENT = "the refused deliveries record no successful sync"
+MSG_HOOK_PROCESSED = "a signed GitHub delivery with a delivery id is processed with 200"
+MSG_HOOK_CLOSED = "the processed delivery closes the linked defect"
+MSG_HOOK_REPLAY = "the same delivery a second time is answered as a duplicate"
+MSG_HOOK_GITLAB_UNSIGNED = "a GitLab delivery without the token is refused with 403"
+MSG_HOOK_GITLAB_UNCHANGED = "after the refused GitLab delivery the defect is still open"
+MSG_HOOK_GITLAB_PROCESSED = "a GitLab delivery with the token is processed with 200"
+READER_BASELINE_ID = f"{VISIBILITY_PREFIX}-BL-001"
+READER_SNAPSHOT = {
+    "requirements": {
+        "count": 2,
+        "ids": [f"{VISIBILITY_PREFIX}-REQ-001", f"{VISIBILITY_PREFIX}-REQ-002"],
+    },
+    "test_cases": {
+        "count": 2,
+        "ids": [f"{VISIBILITY_PREFIX}-TC-001", f"{VISIBILITY_PREFIX}-TC-002"],
+    },
+}
+READER_CUSTOMER_REQ = f"{VISIBILITY_PREFIX}-REQ-001"
+READER_INTERNAL_REQ = f"{VISIBILITY_PREFIX}-REQ-002"
+READER_REQUIREMENT_KIND = "requirement"
+READER_TRACKER = "github"
+READER_SECRET_FIELD = "webhook_secret"
+READER_VARIABLE_KEY = "API_KEY"
+READER_VARIABLE_VALUE = _letters(string.ascii_letters + string.digits, 16, 24)
+READER_MAINTAINER_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+READER_ALL_PERMISSIONS = {"*": ["*"]}
+MSG_READER_BASELINE = "an external reader's read of a baseline is answered 200"
+MSG_READER_NO_SNAPSHOT = "the baseline an external reader gets has no snapshot"
+MSG_READER_SETTINGS = (
+    "an external reader's list of the tracker settings is answered 200 with the one setting"
+)
+MSG_READER_SETTING_FLAGS = "the setting says a token and a webhook secret are set"
+MSG_READER_NO_SECRET = "the setting does not contain the webhook secret"
+MSG_READER_RELATED_HIDDEN = (
+    "the related artefacts of an internal requirement are answered 404 to an external reader"
+)
+MSG_READER_RELATED_SHOWN = (
+    "the related artefacts of a customer requirement are answered 200 to an external reader"
+)
+MSG_READER_VARIABLES_REFUSED = (
+    "an external reader's list of the project parameters is refused with 403"
+)
+MSG_READER_VARIABLES_SHOWN = "a member with every permission lists the project parameter"
+READER_CUSTOMER_TC = f"{VISIBILITY_PREFIX}-TC-001"
+READER_INTERNAL_TC = f"{VISIBILITY_PREFIX}-TC-002"
+READER_VISIBLE_COMMENT = " ".join(_draw.sample(_WORDS, 3))
+READER_HIDDEN_COMMENT = " ".join(_draw.sample(_WORDS, 3))
+READER_VISIBLE_ACTIVITY = " ".join(_draw.sample(_WORDS, 3))
+READER_HIDDEN_ACTIVITY = " ".join(_draw.sample(_WORDS, 3))
+READER_LINK = ("TC", "REQ", "verifies")
+MSG_READER_TC_LIST = "an external reader lists the customer test case and not the internal one"
+MSG_READER_TC_VISIBILITY = "a test case read by an administrator carries its visibility"
+MSG_READER_COMMENTS_HIDDEN = (
+    "the comments of an internal requirement are answered 404 to an external reader"
+)
+MSG_READER_ACTIVITY_HIDDEN = (
+    "the activity of an internal requirement is answered 404 to an external reader"
+)
+MSG_READER_COMMENTS_SHOWN = "an external reader gets the comment of the customer requirement"
+MSG_READER_ACTIVITY_SHOWN = "an external reader gets the activity of the customer requirement"
+MSG_READER_LINKS = "an external reader lists only the link whose two ends are customer artefacts"
+IAMHTTP_ALLOWED_PREFIX = "ABC"
+IAMHTTP_BLOCKED_PREFIX = "PRJ"
+IAMHTTP_BLOCKED_REQ = "PRJ-REQ-001"
+IAMHTTP_MAINTAINER_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+IAMHTTP_REQIF = b"<REQ-IF/>"
+IAMHTTP_DOC_TYPE = "REQ"
+MSG_IAMHTTP_PROJECTS = "a member of one project lists that project only"
+MSG_IAMHTTP_LIST = "the requirements of a project the member is not in are refused with 403"
+MSG_IAMHTTP_READ = "a requirement of a project the member is not in is answered 404"
+MSG_IAMHTTP_TRACEABILITY = "the traceability of a project the member is not in is refused with 403"
+MSG_IAMHTTP_DASHBOARD = "the dashboard shows the member's project only"
+MSG_IAMHTTP_IMPORT = "importing from a project the member is not in is refused with 403"
+MSG_IAMHTTP_REQIF = "an external reader's ReqIF upload is refused with 403"
+EXPORT_ADMIN_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+EXPORT_READER_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+EXPORT_AUTHOR_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+EXPORT_PREFIX = "PRJ"
+EXPORT_SHOWN_REQ = "PRJ-REQ-001"
+EXPORT_HIDDEN_REQ = "PRJ-REQ-002"
+EXPORT_SHOWN_TC = "PRJ-TC-001"
+EXPORT_HIDDEN_TC = "PRJ-TC-002"
+EXPORT_SHOWN_TITLE = "Shown"
+EXPORT_HIDDEN_TITLE = "Hidden"
+EXPORT_PASSED = "Passed"
+EXPORT_PDF_KINDS = ("requirements", "traceability", "test-cases", "verification-dossier")
+EXPORT_DOSSIER = "verification-dossier"
+EXPORT_AUDIT_ACTION = "export.generated"
+EXPORT_AUDIT_KINDS = ["requirements", "test_cases", "traceability", "verification_dossier"]
+EXPORT_PDF = (200, "application/pdf", True)
+EXPORT_READER_PERMISSIONS = {"REQ": ["view", "export"], "TC": ["view", "export"]}
+EXPORT_AUTHOR_PERMISSIONS = {"REQ": ["view", "export"]}
+MSG_EXPORT_PDF = "the {kind} export is answered 200 as a PDF"
+MSG_EXPORT_AUDITED = "each of the four PDF exports is recorded with its kind"
+MSG_EXPORT_REQUIREMENTS = (
+    "an external exporter's requirements export holds the customer requirement only"
+)
+MSG_EXPORT_MATRIX = "an external exporter's traceability export holds the customer pair only"
+MSG_EXPORT_TESTS = "an external exporter's test case export holds the customer test case only"
+MSG_EXPORT_NO_HIDDEN = "the {kind} export does not contain the internal title"
+MSG_EXPORT_DOSSIER = "the dossier is refused with 403 to an exporter of requirements only"
+READER_CUSTOMER_SPEC = f"{VISIBILITY_PREFIX}-SPEC-001"
+READER_INTERNAL_SPEC = f"{VISIBILITY_PREFIX}-SPEC-002"
+READER_DOC_TYPES = ["REQ", "SPEC"]
+READER_REQUIREMENTS_SLUG = "requirements"
+READER_SPECIFICATIONS_SLUG = "specifications"
+READER_DETAIL_STATUSES = (200, 404, 200, 404)
+READER_CUSTOMER_ORIGIN = "Customer"
+READER_INTERNAL_ORIGIN = "Internal"
+READER_NEW_TITLE = " ".join(_draw.sample(_WORDS, 3))
+MSG_READER_DOCS_LIST = (
+    "an external reader lists the customer requirement and the customer specification only"
+)
+MSG_READER_DOCS_VISIBILITY = "every listed document carries the customer visibility"
+MSG_READER_DOCS_DETAIL = (
+    "the customer documents open with 200 and the internal ones are answered 404"
+)
+MSG_READER_REQ_LIST = "an external reader lists the customer requirement and not the internal one"
+MSG_READER_REQ_HIDDEN = "an internal requirement is answered 404 to an external reader"
+MSG_READER_ORIGIN_CUSTOMER = "a requirement created with the Customer origin is customer-visible"
+MSG_READER_ORIGIN_INTERNAL = "a requirement changed to the Internal origin becomes internal"
+READER_COVERAGE = (1, 1, 0)
+MSG_READER_MATRIX = "an external reader's traceability holds the customer requirement with the customer test case only"
+MSG_READER_COVERAGE = (
+    "an external reader's coverage counts the customer requirement only, as covered"
+)
+MSG_READER_IMPACT_HIDDEN = (
+    "the impact of an internal requirement is answered 404 to an external reader"
+)
+READER_VISIBLE_SUITE = f"{VISIBILITY_PREFIX}-TS-001"
+READER_HIDDEN_SUITE = f"{VISIBILITY_PREFIX}-TS-002"
+READER_EXECUTED_AT = datetime(2026, 7, 2, 10, 30, 0)
+READER_EXECUTED_AT_TEXT = "2026-07-02T10:30:00"
+READER_BUD_RUN = _draw.randrange(100, 10_000)
+READER_SUITE_EXECUTION = (1, "Passed", READER_EXECUTED_AT_TEXT, READER_BUD_RUN)
+MSG_READER_SUITE_LIST = "an external reader lists the customer suite and not the internal one"
+MSG_READER_SUITE_LIST_EXECUTION = (
+    "the listed suite counts its one visible test case and carries its last execution"
+)
+MSG_READER_SUITE_HIDDEN = "an internal suite is answered 404 to an external reader"
+MSG_READER_SUITE_SHOWN = "the customer suite opens with 200 and carries its visibility"
+MSG_READER_SUITE_EXECUTION = (
+    "the opened suite counts its one visible test case and carries its last execution"
+)
+MSG_READER_SUITE_ITEMS = "the opened suite holds the customer test case and not the internal one"
+CONTROLLED_KINDS = [
+    ("design", "/api/designs", "design_id", "DES"),
+    ("risk", "/api/risks", "risk_id", "RSK"),
+    ("change", "/api/changes", "change_id", "CHG"),
+    ("concept", "/api/test-concepts", "concept_id", "CPT"),
+    ("defect", "/api/defects", "defect_id", "DEF"),
+]
+MSG_CONTROLLED_LIST = "an external reader lists the customer {kind} and not the internal one"
+MSG_CONTROLLED_HIDDEN = "an internal {kind} is answered 404 to an external reader"
+MSG_CONTROLLED_SHOWN = "the customer {kind} opens with 200 and carries its id and visibility"
+READER_VISIBLE_CAMPAIGN = f"{VISIBILITY_PREFIX}-CMP-001"
+READER_HIDDEN_CAMPAIGN = f"{VISIBILITY_PREFIX}-CMP-002"
+READER_CAMPAIGN_EXECUTED_AT = datetime(2026, 7, 2, 11, 15, 0)
+READER_CAMPAIGN_EXECUTION = (1, "Passed", "2026-07-02T11:15:00")
+READER_CAMPAIGN_EXECUTED = {"status": "Executed", "result": "Passed"}
+READER_CAMPAIGN_PENDING = {"status": "Pending"}
+READER_SYNC_AT = "2026-07-04T10:45:00"
+READER_SYNC_RUN = _draw.randrange(100, 10_000)
+READER_SYNC_COMMENT = " ".join(_draw.sample(_WORDS, 3))
+MSG_READER_CAMPAIGN_LIST = "an external reader lists the customer campaign and not the internal one"
+MSG_READER_CAMPAIGN_LIST_EXECUTION = (
+    "the listed campaign counts its one visible test case and carries its last execution"
+)
+MSG_READER_CAMPAIGN_HIDDEN = "an internal campaign is answered 404 to an external reader"
+MSG_READER_CAMPAIGN_SHOWN = "the customer campaign opens with 200 and carries its visibility"
+MSG_READER_CAMPAIGN_EXECUTION = (
+    "the opened campaign counts its one visible test case and carries its last execution"
+)
+MSG_READER_CAMPAIGN_ITEMS = (
+    "the opened campaign holds the customer test case and not the internal one"
+)
+MSG_READER_CAMPAIGN_SUITES = "the opened campaign names the customer suite and not the internal one"
+MSG_READER_SYNC = "synchronising a result is answered 200"
+MSG_READER_SYNC_NO_RUN = "the synchronised result gives the campaign no Bud run of its own"
+MSG_READER_SYNC_ITEM = "the campaign's item carries the synchronised result and its time"
+MSG_DIRECT_REQUIREMENT = (
+    "the customer requirement shows its customer test case, suite and campaign only"
+)
+MSG_DIRECT_TEST_CASE = (
+    "the customer test case shows its customer requirement, suite and campaign only"
+)
+MSG_DIRECT_CAMPAIGN = "the customer campaign shows its customer test case and that test case's customer requirement only"
+ARQ_BOSS_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+ARQ_SECOND_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+ARQ_MEMBER_EMAIL = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+ARQ_KIND = "requirement"
+ARQ_PREFIX = "PRJ"
+ARQ_REF = "PRJ-REQ-001"
+ARQ_MINE_REF = "PRJ-REQ-002"
+ARQ_FAILED_MAIL_REF = "PRJ-REQ-003"
+ARQ_DECIDED_PREFIX = "XYZ"
+ARQ_DECIDED_REF = "XYZ-REQ-001"
+ARQ_OTHER_PREFIX = "ABC"
+ARQ_REFUSED_REF = "ABC-REQ-001"
+ARQ_PENDING_REF = "ABC-REQ-002"
+ARQ_INVALID_REF = "../../etc"
+ARQ_ADMIN_REF = "PRJ-REQ-009"
+ARQ_MAIL_ERROR = "SMTP is disabled"
+ARQ_PENDING = "pending"
+ARQ_GRANTED = "granted"
+ARQ_REFUSED = "refused"
+ARQ_RESOURCE_LABEL = "PRJ-REQ-001 (not found)"
+ARQ_REVIEW_LINK_END = "/projects/PRJ/edit"
+ARQ_REQUESTED_ACTION = "access.requested"
+ARQ_GRANTED_ACTION = "access.granted"
+ARQ_REFUSED_ACTION = "access.refused"
+ARQ_NOTHING_PHRASE = "nothing to request"
+ARQ_FIELDS = [
+    "already_requested",
+    "created_at",
+    "decided_at",
+    "id",
+    "mail_sent",
+    "project_prefix",
+    "requester_email",
+    "requester_name",
+    "requester_profile_picture_url",
+    "resource_label",
+    "resource_ref",
+    "resource_type",
+    "status",
+]
+MSG_ARQ_CREATED = "a first request is created with 201, pending, and reports its mail as sent"
+MSG_ARQ_REPEATED = "the same request again is answered 200 as already requested, with the same id"
+MSG_ARQ_MAILED = "the request mails each administrator once"
+MSG_ARQ_MAIL = (
+    "the mail names the requester, the resource, the project, the review page and the request id"
+)
+MSG_ARQ_RECORDED = "the request is recorded once with its resource"
+MSG_ARQ_FIELDS = "the answer holds the request's own fields only"
+MSG_ARQ_UNDISCLOSED = "the answer names no requester email and no picture"
+MSG_ARQ_NONE_YET = "before a request the page learns that none is pending"
+MSG_ARQ_MINE = "after the request the page learns that it is pending"
+MSG_ARQ_MAIL_FAILED = (
+    "a request whose mail fails is created with 201 and reports its mail as not sent"
+)
+MSG_ARQ_LISTED = "an administrator lists the request of the project with its requester"
+MSG_ARQ_MEMBER_DECISION = "a member's decision is refused with 403"
+MSG_ARQ_GRANT = "an administrator's grant is answered 200 as granted"
+MSG_ARQ_DECIDED_TWICE = "a second decision on a decided request is refused with 409"
+MSG_ARQ_GRANT_RECORDED = "the grant is recorded once with the administrator and the requester"
+MSG_ARQ_MEMBER_LIST = "a member's list of every request is refused with 403"
+MSG_ARQ_ALL = "an administrator lists every pending request"
+MSG_ARQ_REFUSE = "an administrator's refusal is answered 200 as refused"
+MSG_ARQ_PENDING_LEFT = "the refused request leaves the pending list"
+MSG_ARQ_HISTORY = "the refused request is listed under refused"
+MSG_ARQ_REFUSAL_RECORDED = "the refusal is recorded once with the administrator and the requester"
+MSG_ARQ_ANONYMOUS = "a request without a sign-in is refused with 401"
+MSG_ARQ_INVALID = "a resource reference with path characters is refused with 422"
+MSG_ARQ_ADMIN = "an administrator's own request is refused with 409 as nothing to request"
+MSG_ARQ_ADMIN_SILENT = "the administrator's refused request mails nobody and is not recorded"
+AUDITLOG_USER_AGENT = "audit-test/1.0"
+AUDITLOG_SOMEONE = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+AUDITLOG_MEMBER = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+AUDITLOG_DEMOTED = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+AUDITLOG_ADMIN = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+AUDITLOG_ADMIN_NAME = "Admin"
+AUDITLOG_ADA = ("Ada@example.com", "Ada")
+AUDITLOG_ZOE = ("Zoe@example.com", "Zoe")
+AUDITLOG_PREFIX = "PRJ"
+AUDITLOG_DESIGN = "PRJ-DES-001"
+AUDITLOG_POLICY = f"Policy {_letters(string.ascii_lowercase, 4, 10)}"
+AUDITLOG_SECRET = _letters(string.ascii_letters + string.digits, 24, 32)
+AUDITLOG_LOGIN = "auth.login"
+AUDITLOG_AUTH_FILTER = "auth."
+AUDITLOG_SORT_FILTER = "sort."
+AUDITLOG_FAILED_LOGIN = ("failure", "anonymous", "user")
+AUDITLOG_ROLE_CHANGE = {"from": "maintainer", "to": "external"}
+AUDITLOG_SORT_HOURS = (3, 1, 4, 2)
+AUDITLOG_SORT_ROWS = [
+    ("zoe", "sort.b", "user", "success", "10.0.0.2", "req-d"),
+    ("ada", "sort.d", "project", "failure", None, "req-c"),
+    (None, "sort.a", "policy", "ignored", "10.0.0.3", None),
+    (999, "sort.c", None, "success", "10.0.0.1", "req-a"),
+]
+AUDITLOG_SORTED = {
+    "occurred_at": ([1, 2, 3, 4], [4, 3, 2, 1]),
+    "actor": ([1, 2, 3, 4], [4, 3, 2, 1]),
+    "action": ([4, 3, 2, 1], [1, 2, 3, 4]),
+    "target": ([2, 4, 1, 3], [3, 1, 4, 2]),
+    "outcome": ([1, 4, 3, 2], [2, 3, 4, 1]),
+    "ip": ([1, 2, 3, 4], [4, 3, 2, 1]),
+    "request_id": ([4, 2, 1, 3], [3, 1, 2, 4]),
+}
+AUDITLOG_DIRECTIONS = ("asc", "desc")
+AUDITLOG_PAGE = 2
+AUDITLOG_INVALID = [{"sort": "details"}, {"dir": "sideways"}]
+AUDITLOG_MODULE = "app.api.audit"
+AUDITLOG_ROLE_CHANGED = "user.role_changed"
+AUDITLOG_MEMBER_ADDED = "project_member.added"
+AUDITLOG_VISIBILITY_CHANGED = "artefact.visibility_changed"
+AUDITLOG_DELETED = "artefact.deleted"
+AUDITLOG_INTEGRATION_UPDATED = "integration.updated"
+AUDITLOG_MEMBER_SORT = {"sort": "actor", "dir": "asc"}
+SECRETS_NO_KEY = ""
+MSG_AUDITLOG_REFUSED_LOGIN = "a sign-in with a wrong password is refused with 401"
+MSG_AUDITLOG_FAILURE = (
+    "the refused sign-in is recorded as a failure by an anonymous actor on the account"
+)
+MSG_AUDITLOG_REQUEST = "the record carries the request id, the user agent and an address"
+MSG_AUDITLOG_NO_PASSWORD = "the record does not contain the password that was tried"
+MSG_AUDITLOG_SUCCESS = "a sign-in is recorded as a success by that user"
+MSG_AUDITLOG_ROLE = (
+    "a role change is answered 200 and recorded with the administrator, the account and both roles"
+)
+MSG_AUDITLOG_STATUSES = (
+    "adding a member, changing a visibility and deleting an artefact are answered 201, 200 and 204"
+)
+MSG_AUDITLOG_MEMBER = "the added member is recorded with the project and the account"
+MSG_AUDITLOG_VISIBILITY = (
+    "the visibility change is recorded with the artefact and the new visibility"
+)
+MSG_AUDITLOG_DELETED = "the deletion is recorded with the project and the artefact type"
+MSG_AUDITLOG_ROTATED = "a new token is answered 200 and recorded as a changed token field"
+MSG_AUDITLOG_NO_SECRET = "the record does not contain the new token"
+MSG_AUDITLOG_MEMBER_REFUSED = "a member's read of the audit log is refused with 403"
+MSG_AUDITLOG_FILTERED = (
+    "an administrator reads the sign-in records, every one of them and nothing else"
+)
+MSG_AUDITLOG_NEWEST = "the newest record names the administrator who signed in last"
+MSG_AUDITLOG_SORT = "sorted by {field} {direction}, two pages of two hold the four records in order"
+MSG_AUDITLOG_INVALID = "the query {query} is refused with 422"
+MSG_AUDITLOG_READ_ONLY = "every audit endpoint is a GET"
+RQA_ADMIN = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+RQA_MEMBER = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+RQA_FORMER = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+RQA_OWNER = f"{_letters(string.ascii_lowercase, 5, 8)}@example.com"
+RQA_PREFIX = _letters(string.ascii_uppercase, 3, 3)
+RQA_DESIGN = f"{RQA_PREFIX}-DES-001"
+RQA_ACTION = "api.request"
+RQA_AGENT = "audit-test/1.0"
+RQA_TITLE = " ".join(_draw.sample(_WORDS, 2))
+RQA_NEW_TITLE = " ".join(_draw.sample(_WORDS, 2))
+RQA_LONG_DESCRIPTION = "x" * 2000
+RQA_CLIENTS = {"web": "198.51.100.11", "cli": "198.51.100.12"}
+RQA_SERVICE_ADDRESS = "198.51.100.13"
+RQA_REFUSED_ADDRESS = "198.51.100.14"
+RQA_LIMITED_ADDRESS = "198.51.100.15"
+RQA_REPEATED_ADDRESS = "198.51.100.16"
+RQA_WINDOW_ADDRESS = "198.51.100.17"
+RQA_SECRET_ADDRESS = "198.51.100.18"
+RQA_FILTER_ADDRESS = "198.51.100.19"
+RQA_UNKNOWN_ADDRESS = "203.0.113.9"
+RQA_FORGED = {"Authorization": "Bearer forged.token.value"}
+RQA_MISSING_ID = 999999
+RQA_SERVICE_NAME = "Bud sync"
+RQA_RUN = {"bud_run_id": 7, "run_name": "Nightly"}
+RQA_LOGIN_LIMIT = 10
+RQA_WRONG_LOGIN = {"email": "nobody@example.com", "password": "Wrong-1234"}
+RQA_WINDOW_THRESHOLD = 3
+RQA_OLD_REFUSALS = 5
+RQA_OLD_MINUTES = 11
+RQA_WRONG_PASSWORD = "Not-The-Password-9"
+RQA_SEARCH = "confidential-search-text"
+RQA_EXPLODING_PATH = "/api/__audit_boom__"
+RQA_EXPLOSION = "audit boom"
+RQA_SUPPLIED_ID = "report-me-500"
+RQA_QUOTE = "Quote reference report-me-500 when reporting this."
+RQA_FOREIGN_ORIGIN = "https://foreign.example.com"
+RQA_FAILURE_LOG = "api.request could not be recorded"
+RQA_ROUTE_PATH = "/api/projects/3/things/9"
+RQA_ROUTE_TEMPLATE = "/api/projects/{project_id}/things/{thing_id}"
+RQA_OUTCOME_CODES = (200, 302, 401, 403, 404, 429, 500)
+RQA_OUTCOMES = ["success", "success", "denied", "denied", "failure", "denied", "failure"]
+RQA_CREATED_BODIES = ({"id": 4, "doc_id": "PRJ-DOC-004"}, {"id": 5}, None, None)
+MSG_RQA_STATUSES = "the {client} read, create, change and delete are answered 200, 201, 200 and 204"
+MSG_RQA_GZIP = "the created requirement is answered compressed"
+MSG_RQA_ONE_EVENT = "the {what} leaves exactly one api.request record"
+MSG_RQA_CALL = "the {client} {method} is recorded with its actor, client, route, status and target"
+MSG_RQA_CREATED = "the {client} creation is recorded with the new id and requirement id"
+MSG_RQA_PROJECT = "the {client} project read is recorded with the project"
+MSG_RQA_SERVICE_STATUSES = (
+    "the service credential is issued with 201, and its read and publish are answered 200 and 201"
+)
+MSG_RQA_SERVICE = "the service {what} is recorded as the credential, with no user and no client"
+MSG_RQA_SERVICE_QUERY = "the service read is recorded with its query parameter names"
+MSG_RQA_SERVICE_CREATED = "the publish is recorded with the new document id and document number"
+MSG_RQA_ISSUED = "the credential issue is recorded with the credential id and without the token"
+MSG_RQA_REFUSED_STATUSES = "a forged token, a foreign project, a hidden design and a missing design are answered 401, 403, 404 and 404"
+MSG_RQA_DENIED = "the {what} is recorded as denied with the address"
+MSG_RQA_REFUSAL_DETAILS = "the forged token is anonymous, the foreign project names the project, the hidden design names the design"
+MSG_RQA_MISSING = "the missing design is recorded as a failure"
+MSG_RQA_LIMITED = "the first wrong sign-in is answered 401 and the eleventh 429"
+MSG_RQA_LIMITED_DENIED = (
+    "the refused and the rate-limited sign-in are recorded as denied with the address"
+)
+MSG_RQA_BELOW = "refusals below the threshold leave no repeated refusal record"
+MSG_RQA_DETECTED = "the threshold reached leaves one repeated refusal record with the address, the count and the window"
+MSG_RQA_DENIED_COUNT = "every refused request of the address is recorded as denied"
+MSG_RQA_OLD = "refusals older than the window do not count"
+MSG_RQA_WINDOW = "refusals inside the window reach the threshold once"
+MSG_RQA_QUERY_NAMES = "a search is answered 200 and recorded with its parameter name only"
+MSG_RQA_NO_SECRET = "no record holds the {secret}"
+MSG_RQA_PROBE = (
+    "the {route} probe is recorded as anonymous, without credentials, with its status and duration"
+)
+MSG_RQA_WRITE_FAILED = "a request whose record cannot be written is answered 200 with a request id"
+MSG_RQA_NOT_WRITTEN = "no api.request record is written and the failure is logged"
+MSG_RQA_FILTER = "the audit log filtered by {field} holds only matching records"
+MSG_RQA_FILTER_NONE = "the audit log filtered by an unknown address is empty"
+MSG_RQA_TEMPLATE = (
+    "a route is recorded as its template with the prefix, an unknown path as unmatched"
+)
+MSG_RQA_OUTCOMES = "each status maps to its outcome, and a refused 404 is denied"
+MSG_RQA_BODIES = (
+    "a created body is read plain or compressed, and an oversized or broken one is ignored"
+)
+MSG_RQA_DEPENDENCY_ACTOR = "the user a dependency signs in is the actor of the record"
+MSG_RQA_PREFLIGHT = (
+    "an allowed preflight is answered 200 by the CORS layer, with no request id and no record"
+)
+MSG_RQA_REFUSED_PREFLIGHT = (
+    "a preflight from a foreign origin is refused with 403 and recorded as denied"
+)
+MSG_RQA_FOREIGN = (
+    "a request from a foreign origin gets no CORS permission and is recorded as denied"
+)
+MSG_RQA_CORS_ID = (
+    "an allowed origin gets its CORS header and a request id, and the request is recorded"
+)
+MSG_RQA_500 = (
+    "an unhandled error is answered 500 and recorded once as a failure without the error text"
+)
+MSG_RQA_500_ID = "a 500 quotes the supplied request id in its header, body and record"
+MSG_RQA_DEACTIVATED = "a deactivated account is refused with 403 and recorded as that user, denied"
+MSG_RQA_NOTIFICATION = "another user's notification and a missing one are both answered 404"
+MSG_RQA_NOTIFICATION_OUTCOMES = (
+    "another user's notification is recorded as denied and a missing one as a failure"
+)
+MSG_RQA_404_STATUSES = "a scan, an unknown route and a missing row are answered 404"
+MSG_RQA_404 = "the anonymous scan and the unknown route are denied, the missing row of a signed-in user is a failure"
+TPX_NETWORK = "10.0.0.0/8"
+TPX_FORGED = "198.51.100.9"
+TPX_OUTSIDER = "192.0.2.50"
+TPX_POSING_HOP = "10.0.0.3"
+TPX_FORGED_TOKEN = {"Authorization": "Bearer forged"}
+TPX_SECRET = "test-secret-key-for-trusted-proxy-settings-1234567890"
+TPX_FORWARD = ("10.0.1.2", "203.0.113.21")
+TPX_DEFAULT = ("10.0.3.2", "203.0.113.23")
+TPX_COUNTED = ("10.0.4.2", "203.0.113.24", "203.0.113.25")
+TPX_UNCOUNTED = ("10.0.5.2", "203.0.113.26", "203.0.113.27")
+TPX_OWN_LIMITS = ("10.0.6.2", "203.0.113.28", "203.0.113.29")
+TPX_SHARED = ("10.0.8.2", "203.0.113.30", "203.0.113.31")
+TPX_THRESHOLD = 3
+TPX_LOGIN_LIMIT = 10
+TPX_WRONG_LOGIN = {"email": "nobody@example.com", "password": "Wrong-1234"}
+TPX_LIMITED = [401] * 10 + [429]
+TPX_PROXY = "10.0.0.2"
+TPX_CALLER = "203.0.113.7"
+TPX_ADDRESS_CASES = [
+    ((TPX_PROXY,), TPX_PROXY),
+    ((None, TPX_CALLER), None),
+    ((TPX_PROXY, f"{TPX_FORGED}, {TPX_CALLER}, 10.0.0.9"), TPX_CALLER),
+    ((TPX_PROXY, TPX_FORGED, TPX_CALLER), TPX_CALLER),
+    ((TPX_PROXY, f"{TPX_CALLER}:4711"), TPX_CALLER),
+    ((TPX_PROXY, "[2001:db8::7]:4711"), "2001:db8::7"),
+    ((f"::ffff:{TPX_PROXY}", TPX_CALLER), TPX_CALLER),
+    ((TPX_PROXY, f"{TPX_CALLER}, not-an-address, 10.0.0.9"), "10.0.0.9"),
+    ((TPX_PROXY, "10.0.0.8, 10.0.0.9"), "10.0.0.8"),
+    ((TPX_PROXY, ""), TPX_PROXY),
+    ((TPX_OUTSIDER, TPX_CALLER), TPX_OUTSIDER),
+    (("testclient", TPX_CALLER), "testclient"),
+]
+TPX_DEFAULT_KEY_SCOPES = [
+    (TPX_PROXY, TPX_CALLER),
+    (TPX_OUTSIDER, TPX_FORGED),
+    ("testclient",),
+    (None, TPX_CALLER),
+]
+TPX_KEY_CASES = [
+    ((TPX_PROXY, f"{TPX_FORGED}, {TPX_CALLER}"), TPX_CALLER),
+    ((TPX_OUTSIDER, TPX_CALLER), TPX_OUTSIDER),
+    ((None, TPX_CALLER), "127.0.0.1"),
+]
+TPX_ENV_NETWORKS = '["10.1.2.3/8", " 2001:db8::/32 ", "192.0.2.1"]'
+TPX_LOADED_NETWORKS = ["10.0.0.0/8", "2001:db8::/32", "192.0.2.1/32"]
+TPX_NOT_A_NETWORK = ["proxy.example"]
+MSG_TPX_FORWARDED = "behind a trusted proxy the {what} request is refused with 401 and recorded with the caller's address"
+MSG_TPX_IGNORED = "a forwarded header from an untrusted sender is ignored for the {what} request"
+MSG_TPX_EMPTY = "TRUSTED_PROXY_NETWORKS is empty by default"
+MSG_TPX_DIRECT = "with the empty default the {what} request is recorded with the direct peer"
+MSG_TPX_COUNTED = "behind a trusted proxy repeated refusals are counted by the forwarded address"
+MSG_TPX_UNCOUNTED = "without trusted proxies repeated refusals are counted by the proxy"
+MSG_TPX_OWN_LIMIT = "behind a trusted proxy the {who} caller has a login limit of its own"
+MSG_TPX_NO_ESCAPE = "forged headers from an untrusted sender do not escape its login limit"
+MSG_TPX_SHARED = "without trusted proxies the callers behind one proxy share its login limit"
+MSG_TPX_ELSEWHERE = "a caller elsewhere keeps a login limit of its own"
+MSG_TPX_ADDRESS = (
+    "the client address of peer {peer} with forwarded {forwarded} is the right-most untrusted hop"
+)
+MSG_TPX_DEFAULT_KEY = "with the empty default the rate limit key of {scope} is the direct peer"
+MSG_TPX_KEY = "behind a trusted proxy the rate limit key of {scope} is the resolved address"
+MSG_TPX_LOADED = "the setting reads a JSON array and normalises each entry to a network"
+MSG_TPX_REFUSED = "the setting refuses an entry that is not a network"
+CLIS_VERIFIER = "v" * 43
+CLIS_CALLBACK = "http://127.0.0.1:8123/callback"
+CLIS_CODE_MODE_OFF = "Code sign-in is turned off on this instance. Use callback mode."
+CLIS_INVALID = "Invalid or expired authorization. Request a new sign-in link from your client."
+CLIS_BAD_REDIRECTS = [
+    "https://127.0.0.1:8123/callback",
+    "http://example.com:8123/callback",
+    "http://127.0.0.2:8123/callback",
+    "http://localhost.evil.test:8123/callback",
+    "http://localhost/callback",
+    "http://localhost:0/callback",
+    "http://localhost:65536/callback",
+    "http://localhost:port/callback",
+    "http://user:password@localhost:8123/callback",
+    "http://127.0.0.1:80@evil.test/callback",
+    "http://localhost:8123/callback#fragment",
+    "http://localhost:8123/callback?code=existing",
+    "http://localhost:8123/callback?state=existing",
+    "http://localhost:8123/callback?%63ode=existing",
+    "http://localhost:8123/callback?STATE=existing",
+    "http://localhost:8123/callback?code",
+    "http://localhost:8123/callback?x=a&state=b",
+    "http://127.1:8123/callback",
+    "http://2130706433:8123/callback",
+    "//localhost:8123/callback",
+    "http://localhost:8123/call\\back",
+    "http://local\nhost:8123/callback",
+    "http://localhost:8123/call back",
+]
+CLIS_BAD_STARTS = [
+    {"code_challenge": "short"},
+    {"code_challenge": "a" * 42 + "="},
+    {"code_challenge": "a" * 44},
+    {"state": ""},
+    {"state": "s" * 129},
+    {"client_name": " "},
+    {"client_name": "c" * 101},
+    {"mode": "callback"},
+    {"mode": "other"},
+    {"mode": "code", "redirect_uri": "http://localhost:8123/callback"},
+    {"extra": "field"},
+]
+CLIS_BAD_VERIFIERS = ["x" * 43, "short", "x" * 129, "+" * 43]
+CLIS_BINDINGS = [None, True, "1", -1, 999999]
+CLIS_MUTATIONS = ["expired", "purpose", "user", "version"]
+CLIS_WRONG_VERIFIER = "w" * 43
+CLIS_WRONG_CODE = "AAAA-AAAA"
+CLIS_EVIL_CALLBACK = "https://evil.test/callback"
+CLIS_PUBLIC_LIMITS = [("start", 10), ("exchange", 30), ("refresh", 30)]
+CLIS_SIGNED_IN_LIMITS = [("check", 30), ("approve", 10)]
+MSG_CLIS_REDIRECT = "the callback {uri!r} is refused with 422"
+MSG_CLIS_START = "a start with {change} is refused with 422"
+MSG_CLIS_PKCE = (
+    "the verifier {verifier!r} is refused with 400 or 422, issues no token and consumes nothing"
+)
+MSG_CLIS_PKCE_KEPT = "after the refused verifiers the right one still exchanges with 200"
+MSG_CLIS_LENGTHS = "codes over 256 characters are refused with 422 and 256 with 400; refresh tokens likewise with 422 and 401"
+MSG_CLIS_REJECTED = "an unapproved session, a wrong code, an unknown session and an unknown lookup are each refused with 400"
+MSG_CLIS_REJECTED_AUDIT = (
+    "each refused exchange is recorded as a failure with its reason, no actor and no code"
+)
+MSG_CLIS_STILL = "after the refusals the approved code still exchanges with 200"
+MSG_CLIS_EXPIRED = "an expired {state} session refuses lookup, approval and exchange with 400"
+MSG_CLIS_DISABLED = "a disabled account's approval is refused with 403, its exchange with 400 and its refresh with 401"
+MSG_CLIS_DISABLED_AUDIT = "the refused refresh is recorded as a failure on the user with its reason"
+MSG_CLIS_STALE = (
+    "an approval whose account changed meanwhile is refused and leaves the session unapproved"
+)
+MSG_CLIS_BINDING = "a CLI token whose refresh binding is {binding!r} is refused with 401"
+MSG_CLIS_MUTATION = "a CLI token whose refresh row is {mutation} is refused with 401"
+MSG_CLIS_REFRESH_REJECT = "an unknown refresh token is refused with 401, a missing one with 422, and the failure carries no token"
+MSG_CLIS_NO_SECRET = "no record holds the {secret}"
+MSG_CLIS_OUTCOMES = "the sign-in records hold both successes and failures"
+MSG_CLIS_LIMIT = "the {path} endpoint answers its first {limit} calls and refuses the next with 429"
+MSG_CLIS_MODE_OFF_START = (
+    "with code sign-in off a code start is refused with 403 and stores nothing"
+)
+MSG_CLIS_MODE_OFF_CALLBACK = (
+    "with code sign-in off a callback sign-in is looked up, approved, exchanged and denied"
+)
+MSG_CLIS_MODE_OFF_STORED = (
+    "with code sign-in off every stored code request refuses lookup and approval with 403"
+)
+MSG_CLIS_MODE_OFF_EXCHANGE = "with code sign-in off an approved code request refuses its exchange with 400 and issues no token"
+MSG_CLIS_MODE_OFF_AUDIT = "each refusal is recorded with the reason code_mode_disabled, and the requests stay stored and unapproved"
+MSG_CLIS_MODE_OFF_MISSING = (
+    "with code sign-in off a missing request keeps the answers and reasons of a missing request"
+)
+MSG_CLIS_MODE_OFF_DENY = "with code sign-in off a stored code request can still be denied, which removes it and is recorded"
+MSG_CLIS_DENY_GUARD = "a deny without a sign-in or for an unknown account is refused with 401, an extra or missing field with 422"
+MSG_CLIS_DENY_GUARD_STATE = "the refused denies remove nothing and record nothing"
+MSG_CLIS_DENY_NOT_PENDING = (
+    "a deny of an approved, an expired and an unknown request is refused with 400"
+)
+MSG_CLIS_DENY_NOT_PENDING_AUDIT = "each refused deny is recorded as not pending, nothing is removed, and the approved code still exchanges"
+MSG_CLIS_DENY_AUDIENCE = "any signed-in account may deny or approve, and is recorded as the actor"
+MSG_CLIS_DENY_CALLBACK = (
+    "a stored callback that is no longer valid cannot be denied and stays stored"
+)
+MSG_CLIS_DENY_NO_LIMIT = "twelve denies of an unknown request are each answered 400, never 429"
+MSG_CLIS_MISMATCH = "a wrong typed code is refused on check and approve with 400, the right one passes the check with 204"
+MSG_CLIS_MISMATCH_AUDIT = (
+    "both wrong codes are recorded as mismatches, and only the later approval succeeds"
+)
+MSG_CLIS_RACE = (
+    "a request approved elsewhere after its code check is refused with 400 as not pending"
+)
+ABL_HEAD = "d20260731a09"
+ABL_BASELINE = "d20260731a09_locked_baseline_schema.py"
+ABL_ROOT_MARKERS = ("down_revision: Union[str, Sequence[str], None] = None", "down_revision = None")
+ABL_CORE_TABLES = ["users", "projects", "requirements", "defects", "change_requests"]
+ABL_KEPT_INDEXES = [
+    "ix_defects_project_id",
+    "ix_artefact_links_project_types",
+    "pg_trgm",
+    "gin_trgm_ops",
+]
+MSG_ABL_ROOT = "the locked baseline is the only revision without a parent"
+MSG_ABL_PARENT = "{name} names a parent revision"
+MSG_ABL_NO_CREATE_ALL = "{name} does not rebuild the schema from the models"
+MSG_ABL_HEAD = "the baseline keeps the deployed head id and has no parent"
+MSG_ABL_EXPLICIT = "the baseline creates its tables with explicit DDL and never calls create_all"
+MSG_ABL_TABLE = "the baseline creates the {table} table"
+MSG_ABL_INDEX = "the baseline keeps {index}, which the models do not declare"
+MSG_ABL_ENUMS = "the baseline drops its enum types on downgrade"
+ACL_REFERENCED = "referenced.txt"
+ACL_FRESH = "fresh.txt"
+ACL_OLD = "old.txt"
+ACL_MISSING = "missing.txt"
+ACL_GRACE_SECONDS = 3600
+ACL_OLD_AGE_SECONDS = 2 * 60 * 60
+MSG_ACL_COUNTS = "the reconciliation counts one orphan file and one missing file"
+MSG_ACL_FILES = "the referenced and the fresh orphan file stay, the old orphan file is removed"
+MSG_ACL_COMMITTED = "the reconciliation commits its session"
+MSG_ACL_LIFESPAN = "the application start runs the reconciliation once with its session"
+MDI_FRONTMATTER = "---\ntype: requirement\n---\n# Login\nMust work."
+MDI_TAGGED = "## [REQ] Boot fast\nbody a\n## [DES] Boot design\nbody b"
+MDI_UNMARKED = "# Untagged\nsome text"
+MDI_WRAPPED = (
+    "## [REQ] Boot\n"
+    "Boot within {{parameter: BOOT_MS, value: 500}} ms of power-on, "
+    "below {{parameter: MAX_TEMP, value: 85C}}.\n"
+)
+MDI_REFERENCE = "## [REQ] Boot\nBoot within {{BOOT_MS}} ms.\n"
+MDI_HEADING = "## [REQ] Boot in {{parameter: BOOT_MS, value: 500}} ms\n"
+MDI_TEST_CASE = (
+    "## [TC] Boot within budget\n"
+    "Measures the cold boot time of the device under test.\n"
+    "- Pre-Condition: device under test powered off through the relay\n"
+    "- Loop: repeat {{parameter: BOOT_CYCLES, value: 3}} times\n"
+    "  - Step: switch the relay on => relay reports closed\n"
+    "  - Step: measure the time from relay on to boot banner => within "
+    "{{parameter: BOOT_BUDGET_MS, value: 500}} ms +- "
+    "{{parameter: BOOT_TOLERANCE_MS, value: 50}} ms\n"
+)
+MDI_TEST_CASE_ROWS = [
+    ("precondition", "Pre-Condition", 0, "device under test powered off through the relay", ""),
+    ("loop", "Loop", 0, "repeat {{BOOT_CYCLES}} times", ""),
+    ("step", "Step", 1, "switch the relay on", "relay reports closed"),
+    (
+        "step",
+        "Step",
+        1,
+        "measure the time from relay on to boot banner",
+        "within {{BOOT_BUDGET_MS}} ms +- {{BOOT_TOLERANCE_MS}} ms",
+    ),
+]
+MDI_STRAY_STEP = "## [REQ] Boot\n- Step: not a test case row\n"
+MSG_MDI_FRONTMATTER = "the frontmatter type sets the document and section type"
+MSG_MDI_TAGGED = "a heading tag classifies its own section"
+MSG_MDI_DEFAULT = "an unmarked document takes the default type"
+MSG_MDI_WRAPPED = "parameters written in a sentence become placeholders and are collected"
+MSG_MDI_REFERENCE = "an existing parameter reference is left alone and collects nothing"
+MSG_MDI_HEADING = "a parameter in a heading is replaced and collected"
+MSG_MDI_COLLISION = "a parameter whose name exists in any case is reported as a collision"
+MSG_MDI_TEST_CASE = (
+    "test case lines become step rows with their type, indent, description and expected result"
+)
+MSG_MDI_STRAY = "step lines outside a test case stay text"
+PID_NAME = "Bloom PLM"
+PID_IDENTITY = "Bloom PLM by EmbedLabs"
+PID_POWERED_BY = "Powered by EmbedLabs"
+PID_RENAMED = "Renamed"
+PID_INVITE = {
+    "to_email": "ada@example.com",
+    "full_name": "Ada",
+    "invite_link": "https://bloom.example/i#t",
+}
+PID_ACCESS = {
+    "to_email": "admin@example.com",
+    "admin_name": "Admin",
+    "requester_name": "Ada",
+    "requester_email": "ada@example.com",
+    "resource": "Requirements",
+    "project": "PRJ",
+    "requested_at": "2026-10-19 10:00 UTC",
+    "request_id": "7",
+    "review_link": "https://bloom.example/access",
+}
+PID_AUTHORIZATION = {
+    "to_email": "admin@example.com",
+    "full_name": "Admin",
+    "old_email": "admin@example.com",
+    "new_email": "new@example.com",
+    "confirm_link": "https://bloom.example/c#t",
+}
+PID_SEPARATE_LINK = "Bloom PLM will send a separate verification link"
+MSG_PID_CONSTANTS = "the product name, identity and footer are fixed"
+MSG_PID_INVITE = "the invitation names Bloom PLM in its subject, title, heading and text"
+MSG_PID_ACCESS = "the access request mail names Bloom PLM and leaves no identity placeholder"
+MSG_PID_AUTHORIZATION = "the email change authorization names Bloom PLM in its text and HTML"
+MSG_PID_API = "the API title and description are the fixed identity"
+MSG_PID_NOT_A_SETTING = "BLOOM_APP_NAME is not a setting, from the environment or a dotenv file"
+MSG_PID_ENVIRONMENT = "BLOOM_APP_NAME in the environment does not rename the application"
+ETC_PREFIX = "PRJ"
+ETC_FIRST = "PRJ-TC-001"
+ETC_SECOND = "PRJ-TC-002"
+ETC_MISSING_PROJECT = 99
+MSG_ETC_CSV = "the CSV export has its file name, header and the steps of the first test case"
+MSG_ETC_MARKDOWN = "the Markdown export has its file name, title, heading, precondition and step"
+MSG_ETC_XML = "the XML export is well formed and lists both test cases in order"
+MSG_ETC_MISSING = "an export of a missing project is refused with 404"
+JIN_ADF = {
+    "type": "doc",
+    "content": [
+        {"type": "paragraph", "content": [{"type": "text", "text": "Found by PRJ-TC-004"}]},
+        {
+            "type": "bulletList",
+            "content": [
+                {
+                    "type": "listItem",
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [
+                                {"type": "text", "text": "line one"},
+                                {"type": "hardBreak"},
+                                {"type": "mention", "attrs": {"text": "@Ada"}},
+                            ],
+                        }
+                    ],
+                }
+            ],
+        },
+    ],
+}
+JIN_BUG = {"issuetype": {"name": "Bug"}, "labels": ["bench"]}
+JIN_TASK = {"issuetype": {"name": "Task"}}
+JIN_REFERENCE_FIELD = "customfield_1"
+JIN_REFERENCES = {
+    "summary": "prj-tc-002 fails",
+    "customfield_1": "PRJ-TC-002, PRJ-TC-009, ABC-TC-001",
+}
+JIN_JQL_FULL = (
+    'project = "PROJ" AND issuetype in ("Bug", "Say \\"hi\\"") AND statusCategory != Done '
+    'AND labels = "bench" AND (priority = High) ORDER BY created ASC'
+)
+JIN_JQL_DEFAULT = (
+    'project = "PROJ" AND issuetype in ("Bug") AND statusCategory != Done ORDER BY created ASC'
+)
+JIN_URL = "https://acme.atlassian.net/browse/PROJ-7"
+MSG_JIN_TEXT = "Atlassian document text is flattened to plain lines"
+MSG_JIN_FILTER = "the filter takes bugs by default and honours the issue types and the label"
+MSG_JIN_PRIORITY = "Jira priorities map to Bloom levels, with the setting's own map first"
+MSG_JIN_RESOLVED = "an issue with a resolution is resolved, one without is not"
+MSG_JIN_REFERENCES = (
+    "test case ids are read from the summary and description, and from the reference field when set"
+)
+MSG_JIN_JQL = "the JQL names the project, the types, open issues, the label and the extra clause"
+MSG_JIN_FIELDS = "the search asks for the reference field and builds the issue link"
+CPY_SOURCE = ("Demo", "PRJ")
+CPY_TARGET = ("ABC", "ABC")
+CPY_MISSING_ID = 99999
+CPY_COPIED_REQ = "ABC-REQ-008"
+CPY_COPIED_TC = "ABC-TC-001"
+MSG_CPY_COUNTS = "one requirement is copied after the target's highest id and the missing one is skipped with an error"
+MSG_CPY_FIELDS = "the copy keeps title, description, priority, type and origin"
+MSG_CPY_SOURCE = "the copy is a draft that names its source requirement and project"
+MSG_CPY_NEXT = "the next requirement number of the target follows the copy"
+MSG_CPY_TEST_CASE = (
+    "a copied test case keeps its preconditions and steps, as a draft naming its source"
+)
+ITC_UPDATE_CSV = (
+    "tc_id,title,status,visibility,preconditions,steps,description\n"
+    "PRJ-TC-001,Updated login,Draft,internal,User exists,1. Open => Form,Round-trip\n"
+    ",Brand new case,Draft,internal,,1. Do X => Y,New one\n"
+)
+ITC_APPROVE_CSV = (
+    "tc_id,title,status\nPRJ-TC-001,Unreviewed change,Approved\n,Unreviewed new case,Approved\n"
+)
+ITC_XML = (
+    '<?xml version="1.0"?><test-cases>'
+    '<test-case id="X"><title>From XML</title><status>Draft</status>'
+    "<steps>1. Click => Opens</steps></test-case></test-cases>"
+)
+ITC_NO_TITLE_CSV = "tc_id,title,steps\n,,1. x\n"
+MSG_ITC_UPDATE = "a CSV import updates the existing test case and creates the new one"
+MSG_ITC_UPDATED = "the updated test case has its new title, stays a draft and has its step"
+MSG_ITC_NO_APPROVAL = "a CSV import that sets Approved is skipped and changes nothing"
+MSG_ITC_XML = "an XML import creates the test case with its step and a project id"
+MSG_ITC_NO_TITLE = "a row without a title is skipped with its error"
+PAS_PROJECT_RESOURCES = [
+    "baseline",
+    "parameter",
+    "link",
+    "project",
+    "users",
+    "access",
+    "application",
+]
+PAS_NO_APPROVAL = ["STD", "RSK", "CMP"]
+PAS_NO_EXTRA_REVIEW = ["RPT", "STD", "RSK", "CMP"]
+PAS_OTHER_ACTIONS = ["view", "comment", "create", "edit", "approve", "delete"]
+MSG_PAS_WRITE = "write gives create, edit and view but not review, approve or delete"
+MSG_PAS_APPROVE = "approve and delete give review, approve and delete and nothing else"
+MSG_PAS_WRITE_READ = "write includes read and comment without approve, review or delete"
+MSG_PAS_STORED = "a stored edit reads as view, comment and edit without changing the stored matrix"
+MSG_PAS_REVIEW = "review alone on {resource} grants review and no other action"
+MSG_PAS_ROUNDTRIP = "a review rule is stored and shown back as review only"
+MSG_PAS_ORIGIN = "a review rule without a tag is refused"
+MSG_PAS_PROJECT = "review is refused on {resource}"
+MSG_PAS_EXCEPTION = "approve is refused on {resource}"
+MSG_PAS_EXTERNAL = "external readers may review but never approve or delete"
+MSG_PAS_NO_EXTRA = "write and approve on {resource} do not add review"
+MSG_PAS_TERM = "an external review term keeps review and the customer scope only"
+TCS_EDITOR_ROWS = [
+    ("precondition", "device under test powered off through the relay", "", 0),
+    ("loop", "repeat {{BOOT_CYCLES}} times", "", 0),
+    ("step", "switch the relay on", "relay reports closed", 1),
+    (
+        "step",
+        "measure the time from relay on\nto the boot banner",
+        "within {{BOOT_BUDGET_MS}} ms\n+- {{BOOT_TOLERANCE_MS}} ms",
+        1,
+    ),
+]
+TCS_FIRST_LINES = [
+    "- Pre-Condition: device under test powered off through the relay",
+    "- Loop: repeat {{BOOT_CYCLES}} times",
+    "  - Step: switch the relay on => relay reports closed",
+]
+TCS_ROW_KEYS = [
+    "collapsed",
+    "description",
+    "expected_result",
+    "id",
+    "indent_level",
+    "label",
+    "row_type",
+]
+MSG_TCS_TEXT = "editor rows are written as text and read back as the same rows"
+MSG_TCS_CONTRACT = "a row read from text has the editor's fields and starts expanded with an id"
+MSG_TCS_LEGACY_WRITE = "older stored steps are still written as step lines"
+MSG_TCS_LEGACY_READ = "older numbered text is still read as steps"
+MSG_TCS_EMPTY = "empty step text reads as nothing and nothing writes as empty text"
+MSG_TCS_LEADING = "text before the first row becomes a step"
+MSG_TCS_XML = "the XML export reimports with the same rows"
+MSG_TCS_MARKDOWN = "the Markdown export reimports as the same test case"
+MSG_TCS_PRECONDITION = "plain preconditions become a precondition row in the Markdown export"
+EXR_REQUIREMENT_HEADER = [
+    "req_id",
+    "title",
+    "status",
+    "priority",
+    "type",
+    "origin",
+    "visibility",
+    "description",
+    "created_at",
+    "updated_at",
+]
+EXR_TRACE_HEADER = [
+    "req_id",
+    "req_title",
+    "req_status",
+    "covered",
+    "tc_id",
+    "tc_title",
+    "tc_last_execution",
+]
+EXR_MIN_PDF_BYTES = 800
+MSG_EXR_CSV = "the requirements CSV has its file name, header and both requirements"
+MSG_EXR_PDF = "the requirements PDF is a PDF of more than 800 bytes"
+MSG_EXR_TRACE = "the traceability CSV marks the verified requirement covered and the other not"
+MSG_EXR_MISSING = "a requirements export of a missing project is refused with 404"
+APS_APP_RESOURCES = ["access", "users"]
+APS_APP_PERMISSIONS = {"users": {"view", "create", "edit"}, "access": {"delete"}}
+APS_ADMITTED = {"REQ": {"view", "comment", "edit"}, "project": {"view"}}
+APS_REPLACED = {"REQ": {"view"}}
+APS_BUNDLES = {"REQ": {"view"}, "TC": {"view", "comment", "edit"}}
+MSG_APS_APP = "group app rules apply without project admission and give nothing inside a project"
+MSG_APS_SCOPE = "a {scope} policy supplies no app terms"
+MSG_APS_ADMITTED = (
+    "an admitted group gives its content rules and never its app rules inside the project"
+)
+MSG_APS_REPLACED = "a direct project entry replaces the group's content rules but not its app rules"
+MSG_APS_ADMIN_ONLY = "app rules do not open the administrator-only management"
+MSG_APS_ADMIN = "an instance administrator holds every permission without a policy"
+MSG_APS_BUNDLES = (
+    "two direct bundles combine without restoring indirect project rights, and app rules stay"
+)
+IMR_DIGEST = "sha256:" + "a" * 64
+IMR_OTHER = "sha256:" + "b" * 64
+IMR_IMAGE = "ghcr.io/mbedlabs/product@sha256:" + "a" * 64
+IMR_FLOATING = ["image:v1.0.0", "image:1.0.0", "image:1", "image:1.0", "image:stable"]
+IMR_GOOD_REFERENCES = [
+    "ghcr.io/mbedlabs/product",
+    "ghcr.io/mbedlabs/product:sha-" + "0" * 40,
+    "ghcr.io/mbedlabs/product:1.2.0",
+    "ghcr.io/mbedlabs/product@sha256:" + "a" * 64,
+    "localhost:5000/product:dev",
+    "registry:5000/product:dev",
+    "registry.example.com:443/team/sub_name/product-name:v1.2.0-rc.1",
+]
+IMR_BAD_REFERENCES = [
+    "",
+    "-oProxyCommand=id",
+    "--format={{.Name}}",
+    "-ghcr.io/mbedlabs/product:dev",
+    "product:dev",
+    "mbedlabs/product:dev",
+    "ghcr.io",
+    "ghcr.io/MbedLabs/product:dev",
+    "ghcr.io/mbedlabs/product:dev --help",
+    "ghcr.io/mbedlabs/product:dev\n--help",
+    "ghcr.io/mbedlabs/product:-dev",
+    "ghcr.io/mbedlabs/product@sha256:abc",
+    "ghcr.io/mbedlabs/product@sha256:" + "A" * 64,
+    "ghcr.io/mbedlabs/product:" + "t" * 129,
+    "ghcr.io/mbedlabs/product:dev@sha256:" + "a" * 64,
+    "ghcr.io//product:dev",
+    "registry/product:dev",
+    "ghcr.io:99999999/product:dev",
+    "ghcr.io:99999/product:dev",
+    "ghcr.io:0/product:dev",
+    "ghcr.io:\u0665\u0660\u0660\u0660/product:dev",
+    "registry:/product:dev",
+    None,
+]
+IMR_COMMIT = "0123456789abcdef0123456789abcdef01234567"
+IMR_WORKFLOW_ALIASES = [
+    "ghcr.io/mbedlabs/bloom:1.2.0",
+    "ghcr.io/mbedlabs/bloom:1.2",
+    "ghcr.io/mbedlabs/bloom:1",
+    "ghcr.io/mbedlabs/bloom:v1.2.0",
+    "ghcr.io/mbedlabs/bloom:stable",
+    "ghcr.io/mbedlabs/bloom:latest",
+    "ghcr.io/mbedlabs/bloom:dev",
+    "ghcr.io/mbedlabs/bloom:main",
+    "ghcr.io/mbedlabs/bloom:1.3.0-beta.1",
+]
+MSG_IMR_OLDER = "an older release moves only its own version tags"
+MSG_IMR_CURRENT = "the current release may promote stable"
+MSG_IMR_STALE = "a stale branch run does not promote latest"
+MSG_IMR_PRERELEASE = "a prerelease does not promote stable"
+MSG_IMR_CONFLICT = "a version tag on another digest aborts the promotion before any tag moves"
+MSG_IMR_REPEAT = "a repeated promotion retags each alias with the same image"
+MSG_IMR_MISMATCH = "a digest that differs after promotion fails the promotion"
+MSG_IMR_GOOD = (
+    "the well-formed reference {reference!r} is inspected once with the exact docker command"
+)
+MSG_IMR_BAD = "the malformed reference {reference!r} is refused before docker runs"
+MSG_IMR_MISSING = "a missing image reports no digest"
+MSG_IMR_WORKFLOW = "every reference shape the workflow produces is inspected and promoted"
+IDG_CASES = [
+    ("none exist", [], "REQ", "PRJ-REQ-001"),
+    ("sequential", ["PRJ-REQ-001", "PRJ-REQ-002", "PRJ-REQ-003"], "REQ", "PRJ-REQ-004"),
+    ("gap after a deletion", ["PRJ-REQ-001", "PRJ-REQ-003"], "REQ", "PRJ-REQ-004"),
+    ("only the highest left", ["PRJ-REQ-010"], "REQ", "PRJ-REQ-011"),
+    ("malformed ids ignored", ["PRJ-REQ-001", "PRJ-REQ-abc", "PRJ-REQ-003"], "REQ", "PRJ-REQ-004"),
+    (
+        "other projects and types ignored",
+        ["PRJ-REQ-001", "XYZ-REQ-099", "PRJ-TC-050", "PRJ-REQ-002-extra"],
+        "REQ",
+        "PRJ-REQ-002",
+    ),
+    ("test cases", ["PRJ-TC-005", "PRJ-TC-012"], "TC", "PRJ-TC-013"),
+    ("past 999", ["PRJ-REQ-999"], "REQ", "PRJ-REQ-1000"),
+    ("past 9999", ["PRJ-REQ-9999"], "REQ", "PRJ-REQ-10000"),
+    ("bulk import", ["PRJ-REQ-001", "PRJ-REQ-002", "PRJ-REQ-005"], "REQ", "PRJ-REQ-006"),
+    ("empty string ignored", ["", "PRJ-REQ-001"], "REQ", "PRJ-REQ-002"),
+    ("only malformed", ["PRJ-REQ-abc", "PRJ-REQ-", "PRJ-REQ-xyz"], "REQ", "PRJ-REQ-001"),
+    ("padded below 100", ["PRJ-REQ-098"], "REQ", "PRJ-REQ-099"),
+    ("four digits continue", ["PRJ-REQ-1000"], "REQ", "PRJ-REQ-1001"),
+]
+IDG_TYPE_CODES = ["TC", "DES", "RSK", "CHG", "CPT", "SPEC", "PRT", "RPT", "STD", "BL", "TS"]
+IDG_WIDEN = (
+    ["PRJ-REQ-001", "PRJ-REQ-099", "PRJ-REQ-999", "PRJ-REQ-1000"],
+    {"PRJ-REQ-001": "PRJ-REQ-0001", "PRJ-REQ-099": "PRJ-REQ-0099", "PRJ-REQ-999": "PRJ-REQ-0999"},
+)
+IDG_WIDEN_OTHERS = (["PRJ-REQ-001", "PRJ-TC-001", "ABC-REQ-001"], {"PRJ-REQ-001": "PRJ-REQ-0001"})
+MSG_IDG_NEXT = "the next id when {case} is {expected}"
+MSG_IDG_TYPE = "the first {type_code} id is PRJ-{type_code}-001"
+MSG_IDG_WIDEN = "passing 999 renumbers the narrower ids to four digits and leaves the wider one"
+MSG_IDG_WIDEN_OTHERS = "widening leaves other projects and types alone"
+MSG_IDG_PATTERN = "the id pattern accepts three and four digits"
+MSG_IDG_PREFIX = "a project prefix that is not three letters is refused"
+MSG_IDG_TYPE_CODE = "an unsupported type code is refused"
+MSG_IDG_NORMALIZE = "a supplied id is trimmed and upper-cased"
+MSG_IDG_WRONG_PROJECT = "a supplied id of another project is refused"
+CAT_DOCUMENT_POLICIES = {
+    "Requirements": "REQ",
+    "Specifications": "SPEC",
+    "Standards": "STD",
+    "Designs": "DES",
+    "Risks": "RSK",
+    "Change Requests": "CHG",
+    "Concepts": "CPT",
+    "Test Cases": "TC",
+    "Suites": "TS",
+    "Campaigns": "CMP",
+    "Defects": "DEF",
+    "Protocols": "PRT",
+    "Reports": "RPT",
+    "Visions": "VIS",
+}
+CAT_OTHER_POLICIES = {
+    "Baselines",
+    "Parameters",
+    "Traceability",
+    "Project Management",
+    "Read Internal",
+    "Read Customer",
+    "Review Internal",
+    "Review Customer",
+    "Access Management",
+    "Application Administration",
+}
+CAT_PROJECT_POLICIES = [
+    ("Baselines", "baseline"),
+    ("Parameters", "parameter"),
+    ("Traceability", "link"),
+    ("Project Management", "project"),
+]
+CAT_READERS = [("Read Internal", None), ("Read Customer", "customer")]
+CAT_REVIEWERS = [("Review Internal", None), ("Review Customer", "customer")]
+CAT_NO_REVIEW = {"RPT", "STD", "RSK", "CMP"}
+CAT_GROUPS = {"Product Owners", "Developers", "Testers", "Administrators", "Customers"}
+CAT_COUNT = 24
+CAT_RELEASE_MIGRATION = "c5e8a1f2b9d4_access_entries.py"
+CAT_VISIONS_MIGRATION = "637f976e78e0_visions.py"
+MSG_CAT_NAMES = "the catalogue holds the 24 named policies, one per document type plus ten others"
+MSG_CAT_DOCUMENT = (
+    "the {name} policy covers {resource} alone with every supported action on every origin"
+)
+MSG_CAT_PROJECT = "the {name} policy covers {resource} alone with every action"
+MSG_CAT_READER = "the {name} policy gives view and comment on every resource for its origin"
+MSG_CAT_ACCESS = "Access Management is an app policy with every access action and no tags"
+MSG_CAT_ADMIN = "Application Administration is an app policy with every action on every resource"
+MSG_CAT_GROUPS = "the five default groups hold known policies once each and no people or projects"
+MSG_CAT_GROUP_READ = "the {name} group reads {what}"
+MSG_CAT_FROZEN = "the runtime catalogue equals the release catalogue with the Visions additions"
+MSG_CAT_FROZEN_GROUPS = "the runtime groups equal the release groups with Visions after Specifications for product owners"
+MSG_CAT_MAINTAINER_SET = "the released maintainer set is every document and project policy except the readers and reviewers"
+MSG_CAT_REVIEWER = (
+    "the {name} policy grants review only on every document type for its origin and is in no group"
+)
+RDF_ANCHOR = "PRJ-REQ-001"
+RDF_UNKNOWN = "PRJ-REQ-999"
+RDF_OTHER_PREFIX = "ABC"
+RDF_QUERY_PARAMETERS = ["direction", "related_to", "role"]
+MSG_RDF_RESOLVE = "a readable id resolves to its type and row"
+MSG_RDF_UNKNOWN = "an unknown id resolves to nothing"
+MSG_RDF_BOTH = (
+    "the related artefacts cover links in both directions and leave the unrelated requirement out"
+)
+MSG_RDF_ROLE = "the related artefacts narrow to one role"
+MSG_RDF_DIRECTION = "the {direction} related artefacts are the {expected} test case"
+MSG_RDF_NONE = "a document without links has no related artefacts"
+MSG_RDF_PROJECT = "links do not reach across projects"
+MSG_RDF_PARAMETERS = "the document list takes the related_to, role and direction parameters"
+MSG_RDF_SCOPED = "the project holds its two links"
+TRL_SUITE_XML = b'<?xml version="1.0" encoding="UTF-8"?>\n<suite>\n  <id>S1</id><name>Firmware</name>\n  <sections>\n    <section>\n      <name>Boot</name>\n      <cases>\n        <case>\n          <id>C7</id><title>Cold boot</title><template>Test Case (Steps)</template>\n          <type>Functional</type><priority>High</priority><estimate>5m</estimate>\n          <references>PRJ-REQ-001, JIRA-9</references>\n          <custom>\n            <preconds>Relay open\n\nSerial console attached</preconds>\n            <steps_separated>\n              <step><index>1</index><content>Close the relay</content><expected>Relay closed</expected></step>\n              <step><index>2</index><content>Read the serial port</content><expected>Boot banner</expected></step>\n            </steps_separated>\n          </custom>\n        </case>\n      </cases>\n      <sections>\n        <section>\n          <name>Warm</name>\n          <cases>\n            <case>\n              <id>8</id><title>Warm boot</title><template>Test Case (Text)</template>\n              <custom><steps>Reset the board</steps><expected>Banner within budget</expected></custom>\n            </case>\n          </cases>\n        </section>\n      </sections>\n    </section>\n  </sections>\n</suite>'
+TRL_SEPARATED_CSV = b'\xef\xbb\xbfID,Title,Section Hierarchy,Type,Priority,Estimate,References,Preconditions,Steps (Step),Steps (Expected Result)\nC7,Cold boot,Firmware > Boot,Functional,High,5m,"PRJ-REQ-001, JIRA-9",Relay open,Close the relay,Relay closed\nC7,,,,,,,,Read the serial port,Boot banner\nC9,Soak,Firmware > Soak,,,,,,"1. Start the soak\n2. Wait\nstill waiting","1. Running\n2. Done"\n'
+TRL_TEXT_CSV = b"Title,Steps,Expected Result\nWarm boot,Reset the board,Banner\n"
+TRL_MAPPED_CSV = b"Name,Do,Expect\nCold boot,Close relay,Closed\n"
+TRL_MAPPING = {"title": "Name", "steps": "Do", "expected": "Expect"}
+TRL_COLD_ROWS = [
+    ("precondition", "Relay open", ""),
+    ("precondition", "Serial console attached", ""),
+    ("step", "Close the relay", "Relay closed"),
+    ("step", "Read the serial port", "Boot banner"),
+]
+TRL_CSV_COLD_ROWS = [
+    ("precondition", "Relay open", ""),
+    ("step", "Close the relay", "Relay closed"),
+    ("step", "Read the serial port", "Boot banner"),
+]
+TRL_SOAK_ROWS = [("step", "Start the soak", "Running"), ("step", "Wait\nstill waiting", "Done")]
+TRL_CASE_IDS = (["123", "C123", "c123", "", "X-1"], ["C123", "C123", "C123", "", "X-1"])
+TRL_BAD_XML = [
+    ("broken XML", b"<suite><sections>", "not valid XML"),
+    ("XML without a suite", b"<cases/>", "no <suite>"),
+]
+TRL_LIMITS = [
+    ("case count", {"REQIF_MAX_OBJECTS": 1}, "more than 1 test cases"),
+    ("depth", {"REQIF_MAX_OBJECTS": 999, "REQIF_MAX_HIERARCHY_DEPTH": 1}, "nested deeper"),
+    (
+        "size",
+        {"REQIF_MAX_OBJECTS": 999, "REQIF_MAX_HIERARCHY_DEPTH": 1, "REQIF_MAX_REQUEST_BYTES": 10},
+        "size limit",
+    ),
+]
+TRL_BAD_CSV = [
+    ("unmapped title", b"Name,Do,Expect\nCold boot,Close relay,Closed\n", None, "no Title column"),
+    (
+        "missing mapped column",
+        b"Name,Do,Expect\nCold boot,Close relay,Closed\n",
+        {"title": "Nope"},
+        "no column named 'Nope'",
+    ),
+    ("empty title mapping", b"Title\nx\n", {"title": ""}, "no Title column"),
+    (
+        "unknown field",
+        b"Name,Do,Expect\nCold boot,Close relay,Closed\n",
+        {"colour": "Name"},
+        "Unknown field",
+    ),
+    ("non UTF-8 file", b"\xff\xfeT\x00", None, "not UTF-8"),
+    ("empty file", b"", None, "empty"),
+]
+MSG_TRL_COLD = "the XML case keeps its id, title, section, type, priority, estimate and references"
+MSG_TRL_COLD_ROWS = "the XML preconditions and separated steps become numbered rows"
+MSG_TRL_WARM = "a text template case gets a C id, its nested section path and one step"
+MSG_TRL_XML_REFUSED = "{what} is refused as {phrase}"
+MSG_TRL_LIMIT = "the XML import is refused when it passes the {limit} limit"
+MSG_TRL_CASE_IDS = "case ids are normalised to the C form"
+MSG_TRL_CSV = "CSV rows of one id group into one case with its sections, references and steps"
+MSG_TRL_CSV_TEXT = "a CSV text template case has one step, no id and no section"
+MSG_TRL_MAPPING = "a CSV with other column names reads through a column mapping"
+MSG_TRL_CSV_REFUSED = "the CSV {what} is refused as {phrase}"
+MSG_TRL_COLUMNS = "the header and the detected step columns are read from the CSV"
+MSG_TRL_ROW_LIMIT = "a CSV with more rows than the limit is refused"
+MSG_TRL_MODEL = "a new case model starts without rows"
+DFX_EXACT_ROLES = [("DEF", "TC"), ("CMP", "DEF"), ("DEF", "CMP"), ("TC", "DEF"), ("RPT", "DEF")]
+DFX_INCLUDED_ROLES = [
+    ("DEF", "REQ", ["impacts", "references"]),
+    ("DEF", "DEF", ["duplicates", "relates_to", "depends_on"]),
+    ("CHG", "DEF", ["implements", "references"]),
+]
+DFX_GITHUB = "https://github.com/octocat/Hello-World/issues/42"
+DFX_GITLAB = "https://gitlab.com/mygroup/myproject/-/issues/7"
+DFX_GITLAB_NESTED = "https://gitlab.example.com/org/sub/project/-/issues/99"
+DFX_ISSUE = "https://github.com/owner/repo/issues/5"
+DFX_MISMATCHES = [
+    ("tracker", ("gitlab", "https://github.com/owner/repo/issues/5", None, None), "github"),
+    ("repository", (None, "https://github.com/owner/repo/issues/5", "other/repo", None), "repo"),
+    ("number", (None, "https://github.com/owner/repo/issues/5", None, 99), "99"),
+    ("unsupported tracker", ("jira", None, None, None), "unsupported"),
+    ("unreadable link", (None, "https://example.com/not-an-issue", None, None), "parse"),
+]
+DFX_SECRET = "my-webhook-secret"
+DFX_BODY = b'{"action":"opened"}'
+MSG_DFX_LINKABLE = "defects and campaigns can be linked"
+MSG_DFX_EXACT = "{source} to {target} allows references only"
+MSG_DFX_INCLUDED = "{source} to {target} allows {roles}"
+MSG_DFX_FORBIDDEN = "a defect cannot be linked to a baseline"
+MSG_DFX_GITHUB = "a GitHub issue link reads as tracker, repository and number"
+MSG_DFX_GITLAB = (
+    "a GitLab issue link reads as tracker, repository and number, nested namespaces included"
+)
+MSG_DFX_NOT_AN_ISSUE = "links that are not issues of that tracker read as nothing"
+MSG_DFX_DETECT = "an issue link is read by the tracker it belongs to"
+MSG_DFX_VALID = "matching or empty external fields are accepted"
+MSG_DFX_MISMATCH = "a {what} mismatch is refused with a message naming it"
+MSG_DFX_SIGNATURE = (
+    "a GitHub signature of the body with the secret is accepted and a wrong one refused"
+)
+MSG_DFX_TOKEN = "a GitLab token equal to the secret is accepted and another refused"
+TRI_COLD_DESCRIPTION = "Imported from TestRail case C7. Type: Functional. Priority: High. Estimate: 5m. References: JIRA-9."
+TRI_MAPPED_CSV = b"Name,Do,Expect\nCold boot,Close relay,Closed\n"
+TRI_MAPPING = '{"title": "Name", "steps": "Do", "expected": "Expect"}'
+TRI_NO_TITLE_XML = b"<suite><cases><case><id>C1</id><title></title></case></cases></suite>"
+MSG_TRI_COUNTS = "an XML import creates two test cases, one link and one suite"
+MSG_TRI_COLD = "the imported case is an unreviewed draft naming its source, with its preconditions, rows and description"
+MSG_TRI_LINK = "the imported case verifies the referenced requirement"
+MSG_TRI_SUITE = "the suite takes the section name and holds both cases"
+MSG_TRI_REIMPORT = "a second import updates both cases and creates no suite, link or duplicate"
+MSG_TRI_CSV = "a CSV import creates two cases, one link and the Firmware suite"
+MSG_TRI_MAPPING = "a CSV import through a column mapping creates the case with its step"
+MSG_TRI_ERRORS = (
+    "a broken mapping, a file without a suite and a CSV without a title column are refused with 422"
+)
+MSG_TRI_NO_TITLE = "a case without a title is skipped with its error"
+MSG_TRI_PREVIEW = "the column preview lists the header and the detected section column"
+MSG_TRI_LOOKUPS = "importing twenty cases takes as many lookups as importing one"
+MSG_TRI_ROLE = "an import whose link role no longer exists is refused naming the case and the role, and writes nothing"
+RQL_MINIMAL = (
+    b'<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd">'
+    b"<CORE-CONTENT><REQ-IF-CONTENT><SPEC-OBJECTS>"
+    b'<SPEC-OBJECT IDENTIFIER="OBJ-1"><VALUES/></SPEC-OBJECT>'
+    b"</SPEC-OBJECTS></REQ-IF-CONTENT></CORE-CONTENT></REQ-IF>"
+)
+RQL_STREAM_LIMITS = {"REQIF_MAX_REQUEST_BYTES": 10, "REQIF_STREAM_CHUNK_BYTES": 4}
+RQL_WRONG_ARCHIVES = [
+    ("no ReqIF member", [("readme.txt", b"no")]),
+    ("two ReqIF members", [("a.reqif", RQL_MINIMAL), ("b.REQIF", RQL_MINIMAL)]),
+    ("an XML member only", [("only.xml", RQL_MINIMAL)]),
+]
+RQL_THREE_ENTRIES = [("document.reqif", RQL_MINIMAL), ("a.txt", b"a"), ("b.txt", b"b")]
+RQL_ONE_ENTRY = [("document.reqif", RQL_MINIMAL)]
+RQL_PADDED_ENTRY = [("document.reqif", RQL_MINIMAL + b" " * 100_000)]
+RQL_THREE_OBJECTS = b"".join(
+    f'<SPEC-OBJECT IDENTIFIER="OBJ-{index}"><VALUES/></SPEC-OBJECT>'.encode() for index in range(3)
+)
+RQL_ONE_OBJECT = b'<SPEC-OBJECT IDENTIFIER="OBJ"><VALUES/></SPEC-OBJECT>'
+RQL_TWO_RELATIONS = b"".join(
+    (
+        f'<SPEC-RELATION IDENTIFIER="REL-{index}">'
+        "<SOURCE><SPEC-OBJECT-REF>OBJ</SPEC-OBJECT-REF></SOURCE>"
+        "<TARGET><SPEC-OBJECT-REF>OBJ</SPEC-OBJECT-REF></TARGET>"
+        "</SPEC-RELATION>"
+    ).encode()
+    for index in range(2)
+)
+RQL_THREE_LEVELS = (
+    b'<SPECIFICATION IDENTIFIER="SPEC"><CHILDREN>'
+    b"<SPEC-HIERARCHY><OBJECT><SPEC-OBJECT-REF>A</SPEC-OBJECT-REF></OBJECT><CHILDREN>"
+    b"<SPEC-HIERARCHY><OBJECT><SPEC-OBJECT-REF>B</SPEC-OBJECT-REF></OBJECT><CHILDREN>"
+    b"<SPEC-HIERARCHY><OBJECT><SPEC-OBJECT-REF>C</SPEC-OBJECT-REF></OBJECT>"
+    b"</SPEC-HIERARCHY></CHILDREN></SPEC-HIERARCHY></CHILDREN></SPEC-HIERARCHY>"
+    b"</CHILDREN></SPECIFICATION>"
+)
+RQL_REPEATED_ANCESTOR = (
+    b'<SPECIFICATION IDENTIFIER="SPEC"><CHILDREN>'
+    b"<SPEC-HIERARCHY><OBJECT><SPEC-OBJECT-REF>A</SPEC-OBJECT-REF></OBJECT><CHILDREN>"
+    b"<SPEC-HIERARCHY><OBJECT><SPEC-OBJECT-REF>A</SPEC-OBJECT-REF></OBJECT>"
+    b"</SPEC-HIERARCHY></CHILDREN></SPEC-HIERARCHY>"
+    b"</CHILDREN></SPECIFICATION>"
+)
+MSG_RQL_AT_LIMIT = "an upload exactly at the request limit is read whole, in several chunks"
+MSG_RQL_OVER_LIMIT = "an upload over the request limit is refused before it is read to the end"
+MSG_RQL_ONE_MEMBER = "an archive with {what} is refused: exactly one ReqIF member is required"
+MSG_RQL_ENTRIES = "an archive with more entries than the limit is refused"
+MSG_RQL_MEMBER_SIZE = "a member larger than the uncompressed limit is refused"
+MSG_RQL_RATIO = "a member compressed beyond the ratio limit is refused"
+MSG_RQL_ENCRYPTED = "an encrypted archive member is refused"
+MSG_RQL_WORKER = "the worker parses the document and returns its object"
+MSG_RQL_DEADLINE = "the worker is stopped when the deadline passes"
+MSG_RQL_OBJECTS = "a document with more objects than the limit is refused"
+MSG_RQL_RELATIONS = "a document with more relations than the limit is refused"
+MSG_RQL_DEPTH = "a hierarchy deeper than the limit is refused"
+MSG_RQL_CYCLE = "a hierarchy that repeats an ancestor is refused as a cycle"
+SRC_ALL_LOGIN = {
+    ("REQ", "PRJ-REQ-001"),
+    ("REQ", "ABC-REQ-001"),
+    ("TC", "PRJ-TC-001"),
+    ("SPEC", "PRJ-SPEC-001"),
+    ("DEF", "PRJ-DEF-001"),
+    ("TS", "PRJ-TS-001"),
+}
+SRC_EXACT_ID = "PRJ-REQ-001"
+SRC_READER = {"*": ["view", "comment"]}
+SRC_EVERYTHING = {"*": ["*"]}
+SRC_RANKS = [
+    ("an exact id", "prj-req-001", "PRJ-REQ-001", "anything", 0),
+    ("the start of an id", "prj-req", "PRJ-REQ-001", "x", 1),
+    ("the start of a title", "login", "PRJ-REQ-001", "Login shall", 2),
+    ("a part of an id", "req-001", "PRJ-REQ-001", "x", 3),
+    ("a part of a title", "shall", "PRJ-REQ-001", "Login shall", 4),
+    ("no match", "zzz", "PRJ-REQ-001", "Login shall", 5),
+]
+MSG_SRC_ADMIN = "an administrator finds the matching records of every type in every project"
+MSG_SRC_EXACT = "the record whose id equals the query comes first"
+MSG_SRC_PROJECT = "the project filter keeps the results of that project only"
+MSG_SRC_MEMBER = "a member finds records of their own project only"
+MSG_SRC_NO_MEMBERSHIP = "a user without project access finds nothing"
+MSG_SRC_EXTERNAL = "an external reader finds only customer records of the allowed document type"
+MSG_SRC_EXTERNAL_INTERNAL = "an external reader does not find an internal record"
+MSG_SRC_NO_ALLOWLIST = "an external reader without allowed document types finds nothing"
+MSG_SRC_RANK = "{what} ranks {rank}"
+STB_REPAIR_STEPS = [
+    "create_tables",
+    "migrate_user_columns",
+    "normalize_document_kinds_and_ids",
+    "backfill_campaign_public_ids",
+    "normalize_non_document_public_ids",
+]
+STB_SEED_STEP = "seed_admin_user"
+MSG_STB_NEITHER = "with both switches off the start runs no repair and seeds no administrator"
+MSG_STB_REPAIR = "with only the repair switch on the start runs the five repair steps in order"
+MSG_STB_SEED = "with only the seed switch on the start seeds the administrator"
+MSG_STB_BOTH = (
+    "with both switches on the start runs the repair steps and then seeds the administrator"
+)
+ACR_OLDER = ("PRJ-REQ-900", "Older")
+ACR_SOURCE = ("ABC-REQ-001", "Source")
+ACR_CSV = b"tc_id,title\n,From CSV\n"
+ACR_TESTRAIL = (
+    b"<suite><sections><section><name>Boot</name><cases><case><id>C1</id>"
+    b"<title>From TestRail</title></case></cases></section></sections></suite>"
+)
+ACR_MARKDOWN = b"## [DES] From Markdown\nBody\n"
+ACR_JIRA_ACCOUNTS = [("alpha", "ANN@test.local", True), ("beta", "nobody@test.local", False)]
+ACR_REPORT_RUNS = (41, 42)
+ACR_FIELD = "created_by_id"
+MSG_ACR_CREATE = "a created {kind} records the user who created it"
+MSG_ACR_IMPORT = (
+    "the copied requirement, both imported test cases, the suite and the design record the importer"
+)
+MSG_ACR_JIRA = "a Jira defect records the user of the integration account, or nobody when the account is unknown"
+MSG_ACR_REPORT = "a Bud report records the owner of the credential, or nobody when it has none"
+MSG_ACR_DELETED = "deleting a user clears the creator of their requirement and defect"
+MSG_ACR_HIDDEN = "no response model carries the creator"
+STATUS_UNAVAILABLE = 503
+OBJ_BUCKET = "bloom-test"
+OBJ_S3_SETTINGS = {
+    "STORAGE_BACKEND": "s3",
+    "STORAGE_LOCAL_MIRROR": True,
+    "S3_BUCKET": OBJ_BUCKET,
+    "S3_REGION": "us-east-1",
+    "S3_PREFIX": "bloom",
+    "S3_ENDPOINT_URL": "",
+}
+OBJ_CONTENT = b"evidence"
+OBJ_LONGER_CONTENT = b"longer evidence"
+OBJ_CLIENT_SETTINGS = {
+    "S3_ENDPOINT_URL": "http://minio.local:9000",
+    "S3_REGION": "eu-central-1",
+    "S3_ACCESS_KEY_ID": "key",
+    "S3_SECRET_ACCESS_KEY": "secret",
+}
+OBJ_MIGRATE = ["migrate", "--to", "s3"]
+MSG_OBJ_PERSIST = "a persisted file stays in the mirror and is in the bucket with its content type"
+MSG_OBJ_READ = "the bucket returns the content, the list, the size and a ready answer; an unknown file has no size"
+MSG_OBJ_REMOVE = "removing deletes the object and the mirror file, and removing again is accepted"
+MSG_OBJ_NO_MIRROR = "without the mirror the local file goes and the object stays"
+MSG_OBJ_REFUSED = "an upload the bucket refuses is a 503, leaves no local file, and the bucket is reported not ready"
+MSG_OBJ_LOCAL = "with local storage the file stays local and the store reports a local copy"
+MSG_OBJ_DOWNLOAD = "a download streams the content from the bucket as an attachment"
+MSG_OBJ_FALLBACK = "when the object is gone the download falls back to the mirror file"
+MSG_OBJ_GONE = "when the object and the mirror file are gone the download is a 503"
+MSG_OBJ_RECONCILE = (
+    "the cleanup keeps the referenced object, removes the orphans and reports the missing file"
+)
+MSG_OBJ_RECONCILE_LATE = "a later orphan in the bucket alone is removed too"
+MSG_OBJ_MIGRATE = "the first migration copies both files and skips the part file"
+MSG_OBJ_MIGRATE_AGAIN = "a second migration copies nothing"
+MSG_OBJ_MIGRATE_SIZE = "a file whose stored size differs is reported as a mismatch"
+MSG_OBJ_COMMAND_OK = "the migrate command prints its counts and exits 0"
+MSG_OBJ_COMMAND_MISMATCH = "the migrate command names a size mismatch and exits 1"
+MSG_OBJ_COMMAND_NO_BUCKET = "the migrate command exits 2 without a bucket"
+MSG_OBJ_NEEDS_BUCKET = "S3 storage without a bucket is refused, and the prefix defaults to bloom"
+MSG_OBJ_CLIENT = "the client takes the endpoint and region from the settings"
+MSG_OBJ_NO_PREFIX = "without a prefix an object key is the file name"
+MDI_DOCUMENT = (
+    "---\n"
+    "type: requirement\n"
+    "---\n"
+    "## [REQ] Fast boot\n"
+    "Boot within {{parameter: BOOT_MS, value: 500}} ms\n"
+    "## [DES] Boot design\n"
+    "Greets with {{parameter: NEW_ONE, value: hello}}\n"
+).encode()
+MDI_TWICE = MDI_DOCUMENT + b"The budget {{BOOT_MS}} applies twice.\n"
+MDI_LIMIT = b"## [REQ] Limit\nStay under {{parameter: limit, value: 5}}\n"
+MDI_FRESH = (
+    b"## [REQ] Fresh\nUses {{parameter: FRESH_A, value: 1}} and {{parameter: FRESH_B, value: 2}}\n"
+)
+MDI_RELAY_TEST_CASE = (
+    b"## [TC] Relay boot\n"
+    b"Checks the relay-driven boot.\n"
+    b"- Pre-Condition: relay open\n"
+    b"- Step: close the relay => boot banner within {{parameter: RELAY_MS, value: 200}} ms\n"
+)
+MDI_KEEP = {"BOOT_MS": {"action": "existing"}}
+MDI_RENAME = {"boot_ms": {"action": "rename", "to": "BOOT_MS_V2"}}
+MDI_COLLISION = [{"name": "BOOT_MS", "existing_value": "old", "imported_value": "500"}]
+MDI_REFUSED_ACTIONS = [
+    (
+        "a new name that the import already uses",
+        {"BOOT_MS": {"action": "rename", "to": "NEW_ONE"}},
+        "already taken",
+    ),
+    (
+        "a new name equal to the old one",
+        {"BOOT_MS": {"action": "rename", "to": "BOOT_MS"}},
+        "already taken",
+    ),
+    (
+        "a new name that is not a parameter name",
+        {"BOOT_MS": {"action": "rename", "to": "BAD, NAME"}},
+        "not a valid parameter name",
+    ),
+    ("an unknown action", {"BOOT_MS": {"action": "delete"}}, "Choose 'existing' or 'rename'"),
+    ("a list of names", ["BOOT_MS"], "must be an object"),
+]
+MDI_RENAME_TEXT = (
+    "A {{parameter: X, value: 1}} and {{ x }} and {{Y}} and {{parameter: Y, value: 2}}"
+)
+MDI_RENAMED_TEXT = (
+    "A {{parameter: X2, value: 1}} and {{X2}} and {{Y}} and {{parameter: Y, value: 2}}"
+)
+MDI_STEP_ROWS = [
+    ("precondition", "relay open", ""),
+    ("step", "close the relay", "boot banner within {{RELAY_MS}} ms"),
+]
+MSG_MDI_BLOCKED = (
+    "a parameter name already in the project blocks the import with 409 and names the collision"
+)
+MSG_MDI_NOTHING = "the blocked import creates no requirement and no parameter"
+MSG_MDI_KEEP = "keeping the existing value creates the other parameter and reports the collision"
+MSG_MDI_KEEP_VALUES = (
+    "the existing parameter keeps its value and the new one takes the imported value"
+)
+MSG_MDI_ARTEFACTS = "both sections become artefacts of their type with the parameters as references"
+MSG_MDI_NOTES = "two notifications are created and one asks to check the necessity"
+MSG_MDI_RENAME = "importing under a new name creates both parameters and reports the rename"
+MSG_MDI_RENAME_VALUES = "the project holds the old parameter, the renamed one and the new one"
+MSG_MDI_RENAME_TEXT = "every reference in the imported text uses the new name"
+MSG_MDI_EITHER_KIND = "a name also collides with a parameter of the other kind, whatever its case"
+MSG_MDI_REFUSED = "{what} is refused with 422"
+MSG_MDI_BROKEN = "collision actions that are not JSON are refused, and nothing is imported"
+MSG_MDI_FRESH = "an import without a collision creates every parameter"
+MSG_MDI_REWRITE = "renaming rewrites the declaration and the reference of that parameter only"
+MSG_MDI_RELAY_TEST_CASE = "a test case section is imported with its id, description and step rows"
+MSG_MDI_PERMISSION = (
+    "an import needs the import permission on every imported type, and creates nothing without it"
+)
+NTF_REQUIREMENT_LINK = "/docs/requirements/PRJ-REQ-001"
+NTF_HIDDEN_DETAIL = "The reviewer could no longer see PRJ-REQ-009."
+MSG_NTF_CREATED = "a notification for another user is stored for that user"
+MSG_NTF_SELF = "a notification for the acting user is skipped"
+MSG_NTF_SAME_ASSIGNEE = "an assignment that does not change the assignee notifies nobody"
+MSG_NTF_REVIEWER = "creating a requirement with a reviewer sends that reviewer one assignment notification linking to it"
+MSG_NTF_APPROVER = "setting an approver sends that approver one assignment notification"
+MSG_NTF_APPROVER_ONCE = "a later change that keeps the approver sends no second notification"
+MSG_NTF_LIST = "three notifications are listed and counted as unread"
+MSG_NTF_MARK_ONE = "marking one as read leaves two unread"
+MSG_NTF_MARK_ALL = "marking all as read leaves none unread and an empty unread list"
+MSG_NTF_PRIVATE = "another user lists none of them and cannot mark one as read: 404"
+MSG_NTF_VISIBLE_ASSIGNEE = "a comment notifies only the assignee who can see the requirement"
+MSG_NTF_HIDDEN_APPROVER = "an approver who cannot see the requirement receives nothing"
+MSG_NTF_HIDING_REFUSED = (
+    "a change that hides a requirement from its reviewer is refused with 409 naming it"
+)
+MSG_NTF_CANNOT_SIGN = "a kept external reviewer is shown as unable to sign, the approver as able"
+ISO_PRELUDE = "\nimport json, os, smtplib, socket, sys\nfrom pathlib import Path\noriginal_read = Path.read_text\ndef safe_read(path, *args, **kwargs):\n    if path.name == '.env':\n        raise PermissionError('Operator dotenv reads are forbidden')\n    return original_read(path, *args, **kwargs)\nPath.read_text = safe_read\nimport tests.config\n"
+ISO_INHERITED = {
+    "SECRET_KEY": "synthetic-inherited-secret-key-at-least-32-characters",
+    "SMTP_HOST": "smtp.example.com",
+    "SMTP_USERNAME": "synthetic-user",
+    "SMTP_PASSWORD": "synthetic-password",
+    "S3_ACCESS_KEY_ID": "synthetic-access",
+    "S3_SECRET_ACCESS_KEY": "synthetic-storage-secret",
+    "ADMIN_PASSWORD": "synthetic-admin-password",
+}
+ISO_FLAGS = {
+    "BLOOM_TESTS_USE_DOTENV": "1",
+    "BLOOM_DOTENV_DISABLED": "0",
+    "BLOOM_DATABASE_URL": "postgresql://synthetic:synthetic@db.example.com/live",
+}
+ISO_REPLACED = {
+    "SECRET_KEY": "test-secret-key-for-ci-at-least-32-characters-long",
+    "SMTP_HOST": "127.0.0.1",
+    "SMTP_USERNAME": "",
+    "SMTP_PASSWORD": "",
+    "S3_ACCESS_KEY_ID": "",
+    "S3_SECRET_ACCESS_KEY": "",
+    "ADMIN_PASSWORD": "ci-admin-password-123",
+}
+ISO_READ_CREDENTIALS = "\nkeys = ['SECRET_KEY', 'SMTP_HOST', 'SMTP_USERNAME', 'SMTP_PASSWORD', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY', 'ADMIN_PASSWORD']\nprint(json.dumps({prefix + key: os.environ.get(prefix + key) for prefix in ('', 'BLOOM_') for key in keys} | {'dotenv': os.environ.get('BLOOM_DOTENV_DISABLED')}))\n"
+ISO_EXTERNAL_SMTP = "\ndef attempted(*args, **kwargs):\n    raise RuntimeError('Network connection was attempted')\nsocket.create_connection = attempted\ntry:\n    smtplib.SMTP('smtp.example.com', 587)\nexcept PermissionError:\n    print('blocked before network')\n"
+ISO_SMTP_AUTH = "\ntry:\n    sys.audit('smtplib.send', smtplib.SMTP(), b'AUTH PLAIN synthetic')\nexcept PermissionError:\n    print('blocked before credentials')\n"
+ISO_MAILPIT = "sys.audit('smtplib.connect', smtplib.SMTP(), '127.0.0.1', 11025); print('allowed')"
+ISO_OTHER_MAILPIT = (
+    "sys.audit('smtplib.connect', smtplib.SMTP(), '127.0.0.1', 21025); print('allowed')"
+)
+ISO_LIVE_SECRETS = ("synthetic-password", "db.example.com")
+ISO_LIVE_DATABASE = f"postgresql://synthetic-user:{ISO_LIVE_SECRETS[0]}@{ISO_LIVE_SECRETS[1]}/live"
+ISO_DATABASE_REFUSAL = "Tests require the isolated test database"
+ISO_SMTP_REFUSAL = "dedicated test Mailpit port"
+ISO_DOTENV_READ = "\ntry:\n    sys.audit('open', str(Path.cwd() / '.env'), 'r', 0)\nexcept PermissionError:\n    print('operator dotenv blocked')\n"
+ISO_TEST_DATABASE = "postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom"
+ISO_OVERRIDES = ["?host=db.example.com", "?password=synthetic-password", "#fragment", "?port=5433"]
+ISO_AWS_INHERITED = {
+    "AWS_ACCESS_KEY_ID": "synthetic-inherited-access",
+    "AWS_SECRET_ACCESS_KEY": "synthetic-inherited-secret",
+    "AWS_SESSION_TOKEN": "synthetic-inherited-session",
+}
+ISO_AWS_READ = "\nimport boto3\ncredentials = boto3.Session().get_credentials()\nprint(json.dumps({'access_key': credentials.access_key, 'secret_key': credentials.secret_key, 'source': credentials.method, 'credentials_file': os.environ.get('AWS_SHARED_CREDENTIALS_FILE'), 'config_file': os.environ.get('AWS_CONFIG_FILE'), 'metadata_disabled': os.environ.get('AWS_EC2_METADATA_DISABLED')}))\n"
+ISO_AWS_REPLACED = {
+    "access_key": "test-access-key",
+    "secret_key": "test-secret-key",
+    "source": "env",
+    "credentials_file": "/dev/null",
+    "config_file": "/dev/null",
+    "metadata_disabled": "true",
+}
+ISO_SETTINGS_DOTENV = "\nfrom app.core.config import Settings\npath = Path(os.environ['ISOLATION_FOLDER']) / '.env'\npath.write_text('SECRET_KEY=synthetic-file-secret-key-at-least-32-characters\\n')\noriginal_open = Path.open\ndef guarded_open(path, *args, **kwargs):\n    if path.name == '.env':\n        raise AssertionError('Disabled dotenv source was opened')\n    return original_open(path, *args, **kwargs)\nPath.open = guarded_open\nSettings(_env_file=path)\nprint('dotenv source not opened')\n"
+ISO_LIMITER = "from app.core.deps import limiter; print('limiter loaded safely')"
+ISO_WRONG_DATABASES = [
+    ("a SQLite file", "sqlite+aiosqlite:////srv/operator.db"),
+    (
+        "another PostgreSQL driver",
+        "postgresql+psycopg://test_user:test_password@localhost:15432/test_bloom",
+    ),
+]
+ISO_MIGRATION_DATABASE = (
+    "postgresql+asyncpg://test_user:test_password@localhost:15432/k75_abcdef0123"
+)
+ISO_DEV_POSTGRES_PORTS = [":5432", ":5433", ":5434", ":80", ""]
+ISO_OTHER_PORT_DATABASE = "postgresql+asyncpg://test_user:test_password@127.0.0.1:25432/test_bloom"
+ISO_READ_SERVICES = (
+    "print(json.dumps({'database': os.environ['DATABASE_URL'], 'smtp': os.environ['SMTP_PORT']}))"
+)
+ISO_DEFAULT_SERVICES = {
+    "database": "postgresql+asyncpg://test_user:test_password@localhost:15432/test_bloom",
+    "smtp": "11025",
+}
+ISO_DEV_SMTP_PORTS = ["1025", "8025", "25", "587", "465", "2525", "0", "70000", "abc", ""]
+ISO_DEV_MAILPIT_PORTS = [1025, 8025, 25]
+ISO_CONNECT_MAILPIT = "\ntry:\n    smtplib.SMTP('127.0.0.1', {port})\nexcept PermissionError:\n    print('blocked before network')\n"
+MSG_ISO_DOTENV_OFF = "loading the test configuration turns the dotenv file off"
+MSG_ISO_REPLACED = "the inherited {name} is replaced by the test value"
+MSG_ISO_EXTERNAL_SMTP = "an external mail server is refused before any network connection"
+MSG_ISO_SMTP_AUTH = "mail authentication is refused before credentials are sent"
+MSG_ISO_MAILPIT = "the test Mailpit on its dedicated port is allowed"
+MSG_ISO_LIVE_DATABASE = (
+    "a database that is not the test database is refused without showing its address or password"
+)
+MSG_ISO_DOTENV_READ = "opening the operator dotenv file is refused"
+MSG_ISO_OVERRIDE = "the test database address with {suffix} added is refused"
+MSG_ISO_AWS = "inherited AWS credentials are replaced by test credentials from the environment only"
+MSG_ISO_SETTINGS = "the settings do not open a dotenv file"
+MSG_ISO_LIMITER = "the rate limiter loads without the dotenv file"
+MSG_ISO_WRONG_DATABASE = "{what} is refused as database"
+MSG_ISO_MIGRATION_DATABASE = "a temporary migration database with the test credentials is allowed"
+MSG_ISO_MIGRATION_OVERRIDE = "a temporary migration database with a host override is refused"
+MSG_ISO_DEV_POSTGRES = "the test database on local development port '{port}' is refused"
+MSG_ISO_OTHER_POSTGRES = "another PostgreSQL port outside the development ports is allowed"
+MSG_ISO_DEFAULTS = "without a database address the dedicated test database and mail ports are used"
+MSG_ISO_DEV_SMTP = "the mail port '{port}' is refused"
+MSG_ISO_OTHER_SMTP = "another mail port outside the development ports is allowed"
+MSG_ISO_DEV_MAILPIT = (
+    "a connection to the local development Mailpit on port {port} is refused before the network"
+)
+MLS_SMTP = {
+    "SMTP_ENABLED": True,
+    "SMTP_HOST": "smtp.example.com",
+    "SMTP_PORT": 587,
+    "SMTP_USERNAME": "smtp-user",
+    "SMTP_PASSWORD": "smtp-password",
+    "SMTP_FROM_EMAIL": "noreply@example.com",
+    "SMTP_REPLY_TO": None,
+    "SMTP_STARTTLS": True,
+    "SMTP_SSL": False,
+    "SMTP_TIMEOUT_SECONDS": 9,
+}
+MLS_RELAY = {
+    "SMTP_ENABLED": True,
+    "SMTP_HOST": "mail",
+    "SMTP_PORT": 2525,
+    "SMTP_USERNAME": "",
+    "SMTP_PASSWORD": "",
+    "SMTP_FROM_EMAIL": "noreply@example.com",
+    "SMTP_REPLY_TO": None,
+    "SMTP_STARTTLS": False,
+    "SMTP_SSL": False,
+    "SMTP_TIMEOUT_SECONDS": 9,
+}
+MLS_MESSAGE = {
+    "to_email": "user@example.com",
+    "subject": "Test subject",
+    "text_body": "plain text",
+    "html_body": "<p>plain text</p>",
+}
+MLS_SHORT_MESSAGE = {"to_email": "someone@example.com", "subject": "s", "text_body": "t"}
+MLS_PRIVATE_MESSAGE = {
+    "to_email": "private-recipient@example.com",
+    "subject": "Private subject with an untrusted marker",
+    "text_body": "private message content",
+}
+MLS_SENDER = "Bloom PLM by EmbedLabs <noreply@example.com>"
+MLS_STARTTLS_REPORT = ["mail:2525", "STARTTLS=True", "SMTPNotSupportedError"]
+MLS_PRIVATE_WORDS = ["private-recipient", "untrusted marker", "private message content"]
+MLS_SERVER_WORDS = ["remote response", "forged log entry"]
+MLS_WORKFLOW = {
+    "to_email": "reviewer@example.com",
+    "recipient_name": "Reviewer & partner",
+    "actor_name": "Writer <script>alert(1)</script>",
+    "event_title": "Review requested: PRJ-REQ-001",
+    "document_link": "https://bloom.example.com/projects/PRJ/docs/requirements/PRJ-REQ-001?one=1&two=2",
+}
+MLS_WORKFLOW_NEXT = "View the discussion and document status in Bloom PLM."
+MLS_WORKFLOW_TEXT = [
+    "Reviewer & partner",
+    "Writer <script>alert(1)</script>",
+    "Review requested: PRJ-REQ-001",
+    "Bloom PLM by EmbedLabs",
+    "View the discussion and document status in Bloom PLM.",
+]
+MLS_WORKFLOW_HTML = [
+    "<title>Bloom PLM by EmbedLabs</title>",
+    "background:#8925d0",
+    "background:#ffffff",
+    "Reviewer &amp; partner",
+    "Writer &lt;script&gt;alert(1)&lt;/script&gt;",
+    'one=1&amp;two=2"',
+    "Open document",
+    ">Bloom PLM by EmbedLabs</h1>",
+    "View the discussion and document status in Bloom PLM.",
+]
+MLS_ACCESS = {
+    "to_email": "admin@example.com",
+    "admin_name": "Administrator",
+    "requester_name": "Writer <script>",
+    "requester_email": "writer@example.com",
+    "resource": "PRJ-REQ-001",
+    "project": "PRJ",
+    "requested_at": "2026-10-25T10:00:00Z",
+    "request_id": "42",
+    "review_link": "https://bloom.example.com/access",
+}
+MLS_ACCESS_SUBJECT = "Access requested on Bloom PLM: PRJ-REQ-001"
+MLS_ACCESS_NEXT = "Grant access in Bloom PLM, then mark the request granted or refused."
+MLS_TEXT_HEAD = "Bloom PLM by EmbedLabs\n"
+MLS_LINK = "https://bloom.example.com/link#token"
+MLS_EVERY_MAIL = [
+    (
+        "send_invite_email",
+        {
+            "to_email": "a@example.com",
+            "full_name": "Ada",
+            "invite_link": "https://bloom.example.com/link#token",
+        },
+    ),
+    (
+        "send_verification_email",
+        {
+            "to_email": "a@example.com",
+            "full_name": "Ada",
+            "verification_link": "https://bloom.example.com/link#token",
+        },
+    ),
+    (
+        "send_password_reset_email",
+        {
+            "to_email": "a@example.com",
+            "full_name": "Ada",
+            "reset_link": "https://bloom.example.com/link#token",
+        },
+    ),
+    (
+        "send_admin_welcome_email",
+        {
+            "to_email": "a@example.com",
+            "full_name": "Ada",
+            "login_link": "https://bloom.example.com/link#token",
+        },
+    ),
+    (
+        "send_email_change_email",
+        {
+            "to_email": "a@example.com",
+            "full_name": "Ada",
+            "old_email": "old@example.com",
+            "new_email": "new@example.com",
+            "confirm_link": "https://bloom.example.com/link#token",
+        },
+    ),
+    (
+        "send_email_change_authorization_email",
+        {
+            "to_email": "a@example.com",
+            "full_name": "Ada",
+            "old_email": "old@example.com",
+            "new_email": "new@example.com",
+            "confirm_link": "https://bloom.example.com/link#token",
+        },
+    ),
+    (
+        "send_access_request_email",
+        {
+            "to_email": "a@example.com",
+            "admin_name": "Admin",
+            "requester_name": "Ada",
+            "requester_email": "ada@example.com",
+            "resource": "PRJ-REQ-001",
+            "project": "PRJ",
+            "requested_at": "2026-10-25T10:00:00Z",
+            "request_id": "1",
+            "review_link": "https://bloom.example.com/link#token",
+        },
+    ),
+    (
+        "send_workflow_request_email",
+        {
+            "to_email": "a@example.com",
+            "recipient_name": "Ada",
+            "actor_name": "Writer",
+            "event_title": "Review requested: PRJ-REQ-001",
+            "document_link": "https://bloom.example.com/link#token",
+        },
+    ),
+]
+MLS_HEADING = "<h1[^>]*>(Welcome to )?Bloom PLM by EmbedLabs</h1>"
+MLS_HTML_RIGHTS = "&copy; 2026 EmbedLabs. All rights reserved."
+MLS_TEXT_RIGHTS = "(c) 2026 EmbedLabs. All rights reserved."
+MSG_MLS_SERVER = (
+    "the mail goes to the configured server, with STARTTLS and the login, in one message"
+)
+MSG_MLS_SENDER = "the sender is Bloom PLM by EmbedLabs with the configured address"
+MSG_MLS_STARTTLS = "a refused STARTTLS is reported as a delivery error naming {word}"
+MSG_MLS_SUBCLASS = "a delivery error is a configuration error, so endpoints answer it the same way"
+MSG_MLS_UNREACHABLE = "an unreachable relay is reported as a delivery error naming the relay"
+MSG_MLS_LOG_SENT = "a delivery is logged as sent"
+MSG_MLS_LOG_PRIVATE = "the delivery log leaves out '{word}'"
+MSG_MLS_LOG_ERROR = "a server error is logged by its type and kept in the raised error"
+MSG_MLS_LOG_SERVER = "the error log leaves out '{word}'"
+MSG_MLS_WORKFLOW_HEAD = "the workflow mail goes to the reviewer with the event as subject, once"
+MSG_MLS_WORKFLOW_TEXT = "the workflow text contains '{word}'"
+MSG_MLS_WORKFLOW_HTML = "the workflow HTML contains '{word}'"
+MSG_MLS_WORKFLOW_SAFE = "the workflow HTML has no script tag, one link and no unfilled placeholder, and the text starts with the product"
+MSG_MLS_ACCESS = "the access request mail has the Bloom subject, heading, one link and the same next step in both formats"
+MSG_MLS_ACCESS_ESCAPED = "the requester name is escaped in the HTML and plain in the text"
+MSG_MLS_EVERY_COUNT = "all eight mails are rendered"
+MSG_MLS_EVERY = "the {sender} mail has the product title and heading, one link in both formats, the rights line and no old name"
+ENT_READ = {"REQ": ["view"]}
+ENT_EDIT = {"REQ": ["edit"]}
+ENT_LINKS = {"REQ": ["view"], "link": ["create"]}
+ENT_PARAMETER = {"parameter": ["view"]}
+ENT_AUTHOR = {"REQ": ["view", "create"]}
+ENT_SIGNER = {"REQ": ["view", "approve"]}
+ENT_CUSTOMER_AUTHOR = {"REQ": ["edit", "approve", "delete"]}
+ENT_INTERNAL_ROW = ("PRJ-REQ-001", "Internal", "internal")
+ENT_CUSTOMER_ROW = ("PRJ-REQ-002", "Customer", "customer")
+MSG_ENT_GROUP_PROJECT = "a group grant reaches its own project and no other"
+MSG_ENT_NO_GRANT = "a user without a grant is refused with 403"
+MSG_ENT_ADMIN = "an instance administrator reaches a project without any entry"
+MSG_ENT_LEGACY = "a membership row or a group without a project entry grants no access"
+MSG_ENT_SEPARATE = "with a direct read grant in place, no term carries the group's edit"
+MSG_ENT_DIRECT_KEPT = "after leaving the group the direct read grant is the only term"
+MSG_ENT_BROAD_READ = (
+    "a broad read shows the internal row but lends no edit to the customer-only write"
+)
+MSG_ENT_LINK = (
+    "a policy limited to requirements keeps its link permission and gives none on test cases"
+)
+MSG_ENT_EXTERNAL_PARAMETERS = "an external user {how} cannot read parameters: 403"
+MSG_ENT_OWNER = "an owner entry reaches its project with every permission, no other project, and keeps the instance role"
+MSG_ENT_IDENTITY = "a customer-scoped policy does not make an internal account customer-only; an external account is"
+MSG_ENT_EXTERNAL_READING = "an external account reads customer rows only, even with a broad policy"
+MSG_ENT_CREATION = "both policies cover creating rows of either origin"
+MSG_ENT_APPROVAL = "approval is covered only for the origin the approving policy covers"
+MSG_ENT_WRITE_SCOPE = (
+    "a customer write grant reads and edits customer requirements and nothing else"
+)
+MSG_ENT_BUNDLES = "overlapping bundles keep their own origins for {who}"
+MSG_ENT_BUNDLE_CAPS = "internal reading, approval and deletion are {state} for {who}"
+MSG_ENT_TAG_SCOPE = "a write limited to one tag does not borrow the unrestricted read's tag scope"
+RQI_EXTRA_OBJECT = (
+    b"</SPEC-OBJECTS>",
+    b'<SPEC-OBJECT IDENTIFIER="OBJ-3"><VALUES/></SPEC-OBJECT></SPEC-OBJECTS>',
+)
+RQI_RELATION_NAME = b'LONG-NAME="Refines"'
+RQI_RELATION_ROLES = [
+    ("Refines", "refines"),
+    ("Derives", "derives_from"),
+    ("Depends", "depends_on"),
+    ("Satisfies", "relates_to"),
+    ("Copies", "duplicates"),
+]
+RQI_UNREADABLE = [
+    ("an empty file", b""),
+    ("text that is not XML", b"this is not xml at all"),
+    ("XML without ReqIF content", b"<html><body>nope</body></html>"),
+]
+RQI_LEGACY_ROWS = [("PRJ-REQ-001", "Parent", "OBJ-1"), ("PRJ-REQ-002", "Child", "OBJ-2")]
+MSG_RQI_OBJECTS = "both objects of the document are parsed"
+MSG_RQI_TITLES = "the title comes from the chapter name attribute"
+MSG_RQI_BODY = "the body is kept as HTML with its emphasis and as plain text"
+MSG_RQI_ENUM = "an enumeration value reads as its long name"
+MSG_RQI_FOREIGN_ID = "the foreign id attribute is read"
+MSG_RQI_ORDER = "objects follow the order of the specification"
+MSG_RQI_RELATION = "the relation is parsed with its ends and type name"
+MSG_RQI_ARCHIVE = "a ReqIFZ archive is opened and parsed"
+MSG_RQI_OUTSIDE = "an object outside the hierarchy is kept"
+MSG_RQI_UNREADABLE = "{what} is refused"
+MSG_RQI_FIRST = "the first import creates two requirements and one link"
+MSG_RQI_AGAIN = "a second import creates nothing, skips both and leaves two requirements"
+MSG_RQI_NO_PROJECT = "an import into a project that does not exist is a 404"
+MSG_RQI_NOT_REQIF = "an upload that is not ReqIF is a 422"
+MSG_RQI_ROLE = "a {name} relation is stored as a {role} link and read as that neighbour"
+MSG_RQI_UNKNOWN = (
+    "an unknown relation type is a 422 naming the relation and the type, and nothing is imported"
+)
+MSG_RQI_REMOVED_ROLE = (
+    "a relation whose role is no longer allowed is a 422 naming it, and no link is stored"
+)
+MSG_RQI_LEGACY = "an import that matches an existing legacy link creates no second link"
+AUW_CLEANED_TABLES = [
+    "user_tokens",
+    "users",
+    "requirements",
+    "test_cases",
+    "project_external_doc_types",
+    "project_memberships",
+    "notifications",
+    "import_attempts",
+    "service_credentials",
+    "defects",
+    "document_attachments",
+]
+AUW_SELF_DELETE = "Admin users cannot delete their own account"
+AUW_STILL_REFERENCED = (
+    "User could not be deleted because related records still reference this account"
+)
+AUW_GENERIC_ANSWER = "If the account exists, a password reset email has been sent"
+AUW_RESET_ANSWER = "Password reset successfully"
+AUW_NEW_PASSWORD = "new-password-123"
+AUW_TOKEN_ERRORS = ["Invalid token", "Token has expired", "Token has already been used"]
+AUW_PROMOTION_REFUSED = "Only the initial administrator can promote users to admin"
+AUW_DEMOTION_REFUSED = "Admin role cannot be changed"
+MSG_AUW_CLEANED = "deleting a user touches the {table} table"
+MSG_AUW_ORDER = "the allowed document types are removed before the memberships"
+MSG_AUW_DELETED = "the user is deleted once and the change is flushed once"
+MSG_AUW_SELF = (
+    "an administrator deleting their own account is refused with 400 before anything is deleted"
+)
+MSG_AUW_CONFLICT = "a delete that other records still block is a 409 and deletes nothing"
+MSG_AUW_KNOWN = (
+    "a reset request for a known account answers generically, creates one token and sends one mail"
+)
+MSG_AUW_UNKNOWN = (
+    "a reset request for an unknown account answers the same and creates and sends nothing"
+)
+MSG_AUW_RESET = (
+    "a reset stores the new password, raises the session version and ends the refresh tokens"
+)
+MSG_AUW_BAD_TOKEN = "a reset with '{detail}' is refused with 400 and changes nothing"
+MSG_AUW_PROMOTE = "the initial administrator promotes a user to administrator"
+MSG_AUW_PROMOTE_REFUSED = "another administrator cannot promote a user to administrator: 403"
+MSG_AUW_DEMOTE_REFUSED = "an administrator role cannot be changed: 400"
+DWF_CONTROLLED_KINDS = ["REQ", "SPEC", "TC", "DES", "CPT", "PRT", "TS", "CHG"]
+DWF_CHILDREN = ["section", "attachment", "suite-item"]
+DWF_ARCHIVE_OPERATIONS = ["edit", "delete"]
+DWF_UNSUPPORTED = [("CHG", "Implemented"), ("REQ", "Verified")]
+DWF_SCOPES = ["visibility", "req_origin", "tag"]
+DWF_REVIEW_WRITES = ["body", "section"]
+MSG_DWF_OVERWRITE = "an unguarded write to an approved {kind} is refused with 409"
+MSG_DWF_DIRECT_APPROVAL = "setting a draft to Approved without the workflow is refused with 409"
+MSG_DWF_CHANGE_DEFAULT = "a new change request starts as Draft"
+MSG_DWF_CHILD = "adding a {child} to an approved parent without the workflow is refused with 409"
+MSG_DWF_SNAPSHOT = (
+    "the snapshot keeps the body, visibility, tags, sections, files and sign-offs of a draft"
+)
+MSG_DWF_EXECUTION = "an execution result does not change the content hash of a test case"
+MSG_DWF_CAPTURE = (
+    "capturing twice returns the same revision, with empty approval fields and the file reference"
+)
+MSG_DWF_FILE_REF = "the file reference of a revision cannot be overwritten: 409"
+MSG_DWF_ARCHIVE = "an approved archive refuses {operation} with 409"
+MSG_DWF_REVIEW_EDIT = (
+    "a content edit in review returns the document to Draft and supersedes the request"
+)
+MSG_DWF_REVISION = "a new revision changes the working row and keeps the archive and the baseline"
+MSG_DWF_CHANGE_FROZEN = "an approved change request stays frozen even with a workflow permit: 409"
+MSG_DWF_UNSUPPORTED = (
+    "a {kind} in status {status} gets no workflow (409), keeps its status and stays writable"
+)
+MSG_DWF_RISK = "a risk record takes status and authored writes without a workflow"
+MSG_DWF_SCOPE = (
+    "changing the {scope} in review returns the requirement to Draft and supersedes the request"
+)
+MSG_DWF_APPROVED_SCOPE = (
+    "an approved requirement may change scope while its archive keeps the approved scope"
+)
+MSG_DWF_TRANSPORT = "tracker transport fields do not change the content hash of a change request"
+MSG_DWF_ALIASES = "legacy concept and protocol ids are controlled under their current kinds"
+MSG_DWF_KIND = "an approved document cannot leave the guard by changing its kind: 409"
+MSG_DWF_REVIEW_WRITE = "an unguarded {change} write in review returns the document to Draft and supersedes the request by the actor"
+MSG_DWF_PREPARED = (
+    "a prepared scope edit returns a review to Draft and leaves an approved document approved"
+)
+CFG_ENV_NAMES = [
+    "ACCESS_TOKEN_EXPIRE_MINUTES",
+    "ADMIN_EMAIL",
+    "ADMIN_FULL_NAME",
+    "ADMIN_PASSWORD",
+    "AUTO_SEED_ADMIN",
+    "APP_BASE_URL",
+    "BLOOM_ACCESS_TOKEN_EXPIRE_MINUTES",
+    "BLOOM_ADMIN_EMAIL",
+    "BLOOM_ADMIN_FULL_NAME",
+    "BLOOM_ADMIN_PASSWORD",
+    "BLOOM_AUTO_SEED_ADMIN",
+    "BLOOM_APP_BASE_URL",
+    "BLOOM_ATTACHMENT_DIR",
+    "BLOOM_ATTACHMENT_UPLOADS_PER_15_MINUTES",
+    "BLOOM_CLI_CODE_MODE_ENABLED",
+    "BLOOM_CORS_ORIGINS",
+    "BLOOM_DATABASE_URL",
+    "BLOOM_ENV",
+    "BLOOM_EMAIL_VERIFICATION_TOKEN_TTL_HOURS",
+    "BLOOM_ENABLE_DOCS",
+    "BLOOM_FRONTEND_BASE_URL",
+    "BLOOM_INVITE_TOKEN_TTL_HOURS",
+    "BLOOM_MAX_ATTACHMENT_SIZE",
+    "BLOOM_MAX_CONCURRENT_ATTACHMENT_UPLOADS_PER_USER",
+    "BLOOM_MAX_DOCUMENT_ATTACHMENT_BYTES",
+    "BLOOM_MIN_ATTACHMENT_FREE_BYTES",
+    "BLOOM_PASSWORD_RESET_TOKEN_TTL_HOURS",
+    "BLOOM_REQIF_MAX_REQUEST_BYTES",
+    "BLOOM_REQIF_MAX_MEMBER_BYTES",
+    "BLOOM_REQIF_MAX_ARCHIVE_ENTRIES",
+    "BLOOM_REQIF_MAX_COMPRESSION_RATIO",
+    "BLOOM_REQIF_MAX_OBJECTS",
+    "BLOOM_REQIF_MAX_RELATIONS",
+    "BLOOM_REQIF_MAX_HIERARCHY_DEPTH",
+    "BLOOM_REQIF_PROCESSING_TIMEOUT_SECONDS",
+    "BLOOM_REQIF_IMPORTS_PER_15_MINUTES",
+    "BLOOM_REQIF_STREAM_CHUNK_BYTES",
+    "BLOOM_RUN_STARTUP_DATA_REPAIR",
+    "BLOOM_SECRET_KEY",
+    "BLOOM_SERVICE_TOKEN_PEPPER",
+    "BLOOM_SMTP_ENABLED",
+    "BLOOM_SMTP_FROM_EMAIL",
+    "BLOOM_SMTP_FROM_NAME",
+    "BLOOM_SMTP_HOST",
+    "BLOOM_SMTP_PASSWORD",
+    "BLOOM_SMTP_PORT",
+    "BLOOM_SMTP_REPLY_TO",
+    "BLOOM_SMTP_SSL",
+    "BLOOM_SMTP_STARTTLS",
+    "BLOOM_SMTP_TIMEOUT_SECONDS",
+    "BLOOM_SMTP_USERNAME",
+    "BLOOM_TESTSTATION_APP_URL",
+    "CORS_ORIGINS",
+    "DATABASE_URL",
+    "APP_ENV",
+    "ATTACHMENT_DIR",
+    "ATTACHMENT_UPLOADS_PER_15_MINUTES",
+    "CLI_CODE_MODE_ENABLED",
+    "EMAIL_VERIFICATION_TOKEN_TTL_HOURS",
+    "ENABLE_DOCS",
+    "FRONTEND_BASE_URL",
+    "INVITE_TOKEN_TTL_HOURS",
+    "MAX_ATTACHMENT_SIZE",
+    "MAX_CONCURRENT_ATTACHMENT_UPLOADS_PER_USER",
+    "MAX_DOCUMENT_ATTACHMENT_BYTES",
+    "MIN_ATTACHMENT_FREE_BYTES",
+    "PASSWORD_RESET_TOKEN_TTL_HOURS",
+    "REQIF_MAX_REQUEST_BYTES",
+    "REQIF_MAX_MEMBER_BYTES",
+    "REQIF_MAX_ARCHIVE_ENTRIES",
+    "REQIF_MAX_COMPRESSION_RATIO",
+    "REQIF_MAX_OBJECTS",
+    "REQIF_MAX_RELATIONS",
+    "REQIF_MAX_HIERARCHY_DEPTH",
+    "REQIF_PROCESSING_TIMEOUT_SECONDS",
+    "REQIF_IMPORTS_PER_15_MINUTES",
+    "REQIF_STREAM_CHUNK_BYTES",
+    "RUN_STARTUP_DATA_REPAIR",
+    "SECRET_KEY",
+    "SERVICE_TOKEN_PEPPER",
+    "SMTP_ENABLED",
+    "SMTP_FROM_EMAIL",
+    "SMTP_FROM_NAME",
+    "SMTP_HOST",
+    "SMTP_PASSWORD",
+    "SMTP_PORT",
+    "SMTP_REPLY_TO",
+    "SMTP_SSL",
+    "SMTP_STARTTLS",
+    "SMTP_TIMEOUT_SECONDS",
+    "SMTP_USERNAME",
+    "TESTSTATION_APP_URL",
+]
+CFG_PRODUCTION = {
+    "BLOOM_ENV": "production",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ADMIN_EMAIL": "ops@example.com",
+    "BLOOM_ADMIN_PASSWORD": "this-is-a-long-password",
+}
+CFG_REQIF_DEFAULTS = {"BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
+MSG_CFG_REQIF_DEFAULTS = "the ReqIF limits have their public defaults"
+CFG_REQIF_DEFAULTS_EXPECTED = {
+    "REQIF_MAX_REQUEST_BYTES": 26214400,
+    "REQIF_MAX_MEMBER_BYTES": 26214400,
+    "REQIF_MAX_ARCHIVE_ENTRIES": 100,
+    "REQIF_MAX_COMPRESSION_RATIO": 20,
+    "REQIF_MAX_OBJECTS": 999,
+    "REQIF_MAX_RELATIONS": 10000,
+    "REQIF_MAX_HIERARCHY_DEPTH": 100,
+    "REQIF_PROCESSING_TIMEOUT_SECONDS": 60,
+    "REQIF_IMPORTS_PER_15_MINUTES": 5,
+    "REQIF_STREAM_CHUNK_BYTES": 1048576,
+}
+CFG_UPLOAD_DEFAULTS = {"BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
+MSG_CFG_UPLOAD_DEFAULTS = "the attachment upload limits have their public defaults"
+CFG_UPLOAD_DEFAULTS_EXPECTED = {
+    "ATTACHMENT_UPLOADS_PER_15_MINUTES": 10,
+    "MAX_CONCURRENT_ATTACHMENT_UPLOADS_PER_USER": 1,
+}
+CFG_UPLOAD_PREFIXED = {
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ATTACHMENT_UPLOADS_PER_15_MINUTES": "17",
+    "BLOOM_MAX_CONCURRENT_ATTACHMENT_UPLOADS_PER_USER": "1",
+}
+MSG_CFG_UPLOAD_PREFIXED = "the attachment upload limits are read from the BLOOM_ names"
+CFG_UPLOAD_PREFIXED_EXPECTED = {
+    "ATTACHMENT_UPLOADS_PER_15_MINUTES": 17,
+    "MAX_CONCURRENT_ATTACHMENT_UPLOADS_PER_USER": 1,
+}
+CFG_UPLOAD_CONCURRENCY = {
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_MAX_CONCURRENT_ATTACHMENT_UPLOADS_PER_USER": "2",
+}
+MSG_CFG_UPLOAD_CONCURRENCY = "more than one concurrent upload per user is refused"
+CFG_UPLOAD_CONCURRENCY_REFUSAL = ""
+CFG_MEMBER_LIMIT = {
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_REQIF_MAX_MEMBER_BYTES": "26214401",
+}
+MSG_CFG_MEMBER_LIMIT = "a ReqIF member limit above 25 MiB is refused naming the limit"
+CFG_MEMBER_LIMIT_REFUSAL = "25 MiB"
+CFG_PREFIXED = {
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_DATABASE_URL": "postgresql+asyncpg://postgres:postgres@localhost:5432/bloom_db",
+    "BLOOM_ACCESS_TOKEN_EXPIRE_MINUTES": "42",
+    "BLOOM_APP_BASE_URL": "http://localhost:8000",
+    "BLOOM_FRONTEND_BASE_URL": "http://localhost:5173",
+    "BLOOM_TESTSTATION_APP_URL": "http://localhost:5174",
+    "BLOOM_CORS_ORIGINS": '["http://localhost:5173"]',
+    "BLOOM_ENABLE_DOCS": "true",
+    "BLOOM_ADMIN_EMAIL": "admin@example.com",
+    "BLOOM_ADMIN_PASSWORD": "admin-password",
+    "BLOOM_ADMIN_FULL_NAME": "Bloom Admin",
+    "BLOOM_INVITE_TOKEN_TTL_HOURS": "48",
+    "BLOOM_EMAIL_VERIFICATION_TOKEN_TTL_HOURS": "6",
+    "BLOOM_PASSWORD_RESET_TOKEN_TTL_HOURS": "3",
+    "BLOOM_SMTP_ENABLED": "true",
+    "BLOOM_SMTP_HOST": "smtp.example.com",
+    "BLOOM_SMTP_PORT": "2525",
+    "BLOOM_SMTP_USERNAME": "smtp-user",
+    "BLOOM_SMTP_PASSWORD": "smtp-password",
+    "BLOOM_SMTP_FROM_EMAIL": "noreply@example.com",
+    "BLOOM_SMTP_REPLY_TO": "reply@example.com",
+    "BLOOM_SMTP_STARTTLS": "false",
+    "BLOOM_SMTP_SSL": "true",
+    "BLOOM_SMTP_TIMEOUT_SECONDS": "9",
+    "BLOOM_SMTP_FROM_NAME": "Attempted Override",
+}
+MSG_CFG_PREFIXED = "every setting is read from its BLOOM_ name"
+CFG_PREFIXED_EXPECTED = {
+    "SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "DATABASE_URL": "postgresql+asyncpg://postgres:postgres@localhost:5432/bloom_db",
+    "ACCESS_TOKEN_EXPIRE_MINUTES": 42,
+    "APP_BASE_URL": "http://localhost:8000",
+    "FRONTEND_BASE_URL": "http://localhost:5173",
+    "TESTSTATION_APP_URL": "http://localhost:5174",
+    "CORS_ORIGINS": ["http://localhost:5173"],
+    "ENABLE_DOCS": True,
+    "ADMIN_EMAIL": "admin@example.com",
+    "ADMIN_PASSWORD": "admin-password",
+    "ADMIN_FULL_NAME": "Bloom Admin",
+    "INVITE_TOKEN_TTL_HOURS": 48,
+    "EMAIL_VERIFICATION_TOKEN_TTL_HOURS": 6,
+    "PASSWORD_RESET_TOKEN_TTL_HOURS": 3,
+    "SMTP_ENABLED": True,
+    "SMTP_HOST": "smtp.example.com",
+    "SMTP_PORT": 2525,
+    "SMTP_USERNAME": "smtp-user",
+    "SMTP_PASSWORD": "smtp-password",
+    "SMTP_FROM_EMAIL": "noreply@example.com",
+    "SMTP_REPLY_TO": "reply@example.com",
+    "SMTP_STARTTLS": False,
+    "SMTP_SSL": True,
+    "SMTP_TIMEOUT_SECONDS": 9,
+}
+CFG_PLAIN = {
+    "SECRET_KEY": "ssssssssssssssssssssssssssssssss",
+    "SMTP_ENABLED": "true",
+    "SMTP_HOST": "smtp.unprefixed.example.com",
+    "SMTP_FROM_EMAIL": "noreply@example.com",
+}
+MSG_CFG_PLAIN = "settings without a BLOOM_ name are read from the plain name"
+CFG_PLAIN_EXPECTED = {
+    "SECRET_KEY": "ssssssssssssssssssssssssssssssss",
+    "SMTP_ENABLED": True,
+    "SMTP_HOST": "smtp.unprefixed.example.com",
+    "SMTP_FROM_EMAIL": "noreply@example.com",
+}
+CFG_BOTH = {
+    "SECRET_KEY": "ssssssssssssssssssssssssssssssss",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "SMTP_HOST": "smtp.unprefixed.example.com",
+    "BLOOM_SMTP_HOST": "smtp.bloom-prefixed.example.com",
+}
+MSG_CFG_BOTH = "the BLOOM_ name wins over the plain name"
+CFG_BOTH_EXPECTED = {
+    "SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "SMTP_HOST": "smtp.bloom-prefixed.example.com",
+}
+CFG_CLI_DEFAULT = {"SECRET_KEY": "ssssssssssssssssssssssssssssssss"}
+MSG_CFG_CLI_DEFAULT = "CLI code mode is off by default"
+CFG_CLI_DEFAULT_EXPECTED = {"CLI_CODE_MODE_ENABLED": False}
+CFG_CLI_PREFIXED = {
+    "SECRET_KEY": "ssssssssssssssssssssssssssssssss",
+    "BLOOM_CLI_CODE_MODE_ENABLED": "true",
+}
+MSG_CFG_CLI_PREFIXED = "CLI code mode is read from the BLOOM_ name"
+CFG_CLI_PREFIXED_EXPECTED = {"CLI_CODE_MODE_ENABLED": True}
+CFG_CLI_PLAIN = {"SECRET_KEY": "ssssssssssssssssssssssssssssssss", "CLI_CODE_MODE_ENABLED": "true"}
+MSG_CFG_CLI_PLAIN = "CLI code mode is read from the plain name"
+CFG_CLI_PLAIN_EXPECTED = {"CLI_CODE_MODE_ENABLED": True}
+CFG_CLI_BOTH = {
+    "SECRET_KEY": "ssssssssssssssssssssssssssssssss",
+    "CLI_CODE_MODE_ENABLED": "true",
+    "BLOOM_CLI_CODE_MODE_ENABLED": "false",
+}
+MSG_CFG_CLI_BOTH = "for CLI code mode the BLOOM_ name wins"
+CFG_CLI_BOTH_EXPECTED = {"CLI_CODE_MODE_ENABLED": False}
+CFG_PROD_EMAIL = {
+    "BLOOM_ENV": "production",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ADMIN_EMAIL": "admin@example.com",
+    "BLOOM_ADMIN_PASSWORD": "this-is-a-long-password",
+}
+MSG_CFG_PROD_EMAIL = "production refuses the default administrator email"
+CFG_PROD_EMAIL_REFUSAL = "ADMIN_EMAIL"
+CFG_PROD_PASSWORD = {
+    "BLOOM_ENV": "production",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ADMIN_EMAIL": "ops@example.com",
+    "BLOOM_ADMIN_PASSWORD": "changeme123",
+}
+MSG_CFG_PROD_PASSWORD = "production refuses the default administrator password"
+CFG_PROD_PASSWORD_REFUSAL = "ADMIN_PASSWORD"
+CFG_PROD_SHORT = {
+    "BLOOM_ENV": "production",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ADMIN_EMAIL": "ops@example.com",
+    "BLOOM_ADMIN_PASSWORD": "short-password",
+}
+MSG_CFG_PROD_SHORT = "production refuses an administrator password under 16 characters"
+CFG_PROD_SHORT_REFUSAL = "at least 16"
+CFG_DEV_DEFAULTS = {
+    "BLOOM_ENV": "development",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ADMIN_EMAIL": "admin@example.com",
+    "BLOOM_ADMIN_PASSWORD": "changeme123",
+}
+MSG_CFG_DEV_DEFAULTS = "development accepts the default administrator email and password"
+CFG_DEV_DEFAULTS_EXPECTED = {"ADMIN_EMAIL": "admin@example.com", "ADMIN_PASSWORD": "changeme123"}
+CFG_DEV_SWITCHES = {
+    "BLOOM_ENV": "development",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+}
+MSG_CFG_DEV_SWITCHES = "in development the administrator seed and the data repair are on by default"
+CFG_DEV_SWITCHES_EXPECTED = {"AUTO_SEED_ADMIN": True, "RUN_STARTUP_DATA_REPAIR": True}
+CFG_PROD_SWITCHES = {
+    "BLOOM_ENV": "production",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ADMIN_EMAIL": "ops@example.com",
+    "BLOOM_ADMIN_PASSWORD": "this-is-a-long-password",
+}
+MSG_CFG_PROD_SWITCHES = (
+    "in production the administrator seed and the data repair are off by default"
+)
+CFG_PROD_SWITCHES_EXPECTED = {"AUTO_SEED_ADMIN": False, "RUN_STARTUP_DATA_REPAIR": False}
+CFG_PROD_SEED = {
+    "BLOOM_ENV": "production",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ADMIN_EMAIL": "ops@example.com",
+    "BLOOM_ADMIN_PASSWORD": "this-is-a-long-password",
+    "BLOOM_AUTO_SEED_ADMIN": "true",
+}
+MSG_CFG_PROD_SEED = "production can turn the administrator seed on"
+CFG_PROD_SEED_EXPECTED = {"AUTO_SEED_ADMIN": True}
+CFG_PROD_REPAIR = {
+    "BLOOM_ENV": "production",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ADMIN_EMAIL": "ops@example.com",
+    "BLOOM_ADMIN_PASSWORD": "this-is-a-long-password",
+    "BLOOM_RUN_STARTUP_DATA_REPAIR": "true",
+}
+MSG_CFG_PROD_REPAIR = "production can turn the data repair on"
+CFG_PROD_REPAIR_EXPECTED = {"RUN_STARTUP_DATA_REPAIR": True}
+CFG_PROD_NO_KEY = {
+    "BLOOM_ENV": "production",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ADMIN_EMAIL": "ops@example.com",
+    "BLOOM_ADMIN_PASSWORD": "this-is-a-long-password",
+}
+MSG_CFG_PROD_NO_KEY = "production starts without an integration encryption key"
+CFG_PROD_NO_KEY_EXPECTED = {"BLOOM_ENV": "production", "INTEGRATION_ENCRYPTION_KEY": ""}
+CFG_PROD_BAD_KEY = {
+    "BLOOM_ENV": "production",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_ADMIN_EMAIL": "ops@example.com",
+    "BLOOM_ADMIN_PASSWORD": "this-is-a-long-password",
+    "BLOOM_INTEGRATION_ENCRYPTION_KEY": "not-a-valid-fernet-key",
+}
+MSG_CFG_PROD_BAD_KEY = (
+    "production starts with an unusable integration key; it is checked when a tracker is used"
+)
+CFG_PROD_BAD_KEY_EXPECTED = {"INTEGRATION_ENCRYPTION_KEY": "not-a-valid-fernet-key"}
+CFG_DEV_NO_KEY = {
+    "BLOOM_ENV": "development",
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+}
+MSG_CFG_DEV_NO_KEY = "development starts without an integration encryption key"
+CFG_DEV_NO_KEY_EXPECTED = {"INTEGRATION_ENCRYPTION_KEY": ""}
+CFG_LEGACY_URL = {
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_FRONTEND_BASE_URL": "https://legacy.example.com",
+}
+MSG_CFG_LEGACY_URL = "the frontend address is used when no application address is set"
+CFG_LEGACY_URL_EXPECTED = {"APP_BASE_URL": "https://legacy.example.com"}
+CFG_APP_URL = {
+    "BLOOM_SECRET_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "BLOOM_APP_BASE_URL": "https://app.example.com",
+    "BLOOM_FRONTEND_BASE_URL": "https://legacy.example.com",
+}
+MSG_CFG_APP_URL = "the application address wins over the frontend address"
+CFG_APP_URL_EXPECTED = {"APP_BASE_URL": "https://app.example.com"}
+MSG_CFG_SENDER_NAME = "the mail sender name is not a setting"
+MSG_CFG_PROD_GOOD_KEY = "production starts with a valid integration encryption key"
+PERF_PREFIXES = ("PTA", "PTB", "PTC")
+PERF_REQUIREMENTS = 15
+PERF_STATEMENT_LIMIT = 10
+MSG_PERF_MATRIX = "the traceability matrix of 15 requirements is read with fewer than 10 statements"
+MSG_PERF_GAPS = "the coverage gaps of 15 requirements are read with fewer than 10 statements"
+MSG_PERF_DETAIL = "a requirement is read with fewer than 10 statements"
+SYNS_PREFIXES = ("SSA", "SSB", "SSC", "SSD")
+MSG_SYNS_NAMED = "the sync names the suite holding the case with its id, name, link and counts"
+MSG_SYNS_COUNTS = "each suite reports how many of its cases were synced and how many it holds"
+MSG_SYNS_NO_SUITE = "a synced case in no suite names no suite"
+MSG_SYNS_UNMATCHED = "a test case id that matches nothing updates nothing and names no suite"
+SYNC_PREFIXES = ("SCA", "SCB", "SCC", "SCD", "SCE")
+MSG_SYNC_NAMED = "the sync names the campaign the result reached with its id, name and link"
+MSG_SYNC_NO_CAMPAIGN = "a synced case in no campaign names no campaign"
+MSG_SYNC_UNMATCHED = "a test case id that matches nothing updates nothing and names no campaign"
+MSG_SYNC_BOTH = "results reaching two campaigns name both"
+REQH_PREFIXES = ("RQA", "RQB")
+REQH_BODY = {
+    "type": "doc",
+    "content": [
+        {
+            "type": "paragraph",
+            "content": [
+                {"type": "text", "text": "boots in "},
+                {
+                    "type": "mention",
+                    "attrs": {"id": "1", "label": "BOOT_BUDGET_MS", "mentionSuggestionChar": "{{"},
+                },
+            ],
+        }
+    ],
+}
+REQH_HTML = "<p>boots in {{BOOT_BUDGET_MS}}</p>"
+MSG_REQH_EMPTY = "a new project lists no requirements"
+MSG_REQH_CREATED = "a created requirement is answered 201 with its title and an id of the project"
+MSG_REQH_READ = "the requirement is listed once and read by its id"
+MSG_REQH_UPDATED = "a title change is answered 200 with the new title"
+MSG_REQH_DELETED = "deleting the requirement is answered 200 or 204"
+MSG_REQH_BODY_CREATED = "a test case is created with its editor body"
+MSG_REQH_BODY_READ = "the editor body comes back in the list and the HTML in the detail"
+TRK_PREFIXES = ("TKA", "TKB", "TKC", "TKD", "TKE", "TKF")
+TRK_UNREACHABLE = [
+    ("no route", 502),
+    ("read timeout", 504),
+    ("connect timeout", 504),
+    ("unreadable answer", 502),
+]
+MSG_TRK_UNREACHABLE = "a tracker failing with {failure} is answered {status} with a detail"
+MSG_TRK_NAMED = "the error names the tracker and shows neither the address nor the exception"
+MSG_TRK_REFUSED = "a tracker that refuses with 401 is a 502 naming the 401"
+SETUP_PASSWORD = "a-sufficiently-long-passphrase"
+SETUP_OWNER = {
+    "email": "owner@example.com",
+    "password": SETUP_PASSWORD,
+    "full_name": "Instance Owner",
+}
+SETUP_SQUATTER = {**SETUP_OWNER, "email": "squatter@example.com"}
+SETUP_SHORT = {**SETUP_OWNER, "password": "short"}
+MSG_SETUP_REQUIRED = "an instance without users reports that setup is required"
+MSG_SETUP_CREATED = (
+    "setup is answered 201 and stores one active administrator with a hashed password"
+)
+MSG_SETUP_CLOSED = "after setup the status is closed and a second setup is a 409 that adds no user"
+MSG_SETUP_SHORT = "a password below the policy is refused with 422"
+MSG_SETUP_NO_MAIL = "setup succeeds and closes when mail is unavailable"
+MSG_SETUP_MAIL = "setup mails the new administrator a link to the login page"
+PCB_PREFIXES = ("PCA", "PCB", "PCC", "PCD", "PCE", "PCF", "PCG", "PCH", "PCI")
+PCB_COUNT_KEYS = (
+    "requirement_count",
+    "test_case_count",
+    "campaign_count",
+    "design_count",
+    "risk_count",
+    "change_count",
+    "test_concept_count",
+    "test_suite_count",
+    "defect_count",
+    "coverage_percent",
+    "uncovered_requirement_count",
+)
+MSG_PCB_SAME = (
+    "the project list and the project detail report the same {key} for the {project} project"
+)
+MSG_PCB_COUNTS = "the busy project lists 3 requirements and the empty one none"
+MSG_PCB_ISOLATED = "a requirement of one project is counted for that project only"
+MSG_PCB_SCALE = "listing four more projects takes at most two more statements"
+BLK_PREFIXES = ("BLA", "BLB", "BLC", "BLD", "BLE", "BLF")
+BLK_UNKNOWN_SUITE = 987654
+MSG_BLK_UNKNOWN = "a campaign with an unknown suite is refused with 404 naming the suite id"
+MSG_BLK_FOREIGN = (
+    "a campaign with a suite of another project is refused with 404 naming the suite id"
+)
+MSG_BLK_SKIPPED = "a suite keeps its own project's test case and skips the foreign and unknown ones"
+MSG_BLK_SECTIONS = "the document list counts the sections of each document separately"
+BUDL_PREFIX = "BDL"
+BUDL_MEMBER = "maintainer-docs@example.com"
+BUDL_CASE = {
+    "status": "Draft",
+    "visibility": "customer",
+    "last_execution_status": "Passed",
+    "last_executed_at": datetime(2026, 7, 4, 9, 30, 0),
+    "last_bud_run_id": 987,
+}
+MSG_BUDL_RUN = "the document list shows the test case with the id of its last Bud run"
+TCOV_PREFIX = "TCV"
+TCOV_TITLES = ("Uncovered", "Partial", "Covered")
+MSG_TCOV_APPROVED = "the test case is approved through review and approval by its creator"
+MSG_TCOV_REPORT = "the gap report counts one uncovered, one partial and one covered requirement: 66.7 percent, two gaps"
+MSG_TCOV_MATRIX = "the matrix shows each requirement with its coverage state"
+MSG_TCOV_FILTER = "the Uncovered filter returns the one uncovered requirement"
+MSG_TCOV_SORT = "sorting by coverage lists Uncovered, Partial, Covered"
+PAE_PREFIXES = ("PEA", "PEB", "PEC", "PED", "PEE", "PEF")
+PAE_TC_WRITE = {"TC": ["view", "create", "edit"]}
+PAE_EVERYTHING = {"*": ["*"]}
+PAE_OWNER_CAPABILITIES = {"can_edit": True, "can_delete": False, "can_manage_access": False}
+PAE_NO_CAPABILITIES = {"can_edit": False, "can_delete": False, "can_manage_access": False}
+MSG_PAE_ENTRY = "a direct entry is created with its two policies, no owner flag and no role or document type field"
+MSG_PAE_REPORT = (
+    "the member reads the project and the access report shows one direct origin with both policies"
+)
+MSG_PAE_UPDATED = "the entry is reduced to the read policy"
+MSG_PAE_OWNER = "an owner entry gives edit on its project, without delete or access management"
+MSG_PAE_OWNER_SCOPE = (
+    "the owner reaches only the owned project, and neither groups nor the member list"
+)
+MSG_PAE_OWNER_EDIT = "the owner changes the project description"
+MSG_PAE_CONTENT = "a policy over all content gives no project capability and no project edit: 403"
+MSG_PAE_ADMIN = "an administrator has every project capability"
+MSG_PAE_CREATOR = (
+    "the creator of a project gets an owner entry without policies and reaches no user list"
+)
+MSG_PAE_INVALID = "an entry with {what} is refused with 422"
+UAS_PREFIXES = ("UAA", "UAB", "UAC", "UAD")
+MSG_UAS_SUMMARY = (
+    "the summary lists the user's groups and each project with the groups of its access report"
+)
+MSG_UAS_NO_POLICY = "the summary names no policy"
+MSG_UAS_DIRECT = "a direct policy entry is labelled direct, with no group"
+MSG_UAS_EMPTY = "a user without access has empty lists, and an administrator has every project"
+MSG_UAS_ADMIN_ONLY = (
+    "the summary is refused to a non-administrator with 403 and an unknown user is a 404"
+)
+VISW_VISION = {
+    "project_id": 1,
+    "doc_id": "PRJ-VIS-001",
+    "doc_type": "VIS",
+    "title": "Idea",
+    "status": "Draft",
+    "version": "1",
+    "created_by_id": 1,
+}
+VISW_CHANGE = {
+    "project_id": 1,
+    "change_id": "PRJ-CHG-001",
+    "title": "Next vision",
+    "status": "Approved",
+}
+MSG_VISW_DRAFT = "a new vision is controlled, in Draft, without revisions"
+MSG_VISW_APPROVED = "after review and approval the vision is Approved with revision 1"
+MSG_VISW_CORRECTED = (
+    "a correction returns the vision to Draft at revision 1 and keeps the archived revision"
+)
+MSG_VISW_REVISED = (
+    "an edit authorised by an approved change opens revision 2 naming the change, as version 2"
+)
+VIST_VISION = {"doc_id": "PRJ-VIS-001", "doc_type": "VIS", "title": "Vision"}
+VIST_REQUIREMENT = {"req_id": "PRJ-REQ-001", "title": "Requirement"}
+VIST_MARKDOWN = b"## [VIS] North star\nWhere the product goes\n"
+MSG_VIST_TAGS = (
+    "a vision tags a requirement and a requirement tags a vision, each as a references link"
+)
+MSG_VIST_NAMES = "the Markdown types vis and Vision both mean VIS"
+MSG_VIST_IMPORT = "a VIS section is imported as a draft vision with a vision id"
+OBS_TRACE = "trace-me-123"
+OBS_METRICS = ["http_requests_total", "http_request_duration_seconds", 'path="/api/ping"']
+MSG_OBS_PING_EVENT = (
+    "a request leaves one anonymous, successful api.request event with its request id and route"
+)
+MSG_OBS_QUERY = "the event keeps the names of the query parameters and none of their values"
+MSG_OBS_UNMATCHED = "a request to no route is a 404 recorded as unmatched and denied"
+MSG_OBS_GENERATED = "an answer carries a generated request id of at least 16 characters"
+MSG_OBS_PROPAGATED = "a request id sent by the caller is returned unchanged"
+MSG_OBS_METRICS = "the metrics page is plain text in the Prometheus format"
+MSG_OBS_METRIC = "the metrics page contains {name}"
+MSG_OBS_DISABLED = "with metrics turned off the metrics page is a 404"
+MSG_OBS_JSON = "a log record is formatted as JSON with message, level, logger and request id"
+MSG_OBS_LOGGING = "setting up logging twice leaves one handler with the JSON formatter"
+LNK_PREFIXES = ("LKA", "LKB")
+MSG_LNK_FORBIDDEN = "a test case cannot reference a requirement: 422 saying the role is not allowed"
+MSG_LNK_LEGACY = "a link stored under the old concept code is listed under the current code"
+MSG_LNK_DUPLICATE = "creating the same link again is refused with 400 as already existing"
+PID_PREFIXES = ("PIA", "PIB", "PIC", "PID", "PIE", "PIF")
+MSG_PID_SUITE_ID = "a suite gets a public id of its project and is read by it"
+MSG_PID_SUITE_NUMBER = "{method} of a suite by its database id is a 404 Test suite not found"
+MSG_PID_SUITE_CHANGED = "the suite is renamed and deleted by its public id, and then gone"
+MSG_PID_ITEM_NUMBER = "adding a test case by its database id is a 404"
+MSG_PID_ITEM_ADDED = "a test case is added by its public id once; a second time is a 400"
+MSG_PID_ITEM_REMOVED = "an item is removed by the test case public id only, and then gone"
+MSG_PID_FOREIGN = "a test case of another project is refused with 404 naming the suite project"
+MSG_PID_CAMPAIGN_ID = "a campaign gets a public id of its project and is read by it"
+MSG_PID_CAMPAIGN_NUMBER = "{method} of a campaign by its database id is a 404 Campaign not found"
+MSG_PID_CAMPAIGN_ITEM = (
+    "a campaign item is added, commented and removed by the test case public id only"
+)
+MSG_PID_CAMPAIGN_DELETED = "the campaign is deleted by its public id, and then gone"
+MSG_PID_ADDRESS = (
+    "the document address opens the {slug} by public id and answers 404 for the database id"
+)
+MSG_PID_CASE_ADDRESS = "a test case is still opened by its database id"
+RET_POLICY = {
+    "name": "Project content",
+    "permissions": {"REQ": ["view", "create", "edit"], "RPT": ["view", "create", "edit"]},
+    "type_tags": {"REQ": {"all": True}, "RPT": {"all": True}},
+}
+RET_ASSIGNMENTS = ["bundle", "individual"]
+MSG_RET_BEFORE = "with a {assignment} assignment the author reads the project and the requirement"
+MSG_RET_REMOVED = "after removal the author is refused the project (403) and the requirement (404), and keeps the other project"
+MSG_RET_ROWS = (
+    "removing the {assignment} assignment changes no stored row outside the access tables"
+)
+MSG_RET_OPTION = "the author is still offered for assignment under the same id"
+MSG_RET_RESTORED = "after the assignment is restored the author reads the content and the attachment again, and no row changed"
+PIC_REJECTED = [
+    ("a malformed picture", b"broken", "image/png", 422),
+    ("an empty picture", b"", "image/png", 422),
+    ("an SVG", b"<svg/>", "image/svg+xml", 415),
+    ("an oversized picture", b"x" * 2_000_001, "image/png", 413),
+]
+MSG_PIC_NONE = "an account without a picture answers 404"
+MSG_PIC_UPLOADED = "an upload is answered 200 with the picture flag and without the picture itself"
+MSG_PIC_STORED = "the stored picture is a private PNG scaled to 256 by 128 without its metadata"
+MSG_PIC_SCOPED = "the picture belongs to its account: the other account has none, and its own upload changes nothing here"
+MSG_PIC_REPLACED = "a new upload replaces the picture"
+MSG_PIC_REJECTED = "{what} is refused with {status} and the saved picture stays"
+MSG_PIC_ANONYMOUS = "reading, uploading and removing a picture need a signed-in account: 401"
+MSG_PIC_REMOVED = "removing answers 200 without the picture flag, keeps the other account fields, and the picture is gone"
+MSG_PIC_OTHER_KEPT = "the other account and its picture are unchanged"
+MSG_PIC_REPEAT = "removing again answers 200 and a new upload is accepted"
+MSG_PIC_FORMAT = "a picture sent under another format is a 415, one beyond the size bounds a 422, and nothing is stored"
+MSG_PIC_TURNED = "a rotated JPEG is stored upright at 128 by 256 without EXIF"
+MSG_PIC_FIRST_TAG = "a JPEG with a repeated orientation tag is turned by the first tag"
+MSG_PIC_MPF = "a JPEG whose multi-picture header repeats the image count is refused with 415 and nothing is stored"
+UNH_PATHS = {
+    "error": "/api/__boom__",
+    "unique": "/api/__conflict__",
+    "reference": "/api/__fk__",
+    "late": "/api/__late_conflict__",
+}
+MSG_UNH_REFERENCE = "a 500 carries a 32-character reference in the header, the body and the detail"
+MSG_UNH_QUOTE = "the detail asks to quote that reference"
+MSG_UNH_HIDDEN = "a 500 shows neither the message, the exception type nor a traceback"
+MSG_UNH_CONFLICT = "a lost race is a 409 with its reference, saying the record already exists"
+MSG_UNH_CONSTRAINT = (
+    "the conflict shows neither the constraint, the statement nor the exception type"
+)
+MSG_UNH_FOREIGN = "a row that is still referenced is a 409 that hides the database message"
+MSG_UNH_LATE = "a commit that fails after the endpoint returned is a 409 with its reference and without the constraint"
+MSG_UNH_COMMIT = "every route with a session commits before its response"
+COVC_PREFIXES = ("CVA", "CVB", "CVC", "CVD")
+COVC_STATES = [
+    ("no test case", [], "Uncovered"),
+    ("one draft test case", ["Draft"], "Partial"),
+    ("two draft test cases", ["Draft", "Draft"], "Partial"),
+    ("one approved test case", ["Approved"], "Covered"),
+    ("a draft and an approved test case", ["Draft", "Approved"], "Covered"),
+]
+COVC_PERCENTAGES = [((1, 3), 33.3), ((2, 4), 50.0), ((0, 0), 0)]
+MSG_COVC_STATE = "a requirement with {what} is {state}"
+MSG_COVC_PERCENT = "{covered} of {total} is {percent} percent"
+MSG_COVC_GAPS = (
+    "the gap report counts one covered, one partial and one uncovered requirement as 66.7 percent"
+)
+MSG_COVC_SAME = "the dashboard and the project card report the same uncovered count and percentage"
+MSG_COVC_MATRIX = (
+    "the matrix shows the verified requirement as Covered and the draft-covered one as Partial"
+)
+MSG_COVC_DRAFT = (
+    "a requirement verified by a draft test case counts as having a test case: 100 percent, partial"
+)
+MSG_COVC_FAN_OUT = (
+    "one approved test case over three of four requirements is 75 percent with one uncovered"
+)
+MSG_COVC_GAP_SHAPE = "a gap names its type and carries no missing link types"
+VISH_PREFIXES = ("VHA", "VHB", "VHC", "VHD", "VHE")
+VISH_OTHER_GROUPS = ("Developers", "Testers", "Administrators", "Customers")
+VISH_ALLOWED_LINKS = [
+    ("REQ", "requirements", "VIS", "vision", "derives_from"),
+    ("SPEC", "spec", "VIS", "vision", "refines"),
+    ("CHG", "changes", "VIS", "vision", "impacts"),
+    ("RSK", "risks", "VIS", "vision", "impacts"),
+    ("VIS", "vision", "STD", "standard", "references"),
+]
+VISH_REFUSED_LINKS = [
+    ("DES", "designs", "VIS", "vision", "satisfies"),
+    ("VIS", "vision", "REQ", "requirements", "derives_from"),
+    ("RSK", "risks", "VIS", "vision", "mitigates"),
+]
+VISH_RELEASED_MAINTAINER_SET = (
+    "Requirements",
+    "Specifications",
+    "Standards",
+    "Designs",
+    "Risks",
+    "Change Requests",
+    "Concepts",
+    "Test Cases",
+    "Suites",
+    "Campaigns",
+    "Defects",
+    "Protocols",
+    "Reports",
+    "Baselines",
+    "Parameters",
+    "Traceability",
+    "Project Management",
+)
+MSG_VISH_OWNERS = (
+    "the Product Owners group holds the Visions policy and no other default group does"
+)
+MSG_VISH_CREATED = "a Visions holder creates a draft vision with the first vision id and edits it"
+MSG_VISH_LISTED = "the vision is listed under its type and opened with the edit and approve actions"
+MSG_VISH_READER = "a Read Internal holder reads the vision and cannot edit it: 403"
+MSG_VISH_REVIEWER = "a Review Internal holder may review the vision"
+MSG_VISH_CUSTOMER = "a Read Customer holder lists the customer vision only"
+MSG_VISH_SPEC_ONLY = (
+    "a user with rights on specifications alone lists no vision and cannot read one"
+)
+MSG_VISH_LINK_ALLOWED = "a {source} may link to a {target} as {role}"
+MSG_VISH_LINK_REFUSED = "a {source} cannot link to a {target} as {role}"
+MSG_VISH_AUTHOR = "a {who} creates and edits a vision"
+MSG_VISH_REVIEW = (
+    "a Review Internal holder is assigned, comments and hands the vision on for approval"
+)
+RPQ_KINDS = ["test-case", "test-suite", "requirement", "campaign"]
+RPQ_READER_PERMISSIONS = {
+    "TC": ["view"],
+    "TS": ["view"],
+    "REQ": ["view"],
+    "CMP": ["view"],
+    "RPT": ["view"],
+}
+RPQ_RUN = 41
+RPQ_PEPPER = "test-report-request-pepper-32-characters"
+RPQ_PDF = b"%PDF-1.4 report"
+MSG_RPQ_GUARDED = "a {kind} report request needs a signed-in reader who sees the source and the run: 401, 404, 404"
+MSG_RPQ_ONE = (
+    "a repeated request for the {kind} is the same pending request, hidden from other users"
+)
+MSG_RPQ_MAILBOX = (
+    "the mailbox is closed to users (401) and shows the machine the one request with its requester"
+)
+MSG_RPQ_BLANK_REASON = "a refusal without a reason is refused with 422"
+MSG_RPQ_REFUSED = "the reader sees the refusal and its reason, without the publisher"
+MSG_RPQ_ATTRIBUTED = "the refusal is audited as a service action naming the Bud publisher"
+MSG_RPQ_BAD_FILE = "a report with an unreadable file is a 422 and the request stays pending"
+MSG_RPQ_OTHER_RUN = "a report of another run is stored and the request stays pending"
+MSG_RPQ_DELIVERED = "the report of the requested run delivers the request with its document id"
+MSG_RPQ_LATE_REFUSAL = "a delivered request cannot be refused: 409"
+MSG_RPQ_DELETION = (
+    "deleting the {target} with a pending request is answered 204 and empties the mailbox"
+)
+MSG_RPQ_HISTORY = "deleting a delivered report keeps the request as delivered without a document id"
+DASH_KEYS = (
+    "total_projects",
+    "total_requirements",
+    "total_test_cases",
+    "coverage_percent",
+    "projects",
+)
+DASH_READER = {"*": ["view", "comment"]}
+DASH_RECORDS = [
+    (
+        "Requirement",
+        {
+            "req_id": "PRJ-REQ-001",
+            "title": "Customer requirement",
+            "status": "Draft",
+            "visibility": "customer",
+            "priority": "Medium",
+            "req_type": "Functional",
+            "req_origin": "Customer",
+        },
+    ),
+    (
+        "Requirement",
+        {
+            "req_id": "PRJ-REQ-002",
+            "title": "Internal requirement",
+            "status": "Draft",
+            "visibility": "internal",
+            "priority": "Medium",
+            "req_type": "Functional",
+            "req_origin": "Internal",
+        },
+    ),
+    (
+        "TestCase",
+        {
+            "tc_id": "PRJ-TC-001",
+            "title": "Customer test case",
+            "status": "Draft",
+            "visibility": "customer",
+        },
+    ),
+    (
+        "TestCase",
+        {
+            "tc_id": "PRJ-TC-002",
+            "title": "Internal test case",
+            "status": "Draft",
+            "visibility": "internal",
+        },
+    ),
+    (
+        "TestCampaign",
+        {
+            "campaign_id": "PRJ-CMP-001",
+            "name": "Customer campaign",
+            "status": "Planned",
+            "visibility": "customer",
+        },
+    ),
+    (
+        "TestCampaign",
+        {
+            "campaign_id": "PRJ-CMP-002",
+            "name": "Internal campaign",
+            "status": "Planned",
+            "visibility": "internal",
+        },
+    ),
+]
+DASH_CASES = [
+    ("requirements, test cases and campaigns", ["REQ", "TC", "CMP"], (1, 1, 1, 1)),
+    ("campaigns only", ["CMP"], (0, 0, 1, 0)),
+]
+MSG_DASH_SHAPE = "the dashboard answers 200 with its totals and a project list, and a second read reports the same projects"
+MSG_DASH_TOTALS = "an external reader allowed {types} sees the customer records of those types only in the dashboard totals"
+MSG_DASH_PROJECT = (
+    "the dashboard project row and the project list report the same counts for {types}"
+)
+IDP_COLOURS = ["purple", "green", "blue"]
+IDP_REVIEW = {"REQ": ["view", "review"]}
+IDP_REQUIREMENT = {
+    "req_id": "PRJ-REQ-001",
+    "title": "Requirement",
+    "status": "Draft",
+    "visibility": "internal",
+    "req_type": "Functional",
+    "req_origin": "Internal",
+    "priority": "Medium",
+}
+MSG_IDP_DIRECTORY = "the user list gives each of the three people a different picture"
+MSG_IDP_MENTIONS = "the people who can be mentioned in the project carry the same pictures"
+MSG_IDP_GUARDS = (
+    "the user list and the mention list keep their guards: 403, hidden project, outsider, 401"
+)
+MSG_IDP_ROSTER = "the project members and the audit list show the picture of the same person"
+MSG_IDP_AUTHOR_FIELD = "a comment naming another author is refused with 422"
+MSG_IDP_COMMENT = "a new comment carries the signed-in author and their picture"
+MSG_IDP_COMMENT_KEPT = (
+    "after a name change the comment keeps its author and picture, and an outsider cannot read it"
+)
+MSG_IDP_COMMENT_REMOVED = "after the picture is removed the comment shows none"
+MSG_IDP_REPLACED = "a replaced picture shows in the user list"
+MSG_IDP_REMOVED = "a removed picture shows as none in the user list"
+MSG_IDP_REQUEST = (
+    "an access request shows its requester's name and picture to the administrator only"
+)
+MSG_IDP_REQUEST_REMOVED = "after the picture is removed the access request shows none"
+MSG_IDP_ACTIVITY = "the activity entry and the notification name the real actor with their picture"
+MSG_IDP_NOTICE_GUARD = (
+    "an outsider has no notifications, cannot mark this one and cannot read the activity"
+)
+MSG_IDP_ACTOR_RENAMED = "the activity shows the actor's new name"
+MSG_IDP_ACTOR_REMOVED = "after the picture is removed the activity and the notification show none"
+MNT_PEOPLE = [
+    ("admin", "Ada Admin", "admin", True),
+    ("grace", "Grace Hopper", "maintainer", True),
+    ("alan", "Alan Turing", "maintainer", True),
+    ("elsewhere", "Elsewhere Maintainer", "maintainer", True),
+    ("outsider", "Unassigned Maintainer", "maintainer", True),
+    ("retired", "Retired Member", "maintainer", False),
+    ("customer", "Customer Contact", "external", True),
+]
+MNT_OFFERED = ["Ada Admin", "Alan Turing", "Customer Contact", "Grace Hopper"]
+MNT_FIELDS = {"id", "full_name", "profile_picture_url"}
+MSG_MNT_LIST = (
+    "a member is offered the active project members and the administrators, and nobody else"
+)
+MSG_MNT_FIELDS = "each person is disclosed by id, name and picture only"
+MSG_MNT_REFUSED = "{who} is refused the list with 403"
+MSG_MNT_ADMIN = "an administrator reads the list of any project"
+MSG_MNT_UNKNOWN = "an unknown project is a 404"
+MSG_MNT_ROUTE = "the mention list is its own route, and is not read as a user id"
+TGL_PREFIXES = ("TGA", "TGB", "TGC", "TGD", "TGE", "TGF", "TGG", "TGH", "TGI", "TGJ")
+TGL_PARAMETER_BODY = {
+    "type": "doc",
+    "content": [
+        {
+            "type": "paragraph",
+            "content": [
+                {
+                    "type": "mention",
+                    "attrs": {"id": "7", "label": "MAX_TEMP", "mentionSuggestionChar": "{{"},
+                }
+            ],
+        }
+    ],
+}
+MSG_TGL_CREATED = "tagging a specification in a requirement creates one references link to it"
+MSG_TGL_BACKLINK = "the tag is read from the tagged document as one incoming references link"
+MSG_TGL_ONCE = "saving the same tag again keeps one link"
+MSG_TGL_SELF = "a requirement tagging itself creates no link"
+MSG_TGL_UNKNOWN = "a tag of an unknown type is refused with 422 naming the type, and neither link nor requirement is stored"
+MSG_TGL_PARAMETER = "a parameter mention creates no link"
+MSG_TGL_PAIR = "a {source} can tag a {target}"
+MSG_TGL_TEST_CASE = "a tag in a test case body creates no link"
+GOP_PREFIXES = ("GOA", "GOB", "GOC", "GOD", "GOE", "GOF", "GOG", "GOH", "GOI")
+MSG_GOP_GROUP = "a group is created with both policies, no members and no grants"
+MSG_GOP_REDUCED = "the group is reduced to one policy, and a policy in use cannot be deleted: 409"
+MSG_GOP_ACTIONS = "a write rule gives create and edit without sign-off, and an approve rule gives review and approve without writing"
+MSG_GOP_AUTHOR = "the author creates and requests review but cannot sign: 403"
+MSG_GOP_SIGNER = (
+    "the signer cannot edit (403 naming the permission), and comments, reviews and approves"
+)
+MSG_GOP_APPROVED = "the requirement is Approved, reviewed and approved by the signer; the author's approval is refused with 403"
+MSG_GOP_UNSUPPORTED = "an approve rule on a kind without approval is refused with 400"
+MSG_GOP_SCOPE = "a policy assigned to a project cannot become an app policy: 409, and it stays a document policy"
+MSG_GOP_ORIGINS = "a rule for all origins covers a requirement tagged after the assignment: read, listed and edited"
+MSG_GOP_OVERRIDE = "inherited group policies allow creating in the first project; the explicit read policy refuses it in the second: 403"
+MSG_GOP_NOT_ADMITTED = "the explicit entry lists no create permission, and a project without an entry is refused with 403"
+MSG_GOP_EXTERNAL = "an external account keeps review and loses approve and delete"
+MSG_GOP_EXTERNAL_REVIEW = (
+    "an external account comments only once assigned as reviewer, and cannot be made approver: 422"
+)
+MSG_GOP_EXTERNAL_LIMITS = "an external account cannot delete (403 naming the permission) or reach an internal requirement (404)"
+MSG_GOP_NARROW = "a read for all origins lends no edit to a write limited to customer content: read 200, edit 403"
+MSG_GOP_APP = "an app policy cannot be used in a project entry: 400"
+PPG_PREFIXES = ("PGA", "PGB", "PGC", "PGD", "PGE", "PGF", "PGG", "PGH", "PGI", "PGJ")
+PPG_CUSTOMER_READ_RULES = {
+    "REQ": {
+        "read": True,
+        "write": False,
+        "review": False,
+        "approve": False,
+        "delete": False,
+        "all_origins": False,
+        "visibility": ["customer"],
+        "tags": [],
+        "actions": ["comment", "view"],
+    }
+}
+PPG_TC_WRITE = {"TC": ["view", "create", "edit"]}
+PPG_INVALID_RULES = [
+    ({"widget": {"read": True}}, "Unknown resources"),
+    ({"REQ": {"read": True}}, "Choose at least one tag for REQ."),
+    ({"link": {"read": True, "visibility": ["internal"]}}, "link takes no tags."),
+    ({"REQ": {"read": True, "tags": [987654]}}, "Unknown tags"),
+]
+MSG_PPG_CONTRACT = (
+    "a policy answers with its rules and tags, without a base role, and a copy has the same rules"
+)
+MSG_PPG_GROUP = "a group grant carries the group's two policies and no policy of its own"
+MSG_PPG_REACH = (
+    "the member reaches the granted project only, with read on requirements and write on test cases"
+)
+MSG_PPG_IN_USE = "a policy in use cannot be deleted: 409"
+MSG_PPG_REDUCED = "removing the write policy from the group removes test case rights"
+MSG_PPG_REVOKED = "removing the grant removes the project: 403"
+MSG_PPG_ADMISSION = "a grant {what} is refused with 422"
+MSG_PPG_LEGACY = "a group with a single policy field is refused with 422, and no grant was stored"
+MSG_PPG_CREATE = "creating an internal requirement is refused (403) when only the customer policy allows creating; a customer one is created"
+MSG_PPG_CREATED_ROWS = "only the customer requirement is stored"
+MSG_PPG_RULES = "rules with {detail} are refused with 400"
+MSG_PPG_APPROVAL = "approving the {origin} requirement is answered {status}, leaving it {state}"
+MSG_PPG_ASSIGNEE = "a reviewer who cannot see an internal requirement cannot be assigned (422); a customer one is accepted"
+MSG_PPG_REASSIGN = "assigning the reviewer while changing a {origin} requirement to internal is refused with 422 and changes nothing"
+MSG_PPG_DEFECT = "a defect reviewer with a review policy on defects is accepted"
+MSG_PPG_LINKS = "a customer reader {how} link read is answered {status}"
+MSG_PPG_LINK_ROWS = "the reader sees only the link to the customer requirement"
+GRP_PREFIXES = ("GRA", "GRB", "GRC", "GRD", "GRE")
+GRP_REVIEW_RULE = {
+    "read": False,
+    "write": False,
+    "review": True,
+    "approve": False,
+    "delete": False,
+    "visibility": ["customer"],
+}
+GRP_READ_ONLY = "Default policies are read-only; duplicate one to change it."
+MSG_GRP_LISTED = (
+    "the 24 default policies are listed, without a base role, with their origins and no tags"
+)
+MSG_GRP_REVIEW_CREATED = (
+    "a review-only policy is stored with its customer origin and the review action only"
+)
+MSG_GRP_REVIEW_UPDATED = (
+    "the review-only policy changes to internal and keeps the review action only"
+)
+MSG_GRP_REVIEW_UNSCOPED = "a review rule without an origin is refused with 400"
+MSG_GRP_REVIEW_DEFAULTS = (
+    "the {name} default reviews every document type{origin}, with no other right"
+)
+MSG_GRP_NEW = "a new group has no members, no grants and no single policy field"
+MSG_GRP_MEMBER = "a member is added once with their email; a second time is a 409"
+MSG_GRP_GRANT = "a project is granted once; a second time is a 409"
+MSG_GRP_READ = "the group shows one member and one grant and is listed"
+MSG_GRP_EMPTIED = "removing the grant and the member empties the group, and a deleted group is gone"
+MSG_GRP_ACCESS = "a group grant gives its member the granted project only, until the member leaves"
+MSG_GRP_EXTERNAL = "a group grant admits an external account to the project"
+MSG_GRP_UNKNOWN_TYPE = "a policy with an unknown document type is refused with 400 naming it"
+MSG_GRP_DEFAULT_DELETE = "a default policy cannot be deleted: 400"
+MSG_GRP_DEFAULT_CHANGE = "changing the {field} of a default policy is refused with 403"
+MSG_GRP_COPIES = "copies of a default policy are numbered, editable, deletable and keep its rules"
+MSG_GRP_CUSTOM = "a custom policy is changed and deleted"
+MSG_GRP_IN_USE = (
+    "a policy used by a granted group cannot be deleted (409) until the group is deleted"
+)
+MSG_GRP_ADMIN_ONLY = "groups and policies are refused to a non-administrator: 403"
+TAG_HTTP_PREFIXES = ("THA", "THB", "THC", "THD", "THE", "THF", "THG", "THH", "THI", "THJ", "THK")
+TAG_HTTP_TESTRAIL = (
+    b"<suite><sections><section><name>Boot</name><cases><case><id>C1</id>"
+    b"<title>Cold boot</title></case></cases></section></sections></suite>"
+)
+TAG_HTTP_OUTSIDE = "Only tags your policies tick can be added or removed."
+TAG_HTTP_INSIDE = "The artefact must stay inside your policies."
+TAG_HTTP_NO_CREATE = "No create policy covers this artefact."
+TAG_HTTP_GIVEN = "Only tags your policies tick can be given."
+TAG_HTTP_NO_EDIT = "No edit policy covers this visibility."
+MSG_TAGH_RENAMED = "an administrator renames a tag, and a second tag of that name is a 409"
+MSG_TAGH_ADMIN_ONLY = (
+    "a maintainer cannot create a tag (403), and a policy naming an unknown tag is a 400"
+)
+MSG_TAGH_EXTERNAL_LIST = "an external reader lists only the requirement carrying their tag"
+MSG_TAGH_EXTERNAL_HIDDEN = "the requirement with another tag and the untagged one are a 404"
+MSG_TAGH_EXTERNAL_TAGS = "the reader sees their tag on the requirement, is offered only that tag, and cannot change tags: 403"
+MSG_TAGH_EDITOR_ADDED = "an editor adds the tags their policy ticks"
+MSG_TAGH_EDITOR_REFUSED = (
+    "an editor cannot add a tag outside their policy, nor leave the artefact outside it: 403"
+)
+MSG_TAGH_EDITOR_NARROWED = "narrowing changes only the editor's tags and keeps the others"
+MSG_TAGH_CUSTOMER = "a policy ticking customer shows customer requirements only"
+MSG_TAGH_CREATE_REFUSED = (
+    "a scoped user cannot create without one of their tags or with a tag outside them: 403"
+)
+MSG_TAGH_CREATED = "a scoped user creates with one of their tags, lists it, and it carries that tag"
+MSG_TAGH_FREE = "an unscoped user creates with {what}"
+MSG_TAGH_UNKNOWN = "creating with an unknown tag is a 400"
+MSG_TAGH_SCOPE = "the create form is limited to a scoped user's tags and open to an administrator"
+MSG_TAGH_IMPORT_REFUSED = (
+    "an import by a scoped user without a tag creates nothing and names the case"
+)
+MSG_TAGH_IMPORTED = "an import with one of the user's tags creates the case carrying that tag"
+MSG_TAGH_VISIBILITY = "a visibility change needs a write policy ticking the new visibility: 403 for a narrow one, 200 for a wide one"
+MSG_TAGH_READ_TAG = "a tag only a read policy ticks cannot be added: 403"
+MSG_TAGH_IMPORT_KEEPS = "an import does not overwrite a test case the importer cannot edit"
+MSG_TAGH_EXTERNAL_CAP = (
+    "an external account has neither approve nor delete, and cannot delete its own requirement: 403"
+)
+ATT_PREFIXES = (
+    "ATA",
+    "ATB",
+    "ATC",
+    "ATD",
+    "ATE",
+    "ATF",
+    "ATG",
+    "ATH",
+    "ATI",
+    "ATJ",
+    "ATK",
+    "ATL",
+    "ATM",
+    "ATN",
+    "ATO",
+    "ATP",
+    "ATQ",
+    "ATR",
+    "ATS",
+    "ATT",
+    "ATU",
+    "ATV",
+)
+ATT_PDF = b"%PDF-1.4 fake report"
+ATT_XML = b"<testsuites><testsuite name='s'/></testsuites>"
+ATT_RUN_URL = "https://bud.test/test-runs/41"
+MSG_ATT_NO_DELETE = (
+    "a writer without delete uploads a file but cannot remove it (403), and it stays listed"
+)
+MSG_ATT_RATE = "a maintainer's third upload start within the window is refused with 429 and retry after 900 seconds"
+MSG_ATT_ONE_ACTIVE = "of two simultaneous uploads by one maintainer one is stored and the other refused with 429, retry after 60"
+MSG_ATT_STORED = "a stored file keeps its name and size and is listed"
+MSG_ATT_BYTES = "the download returns the bytes as an attachment that browsers may not sniff"
+MSG_ATT_NAME = "a supplied path is stripped from the stored name"
+MSG_ATT_TYPE = "a file type that is not allowed is refused with 415"
+MSG_ATT_DIGEST = "the stored file's SHA-256 is recorded"
+MSG_ATT_REMOVED = "removing a file is answered 204 and it is no longer listed"
+MSG_ATT_MISSING = "the files of a missing document are a 404"
+MSG_ATT_ANONYMOUS = "reading files needs a signed-in user: 401"
+MSG_ATT_REPORT = "a published Bud report creates a report document carrying both files"
+MSG_ATT_REGISTRY = "the report is listed as an RPT document"
+MSG_ATT_SUMMARY = "the report description records the outcome, the test case and the run link"
+MSG_ATT_SAME_RUN = "publishing the same run again updates the same document and keeps two files"
+MSG_ATT_OTHER_RUN = "another run gets its own document"
+MSG_ATT_NOT_BASE64 = "a file whose content is not base64 is refused with 422"
+MSG_ATT_REPORT_TYPE = "a report file type that is not allowed is refused with 415"
+MSG_ATT_NO_PROJECT = "a report for an unknown project is a 404"
+MSG_ATT_USER_TOKEN = "a user token cannot publish a report: 401"
+MSG_ATT_NO_TOKEN = "publishing needs a credential: 401"
+MSG_ATT_HIDDEN = "an external user gets a named 404 for {what} of a document they cannot see"
+MSG_ATT_KEPT = "the file stays listed for the administrator"
+PBA_PREFIXES = tuple(f"PB{letter}" for letter in "ABCDEFGHIJKLMNOPQRSTU")
+PBA_MISSING = 2147483647
+MSG_PBA_TWO_BUNDLES = "one user holds a writing bundle on one project and a reading bundle on the other, and the bundles gain no members"
+MSG_PBA_CREATE = "the user creates in the writing project (201) and not in the reading one (403)"
+MSG_PBA_BUNDLE_CHANGED = "changing the bundle's policies changes the user's rights on that project"
+MSG_PBA_MANAGER_BEFORE = "without the application policy the manager cannot read tags: 403"
+MSG_PBA_MANAGER_REACH = (
+    "Access Management lets the manager read tags and assignment options, not users or the project"
+)
+MSG_PBA_ATOMIC = "an assignment naming an unknown user is a 404 and adds nobody"
+MSG_PBA_ASSIGNED = "the manager assigns two people with the bundle, and still reaches neither the project nor users"
+MSG_PBA_ADMINISTRATORS = (
+    "the Administrators bundle edits its project only and gives no group, user or delete rights"
+)
+MSG_PBA_CONTENT_APP = (
+    "a content policy cannot be an application policy (400) and the account keeps its role"
+)
+MSG_PBA_VIEWER = "an external account with Access Management edits access without delete, reads options, has no project and keeps its role"
+MSG_PBA_MIXED = "a bundle entry with an owner flag (422), an unknown bundle (404), a valid entry (201) and a mixed change (422, unchanged)"
+MSG_PBA_APP_SCOPE = "an assigned application policy cannot change scope (409) and stays assignable"
+MSG_PBA_ROSTER = (
+    "the Administrators bundle is assigned to {who} on each project, editing that project only"
+)
+MSG_PBA_ROSTER_KEPT = "the bundle gains no members and the account administrator keeps the role"
+MSG_PBA_OVERLAP = "two bundles give one user two entries with both rights, reported with both group names; a repeated one is the same entry"
+MSG_PBA_OVERLAP_REMOVED = (
+    "removing one entry removes its rights only, and the role and the other bundle are unchanged"
+)
+MSG_PBA_DUPLICATES = "changing a bundle entry into a duplicate, owner or inherited one is a 409, and a duplicate entry is a 409"
+MSG_PBA_INDEPENDENT = "a failed batch changes nothing, and an assignment on one project leaves the other project's entry"
+MSG_PBA_CONCURRENT = "simultaneous assignments of {what} keep one entry per bundle"
+MSG_PBA_LEGACY = "the first bundle replaces an owner entry, and the second adds its own entry and keeps the first"
+MSG_PBA_AUDIT = "the audit records each added, changed and removed bundle entry with its ids"
+CLIA_RFC_VERIFIER = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+CLIA_RFC_CHALLENGE = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+CLIA_RFC_REQUEST_CODE = "BUUZ-WHVV"
+CLIA_SESSION_FIELDS = {
+    "session_id",
+    "client_name",
+    "mode",
+    "redirect_uri",
+    "expires_at",
+    "consumed",
+    "created_at",
+}
+CLIA_HIDDEN_FIELDS = {"code", "exchange_code_hash", "code_challenge", "state", "user_id"}
+CLIA_TOKEN_FIELDS = {"access_token", "refresh_token", "token_type", "user"}
+CLIA_STATE = "state with & and + and ="
+CLIA_CALLBACKS = [
+    "http://127.0.0.1:8123/callback",
+    "http://localhost:8123/callback?existing=a%20b",
+    "http://[::1]:8123/callback",
+    "http://127.0.0.1:8123/callback?x=a;state=b",
+]
+CLIA_TYPED_RIGHT = ["BUUZ-WHVV", "buuz-whvv", "BUUZWHVV", "BUUZ WHVV"]
+CLIA_TYPED_WRONG = ["BUUZ-WHVW", "BUUZ-WHV", "BUUZ-WHVVA", "BUUZ-WHV1", ""]
+MSG_CLIA_STARTED = (
+    "a started request expires in ten minutes and points to the sign-in page with its session id"
+)
+MSG_CLIA_LOOKUP = "the request shows its public fields only, uncached"
+MSG_CLIA_APPROVED = "an approval returns an exchange code and its expiry"
+MSG_CLIA_EXCHANGED = (
+    "the exchange returns uncached bearer tokens and the same account as the browser"
+)
+MSG_CLIA_CLAIMS = "the access token names the user, the user type and the session version"
+MSG_CLIA_STORED = (
+    "only hashes are stored, the request is consumed at version 1, and one refresh token is kept"
+)
+MSG_CLIA_ACCESS = "the CLI token resolves to the same project access as the browser token"
+MSG_CLIA_AUDIT = "the {action} audit event names the user and the request and holds no secret"
+MSG_CLIA_REUSED = (
+    "a second exchange of the code is refused with 400 and audited as a failure, without a cookie"
+)
+MSG_CLIA_CALLBACK = "a callback approval to {uri} keeps its address and query and adds the state and one usable code"
+MSG_CLIA_ROTATED = "a refresh returns new tokens without a cookie and is audited for the user"
+MSG_CLIA_REVOKED = "the old refresh token and access token stop working; revoking every refresh token ends the new ones too"
+MSG_CLIA_REFRESH_AUDIT = "the refresh audit holds one success and two failures"
+MSG_CLIA_SHARED = "a browser refresh token works for the CLI, and a CLI refresh token for the browser, then no longer for the CLI"
+MSG_CLIA_ONCE = "reading or approving needs a signed-in user (401), and a second approval is a 400 audited as not pending"
+MSG_CLIA_VERSION = "a code approved before the session version changed is refused with 400, audited, and issues no token"
+MSG_CLIA_CLEANUP = (
+    "a new request deletes the expired and consumed requests and keeps the pending one"
+)
+MSG_CLIA_VECTOR = "the request code of the RFC 7636 challenge is BUUZ-WHVV, and another challenge gives another code"
+MSG_CLIA_TIMES = "a {mode} request shows when it was made and expires ten minutes later, without its code or challenge"
+MSG_CLIA_DENY_CALLBACK = "denying a callback request to {uri} redirects with access_denied and the state, deletes it and is audited"
+MSG_CLIA_DENY_CODE = "denying a code request answers empty, deletes it and is audited"
+MSG_CLIA_DENIED = (
+    "a denied {mode} request answers 400 to reading, approving, exchanging and denying"
+)
+MSG_CLIA_CHECK_RIGHT = "the typed code '{typed}' is accepted (204, uncached) and approves nothing"
+MSG_CLIA_CHECK_WRONG = "the typed code '{typed}' is refused with 400 and the request stays"
+MSG_CLIA_CHECK_STATE = "checking the code of {what} request is refused with 400"
+MSG_CLIA_CHECK_GUARD = "checking needs a signed-in user (401) and code mode (403)"
+MSG_CLIA_APPROVE_CODE = "approving without the code is a 422, with a wrong one a 400 that keeps the request, with the right one it signs in"
+MSG_CLIA_DENY_NO_CODE = "denying with a request code is a 422, without one a 200"
+REG_PREFIXES = ("RGA", "RGB", "RGC", "RGD")
+REG_REVIEWER = "Grace Hopper"
+REG_LINK_STATES = [
+    ("linked", ["alpha", "charlie", "delta"]),
+    ("unlinked", ["bravo"]),
+    ("incoming", ["alpha", "delta"]),
+    ("outgoing", ["charlie"]),
+    ("suspect", ["alpha", "charlie"]),
+    ("clean", ["bravo", "delta"]),
+]
+MSG_REG_ALL = "the registry returns the four documents of the project"
+MSG_REG_COLUMNS = "a row carries the columns the registry shows"
+MSG_REG_NO_BODY = "no row carries the document body"
+MSG_REG_LINK_COUNTS = "links are counted in both directions"
+MSG_REG_SUSPECT = "a suspect link counts against both of its ends"
+MSG_REG_SKIP_COUNTS = "link counts can be left out"
+MSG_REG_FILTER = "the {what} filter returns {expected}"
+MSG_REG_BAD_REVIEWER = "a reviewer that is not a user id is refused with 422"
+MSG_REG_DATES = "a one-day range includes that day's rows, and a range in the future returns none"
+MSG_REG_SEARCH = "searching '{term}' returns {expected}"
+MSG_REG_NOTHING = "a term matching nothing returns no row and a total of 0"
+MSG_REG_DEFAULT_ORDER = "rows come most recently updated first"
+MSG_REG_ID_ORDER = "sorting by id works both ways"
+MSG_REG_TITLE_ORDER = "sorting by title ignores case"
+MSG_REG_REVIEWER_ORDER = "sorting by reviewer puts the unreviewed rows first"
+MSG_REG_ORIGIN_ORDER = "sorting by a column only requirements have puts test cases first"
+MSG_REG_BAD_SORT = "sorting by a column the registry cannot sort is refused with 422 naming it"
+MSG_REG_PAGE = "a page of two reports the whole count of four"
+MSG_REG_PAGES = "two pages of two cover the four rows without repeating one"
+MSG_REG_FILTERED_PAGE = "a page of a filtered set counts the filtered set"
+MSG_REG_PAST_END = "a page past the end is empty with the whole count"
+MSG_REG_SUMMARY = "the type summary counts two requirements and two test cases"
+MSG_REG_SUMMARY_AGREES = (
+    "the type summary agrees with the listing on counts and suspect links per type"
+)
+MSG_REG_EDGES = "the summary reports suite and campaign membership as edges"
+MSG_REG_OTHER_PROJECT = "the summary of another project is empty"
+MSG_REG_SUMMARY_ANONYMOUS = "the summary needs a signed-in user: 401"
+MSG_REG_KEYS = "asking for named rows returns only those rows"
+MSG_REG_KEYS_TYPES = "named rows of two types are returned together"
+MSG_REG_KEYS_WRONG_TYPE = "a row id under another type returns nothing"
+MSG_REG_KEYS_UNKNOWN = "an unknown row id is simply absent"
+MSG_REG_KEYS_RELATED = "named rows combined with related_to give the intersection"
+MSG_REG_KEYS_REFUSED = "{what} is refused with 422"
+MSG_REG_KEYS_PROJECT = "a row of another project cannot be read by naming it"
+MSG_REG_KEYS_SPEC = "a specification is returned by naming it"
+CRUD_PREFIX = "CRD"
+CRUD_ANONYMOUS = [
+    ("GET", "/api/defects?project_id=1"),
+    ("POST", "/api/defects"),
+    ("GET", "/api/defects/1"),
+    ("PATCH", "/api/defects/1"),
+    ("DELETE", "/api/defects/1"),
+    ("GET", "/api/changes?project_id=1"),
+    ("POST", "/api/changes"),
+    ("GET", "/api/risks?project_id=1"),
+    ("POST", "/api/risks"),
+    ("GET", "/api/baselines"),
+    ("POST", "/api/baselines"),
+    ("GET", "/api/projects/1/members"),
+    ("POST", "/api/projects/1/members"),
+]
+MSG_CRUD_DEFECT_CREATED = "a defect is created with an id of its project and its severity"
+MSG_CRUD_DEFECT_IDS = "two defects get different ids"
+MSG_CRUD_UNKNOWN_PROJECT = "creating a {kind} in an unknown project is a 404"
+MSG_CRUD_DEFECT_SEVERITY = "the severity filter returns critical defects only"
+MSG_CRUD_DEFECT_STATUS = "the status filter returns open defects only"
+MSG_CRUD_DEFECT_READ = "a defect is read by its id, and an unknown one is a 404"
+MSG_CRUD_DEFECT_PATCHED = "a defect's title and severity are changed"
+MSG_CRUD_DEFECT_CLOSED = "closing a defect stamps its closing time and reopening clears it"
+MSG_CRUD_DEFECT_TRACKER = "{what} is refused with 422"
+MSG_CRUD_DEFECT_UNKNOWN = "changing or deleting an unknown defect is a 404"
+MSG_CRUD_DEFECT_DELETED = "a deleted defect is gone"
+MSG_CRUD_DEFECT_REFRESH = "refreshing a defect without an issue link is a 422 asking for one"
+MSG_CRUD_CHANGE_CREATED = "a change request is created with an id of its project"
+MSG_CRUD_LISTED = "the {kind} list of the project holds the new one"
+MSG_CRUD_CHANGE_ROUND = "a change request is read, changed while staying a draft, and deleted"
+MSG_CRUD_UNKNOWN = "reading, changing or deleting an unknown {kind} is a 404"
+MSG_CRUD_RISK_CREATED = "a risk is created with an id of its project and its severity"
+MSG_CRUD_RISK_ROUND = "a risk is read, mitigated and deleted"
+MSG_CRUD_BASELINE_CREATED = "a baseline is created with its name"
+MSG_CRUD_BASELINE_LISTED = "the baseline is listed, and the project filter keeps that project only"
+MSG_CRUD_BASELINE_ROUND = "a baseline is read, renamed and deleted"
+MSG_CRUD_MEMBER_ADDED = "a member is added, listed and read by the entry id"
+MSG_CRUD_MEMBER_OWNER = "a member becomes owner without policies"
+MSG_CRUD_MEMBER_ROLE = "an entry with a viewer role is refused with 422"
+MSG_CRUD_MEMBER_REMOVED = "a removed member is no longer listed"
+MSG_CRUD_MEMBER_UNKNOWN_USER = "adding an unknown user is refused"
+MSG_CRUD_MEMBER_UNKNOWN = "reading or removing an unknown entry is a 404"
+MSG_CRUD_ANONYMOUS = "{method} {path} refuses an anonymous caller with 401"
+DWH_KINDS = [
+    (
+        "requirement",
+        "Requirement",
+        {"req_id": "PRJ-REQ-001", "title": "Requirement"},
+        "requirements",
+        "REQ",
+    ),
+    ("test-case", "TestCase", {"tc_id": "PRJ-TC-001", "title": "Test case"}, "test-cases", "TC"),
+    (
+        "document",
+        "Document",
+        {"doc_id": "PRJ-SPEC-001", "doc_type": "SPEC", "title": "Spec"},
+        "documents",
+        "SPEC",
+    ),
+    (
+        "document",
+        "Document",
+        {"doc_id": "PRJ-PRT-001", "doc_type": "PRT", "title": "Protocol"},
+        "documents",
+        "PRT",
+    ),
+    ("design", "DesignItem", {"design_id": "PRJ-DES-001", "title": "Design"}, "designs", "DES"),
+    (
+        "test-concept",
+        "TestConcept",
+        {"concept_id": "PRJ-CPT-001", "name": "Concept"},
+        "test-concepts",
+        "CPT",
+    ),
+    ("test-suite", "TestSuite", {"suite_id": "PRJ-TS-001", "name": "Suite"}, "test-suites", "TS"),
+    ("change", "ChangeRequest", {"change_id": "PRJ-CHG-001", "title": "Change"}, "changes", "CHG"),
+]
+DWH_CREATE_ROUTES = [
+    ("/api/requirements", {"title": "Requirement"}, "requirement"),
+    ("/api/test-cases", {"title": "Case"}, "test-case"),
+    ("/api/designs", {"title": "Design"}, "design"),
+    ("/api/test-concepts", {"name": "Concept"}, "test-concept"),
+    ("/api/changes", {"title": "Change"}, "change"),
+    ("/api/test-suites", {"name": "Suite"}, "test-suite"),
+]
+DWH_DOCUMENT_ROUTES = [
+    ("/api/projects/1/documents", {"title": "Specification", "doc_type": "SPEC"}, "document"),
+    ("/api/projects/1/documents", {"title": "Protocol", "doc_type": "PRT"}, "document"),
+]
+DWH_OPERATIONAL = [
+    ("document", "Document", {"doc_id": "PRJ-RPT-001", "doc_type": "RPT", "title": "Report"}),
+    ("document", "Document", {"doc_id": "PRJ-STD-001", "doc_type": "STD", "title": "Standard"}),
+    ("risk", "RiskItem", {"risk_id": "PRJ-RSK-001", "title": "Risk"}),
+    ("defect", "Defect", {"defect_id": "PRJ-DEF-001", "title": "Defect"}),
+    ("campaign", "TestCampaign", {"campaign_id": "PRJ-CMP-001", "name": "Campaign"}),
+]
+DWH_ANCHOR = {"exact": "the sensor", "prefix": "Check ", "suffix": " twice"}
+DWH_REQUIREMENT_LINK = "/projects/PRJ/docs/requirements/{req_id}"
+MSG_DWH_CONTROLLED = "a draft {kind} has a controlled workflow with its creator as assignee who may comment and request review"
+MSG_DWH_READING_ADMIN = "an administrator who is not assigned cannot comment (403); the assigned reviewer can, under their own id"
+MSG_DWH_CREATE_DRAFT = "creating an approved {route} skips the draft and is refused with 422"
+MSG_DWH_DIRECT_APPROVAL = (
+    "approving without a request is refused with 409 and leaves the requirement unapproved"
+)
+MSG_DWH_REVIEW = "the {kind} goes to Review once and records one review request"
+MSG_DWH_APPROVAL = (
+    "the {kind} reaches Approval after the reviewer's comment and is listed in that phase"
+)
+MSG_DWH_APPROVED = (
+    "the {kind} is approved by the approver only, signed by both, with the archived content"
+)
+MSG_DWH_REVISED = "an approved change of the {kind} opens revision 2 and keeps revision 1"
+MSG_DWH_CHANGE_FROZEN = "an approved change request cannot be edited: 409"
+MSG_DWH_SUPERSEDED = "an edit during review returns to Draft and supersedes the request by the editor; approval is refused"
+MSG_DWH_UNASSIGNED_REVIEW = "an unassigned review reaches every administrator, who may decline but not comment until assigned"
+MSG_DWH_FALLBACK = (
+    "a review for an inactive reviewer reaches the other administrators, who may decline it"
+)
+MSG_DWH_APPROVER_FALLBACK = (
+    "an approval for an inactive approver can be answered by another administrator"
+)
+MSG_DWH_EXTERNAL_READ = "an external reviewer without view cannot see the requirement (404), with view may comment, cannot reach internal ones, and loses comments when review is removed"
+MSG_DWH_PROJECT_DELETION = "deleting the project keeps the workflow without its project and the archived content, and hides the revision"
+MSG_DWH_EXTERNAL_OWNER = "an external owner comments only with a review policy and while assigned"
+MSG_DWH_CREATED = "a {kind} created over HTTP is a draft owned by its creator"
+MSG_DWH_NOTIFICATIONS = (
+    "a maintainer cannot delete the project (403); deleting it removes only its notifications"
+)
+MSG_DWH_REQUESTER_DELETED = (
+    "deleting the requester removes their request and keeps the signed revision and its identities"
+)
+MSG_DWH_PENDING = "an external reviewer lists only visible pending requests of their project, and none once review is removed"
+MSG_DWH_DELIVERY = "a review request mails the reviewer once, a repeat sends nothing, and a decline mails the requester"
+MSG_DWH_DELIVERY_AUDIT = "the request and the decline are audited under their real actors"
+MSG_DWH_OPERATIONAL = (
+    "a {kind} keeps its own status and takes comments only from its assigned reviewer"
+)
+MSG_DWH_CORRECTION = "a correction of an approved {kind} reopens revision 1 under the corrector and keeps the version"
+MSG_DWH_REAPPROVED = (
+    "the corrected {kind} is approved again as revision 1 with the archive unchanged"
+)
+MSG_DWH_USED_CHANGE = "a used change authorises one revision; later corrections and approvals stay on it until another change"
+MSG_DWH_UNAPPROVED_CHANGE = (
+    "a change that is not approved cannot authorise a revision: 409, nothing changes"
+)
+MSG_DWH_VERSION = (
+    "the version of an approved document cannot be changed without an authorised revision: 409"
+)
+MSG_DWH_HANDOVER = (
+    "the creator hands the work to another person, who is notified and may request review"
+)
+MSG_DWH_ASSIGNEE_REFUSED = "an assignee who cannot edit, none and an unknown one are refused with 422, and so is one on a defect"
+MSG_DWH_MAY_CHANGE = "the creator, the assignee and a manager may change the assignee; nobody else"
+MSG_DWH_DISCUSSION = "the creator, assignee, reviewer and approver comment on a draft and each comment notifies the other three"
+MSG_DWH_AFTER_APPROVAL = "after approval only the reviewer may still comment"
+MSG_DWH_NEW_WORKFLOW = "a new workflow starts with the creator as assignee"
+MSG_DWH_ASSIGNEE_RECORDED = (
+    "an assignee change is recorded in activity and audit and refused to an outsider: 403"
+)
+MSG_DWH_PHASE_COMMENT = "the creator comments during {phase}"
+MSG_DWH_REVIEW_EDITED = "a review edited without a workflow gets a draft workflow for the creator"
+MSG_DWH_THREADS = (
+    "a comment quotes a passage, replies gather under the thread, and a general note has no quote"
+)
+MSG_DWH_THREAD_REFUSED = (
+    "a reply with a quote, a reply on another document and a quote on a suite are refused with 422"
+)
+MSG_DWH_RESOLVE = "on a {status} requirement the creator, reviewer and approver resolve and reopen a thread; others cannot, nor resolve a reply"
+MSG_DWH_REPLY_NOTICE = "a reply notifies the earlier writers who still see the document"
+MSG_DWH_REVIEWER_REPLY = "a reviewer's reply counts as the review"
+MSG_DWH_FORMER_REVIEWER = (
+    "a reply reaches a former reviewer who wrote in the thread, unless hidden from them"
+)
+MSG_DWH_ASSIGNEE_RESOLVES = "a separate assignee resolves a thread"
+MSG_DWH_ADMIN_REQUEST = "an administrator requests review and declines in their own name"
+MSG_DWH_ADMIN_NO_APPROVE = "the administrator cannot approve for the approver; the approver does"
+DWH_RISK_STATUSES = ["Accepted", "Mitigated", "Closed", "Monitoring"]
+DWH_UNSUPPORTED_STATUSES = ["Implemented", "Verified", "Active"]
+DWH_LEGACY_CHANGE_STATUSES = ["Submitted", "Closed"]
+MSG_DWH_RISK_STATUS = (
+    "a risk in status {status} keeps it, is listed and opened under it, and gets no workflow"
+)
+MSG_DWH_UNSUPPORTED = "a requirement in status {status} shows no phase or revision, gets no workflow and is not listed as a draft"
+MSG_DWH_DRAFTED = (
+    "a requirement in status {status} is turned into a draft at revision 1 with its content kept"
+)
+MSG_DWH_LEGACY_CHANGE = (
+    "a change request in status {status} stays visible and filterable without a workflow"
+)
+GP_REQIF = REQIF_SAMPLE.encode() if isinstance(REQIF_SAMPLE, str) else REQIF_SAMPLE
+GP_LIST_KINDS = {
+    "requirements": ("REQ", "title"),
+    "test-cases": ("TC", "title"),
+    "test-suites": ("TS", "name"),
+    "campaigns": ("CMP", "name"),
+    "defects": ("DEF", "title"),
+    "designs": ("DES", "title"),
+    "risks": ("RSK", "title"),
+    "changes": ("CHG", "title"),
+    "test-concepts": ("CPT", "name"),
+}
+GP_EXTERNAL_AUTHOR = ("Requirements Author", "Test Author", "Design Author")
+GP_ONLY_OWN = "External users change only what they created."
+MSG_GP_READ_ONLY = "a read-only group reads requirements and cannot create one: 403"
+MSG_GP_EXTERNAL_ROLE = "an external test author creates test cases and not requirements"
+MSG_GP_CONTENT_GRANT = "a content grant creates content and lists no member right"
+MSG_GP_MANAGE_ACCESS = "{method} {path} needs an application permission: 403"
+MSG_GP_ADMIN_MANAGES = "an administrator reads the members and the access report"
+MSG_GP_NO_ACCESS = (
+    "a user without access is refused and has no permissions; the administrator has all"
+)
+MSG_GP_RULES_CHECKED = "unknown resources and a rule without a tag are refused with 400"
+MSG_GP_ACCESS_REPORT = "the report shows the direct entry alone for a replaced group, the group for the other user, nothing elsewhere"
+MSG_GP_DOCUMENT_TYPE = "edit rights follow the document type, including a change of type"
+MSG_GP_UNSEEN_UNCHANGED = (
+    "an external user gets 404 changing or deleting internal rows, which stay unchanged"
+)
+MSG_GP_OUTSIDE = "a user outside the project gets 404 for a requirement by id"
+MSG_GP_OWN_CAMPAIGN = "an external author creates a campaign of their own"
+MSG_GP_HIDDEN_BY_ID = "{method} {path} answers a named 404 to an external user"
+MSG_GP_OWN_ROWS = "an external user renames their own test case and not a shared one: 403"
+MSG_GP_HIDDEN_CAMPAIGN = "an item of a hidden campaign is a 404"
+MSG_GP_BODY_REACH = (
+    "a suite keeps only visible test cases, and a campaign naming a hidden suite is a 404"
+)
+MSG_GP_KEEPS_HIDDEN_SUITES = "a campaign update keeps the suites the editor cannot see"
+MSG_GP_EMPTY_SUITES = "an empty suite list keeps suites outside the allowed types"
+MSG_GP_COPY_HIDDEN = "a copy leaves out the source row the user cannot see"
+MSG_GP_IMPORT_CREATE_ONLY = "a creator imports the new row and is refused the existing one"
+MSG_GP_IMPORT_EDIT_ONLY = "an editor changes the existing row and is refused the new one"
+MSG_GP_IMPORT_HIDDEN_NEW = "an import treats a hidden test case as new and leaves it unchanged"
+MSG_GP_TESTRAIL_HIDDEN = (
+    "a TestRail import by an external user neither reuses nor links hidden rows"
+)
+MSG_GP_REQIF_HIDDEN = "a ReqIF import by an external user does not reuse hidden requirements"
+MSG_GP_MARKDOWN_HIDDEN = "a Markdown import does not count hidden rows as duplicates"
+MSG_GP_COPY_RIGHT = "a copy without create is refused per row"
+MSG_GP_REQIF_RIGHT = "a ReqIF import without create is refused per object"
+MSG_GP_REQIF_LINK_RIGHT = (
+    "a ReqIF import without link rights imports the objects and refuses the relation"
+)
+MSG_GP_TESTRAIL_RIGHT = "a TestRail import without link or suite rights creates the case, reports both and keeps the reference"
+MSG_GP_MARKDOWN_RIGHT = "a Markdown import without create is refused per section"
+MSG_GP_TESTRAIL_SUITE_RIGHT = (
+    "a TestRail import reports a suite it may not create and cases it may not create"
+)
+MSG_GP_MARKDOWN_SCOPE = "a Markdown import of a type outside the policy scope is refused with 403"
+MSG_GP_CAMPAIGN_ITEM = "adding a test case to a campaign returns the stored item"
+MSG_GP_EXTERNAL_CREATES = "an external user's creations are customer rows in their first status"
+MSG_GP_EXTERNAL_CREATE_REFUSED = "an external user may not {message}: 403"
+MSG_GP_EXTERNAL_DRAFT_ONLY = "an external user keeps customer visibility, moves to review only by request, and sets no other status"
+MSG_GP_OTHERS_ROWS = "{method} {path} on another's row is refused with 403"
+MSG_GP_OTHERS_ATTACHMENT = "a file cannot be added to another's document: 403"
+MSG_GP_ALLOWLIST_FIRST = "a type outside the allowlist answers 404 before a missing right"
+MSG_GP_DESIGN_REQUEST = (
+    "a review request needs a visible design the user is assigned to, and no direct transition"
+)
+MSG_GP_DESIGN_REVIEW = "an external creator comments and reviews when assigned, and never approves"
+MSG_GP_ALLOWED_ACTIONS = "the detail read names the changes each reader may make"
+MSG_GP_EXTERNAL_IMPORT = "an external import creates customer rows and touches only its own"
+MSG_GP_EXTERNAL_DOCUMENT = (
+    "an external user's document is a customer draft, and an internal one is refused"
+)
+MSG_GP_EXTERNAL_COPY = "an external copy, ReqIF and Markdown import create customer drafts"
+MSG_GP_INTERNAL_ACTIONS = "the detail read follows an internal user's permissions"
+MSG_GP_STATUS_HANDOFF = "a status edit goes through the workflow and the author cannot sign"
+MSG_GP_SEPARATE_SIGNOFF = "the reviewer and the approver sign with their own rights only"
+MSG_GP_OTHER_STATUSES = (
+    "document and design statuses go through the workflow, and a defect status needs approve"
+)
+MSG_GP_CREATED_DRAFT = "a requirement is created as a draft"
+MSG_GP_CREATED_NOT_DRAFT = "creating in status {status} is refused with 422"
+MSG_GP_APPROVER_STILL_DRAFT = "an approver still creates drafts only, and a reader creates nothing"
+MSG_GP_REVIEW_SIGNED = "the review is signed only by the assigned reviewer after a review comment"
+MSG_GP_APPROVAL_SIGNED = (
+    "the approval is signed by the assigned approver, never by an external account"
+)
+MSG_GP_IMPORT_STATUSES = "an import with approve {with_approve} creates and edits drafts only"
+MSG_GP_HANDOFF_KIND = "a {kind} is approved through the workflow by the signer only"
+MSG_GP_CAMPAIGN_STATUS = "a campaign author moves the campaign on but cannot approve it"
+MSG_GP_CREATE_NO_EDIT = "a creator's import adds a draft only and changes no existing row"
+MSG_GP_LINK_ENDS = "an external user links their own visible rows only"
+MSG_GP_LINK_DELETE = (
+    "a link with a hidden end is a 404, another's is a 403, and one with a deleted end can go"
+)
+MSG_GP_TAG_VISIBLE = "a tag links only a visible requirement of the same project"
+MSG_GP_IMPORT_LINKS = "an external import links only rows the importer created"
+MSG_GP_HIDDEN_LINK_FIRST = "a hidden link is a 404 before a missing delete right"
+MSG_GP_VIEW_BY_ID = "{path} needs the view right"
+MSG_GP_COMMENT_READERS = "a reader cannot comment: 403"
+MSG_GP_COMMENT_REVIEWER = "a reviewer comments only when they see the requirement and are assigned"
+MSG_GP_ASSIGN_APPROVER = "an approver can review a requirement"
+MSG_GP_ASSIGN_REFUSED = "a reviewer without the right or the sight is refused with 422"
+MSG_GP_ASSIGN_OTHER_KINDS = (
+    "an external approver of a test case or defect and an author as approver are refused with 422"
+)
+MSG_GP_UNSEEN_CHANGES = (
+    "a user who cannot view requirements cannot change, comment, link or delete one: 404"
+)
+MSG_GP_LIST_VIEW = "the {kind} list is empty without view and holds the row with it"
+MSG_GP_REGISTRY_VIEW = (
+    "the registry, the summary, link counts and the next id leave out a type without view"
+)
+MSG_GP_LINK_LIST_VIEW = "the link list leaves out links to a type without view"
+MSG_GP_NESTED_VIEW = "nested test cases and their counts are left out without view"
+MSG_GP_COUNTS_VIEW = "project counts, search and dashboard leave out a type without view"
+MSG_GP_TRACE_VIEW = "traceability, gaps and impact follow the view right"
+MSG_GP_EXPORT_VIEW = "an export leaves out the test cases the exporter cannot view"
+AEM_BEFORE = "e1a7c3f9b204"
+AEM_USERS = [
+    ("maintainer", "maintainer"),
+    ("viewer", "maintainer"),
+    ("chosen", "external"),
+    ("every", "external"),
+    ("empty", "external"),
+    ("admin", "admin"),
+]
+AEM_MEMBERSHIPS = [
+    ("maintainer", "maintainer", []),
+    ("viewer", "external", []),
+    ("chosen", "external", ["REQ", "TC"]),
+    ("every", "external", None),
+    ("empty", "external", []),
+    ("admin", "maintainer", []),
+]
+AEM_NOT_MAINTAINER = {
+    "Read Internal",
+    "Read Customer",
+    "Review Internal",
+    "Review Customer",
+    "Access Management",
+    "Application Administration",
+}
+AEM_RELEASED = {
+    "viewer": "Released Read-only",
+    "every": "Released Read (all document types)",
+    "chosen": "Released Read (REQ, TC)",
+    "empty": "Released Read (no document types)",
+}
+AEM_NO_REVIEW = {"CMP", "RPT", "RSK", "STD"}
+AEM_APPLICATION = {"users", "access", "application"}
+AEM_SUITES = [
+    "tests.api.BLOOM_group_owned_policies.GroupOwnedPoliciesTest",
+    "tests.api.BLOOM_groups_http.GroupsHttpTest",
+    "tests.api.BLOOM_group_permissions_http.GroupPermissionsHttpTest",
+    "tests.api.BLOOM_project_policy_grants.ProjectPolicyGrantsTest",
+    "tests.api.BLOOM_project_access_entries.ProjectAccessEntriesTest",
+    "tests.logic.BLOOM_entitlements.EntitlementsTest",
+    "tests.logic.BLOOM_app_policy_scope.AppPolicyScopeTest",
+    "tests.logic.BLOOM_policy_action_separation.PolicyActionSeparationTest",
+    "tests.api.BLOOM_document_attachments.DocumentAttachmentsTest",
+    "tests.api.BLOOM_group_bulk_members.GroupBulkMembersTest",
+]
+MSG_AEM_ROUND_TRIP = "a downgrade removes the access tables and an upgrade restores the same state"
+MSG_AEM_DEFAULTS = "the migration seeds the 24 default policies"
+MSG_AEM_DEFAULT_SPEC = "the default policy {name} is stored as specified"
+MSG_AEM_GROUPS = "the default groups are seeded with their policies and no members, and requirements record their creator"
+MSG_AEM_MAINTAINER = "a 1.1.0 maintainer gets one entry with every document and project policy"
+MSG_AEM_RELEASED = "a 1.1.0 {who} membership becomes one entry with the {policy} policy"
+MSG_AEM_ADMIN = "an administrator's membership becomes no entry"
+MSG_AEM_ROLES = "the account roles are kept"
+MSG_AEM_READ_ONLY = "the {policy} policy is custom, reads and comments only, and covers no parameters or every origin"
+MSG_AEM_CHOSEN = "the chosen-types policy covers customer requirements and test cases only"
+MSG_AEM_NO_TYPES = "the no-types policy covers baselines, links and the project only"
+MSG_AEM_ALL_TYPES = (
+    "the all-types policy covers every document type except visions, for customer content"
+)
+MSG_AEM_READ_TAGS = "the read-only policy covers internal and customer content"
+MSG_AEM_FULL = "the maintainer's policies add up to every document and project right"
+MSG_AEM_SUITE = "the {suite} suite passes on the migrated database"
+
+LKP_PREFIX = "LKP"
+LKP_REQUIREMENT = {
+    "title": "Supply voltage stays within range",
+    "status": "Draft",
+    "priority": "High",
+    "req_type": "Functional",
+    "req_origin": "Customer",
+}
+LKP_SPECIFICATION = "Power supply specification"
+LKP_STANDARD = "Supply standard"
+LKP_LINK_ROLE = "references"
+LKP_MISSING_SPEC = f"{LKP_PREFIX}-SPEC-999"
+LKP_REQUIREMENT_SLUG = "requirements"
+
+MSG_LKP_LINKS = "the requirement is linked to the specification and the standard"
+MSG_LKP_RELATED_SPEC = "related_to a specification lists the requirement linked to it"
+MSG_LKP_RELATED_STD = "related_to a standard lists the requirement linked to it"
+MSG_LKP_RELATED_REQ = "related_to a requirement still lists the documents linked to it"
+MSG_LKP_RELATED_MISSING = "related_to a document ID that does not exist answers 404"
+MSG_LKP_DETAIL_TYPE = "the detail of a requirement carries the req_type and req_origin of the list"
+MSG_LKP_ANY_CASE = "the detail route finds a document by its document ID in lower case"

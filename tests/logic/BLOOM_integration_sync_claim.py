@@ -15,8 +15,8 @@ class IntegrationSyncClaimTest(IntegrationSyncClaimBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_project_id = self.bloom.bloom_create_project()
-        self.tc_setting_id = self.bloom.bloom_create_integration(self.tc_project_id)
+        self.project_id = self.bloom.bloom_create_project()
+        self.setting_id = self.bloom.bloom_create_integration(self.project_id)
 
     def tearDownClass(self):
         super().tearDownClass()

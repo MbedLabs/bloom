@@ -15,30 +15,7 @@ class JiraWebhookFollowsIssueTest(JiraWebhookFollowsIssueBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_env = self.bloom.bloom_create_webhook_environment()
-        key = self.bloom.bloom_jira_key(self.parameters.LINKED_NUMBER)
-        edit = self.bloom.bloom_jira_webhook_body(
-            key,
-            status={
-                "name": self.parameters.JIRA_TO_DO,
-                "statusCategory": {"key": self.parameters.JIRA_NEW},
-            },
-            summary=self.parameters.CHANGED_TITLE,
-            description=self.parameters.CHANGED_DESCRIPTION,
-            priority={"name": self.parameters.JIRA_PRIORITY},
-        )
-        self.tc_edit = self.bloom.bloom_post_jira_webhook(
-            edit, delivery=self.parameters.DELIVERIES[5]
-        )
-        self.tc_after_edit = self.bloom.bloom_get_defect(self.tc_env.defect_id)
-        in_review = {
-            "name": self.parameters.JIRA_IN_REVIEW,
-            "statusCategory": {"key": self.parameters.JIRA_IN_PROGRESS_CATEGORY},
-        }
-        resolved = self.bloom.bloom_jira_webhook_body(
-            key, status=in_review, resolution={"name": self.parameters.JIRA_FIXED}
-        )
-        self.bloom.bloom_post_jira_webhook(resolved, delivery=self.parameters.DELIVERIES[6])
+        self.env = self.bloom.bloom_create_webhook_environment()
 
     def tearDownClass(self):
         super().tearDownClass()

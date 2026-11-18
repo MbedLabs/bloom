@@ -17,7 +17,7 @@ class IntegrationSyncChangeWorkflowBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_run_succeeds_at_now(self):
-        setting = self.bloom.bloom_get_setting(self.tc_setting_id)
+        setting = self.bloom.bloom_get_setting(self.setting_id)
         self.print_variables({"error": setting.sync_error, "synced at": setting.synced_at})
         self.assertEqual(
             (setting.sync_error, setting.synced_at),
@@ -27,7 +27,7 @@ class IntegrationSyncChangeWorkflowBase(BloomTestCase):
         )
 
     def bud_approved_change_request_keeps_its_status(self):
-        change = self.bloom.bloom_get_change(self.tc_approved_id)
+        change = self.bloom.bloom_get_change(self.approved_id)
         self.print_variables({"status": change.status, "issue state": change.external_issue_state})
         self.assertEqual(
             (change.status, change.external_issue_state),
@@ -37,7 +37,7 @@ class IntegrationSyncChangeWorkflowBase(BloomTestCase):
         )
 
     def bud_submitted_change_request_with_a_resolved_issue_is_closed(self):
-        status = self.bloom.bloom_get_change(self.tc_submitted_id).status
+        status = self.bloom.bloom_get_change(self.submitted_id).status
         self.print_variables({"status": status})
         self.assertEqual(
             status,

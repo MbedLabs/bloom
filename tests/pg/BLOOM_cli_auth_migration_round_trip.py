@@ -15,41 +15,14 @@ class CliAuthMigrationRoundTripTest(CliAuthMigrationRoundTripBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_postgres = self.bloom.bloom_use_postgres(tables=False)
-        if not self.tc_postgres:
+        self.postgres = self.bloom.bloom_use_postgres(tables=False)
+        if not self.postgres:
             return
-        self.tc_commands = [
-            self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_BEFORE_CLI)
-        ]
-        self.tc_ids = self.bloom.bloom_seed_retained_rows()
-        self.tc_before_revision = self.bloom.bloom_read_revision()
-        self.tc_before_rows = self.bloom.bloom_read_retained_rows(self.tc_ids)
-        self.tc_before_table = self.bloom.bloom_read_cli_session_table()
-
-        self.tc_commands.append(
-            self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
+        self.prepared = self.bloom.bloom_run_alembic(
+            "upgrade", self.parameters.MIGRATION_BEFORE_CLI
         )
-        self.tc_heads = self.bloom.bloom_list_alembic_heads()
-        self.tc_upgraded_revision = self.bloom.bloom_read_revision()
-        self.tc_upgraded_rows = self.bloom.bloom_read_retained_rows(self.tc_ids)
-        self.tc_upgraded_table = self.bloom.bloom_read_cli_session_table()
-
-        self.bloom.bloom_add_cli_sessions(self.tc_ids["user"])
-        self.tc_stored_sessions = self.bloom.bloom_read_cli_session_table()["sessions"]
-
-        self.tc_commands.append(
-            self.bloom.bloom_run_alembic("downgrade", self.parameters.MIGRATION_BEFORE_CLI)
-        )
-        self.tc_downgraded_revision = self.bloom.bloom_read_revision()
-        self.tc_downgraded_rows = self.bloom.bloom_read_retained_rows(self.tc_ids)
-        self.tc_downgraded_table = self.bloom.bloom_read_cli_session_table()
-
-        self.tc_commands.append(
-            self.bloom.bloom_run_alembic("upgrade", self.parameters.MIGRATION_HEAD)
-        )
-        self.tc_reupgraded_revision = self.bloom.bloom_read_revision()
-        self.tc_reupgraded_rows = self.bloom.bloom_read_retained_rows(self.tc_ids)
-        self.tc_reupgraded_table = self.bloom.bloom_read_cli_session_table()
+        self.ids = self.bloom.bloom_seed_retained_rows()
+        self.before_rows = self.bloom.bloom_read_retained_rows(self.ids)
 
     def tearDownClass(self):
         super().tearDownClass()

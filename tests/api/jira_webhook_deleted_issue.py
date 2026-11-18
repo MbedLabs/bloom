@@ -17,8 +17,15 @@ class JiraWebhookDeletedIssueBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_deleted_issue_keeps_its_defect(self):
-        defect = self.bloom.bloom_get_defect(self.tc_env.defect_id)
-        found = (self.tc_response.json().get("status"), defect.external_issue_state, defect.title)
+        defect_gone = self.bloom.bloom_jira_webhook_body(
+            self.bloom.bloom_jira_key(self.parameters.LINKED_NUMBER),
+            event=self.parameters.ISSUE_DELETED,
+        )
+        response = self.bloom.bloom_post_jira_webhook(
+            defect_gone, delivery=self.parameters.DELIVERIES[7]
+        )
+        defect = self.bloom.bloom_get_defect(self.env.defect_id)
+        found = (response.json().get("status"), defect.external_issue_state, defect.title)
         self.print_variables({"answer, state, title": found})
         self.assertEqual(
             found,
@@ -32,7 +39,12 @@ class JiraWebhookDeletedIssueBase(BloomTestCase):
         )
 
     def bud_deleted_issue_marks_its_change_request(self):
-        state = self.bloom.bloom_get_change(self.tc_env.change_id).external_issue_state
+        change_gone = self.bloom.bloom_jira_webhook_body(
+            self.bloom.bloom_jira_key(self.parameters.CHANGE_NUMBER),
+            event=self.parameters.ISSUE_DELETED,
+        )
+        self.bloom.bloom_post_jira_webhook(change_gone, delivery=self.parameters.DELIVERIES[8])
+        state = self.bloom.bloom_get_change(self.env.change_id).external_issue_state
         self.print_variables({"change request state": state})
         self.assertEqual(
             state,

@@ -20,10 +20,10 @@ class SignOffActivityBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_setup_calls_succeed(self):
-        self.print_variables({"setup": self.tc_setup})
+        self.print_variables({"setup": self.setup})
         self.assertEqual(
-            [found for found, _ in self.tc_setup],
-            [expected for _, expected in self.tc_setup],
+            [found for found, _ in self.setup],
+            [expected for _, expected in self.setup],
             msg=self.parameters.MSG_API_SETUP,
             abort_on_fail=True,
         )
@@ -31,7 +31,7 @@ class SignOffActivityBase(BloomTestCase):
     @parameterized(params.SIGN_OFF_CASES)
     def bud_review_logs_reviewed(self, index):
         kind, without_update = self.parameters.SIGN_OFF_CASES_LIST[index]
-        events = self.tc_reviewed_events[kind] or []
+        events = self.reviewed_events[kind] or []
         self.print_variables({"artefact": kind, "events": events})
         self.assertIn(
             self.parameters.EVENT_REVIEWED,
@@ -50,36 +50,50 @@ class SignOffActivityBase(BloomTestCase):
     @parameterized(params.SIGN_OFF_CASES)
     def bud_approval_logs_approved(self, index):
         kind, _ = self.parameters.SIGN_OFF_CASES_LIST[index]
-        self.print_variables({"artefact": kind, "events": self.tc_approved_events[kind]})
+        self.print_variables({"artefact": kind, "events": self.approved_events[kind]})
         self.assertIn(
             self.parameters.EVENT_APPROVED,
-            self.tc_approved_events[kind] or [],
+            self.approved_events[kind] or [],
             msg=self.parameters.MSG_APPROVE_LOGGED,
             abort_on_fail=False,
         )
 
     def bud_test_case_review_fields_in_an_edit_are_refused(self):
-        self.print_variables({"status": self.tc_refused})
+        refused = self.bloom.bloom_api_update_artefact(
+            self.admin,
+            self.parameters.TEST_CASE_KIND,
+            self.test_case_id,
+            {
+                "reviewed_by_id": self.admin_id,
+                "reviewed_at": self.parameters.FORGED_REVIEWED_AT,
+            },
+        ).status_code
+        self.print_variables({"status": refused})
         self.assertEqual(
-            self.tc_refused,
+            refused,
             self.parameters.STATUS_UNPROCESSABLE,
             msg=self.parameters.MSG_REVIEW_FIELDS_REFUSED,
             abort_on_fail=False,
         )
 
     def bud_test_case_review_records_the_reviewer(self):
-        self.print_variables({"reviewer, utc": self.tc_test_case_reviewer})
+        self.print_variables({"reviewer, utc": self.test_case_reviewer})
         self.assertEqual(
-            self.tc_test_case_reviewer,
-            (self.tc_admin_id, True),
+            self.test_case_reviewer,
+            (self.admin_id, True),
             msg=self.parameters.MSG_REVIEW_RECORDS,
             abort_on_fail=False,
         )
 
     def bud_test_case_status_only_edit_logs_approved(self):
-        self.print_variables({"status": self.tc_status_only, "events": self.tc_status_events})
+        kind = self.parameters.TEST_CASE_KIND
+        status_only = self.bloom.bloom_api_update_artefact(
+            self.admin, kind, self.test_case_id, {"status": self.parameters.STATUS_APPROVED}
+        ).status_code
+        status_events = self.bloom.bloom_api_activity_types(self.admin, kind, self.test_case_id)
+        self.print_variables({"status": status_only, "events": status_events})
         self.assertEqual(
-            (self.tc_status_only, self.parameters.EVENT_APPROVED in (self.tc_status_events or [])),
+            (status_only, self.parameters.EVENT_APPROVED in (status_events or [])),
             (self.parameters.STATUS_OK, True),
             msg=self.parameters.MSG_STATUS_ONLY_APPROVED,
             abort_on_fail=False,

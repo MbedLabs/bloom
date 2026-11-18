@@ -17,15 +17,14 @@ class IntegrationSyncSaveDuringScanTest(IntegrationSyncSaveDuringScanBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_project_id = self.bloom.bloom_create_project()
-        self.tc_setting_id = self.bloom.bloom_create_integration(self.tc_project_id)
+        self.project_id = self.bloom.bloom_create_project()
+        self.setting_id = self.bloom.bloom_create_integration(self.project_id)
         self.bloom.bloom_save_during_search(
-            self.tc_setting_id,
+            self.setting_id,
             self.parameters.LABEL,
             self.parameters.NOW + self.parameters.SAVE_OFFSET,
         )
         self.bloom.bloom_serve_jira()
-        self.tc_synced = self.bloom.bloom_run_sync(self.parameters.NOW)
 
     def tearDownClass(self):
         super().tearDownClass()

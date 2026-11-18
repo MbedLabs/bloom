@@ -15,21 +15,21 @@ class JiraOutboundSendTest(JiraOutboundSendBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_project_id = self.bloom.bloom_create_project()
-        self.tc_setting_id = self.bloom.bloom_create_integration(
-            self.tc_project_id, direction=self.parameters.OUTBOUND_DIRECTION
+        self.project_id = self.bloom.bloom_create_project()
+        self.setting_id = self.bloom.bloom_create_integration(
+            self.project_id, direction=self.parameters.OUTBOUND_DIRECTION
         )
         self.bloom.bloom_mark_sends_since(self.parameters.OUTBOUND_MARKER)
-        self.tc_sent_id = self.bloom.bloom_add_unlinked_defect(
-            self.tc_project_id, self.parameters.OUTBOUND_SENT_TITLE
+        self.sent_id = self.bloom.bloom_add_unlinked_defect(
+            self.project_id, self.parameters.OUTBOUND_SENT_TITLE
         )
-        self.tc_refused_id = self.bloom.bloom_add_unlinked_defect(
-            self.tc_project_id, self.parameters.OUTBOUND_REFUSED_TITLE
+        self.refused_id = self.bloom.bloom_add_unlinked_defect(
+            self.project_id, self.parameters.OUTBOUND_REFUSED_TITLE
         )
-        self.tc_created = self.bloom.bloom_serve_jira_creation(
+        self.created = self.bloom.bloom_serve_jira_creation(
             self.parameters.OUTBOUND_FIRST_NUMBER, refuse_after=1
         )
-        self.bloom.bloom_send_now(self.tc_setting_id)
+        self.bloom.bloom_send_now(self.setting_id)
 
     def tearDownClass(self):
         super().tearDownClass()

@@ -15,7 +15,7 @@ class ExternalDocTypesAdminTest(ExternalDocTypesAdminBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_admin = self.bloom.bloom_external_doc_types_as_admin(
+        self.admin = self.bloom.bloom_external_doc_types_as_admin(
             self.parameters.EXTERNAL_PROJECT_ID
         )
 

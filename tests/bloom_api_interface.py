@@ -8,37 +8,124 @@
 * @note     Requests go through an ASGI transport; no server is started.
 """
 
+import asyncio
+import base64
+import contextlib
+import csv
+import gzip
 import hashlib
 import hmac
+import io
 import json
 import logging
+import re
+import struct
+from datetime import datetime, timedelta
 from logging.handlers import BufferingHandler
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlsplit
+from uuid import UUID, uuid4
 
+import asyncpg
 import httpx
-from fastapi import FastAPI, HTTPException
+import jwt
+from cryptography.fernet import Fernet
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.routing import APIRoute
-from sqlalchemy import event
+from PIL import Image, PngImagePlugin
+from pydantic import ValidationError
+from slowapi.util import get_remote_address
+from sqlalchemy import event, select, text, update
+from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from starlette.requests import Request
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 import tests.parameters as params
 from app import main
 from app.api import access_requests as access_requests_api
+from app.api import artefacts as artefacts_api
+from app.api import defects as defects_api
 from app.api import integrations
-from app.core import id_generator
-from app.core.config import settings
+from app.api import setup as setup_api
+from app.api.workflow import _set_assignee, may_change_assignee
+from app.core import database, id_generator
+from app.core.cache import dashboard_stats_cache
+from app.core.config import Settings, settings
 from app.core.database import get_db
-from app.core.deps import limiter
-from app.core.permissions import DOC_TYPE_RESOURCES
-from app.core.security import get_password_hash
-from app.models import ChangeRequest, Defect, Document, IntegrationSetting
+from app.core.deps import limiter, rate_limit_key
+from app.core.observability import (
+    CREATED_BODY_LIMIT,
+    CreatedBody,
+    JsonLogFormatter,
+    RequestObservabilityMiddleware,
+    client_address,
+    metrics_router,
+    request_id_var,
+    setup_logging,
+)
+from app.core.permissions import DOC_TYPE_RESOURCES, RESOURCE_ACTIONS
+from app.core.policy_seed import DEFAULT_POLICIES
+from app.core.security import (
+    accessible_project_ids,
+    create_access_token,
+    get_current_user,
+)
+from app.core.service_auth import create_service_credential, require_bud_sync_token
+from app.models import (
+    ArtefactActivity,
+    ArtefactComment,
+    ArtefactLink,
+    AuditEvent,
+    Baseline,
+    CampaignSuite,
+    ChangeRequest,
+    Defect,
+    DesignItem,
+    Document,
+    IntegrationSetting,
+    Notification,
+    Project,
+    ProjectVariable,
+    Requirement,
+    RiskItem,
+    TestCampaign,
+    TestCampaignItem,
+)
 from app.models import TestCase as TestCaseModel
+from app.models import TestConcept
+from app.models import TestSuite as TestSuiteModel
+from app.models import TestSuiteItem as TestSuiteItemModel
+from app.models.cli_auth_session import CliAuthSession
+from app.models.groups import Group, GroupMembership, Policy, user_application_policies
+from app.models.project_membership import ProjectAccess
 from app.models.user import User, UserRole
-from app.services.integration_secrets import encrypt_integration_secret
+from app.models.user_token import UserToken, UserTokenPurpose
+from app.models.workflow import ArtefactWorkflow
+from app.schemas.cli_auth import CliStartRequest
+from app.schemas.memberships import DEFAULT_EXTERNAL_DOC_TYPES
+from app.services import attachment_storage
+from app.services import audit as audit_service
+from app.services import cli_auth
+from app.services import coverage as coverage_service
+from app.services import mail_service
+from app.services.audit import request_outcome, route_template
+from app.services.integration_secrets import (
+    ENVELOPE_PREFIX,
+    decrypt_integration_secret,
+    encrypt_integration_secret,
+    is_encrypted,
+)
+from app.services.mail_service import MailConfigurationError
+from app.services.token_service import create_user_token, invalidate_all_refresh_tokens
 from tests.access_fixtures import (
     allow_doc_types,
     project_access_fixture,
+    scenario_permissions,
     scenario_rules,
+    scenario_type_tags,
 )
 from tests.bloom_interface import BloomInterface
 
@@ -122,14 +209,81 @@ class BloomApiInterface(BloomInterface):
             headers["X-Atlassian-Webhook-Identifier"] = delivery
         return self._run(self._post(self.parameters.WEBHOOK_PATH, body, headers))
 
+    def bloom_github_issue_body(self, number, repo):
+        payload = {
+            "action": "closed",
+            "issue": {"number": number, "state": "closed"},
+            "repository": {"full_name": repo},
+        }
+        return json.dumps(payload).encode()
+
+    def bloom_oversized_webhook_body(self):
+        return b"{" + b"x" * self.parameters.HOOK_OVERSIZED_BYTES
+
+    def bloom_post_github_webhook(self, body, signature=None, delivery=None):
+        headers = {"X-GitHub-Event": "issues", "Content-Type": "application/json"}
+        if signature is not None:
+            headers["X-Hub-Signature-256"] = signature
+        if delivery is not None:
+            headers["X-GitHub-Delivery"] = delivery
+        return self._answer(self._run(self._post(self.parameters.HOOK_GITHUB_PATH, body, headers)))
+
+    def bloom_post_gitlab_webhook(self, number, repo, token=None, delivery=None):
+        payload = {
+            "object_attributes": {"iid": number, "state": "closed", "action": "close"},
+            "project": {"path_with_namespace": repo},
+        }
+        headers = {"X-Gitlab-Event": "Issue Hook", "Content-Type": "application/json"}
+        if token is not None:
+            headers["X-Gitlab-Token"] = token
+        if delivery is not None:
+            headers["X-Gitlab-Event-UUID"] = delivery
+        body = json.dumps(payload).encode()
+        return self._answer(self._run(self._post(self.parameters.HOOK_GITLAB_PATH, body, headers)))
+
+    def bloom_encrypt_secret(self, secret, key=None):
+        return self._with_key(key, encrypt_integration_secret, secret)
+
+    def bloom_decrypt_secret(self, envelope, key=None):
+        return self._with_key(key, decrypt_integration_secret, envelope)
+
+    def bloom_is_encrypted(self, value):
+        return is_encrypted(value)
+
+    def bloom_envelope_prefix(self):
+        return ENVELOPE_PREFIX
+
+    def bloom_new_encryption_key(self):
+        return Fernet.generate_key().decode()
+
+    def bloom_api_create_setting(self, headers, project_id, tracker, token, webhook_secret):
+        body = {
+            "project_id": project_id,
+            "tracker": tracker,
+            "token": token,
+            "webhook_secret": webhook_secret,
+            "enabled": True,
+        }
+        return self.bloom_api_call("POST", "/api/integrations/settings", headers, json=body)
+
+    def bloom_api_rotate_setting_token(self, headers, setting_id, token):
+        path = f"/api/integrations/settings/{setting_id}"
+        return self.bloom_api_call("PATCH", path, headers, json={"token": token})
+
+    def bloom_read_setting_secrets(self, setting_id):
+        setting = self._run(self._get(IntegrationSetting, setting_id))
+        return setting.token_encrypted, setting.webhook_secret
+
     def bloom_set_defect_status(self, defect_id, status):
         self._run(self._update(Defect, defect_id, status=status))
 
     def bloom_update_setting(self, setting_id, **fields):
         self._run(self._update(IntegrationSetting, setting_id, **fields))
 
-    def bloom_add_test_case(self, project_id, tc_id, title):
-        return self._run(self._add(TestCaseModel(project_id=project_id, tc_id=tc_id, title=title)))
+    def bloom_add_test_case(self, project_id, tc_id, title, **fields):
+        return self._run(
+            self._add(TestCaseModel(project_id=project_id, tc_id=tc_id, title=title, **fields))
+        )
 
     def bloom_log_sync_event(self, target, target_id, event_type):
         async def log():
@@ -223,30 +377,1957 @@ class BloomApiInterface(BloomInterface):
 
         self.patches.enter_context(patch.object(integrations, "_reserve_webhook_delivery", reserve))
 
+    def bloom_api_seed_registry(self, headers, prefix):
+        values = self.parameters
+        project = self.bloom_api_new_project(headers, prefix)
+        email, password = "registry-reviewer@example.com", values.API_PASSWORD
+        reviewer = self.bloom_api_create_user(
+            headers, email, password, "maintainer", values.REG_REVIEWER
+        ).json()
+        policy = self.bloom_api_new_policy(headers, "Registry reviewer", {"*": ["*"]})
+        self.bloom_api_admit(headers, project["id"], reviewer["id"], policy_ids=[policy["id"]])
+
+        def post(path, **fields):
+            return self.bloom_api_call(
+                "POST", path, headers, json={"project_id": project["id"], **fields}
+            ).body
+
+        alpha = post(
+            "/api/requirements",
+            title="Alpha boot timing",
+            status="Draft",
+            priority="High",
+            req_type="Functional",
+            req_origin="Customer",
+            reviewer_id=reviewer["id"],
+        )
+        bravo = post(
+            "/api/requirements", title="Bravo shutdown sequence", status="Draft", priority="Low"
+        )
+        charlie = post("/api/test-cases", title="Charlie cold start", status="Draft")
+        delta = post(
+            "/api/test-cases", title="Delta brownout", status="Draft", reviewer_id=reviewer["id"]
+        )
+        links = (
+            (charlie, "TC", alpha, "REQ", "verifies", True),
+            (charlie, "TC", delta, "TC", "relates_to", False),
+        )
+        for source, source_type, target, target_type, role, suspect in links:
+            post(
+                "/api/links",
+                source_type=source_type,
+                source_id=source["id"],
+                target_type=target_type,
+                target_id=target["id"],
+                role=role,
+                suspect=suspect,
+            )
+        alpha_path = f"/api/artefacts/requirement/{alpha['id']}"
+        for path in (alpha_path, f"/api/artefacts/test-case/{charlie['id']}"):
+            self.bloom_api_call("POST", path + "/requests", headers, json={"kind": "review"})
+        reviewer_headers, _ = self.bloom_log_in(email, password)
+        self.bloom_api_call(
+            "POST",
+            alpha_path + "/comments",
+            reviewer_headers,
+            json={"body": "Reviewed the requested requirement."},
+        )
+        self.bloom_api_call(
+            "POST", alpha_path + "/requests", reviewer_headers, json={"kind": "approval"}
+        )
+        signed = self.bloom_api_call(
+            "POST", alpha_path + "/sign-off", headers, json={"step": "approve"}
+        )
+        return SimpleNamespace(
+            project=project,
+            prefix=project["prefix"],
+            reviewer=reviewer,
+            signed=signed,
+            names={
+                "alpha": alpha["req_id"],
+                "bravo": bravo["req_id"],
+                "charlie": charlie["tc_id"],
+                "delta": delta["tc_id"],
+            },
+        )
+
+    def bloom_api_registry(self, headers, prefix, **query):
+        return self.bloom_api_call("GET", f"/api/projects/{prefix}/docs", headers, params=query)
+
+    def bloom_api_assign_bundle(self, headers, group_id, project_id, user_ids):
+        body = {"project_id": project_id, "user_ids": list(user_ids)}
+        return self.bloom_api_call(
+            "POST", f"/api/groups/{group_id}/assignments", headers, json=body
+        )
+
+    def bloom_api_assign_bundles_at_once(self, headers, project_id, user_id, group_ids):
+        async def assign_all():
+            calls = [
+                self._request(
+                    "POST",
+                    f"/api/groups/{group}/assignments",
+                    headers,
+                    json={"project_id": project_id, "user_ids": [user_id]},
+                )
+                for group in group_ids
+            ]
+            return [answer.json()[0] for answer in await asyncio.gather(*calls)]
+
+        return self._run(assign_all())
+
+    def bloom_api_set_application_policies(self, headers, user_id, policy_ids):
+        body = {"policy_ids": list(policy_ids)}
+        return self.bloom_api_call(
+            "PUT", f"/api/users/{user_id}/application-policies", headers, json=body
+        )
+
+    def bloom_api_default_named(self, headers, kind, name):
+        return next(
+            row
+            for row in self.bloom_api_call("GET", f"/api/{kind}", headers).body
+            if row["name"] == name
+        )
+
+    def bloom_start_attachment_api(self):
+        self.bloom_start_full_api()
+        folder = Path(self.patches.enter_context(self._temp_dir())).resolve()
+        self.patches.enter_context(
+            patch.object(attachment_storage, "get_attachment_root", lambda: folder)
+        )
+        self.bloom_set_attachment_limit(100)
+
+    def bloom_set_attachment_limit(self, starts):
+        self.patches.enter_context(
+            patch.object(settings, "ATTACHMENT_UPLOADS_PER_15_MINUTES", starts)
+        )
+
+    def bloom_api_service_token(self, headers, name):
+        body = {"name": name, "expires_in_days": 30}
+        return self.bloom_api_call("POST", "/api/service-credentials", headers, json=body).body[
+            "token"
+        ]
+
+    def bloom_api_upload_attachment(self, headers, document_id, name, payload, mime):
+        return self._run(self._upload_attachment(headers, document_id, name, payload, mime))
+
+    def bloom_api_download(self, headers, path):
+        answer = self._run(self._request("GET", path, headers))
+        return SimpleNamespace(
+            status=answer.status_code, headers=answer.headers, content=answer.content
+        )
+
+    def bloom_api_race_two_uploads(self, headers, document_id, payload):
+        original = attachment_storage.write_stream
+
+        async def race():
+            entered, release, calls = asyncio.Event(), asyncio.Event(), []
+
+            async def controlled(file, final_path, *, max_bytes):
+                calls.append(final_path)
+                if len(calls) == 1:
+                    entered.set()
+                    await release.wait()
+                return await original(file, final_path, max_bytes=max_bytes)
+
+            with patch.object(attachment_storage, "write_stream", controlled):
+                first = asyncio.ensure_future(
+                    self._upload_attachment(
+                        headers, document_id, "slow.pdf", payload, "application/pdf"
+                    )
+                )
+                await asyncio.wait_for(entered.wait(), 10)
+                try:
+                    second = await self._upload_attachment(
+                        headers, document_id, "racing.pdf", payload, "application/pdf"
+                    )
+                finally:
+                    release.set()
+                return await first, second
+
+        return self._run(race())
+
+    def bloom_api_publish_bud_report(
+        self, token, prefix, run_id=41, files=None, name="Nightly HIL"
+    ):
+        values = self.parameters
+        if files is None:
+            files = [
+                {
+                    "filename": "bud-run-41.pdf",
+                    "content_type": "application/pdf",
+                    "content_base64": base64.b64encode(values.ATT_PDF).decode(),
+                },
+                {
+                    "filename": "report_junit.xml",
+                    "content_type": "application/xml",
+                    "content_base64": base64.b64encode(values.ATT_XML).decode(),
+                },
+            ]
+        body = {
+            "project_prefix": prefix,
+            "bud_run_id": run_id,
+            "run_name": name,
+            "status": "Completed",
+            "total_tests": 3,
+            "passed_tests": 2,
+            "failed_tests": 1,
+            "run_url": values.ATT_RUN_URL,
+            "tc_ids": ["PRJ-TC-001"],
+            "files": files,
+        }
+        headers = {"Authorization": f"Bearer {token}"} if token else None
+        return self.bloom_api_call("POST", "/api/bud/test-reports", headers, json=body)
+
+    def bloom_api_scenario_member(self, headers, name, policy_name, project_ids, role="maintainer"):
+        permissions = scenario_permissions(policy_name)
+        external_reader = policy_name == "External Reader"
+        types = ["REQ", "TC", "CPT", "CMP"] if external_reader else None
+        rules = scenario_rules(permissions, "customer" if external_reader else "internal", types)
+        policy = self.bloom_api_create_policy_rules(headers, f"{name} {policy_name}", rules).json()
+        statement = update(Policy).where(Policy.id == policy["id"]).values(permissions=permissions)
+        self._run(self._execute_statement(statement))
+        return self.bloom_api_group_member(headers, name, project_ids, [policy["id"]], role)
+
+    async def _upload_attachment(self, headers, document_id, name, payload, mime):
+        transport = httpx.ASGITransport(app=self.api)
+        async with REAL_CLIENT(transport=transport, base_url=self.parameters.API_BASE) as client:
+            path = f"/api/documents/{document_id}/attachments"
+            answer = await client.post(path, headers=headers, files={"file": (name, payload, mime)})
+        return SimpleNamespace(
+            status=answer.status_code, body=answer.json(), headers=answer.headers
+        )
+
+    def bloom_api_new_tag(self, headers, name):
+        return self.bloom_api_call("POST", "/api/tags", headers, json={"name": name}).body
+
+    def bloom_api_tag(self, headers, kind, artefact_id, tag_ids):
+        path = f"/api/artefacts/{kind}/{artefact_id}/tags"
+        return self.bloom_api_call("PUT", path, headers, json={"tag_ids": tag_ids})
+
+    def bloom_api_tags_of(self, headers, kind, artefact_id):
+        return [
+            tag["id"]
+            for tag in self.bloom_api_call(
+                "GET", f"/api/artefacts/{kind}/{artefact_id}/tags", headers
+            ).body
+        ]
+
+    def bloom_api_ruled_member(self, headers, name, project_id, role, *rule_sets):
+        policies = [
+            self.bloom_api_call(
+                "POST",
+                "/api/policies",
+                headers,
+                json={"name": f"{name} policy {number}", "rules": rules},
+            ).body["id"]
+            for number, rules in enumerate(rule_sets)
+        ]
+        member = self.bloom_api_new_member(headers, name, role)
+        group = self.bloom_api_new_group(headers, f"{name} group", policies)
+        self.bloom_api_admit_group(headers, group["id"], project_id)
+        self.bloom_api_add_group_member(headers, group["id"], member.id)
+        return member
+
+    def bloom_limit_reqif_imports(self, starts):
+        self.patches.enter_context(patch.object(settings, "REQIF_IMPORTS_PER_15_MINUTES", starts))
+
+    def bloom_api_import_file(self, headers, project_id, kind, name, content, mime, **params):
+        async def send():
+            transport = httpx.ASGITransport(app=self.api)
+            async with REAL_CLIENT(
+                transport=transport, base_url=self.parameters.API_BASE
+            ) as client:
+                path = f"/api/projects/{project_id}/import/{kind}"
+                return await client.post(
+                    path, headers=headers, params=params, files={"file": (name, content, mime)}
+                )
+
+        answer = self._run(send())
+        return SimpleNamespace(status=answer.status_code, body=answer.json())
+
+    def bloom_api_rules_policy(self, headers, name, doc_types=("REQ",), external=False):
+        shown = ["customer"] if external else ["internal", "customer"]
+        rules = {doc_type: {"read": True, "visibility": shown} for doc_type in doc_types}
+        return self.bloom_api_call(
+            "POST", "/api/policies", headers, json={"name": name, "rules": rules}
+        ).body
+
+    def bloom_default_policy_names(self):
+        return {spec["name"] for spec in DEFAULT_POLICIES}
+
+    def bloom_document_types(self):
+        return set(DOC_TYPE_RESOURCES)
+
+    def bloom_resource_actions_of(self, resource):
+        return set(RESOURCE_ACTIONS[resource])
+
+    def bloom_api_rule_policy(self, headers, name, resource, scope="document", **rule):
+        rules = {resource: {"read": True, "all_origins": True, **rule}}
+        return self.bloom_api_call(
+            "POST", "/api/policies", headers, json={"name": name, "scope": scope, "rules": rules}
+        )
+
+    def bloom_api_admit(self, headers, project_id, user_id, **entry):
+        body = {"user_id": user_id, **entry}
+        return self.bloom_api_call(
+            "POST", f"/api/projects/{project_id}/members", headers, json=body
+        )
+
+    def bloom_tag_body(self, kind, artefact_id):
+        attributes = {
+            "id": f"{kind}:{artefact_id}",
+            "label": "TAGGED",
+            "mentionSuggestionChar": "#",
+        }
+        paragraph = {"type": "paragraph", "content": [{"type": "mention", "attrs": attributes}]}
+        return {"type": "doc", "content": [paragraph]}
+
+    def bloom_api_links(self, headers, project_id, **query):
+        found = self.bloom_api_call(
+            "GET", "/api/links", headers, params={"project_id": project_id, **query}
+        ).body
+        return [(link["target_type"], link["target_id"], link["role"]) for link in found]
+
+    def bloom_api_add_to(self, headers, project_id, kind, title, **fields):
+        paths = {"REQ": "/api/requirements", "TC": "/api/test-cases", "DES": "/api/designs"}
+        body = {"project_id": project_id, "title": title, **fields}
+        if kind in paths:
+            return self.bloom_api_call("POST", paths[kind], headers, json=body)
+        return self.bloom_api_call(
+            "POST",
+            f"/api/projects/{project_id}/documents",
+            headers,
+            json={**body, "doc_type": kind},
+        )
+
+    def bloom_new_mention_world(self):
+        self.bloom_new_database()
+        people = {}
+        for key, name, role, active in self.parameters.MNT_PEOPLE:
+            people[key] = self.bloom_add_record(
+                "User",
+                email=f"{key}@example.com",
+                full_name=name,
+                hashed_password="unused",
+                role=UserRole(role),
+                is_active=active,
+            )
+        project = self.bloom_add_record(
+            "Project", name="Demo", prefix="PRJ", description="The project"
+        )
+        other = self.bloom_add_record(
+            "Project", name="ABC", prefix="ABC", description="A different project"
+        )
+        for key in ("grace", "alan", "retired"):
+            self.bloom_add_internal_member(project, people[key], {"*": ["*"]})
+        self.bloom_add_external_member(
+            project, people["customer"], {"*": ["view", "comment"]}, "customer", []
+        )
+        self.bloom_add_internal_member(other, people["elsewhere"], {"*": ["*"]})
+        headers = {
+            key: self.bloom_user_token_headers(user)
+            for key, user in people.items()
+            if key != "retired"
+        }
+        return SimpleNamespace(project=project, other=other, **headers)
+
+    def bloom_api_mentionable(self, headers, project_id):
+        return self.bloom_api_call(
+            "GET", "/api/users/mentionable", headers, params={"project_id": project_id}
+        )
+
+    def bloom_new_identity_world(self):
+        self.bloom_new_database()
+        values = self.parameters
+        people = []
+        for number, role in enumerate([UserRole.admin, UserRole.maintainer, UserRole.external]):
+            picture = io.BytesIO()
+            Image.new("RGB", (32, 32), values.IDP_COLOURS[number]).save(picture, "PNG")
+            person = self.bloom_add_record(
+                "User",
+                email=f"identity-{number}@example.com",
+                full_name=f"Person {number}",
+                role=role,
+                hashed_password="unused",
+                profile_picture=picture.getvalue(),
+            )
+            people.append(person)
+        admin, member, outsider = people
+        project = self.bloom_add_record("Project", name="Demo", prefix="PRJ")
+        hidden = self.bloom_add_record("Project", name="ABC", prefix="ABC")
+        self.bloom_add_internal_member(project, member, values.IDP_REVIEW)
+        requirement = self.bloom_add_record(
+            "Requirement",
+            project_id=project,
+            reviewer_id=member,
+            approver_id=admin,
+            **values.IDP_REQUIREMENT,
+        )
+        self.bloom_add_record(
+            "AuditEvent", actor_user_id=member, actor_type="user", action="identity.read"
+        )
+        self.bloom_add_record(
+            "AccessRequest",
+            user_id=member,
+            resource_type="project",
+            resource_ref="PRJ",
+            project_prefix="PRJ",
+        )
+        return SimpleNamespace(
+            admin=self.bloom_user_token_headers(admin),
+            member=self.bloom_user_token_headers(member),
+            outsider=self.bloom_user_token_headers(outsider),
+            project=project,
+            hidden=hidden,
+            requirement=requirement,
+        )
+
+    def bloom_picture_of(self, url):
+        prefix = "data:image/png;base64,"
+        return base64.b64decode(url[len(prefix) :]) if url and url.startswith(prefix) else None
+
+    def bloom_new_external_dashboard_reader(self, doc_types):
+        self.bloom_new_database()
+        values = self.parameters
+        external = self.bloom_add_record(
+            "User",
+            email="external@example.com",
+            full_name="External User",
+            hashed_password="unused",
+            role=UserRole.external,
+            is_active=True,
+        )
+        project = self.bloom_add_record(
+            "Project", name="Demo", prefix="PRJ", description="Visibility"
+        )
+        self.bloom_add_external_member(project, external, values.DASH_READER, "customer", doc_types)
+        for kind, fields in values.DASH_RECORDS:
+            self.bloom_add_record(kind, project_id=project, **fields)
+        self.bloom_clear_dashboard_cache()
+        return self.bloom_user_token_headers(external)
+
+    def bloom_new_report_request_world(self):
+        self.bloom_new_database()
+        self.bloom_enforce_foreign_keys()
+        values = self.parameters
+        admin, reader, outsider = (
+            self.bloom_add_record(
+                "User",
+                email=f"reader-{number}@example.com",
+                full_name=f"Reader {number}",
+                role=role,
+                hashed_password="unused",
+            )
+            for number, role in enumerate(
+                [UserRole.admin, UserRole.maintainer, UserRole.maintainer]
+            )
+        )
+        project = self.bloom_add_record("Project", name="Demo", prefix="PRJ")
+        self.bloom_add_internal_member(project, reader, values.RPQ_READER_PERMISSIONS)
+        run = values.RPQ_RUN
+        case = self.bloom_add_record(
+            "TestCase",
+            project_id=project,
+            tc_id="PRJ-TC-001",
+            title="Check",
+            last_bud_run_id=run,
+            last_executed_at=datetime.utcnow(),
+        )
+        suite = self.bloom_add_record(
+            "TestSuite", project_id=project, suite_id="PRJ-TS-001", name="Suite"
+        )
+        requirement = self.bloom_add_record(
+            "Requirement", project_id=project, req_id="PRJ-REQ-001", title="Requirement"
+        )
+        campaign = self.bloom_add_record(
+            "TestCampaign",
+            project_id=project,
+            campaign_id="PRJ-CMP-001",
+            name="Campaign",
+            bud_run_id=run,
+        )
+        self.bloom_add_record("TestSuiteItem", suite_id=suite, test_case_id=case, order=0)
+        self.bloom_add_record("TestRunLink", requirement_id=requirement, test_run_id=run)
+
+        async def credential():
+            async with self.maker() as db:
+                _, token = await create_service_credential(db, created_by_user_id=admin, name="Bud")
+                await db.commit()
+                return token
+
+        return SimpleNamespace(
+            admin=self.bloom_user_token_headers(admin),
+            reader=self.bloom_user_token_headers(reader),
+            outsider=self.bloom_user_token_headers(outsider),
+            reader_id=reader,
+            machine={"Authorization": f"Bearer {self._run(credential())}"},
+            sources={
+                "test-case": case,
+                "test-suite": suite,
+                "requirement": requirement,
+                "campaign": campaign,
+            },
+            project=project,
+        )
+
+    def bloom_start_report_request_api(self):
+        self.bloom_start_full_api()
+        folder = Path(self.patches.enter_context(self._temp_dir())).resolve()
+        self.patches.enter_context(
+            patch.object(settings, "SERVICE_TOKEN_PEPPER", self.parameters.RPQ_PEPPER)
+        )
+        self.patches.enter_context(
+            patch.object(attachment_storage, "get_attachment_root", lambda: folder)
+        )
+
+    def bloom_api_publish_report(self, headers, run_id, content):
+        file = {
+            "filename": "report.pdf",
+            "content_type": "application/pdf",
+            "content_base64": content,
+        }
+        body = {"project_prefix": "PRJ", "bud_run_id": run_id, "run_name": "Run", "files": [file]}
+        return self.bloom_api_call("POST", "/api/bud/test-reports", headers, json=body)
+
+    def bloom_api_built_in_policy(self, headers, name):
+        policies = self.bloom_api_call("GET", "/api/policies", headers).body
+        return next(
+            policy["id"] for policy in policies if policy["is_default"] and policy["name"] == name
+        )
+
+    def bloom_api_group_member(self, headers, name, project_ids, policy_ids, role="maintainer"):
+        member = self.bloom_api_new_member(headers, name, role)
+        for number, policy_id in enumerate(policy_ids):
+            group = self.bloom_api_new_group(headers, f"{name} group {number}", [policy_id])
+            for project_id in project_ids:
+                self.bloom_api_admit_group(headers, group["id"], project_id)
+            self.bloom_api_add_group_member(headers, group["id"], member.id)
+        return member
+
+    def bloom_api_holder(self, headers, name, project_id, *policy_names):
+        policy_ids = [self.bloom_api_built_in_policy(headers, policy) for policy in policy_names]
+        return self.bloom_api_group_member(headers, name, [project_id], policy_ids)
+
+    def bloom_api_policy_user(
+        self, headers, name, permissions, *project_ids, role="maintainer", scope=None
+    ):
+        visibility = "customer" if role == "external" else "internal"
+        policy = self.bloom_api_new_policy(
+            headers, f"{name} policy", permissions, visibility, scope
+        )
+        statement = update(Policy).where(Policy.id == policy["id"]).values(permissions=permissions)
+        self._run(self._execute_statement(statement))
+        return self.bloom_api_group_member(headers, name, project_ids, [policy["id"]], role)
+
+    def bloom_api_add_typed_document(
+        self, headers, project_id, doc_type, title, visibility="internal"
+    ):
+        body = {
+            "project_id": project_id,
+            "doc_type": doc_type,
+            "title": title,
+            "visibility": visibility,
+        }
+        return self.bloom_api_call(
+            "POST", f"/api/projects/{project_id}/documents", headers, json=body
+        )
+
+    def bloom_coverage_status(self, statuses):
+        return coverage_service.coverage_status(statuses)
+
+    def bloom_coverage_percent(self, covered, total):
+        return coverage_service.coverage_percent(covered, total)
+
+    def bloom_clear_dashboard_cache(self):
+        dashboard_stats_cache._store.clear()
+
+    def bloom_new_picture_accounts(self):
+        self.bloom_new_database()
+        accounts = []
+        for number in range(2):
+            fields = {
+                "full_name": f"Picture User {number}",
+                "hashed_password": "unused",
+                "role": UserRole.external,
+            }
+            user = self.bloom_add_record("User", email=f"picture-{number}@example.com", **fields)
+            accounts.append(self.bloom_user_token_headers(user))
+        return accounts
+
+    def bloom_picture(self, color="purple", size=(600, 300), mode="RGB"):
+        buffer, metadata = io.BytesIO(), PngImagePlugin.PngInfo()
+        metadata.add_text("Author", "Metadata must not be retained")
+        Image.new(mode, size, color if mode == "RGB" else 0).save(
+            buffer, format="PNG", pnginfo=metadata
+        )
+        return buffer.getvalue()
+
+    def bloom_rotated_jpeg(self):
+        buffer, exif = io.BytesIO(), Image.Exif()
+        exif[274] = 6
+        Image.new("RGB", (600, 300), "orange").save(buffer, format="JPEG", exif=exif)
+        return buffer.getvalue()
+
+    def bloom_jpeg_with_repeated(self, what):
+        if what == "orientation":
+            entries = struct.pack("<HHIHH", 274, 3, 1, 6, 0) + struct.pack(
+                "<HHIHH", 274, 3, 1, 1, 0
+            )
+            payload = (
+                b"Exif\x00\x00II*\x00" + struct.pack("<IH", 8, 2) + entries + struct.pack("<I", 0)
+            )
+            marker = b"\xff\xe1"
+        else:
+            directory = (
+                struct.pack("<H", 3)
+                + struct.pack("<HHII", 0xB001, 4, 1, 2)
+                + struct.pack("<HHII", 0xB001, 4, 1, 1)
+                + struct.pack("<HHII", 0xB002, 7, 32, 50)
+                + struct.pack("<I", 0)
+            )
+            entries = struct.pack("<LLLHH", 0x20030000, 0, 0, 0, 0) + struct.pack(
+                "<LLLHH", 0x00010001, 0, 0, 0, 0
+            )
+            payload = b"MPF\x00II*\x00" + struct.pack("<I", 8) + directory + entries
+            marker = b"\xff\xe2"
+        base = io.BytesIO()
+        Image.new("RGB", (600, 300), "orange").save(base, format="JPEG")
+        data = base.getvalue()
+        return data[:2] + marker + struct.pack(">H", len(payload) + 2) + payload + data[2:]
+
+    def bloom_picture_facts(self, content):
+        with Image.open(io.BytesIO(content)) as image:
+            return image.size, "Author" in image.info, bool(image.getexif())
+
+    def bloom_api_put_picture(self, headers, data, mime="image/png"):
+        async def put():
+            transport = httpx.ASGITransport(app=self.api)
+            async with REAL_CLIENT(
+                transport=transport, base_url=self.parameters.API_BASE
+            ) as client:
+                files = {"file": ("picture.png", data, mime)}
+                return await client.put("/api/auth/me/picture", headers=headers, files=files)
+
+        answer = self._run(put())
+        body = (
+            answer.json()
+            if answer.headers.get("content-type", "").startswith("application/json")
+            else None
+        )
+        return SimpleNamespace(status=answer.status_code, body=body)
+
+    def bloom_api_picture(self, headers=None, method="GET"):
+        answer = self._run(self._request(method, "/api/auth/me/picture", headers))
+        return SimpleNamespace(
+            status=answer.status_code, headers=answer.headers, content=answer.content
+        )
+
+    def bloom_start_plain_api(self):
+        async def skip(*args, **kwargs):
+            return None
+
+        self.patches.enter_context(patch.object(audit_service, "record_request_event", skip))
+        self.api = main.app
+
+    def bloom_add_failing_routes(self):
+        routes, paths = list(main.app.router.routes), self.parameters.UNH_PATHS
+        unique = asyncpg.exceptions.UniqueViolationError("duplicate key value: projects_prefix_key")
+
+        @main.app.get(paths["error"])
+        async def boom():
+            raise RuntimeError("something went bang")
+
+        @main.app.get(paths["unique"])
+        async def conflict():
+            raise IntegrityError("INSERT INTO projects ...", {}, unique)
+
+        @main.app.get(paths["reference"])
+        async def reference():
+            still = asyncpg.exceptions.ForeignKeyViolationError("still referenced")
+            raise IntegrityError("DELETE FROM projects ...", {}, still)
+
+        class FailingCommit:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc_info):
+                return False
+
+            async def commit(self):
+                raise IntegrityError("INSERT INTO projects ...", {}, unique)
+
+            async def rollback(self):
+                return None
+
+            async def close(self):
+                return None
+
+        self.patches.enter_context(patch.object(database, "async_session_maker", FailingCommit))
+
+        @main.app.get(paths["late"])
+        async def late(db=Depends(get_db, scope="function")):
+            return {"ok": True}
+
+        self.patches.callback(setattr, main.app.router, "routes", routes)
+
+    def bloom_api_get_unhandled(self, path):
+        answer = self.bloom_api_send("GET", path, errors=False)
+        return SimpleNamespace(
+            status=answer.status_code,
+            body=answer.json(),
+            text=answer.text,
+            reference=answer.headers["x-request-id"],
+        )
+
+    def bloom_session_routes(self):
+        def sessions(dependant):
+            for sub in dependant.dependencies:
+                if sub.call is get_db:
+                    yield sub
+                yield from sessions(sub)
+
+        def api_routes(routes):
+            for route in routes:
+                if isinstance(route, APIRoute):
+                    yield route
+                included = getattr(route, "original_router", None)
+                if included is not None:
+                    yield from api_routes(included.routes)
+
+        found = [
+            (route, dependency)
+            for route in api_routes(main.app.routes)
+            for dependency in sessions(route.dependant)
+        ]
+        late = sorted(
+            {
+                f"{sorted(route.methods)} {route.path}"
+                for route, dependency in found
+                if dependency.scope != "function"
+            }
+        )
+        return len(found), late
+
+    def bloom_new_retention_world(self):
+        self.bloom_new_database()
+        self.bloom_enforce_foreign_keys()
+        self.bloom_add_record("Project", id=1, name="Demo", prefix="PRJ")
+        self.bloom_add_record("Project", id=2, name="ABC", prefix="ABC")
+        people = (
+            (1, "admin@example.com", "Admin", UserRole.admin),
+            (2, "author@example.com", "Author", UserRole.maintainer),
+        )
+        for number, email, name, role in people:
+            self.bloom_add_record(
+                "User", id=number, email=email, full_name=name, hashed_password="x", role=role
+            )
+        return self.bloom_user_token_headers(1), self.bloom_user_token_headers(2)
+
+    def bloom_add_authored_content(self, project_id, author_id, approver_id):
+        requirement = self.bloom_add_record(
+            "Requirement",
+            project_id=project_id,
+            req_id="PRJ-REQ-001",
+            title="Authored content",
+            created_by_id=author_id,
+            reviewer_id=author_id,
+        )
+        document = self.bloom_add_record(
+            "Document",
+            project_id=project_id,
+            doc_id="PRJ-RPT-001",
+            doc_type="RPT",
+            title="Authored report",
+            created_by_id=author_id,
+        )
+        workflow = self.bloom_add_record(
+            "ArtefactWorkflow",
+            project_id=project_id,
+            artefact_type="requirement",
+            artefact_id=requirement,
+            revision_creator_id=author_id,
+            reviewer_id=author_id,
+        )
+        about = {"artefact_type": "requirement", "artefact_id": requirement}
+        self.bloom_add_record(
+            "ArtefactComment",
+            **about,
+            author_name="Author",
+            author_user_id=author_id,
+            body="Recorded review comment",
+        )
+        self.bloom_add_record(
+            "ArtefactActivity",
+            **about,
+            event_type="created",
+            summary="Author created the requirement",
+            actor_user_id=author_id,
+        )
+        self.bloom_add_record(
+            "ArtefactRevision",
+            workflow_id=workflow,
+            revision_number=1,
+            content_snapshot={"title": "Preserved earlier revision"},
+            content_hash="a" * 64,
+            reviewed_by_id=author_id,
+            approved_by_id=approver_id,
+        )
+        self.bloom_add_record(
+            "DocumentAttachment",
+            document_id=document,
+            filename="retained.txt",
+            original_filename="retained.txt",
+            storage_path="retained.txt",
+            content_type="text/plain",
+            size_bytes=4,
+            sha256="b" * 64,
+            uploaded_by_id=author_id,
+        )
+        return requirement, document
+
+    def bloom_start_observed_api(self):
+        app = FastAPI()
+        app.add_middleware(RequestObservabilityMiddleware)
+        app.include_router(metrics_router, prefix="/api")
+        app.dependency_overrides[get_db] = self._serve_session
+
+        @app.get("/api/ping")
+        async def ping():
+            return {"ok": True}
+
+        self.api = app
+
+    def bloom_api_raw(self, method, path, headers=None, params=None):
+        answer = self._run(self._request(method, path, headers, params=params))
+        return SimpleNamespace(status=answer.status_code, headers=answer.headers, text=answer.text)
+
+    def bloom_api_metrics(self, enabled=True):
+        with patch.object(settings, "ENABLE_METRICS", enabled):
+            return self.bloom_api_raw("GET", "/api/metrics")
+
+    def bloom_format_log_record(self, message, arguments, request_id):
+        token = request_id_var.set(request_id)
+        try:
+            record = logging.LogRecord(
+                "bloom.test", logging.INFO, __file__, 1, message, arguments, None
+            )
+            return json.loads(JsonLogFormatter().format(record))
+        finally:
+            request_id_var.reset(token)
+
+    def bloom_set_up_logging_twice(self):
+        root = logging.getLogger()
+        handlers, level = list(root.handlers), root.level
+        try:
+            setup_logging(level="INFO", json_logs=True)
+            setup_logging(level="INFO", json_logs=True)
+            return len(root.handlers), isinstance(root.handlers[0].formatter, JsonLogFormatter)
+        finally:
+            root.handlers[:] = handlers
+            root.setLevel(level)
+
+    def bloom_api_next_name(self, stem):
+        self._serial = getattr(self, "_serial", 0) + 1
+        return f"{stem} {self._serial}"
+
+    def bloom_api_next_project(self, headers):
+        self._projects = getattr(self, "_projects", 0) + 1
+        number = self._projects
+        prefix = "G" + chr(65 + number // 26 % 26) + chr(65 + number % 26)
+        return self.bloom_api_new_project(headers, prefix)
+
+    def bloom_api_make(self, headers, kind, project_id, **fields):
+        named = {"test-suites", "campaigns", "test-concepts"}
+        field = "name" if kind in named else "title"
+        body = {"project_id": project_id, field: self.bloom_api_next_name(kind), **fields}
+        path = f"/api/projects/{project_id}/documents" if kind == "documents" else f"/api/{kind}"
+        return self.bloom_api_call("POST", path, headers, json=body)
+
+    def bloom_api_grant_scenario(self, headers, policy_name, user_id, project_id):
+        permissions = scenario_permissions(policy_name)
+        external_reader = policy_name == "External Reader"
+        types = ["REQ", "TC", "CPT", "CMP"] if external_reader else None
+        rules = scenario_rules(permissions, "customer" if external_reader else "internal", types)
+        name = self.bloom_api_next_name(policy_name)
+        policy = self.bloom_api_create_policy_rules(headers, name, rules).json()
+        statement = update(Policy).where(Policy.id == policy["id"]).values(permissions=permissions)
+        self._run(self._execute_statement(statement))
+        group = self.bloom_api_new_group(headers, self.bloom_api_next_name("Group"), [policy["id"]])
+        self.bloom_api_admit_group(headers, group["id"], project_id)
+        self.bloom_api_add_group_member(headers, group["id"], user_id)
+
+    def bloom_api_scenario_user(self, headers, role, project_ids, *policy_names):
+        member = self.bloom_api_new_member(
+            headers, self.bloom_api_next_name("person").replace(" ", "-"), role
+        )
+        for project_id in project_ids:
+            for policy_name in policy_names:
+                self.bloom_api_grant_scenario(headers, policy_name, member.id, project_id)
+        return member
+
+    def bloom_api_permission_user(
+        self, headers, permissions, *project_ids, role="maintainer", scope=None
+    ):
+        name = self.bloom_api_next_name("permission-user").replace(" ", "-")
+        return self.bloom_api_policy_user(
+            headers, name, permissions, *project_ids, role=role, scope=scope
+        )
+
+    def bloom_api_link_ends(self, headers, project_id, source, target, role="verifies"):
+        body = {
+            "project_id": project_id,
+            "source_type": source[0],
+            "source_id": source[1],
+            "target_type": target[0],
+            "target_id": target[1],
+            "role": role,
+        }
+        return self.bloom_api_call("POST", "/api/links", headers, json=body)
+
+    def bloom_change_record(self, kind, row_id, **fields):
+        async def change():
+            async with self.maker() as db:
+                row = await db.get(self._model(kind), row_id)
+                for name, value in fields.items():
+                    setattr(row, name, value)
+                await db.commit()
+
+        self._run(change())
+
+    def bloom_list_records(self, kind, **match):
+        model = self._model(kind)
+        query = select(model).order_by(*model.__table__.primary_key.columns)
+        for name, value in match.items():
+            query = query.where(getattr(model, name) == value)
+        return self._run(self._all(query))
+
+    def bloom_set_account_role(self, user_id, role):
+        self.bloom_change_record("User", user_id, role=UserRole(role))
+
+    def bloom_add_access_entry(
+        self, user_id, project_id, permissions, visibility="internal", owner=False
+    ):
+        async def add():
+            async with self.maker() as db:
+                entry = project_access_fixture(
+                    user_id=user_id,
+                    project_id=project_id,
+                    permissions=permissions,
+                    visibility=visibility,
+                )
+                entry.owner = owner
+                db.add(entry)
+                await db.commit()
+                return entry.policies[0].id
+
+        return self._run(add())
+
+    def bloom_set_policy_permissions(self, policy_id, permissions):
+        self.bloom_change_record("Policy", policy_id, permissions=permissions)
+
+    def bloom_list_audit_events_like(self, prefix):
+        query = (
+            select(AuditEvent).where(AuditEvent.action.like(prefix + "%")).order_by(AuditEvent.id)
+        )
+        return [(event.action, event.actor_user_id) for event in self._run(self._all(query))]
+
+    def bloom_hidden_from(self, user_ids):
+        original = artefacts_api.row_visible_to
+
+        async def visible(db, person, artefact, type_code):
+            return person.id not in user_ids and await original(db, person, artefact, type_code)
+
+        return patch.object(artefacts_api, "row_visible_to", visible)
+
+    def bloom_may_change_assignee(self, user_id, created_by, assignee, manages):
+        return may_change_assignee(
+            User(id=user_id),
+            Requirement(created_by_id=created_by),
+            ArtefactWorkflow(assignee_id=assignee),
+            manages,
+        )
+
+    def bloom_outsider_sets_assignee(self, requirement_id, assignee_id):
+        async def attempt():
+            async with self.maker() as db:
+                row = await db.get(Requirement, requirement_id)
+                query = select(ArtefactWorkflow).where(
+                    ArtefactWorkflow.artefact_id == requirement_id
+                )
+                state = await db.scalar(query)
+                outsider = User(id=9, full_name="Outsider", role=UserRole.external, is_active=True)
+                try:
+                    await _set_assignee(db, row, state, outsider, assignee_id)
+                except HTTPException as refused:
+                    return refused.status_code
+                return None
+
+        return self._run(attempt())
+
+    def bloom_start_workflow_api(self):
+        self.bloom_start_full_api()
+        self.actor, self.deliveries = 1, []
+        main.app.dependency_overrides[get_current_user] = self._acting_user
+        record = lambda **message: self.deliveries.append(message)
+        self.patches.enter_context(patch.object(mail_service, "send_email", record))
+
+    def bloom_new_workflow_world(self):
+        self.bloom_new_database()
+        self.bloom_enforce_foreign_keys()
+        self.actor = 1
+        self.deliveries.clear()
+        self._run(self._seed_workflow_world())
+
+    def bloom_act_as(self, user_id):
+        self.actor = user_id
+
+    def bloom_list_deliveries(self):
+        return list(self.deliveries)
+
+    def bloom_api_approve_as_three_people(self, path):
+        assignees = {"reviewer_id": 2, "approver_id": 3}
+        self.bloom_api_call("PUT", path + "/workflow/assignees", json=assignees)
+        self.bloom_api_call("POST", path + "/requests", json={"kind": "review"})
+        self.bloom_act_as(2)
+        self.bloom_api_call("POST", path + "/comments", json={"body": "Reviewed"})
+        self.bloom_api_call("POST", path + "/requests", json={"kind": "approval"})
+        self.bloom_act_as(3)
+        signed = self.bloom_api_call("POST", path + "/sign-off", json={"step": "approve"})
+        self.bloom_act_as(1)
+        return signed
+
+    async def _acting_user(self):
+        async with self.maker() as db:
+            user = await db.get(User, self.actor)
+            await accessible_project_ids(db, user)
+            return user
+
+    async def _seed_workflow_world(self):
+        async with self.maker() as db:
+            db.add(Project(id=1, name="Demo", prefix="PRJ"))
+            for number in range(1, 5):
+                db.add(
+                    User(
+                        id=number,
+                        email=f"person{number}@example.com",
+                        full_name=f"Person {number}",
+                        hashed_password="x",
+                        role=UserRole.admin,
+                        is_active=True,
+                    )
+                )
+            await db.commit()
+
+    def bloom_api_new_member(self, headers, name, role="maintainer"):
+        email, password = f"{name}@example.com", self.parameters.API_PASSWORD
+        created = self.bloom_api_create_user(headers, email, password, role).json()
+        signed_in, _ = self.bloom_log_in(email, password)
+        return SimpleNamespace(id=created["id"], email=email, headers=signed_in)
+
+    def bloom_api_new_policy(
+        self, headers, name, permissions=None, visibility="internal", types=None
+    ):
+        permissions = permissions or {"REQ": ["view"]}
+        return self.bloom_api_create_policy(headers, name, permissions, types, visibility).json()
+
+    def bloom_api_new_group(self, headers, name, policy_ids=()):
+        return self.bloom_api_create_group(headers, name, list(policy_ids)).json()
+
+    def bloom_api_verify(self, headers, project_id, test_case_id, requirement_id):
+        body = {
+            "project_id": project_id,
+            "source_type": "TC",
+            "source_id": test_case_id,
+            "target_type": "REQ",
+            "target_id": requirement_id,
+            "role": "verifies",
+        }
+        return self.bloom_api_call("POST", "/api/links", headers, json=body)
+
+    def bloom_api_approve_test_case(self, headers, test_case_id):
+        path = f"/api/artefacts/test-case/{test_case_id}"
+        actor = self.bloom_api_call("GET", path + "/workflow", headers).body["creator"]["id"]
+        self.bloom_api_call(
+            "PUT", path + "/workflow/assignees", headers, json={"reviewer_id": actor}
+        )
+        self.bloom_api_call("POST", path + "/requests", headers, json={"kind": "review"})
+        comment = {"body": "Reviewed the requested test case."}
+        self.bloom_api_call("POST", path + "/comments", headers, json=comment)
+        self.bloom_api_call("POST", path + "/requests", headers, json={"kind": "approval"})
+        signed = self.bloom_api_call("POST", path + "/sign-off", headers, json={"step": "approve"})
+        return actor, signed
+
+    def bloom_api_add_tracked_defect(self, headers, prefix):
+        project = self.bloom_api_new_project(headers, prefix)
+        body = {
+            "project_id": project["id"],
+            "title": f"Defect {prefix}",
+            "external_tracker": "github",
+            "external_repo_full_name": "MbedLabs/bloom",
+            "external_issue_number": 7,
+            "external_issue_url": "https://github.com/MbedLabs/bloom/issues/7",
+        }
+        return self.bloom_api_call("POST", "/api/defects", headers, json=body).body
+
+    def bloom_api_refresh_defect_while_tracker_fails(self, headers, defect_id, failure):
+        refusal = httpx.HTTPStatusError(
+            "401",
+            request=httpx.Request("GET", "https://api.github.com"),
+            response=httpx.Response(401),
+        )
+        failures = {
+            "no route": httpx.ConnectError("no route to host"),
+            "no route to an address": httpx.ConnectError("no route to host 10.0.0.5"),
+            "read timeout": httpx.ReadTimeout("timed out"),
+            "connect timeout": httpx.ConnectTimeout("timed out"),
+            "unreadable answer": ValueError("not json"),
+            "refusal": refusal,
+        }
+
+        async def fail(*args, **kwargs):
+            raise failures[failure]
+
+        path, body = f"/api/defects/{defect_id}/refresh-external", {
+            "token": "a-token-the-test-never-uses"
+        }
+        with patch.object(defects_api, "_fetch_github_issue", fail):
+            answer = self._run(self._request("POST", path, headers, json=body))
+        return SimpleNamespace(status=answer.status_code, body=answer.json(), text=answer.text)
+
+    def bloom_api_setup(self, body, mail="recorded"):
+        sent = {}
+
+        def record(**fields):
+            if mail == "unavailable":
+                raise MailConfigurationError("SMTP is disabled")
+            sent.update(fields)
+
+        with patch.object(setup_api, "send_admin_welcome_email", record):
+            answer = self.bloom_api_call("POST", "/api/setup", json=body)
+        return answer, sent
+
+    def bloom_list_accounts(self):
+        rows = self._run(self._all(select(User).order_by(User.id)))
+        return [(row.email, row.role.value, row.is_active, row.hashed_password) for row in rows]
+
+    def bloom_start_api_with_admin(self):
+        self.bloom_start_full_api()
+        self.bloom_add_admin(self.parameters.API_ADMIN_EMAIL, self.parameters.API_PASSWORD)
+        headers, _ = self.bloom_log_in(
+            self.parameters.API_ADMIN_EMAIL, self.parameters.API_PASSWORD
+        )
+        return headers
+
+    def bloom_api_new_project(self, headers, prefix, **fields):
+        body = {"name": f"Project {prefix}", "prefix": prefix, **fields}
+        return self.bloom_api_call("POST", "/api/projects", headers, json=body).body
+
+    def bloom_api_add_requirements(self, headers, project_id, count):
+        for number in range(count):
+            self.bloom_api_call(
+                "POST",
+                "/api/requirements",
+                headers,
+                json={"project_id": project_id, "title": f"Req {number}"},
+            )
+
+    def bloom_api_add_test_case(self, headers, project_id, title, **fields):
+        body = {"project_id": project_id, "title": title, **fields}
+        return self.bloom_api_call("POST", "/api/test-cases", headers, json=body)
+
+    def bloom_api_add_suite(self, headers, project_id, name, cases):
+        body = {
+            "project_id": project_id,
+            "name": name,
+            "test_case_ids": [case["id"] for case in cases],
+        }
+        return self.bloom_api_call("POST", "/api/test-suites", headers, json=body).body
+
+    def bloom_api_add_campaign_with_one_case(self, headers, prefix):
+        project = self.bloom_api_new_project(headers, prefix)
+        case = self.bloom_api_add_test_case(headers, project["id"], f"Case {prefix}").body
+        body = {
+            "project_id": project["id"],
+            "name": f"Campaign {prefix}",
+            "test_case_ids": [case["id"]],
+        }
+        campaign = self.bloom_api_call("POST", "/api/campaigns", headers, json=body).body
+        return SimpleNamespace(project=project, case=case, campaign=campaign)
+
+    def bloom_api_count_statements(self, method, path, headers):
+        skipped = ("SAVEPOINT", "RELEASE SAVEPOINT", "ROLLBACK TO SAVEPOINT", "BEGIN", "COMMIT")
+        counted = []
+
+        def record(conn, cursor, statement, parameters, context, executemany):
+            if not statement.strip().upper().startswith(skipped):
+                counted.append(statement)
+
+        event.listen(self.engine.sync_engine, "before_cursor_execute", record)
+        try:
+            answer = self.bloom_api_call(method, path, headers)
+        finally:
+            event.remove(self.engine.sync_engine, "before_cursor_execute", record)
+        return answer, len(counted)
+
     def bloom_start_full_api(self):
         self.patches.enter_context(patch.dict(main.app.dependency_overrides))
         main.app.dependency_overrides[get_db] = self._serve_session
         self.patches.enter_context(patch.object(limiter, "enabled", False))
         self.api = main.app
 
-    def bloom_add_admin(self, email, password):
-        return self.bloom_add_account(email, password, UserRole.admin.value)
+    def bloom_create_external_reader_environment(self, doc_types=()):
+        values = self.parameters
+        self.bloom_start_full_api()
+        project_id = self.bloom_create_project(values.VISIBILITY_PREFIX)
+        user_id = self.bloom_add_account(
+            values.EXTERNAL_EMAIL, values.API_PASSWORD, values.EXTERNAL_ROLE
+        )
+        self.bloom_add_external_member(
+            project_id,
+            user_id,
+            values.EXTERNAL_PERMISSIONS,
+            values.CUSTOMER_VISIBILITY,
+            doc_types,
+        )
+        headers, _ = self.bloom_log_in(values.EXTERNAL_EMAIL, values.API_PASSWORD)
+        return SimpleNamespace(project_id=project_id, user_id=user_id, headers=headers)
 
-    def bloom_add_account(self, email, password, role):
+    def bloom_default_external_doc_types(self):
+        return sorted(DEFAULT_EXTERNAL_DOC_TYPES)
+
+    def bloom_add_baseline(self, project_id, baseline_id, name, snapshot):
         return self._run(
             self._add(
-                User(
-                    email=email,
-                    full_name=email,
-                    hashed_password=get_password_hash(password),
-                    role=UserRole(role),
-                    is_active=True,
+                Baseline(
+                    project_id=project_id,
+                    baseline_id=baseline_id,
+                    name=name,
+                    baseline_type="Milestone",
+                    snapshot=snapshot,
                 )
             )
         )
 
-    def bloom_add_external_member(self, project_id, user_id, permissions, visibility):
-        self._run(self._add_external_member(project_id, user_id, permissions, visibility))
+    def bloom_add_requirement(self, project_id, req_id, visibility):
+        return self._run(
+            self._add(
+                Requirement(
+                    project_id=project_id,
+                    req_id=req_id,
+                    title=req_id,
+                    status=self.parameters.DOCUMENT_STATUS,
+                    visibility=visibility,
+                )
+            )
+        )
+
+    def bloom_add_project_variable(self, project_id, key, value):
+        return self._run(
+            self._add(
+                ProjectVariable(project_id=project_id, kind="parameter", key=key, value=value)
+            )
+        )
+
+    def bloom_add_comment(self, kind, artefact_id, body):
+        return self._run(
+            self._add(
+                ArtefactComment(
+                    artefact_type=kind, artefact_id=artefact_id, author_name="System", body=body
+                )
+            )
+        )
+
+    def bloom_add_activity(self, kind, artefact_id, summary):
+        return self._run(
+            self._add(
+                ArtefactActivity(
+                    artefact_type=kind,
+                    artefact_id=artefact_id,
+                    event_type="created",
+                    summary=summary,
+                )
+            )
+        )
+
+    def bloom_add_artefact_link(self, project_id, source_id, target_id):
+        source_type, target_type, role = self.parameters.READER_LINK
+        return self._run(
+            self._add(
+                ArtefactLink(
+                    project_id=project_id,
+                    source_type=source_type,
+                    source_id=source_id,
+                    target_type=target_type,
+                    target_id=target_id,
+                    role=role,
+                )
+            )
+        )
+
+    def bloom_api_list_test_cases(self, headers, project_id):
+        query = {"project_id": project_id}
+        return self.bloom_api_call("GET", "/api/test-cases", headers, params=query)
+
+    def bloom_api_get_test_case(self, headers, test_case_id):
+        return self.bloom_api_call("GET", f"/api/test-cases/{test_case_id}", headers)
+
+    def bloom_api_comments(self, headers, kind, artefact_id):
+        return self.bloom_api_call("GET", f"/api/artefacts/{kind}/{artefact_id}/comments", headers)
+
+    def bloom_api_activity(self, headers, kind, artefact_id):
+        return self.bloom_api_call("GET", f"/api/artefacts/{kind}/{artefact_id}/activity", headers)
+
+    def bloom_api_list_links(self, headers, project_id):
+        return self.bloom_api_call("GET", "/api/links", headers, params={"project_id": project_id})
+
+    def bloom_api_list_projects(self, headers):
+        return self.bloom_api_call("GET", "/api/projects", headers)
+
+    def bloom_api_list_requirements(self, headers, project_id):
+        query = {"project_id": project_id}
+        return self.bloom_api_call("GET", "/api/requirements", headers, params=query)
+
+    def bloom_api_read_requirement(self, headers, requirement_id):
+        return self.bloom_api_call("GET", f"/api/requirements/{requirement_id}", headers)
+
+    def bloom_api_traceability(self, headers, project_id):
+        query = {"project_id": project_id}
+        return self.bloom_api_call("GET", "/api/traceability", headers, params=query)
+
+    def bloom_api_dashboard_stats(self, headers):
+        dashboard_stats_cache._store.clear()
+        return self.bloom_api_call("GET", "/api/dashboard/stats", headers)
+
+    def bloom_api_import_from(self, headers, project_id, source_project_id, doc_type, doc_ids):
+        body = {
+            "source_project_id": source_project_id,
+            "doc_type": doc_type,
+            "doc_ids": doc_ids,
+            "include_links": True,
+        }
+        return self.bloom_api_call("POST", f"/api/projects/{project_id}/import", headers, json=body)
+
+    def bloom_api_upload_reqif(self, headers, project_id, content):
+        files = {"file": ("requirements.reqif", content, "application/xml")}
+        path = f"/api/projects/{project_id}/import/reqif"
+        return self._answer(self._run(self._upload(path, headers, files)))
+
+    def bloom_create_export_project(self):
+        values = self.parameters
+        project = self.bloom_create_project(values.EXPORT_PREFIX)
+        shown, hidden = values.CUSTOMER_VISIBILITY, values.INTERNAL_VISIBILITY
+        pairs = (
+            (values.EXPORT_SHOWN_REQ, values.EXPORT_SHOWN_TC, values.EXPORT_SHOWN_TITLE, shown),
+            (values.EXPORT_HIDDEN_REQ, values.EXPORT_HIDDEN_TC, values.EXPORT_HIDDEN_TITLE, hidden),
+        )
+        for req_id, tc_id, title, visibility in pairs:
+            requirement = self._run(
+                self._add(
+                    Requirement(
+                        project_id=project, req_id=req_id, title=title, visibility=visibility
+                    )
+                )
+            )
+            fields = {"last_execution_status": values.EXPORT_PASSED} if visibility == shown else {}
+            test_case = self.bloom_add_test_case(
+                project, tc_id, title, visibility=visibility, **fields
+            )
+            self.bloom_add_artefact_link(project, test_case, requirement)
+        return project
+
+    def bloom_add_group_exporter(self, project_id, email, permissions):
+        user_id = self.bloom_add_account(
+            email, self.parameters.API_PASSWORD, self.parameters.EXTERNAL_ROLE
+        )
+        self._run(self._add_group_exporter(project_id, user_id, email, permissions))
+        return user_id
+
+    def bloom_api_export(self, headers, project_id, kind, pdf=False):
+        path = f"/api/projects/{project_id}/export/{kind}"
+        query = {"format": "pdf"} if pdf and kind != self.parameters.EXPORT_DOSSIER else None
+        answer = self._run(self._request("GET", path, headers, params=query))
+        is_pdf = answer.content.startswith(b"%PDF")
+        return SimpleNamespace(
+            status=answer.status_code,
+            content_type=answer.headers.get("content-type"),
+            is_pdf=is_pdf,
+            text="" if is_pdf else answer.text,
+            rows=[] if is_pdf else list(csv.DictReader(io.StringIO(answer.text))),
+        )
+
+    def bloom_list_audit_details(self, action):
+        query = select(AuditEvent).where(AuditEvent.action == action).order_by(AuditEvent.id)
+        return [event.details for event in self._run(self._all(query))]
+
+    def bloom_api_list_docs_of_types(self, headers, prefix, types):
+        query = [("type", doc_type) for doc_type in types]
+        return self.bloom_api_call("GET", f"/api/projects/{prefix}/docs", headers, params=query)
+
+    def bloom_api_open_doc(self, headers, prefix, slug, doc_id):
+        return self.bloom_api_call("GET", f"/api/projects/{prefix}/docs/{slug}/{doc_id}", headers)
+
+    def bloom_api_create_requirement_of_origin(self, headers, project_id, title, origin):
+        body = {"project_id": project_id, "title": title, "req_origin": origin}
+        return self.bloom_api_call("POST", "/api/requirements", headers, json=body)
+
+    def bloom_api_set_requirement_origin(self, headers, requirement_id, origin):
+        path = f"/api/requirements/{requirement_id}"
+        return self.bloom_api_call("PATCH", path, headers, json={"req_origin": origin})
+
+    def bloom_api_coverage_gaps(self, headers, project_id):
+        return self.bloom_api_call("GET", f"/api/traceability/coverage-gaps/{project_id}", headers)
+
+    def bloom_api_impact(self, headers, requirement_id):
+        return self.bloom_api_call("GET", f"/api/traceability/impact/{requirement_id}", headers)
+
+    def bloom_add_test_suite(self, project_id, suite_id, visibility, test_case_ids):
+        suite = self._run(
+            self._add(
+                TestSuiteModel(
+                    project_id=project_id,
+                    suite_id=suite_id,
+                    name=suite_id,
+                    status=self.parameters.DOCUMENT_STATUS,
+                    visibility=visibility,
+                )
+            )
+        )
+        for order, test_case_id in enumerate(test_case_ids):
+            self._run(
+                self._add(
+                    TestSuiteItemModel(suite_id=suite, test_case_id=test_case_id, order=order)
+                )
+            )
+        return suite
+
+    def bloom_api_list_test_suites(self, headers, project_id):
+        query = {"project_id": project_id}
+        return self.bloom_api_call("GET", "/api/test-suites", headers, params=query)
+
+    def bloom_api_get_test_suite(self, headers, suite_id):
+        return self.bloom_api_call("GET", f"/api/test-suites/{suite_id}", headers)
+
+    def bloom_add_controlled_pair(self, project_id, kind, code):
+        prefix = self.parameters.VISIBILITY_PREFIX
+        visible, hidden = f"{prefix}-{code}-001", f"{prefix}-{code}-002"
+        shown, internal = self.parameters.CUSTOMER_VISIBILITY, self.parameters.INTERNAL_VISIBILITY
+        return SimpleNamespace(
+            public=visible,
+            visible=self._run(self._add(self._controlled(kind, project_id, visible, shown))),
+            hidden=self._run(self._add(self._controlled(kind, project_id, hidden, internal))),
+        )
+
+    def bloom_api_probe_controlled(self, headers, project_id, path, pair):
+        query = {"project_id": project_id}
+        return SimpleNamespace(
+            listed=self.bloom_api_call("GET", path, headers, params=query),
+            hidden=self.bloom_api_call("GET", f"{path}/{pair.hidden}", headers),
+            visible=self.bloom_api_call("GET", f"{path}/{pair.visible}", headers),
+        )
+
+    def bloom_add_campaign(self, project_id, campaign_id, visibility, suite_ids, items):
+        campaign = self._run(
+            self._add(
+                TestCampaign(
+                    project_id=project_id,
+                    campaign_id=campaign_id,
+                    name=campaign_id,
+                    status="Planned",
+                    visibility=visibility,
+                )
+            )
+        )
+        for suite_id in suite_ids:
+            self._run(self._add(CampaignSuite(campaign_id=campaign, suite_id=suite_id)))
+        for test_case_id, fields in items:
+            self._run(
+                self._add(
+                    TestCampaignItem(campaign_id=campaign, test_case_id=test_case_id, **fields)
+                )
+            )
+        return campaign
+
+    def bloom_allow_bud_sync(self):
+        async def credential():
+            return object()
+
+        main.app.dependency_overrides[require_bud_sync_token] = credential
+
+    def bloom_api_list_campaigns(self, headers, project_id):
+        query = {"project_id": project_id}
+        return self.bloom_api_call("GET", "/api/campaigns", headers, params=query)
+
+    def bloom_api_get_campaign(self, headers, campaign_id):
+        return self.bloom_api_call("GET", f"/api/campaigns/{campaign_id}", headers)
+
+    def bloom_api_sync_results(self, headers, results):
+        body = {"results": results}
+        return self.bloom_api_call("POST", "/api/campaigns/sync-results", headers, json=body)
+
+    def bloom_rules_for(self, permissions):
+        return scenario_rules(permissions)
+
+    def bloom_api_try_log_in(self, email, password):
+        headers = {"user-agent": self.parameters.AUDITLOG_USER_AGENT}
+        body = {"email": email, "password": password}
+        return self._run(self._request("POST", "/api/auth/login", headers, json=body))
+
+    def bloom_add_design(self, project_id, design_id):
+        return self._run(
+            self._add(DesignItem(project_id=project_id, design_id=design_id, title=design_id))
+        )
+
+    def bloom_api_set_design_visibility(self, headers, design_id, visibility):
+        body = {"visibility": visibility}
+        return self.bloom_api_call("PATCH", f"/api/designs/{design_id}", headers, json=body)
+
+    def bloom_api_delete_design(self, headers, design_id):
+        return self.bloom_api_call("DELETE", f"/api/designs/{design_id}", headers)
+
+    def bloom_api_audit(self, headers, **query):
+        return self.bloom_api_call("GET", "/api/audit", headers, params=query)
+
+    def bloom_add_audit_events(self, hours, rows, actors):
+        ids = []
+        for hour, (actor, action, target, outcome, ip, request_id) in zip(hours, rows):
+            actor_id = actors.get(actor, actor)
+            ids.append(
+                self._run(
+                    self._add(
+                        AuditEvent(
+                            occurred_at=datetime(2026, 10, 12, hour),
+                            actor_user_id=actor_id,
+                            actor_type="anonymous" if actor_id is None else "user",
+                            action=action,
+                            target_type=target,
+                            target_id=str(hour),
+                            outcome=outcome,
+                            ip=ip,
+                            request_id=request_id,
+                        )
+                    )
+                )
+            )
+        return ids
+
+    def bloom_api_audit_pages(self, headers, action, field, direction):
+        ids = []
+        for offset in (0, self.parameters.AUDITLOG_PAGE):
+            page = self.bloom_api_audit(
+                headers,
+                action=action,
+                sort=field,
+                dir=direction,
+                limit=self.parameters.AUDITLOG_PAGE,
+                offset=offset,
+            )
+            if page.status != self.parameters.STATUS_OK:
+                return page.status
+            ids.extend(item["id"] for item in page.body["items"])
+        return ids
+
+    def bloom_route_methods_of(self, module):
+        return sorted(
+            {
+                method
+                for _, route in self._api_routes(main.app)
+                if route.endpoint.__module__ == module
+                for method in route.methods
+            }
+        )
+
+    def bloom_api_send(self, method, path, headers=None, address=None, errors=True, **fields):
+        headers = {"user-agent": self.parameters.RQA_AGENT, **(headers or {})}
+        return self._run(self._send_from(method, path, headers, address, errors, fields))
+
+    def bloom_new_cli_world(self):
+        self._run(self.engine.dispose())
+        self.engine = create_async_engine(self.parameters.SYNC_DATABASE)
+        self._run(self._create_tables())
+        self.maker = async_sessionmaker(self.engine, expire_on_commit=False)
+        self.bloom_enforce_foreign_keys()
+        self.patches.enter_context(patch.object(settings, "CLI_CODE_MODE_ENABLED", True))
+        return self._run(self._seed_cli_world())
+
+    def bloom_cli_secret_state(self):
+        async def read():
+            async with self.maker() as db:
+                query = text(
+                    "SELECT exchange_code_hash, consumed_at, approved_session_version FROM cli_auth_sessions"
+                )
+                row = (await db.execute(query)).one()
+                tokens = (await db.scalars(select(UserToken))).all()
+                return tuple(row), [(token.id, token.purpose, token.token_hash) for token in tokens]
+
+        return self._run(read())
+
+    def bloom_same_project_access(self, first_token, second_token):
+        async def compare():
+            async with self.maker() as db:
+                first = await get_current_user(first_token, db)
+                second = await get_current_user(second_token, db)
+                return first.access_map == second.access_map
+
+        return self._run(compare())
+
+    def bloom_decode_access_token(self, token):
+        return jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+
+    def bloom_revoke_refresh_tokens(self, user_id):
+        async def revoke():
+            async with self.maker() as db:
+                await invalidate_all_refresh_tokens(db, user_id)
+                await db.commit()
+
+        self._run(revoke())
+
+    def bloom_new_browser_refresh_token(self, user_id):
+        async def create():
+            async with self.maker() as db:
+                token = await create_user_token(
+                    db,
+                    user_id=user_id,
+                    purpose=UserTokenPurpose.refresh,
+                    ttl_hours=24,
+                    invalidate_existing=False,
+                )
+                await db.commit()
+                return token
+
+        return self._run(create())
+
+    def bloom_browser_refresh(self, refresh_token):
+        async def send():
+            transport = httpx.ASGITransport(app=self.api)
+            cookies = {"bloom_refresh_token": refresh_token}
+            async with REAL_CLIENT(
+                transport=transport, base_url=self.parameters.API_BASE, cookies=cookies
+            ) as client:
+                return await client.post("/api/auth/refresh")
+
+        return self._run(send())
+
+    def bloom_refresh_purpose(self):
+        return UserTokenPurpose.refresh
+
+    def bloom_cli_request_code(self, challenge):
+        return cli_auth.request_code(challenge)
+
+    def bloom_set_code_mode(self, enabled):
+        self.patches.enter_context(patch.object(settings, "CLI_CODE_MODE_ENABLED", enabled))
+
+    def bloom_cli_challenge(self, verifier=None):
+        verifier = verifier or self.parameters.CLIS_VERIFIER
+        digest = hashlib.sha256(verifier.encode()).digest()
+        challenge = base64.urlsafe_b64encode(digest).decode().rstrip("=")
+        letters = base64.b32encode(hashlib.sha256(challenge.encode()).digest()[:5]).decode()
+        return challenge, f"{letters[:4]}-{letters[4:]}"
+
+    def bloom_cli_start(self, **overrides):
+        challenge, _ = self.bloom_cli_challenge()
+        body = {"client_name": "Example client", "mode": "code", "code_challenge": challenge}
+        body.update({"state": "test-state", **overrides})
+        return self._cli("POST", "/start", json=body)
+
+    def bloom_cli_session(self, **overrides):
+        return self.bloom_cli_start(**overrides).json()["session_id"]
+
+    def bloom_cli_approve(self, headers, session_id, request_code=None):
+        code = request_code or self.bloom_cli_challenge()[1]
+        body = {"session_id": session_id, "request_code": code}
+        return self._cli("POST", "/approve", headers, json=body)
+
+    def bloom_cli_check(self, headers, session_id, request_code=None):
+        code = request_code or self.bloom_cli_challenge()[1]
+        body = {"session_id": session_id, "request_code": code}
+        return self._cli("POST", "/check", headers, json=body)
+
+    def bloom_cli_exchange(self, session_id, code, verifier=None):
+        body = {
+            "session_id": session_id,
+            "code": code,
+            "code_verifier": verifier or self.parameters.CLIS_VERIFIER,
+        }
+        return self._cli("POST", "/exchange", json=body)
+
+    def bloom_cli_deny(self, headers, session_id, **extra):
+        return self._cli("POST", "/deny", headers, json={"session_id": session_id, **extra})
+
+    def bloom_cli_lookup(self, headers, session_id):
+        return self._cli("GET", f"/sessions/{session_id}", headers)
+
+    def bloom_cli_refresh(self, body):
+        return self._cli("POST", "/refresh", json=body)
+
+    def bloom_cli_post(self, path, headers=None, body=None):
+        return self._cli("POST", f"/{path}", headers, json=body)
+
+    def bloom_cli_signed_in(self, headers):
+        session_id = self.bloom_cli_session()
+        code = self.bloom_cli_approve(headers, session_id).json()["exchange_code"]
+        return self.bloom_cli_exchange(session_id, code).json()
+
+    def bloom_cli_stored_ids(self):
+        return {str(value) for value in self._run(self._all(select(CliAuthSession.id)))}
+
+    def bloom_cli_get_session(self, session_id):
+        return self._run(self._get(CliAuthSession, UUID(session_id)))
+
+    def bloom_cli_change_session(self, session_id, **values):
+        statement = update(CliAuthSession).where(CliAuthSession.id == UUID(session_id))
+        self._run(self._execute_statement(statement.values(**values)))
+
+    def bloom_cli_expire(self, session_id):
+        self.bloom_cli_change_session(
+            session_id, expires_at=datetime.utcnow() - timedelta(seconds=1)
+        )
+
+    def bloom_set_session_version(self, user_id, version):
+        self._run(
+            self._execute_statement(
+                update(User).where(User.id == user_id).values(session_version=version)
+            )
+        )
+
+    def bloom_change_refresh_rows(self, **values):
+        self._run(self._execute_statement(update(UserToken).values(**values)))
+
+    def bloom_count_user_tokens(self):
+        return len(self._run(self._all(select(UserToken))))
+
+    def bloom_token_headers(self, claims):
+        return {"Authorization": "Bearer " + create_access_token(claims)}
+
+    def bloom_password_reset_purpose(self):
+        return UserTokenPurpose.password_reset
+
+    def bloom_callback_code(self, target):
+        return parse_qs(urlsplit(target).query)["code"][0]
+
+    def bloom_unknown_session(self):
+        return str(uuid4())
+
+    def bloom_approve_with_stale_account(self, user_id):
+        return self._run(self._approve_with_stale_account(user_id))
+
+    def bloom_approve_after_concurrent_approval(self, headers, session_id, user_id):
+        original = cli_auth.check_request_code
+
+        async def approved_elsewhere(db, checked_id, typed):
+            checked = await original(db, checked_id, typed)
+            async with self.maker() as other:
+                await other.execute(
+                    update(CliAuthSession)
+                    .where(CliAuthSession.id == checked_id)
+                    .values(user_id=user_id, exchange_code_hash="approved-elsewhere")
+                )
+                await other.commit()
+            return checked
+
+        with patch.object(cli_auth, "check_request_code", approved_elsewhere):
+            return self.bloom_cli_approve(headers, session_id)
+
+    def bloom_api_send_through_image(
+        self,
+        received_from,
+        forwarded=None,
+        trusted=None,
+        method="GET",
+        path="/api/projects",
+        **fields,
+    ):
+        chain = f"{forwarded}, {received_from}" if forwarded else received_from
+        headers = {**fields.pop("headers", {}), "X-Forwarded-For": chain}
+        app = ProxyHeadersMiddleware(self.api, trusted_hosts="127.0.0.1,::1")
+        with patch.object(settings, "TRUSTED_PROXY_NETWORKS", list(trusted or [])):
+            return self._run(
+                self._send_to(app, ("127.0.0.1", 50000), method, path, headers, fields)
+            )
+
+    def bloom_api_send_direct(
+        self, address, forwarded, trusted=None, method="GET", path="/api/projects", **fields
+    ):
+        headers = {**fields.pop("headers", {}), "X-Forwarded-For": forwarded}
+        with patch.object(settings, "TRUSTED_PROXY_NETWORKS", list(trusted or [])):
+            return self._run(
+                self._send_to(self.api, (address, 50000), method, path, headers, fields)
+            )
+
+    def bloom_with_login_limit(self, sends):
+        limiter.reset()
+        try:
+            with patch.object(limiter, "enabled", True):
+                return [send() for send in sends]
+        finally:
+            limiter.reset()
+
+    def bloom_with_refusal_threshold(self, threshold, sends):
+        with patch.object(settings, "AUDIT_REFUSAL_THRESHOLD", threshold):
+            return [send() for send in sends]
+
+    def bloom_client_address(self, trusted, peer, *forwarded):
+        with patch.object(settings, "TRUSTED_PROXY_NETWORKS", list(trusted)):
+            return client_address(self._scope(peer, *forwarded))
+
+    def bloom_rate_limit_keys(self, trusted, peer, *forwarded):
+        with patch.object(settings, "TRUSTED_PROXY_NETWORKS", list(trusted)):
+            request = Request(self._scope(peer, *forwarded))
+            return rate_limit_key(request), get_remote_address(request)
+
+    def bloom_trusted_proxy_setting(self):
+        return settings.TRUSTED_PROXY_NETWORKS
+
+    def bloom_load_trusted_proxies(self, secret, env_value=None, networks=None):
+        fields = {"SECRET_KEY": secret, "_env_file": None}
+        if networks is not None:
+            fields["TRUSTED_PROXY_NETWORKS"] = networks
+        with patch.dict(
+            "os.environ", {} if env_value is None else {"TRUSTED_PROXY_NETWORKS": env_value}
+        ):
+            try:
+                return Settings(**fields).TRUSTED_PROXY_NETWORKS, None
+            except ValidationError as error:
+                return None, type(error).__name__
+
+    def bloom_request_records(self, response=None, **match):
+        found = []
+        for record in self.bloom_list_audit_events(self.parameters.RQA_ACTION):
+            values = {**(record.details or {}), "outcome": record.outcome, "ip": record.ip}
+            if response is not None and record.request_id != response.headers.get("x-request-id"):
+                continue
+            if all(values.get(key) == value for key, value in match.items()):
+                found.append(record)
+        return found
+
+    def bloom_audit_columns(self):
+        return list(AuditEvent.__table__.columns.keys())
+
+    def bloom_list_every_audit_event(self):
+        return self._run(self._all(select(AuditEvent).order_by(AuditEvent.id)))
+
+    def bloom_cli_headers(self, user_id):
+        user = self._run(self._get(User, user_id))
+        refresh = self._run(
+            self._add(
+                UserToken(
+                    user_id=user_id,
+                    purpose=UserTokenPurpose.refresh,
+                    token_hash="c" * 64,
+                    expires_at=datetime.utcnow() + timedelta(days=1),
+                )
+            )
+        )
+        claims = {"sub": str(user_id), "type": "user", "ver": user.session_version}
+        token = create_access_token({**claims, "cli_refresh_id": refresh})
+        return {"Authorization": f"Bearer {token}"}
+
+    def bloom_user_token_headers(self, user_id):
+        user = self._run(self._get(User, user_id))
+        claims = {"sub": str(user_id), "type": "user", "ver": user.session_version}
+        return {"Authorization": f"Bearer {create_access_token(claims)}"}
+
+    def bloom_deactivate(self, user_id):
+        self._run(
+            self._execute_statement(update(User).where(User.id == user_id).values(is_active=False))
+        )
+
+    def bloom_add_notification(self, user_id):
+        return self._run(
+            self._add(Notification(user_id=user_id, event_type="comment", title="For the owner"))
+        )
+
+    def bloom_add_old_refusals(self, address, count, minutes):
+        for _ in range(count):
+            self._run(
+                self._add(
+                    AuditEvent(
+                        occurred_at=datetime.utcnow() - timedelta(minutes=minutes),
+                        actor_type="anonymous",
+                        action=self.parameters.RQA_ACTION,
+                        ip=address,
+                        outcome="denied",
+                    )
+                )
+            )
+
+    def bloom_set_refusal_threshold(self, threshold):
+        self.patches.enter_context(patch.object(settings, "AUDIT_REFUSAL_THRESHOLD", threshold))
+
+    def bloom_refusal_window(self):
+        return settings.AUDIT_REFUSAL_THRESHOLD, settings.AUDIT_REFUSAL_WINDOW_MINUTES
+
+    def bloom_cors_origin(self):
+        return settings.CORS_ORIGINS[0]
+
+    def bloom_sign_in_many_times_rate_limited(self, address, count, body):
+        limiter.reset()
+        try:
+            with patch.object(limiter, "enabled", True):
+                return [
+                    self.bloom_api_send("POST", "/api/auth/login", address=address, json=body)
+                    for _ in range(count)
+                ]
+        finally:
+            limiter.reset()
+
+    def bloom_send_while_audit_fails(self, path):
+        async def unavailable(scope):
+            raise OperationalError("INSERT", {}, Exception("database unavailable"))
+
+        root = logging.getLogger()
+        handler = BufferingHandler(self.parameters.LOG_CAPACITY)
+        root.addHandler(handler)
+        try:
+            with patch.object(audit_service, "_open_session", unavailable):
+                answer = self.bloom_api_send("GET", path)
+        finally:
+            root.removeHandler(handler)
+        return answer, "\n".join(record.getMessage() for record in handler.buffer)
+
+    def bloom_add_exploding_route(self, path, message):
+        routes = list(main.app.router.routes)
+
+        @main.app.get(path)
+        async def explode():
+            raise RuntimeError(message)
+
+        self.patches.callback(setattr, main.app.router, "routes", routes)
+
+    def bloom_route_template(self, path):
+        class Route:
+            path_format = "/{project_id}/things/{thing_id}"
+            path_regex = re.compile(r"^/(?P<project_id>[^/]+)/things/(?P<thing_id>[^/]+)$")
+
+        return route_template({"route": Route(), "path": path}), route_template({"path": path})
+
+    def bloom_request_outcomes(self, codes):
+        return [request_outcome(code) for code in codes], request_outcome(404, refused=True)
+
+    def bloom_read_created_bodies(self):
+        plain = CreatedBody(gzipped=False)
+        plain.feed(b'{"id": 4, ')
+        plain.feed(b'"doc_id": "PRJ-DOC-004"}')
+        packed = CreatedBody(gzipped=True)
+        packed.feed(gzip.compress(b'{"id": 5}'))
+        large = CreatedBody(gzipped=False)
+        large.feed(b"x" * (CREATED_BODY_LIMIT + 1))
+        broken = CreatedBody(gzipped=True)
+        broken.feed(b"not gzip")
+        return tuple(body.parsed() for body in (plain, packed, large, broken))
+
+    def bloom_api_get_baseline(self, headers, baseline_id):
+        return self.bloom_api_call("GET", f"/api/baselines/{baseline_id}", headers)
+
+    def bloom_api_list_settings(self, headers, project_id):
+        query = {"project_id": project_id}
+        return self.bloom_api_call("GET", "/api/integrations/settings", headers, params=query)
+
+    def bloom_api_related(self, headers, kind, artefact_id):
+        return self.bloom_api_call("GET", f"/api/artefacts/{kind}/{artefact_id}/related", headers)
+
+    def bloom_api_list_variables(self, headers, project_id):
+        query = {"project_id": project_id}
+        return self.bloom_api_call("GET", "/api/project-variables", headers, params=query)
 
     def bloom_add_document(self, project_id, doc_id, title, visibility):
         return self._run(
@@ -448,6 +2529,27 @@ class BloomApiInterface(BloomInterface):
         query = {"project_prefix": prefix}
         return self._run(self._request("GET", "/api/access-requests", headers, params=query))
 
+    def bloom_api_decide_access_request(self, headers, request_id, decision):
+        path = f"/api/access-requests/{request_id}/decision"
+        return self._run(self._request("POST", path, headers, json={"decision": decision}))
+
+    def bloom_api_list_all_access_requests(self, headers, status=None):
+        query = {"status": status} if status else None
+        return self._run(self._request("GET", "/api/access-requests", headers, params=query))
+
+    def bloom_api_request_access_while_mail_fails(
+        self, headers, resource_type, resource_ref, prefix
+    ):
+        def fail(**mail):
+            raise MailConfigurationError(self.parameters.ARQ_MAIL_ERROR)
+
+        with patch.object(access_requests_api, "send_access_request_email", fail):
+            return self.bloom_api_request_access(headers, resource_type, resource_ref, prefix)
+
+    def bloom_list_audit_events(self, action):
+        query = select(AuditEvent).where(AuditEvent.action == action).order_by(AuditEvent.id)
+        return self._run(self._all(query))
+
     def bloom_api_get_requirement(self, headers, requirement_id):
         return self._run(self._request("GET", f"/api/requirements/{requirement_id}", headers))
 
@@ -501,6 +2603,9 @@ class BloomApiInterface(BloomInterface):
         return listed.status, [row["id"] for row in rows]
 
     def bloom_enforce_foreign_keys(self):
+        if not str(self.engine.url).startswith("sqlite"):
+            return
+
         async def enforce():
             async with self.engine.connect() as conn:
                 await conn.exec_driver_sql(self.parameters.SQLITE_FOREIGN_KEYS)
@@ -568,25 +2673,177 @@ class BloomApiInterface(BloomInterface):
                 setattr(row, name, value)
             await db.commit()
 
+    def _controlled(self, kind, project_id, public, visibility):
+        common = {"project_id": project_id, "visibility": visibility}
+        if kind == "design":
+            return DesignItem(
+                design_id=public,
+                title=public,
+                status="Draft",
+                priority="Medium",
+                design_type="Architecture",
+                **common,
+            )
+        if kind == "risk":
+            return RiskItem(
+                risk_id=public,
+                title=public,
+                status="Open",
+                severity="Medium",
+                probability="Medium",
+                risk_category="Technical",
+                **common,
+            )
+        if kind == "change":
+            return ChangeRequest(
+                change_id=public,
+                title=public,
+                status="Submitted",
+                priority="Medium",
+                change_type="Enhancement",
+                **common,
+            )
+        if kind == "concept":
+            return TestConcept(concept_id=public, name=public, status="Draft", coverage=0, **common)
+        return Defect(
+            defect_id=public,
+            title=public,
+            status="Open",
+            severity="Medium",
+            priority="Medium",
+            **common,
+        )
+
+    def _answer(self, answer):
+        try:
+            body = answer.json()
+        except ValueError:
+            body = None
+        return SimpleNamespace(status=answer.status_code, body=body)
+
+    def _with_key(self, key, call, value):
+        try:
+            if key is None:
+                return SimpleNamespace(value=call(value), status=None)
+            with patch.object(settings, "INTEGRATION_ENCRYPTION_KEY", key):
+                return SimpleNamespace(value=call(value), status=None)
+        except HTTPException as exc:
+            return SimpleNamespace(value=None, status=exc.status_code)
+
+    def _cli(self, method, path, headers=None, json=None):
+        return self.bloom_api_send(method, self.parameters.CLI_PREFIX + path, headers, json=json)
+
+    async def _seed_cli_world(self):
+        async with self.maker() as db:
+            user = User(
+                email="cli-reader@example.com",
+                full_name="CLI Reader",
+                hashed_password="unused",
+                role=UserRole.maintainer,
+                is_active=True,
+            )
+            other = User(
+                email="other@example.com",
+                full_name="Other",
+                hashed_password="unused",
+                role=UserRole.external,
+                is_active=True,
+            )
+            project = Project(name="Demo", prefix="PRJ")
+            policy = Policy(name="App reader", scope="app", permissions={"application": ["view"]})
+            db.add_all([user, other, project, policy])
+            await db.flush()
+            db.add(
+                project_access_fixture(
+                    user_id=user.id, project_id=project.id, permissions={"REQ": ["view"]}
+                )
+            )
+            await db.execute(
+                user_application_policies.insert().values(user_id=user.id, policy_id=policy.id)
+            )
+            await db.commit()
+            claims = {"sub": str(user.id), "type": "user", "ver": 1}
+            return SimpleNamespace(
+                headers={"Authorization": "Bearer " + create_access_token(claims)},
+                user_id=user.id,
+                other_id=other.id,
+            )
+
+    async def _approve_with_stale_account(self, user_id):
+        challenge, request_code = self.bloom_cli_challenge()
+        async with self.maker() as db:
+            start = CliStartRequest(
+                client_name="Client", mode="code", code_challenge=challenge, state="state"
+            )
+            session = await cli_auth.start_session(db, start)
+            await db.commit()
+            session_id = session.id
+        async with self.maker() as db:
+            account = await db.get(User, user_id)
+            async with self.maker() as other:
+                await other.execute(
+                    update(User).where(User.id == user_id).values(session_version=2)
+                )
+                await other.commit()
+            try:
+                await cli_auth.approve_session(db, session_id, account, request_code)
+                reason = None
+            except cli_auth.CliAuthorizationError as refused:
+                reason = refused.reason
+        stored = await self._get(CliAuthSession, session_id)
+        return reason, stored.user_id, stored.exchange_code_hash
+
+    def _scope(self, peer, *forwarded):
+        return {
+            "type": "http",
+            "client": (peer, 50000) if peer else None,
+            "headers": [(b"x-forwarded-for", value.encode("latin-1")) for value in forwarded],
+        }
+
+    async def _send_to(self, app, origin, method, path, headers, fields):
+        transport = httpx.ASGITransport(app=app, client=origin)
+        async with REAL_CLIENT(transport=transport, base_url=self.parameters.API_BASE) as client:
+            return await client.request(method, path, headers=headers, **fields)
+
+    async def _send_from(self, method, path, headers, address, errors, fields):
+        origin = (address, 4321) if address else ("127.0.0.1", 123)
+        transport = httpx.ASGITransport(app=self.api, client=origin, raise_app_exceptions=errors)
+        async with REAL_CLIENT(transport=transport, base_url=self.parameters.API_BASE) as client:
+            return await client.request(method, path, headers=headers, **fields)
+
+    async def _execute_statement(self, statement):
+        async with self.maker() as db:
+            await db.execute(statement)
+            await db.commit()
+
+    async def _upload(self, path, headers, files):
+        transport = httpx.ASGITransport(app=self.api)
+        async with REAL_CLIENT(transport=transport, base_url=self.parameters.API_BASE) as client:
+            return await client.post(path, headers=headers, files=files)
+
+    async def _add_group_exporter(self, project_id, user_id, name, permissions):
+        async with self.maker() as db:
+            read = {resource: ["view"] for resource in permissions}
+            policy = Policy(
+                name=name,
+                permissions=permissions,
+                type_tags=scenario_type_tags(read, self.parameters.CUSTOMER_VISIBILITY),
+            )
+            group = Group(name=name)
+            db.add_all([policy, group])
+            await db.flush()
+            db.add_all(
+                [
+                    GroupMembership(group_id=group.id, user_id=user_id),
+                    ProjectAccess(group_id=group.id, project_id=project_id, policies=[policy]),
+                ]
+            )
+            await db.commit()
+
     async def _post(self, path, body, headers):
         transport = httpx.ASGITransport(app=self.api)
         async with REAL_CLIENT(transport=transport, base_url=self.parameters.API_BASE) as client:
             return await client.post(path, content=body, headers=headers)
-
-    async def _add_external_member(self, project_id, user_id, permissions, visibility):
-        async with self.maker() as db:
-            membership = project_access_fixture(
-                user_id=user_id,
-                project_id=project_id,
-                permissions=permissions,
-                visibility=visibility,
-                doc_types=[],
-            )
-            db.add(membership)
-            await db.flush()
-            for doc_type in DOC_TYPE_RESOURCES:
-                allow_doc_types(membership.policies[0], [doc_type])
-            await db.commit()
 
     async def _request(self, method, path, headers=None, json=None, params=None):
         transport = httpx.ASGITransport(app=self.api)

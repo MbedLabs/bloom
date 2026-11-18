@@ -17,14 +17,17 @@ class CampaignSyncResultsBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_latest_result_is_applied(self):
-        case = self.tc_latest.case
+        latest = self.bloom.bloom_apply_test_result(
+            self.parameters.SYNC_RESULT_EMPTY_CASE, self.parameters.SYNC_RESULT_FAILED
+        )
+        case = latest.case
         result = self.parameters.SYNC_RESULT_FAILED
-        self.print_variables({"applied": self.tc_latest.applied, "case": vars(case)})
+        self.print_variables({"applied": latest.applied, "case": vars(case)})
         self.assertTrue(
-            self.tc_latest.applied is True,
+            latest.applied is True,
             msg=self.parameters.MSG_SYNC_RESULT_APPLIED,
             expected=True,
-            actual=self.tc_latest.applied,
+            actual=latest.applied,
             abort_on_fail=False,
         )
         checks = (
@@ -47,14 +50,17 @@ class CampaignSyncResultsBase(BloomTestCase):
         )
 
     def bud_older_result_is_ignored(self):
-        case = self.tc_older.case
+        older = self.bloom.bloom_apply_test_result(
+            self.parameters.SYNC_RESULT_NEWER_CASE, self.parameters.SYNC_RESULT_OLDER
+        )
+        case = older.case
         kept = self.parameters.SYNC_RESULT_NEWER_CASE
-        self.print_variables({"applied": self.tc_older.applied, "case": vars(case)})
+        self.print_variables({"applied": older.applied, "case": vars(case)})
         self.assertTrue(
-            self.tc_older.applied is False,
+            older.applied is False,
             msg=self.parameters.MSG_SYNC_RESULT_OLDER,
             expected=False,
-            actual=self.tc_older.applied,
+            actual=older.applied,
             abort_on_fail=False,
         )
         for field in ("last_execution_status", "last_execution_comment", "last_bud_run_id"):
@@ -66,11 +72,14 @@ class CampaignSyncResultsBase(BloomTestCase):
             )
 
     def bud_sync_payload_is_bounded(self):
-        self.print_variables(
-            {"results": self.parameters.SYNC_RESULT_TOO_MANY, "refusal": self.tc_too_many}
+        too_many = self.bloom.bloom_build_sync_request(
+            self.parameters.SYNC_RESULT_TC_ID,
+            self.parameters.SYNC_RESULT_STATUS,
+            self.parameters.SYNC_RESULT_TOO_MANY,
         )
+        self.print_variables({"results": self.parameters.SYNC_RESULT_TOO_MANY, "refusal": too_many})
         self.assertEqual(
-            self.tc_too_many,
+            too_many,
             self.parameters.SYNC_RESULT_REFUSAL,
             msg=self.parameters.MSG_SYNC_RESULT_BOUNDED,
             abort_on_fail=False,

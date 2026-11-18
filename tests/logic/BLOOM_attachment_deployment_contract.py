@@ -15,12 +15,9 @@ class AttachmentDeploymentContractTest(AttachmentDeploymentContractBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_compose = self.bloom.bloom_read_compose_service(self.parameters.COMPOSE_SERVICE)
-        self.tc_dockerfile = self.bloom.bloom_read_repo_lines_with(
+        self.compose = self.bloom.bloom_read_compose_service(self.parameters.COMPOSE_SERVICE)
+        self.dockerfile = self.bloom.bloom_read_repo_lines_with(
             self.parameters.DOCKERFILE, self.parameters.ATTACHMENT_WORDS
-        )
-        self.tc_example = self.bloom.bloom_read_repo_lines_with(
-            self.parameters.ENV_EXAMPLE, self.parameters.ATTACHMENT_WORDS
         )
 
     def tearDownClass(self):

@@ -17,10 +17,13 @@ class JiraWebhookInboundCreationBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_unmatched_issue_creates_a_defect(self):
+        response = self.bloom.bloom_post_jira_webhook(
+            self.body, delivery=self.parameters.DELIVERIES[10]
+        )
         found = (
-            self.tc_response.status_code,
-            self.tc_response.json().get("status"),
-            self.tc_response.json().get("target"),
+            response.status_code,
+            response.json().get("status"),
+            response.json().get("target"),
         )
         self.print_variables({"status, answer, target": found})
         self.assertEqual(
@@ -48,8 +51,11 @@ class JiraWebhookInboundCreationBase(BloomTestCase):
         )
 
     def bud_replayed_create_makes_no_second_defect(self):
+        replay = self.bloom.bloom_post_jira_webhook(
+            self.body, delivery=self.parameters.DELIVERIES[10]
+        )
         found = (
-            self.tc_replay.json().get("status"),
+            replay.json().get("status"),
             len(self.bloom.bloom_list_defects_linked_to(self.parameters.WEBHOOK_NEW_NUMBER)),
         )
         self.print_variables({"answer, defects": found})

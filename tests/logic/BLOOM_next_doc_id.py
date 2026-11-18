@@ -15,22 +15,6 @@ class NextDocIdTest(NextDocIdBase):
 
     def setUpClass(self):
         super().setUpClass()
-        prefix = self.parameters.NEXT_ID_PREFIX
-        kind = self.parameters.NEXT_ID_TYPE
-        self.tc_empty = self.bloom.bloom_compute_next_id([], prefix, kind)
-        self.tc_after_taken = self.bloom.bloom_compute_next_id(
-            self.parameters.NEXT_ID_TAKEN_IDS, prefix, kind
-        )
-        self.tc_after_gap = self.bloom.bloom_compute_next_id(
-            self.parameters.NEXT_ID_GAP_IDS, prefix, kind
-        )
-        self.tc_among_others = self.bloom.bloom_compute_next_id(
-            self.parameters.NEXT_ID_MIXED_IDS, prefix, kind
-        )
-        self.tc_unsupported = self.bloom.bloom_compute_next_id(
-            [], prefix, self.parameters.NEXT_ID_UNSUPPORTED_TYPE
-        )
-        self.tc_routes = self.bloom.bloom_list_docs_routes()
 
     def tearDownClass(self):
         super().tearDownClass()

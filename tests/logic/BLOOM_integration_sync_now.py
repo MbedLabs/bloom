@@ -15,15 +15,15 @@ class IntegrationSyncNowTest(IntegrationSyncNowBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_project_id = self.bloom.bloom_create_project()
-        self.tc_setting_id = self.bloom.bloom_create_integration(
-            self.tc_project_id, create_defects_on_inbound=False
+        self.project_id = self.bloom.bloom_create_project()
+        self.setting_id = self.bloom.bloom_create_integration(
+            self.project_id, create_defects_on_inbound=False
         )
-        self.tc_defect_id = self.bloom.bloom_link_defect(
-            self.tc_project_id, "jira", self.parameters.JIRA_PROJECT, self.parameters.LINKED_NUMBER
+        self.defect_id = self.bloom.bloom_link_defect(
+            self.project_id, "jira", self.parameters.JIRA_PROJECT, self.parameters.LINKED_NUMBER
         )
-        self.tc_change_id = self.bloom.bloom_link_change(
-            self.tc_project_id,
+        self.change_id = self.bloom.bloom_link_change(
+            self.project_id,
             "jira",
             self.parameters.JIRA_PROJECT,
             self.parameters.CHANGE_NUMBER,
@@ -47,7 +47,7 @@ class IntegrationSyncNowTest(IntegrationSyncNowBase):
                 ): self.parameters.STATUS_SERVER_ERROR
             },
         )
-        self.tc_result = self.bloom.bloom_sync_now(self.tc_setting_id, self.parameters.ADMIN_EMAIL)
+        self.result = self.bloom.bloom_sync_now(self.setting_id, self.parameters.ADMIN_EMAIL)
 
     def tearDownClass(self):
         super().tearDownClass()

@@ -18,7 +18,7 @@ class TokenLoggingTest(TokenLoggingBase):
         self.bloom.bloom_start_full_api()
         path = self.parameters.INVITE_INFO_PATH
         body = {"token": self.parameters.ONE_TIME_TOKEN}
-        self.tc_logs = self.bloom.bloom_api_post_and_read_logs(
+        self.logs = self.bloom.bloom_api_post_and_read_logs(
             [(path, body), (f"{path}?token={self.parameters.ONE_TIME_TOKEN}", body)]
         )
 

@@ -17,31 +17,31 @@ class CliAuthRefreshRevocationBase(BloomTestCase):
     interface = BloomPgInterface
 
     def bud_database_upgrades(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        code, output = self.tc_upgrade
+        code, output = self.upgrade
         if code:
             self.log_info(output)
         self.print_variables({"exit code": code})
         self.assertEqual(code, 0, msg=self.parameters.MSG_FRESH_UPGRADE, abort_on_fail=True)
 
     def bud_refresh_waits_for_the_account_lock(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"asked for the lock": self.tc_outcome.waited})
+        self.print_variables({"asked for the lock": self.outcome.waited})
         self.assertTrue(
-            self.tc_outcome.waited, msg=self.parameters.MSG_REFRESH_WAITED, abort_on_fail=False
+            self.outcome.waited, msg=self.parameters.MSG_REFRESH_WAITED, abort_on_fail=False
         )
 
     def bud_refresh_is_refused_after_the_revocation(self):
-        if not self.tc_postgres:
+        if not self.postgres:
             self.skipAssert(self.parameters.MSG_NEEDS_POSTGRES)
             return
-        self.print_variables({"refusal": self.tc_outcome.reason})
+        self.print_variables({"refusal": self.outcome.reason})
         self.assertEqual(
-            self.tc_outcome.reason,
+            self.outcome.reason,
             self.parameters.CLI_INVALID_TOKEN,
             msg=self.parameters.MSG_REFRESH_REVOKED,
             abort_on_fail=False,

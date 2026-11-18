@@ -15,12 +15,12 @@ class JiraWebhookEventLogsTest(JiraWebhookEventLogsBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_env = self.bloom.bloom_create_webhook_environment()
+        self.env = self.bloom.bloom_create_webhook_environment()
         self.bloom.bloom_log_sync_event(
-            self.parameters.TARGET_DEFECT, self.tc_env.defect_id, self.parameters.PROBE_DEFECT_EVENT
+            self.parameters.TARGET_DEFECT, self.env.defect_id, self.parameters.PROBE_DEFECT_EVENT
         )
         self.bloom.bloom_log_sync_event(
-            self.parameters.TARGET_CHANGE, self.tc_env.change_id, self.parameters.PROBE_CHANGE_EVENT
+            self.parameters.TARGET_CHANGE, self.env.change_id, self.parameters.PROBE_CHANGE_EVENT
         )
 
     def tearDownClass(self):

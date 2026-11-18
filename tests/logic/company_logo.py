@@ -18,54 +18,65 @@ class CompanyLogoBase(BloomTestCase):
 
     def bud_logo_is_stored_served_and_deleted(self):
         png = self.parameters.LOGO_PNG
+        stored = self.bloom.bloom_set_logo(png, self.parameters.LOGO_PNG_TYPE)
+        served = self.bloom.bloom_get_logo()
+        report_logo = self.bloom.bloom_report_logo()
+        self.bloom.bloom_delete_logo()
+        deleted = self.bloom.bloom_get_logo()
+        report_after = self.bloom.bloom_report_logo()
         self.print_variables(
             {
-                "stored": vars(self.tc_stored),
-                "served": (self.tc_served.status, self.tc_served.media_type),
-                "after delete": self.tc_deleted.status,
+                "stored": vars(stored),
+                "served": (served.status, served.media_type),
+                "after delete": deleted.status,
             }
         )
         self._equal(
-            self.tc_stored.content_type,
+            stored.content_type,
             self.parameters.LOGO_PNG_TYPE,
             self.parameters.MSG_LOGO_TYPE,
         )
-        self._equal(self.tc_stored.size, len(png), self.parameters.MSG_LOGO_SIZE)
-        self._equal(self.tc_served.body, png, self.parameters.MSG_LOGO_BODY)
+        self._equal(stored.size, len(png), self.parameters.MSG_LOGO_SIZE)
+        self._equal(served.body, png, self.parameters.MSG_LOGO_BODY)
         self._equal(
-            self.tc_served.media_type, self.parameters.LOGO_PNG_TYPE, self.parameters.MSG_LOGO_MEDIA
+            served.media_type, self.parameters.LOGO_PNG_TYPE, self.parameters.MSG_LOGO_MEDIA
         )
-        self._equal(self.tc_report_logo, png, self.parameters.MSG_LOGO_REPORT)
+        self._equal(report_logo, png, self.parameters.MSG_LOGO_REPORT)
         self._equal(
-            self.tc_deleted.status,
+            deleted.status,
             self.parameters.STATUS_NOT_FOUND,
             self.parameters.MSG_LOGO_DELETED,
         )
-        self._equal(self.tc_report_after, None, self.parameters.MSG_LOGO_REPORT_NONE)
+        self._equal(report_after, None, self.parameters.MSG_LOGO_REPORT_NONE)
 
     def bud_non_image_is_refused(self):
-        self.print_variables(vars(self.tc_text))
+        text = self.bloom.bloom_set_logo(
+            self.parameters.LOGO_NOT_IMAGE, self.parameters.LOGO_TEXT_TYPE
+        )
+        self.print_variables(vars(text))
         self._equal(
-            self.tc_text.status,
+            text.status,
             self.parameters.STATUS_UNSUPPORTED_MEDIA,
             self.parameters.MSG_LOGO_NOT_IMAGE,
         )
 
     def bud_requirements_pdf_embeds_the_logo(self):
+        pdf_plain = self.bloom.bloom_requirements_pdf(None)
+        pdf_logo = self.bloom.bloom_requirements_pdf(self.parameters.LOGO_PNG)
         header = self.parameters.LOGO_PDF_HEADER
         self.print_variables(
             {
-                "without": (self.tc_pdf_plain[:8], len(self.tc_pdf_plain)),
-                "with": (self.tc_pdf_logo[:8], len(self.tc_pdf_logo)),
+                "without": (pdf_plain[:8], len(pdf_plain)),
+                "with": (pdf_logo[:8], len(pdf_logo)),
             }
         )
-        self._equal(self.tc_pdf_plain[: len(header)], header, self.parameters.MSG_LOGO_PDF)
-        self._equal(self.tc_pdf_logo[: len(header)], header, self.parameters.MSG_LOGO_PDF)
+        self._equal(pdf_plain[: len(header)], header, self.parameters.MSG_LOGO_PDF)
+        self._equal(pdf_logo[: len(header)], header, self.parameters.MSG_LOGO_PDF)
         self.assertTrue(
-            len(self.tc_pdf_logo) >= len(self.tc_pdf_plain),
+            len(pdf_logo) >= len(pdf_plain),
             msg=self.parameters.MSG_LOGO_PDF_SIZE,
-            expected=f">= {len(self.tc_pdf_plain)}",
-            actual=len(self.tc_pdf_logo),
+            expected=f">= {len(pdf_plain)}",
+            actual=len(pdf_logo),
             abort_on_fail=False,
         )
 

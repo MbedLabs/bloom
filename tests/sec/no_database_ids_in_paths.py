@@ -17,15 +17,15 @@ class NoDatabaseIdsInPathsBase(BloomTestCase):
     interface = BloomApiInterface
 
     def bud_no_unlisted_route_takes_a_database_id(self):
-        unlisted = sorted(self.tc_integer_routes - self.tc_allowlisted)
-        self.print_variables({"integer routes": len(self.tc_integer_routes), "unlisted": unlisted})
+        unlisted = sorted(self.integer_routes - self.allowlisted)
+        self.print_variables({"integer routes": len(self.integer_routes), "unlisted": unlisted})
         self.assertEqual(
             unlisted, [], msg=self.parameters.MSG_DATABASE_ID_UNLISTED, abort_on_fail=False
         )
 
     def bud_every_allowlisted_route_still_takes_a_database_id(self):
-        stale = sorted(self.tc_allowlisted - self.tc_integer_routes)
-        self.print_variables({"allowlisted": len(self.tc_allowlisted), "stale": stale})
+        stale = sorted(self.allowlisted - self.integer_routes)
+        self.print_variables({"allowlisted": len(self.allowlisted), "stale": stale})
         self.assertEqual(stale, [], msg=self.parameters.MSG_DATABASE_ID_STALE, abort_on_fail=False)
 
     def bud_each_route_has_one_owner(self):
@@ -44,7 +44,7 @@ class NoDatabaseIdsInPathsBase(BloomTestCase):
     def bud_suite_and_campaign_routes_take_no_database_id(self):
         owned = sorted(
             route
-            for route in self.tc_integer_routes | self.tc_allowlisted
+            for route in self.integer_routes | self.allowlisted
             if route.split(" ", 1)[1].startswith(self.parameters.DATABASE_ID_FREE_PREFIXES)
         )
         self.print_variables({"owned": owned})

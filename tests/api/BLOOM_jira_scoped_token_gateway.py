@@ -15,7 +15,7 @@ class JiraScopedTokenGatewayTest(JiraScopedTokenGatewayBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_env = self.bloom.bloom_create_webhook_environment(
+        self.env = self.bloom.bloom_create_webhook_environment(
             jira_project_key=self.parameters.JIRA_PROJECT, create_defects_on_inbound=True
         )
         issue = {
@@ -26,9 +26,6 @@ class JiraScopedTokenGatewayTest(JiraScopedTokenGatewayBase):
             },
         }
         self.bloom.bloom_serve_atlassian_gateway(self.parameters.CLOUD_ID, [issue])
-        self.tc_result = self.bloom.bloom_sync_now(
-            self.tc_env.setting_id, self.parameters.ADMIN_EMAIL
-        )
 
     def tearDownClass(self):
         super().tearDownClass()

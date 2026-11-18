@@ -15,11 +15,10 @@ class CloudronMetadataTest(CloudronMetadataBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_version = self.bloom.bloom_project_version()
-        self.tc_manifest = self.bloom.bloom_read_repo_json(self.parameters.CLOUDRON_MANIFEST)
-        self.tc_description = self.bloom.bloom_read_repo_text(self.parameters.CLOUDRON_DESCRIPTION)
-        self.tc_catalog = self.bloom.bloom_read_repo_json(self.parameters.CLOUDRON_CATALOG)
-        self.tc_changelog = self.bloom.bloom_read_repo_text(self.parameters.CLOUDRON_CHANGELOG)
+        self.version = self.bloom.bloom_project_version()
+        self.manifest = self.bloom.bloom_read_repo_json(self.parameters.CLOUDRON_MANIFEST)
+        self.description = self.bloom.bloom_read_repo_text(self.parameters.CLOUDRON_DESCRIPTION)
+        self.changelog = self.bloom.bloom_read_repo_text(self.parameters.CLOUDRON_CHANGELOG)
 
     def tearDownClass(self):
         super().tearDownClass()

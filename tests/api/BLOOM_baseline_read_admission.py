@@ -30,7 +30,7 @@ class BaselineReadAdmissionTest(BaselineReadAdmissionBase):
             self.parameters.API_PASSWORD,
             self.parameters.API_MEMBER_ROLE,
         )
-        member, _ = self.bloom.bloom_log_in(
+        self.member, _ = self.bloom.bloom_log_in(
             self.parameters.BASELINE_MEMBER_EMAIL, self.parameters.API_PASSWORD
         )
         policy = self.bloom.bloom_api_create_policy(
@@ -40,13 +40,9 @@ class BaselineReadAdmissionTest(BaselineReadAdmissionBase):
             admin, self.parameters.BASELINE_GROUP_NAME, [policy.json()["id"]]
         )
         joined = self.bloom.bloom_api_add_group_member(admin, group.json()["id"], user.json()["id"])
-        self.tc_reads = [
-            answer.status_code
-            for answer in self.bloom.bloom_api_read_baselines(
-                member, project.json()["id"], baseline.json()["id"]
-            )
-        ]
-        self.tc_setup = [
+        self.project_id = project.json()["id"]
+        self.baseline_id = baseline.json()["id"]
+        self.setup = [
             (project.status_code, self.parameters.STATUS_CREATED),
             (baseline.status_code, self.parameters.STATUS_CREATED),
             (user.status_code, self.parameters.STATUS_CREATED),

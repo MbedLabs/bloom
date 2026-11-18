@@ -27,7 +27,7 @@ class IntegrationSyncGitlabRedirectsBase(BloomTestCase):
         )
 
     def bud_run_error_names_the_redirect(self):
-        error = self.bloom.bloom_get_setting(self.tc_setting_id).sync_error
+        error = self.bloom.bloom_get_setting(self.setting_id).sync_error
         self.print_variables({"error": error})
         self.assertEqual(
             error,

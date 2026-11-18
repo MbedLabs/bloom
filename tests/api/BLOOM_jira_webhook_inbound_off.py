@@ -15,14 +15,8 @@ class JiraWebhookInboundOffTest(JiraWebhookInboundOffBase):
 
     def setUpClass(self):
         super().setUpClass()
-        self.tc_env = self.bloom.bloom_create_webhook_environment(
+        self.env = self.bloom.bloom_create_webhook_environment(
             jira_project_key=self.parameters.JIRA_PROJECT, create_defects_on_inbound=False
-        )
-        body = self.bloom.bloom_jira_webhook_body(
-            self.bloom.bloom_jira_key(self.parameters.WEBHOOK_OFF_NUMBER)
-        )
-        self.tc_response = self.bloom.bloom_post_jira_webhook(
-            body, delivery=self.parameters.DELIVERIES[11]
         )
 
     def tearDownClass(self):

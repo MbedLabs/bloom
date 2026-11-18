@@ -17,63 +17,79 @@ class NextDocIdBase(BloomTestCase):
     interface = BloomLogicInterface
 
     def bud_empty_project_starts_at_its_first_id(self):
-        self.print_variables({"preview": self.tc_empty})
+        empty = self.bloom.bloom_compute_next_id(
+            [], self.parameters.NEXT_ID_PREFIX, self.parameters.NEXT_ID_TYPE
+        )
+        self.print_variables({"preview": empty})
         self.assertEqual(
-            self.tc_empty,
+            empty,
             (self.parameters.NEXT_ID_FIRST, None),
             msg=self.parameters.MSG_NEXT_ID_EMPTY,
             abort_on_fail=False,
         )
 
     def bud_preview_advances_past_the_taken_id(self):
-        self.print_variables(
-            {"taken": self.parameters.NEXT_ID_TAKEN_IDS, "preview": self.tc_after_taken}
+        after_taken = self.bloom.bloom_compute_next_id(
+            self.parameters.NEXT_ID_TAKEN_IDS,
+            self.parameters.NEXT_ID_PREFIX,
+            self.parameters.NEXT_ID_TYPE,
         )
+        self.print_variables({"taken": self.parameters.NEXT_ID_TAKEN_IDS, "preview": after_taken})
         self.assertEqual(
-            self.tc_after_taken,
+            after_taken,
             (self.parameters.NEXT_ID_AFTER_TAKEN, None),
             msg=self.parameters.MSG_NEXT_ID_TAKEN,
             abort_on_fail=False,
         )
 
     def bud_preview_follows_the_highest_number(self):
-        self.print_variables(
-            {"taken": self.parameters.NEXT_ID_GAP_IDS, "preview": self.tc_after_gap}
+        after_gap = self.bloom.bloom_compute_next_id(
+            self.parameters.NEXT_ID_GAP_IDS,
+            self.parameters.NEXT_ID_PREFIX,
+            self.parameters.NEXT_ID_TYPE,
         )
+        self.print_variables({"taken": self.parameters.NEXT_ID_GAP_IDS, "preview": after_gap})
         self.assertEqual(
-            self.tc_after_gap,
+            after_gap,
             (self.parameters.NEXT_ID_AFTER_HIGH, None),
             msg=self.parameters.MSG_NEXT_ID_HIGHEST,
             abort_on_fail=False,
         )
 
     def bud_preview_ignores_other_types_and_projects(self):
-        self.print_variables(
-            {"taken": self.parameters.NEXT_ID_MIXED_IDS, "preview": self.tc_among_others}
+        among_others = self.bloom.bloom_compute_next_id(
+            self.parameters.NEXT_ID_MIXED_IDS,
+            self.parameters.NEXT_ID_PREFIX,
+            self.parameters.NEXT_ID_TYPE,
         )
+        self.print_variables({"taken": self.parameters.NEXT_ID_MIXED_IDS, "preview": among_others})
         self.assertEqual(
-            self.tc_among_others,
+            among_others,
             (self.parameters.NEXT_ID_AFTER_LOW, None),
             msg=self.parameters.MSG_NEXT_ID_OTHERS,
             abort_on_fail=False,
         )
 
     def bud_unsupported_type_is_refused(self):
+        unsupported = self.bloom.bloom_compute_next_id(
+            [], self.parameters.NEXT_ID_PREFIX, self.parameters.NEXT_ID_UNSUPPORTED_TYPE
+        )
         self.print_variables(
-            {"type": self.parameters.NEXT_ID_UNSUPPORTED_TYPE, "answer": self.tc_unsupported}
+            {"type": self.parameters.NEXT_ID_UNSUPPORTED_TYPE, "answer": unsupported}
         )
         self.assertEqual(
-            self.tc_unsupported,
+            unsupported,
             (None, self.parameters.NEXT_ID_ERROR),
             msg=self.parameters.MSG_NEXT_ID_UNSUPPORTED,
             abort_on_fail=False,
         )
 
     def bud_next_id_has_its_own_route(self):
+        routes = self.bloom.bloom_list_docs_routes()
         self.print_variables({"route": self.parameters.NEXT_ID_ROUTE})
         self.assertIn(
             self.parameters.NEXT_ID_ROUTE,
-            self.tc_routes,
+            routes,
             msg=self.parameters.MSG_NEXT_ID_ROUTE,
             abort_on_fail=False,
         )
