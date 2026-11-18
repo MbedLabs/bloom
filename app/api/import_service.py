@@ -13,7 +13,7 @@ from typing import Annotated, Dict, List, Optional
 from defusedxml import ElementTree as SafeET
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.artefact_utils import (
@@ -29,8 +29,18 @@ from app.api.artefact_utils import (
 from app.api.link_read_utils import LEGACY_REQ_LINK_TYPE_TO_ROLE
 from app.core.database import get_db
 from app.core.id_generator import format_doc_id, next_doc_id
-from app.core.link_rules import is_allowed_link_role
-from app.core.md_content import content_html, markdown_content
+from app.core.link_rules import (
+    is_allowed_link_role,
+    is_tag_host_type,
+    normalize_linkable_type,
+)
+from app.core.md_content import (
+    SECTION_REFERENCE_RE,
+    artefact_mention,
+    content_html,
+    markdown_content,
+    section_key,
+)
 from app.core.md_import import (
     parameter_name_collisions,
     parse_markdown_document,
@@ -93,6 +103,12 @@ from app.services.reqif_worker import (
     parse_reqif_in_worker,
 )
 from app.services.rich_text import description_with_content
+from app.services.tag_links import (
+    LINK_END_MODELS,
+    PUBLIC_ID_COLUMNS,
+    link_end,
+    sync_tag_links,
+)
 
 TARGET_PROJECT_NOT_FOUND = "Target project not found"
 IMPORT_RUN = "import.run"
@@ -917,6 +933,166 @@ def _collision_actions(raw: Optional[str]) -> dict:
     return actions
 
 
+async def _project_artefacts_titled(
+    db: AsyncSession, current_user: User, project_id: int, title: str
+) -> list:
+    """Each artefact of the project with exactly this title that the user may view, as its
+    type code, row id and document ID."""
+    found: list = []
+    for type_code, model in LINK_END_MODELS.items():
+        column = model.title if hasattr(model, "title") else model.name
+        rows = await db.execute(
+            select(model.id, getattr(model, PUBLIC_ID_COLUMNS[type_code])).where(
+                model.project_id == project_id, column == title
+            )
+        )
+        found.extend((type_code, row_id, public_id) for row_id, public_id in rows.all())
+    rows = await db.execute(
+        select(Document.id, Document.doc_type, Document.doc_id).where(
+            Document.project_id == project_id, Document.title == title
+        )
+    )
+    for row_id, doc_type, doc_id in rows.all():
+        kind = normalize_linkable_type(doc_type)
+        found.append((kind, row_id, doc_id or f"{kind} {row_id}"))
+    return [
+        target
+        for target in found
+        if (await link_end(db, project_id, target[0], target[1], current_user))[1]
+    ]
+
+
+async def _reference_targets(
+    db: AsyncSession,
+    current_user: User,
+    project_id: int,
+    section,
+    sections: dict,
+    existing: dict,
+) -> tuple:
+    """The artefact each ``[[Title]]`` of a section body names, by section key, and an
+    error line for each reference that names nothing or more than one artefact.
+
+    A title names the section of the document with that heading; without one, the
+    existing artefact of the project with exactly that title. ``sections`` maps a
+    section key to the artefact of each section with that title, None for a section
+    that was not imported; ``existing`` holds the project lookups made so far."""
+    title = section.title.strip()
+    targets: dict = {}
+    errors: list = []
+    for raw in dict.fromkeys(m.group(1) for m in SECTION_REFERENCE_RE.finditer(section.body)):
+        key = section_key(raw)
+        matches = sections.get(key, [])
+        if len(matches) > 1:
+            errors.append(f"section {title}: [[{raw}]] matches {len(matches)} sections")
+            continue
+        if matches and matches[0] is None:
+            errors.append(f"section {title}: [[{raw}]] names a section that was not imported")
+            continue
+        if not matches:
+            wanted = raw.strip()
+            if wanted not in existing:
+                existing[wanted] = await _project_artefacts_titled(
+                    db, current_user, project_id, wanted
+                )
+            matches = existing[wanted]
+        if not matches:
+            errors.append(
+                f"section {title}: [[{raw}]] matches no section of the document "
+                "and no artefact of the project"
+            )
+        elif len(matches) > 1:
+            errors.append(
+                f"section {title}: [[{raw}]] matches {len(matches)} artefacts of the project"
+            )
+        else:
+            targets[key] = matches[0]
+    return targets, errors
+
+
+async def _write_imported_body(
+    db: AsyncSession,
+    current_user: User,
+    project_id: int,
+    section,
+    instance,
+    parameters: dict,
+    sections: dict,
+    existing: dict,
+) -> list:
+    """Write an imported artefact's description and rich content with its mentions, and
+    the references link of each mention; return the error lines of its references.
+
+    In the description each resolved ``[[Title]]`` reads as the artefact's ``#``
+    document ID. A requirement is plain text: it gets the description and the link of
+    each resolved reference, and no rich content. A body of a kind that holds no
+    mentions keeps every reference as that text."""
+    if not section.body:
+        return []
+    title = section.title.strip()
+    targets, errors = await _reference_targets(
+        db, current_user, project_id, section, sections, existing
+    )
+
+    def _as_id(match) -> str:
+        target = targets.get(section_key(match.group(1)))
+        return f"#{target[2]}" if target else match.group(0)
+
+    description = SECTION_REFERENCE_RE.sub(_as_id, section.body)
+    if hasattr(instance, "description"):
+        instance.description = description
+    host = is_tag_host_type(section.type_code)
+    if targets and not host:
+        errors.append(
+            f"section {title}: a {section.type_code} holds no artefact mentions, "
+            "its references are kept as document IDs"
+        )
+    if section.type_code == "REQ":
+        if targets:
+            await sync_tag_links(
+                db,
+                project_id=project_id,
+                source_type="REQ",
+                source_id=instance.id,
+                content_json=[artefact_mention(*target) for target in targets.values()],
+                user=current_user,
+            )
+        return errors
+    if not hasattr(instance, "content_json"):
+        return errors
+    artefacts = targets if host else {}
+    rich = markdown_content(section.body if host else description, parameters, artefacts)
+    instance.content_json = rich
+    instance.content_html = content_html(rich)
+    if host and rich:
+        await sync_tag_links(
+            db,
+            project_id=project_id,
+            source_type=normalize_linkable_type(section.type_code),
+            source_id=instance.id,
+            content_json=rich,
+            user=current_user,
+        )
+    return errors
+
+
+async def _has_link(db: AsyncSession, project_id: int, type_code: str, row_id: int) -> bool:
+    """Whether the artefact is the source or the target of a link of the project."""
+    kind = normalize_linkable_type(type_code)
+    found = await db.execute(
+        select(ArtefactLink.id)
+        .where(
+            ArtefactLink.project_id == project_id,
+            or_(
+                and_(ArtefactLink.source_type == kind, ArtefactLink.source_id == row_id),
+                and_(ArtefactLink.target_type == kind, ArtefactLink.target_id == row_id),
+            ),
+        )
+        .limit(1)
+    )
+    return found.first() is not None
+
+
 @router.post(
     "/projects/{project_id}/import/markdown",
     response_model=MarkdownImportResult,
@@ -1087,7 +1263,9 @@ async def import_markdown(
     notifications_created = 0
     rights = await effective_permissions(db, current_user, target_project.id)
     errors: List[str] = []
-    for section in parsed.sections:
+    imported: list = []
+    section_rows: dict = {}
+    for index, section in enumerate(parsed.sections):
         title = section.title.strip()
         if not title:
             continue
@@ -1113,7 +1291,7 @@ async def import_markdown(
                 (
                     await db.execute(
                         apply_external_visibility_filter(
-                            select(model.id).where(
+                            select(model.id, getattr(model, id_attr)).where(
                                 model.project_id == target_project.id,
                                 model.source_ref == source_marker,
                             ),
@@ -1127,6 +1305,7 @@ async def import_markdown(
             )
             if duplicate is not None:
                 artefacts_skipped += 1
+                section_rows[index] = (section.type_code, duplicate[0], duplicate[1])
                 continue
         new_id = await next_doc_id(
             db,
@@ -1147,10 +1326,6 @@ async def import_markdown(
         instance = model(**kwargs)
         if section.body and hasattr(instance, "description"):
             instance.description = section.body
-        if section.body and hasattr(instance, "content_json"):
-            rich = markdown_content(section.body, references)
-            instance.content_json = rich
-            instance.content_html = content_html(rich)
         if section.steps and hasattr(instance, "steps"):
             instance.steps = section.steps
         if hasattr(instance, "source_ref"):
@@ -1166,6 +1341,34 @@ async def import_markdown(
             f"{current_user.full_name} imported {new_id} from Markdown",
         )
         artefacts_created += 1
+        imported.append((section, instance, new_id))
+        section_rows[index] = (section.type_code, instance.id, new_id)
+
+    sections_by_key: dict = {}
+    for index, section in enumerate(parsed.sections):
+        if section.title.strip():
+            sections_by_key.setdefault(section_key(section.title), []).append(
+                section_rows.get(index)
+            )
+    existing_titles: dict = {}
+    for section, instance, _ in imported:
+        errors.extend(
+            await _write_imported_body(
+                db,
+                current_user,
+                target_project.id,
+                section,
+                instance,
+                references,
+                sections_by_key,
+                existing_titles,
+            )
+        )
+
+    await db.flush()
+    for section, instance, new_id in imported:
+        if await _has_link(db, target_project.id, section.type_code, instance.id):
+            continue
         slug = ARTEFACT_SLUG_FOR_CODE.get(section.type_code, "docs")
         needs_review = section.type_code in LINK_REVIEW_CODES
         await notify(

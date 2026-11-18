@@ -4,6 +4,8 @@ The result is the editor's TipTap JSON (``content_json``) and the HTML the edito
 beside it (``content_html``). Headings, paragraphs, bold, italic, strikethrough, inline
 code, code blocks, links, bullet and numbered lists, block quotes, horizontal rules and
 tables are kept. A ``{{NAME}}`` reference becomes the editor's parameter mention node.
+A ``[[Title]]`` reference becomes the editor's artefact mention node when the caller
+resolves it to an artefact; otherwise it stays text.
 """
 
 import re
@@ -13,8 +15,11 @@ from typing import Any, Mapping, Optional
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
 
+from app.services.tag_links import TAG_TRIGGER
+
 PARAMETER_TRIGGER = "{{"
-_REFERENCE_RE = re.compile(r"\{\{([^{}]*)\}\}")
+SECTION_REFERENCE_RE = re.compile(r"\[\[([^\[\]\n]+)\]\]")
+_TOKEN_RE = re.compile(r"\{\{(?P<parameter>[^{}]*)\}\}|\[\[(?P<title>[^\[\]\n]+)\]\]")
 _SLOT_OPEN = "\ue000"
 _SLOT_CLOSE = "\ue001"
 _SLOT_RE = re.compile(_SLOT_OPEN + r"(\d+)" + _SLOT_CLOSE)
@@ -57,6 +62,23 @@ def reference_name(raw: str) -> Optional[str]:
     if not name or any(char in name for char in (":", ",", "\n")):
         return None
     return name
+
+
+def section_key(title: str) -> str:
+    """The form a section title is matched in: spacing collapsed, case folded."""
+    return " ".join(title.split()).casefold()
+
+
+def artefact_mention(type_code: str, row_id: int, public_id: str) -> dict:
+    """The editor's artefact mention node, as written when a user picks an artefact after ``#``."""
+    return {
+        "type": "mention",
+        "attrs": {
+            "id": f"{type_code}:{row_id}",
+            "label": public_id,
+            "mentionSuggestionChar": TAG_TRIGGER,
+        },
+    }
 
 
 def _mention(name: str, parameters: Mapping[str, tuple]) -> dict:
@@ -129,42 +151,53 @@ def _close_mark(marks: list, mark_type: str) -> None:
 
 
 class _Converter:
-    """Converts one Markdown text, holding the ``{{NAME}}`` references it set aside."""
+    """Converts one Markdown text, holding the mention nodes of the references it set aside."""
 
-    def __init__(self, parameters: Mapping[str, tuple]) -> None:
+    def __init__(self, parameters: Mapping[str, tuple], artefacts: Mapping[str, tuple]) -> None:
         self.parameters = parameters
+        self.artefacts = artefacts
         self.references: list = []
 
+    def _node(self, match: re.Match) -> Optional[dict]:
+        """The mention node a reference stands for, or None when it stays text."""
+        if match.group("parameter") is not None:
+            name = reference_name(match.group("parameter"))
+            return _mention(name, self.parameters) if name else None
+        target = self.artefacts.get(section_key(match.group("title")))
+        return artefact_mention(*target) if target else None
+
     def protect(self, text: str) -> str:
-        """Replace each ``{{NAME}}`` by a slot the Markdown parser leaves untouched."""
+        """Replace each reference that becomes a mention by a slot the Markdown parser
+        leaves untouched."""
 
         def _slot(match: re.Match) -> str:
-            if reference_name(match.group(1)) is None:
+            node = self._node(match)
+            if node is None:
                 return match.group(0)
-            self.references.append(match.group(0))
+            self.references.append((match.group(0), node))
             return f"{_SLOT_OPEN}{len(self.references) - 1}{_SLOT_CLOSE}"
 
-        return _REFERENCE_RE.sub(_slot, text)
+        return _TOKEN_RE.sub(_slot, text)
 
     def _original(self, match: re.Match) -> str:
         """The reference text a slot stands for, or the slot itself when unknown."""
         index = int(match.group(1))
-        return self.references[index] if index < len(self.references) else match.group(0)
+        return self.references[index][0] if index < len(self.references) else match.group(0)
 
     def restore(self, text: str) -> str:
-        """Put the original ``{{NAME}}`` text back in place of each slot."""
+        """Put the original reference text back in place of each slot."""
         return _SLOT_RE.sub(self._original, text)
 
     def text_nodes(self, nodes: list, text: str, marks: list) -> None:
-        """Add text, turning each reference slot into a parameter mention."""
+        """Add text, turning each reference slot into its mention."""
         position = 0
         for match in _SLOT_RE.finditer(text):
             index = int(match.group(1))
             if index >= len(self.references):
                 continue
             _append_text(nodes, text[position : match.start()], marks)
-            name = reference_name(self.references[index][2:-2]) or ""
-            nodes.append(_with_marks(_mention(name, self.parameters), marks))
+            node = dict(self.references[index][1], attrs=dict(self.references[index][1]["attrs"]))
+            nodes.append(_with_marks(node, marks))
             position = match.end()
         _append_text(nodes, text[position:], marks)
 
@@ -245,16 +278,20 @@ class _Converter:
 
 
 def markdown_content(
-    text: Optional[str], parameters: Optional[Mapping[str, tuple]] = None
+    text: Optional[str],
+    parameters: Optional[Mapping[str, tuple]] = None,
+    artefacts: Optional[Mapping[str, tuple]] = None,
 ) -> Optional[dict]:
     """The editor document for Markdown text, or None when the text holds nothing.
 
     ``parameters`` maps a lower-case parameter name to its project row id and its key;
     a ``{{NAME}}`` the map does not hold becomes a mention whose id and label are NAME.
+    ``artefacts`` maps ``section_key(title)`` to the type code, row id and document ID
+    of an artefact; a ``[[Title]]`` the map does not hold stays text.
     """
     if not text or not text.strip():
         return None
-    converter = _Converter(parameters or {})
+    converter = _Converter(parameters or {}, artefacts or {})
     content = converter.blocks(_parser().parse(converter.protect(text)))
     if not content:
         return None
@@ -283,17 +320,18 @@ def _wrap_marks(html: str, marks: list) -> str:
 
 
 def _html_mention(node: dict) -> str:
-    """The HTML the editor writes for a parameter mention."""
+    """The HTML the editor writes for a parameter or artefact mention."""
     attrs = node.get("attrs") or {}
     label = str(attrs.get("label") or attrs.get("id") or "")
+    artefact = attrs.get("mentionSuggestionChar") == TAG_TRIGGER
     span_attrs = {
         "data-type": "mention",
         "data-id": attrs.get("id"),
         "data-label": attrs.get("label"),
         "data-mention-suggestion-char": attrs.get("mentionSuggestionChar"),
-        "class": "mention",
+        "class": "mention-artefact" if artefact else "mention",
     }
-    text = escape("{{" + label + "}}", quote=False)
+    text = escape(label if artefact else "{{" + label + "}}", quote=False)
     return _wrap_marks(f"<span{_attributes(span_attrs)}>{text}</span>", node.get("marks"))
 
 
