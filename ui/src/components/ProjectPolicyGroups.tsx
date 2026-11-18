@@ -13,7 +13,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { applicationAllows } from '../lib/applicationAccess'
 import { useToast } from './useToast'
 
-const DEFAULT_GROUPS = ['Administrators', 'Developers', 'Product Owners', 'Testers']
+const DEFAULT_GROUPS = ['Administrators', 'Developers', 'Product Owners', 'Testers', 'Defect Managers']
 type Person = { id: number; email: string; full_name: string; role?: string; profile_picture_url?: string | null }
 
 /** A project member's identity and permitted assignment actions. */
@@ -45,7 +45,7 @@ function memberPolicySource(member: ProjectMember): string {
 
 function groupRequiresRole(group: Group, policies: Policy[]): 'admin' | 'maintainer' | 'external' {
   if (group.name === 'Administrators') return 'maintainer'
-  if (['Developers', 'Product Owners', 'Testers'].includes(group.name)) return 'maintainer'
+  if (['Developers', 'Product Owners', 'Testers', 'Defect Managers'].includes(group.name)) return 'maintainer'
   const groupPolicies = policies.filter((p) => group.policy_ids.includes(p.id))
   if (groupPolicies.some((p) => p.scope === 'app')) return 'admin'
   const hasWrite = groupPolicies.some((p) =>

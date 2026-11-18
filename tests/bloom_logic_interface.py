@@ -46,6 +46,7 @@ from moto import mock_aws
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import event, func, select, text
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
 from starlette.datastructures import Headers
 from starlette.requests import Request
 
@@ -275,6 +276,30 @@ class BloomLogicInterface(BloomInterface):
 
     def bloom_add_unlinked_defect(self, project_id, title):
         return self._run(self._link_defect(project_id, None, None, None, {"title": title}))
+
+    def bloom_give_project_group(self, user_id, project_id, group_name):
+        async def work(db):
+            group = await db.scalar(select(Group).where(Group.name == group_name))
+            db.add(ProjectAccess(user_id=user_id, project_id=project_id, policy_group=group))
+            await db.commit()
+
+        self._run(self._with_db(work))
+
+    def bloom_group_policy_names(self, group_name):
+        async def work(db):
+            group = await db.scalar(
+                select(Group).where(Group.name == group_name).options(selectinload(Group.policies))
+            )
+            return sorted(policy.name for policy in group.policies) if group else None
+
+        return self._run(self._with_db(work))
+
+    def bloom_failure_recipient_emails(self, project_id):
+        async def work(db):
+            recipients = await jira_outbound.failure_recipients(db, project_id)
+            return sorted(user.email for user in recipients)
+
+        return self._run(self._with_db(work))
 
     def bloom_serve_jira_creation(self, first_number, refuse_after=None):
         created = []

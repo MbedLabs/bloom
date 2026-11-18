@@ -3278,10 +3278,18 @@ CAT_PROJECT_POLICIES = [
 CAT_READERS = [("Read Internal", None), ("Read Customer", "customer")]
 CAT_REVIEWERS = [("Review Internal", None), ("Review Customer", "customer")]
 CAT_NO_REVIEW = {"RPT", "STD", "RSK", "CMP"}
-CAT_GROUPS = {"Product Owners", "Developers", "Testers", "Administrators", "Customers"}
+CAT_GROUPS = {
+    "Product Owners",
+    "Developers",
+    "Testers",
+    "Administrators",
+    "Customers",
+    "Defect Managers",
+}
 CAT_COUNT = 24
 CAT_RELEASE_MIGRATION = "c5e8a1f2b9d4_access_entries.py"
 CAT_VISIONS_MIGRATION = "637f976e78e0_visions.py"
+CAT_DEFECT_MANAGERS_MIGRATION = "d4e6f8a1c3b5_defect_managers_group.py"
 MSG_CAT_NAMES = "the catalogue holds the 24 named policies, one per document type plus ten others"
 MSG_CAT_DOCUMENT = (
     "the {name} policy covers {resource} alone with every supported action on every origin"
@@ -3290,10 +3298,10 @@ MSG_CAT_PROJECT = "the {name} policy covers {resource} alone with every action"
 MSG_CAT_READER = "the {name} policy gives view and comment on every resource for its origin"
 MSG_CAT_ACCESS = "Access Management is an app policy with every access action and no tags"
 MSG_CAT_ADMIN = "Application Administration is an app policy with every action on every resource"
-MSG_CAT_GROUPS = "the five default groups hold known policies once each and no people or projects"
+MSG_CAT_GROUPS = "the six default groups hold known policies once each and no people or projects"
 MSG_CAT_GROUP_READ = "the {name} group reads {what}"
 MSG_CAT_FROZEN = "the runtime catalogue equals the release catalogue with the Visions additions"
-MSG_CAT_FROZEN_GROUPS = "the runtime groups equal the release groups with Visions after Specifications for product owners"
+MSG_CAT_FROZEN_GROUPS = "the runtime groups equal the release groups with Visions after Specifications for product owners and the Defect Managers group"
 MSG_CAT_MAINTAINER_SET = "the released maintainer set is every document and project policy except the readers and reviewers"
 MSG_CAT_REVIEWER = (
     "the {name} policy grants review only on every document type for its origin and is in no group"
@@ -5708,3 +5716,20 @@ MSG_LKP_RELATED_REQ = "related_to a requirement still lists the documents linked
 MSG_LKP_RELATED_MISSING = "related_to a document ID that does not exist answers 404"
 MSG_LKP_DETAIL_TYPE = "the detail of a requirement carries the req_type and req_origin of the list"
 MSG_LKP_ANY_CASE = "the detail route finds a document by its document ID in lower case"
+
+DM_GROUP = "Defect Managers"
+DM_POLICIES = ("Read Internal", "Read Customer", "Defects")
+DM_OWNERS_GROUP = "Product Owners"
+DM_TESTERS_GROUP = "Testers"
+DM_PROJECT = "DMP"
+DM_OTHER_PROJECT = "DMO"
+DM_ADMIN = "admin@example.com"
+DM_OWNER = "owner@example.com"
+DM_MANAGER = "defects@example.com"
+DM_TESTER = "tester@example.com"
+DM_OTHER_MANAGER = "elsewhere@example.com"
+MSG_DM_GROUP = "the default Defect Managers group holds Read Internal, Read Customer and Defects"
+MSG_DM_RECIPIENTS = (
+    "a failed send emails the administrators and the project's Product Owners and Defect Managers, "
+    "no Tester and no Defect Manager of another project"
+)

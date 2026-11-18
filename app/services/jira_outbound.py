@@ -55,6 +55,7 @@ logger = logging.getLogger(__name__)
 ISSUE_TYPE = "Bug"
 SUMMARY_LIMIT = 255
 PRODUCT_OWNERS_GROUP = "Product Owners"
+DEFECT_MANAGERS_GROUP = "Defect Managers"
 CREATED_EVENT = "issue_created"
 CREATE_FAILED_EVENT = "issue_create_failed"
 CREATE_REFUSED_EVENT = "issue_create_refused"
@@ -130,7 +131,7 @@ def issue_fields(setting: IntegrationSetting, defect: Defect) -> dict:
 
 async def failure_recipients(db: AsyncSession, project_id: int) -> list[User]:
     """The active users told of a defect Jira did not take: the administrators and the
-    project's Product Owners."""
+    project's Product Owners and Defect Managers."""
     admins = await db.scalars(
         select(User).where(User.role == UserRole.admin, User.is_active.is_(True))
     )
@@ -140,7 +141,7 @@ async def failure_recipients(db: AsyncSession, project_id: int) -> list[User]:
         .join(Group, Group.id == ProjectAccess.policy_group_id)
         .where(
             ProjectAccess.project_id == project_id,
-            Group.name == PRODUCT_OWNERS_GROUP,
+            Group.name.in_((PRODUCT_OWNERS_GROUP, DEFECT_MANAGERS_GROUP)),
             User.is_active.is_(True),
         )
     )

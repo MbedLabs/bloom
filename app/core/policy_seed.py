@@ -130,6 +130,11 @@ DEFAULT_GROUPS = [
         ],
     },
     {
+        "name": "Defect Managers",
+        "description": "",
+        "policy_names": [READ_INTERNAL, READ_CUSTOMER, "Defects"],
+    },
+    {
         "name": "Administrators",
         "description": "",
         "policy_names": ["Application Administration", "Project Management"],
