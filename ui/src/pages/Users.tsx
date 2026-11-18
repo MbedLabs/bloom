@@ -365,7 +365,7 @@ export default function UsersPage() {
   )
 }
 
-/** The projects a user can access, by name only. */
+/** The projects a user can access, each with the groups behind it. */
 function UserAccessDetails({ userId }: Readonly<{ userId: number }>) {
   const summary = useQuery({
     queryKey: ['user-access-summary', userId],
@@ -386,14 +386,26 @@ function UserAccessDetails({ userId }: Readonly<{ userId: number }>) {
   }
   const { every_project: everyProject, projects } = summary.data
   return (
-    <p className="text-xs">
-      <span className="font-medium text-muted-foreground">Projects: </span>
-      {everyProject && <span className="text-foreground">Every project (Admin)</span>}
-      {!everyProject && projects.length === 0 && <span className="text-muted-foreground">No projects</span>}
-      {!everyProject && projects.length > 0 && (
-        <span className="text-foreground">{projects.map((project) => project.project_name).join(', ')}</span>
-      )}
-    </p>
+    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs">
+      <dt className="font-medium text-muted-foreground">Projects</dt>
+      <dd>
+        {everyProject && <span className="text-foreground">Every project (Admin)</span>}
+        {!everyProject && projects.length === 0 && <span className="text-muted-foreground">No projects</span>}
+        {!everyProject && projects.length > 0 && (
+          <ul className="space-y-0.5">
+            {projects.map((project) => (
+              <li key={project.project_id} className="text-foreground">
+                <span className="font-medium">{project.project_name}</span>
+                <span className="text-muted-foreground">
+                  {': '}
+                  {[...(project.owner ? ['Owner'] : []), ...project.groups, ...(project.direct ? ['Direct'] : [])].join(', ')}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </dd>
+    </dl>
   )
 }
 

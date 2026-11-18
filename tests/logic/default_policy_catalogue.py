@@ -186,6 +186,12 @@ class DefaultPolicyCatalogueBase(BloomTestCase):
         release_groups = {group["name"]: copy.deepcopy(group) for group in release.DEFAULT_GROUPS}
         owners = release_groups[visions.PRODUCT_OWNERS]["policy_names"]
         owners.insert(owners.index("Specifications") + 1, visions.VISIONS)
+        defect_managers = self.bloom.bloom_load_migration(values.CAT_DEFECT_MANAGERS_MIGRATION)
+        release_groups[defect_managers.DEFECT_MANAGERS] = {
+            "name": defect_managers.DEFECT_MANAGERS,
+            "description": "",
+            "policy_names": list(defect_managers.POLICY_NAMES),
+        }
         self.assertEqual(
             {group["name"]: group for group in groups},
             release_groups,

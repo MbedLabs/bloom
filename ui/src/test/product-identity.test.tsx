@@ -52,19 +52,19 @@ describe('product identity', () => {
     expect(PRODUCT_IDENTITY).toBe('Bloom PLM by EmbedLabs')
   })
 
-  it('shows Bloom PLM and by EmbedLabs in the expanded sidebar', () => {
+  it('shows Bloom and Product Lifecycle Management in the expanded sidebar', () => {
     renderLayout()
-    expect(screen.getByRole('heading', { level: 1, name: 'Bloom PLM' })).toBeTruthy()
-    expect(screen.getByText('by EmbedLabs')).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1, name: 'Bloom' })).toBeTruthy()
+    expect(screen.getByText('Product Lifecycle Management')).toBeTruthy()
     expect(screen.getByAltText('Bloom PLM by EmbedLabs')).toBeTruthy()
-    expect(screen.queryByText('Product Lifecycle Management')).toBeNull()
+    expect(screen.queryByText('by EmbedLabs')).toBeNull()
   })
 
   it('shows only the mark in the collapsed sidebar', () => {
     localStorage.setItem('bloom-sidebar-collapsed', 'true')
     renderLayout()
     expect(screen.getByAltText('Bloom PLM by EmbedLabs')).toBeTruthy()
-    expect(screen.queryByRole('heading', { level: 1, name: 'Bloom PLM' })).toBeNull()
+    expect(screen.queryByRole('heading', { level: 1, name: 'Bloom' })).toBeNull()
     expect(screen.queryByText('by EmbedLabs')).toBeNull()
   })
 })
