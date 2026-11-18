@@ -1,4 +1,4 @@
-import { PRODUCT_IDENTITY, PRODUCT_NAME } from '../brandAssets'
+import { PRODUCT_IDENTITY } from '../brandAssets'
 import { Suspense, useState, useEffect, useMemo, useRef } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -271,8 +271,8 @@ function LayoutInner() {
             </div>
             {!sidebarCollapsed && (
               <div className="min-w-0">
-                <h1 className="text-base font-bold text-violet-100 tracking-tight">{PRODUCT_NAME}</h1>
-                <p className="text-[10px] text-violet-300/60 font-medium uppercase tracking-wider leading-snug">by EmbedLabs</p>
+                <h1 className="text-base font-bold text-violet-100 tracking-tight">Bloom</h1>
+                <p className="text-[10px] text-violet-300/60 font-medium uppercase tracking-wider leading-snug">Product Lifecycle Management</p>
               </div>
             )}
           </div>
