@@ -45,10 +45,17 @@ class ImportMarkdownFormattingBase(BloomTestCase):
         values = self.parameters
         self._import(values.MDF_SIGN_IN)
         nodes, _, _, text = self._parts(values.MDF_SIGN_IN_TITLE)
-        self.print_variables({"nodes": sorted(map(str, nodes)), "text": text})
+        levels = self.bloom.bloom_heading_levels(
+            self.bloom.bloom_imported_contents().get(values.MDF_SIGN_IN_TITLE)
+        )
+        self.print_variables({"nodes": sorted(map(str, nodes)), "levels": levels, "text": text})
         self.assertEqual(
-            (values.MDF_SPECIFICATION_NODES <= nodes, text.startswith(values.MDF_SIGN_IN_OPENING)),
-            (True, True),
+            (
+                values.MDF_SPECIFICATION_NODES <= nodes,
+                levels,
+                text.startswith(values.MDF_SIGN_IN_OPENING),
+            ),
+            (True, [1, 1], True),
             msg=values.MSG_MDF_SPECIFICATION,
             abort_on_fail=False,
         )
@@ -83,16 +90,34 @@ class ImportMarkdownFormattingBase(BloomTestCase):
             abort_on_fail=False,
         )
 
-    def bud_the_description_names_each_mention_by_its_id(self):
+    def bud_the_specification_has_no_description(self):
         values = self.parameters
-        _, specification, requirements = self._sign_in()
-        description = (specification.description or "") if specification else ""
-        named = [f"#{requirement.req_id}" in description for requirement in requirements]
+        _, specification, _ = self._sign_in()
+        description = specification.description if specification else "missing"
         self.print_variables({"description": description})
         self.assertEqual(
-            (named, "[[" in description),
-            ([True, True], False),
+            description,
+            None,
             msg=values.MSG_MDF_SPEC_DESCRIPTION,
+            abort_on_fail=False,
+        )
+
+    def bud_a_requirement_names_its_mention_by_id_and_links_it(self):
+        values = self.parameters
+        self._import(values.MDF_REQUIREMENT_MENTION)
+        source = self.bloom.bloom_artefact_titled("Requirement", values.MDF_LOCK_RULE)
+        target = self.bloom.bloom_artefact_titled("Requirement", values.MDF_SAME_ANSWER_RULE)
+        found = (
+            f"#{target.req_id}" in (source.description or ""),
+            "[[" in (source.description or ""),
+            (source.content_json, source.content_html),
+            self.bloom.bloom_artefact_links("REQ", source.id),
+        )
+        self.print_variables({"description": source.description, "found": found})
+        self.assertEqual(
+            found,
+            (True, False, (None, None), [("REQ", target.id, values.MDF_LINK_ROLE)]),
+            msg=values.MSG_MDF_REQ_MENTION,
             abort_on_fail=False,
         )
 
@@ -167,6 +192,9 @@ class ImportMarkdownFormattingBase(BloomTestCase):
         values = self.parameters
         result, refusal = self._import(values.MDF_EVERY_ELEMENT)
         nodes, marks, _, text = self._parts(values.MDF_EVERY_ELEMENT_TITLE)
+        levels = self.bloom.bloom_heading_levels(
+            self.bloom.bloom_imported_contents().get(values.MDF_EVERY_ELEMENT_TITLE)
+        )
         sections = (
             {section.title: section.type_code for section in result.sections} if result else refusal
         )
@@ -184,8 +212,9 @@ class ImportMarkdownFormattingBase(BloomTestCase):
                 sorted(values.MDF_ELEMENT_NODES - nodes),
                 sorted(values.MDF_ELEMENT_MARKS - marks),
                 "# not a heading" in text,
+                levels,
             ),
-            (values.MDF_EVERY_ELEMENT_SECTIONS, [], [], True),
+            (values.MDF_EVERY_ELEMENT_SECTIONS, [], [], True, [1]),
             msg=values.MSG_MDF_ELEMENTS,
             abort_on_fail=False,
         )
@@ -223,11 +252,12 @@ class ImportMarkdownFormattingBase(BloomTestCase):
         values = self.parameters
         self._import(values.MDF_EVERY_TYPE)
         contents = self.bloom.bloom_imported_contents()
+        descriptions = self.bloom.bloom_imported_descriptions()
         for title in values.MDF_EVERY_TYPE_TITLES:
             _, marks, _, text = self.bloom.bloom_rich_content_parts(contents.get(title))
             self.assertEqual(
-                ("bold" in marks, text),
-                (True, values.MDF_TYPED_TEXT),
+                ("bold" in marks, text, descriptions.get(title, "missing")),
+                (True, values.MDF_TYPED_TEXT, None),
                 msg=values.MSG_MDF_EVERY_TYPE.format(title=title),
                 abort_on_fail=False,
             )

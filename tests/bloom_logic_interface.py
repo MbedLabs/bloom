@@ -1505,6 +1505,30 @@ class BloomLogicInterface(BloomInterface):
         text = (Path(__file__).resolve().parent.parent / "docs" / "md-import-format.md").read_text()
         return re.findall(r"^```markdown\n(.*?)^```", text, flags=re.S | re.M)
 
+    def bloom_imported_descriptions(self):
+        """Return the description of every artefact that holds rich content, by its title."""
+        found = {}
+        for model in ARTEFACT_MODELS:
+            if not hasattr(model, "content_json"):
+                continue
+            for row in self._run(self._all(select(model))):
+                found[getattr(row, "title", None) or getattr(row, "name", None)] = row.description
+        return found
+
+    def bloom_heading_levels(self, content):
+        """Return the level of each heading in rich content, in reading order."""
+        found = []
+
+        def walk(node):
+            if isinstance(node, dict):
+                if node.get("type") == "heading":
+                    found.append((node.get("attrs") or {}).get("level"))
+                for child in node.get("content") or []:
+                    walk(child)
+
+        walk(content)
+        return found
+
     def bloom_artefact_mentions(self, content):
         """Return the ids of the artefact mentions in rich content, in reading order."""
         found = []

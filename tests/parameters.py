@@ -3725,6 +3725,18 @@ MDF_UNMATCHED = (
     "The list reads the session table filtered by the user ID.\n"
 ).encode()
 MDF_LINK_ROLE = "references"
+MDF_LOCK_RULE = "An account is locked after repeated refused sign-ins"
+MDF_SAME_ANSWER_RULE = "Every refused sign-in gets the same answer"
+MDF_REQUIREMENT_MENTION = (
+    f"## [REQ] {MDF_LOCK_RULE}\n"
+    "Repeated refusals suggest that someone is guessing. The product shall lock an account "
+    "after {{parameter: REFUSAL_LIMIT, value: 5}} refused sign-ins in a row. The answer to "
+    f"each refusal follows [[{MDF_SAME_ANSWER_RULE}]].\n"
+    "\n"
+    f"## [REQ] {MDF_SAME_ANSWER_RULE}\n"
+    "An answer that differs tells an attacker what was wrong. The product shall answer "
+    "every refused sign-in with the same message.\n"
+).encode()
 MDF_EVERY_ELEMENT = (
     b"## [DES] Formatted design\n"
     b"### Scope\n"
@@ -3816,7 +3828,13 @@ MSG_MDF_SPEC_MENTIONS = (
     "the specification mentions each requirement of its document as the editor's artefact mention"
 )
 MSG_MDF_SPEC_LINKS = "each mention links the specification to its requirement"
-MSG_MDF_SPEC_DESCRIPTION = "the plain description names each mentioned requirement by its # ID"
+MSG_MDF_SPEC_DESCRIPTION = (
+    "the specification's description, its one-line brief description, stays unset"
+)
+MSG_MDF_REQ_MENTION = (
+    "a requirement names its mention by # ID in its plain description, gets no rich content "
+    "and links the mentioned requirement"
+)
 MSG_MDF_NO_UNLINKED_NOTICE = "artefacts the import links get no notification that they have no links"
 MSG_MDF_EXISTING_MENTION = (
     "the title of an existing requirement becomes its mention and links the specification to it"
