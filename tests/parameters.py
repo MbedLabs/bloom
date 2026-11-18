@@ -3662,6 +3662,114 @@ MSG_MDI_RENAME_TEXT = "every reference in the imported text uses the new name"
 MSG_MDI_EITHER_KIND = "a name also collides with a parameter of the other kind, whatever its case"
 MSG_MDI_REFUSED = "{what} is refused with 422"
 MSG_MDI_BROKEN = "collision actions that are not JSON are refused, and nothing is imported"
+MDF_SPECIFICATION = (
+    b"## [SPEC] Sign-in\n"
+    b"Users sign in with an email and a password.\n"
+    b"\n"
+    b"- A wrong password is refused.\n"
+    b"- A locked account is refused.\n"
+)
+MDF_SPECIFICATION_TEXT = (
+    "Users sign in with an email and a password. "
+    "A wrong password is refused. A locked account is refused."
+)
+MDF_SPECIFICATION_NODES = {"paragraph", "bulletList", "listItem"}
+MDF_EVERY_ELEMENT = (
+    b"## [REQ] Formatted rule\n"
+    b"### Scope\n"
+    b"A **bold** word, an *italic* word, `inline code` and a [link](https://example.com).\n"
+    b"\n"
+    b"- first item\n"
+    b"- second item\n"
+    b"\n"
+    b"1. first step\n"
+    b"2. second step\n"
+    b"\n"
+    b"| Event | Effect |\n"
+    b"| --- | --- |\n"
+    b"| Idle | The session ends |\n"
+    b"\n"
+    b"```text\n"
+    b"# not a heading\n"
+    b"- Step: not a row\n"
+    b"```\n"
+)
+MDF_EVERY_ELEMENT_SECTIONS = {"Formatted rule": "REQ"}
+MDF_ELEMENT_NODES = {
+    "heading",
+    "paragraph",
+    "bulletList",
+    "orderedList",
+    "listItem",
+    "table",
+    "tableRow",
+    "tableHeader",
+    "tableCell",
+    "codeBlock",
+}
+MDF_ELEMENT_MARKS = {"bold", "italic", "code", "link"}
+MDF_PARAMETER_REFERENCE = (
+    b"## [REQ] Idle timeout\n"
+    b"The session ends after {{parameter: IDLE_MINUTES, value: 30}} minutes without a request.\n"
+)
+MDF_PARAMETER_CHIPS = [("IDLE_MINUTES", "{{")]
+MDF_TEST_CASE = (
+    b"## [TC] Relay boot\n"
+    b"Checks the **relay-driven** boot.\n"
+    b"- Pre-Condition: relay open\n"
+    b"- Step: close the relay => boot banner within {{parameter: RELAY_MS, value: 200}} ms\n"
+)
+MDF_TEST_CASE_TEXT = "Checks the relay-driven boot."
+MDF_EVERY_TYPE = (
+    b"## [REQ] Typed requirement\nText with **bold**.\n"
+    b"## [DES] Typed design\nText with **bold**.\n"
+    b"## [RSK] Typed risk\nText with **bold**.\n"
+    b"## [CHG] Typed change\nText with **bold**.\n"
+    b"## [CPT] Typed concept\nText with **bold**.\n"
+    b"## [TC] Typed case\nText with **bold**.\n"
+    b"## [SPEC] Typed specification\nText with **bold**.\n"
+    b"## [STD] Typed standard\nText with **bold**.\n"
+    b"## [VIS] Typed vision\nText with **bold**.\n"
+)
+MDF_EVERY_TYPE_TITLES = [
+    "Typed requirement",
+    "Typed design",
+    "Typed risk",
+    "Typed change",
+    "Typed concept",
+    "Typed case",
+    "Typed specification",
+    "Typed standard",
+    "Typed vision",
+]
+MDF_TYPED_TEXT = "Text with bold."
+MDF_TWO_KINDS = (
+    b"## [REQ] Two kinds\n"
+    b"Uses {{parameter: P_ONE, value: 1}} and {{variable: V_ONE, value: 2}}.\n"
+)
+MDF_TWO_KINDS_VALUES = {"BOOT_MS": "variable", "P_ONE": "parameter", "V_ONE": "variable"}
+MDF_TWO_KINDS_TEXT = "Uses {{P_ONE}} and {{V_ONE}}."
+MDF_VARIABLE_COLLISION = b"## [REQ] Limit\nStay under {{variable: BOOT_MS, value: 9}}\n"
+MDF_VARIABLE_COLLISION_FOUND = [
+    {"name": "BOOT_MS", "existing_value": "old", "imported_value": "9"}
+]
+MSG_MDF_SPECIFICATION = (
+    "an imported specification holds its body as rich content with its paragraph and list"
+)
+MSG_MDF_ELEMENTS = (
+    "a sub-heading and a fenced block stay in their section, and every Markdown element "
+    "becomes its editor node or mark"
+)
+MSG_MDF_CHIPS = "a parameter in imported text becomes the editor's parameter chip"
+MSG_MDF_TEST_CASE = (
+    "a test case keeps its step rows, and only the text around them becomes rich content"
+)
+MSG_MDF_EVERY_TYPE = "{title} holds its imported body as rich content"
+MSG_MDF_KINDS = (
+    "a declared parameter is a parameter, a declared variable is a variable, "
+    "and both are referenced by name"
+)
+MSG_MDF_VARIABLE_COLLISION = "a declared variable whose name exists blocks the import with 409"
 MSG_MDI_FRESH = "an import without a collision creates every parameter"
 MSG_MDI_REWRITE = "renaming rewrites the declaration and the reference of that parameter only"
 MSG_MDI_RELAY_TEST_CASE = "a test case section is imported with its id, description and step rows"

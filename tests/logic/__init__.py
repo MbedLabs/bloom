@@ -36,6 +36,7 @@ SUITES = [
     "tests.logic.BLOOM_image_release.ImageReleaseTest",
     "tests.logic.BLOOM_import_attempts.ImportAttemptsTest",
     "tests.logic.BLOOM_import_markdown.ImportMarkdownTest",
+    "tests.logic.BLOOM_import_markdown_formatting.ImportMarkdownFormattingTest",
     "tests.logic.BLOOM_import_test_cases.ImportTestCasesTest",
     "tests.logic.BLOOM_import_testrail.ImportTestrailTest",
     "tests.logic.BLOOM_integration_sync_capped_search.IntegrationSyncCappedSearchTest",

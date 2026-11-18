@@ -1486,6 +1486,43 @@ class BloomLogicInterface(BloomInterface):
     def bloom_rename_parameters(self, text, names):
         return rename_parameters(text, names)
 
+    def bloom_project_variable_kinds(self):
+        rows = self._run(self._all(select(ProjectVariable).order_by(ProjectVariable.id)))
+        return {row.key: row.kind for row in rows}
+
+    def bloom_imported_contents(self):
+        """Return the rich content of every artefact by its title, for the types that hold one."""
+        found = {}
+        for model in ARTEFACT_MODELS:
+            if not hasattr(model, "content_json"):
+                continue
+            for row in self._run(self._all(select(model))):
+                found[getattr(row, "title", None) or getattr(row, "name", None)] = row.content_json
+        return found
+
+    def bloom_rich_content_parts(self, content):
+        """Return the node types, the mark types, the parameter chips and the plain text of rich content."""
+        nodes, marks, chips, text = set(), set(), [], []
+
+        def walk(node):
+            if not isinstance(node, dict):
+                return
+            nodes.add(node.get("type"))
+            marks.update(mark.get("type") for mark in node.get("marks") or [])
+            if node.get("type") == "mention":
+                attrs = node.get("attrs") or {}
+                chips.append((attrs.get("label"), attrs.get("mentionSuggestionChar")))
+            if isinstance(node.get("text"), str):
+                text.append(node["text"])
+                return
+            for child in node.get("content") or []:
+                walk(child)
+            if node.get("type") not in ("mention", "hardBreak"):
+                text.append(" ")
+
+        walk(content)
+        return nodes, marks, chips, " ".join("".join(text).split())
+
     def bloom_add_requirement_importer(self, project_id):
         async def work(db):
             author = User(
