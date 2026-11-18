@@ -47,6 +47,8 @@ async def _response(db: AsyncSession, item: TestConcept) -> TestConceptResponse:
         concept_id=item.concept_id,
         name=item.name,
         description=item.description,
+        content_json=item.content_json,
+        content_html=item.content_html,
         status=item.status,
         visibility=item.visibility,
         linked_requirement_ids=merged,
