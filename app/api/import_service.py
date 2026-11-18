@@ -1020,13 +1020,13 @@ async def _write_imported_body(
     sections: dict,
     existing: dict,
 ) -> list:
-    """Write an imported artefact's description and rich content with its mentions, and
-    the references link of each mention; return the error lines of its references.
+    """Write an imported artefact's body with its mentions, and the references link of
+    each mention; return the error lines of its references.
 
-    In the description each resolved ``[[Title]]`` reads as the artefact's ``#``
-    document ID. A requirement is plain text: it gets the description and the link of
-    each resolved reference, and no rich content. A body of a kind that holds no
-    mentions keeps every reference as that text."""
+    A requirement and a defect are plain text: the body becomes the description, with
+    each resolved ``[[Title]]`` as the artefact's ``#`` document ID. Every other type
+    gets the body as rich content and no description. A body of a kind that holds no
+    mentions keeps every resolved reference as that ``#`` document ID text."""
     if not section.body:
         return []
     title = section.title.strip()
@@ -1039,7 +1039,8 @@ async def _write_imported_body(
         return f"#{target[2]}" if target else match.group(0)
 
     description = SECTION_REFERENCE_RE.sub(_as_id, section.body)
-    if hasattr(instance, "description"):
+    plain = section.type_code == "REQ" or not hasattr(instance, "content_json")
+    if plain and hasattr(instance, "description"):
         instance.description = description
     host = is_tag_host_type(section.type_code)
     if targets and not host:
@@ -1116,9 +1117,10 @@ async def import_markdown(
     """Import a Markdown document: create its parameters and variables and one
     artefact per classified section.
 
-    Each section body is stored as the artefact's description and, where the artefact
-    holds rich content, as the editor's ``content_json`` and ``content_html``, with
-    each ``{{NAME}}`` as a parameter mention. A ``{{parameter: ...}}`` declaration
+    A requirement or defect section body is stored as the artefact's description; every
+    other section body as the editor's ``content_json`` and ``content_html``, with each
+    ``{{NAME}}`` as a parameter mention and each resolved ``[[Title]]`` as an artefact
+    mention. A ``{{parameter: ...}}`` declaration
     creates a parameter and a ``{{variable: ...}}`` declaration a variable.
 
     A parameter whose name already exists in the project is never overwritten. While
@@ -1324,8 +1326,6 @@ async def import_markdown(
             **external_create_values(current_user, section.type_code, {}),
         }
         instance = model(**kwargs)
-        if section.body and hasattr(instance, "description"):
-            instance.description = section.body
         if section.steps and hasattr(instance, "steps"):
             instance.steps = section.steps
         if hasattr(instance, "source_ref"):

@@ -295,7 +295,27 @@ def markdown_content(
     content = converter.blocks(_parser().parse(converter.protect(text)))
     if not content:
         return None
-    return {"type": "doc", "content": content}
+    document = {"type": "doc", "content": content}
+    _lift_headings(document)
+    return document
+
+
+def _headings(node: dict) -> list:
+    """Every heading node inside a node, at any depth."""
+    found = [node] if node.get("type") == "heading" else []
+    for child in node.get("content") or []:
+        found.extend(_headings(child))
+    return found
+
+
+def _lift_headings(document: dict) -> None:
+    """Move every heading up by the same number of levels until the shallowest one is level 1."""
+    headings = _headings(document)
+    if not headings:
+        return
+    shift = min(heading["attrs"]["level"] for heading in headings) - 1
+    for heading in headings:
+        heading["attrs"]["level"] -= shift
 
 
 def _attributes(values: Mapping[str, Any]) -> str:

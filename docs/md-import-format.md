@@ -50,10 +50,9 @@ Once every section is created, each `[[Title]]` is resolved:
 
 The reference becomes a mention of that artefact, the same as one picked in the
 editor after typing `#`, and the section is linked to it with a `references` link.
-In the artefact's description text the reference reads as the document ID Bloom gave
-the mentioned artefact, with a `#` in front. A requirement is plain text, so in a
-requirement the reference reads as that `#` document ID, the form the requirement
-editor writes, and still creates the link.
+A requirement and a defect are plain text: in their text the reference reads as the
+document ID Bloom gave the mentioned artefact, with a `#` in front, the form the
+requirement editor writes. In a requirement it still creates the link.
 
 A specification frames its area: what it covers, why, and where it ends. Its
 sub-headings group the requirements by mentioning them. Each rule is its own
@@ -100,10 +99,13 @@ that artefact. What the body becomes depends on the type:
 
 | Type | The body becomes |
 |---|---|
-| specification, standard, vision, design, risk, change request, test concept | rich content, shown formatted and opened in the editor, and the same text as the description |
-| test case | the step rows (see Test cases), and the other text as rich content and description |
-| requirement | the description only, as plain text |
-| defect | the description only, as plain text |
+| specification, standard, vision, design, risk, change request, test concept | rich content, shown formatted and opened in the editor |
+| test case | the step rows (see Test cases), and the other text as rich content |
+| requirement | the description, as plain text |
+| defect | the description, as plain text |
+
+For the types with rich content the description is the one-line brief description
+under the title. The import leaves it empty; write it in Bloom when needed.
 
 A requirement holds one rule in plain prose, so write its body without Markdown
 formatting. In rich content the following is kept:
@@ -133,6 +135,11 @@ the section heading belongs to the body: under `## [SPEC] Sign-in`, a `### Sessi
 heading is a heading of that specification. A heading at the same level or above
 starts the next section. Lines inside a fenced code block are never read as headings
 or test case rows.
+
+The editor numbers headings from level 1, so the shallowest heading of a body becomes
+a level 1 heading and deeper headings keep their distance to it: under
+`## [SPEC] Sign-in`, `### Sessions` becomes heading 1 and a `####` below it heading
+1.1.
 
 A design is where technical detail such as tables of values and code belongs:
 
@@ -189,8 +196,8 @@ Rich content shows the parameter value in the text, so write the sentence around
 A `{{NAME}}` without `parameter:` or `variable:` and `value:` is a reference to an
 existing parameter or variable and is kept as it is. In rich content every `{{NAME}}`
 becomes the parameter, shown with its value, the same as one written in the editor;
-inside inline code or a code block it stays plain text. In a description, and so in a
-requirement, it stays `{{NAME}}`.
+inside inline code or a code block it stays plain text. In a requirement or a defect
+it stays `{{NAME}}`.
 
 Each parameter and variable has a **name** and a **value**. On import the backend
 checks each name. A name that already exists in the project, as a parameter or a variable, is
@@ -206,7 +213,7 @@ import runs once every name has a choice.
 A test case is one scenario. In a `[TC]` section, each `- Pre-Condition:`, `- Step:`
 or `- Loop:` line becomes a row of the test case's steps table. Text after `=>` is the
 row's expected result. Indent a row by two spaces to nest it under the loop above it.
-Every other line of the section is the test case description, imported with its
+Every other line of the section becomes the test case's rich content, with its
 formatting as described in Section body and formatting. Keep each step to one action
 with one expected result.
 
@@ -271,6 +278,6 @@ decides which template a section is filed under.
 | `des` / `design` | Design | title + body |
 | `rsk` / `risk` | Risk | title + body |
 | `cpt` / `concept` / `test-concept` | Test Concept | title becomes the concept name |
-| `tc` / `test-case` | Test Case | title, description and steps rows (see Test cases) |
+| `tc` / `test-case` | Test Case | title, rich content and steps rows (see Test cases) |
 | `chg` / `change` | Change Request | title + body |
 | `def` / `defect` | Defect | title + body; plain text, no mentions |
