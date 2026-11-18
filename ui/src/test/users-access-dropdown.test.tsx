@@ -83,29 +83,26 @@ describe('access under each user', () => {
     expect(usersApi.accessSummary).not.toHaveBeenCalled()
   })
 
-  it('shows groups and each project with its labels, without permissions, and hides them again', async () => {
+  it('lists the projects by name only, without groups, and hides them again', async () => {
     renderIt()
     await screen.findByText('Mia')
     fireEvent.click(screen.getByRole('button', { name: 'Show access of Mia' }))
-    expect(await screen.findByText('PRJ Alpha')).toBeInTheDocument()
-    expect(screen.getByText(': Authors, Reviewers')).toBeInTheDocument()
-    expect(screen.getByText(': Owner')).toBeInTheDocument()
-    expect(screen.getByText(': Direct')).toBeInTheDocument()
-    expect(screen.getAllByText('Authors')).toHaveLength(1)
+    expect(await screen.findByText('PRJ Alpha, PRJ Beta, PRJ Gamma')).toBeInTheDocument()
+    expect(screen.getByText('Projects:')).toBeInTheDocument()
+    expect(screen.queryByText(/Groups|Authors|Reviewers|Owner|Direct/)).toBeNull()
     expect(screen.getByRole('button', { name: 'Hide access of Mia' })).toHaveAttribute('aria-expanded', 'true')
     expect(usersApi.accessSummary).toHaveBeenCalledTimes(1)
     expect(usersApi.accessSummary).toHaveBeenCalledWith(2)
-    expect(screen.queryByText(/\b(view|create|edit|delete)\b/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Hide access of Mia' }))
-    expect(screen.queryByText('PRJ Alpha')).toBeNull()
+    expect(screen.queryByText('PRJ Alpha, PRJ Beta, PRJ Gamma')).toBeNull()
   })
 
-  it('says No groups and No projects for a user without access', async () => {
+  it('says No projects for a user without access', async () => {
     renderIt()
     await screen.findByText('Vic')
     fireEvent.click(screen.getByRole('button', { name: 'Show access of Vic' }))
-    expect(await screen.findByText('No groups')).toBeInTheDocument()
-    expect(screen.getByText('No projects')).toBeInTheDocument()
+    expect(await screen.findByText('No projects')).toBeInTheDocument()
+    expect(screen.queryByText('No groups')).toBeNull()
   })
 
   it('shows every project for an Admin', async () => {
@@ -122,7 +119,7 @@ describe('access under each user', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show access of Mia' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load access.')
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
-    expect(await screen.findByText('PRJ Alpha')).toBeInTheDocument()
+    expect(await screen.findByText('PRJ Alpha, PRJ Beta, PRJ Gamma')).toBeInTheDocument()
     expect(usersApi.accessSummary).toHaveBeenCalledTimes(2)
   })
 })
