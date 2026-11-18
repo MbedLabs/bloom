@@ -90,6 +90,21 @@ class ImportMarkdownFormattingBase(BloomTestCase):
             abort_on_fail=False,
         )
 
+    def bud_the_test_concept_route_returns_its_content(self):
+        values = self.parameters
+        self._import(values.MDF_TEST_CONCEPT)
+        concept = self.bloom.bloom_artefact_titled("TestConcept", values.MDF_TEST_CONCEPT_NAME)
+        answer = self.bloom.bloom_test_concept_answer(concept.id, self.records.admin)
+        _, marks, _, text = self.bloom.bloom_rich_content_parts(answer.content_json)
+        found = ("bold" in marks, text, bool(answer.content_html))
+        self.print_variables({"bold, text, html": found})
+        self.assertEqual(
+            found,
+            (True, values.MDF_TEST_CONCEPT_TEXT, True),
+            msg=values.MSG_MDF_CONCEPT_ROUTE,
+            abort_on_fail=False,
+        )
+
     def bud_the_specification_has_no_description(self):
         values = self.parameters
         _, specification, _ = self._sign_in()

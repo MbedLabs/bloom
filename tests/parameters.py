@@ -3725,7 +3725,16 @@ MDF_UNMATCHED = (
     "The list reads the session table filtered by the user ID.\n"
 ).encode()
 MDF_LINK_ROLE = "references"
-MDF_LOCK_RULE = "An account is locked after repeated refused sign-ins"
+MDF_TEST_CONCEPT_NAME = "Sign-in verification"
+MDF_TEST_CONCEPT = (
+    f"## [CPT] {MDF_TEST_CONCEPT_NAME}\n"
+    "The sign-in rules are verified **black box**, through the API and the UI of a test instance.\n"
+).encode()
+MDF_TEST_CONCEPT_TEXT = (
+    "The sign-in rules are verified black box, through the API and the UI of a test instance."
+)
+MSG_MDF_CONCEPT_ROUTE = "the test concept route returns the imported concept's rich content and its HTML"
+MDF_LOCK_RULE ="An account is locked after repeated refused sign-ins"
 MDF_SAME_ANSWER_RULE = "Every refused sign-in gets the same answer"
 MDF_REQUIREMENT_MENTION = (
     f"## [REQ] {MDF_LOCK_RULE}\n"

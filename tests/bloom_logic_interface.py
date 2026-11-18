@@ -68,6 +68,7 @@ from app.api import (
     integrations,
 )
 from app.api import project_variables as project_variables_api
+from app.api import test_concepts as test_concepts_api
 from app.api import users as users_api
 from app.api.artefacts import create_comment
 from app.api.attachments import download_attachment, publish_test_report
@@ -1475,7 +1476,8 @@ class BloomLogicInterface(BloomInterface):
 
     def bloom_artefact_titled(self, kind, title):
         model = next(model for model in ARTEFACT_MODELS if model.__name__ == kind)
-        return self._run(self._scalar(select(model).where(model.title == title)))
+        column = model.title if hasattr(model, "title") else model.name
+        return self._run(self._scalar(select(model).where(column == title)))
 
     def bloom_notification_bodies(self):
         return [
@@ -1514,6 +1516,16 @@ class BloomLogicInterface(BloomInterface):
             for row in self._run(self._all(select(model))):
                 found[getattr(row, "title", None) or getattr(row, "name", None)] = row.description
         return found
+
+    def bloom_test_concept_answer(self, concept_id, user_id):
+        """Return what the test concept route answers for one concept."""
+
+        async def work(db):
+            return await test_concepts_api.get_test_concept(
+                concept_id=concept_id, db=db, current_user=await db.get(User, user_id)
+            )
+
+        return self._run(self._with_db(work))
 
     def bloom_heading_levels(self, content):
         """Return the level of each heading in rich content, in reading order."""
