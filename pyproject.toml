@@ -35,6 +35,7 @@ dependencies = [
     "alembic>=1.18.0",
     "defusedxml>=0.7.1",
     "boto3>=1.34.0",
+    "markdown-it-py>=4.2.0",
 ]
 
 [project.optional-dependencies]

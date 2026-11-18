@@ -28,11 +28,61 @@ Body text for this requirement.
 Body text for this design.
 ```
 
-## Parameters
+## Section body and formatting
+
+Everything under a section heading, up to the next section heading, is the body of
+that artefact. The body is written in Markdown and is imported as the artefact's rich
+content, so the artefact page shows it formatted and the editor opens it for editing.
+The following is kept:
+
+| Markdown | Shown as |
+|---|---|
+| `### Heading` (levels 1 to 6) | heading |
+| a blank line between lines of text | new paragraph |
+| `**bold**`, `*italic*`, `~~struck~~` | bold, italic, struck text |
+| `` `code` `` | inline code |
+| a fenced block between ```` ``` ```` lines, with an optional language | code block |
+| `[text](https://example.com)` | link |
+| `- item` or `* item` | bullet list, nested by indenting |
+| `1. item` | numbered list, nested by indenting |
+| a table with a `\| --- \|` header line, with `:--`, `:-:` or `--:` alignment | table with a header row |
+| `> text` | quote |
+| `---` on its own line | horizontal rule |
+| `{{NAME}}` | the parameter, shown with its value |
+
+A line break inside a paragraph joins the lines; end a line with two spaces to keep
+the break. An image `![text](https://example.com/image.png)` is imported as a link to
+the image. Raw HTML is imported as text.
+
+Inside a section opened by a type tag, a heading without a tag that is deeper than
+the section heading belongs to the body: under `## [SPEC] Sign-in`, a `### Refusals`
+heading is a heading of that specification. A heading at the same level or above
+starts the next section. Lines inside a fenced code block are never read as headings
+or test case rows.
+
+The body is also stored as the artefact's description text. A defect has no rich
+content and shows its body as that text.
+
+```markdown
+## [SPEC] Sign-in
+Users sign in with an **email** and a password.
+
+### Refusals
+- A wrong password is refused.
+- A locked account is refused.
+
+| Event | Effect |
+| --- | --- |
+| No request for {{IDLE_MINUTES}} minutes | The session ends |
+```
+
+## Parameters and variables
 
 Write a parameter inside the sentence where it is used, wrapped as
-`{{parameter: NAME, value: VALUE}}`. On import Bloom creates the parameter and
-replaces the wrapped form with `{{NAME}}`.
+`{{parameter: NAME, value: VALUE}}`. On import Bloom creates a parameter and replaces
+the wrapped form with `{{NAME}}`. Write `{{variable: NAME, value: VALUE}}` the same
+way to create a variable instead. Both forms read `{{NAME}}` once imported, and the
+rules below on names apply to both.
 
 ```markdown
 ## [REQ] Boot time
@@ -48,24 +98,28 @@ The system shall boot within {{BOOT_BUDGET_MS}} ms of power-on.
 The app shows the parameter value in the text, so write the sentence around it:
 `repeat {{parameter: BOOT_CYCLES, value: 3}} times` reads "repeat 3 times".
 
-A `{{NAME}}` without `parameter:` and `value:` is a reference to an existing
-parameter and is kept as it is.
+A `{{NAME}}` without `parameter:` or `variable:` and `value:` is a reference to an
+existing parameter or variable and is kept as it is. Every `{{NAME}}` of the body is
+shown as the parameter, with its value, the same as one written in the editor. Inside
+inline code or a code block it stays plain text.
 
-Each parameter has a **name** and a **value**. On import the backend checks each
-name. A name that already exists in the project, as a parameter or a variable, is
+Each parameter and variable has a **name** and a **value**. On import the backend
+checks each name. A name that already exists in the project, as a parameter or a variable, is
 never overwritten: the import stops before creating anything and lists each such name
 with the project's value and the file's value. For each one, choose to keep the
 project's value (the imported text then refers to it) or to import the file's value
-under a new name (the new parameter is created and every `{{NAME}}` of the imported
-text refers to the new name). The import runs once every name has a choice.
+under a new name (the new parameter or variable is created with the kind the file
+declares, and every `{{NAME}}` of the imported text refers to the new name). The
+import runs once every name has a choice.
 
 ## Test cases
 
 In a `[TC]` section, each `- Pre-Condition:`, `- Step:` or `- Loop:` line becomes a
 row of the test case's steps table. Text after `=>` is the row's expected result.
 Indent a row by two spaces to nest it under the loop above it. Every other line of
-the section is the test case description. Keep each step to one action with one
-expected result.
+the section is the test case description, imported with its formatting as described
+in Section body and formatting. Keep each step to one action with one expected
+result.
 
 ```markdown
 ## [TC] Boot within budget
@@ -87,8 +141,9 @@ format. Give it this file and ask it to follow it exactly:
 
 - one `##` section per artefact, with the type tag in the heading (`## [REQ]`,
   `## [TC]`, ...);
-- every value that can change written as `{{parameter: NAME, value: VALUE}}` inside
-  the sentence where it is used, with the same NAME wherever it is the same value;
+- every value that can change written as `{{parameter: NAME, value: VALUE}}` (or
+  `{{variable: NAME, value: VALUE}}` for a variable) inside the sentence where it is
+  used, with the same NAME wherever it is the same value;
 - in a `[TC]` section, one action per `- Step:` line and its expected result after
   `=>`, preconditions as `- Pre-Condition:`, repetitions as `- Loop:` with the looped
   steps indented by two spaces;

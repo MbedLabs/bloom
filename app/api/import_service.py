@@ -30,6 +30,7 @@ from app.api.link_read_utils import LEGACY_REQ_LINK_TYPE_TO_ROLE
 from app.core.database import get_db
 from app.core.id_generator import format_doc_id, next_doc_id
 from app.core.link_rules import is_allowed_link_role
+from app.core.md_content import content_html, markdown_content
 from app.core.md_import import (
     parameter_name_collisions,
     parse_markdown_document,
@@ -936,8 +937,13 @@ async def import_markdown(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    """Import a Markdown document: create its parameters and one artefact per
-    classified section.
+    """Import a Markdown document: create its parameters and variables and one
+    artefact per classified section.
+
+    Each section body is stored as the artefact's description and, where the artefact
+    holds rich content, as the editor's ``content_json`` and ``content_html``, with
+    each ``{{NAME}}`` as a parameter mention. A ``{{parameter: ...}}`` declaration
+    creates a parameter and a ``{{variable: ...}}`` declaration a variable.
 
     A parameter whose name already exists in the project is never overwritten. While
     any such name has no action, nothing is imported and the answer (409) lists each
@@ -1056,7 +1062,7 @@ async def import_markdown(
         db.add(
             ProjectVariable(
                 project_id=target_project.id,
-                kind="variable",
+                kind=parameter.kind,
                 key=parameter.name.strip(),
                 value=parameter.value,
             )
@@ -1065,6 +1071,16 @@ async def import_markdown(
         created += 1
 
     await db.flush()
+    references = {
+        key.strip().lower(): (row_id, key)
+        for row_id, key in (
+            await db.execute(
+                select(ProjectVariable.id, ProjectVariable.key)
+                .where(ProjectVariable.project_id == target_project.id)
+                .order_by(ProjectVariable.id.desc())
+            )
+        ).all()
+    }
 
     artefacts_created = 0
     artefacts_skipped = 0
@@ -1131,6 +1147,10 @@ async def import_markdown(
         instance = model(**kwargs)
         if section.body and hasattr(instance, "description"):
             instance.description = section.body
+        if section.body and hasattr(instance, "content_json"):
+            rich = markdown_content(section.body, references)
+            instance.content_json = rich
+            instance.content_html = content_html(rich)
         if section.steps and hasattr(instance, "steps"):
             instance.steps = section.steps
         if hasattr(instance, "source_ref"):
