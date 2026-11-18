@@ -3662,20 +3662,71 @@ MSG_MDI_RENAME_TEXT = "every reference in the imported text uses the new name"
 MSG_MDI_EITHER_KIND = "a name also collides with a parameter of the other kind, whatever its case"
 MSG_MDI_REFUSED = "{what} is refused with 422"
 MSG_MDI_BROKEN = "collision actions that are not JSON are refused, and nothing is imported"
-MDF_SPECIFICATION = (
-    b"## [SPEC] Sign-in\n"
-    b"Users sign in with an email and a password.\n"
-    b"\n"
-    b"- A wrong password is refused.\n"
-    b"- A locked account is refused.\n"
-)
-MDF_SPECIFICATION_TEXT = (
-    "Users sign in with an email and a password. "
-    "A wrong password is refused. A locked account is refused."
-)
-MDF_SPECIFICATION_NODES = {"paragraph", "bulletList", "listItem"}
+MDF_REFUSAL_RULE = "A wrong password is refused without saying which part was wrong"
+MDF_IDLE_RULE = "A session ends after a period without requests"
+MDF_SIGN_IN = (
+    "## [SPEC] Sign-in\n"
+    "Sign-in is how a person proves who they are before they see any project data. "
+    "This area covers signing in with an email and a password and ending a session that "
+    "is no longer used. Signing in through an identity provider is not part of it.\n"
+    "\n"
+    "### Credentials\n"
+    "How the product treats the email and the password a person enters.\n"
+    "\n"
+    f"- [[{MDF_REFUSAL_RULE}]]\n"
+    "\n"
+    "### Sessions\n"
+    "How long a signed-in session lasts.\n"
+    "\n"
+    f"- [[{MDF_IDLE_RULE}]]\n"
+    "\n"
+    f"## [REQ] {MDF_REFUSAL_RULE}\n"
+    "A refusal that names the wrong part tells an attacker which emails exist. The product "
+    "shall refuse a sign-in whose password does not match the account, with the same answer "
+    "whether the email or the password was wrong. A refused sign-in does not lock the account.\n"
+    "\n"
+    f"## [REQ] {MDF_IDLE_RULE}\n"
+    "A session left open on a shared machine is a way into the project. The product shall end "
+    "a session that has received no request for {{parameter: IDLE_MINUTES, value: 30}} "
+    "minutes. A session that is in use is never ended by this rule.\n"
+).encode()
+MDF_SIGN_IN_TITLE = "Sign-in"
+MDF_SIGN_IN_OPENING = "Sign-in is how a person proves who they are before they see any project data."
+MDF_SPECIFICATION_NODES = {"paragraph", "heading", "bulletList", "listItem"}
+MDF_EXISTING_RULE = "A locked account cannot sign in"
+MDF_EXISTING_REQUIREMENT = (
+    f"## [REQ] {MDF_EXISTING_RULE}\n"
+    "A locked account protects its owner while a reset is pending. The product shall refuse "
+    "every sign-in to a locked account until it is unlocked.\n"
+).encode()
+MDF_EXISTING_SPECIFICATION_TITLE = "Account locking"
+MDF_EXISTING_SPECIFICATION = (
+    f"## [SPEC] {MDF_EXISTING_SPECIFICATION_TITLE}\n"
+    "Account locking is how the product keeps a suspicious account closed until its owner "
+    "acts. Unlocking by an administrator is not part of it.\n"
+    "\n"
+    f"- [[{MDF_EXISTING_RULE}]]\n"
+).encode()
+MDF_UNKNOWN_TITLE = "A rule that is not in this document"
+MDF_TWIN_TITLE = "Sessions are listed per user"
+MDF_UNMATCHED = (
+    "## [SPEC] Session overview\n"
+    "The session overview is how a person sees where they are signed in. Ending a session "
+    "from another device is not part of it.\n"
+    "\n"
+    f"- [[{MDF_UNKNOWN_TITLE}]]\n"
+    f"- [[{MDF_TWIN_TITLE}]]\n"
+    "\n"
+    f"## [REQ] {MDF_TWIN_TITLE}\n"
+    "A person needs to see their own sessions. The product shall list the sessions of the "
+    "signed-in user.\n"
+    "\n"
+    f"## [DES] {MDF_TWIN_TITLE}\n"
+    "The list reads the session table filtered by the user ID.\n"
+).encode()
+MDF_LINK_ROLE = "references"
 MDF_EVERY_ELEMENT = (
-    b"## [REQ] Formatted rule\n"
+    b"## [DES] Formatted design\n"
     b"### Scope\n"
     b"A **bold** word, an *italic* word, `inline code` and a [link](https://example.com).\n"
     b"\n"
@@ -3694,7 +3745,8 @@ MDF_EVERY_ELEMENT = (
     b"- Step: not a row\n"
     b"```\n"
 )
-MDF_EVERY_ELEMENT_SECTIONS = {"Formatted rule": "REQ"}
+MDF_EVERY_ELEMENT_TITLE = "Formatted design"
+MDF_EVERY_ELEMENT_SECTIONS = {"Formatted design": "DES"}
 MDF_ELEMENT_NODES = {
     "heading",
     "paragraph",
@@ -3708,9 +3760,11 @@ MDF_ELEMENT_NODES = {
     "codeBlock",
 }
 MDF_ELEMENT_MARKS = {"bold", "italic", "code", "link"}
+MDF_PARAMETER_REFERENCE_TITLE = "Idle session timer"
 MDF_PARAMETER_REFERENCE = (
-    b"## [REQ] Idle timeout\n"
-    b"The session ends after {{parameter: IDLE_MINUTES, value: 30}} minutes without a request.\n"
+    b"## [DES] Idle session timer\n"
+    b"Each request resets a timer of {{parameter: IDLE_MINUTES, value: 30}} minutes on the "
+    b"session row.\n"
 )
 MDF_PARAMETER_CHIPS = [("IDLE_MINUTES", "{{")]
 MDF_TEST_CASE = (
@@ -3722,6 +3776,7 @@ MDF_TEST_CASE = (
 MDF_TEST_CASE_TEXT = "Checks the relay-driven boot."
 MDF_EVERY_TYPE = (
     b"## [REQ] Typed requirement\nText with **bold**.\n"
+    b"## [DEF] Typed defect\nText with **bold**.\n"
     b"## [DES] Typed design\nText with **bold**.\n"
     b"## [RSK] Typed risk\nText with **bold**.\n"
     b"## [CHG] Typed change\nText with **bold**.\n"
@@ -3731,8 +3786,9 @@ MDF_EVERY_TYPE = (
     b"## [STD] Typed standard\nText with **bold**.\n"
     b"## [VIS] Typed vision\nText with **bold**.\n"
 )
+MDF_PLAIN_TYPES = [("Requirement", "Typed requirement"), ("Defect", "Typed defect")]
+MDF_PLAIN_BODY = "Text with **bold**."
 MDF_EVERY_TYPE_TITLES = [
-    "Typed requirement",
     "Typed design",
     "Typed risk",
     "Typed change",
@@ -3754,7 +3810,29 @@ MDF_VARIABLE_COLLISION_FOUND = [
     {"name": "BOOT_MS", "existing_value": "old", "imported_value": "9"}
 ]
 MSG_MDF_SPECIFICATION = (
-    "an imported specification holds its body as rich content with its paragraph and list"
+    "an imported specification holds its body as rich content with its sub-headings and lists"
+)
+MSG_MDF_SPEC_MENTIONS = (
+    "the specification mentions each requirement of its document as the editor's artefact mention"
+)
+MSG_MDF_SPEC_LINKS = "each mention links the specification to its requirement"
+MSG_MDF_SPEC_DESCRIPTION = "the plain description names each mentioned requirement by its # ID"
+MSG_MDF_NO_UNLINKED_NOTICE = "artefacts the import links get no notification that they have no links"
+MSG_MDF_EXISTING_MENTION = (
+    "the title of an existing requirement becomes its mention and links the specification to it"
+)
+MDF_DOCUMENT_ID = r"\b[A-Z]{3}-[A-Z]+-\d+\b"
+MSG_MDF_DOC_EXAMPLES = (
+    "no import example of the format document holds a document ID, and every specification "
+    "example mentions its requirements as [[Title]]"
+)
+MSG_MDF_PLAIN ="{title} keeps its body as plain description with no rich content"
+MSG_MDF_SIGN_IN_REQUIREMENTS = (
+    "the requirements stay plain text, the second keeps {{IDLE_MINUTES}} in its text, "
+    "and IDLE_MINUTES is a parameter"
+)
+MSG_MDF_UNMATCHED = (
+    "an unknown or ambiguous section title stays text, is listed in the errors and links nothing"
 )
 MSG_MDF_ELEMENTS = (
     "a sub-heading and a fenced block stay in their section, and every Markdown element "

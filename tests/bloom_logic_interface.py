@@ -1500,6 +1500,38 @@ class BloomLogicInterface(BloomInterface):
                 found[getattr(row, "title", None) or getattr(row, "name", None)] = row.content_json
         return found
 
+    def bloom_import_format_examples(self):
+        """Return the fenced Markdown examples of the import format document."""
+        text = (Path(__file__).resolve().parent.parent / "docs" / "md-import-format.md").read_text()
+        return re.findall(r"^```markdown\n(.*?)^```", text, flags=re.S | re.M)
+
+    def bloom_artefact_mentions(self, content):
+        """Return the ids of the artefact mentions in rich content, in reading order."""
+        found = []
+
+        def walk(node):
+            if isinstance(node, dict):
+                attrs = node.get("attrs") or {}
+                if node.get("type") == "mention" and attrs.get("mentionSuggestionChar") == "#":
+                    found.append(attrs.get("id"))
+                for child in node.get("content") or []:
+                    walk(child)
+
+        walk(content)
+        return found
+
+    def bloom_artefact_links(self, source_type, source_id):
+        """Return the links of one source artefact as sorted (target type, target id, role)."""
+        rows = self._run(
+            self._all(
+                select(ArtefactLink).where(
+                    ArtefactLink.source_type == source_type,
+                    ArtefactLink.source_id == source_id,
+                )
+            )
+        )
+        return sorted((row.target_type, row.target_id, row.role) for row in rows)
+
     def bloom_rich_content_parts(self, content):
         """Return the node types, the mark types, the parameter chips and the plain text of rich content."""
         nodes, marks, chips, text = set(), set(), [], []
