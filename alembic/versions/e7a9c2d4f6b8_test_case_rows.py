@@ -105,6 +105,15 @@ def _rows(steps, preconditions, tc_id: str):
     if not isinstance(steps, list):
         steps = [] if steps is None else [steps]
     rows = [_row(step, position, tc_id) for position, step in enumerate(steps, start=1)]
+    rows = _precondition_rows(rows, preconditions) + rows
+    if not rows:
+        return None
+    _give_ids(rows)
+    return rows
+
+
+def _precondition_rows(rows: list, preconditions) -> list:
+    """A precondition row for each non-empty line of the text that no precondition row holds."""
     held = {row["description"].strip() for row in rows if row["row_type"] == "precondition"}
     added = []
     for line in (preconditions or "").splitlines():
@@ -122,9 +131,11 @@ def _rows(steps, preconditions, tc_id: str):
                     "collapsed": False,
                 }
             )
-    rows = added + rows
-    if not rows:
-        return None
+    return added
+
+
+def _give_ids(rows: list) -> None:
+    """Give each row without an id the id ``row-<position>``, with a suffix when it is taken."""
     taken = {row["id"] for row in rows if row["id"]}
     for position, row in enumerate(rows, start=1):
         if row["id"]:
@@ -135,7 +146,6 @@ def _rows(steps, preconditions, tc_id: str):
             candidate = f"row-{position}-{suffix}"
         row["id"] = candidate
         taken.add(candidate)
-    return rows
 
 
 def upgrade() -> None:

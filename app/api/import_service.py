@@ -1058,9 +1058,27 @@ async def _write_imported_body(
                 content_json=[artefact_mention(*target) for target in targets.values()],
                 user=current_user,
             )
-        return errors
-    if not hasattr(instance, "content_json"):
-        return errors
+    elif hasattr(instance, "content_json"):
+        await _write_rich_body(
+            db, current_user, project_id, section, instance, parameters, targets, description
+        )
+    return errors
+
+
+async def _write_rich_body(
+    db: AsyncSession,
+    current_user: User,
+    project_id: int,
+    section,
+    instance,
+    parameters: dict,
+    targets: dict,
+    description: str,
+) -> None:
+    """Store an imported body as the artefact's rich content and its HTML; a kind that holds
+    mentions keeps each resolved reference as a mention with its references link, every other
+    kind gets the description with the references as document IDs."""
+    host = is_tag_host_type(section.type_code)
     artefacts = targets if host else {}
     rich = markdown_content(section.body if host else description, parameters, artefacts)
     instance.content_json = rich
@@ -1074,7 +1092,6 @@ async def _write_imported_body(
             content_json=rich,
             user=current_user,
         )
-    return errors
 
 
 async def _has_link(db: AsyncSession, project_id: int, type_code: str, row_id: int) -> bool:

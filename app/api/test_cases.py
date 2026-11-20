@@ -367,7 +367,10 @@ async def get_test_case(
 @router.patch(
     "/{test_case_id}",
     response_model=TestCaseResponse,
-    responses={404: {"description": HTTPStatus(404).phrase}},
+    responses={
+        404: {"description": HTTPStatus(404).phrase},
+        422: {"description": HTTPStatus(422).phrase},
+    },
 )
 async def update_test_case(
     test_case_id: int,
@@ -381,16 +384,15 @@ async def update_test_case(
     test_case = await get_visible_row(
         db, TestCase, test_case_id, "Test case not found", current_user, permission=("edit", "TC")
     )
-    rows_changed = data.steps is not None or data.preconditions is not None
-    rows = (
-        _rows_or_422(
-            data.steps if data.steps is not None else test_case.steps,
+    steps_given = data.steps is not None
+    rows_changed = steps_given or data.preconditions is not None
+    rows = None
+    if rows_changed:
+        rows = _rows_or_422(
+            data.steps if steps_given else test_case.steps,
             data.preconditions,
-            strict=data.steps is not None,
+            strict=steps_given,
         )
-        if rows_changed
-        else None
-    )
     changes = data.model_dump(exclude_unset=True)
     check_external_change(current_user, "TC", test_case, changes)
     await check_status_right(db, current_user, "TC", test_case, changes)
