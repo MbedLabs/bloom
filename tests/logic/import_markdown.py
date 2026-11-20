@@ -111,8 +111,7 @@ class ImportMarkdownBase(BloomTestCase):
         self.assertEqual(
             (
                 requirement.description,
-                ("BOOT_MS_V2", "{{")
-                in self.bloom.bloom_rich_content_parts(design.content_json)[2],
+                ("BOOT_MS_V2", "{{") in self.bloom.bloom_rich_content_parts(design.content_json)[2],
             ),
             ("Boot within {{BOOT_MS_V2}} ms", True),
             msg=values.MSG_MDI_RENAME_TEXT,

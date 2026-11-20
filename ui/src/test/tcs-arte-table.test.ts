@@ -45,6 +45,34 @@ describe('createDefaultTcsRow', () => {
 })
 
 describe('normalizeTcsRows', () => {
+  it('reads a row type in any letter case and from a label', () => {
+    const rows = normalizeTcsRows([
+      { row_type: 'Pre-Condition', description: 'Device is powered' },
+      { row_type: 'PRECONDITION', description: 'Cable connected' },
+      { label: 'loop', description: 'Repeat' },
+      { row_type: 'Step', description: 'Press the button', expected_result: 'LED is on' },
+    ])
+
+    expect(rows.map((row) => [row.row_type, row.description, row.expected_result])).toEqual([
+      ['precondition', 'Device is powered', ''],
+      ['precondition', 'Cable connected', ''],
+      ['loop', 'Repeat', ''],
+      ['step', 'Press the button', 'LED is on'],
+    ])
+  })
+
+  it('shows rows without a type as steps and reads the older field names', () => {
+    const rows = normalizeTcsRows([
+      { description: 'Open the page', expected_result: 'It loads' },
+      { action: 'Click Save', expected: 'Saved' },
+    ])
+
+    expect(rows.map((row) => [row.row_type, row.description, row.expected_result])).toEqual([
+      ['step', 'Open the page', 'It loads'],
+      ['step', 'Click Save', 'Saved'],
+    ])
+  })
+
   it('preserves structured TCS rows without forcing generated labels', () => {
     const rows = normalizeTcsRows([
       {

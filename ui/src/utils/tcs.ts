@@ -45,16 +45,35 @@ export function createDefaultTcRows(): TcsRow[] {
   ]
 }
 
-function isTcsRowType(value: unknown): value is TcsRowType {
-  return typeof value === 'string' && TCS_ROW_TYPE_OPTIONS.some((option) => option.value === value)
+const ROW_TYPE_NAMES: Record<string, TcsRowType> = {
+  precondition: 'precondition',
+  'pre-condition': 'precondition',
+  step: 'step',
+  loop: 'loop',
+}
+
+/** The row type a `row_type` or `label` value names in any letter case, or null. */
+function rowTypeOf(value: unknown): TcsRowType | null {
+  return typeof value === 'string' ? ROW_TYPE_NAMES[value.trim().toLowerCase()] ?? null : null
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
+/** The first of the keys holding non-empty text, else an empty string. */
+function firstText(row: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = row[key]
+    if (typeof value === 'string' && value !== '') return value
+    if (typeof value === 'number') return String(value)
+  }
+  return ''
+}
+
 function coerceTcsRow(row: Record<string, unknown>): TcsRow {
-  const rowType = isTcsRowType(row.row_type) ? row.row_type : 'step'
+  const typed = typeof row.row_type === 'string' && row.row_type.trim() !== ''
+  const rowType = (typed ? rowTypeOf(row.row_type) : rowTypeOf(row.label)) ?? 'step'
   const indentLevel = typeof row.indent_level === 'number' && Number.isFinite(row.indent_level)
     ? Math.max(0, row.indent_level)
     : 0
@@ -63,8 +82,8 @@ function coerceTcsRow(row: Record<string, unknown>): TcsRow {
     id: typeof row.id === 'string' && row.id.trim() ? row.id : generateId(),
     row_type: rowType,
     label: typeof row.label === 'string' && row.label.trim() ? row.label : getDefaultTcsLabel(rowType),
-    description: typeof row.description === 'string' ? row.description : '',
-    expected_result: typeof row.expected_result === 'string' ? row.expected_result : '',
+    description: firstText(row, ['description', 'action', 'step']),
+    expected_result: firstText(row, ['expected_result', 'expected']),
     indent_level: indentLevel,
     collapsed: Boolean(row.collapsed),
   }
@@ -82,13 +101,9 @@ export function migrateOldSteps(oldSteps: Array<{ step_number?: number; action?:
   }))
 }
 
+/** The rows of a stored test case in the editor's form: every row is kept, a row without a type is a step. */
 export function normalizeTcsRows(steps: unknown): TcsRow[] {
-  if (!Array.isArray(steps) || steps.length === 0) return []
-  if (steps.every((row) => isRecord(row) && 'row_type' in row)) {
-    return steps.map((row) => coerceTcsRow(row as Record<string, unknown>))
-  }
-  if (steps.every((row) => isRecord(row) && ('action' in row || 'step_number' in row))) {
-    return migrateOldSteps(steps as Array<{ step_number?: number; action?: string; expected_result?: string }>)
-  }
-  return []
+  const list = isRecord(steps) && !Array.isArray(steps) && Array.isArray(steps.steps) ? steps.steps : steps
+  if (!Array.isArray(list) || list.length === 0) return []
+  return list.map((row) => coerceTcsRow(isRecord(row) ? row : { description: String(row) }))
 }

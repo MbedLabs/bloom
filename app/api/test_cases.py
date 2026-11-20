@@ -41,6 +41,7 @@ from app.core.security import (
     get_current_user,
     require_project_access,
 )
+from app.core.tc_steps import StepRowError, normalize_rows
 from app.models import (
     ArtefactLink,
     Project,
@@ -250,11 +251,23 @@ async def list_test_cases(
     )
 
 
+def _rows_or_422(steps, preconditions, strict: bool = True):
+    """The rows ``normalize_rows`` stores for the steps and precondition text, or a 422 naming
+    the refused row."""
+    try:
+        return normalize_rows(steps, preconditions, strict=strict)
+    except StepRowError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
 @router.post(
     "",
     response_model=TestCaseResponse,
     status_code=201,
-    responses={400: {"description": HTTPStatus(400).phrase}},
+    responses={
+        400: {"description": HTTPStatus(400).phrase},
+        422: {"description": HTTPStatus(422).phrase},
+    },
 )
 async def create_test_case(
     data: TestCaseCreate,
@@ -275,6 +288,7 @@ async def create_test_case(
     named = data.model_dump(exclude_unset=True)
     forced = external_create_values(current_user, "TC", named)
     await check_create_status_right(db, current_user, data.project_id, "TC", named)
+    rows = _rows_or_422(data.steps, data.preconditions)
 
     tc_id = await next_doc_id(db, TestCase, TestCase.tc_id, data.project_id, project.prefix, "TC")
 
@@ -294,8 +308,8 @@ async def create_test_case(
         tc_id=tc_id,
         title=data.title,
         description=data.description,
-        preconditions=data.preconditions,
-        steps=data.steps,
+        preconditions=None,
+        steps=rows,
         status=forced.get("status", data.status),
         visibility=forced.get("visibility", data.visibility),
         reviewer_id=data.reviewer_id,
@@ -367,6 +381,16 @@ async def update_test_case(
     test_case = await get_visible_row(
         db, TestCase, test_case_id, "Test case not found", current_user, permission=("edit", "TC")
     )
+    rows_changed = data.steps is not None or data.preconditions is not None
+    rows = (
+        _rows_or_422(
+            data.steps if data.steps is not None else test_case.steps,
+            data.preconditions,
+            strict=data.steps is not None,
+        )
+        if rows_changed
+        else None
+    )
     changes = data.model_dump(exclude_unset=True)
     check_external_change(current_user, "TC", test_case, changes)
     await check_status_right(db, current_user, "TC", test_case, changes)
@@ -394,10 +418,9 @@ async def update_test_case(
         test_case.title = data.title
     if data.description is not None:
         test_case.description = data.description
-    if data.preconditions is not None:
-        test_case.preconditions = data.preconditions
-    if data.steps is not None:
-        test_case.steps = data.steps
+    if rows_changed:
+        test_case.steps = rows
+        test_case.preconditions = None
     if data.status is not None:
         test_case.status = data.status
     if data.visibility is not None:

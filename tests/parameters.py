@@ -3691,7 +3691,9 @@ MDF_SIGN_IN = (
     "minutes. A session that is in use is never ended by this rule.\n"
 ).encode()
 MDF_SIGN_IN_TITLE = "Sign-in"
-MDF_SIGN_IN_OPENING = "Sign-in is how a person proves who they are before they see any project data."
+MDF_SIGN_IN_OPENING = (
+    "Sign-in is how a person proves who they are before they see any project data."
+)
 MDF_SPECIFICATION_NODES = {"paragraph", "heading", "bulletList", "listItem"}
 MDF_EXISTING_RULE = "A locked account cannot sign in"
 MDF_EXISTING_REQUIREMENT = (
@@ -3733,8 +3735,10 @@ MDF_TEST_CONCEPT = (
 MDF_TEST_CONCEPT_TEXT = (
     "The sign-in rules are verified black box, through the API and the UI of a test instance."
 )
-MSG_MDF_CONCEPT_ROUTE = "the test concept route returns the imported concept's rich content and its HTML"
-MDF_LOCK_RULE ="An account is locked after repeated refused sign-ins"
+MSG_MDF_CONCEPT_ROUTE = (
+    "the test concept route returns the imported concept's rich content and its HTML"
+)
+MDF_LOCK_RULE = "An account is locked after repeated refused sign-ins"
 MDF_SAME_ANSWER_RULE = "Every refused sign-in gets the same answer"
 MDF_REQUIREMENT_MENTION = (
     f"## [REQ] {MDF_LOCK_RULE}\n"
@@ -3827,9 +3831,7 @@ MDF_TWO_KINDS = (
 MDF_TWO_KINDS_VALUES = {"BOOT_MS": "variable", "P_ONE": "parameter", "V_ONE": "variable"}
 MDF_TWO_KINDS_TEXT = "Uses {{P_ONE}} and {{V_ONE}}."
 MDF_VARIABLE_COLLISION = b"## [REQ] Limit\nStay under {{variable: BOOT_MS, value: 9}}\n"
-MDF_VARIABLE_COLLISION_FOUND = [
-    {"name": "BOOT_MS", "existing_value": "old", "imported_value": "9"}
-]
+MDF_VARIABLE_COLLISION_FOUND = [{"name": "BOOT_MS", "existing_value": "old", "imported_value": "9"}]
 MSG_MDF_SPECIFICATION = (
     "an imported specification holds its body as rich content with its sub-headings and lists"
 )
@@ -3844,7 +3846,9 @@ MSG_MDF_REQ_MENTION = (
     "a requirement names its mention by # ID in its plain description, gets no rich content "
     "and links the mentioned requirement"
 )
-MSG_MDF_NO_UNLINKED_NOTICE = "artefacts the import links get no notification that they have no links"
+MSG_MDF_NO_UNLINKED_NOTICE = (
+    "artefacts the import links get no notification that they have no links"
+)
 MSG_MDF_EXISTING_MENTION = (
     "the title of an existing requirement becomes its mention and links the specification to it"
 )
@@ -3853,7 +3857,7 @@ MSG_MDF_DOC_EXAMPLES = (
     "no import example of the format document holds a document ID, and every specification "
     "example mentions its requirements as [[Title]]"
 )
-MSG_MDF_PLAIN ="{title} keeps its body as plain description with no rich content"
+MSG_MDF_PLAIN = "{title} keeps its body as plain description with no rich content"
 MSG_MDF_SIGN_IN_REQUIREMENTS = (
     "the requirements stay plain text, the second keeps {{IDLE_MINUTES}} in its text, "
     "and IDLE_MINUTES is a parameter"
@@ -5945,4 +5949,115 @@ MSG_DM_GROUP = "the default Defect Managers group holds Read Internal, Read Cust
 MSG_DM_RECIPIENTS = (
     "a failed send emails the administrators and the project's Product Owners and Defect Managers, "
     "no Tester and no Defect Manager of another project"
+)
+PRE_PREFIX = "PRC"
+PRE_ACCOUNT = "a test account exists"
+PRE_SIGN_IN = ("sign in", "the project list opens")
+PRE_CAPITALISED = [
+    {"row_type": "Precondition", "description": PRE_ACCOUNT},
+    {"row_type": "Step", "description": PRE_SIGN_IN[0], "expected_result": PRE_SIGN_IN[1]},
+]
+PRE_LABELLED = [
+    {"row_type": "Pre-Condition", "description": PRE_ACCOUNT},
+    {"row_type": "loop", "description": "repeat 3 times"},
+    {
+        "row_type": "STEP",
+        "description": PRE_SIGN_IN[0],
+        "expected_result": PRE_SIGN_IN[1],
+        "indent_level": 1,
+    },
+]
+PRE_UNTYPED = [{"description": PRE_SIGN_IN[0], "expected_result": PRE_SIGN_IN[1]}]
+PRE_OLD_NAMES = [{"action": PRE_SIGN_IN[0], "expected": PRE_SIGN_IN[1]}]
+PRE_BY_LABEL = [{"label": "Pre-Condition", "description": PRE_ACCOUNT}]
+PRE_TEXT = f"{PRE_ACCOUNT}\n\nthe browser is open"
+PRE_ONE_STEP = [
+    {"row_type": "step", "description": PRE_SIGN_IN[0], "expected_result": PRE_SIGN_IN[1]}
+]
+PRE_UNKNOWN = [
+    {"row_type": "step", "description": PRE_SIGN_IN[0], "expected_result": PRE_SIGN_IN[1]},
+    {"row_type": "setup", "description": "prepare the bench"},
+]
+PRE_ROW_FIELDS = [
+    "collapsed",
+    "description",
+    "expected_result",
+    "id",
+    "indent_level",
+    "label",
+    "row_type",
+]
+PRE_ROWS_CAPITALISED = [("precondition", PRE_ACCOUNT, "", 0), ("step", *PRE_SIGN_IN, 0)]
+PRE_ROWS_LABELLED = [
+    ("precondition", PRE_ACCOUNT, "", 0),
+    ("loop", "repeat 3 times", "", 0),
+    ("step", *PRE_SIGN_IN, 1),
+]
+PRE_ROWS_ONE_STEP = [("step", *PRE_SIGN_IN, 0)]
+PRE_ROWS_BY_LABEL = [("precondition", PRE_ACCOUNT, "", 0)]
+PRE_ROWS_FROM_TEXT = [
+    ("precondition", PRE_ACCOUNT, "", 0),
+    ("precondition", "the browser is open", "", 0),
+    ("step", *PRE_SIGN_IN, 0),
+]
+PRE_LABELS = {"precondition": "Pre-Condition", "step": "Step", "loop": "Loop"}
+PRE_ACCEPTED_TYPES = ("precondition", "step", "loop")
+MSG_PRE_CAPITALISED = (
+    "a capitalised Precondition row is stored as a precondition and Step as a step"
+)
+MSG_PRE_LABELLED = "Pre-Condition, loop and STEP keep their type and indent"
+MSG_PRE_UNTYPED = "a row without a type is stored as a step with its expected result"
+MSG_PRE_OLD_NAMES = "a row with action and expected is stored as description and expected_result"
+MSG_PRE_BY_LABEL = "a row without a type takes it from its label"
+MSG_PRE_TEXT = "each line of the preconditions text becomes a precondition row before the steps, and the field is emptied"
+MSG_PRE_TEXT_TWICE = "a preconditions line that is already a precondition row is not added again"
+MSG_PRE_UNKNOWN = "an unknown row type is refused with 422 naming the row and the accepted types, and nothing is stored"
+MSG_PRE_EDITOR_FORM = "every stored row has the editor's fields and the label of its type"
+MSG_PRE_UPDATE = "an update applies the same rules to its rows and its preconditions text"
+
+TCS_ROWS_MIGRATION = "e7a9c2d4f6b8_test_case_rows.py"
+TCS_MIGRATION_FIELDS = (
+    "id",
+    "row_type",
+    "label",
+    "description",
+    "expected_result",
+    "indent_level",
+    "collapsed",
+)
+TCS_MIGRATION_EDITOR_ROWS = [
+    {
+        "id": "row-1",
+        "row_type": "precondition",
+        "label": "Pre-Condition",
+        "description": "Powered",
+        "expected_result": "",
+        "indent_level": 0,
+        "collapsed": False,
+    },
+    {
+        "id": "row-2",
+        "row_type": "step",
+        "label": "Step",
+        "description": "Boot",
+        "expected_result": "Ready",
+        "indent_level": 0,
+        "collapsed": False,
+    },
+]
+TCS_MIGRATION_MIXED_ROWS = [
+    {"row_type": "Pre-Condition", "description": "Relay open"},
+    {"action": "Close the relay", "expected": "Banner shown"},
+    {"row_type": "setup", "description": "Unknown kind"},
+]
+TCS_MIGRATION_PRECONDITIONS = "Cable connected\nRelay open"
+TCS_MIGRATION_EXPECTED = [
+    ("precondition", "Cable connected", ""),
+    ("precondition", "Relay open", ""),
+    ("step", "Close the relay", "Banner shown"),
+    ("step", "Unknown kind", ""),
+]
+MSG_TCS_MIGRATION = (
+    "the test case rows migration keeps rows in the editor form, reads any case and the older names, "
+    "folds new precondition lines in front, and stores an unknown type as a step"
 )
