@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.3.0 - 2026-11-18
+## 1.3.0 - 2026-11-20
 
 ### Added
 
@@ -37,6 +37,8 @@
 
 ### Fixed
 
+- Imported Markdown shows formatted and stays editable: each imported section gets the editor's rich content, its headings are numbered from level 1, artefacts it names by title are mentioned and linked, requirements stay plain text, and a test concept's page shows its body.
+- Test case preconditions are kept. A step row's `row_type` is read in any letter case (`Pre-Condition` and `pre-condition` are a precondition), a row without one takes it from its label or is a step, `action` and `expected` are read as `description` and `expected_result`, and each non-empty line of `preconditions` becomes a precondition row; another `row_type` is answered with 422 naming the row and the accepted values. Migration `e7a9c2d4f6b8` stores the test cases already saved the same way, and the test case page shows rows without a type as steps.
 - A document address that names a document other than a test suite or campaign by its database number instead of its document ID, such as the links inside a document opened in the editor, opens the document; before, it answered not found and the page said "You don't have access" to everyone, administrators included.
 - An administrator could request access, even from themselves. An administrator, or anyone who can already open what they ask for, is now told so and no request is recorded or emailed, and nobody is emailed about their own request.
 - An administrator who opened something that does not exist saw "You don't have access" with a Request access button. An administrator now sees Not found and is never offered a request; other users keep the access page.

@@ -67,14 +67,14 @@ class ImportMarkdownBase(BloomTestCase):
                 result.artefacts_created,
                 requirement.req_id.startswith("PRJ-REQ-"),
                 requirement.description,
-                design.description,
+                self.bloom.bloom_rich_content_parts(design.content_json)[2],
             ),
             (
                 {"Fast boot": "REQ", "Boot design": "DES"},
                 2,
                 True,
                 "Boot within {{BOOT_MS}} ms",
-                "Greets with {{NEW_ONE}}",
+                [("NEW_ONE", "{{")],
             ),
             msg=values.MSG_MDI_ARTEFACTS,
             abort_on_fail=False,
@@ -111,7 +111,7 @@ class ImportMarkdownBase(BloomTestCase):
         self.assertEqual(
             (
                 requirement.description,
-                "The budget {{BOOT_MS_V2}} applies twice." in design.description,
+                ("BOOT_MS_V2", "{{") in self.bloom.bloom_rich_content_parts(design.content_json)[2],
             ),
             ("Boot within {{BOOT_MS_V2}} ms", True),
             msg=values.MSG_MDI_RENAME_TEXT,
@@ -191,7 +191,7 @@ class ImportMarkdownBase(BloomTestCase):
             (
                 result.artefacts_created,
                 case.tc_id.startswith("PRJ-TC-"),
-                case.description,
+                self.bloom.bloom_rich_content_parts(case.content_json)[3],
                 [
                     (row["row_type"], row["description"], row["expected_result"])
                     for row in case.steps

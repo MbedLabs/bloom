@@ -131,6 +131,26 @@ class TcStepsBase(BloomTestCase):
             abort_on_fail=False,
         )
 
+    def bud_the_test_case_rows_migration_stores_the_editor_form(self):
+        values = self.parameters
+        migration = self.bloom.bloom_load_migration(values.TCS_ROWS_MIGRATION)
+        editor = migration._rows(values.TCS_MIGRATION_EDITOR_ROWS, None, "PRJ-TC-001")
+        mixed = migration._rows(
+            values.TCS_MIGRATION_MIXED_ROWS, values.TCS_MIGRATION_PRECONDITIONS, "PRJ-TC-002"
+        )
+        found = (
+            editor == values.TCS_MIGRATION_EDITOR_ROWS,
+            [(row["row_type"], row["description"], row["expected_result"]) for row in mixed],
+            all(set(values.TCS_MIGRATION_FIELDS) <= set(row) for row in mixed),
+        )
+        self.print_variables({"editor kept, mixed rows, fields": found})
+        self.assertEqual(
+            found,
+            (True, values.TCS_MIGRATION_EXPECTED, True),
+            msg=values.MSG_TCS_MIGRATION,
+            abort_on_fail=False,
+        )
+
     def bud_plain_preconditions_become_a_row(self):
         case = self.bloom.bloom_step_case(
             preconditions="relay open",

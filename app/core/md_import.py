@@ -4,9 +4,12 @@ The import format lets an uploaded Markdown file declare, per section, which
 artefact type it becomes. Classification is driven by a heading tag
 (``## [REQ] Title``), by frontmatter (``type: requirement``), or by a default type
 chosen at import. A parameter is written inside a sentence as
-``{{parameter: NAME, value: VALUE}}``; the backend recognises it wherever it appears,
-records it, and replaces it in place with ``{{NAME}}``. A name that already exists is
-a collision that requires an action and is never silently overwritten.
+``{{parameter: NAME, value: VALUE}}`` and a variable as
+``{{variable: NAME, value: VALUE}}``; the backend recognises either wherever it appears,
+records it with its kind, and replaces it in place with ``{{NAME}}``. A name the
+project holds is a collision that requires an action and is never silently overwritten.
+Inside a section opened by a type tag, a deeper heading without a tag stays in the
+section body, and lines inside a fenced code block are body text.
 """
 
 import re
@@ -40,20 +43,24 @@ TYPE_TOKENS = {
     "defect": "DEF",
 }
 
-_HEADING_TAG_RE = re.compile(r"^\s*#{1,6}\s*\[(?P<tag>[A-Za-z-]+)\](?P<title>.*)$")
-_HEADING_RE = re.compile(r"^\s*#{1,6}\s(?P<title>.*)$")
+_HEADING_TAG_RE = re.compile(r"^\s*(?P<hashes>#{1,6})\s*\[(?P<tag>[A-Za-z-]+)\](?P<title>.*)$")
+_HEADING_RE = re.compile(r"^\s*(?P<hashes>#{1,6})\s(?P<title>.*)$")
+_FENCE_RE = re.compile(r"^ {0,3}(?P<fence>`{3,}|~{3,})")
 _PARAM_RE = re.compile(
-    r"\{\{\s*parameter\s*:(?P<name>[^{},]+),\s*value\s*:(?P<value>[^{}]*)\}\}",
+    r"\{\{\s*(?P<kind>parameter|variable)\s*:(?P<name>[^{},]+),"
+    r"\s*value\s*:(?P<value>[^{}]*)\}\}",
     re.IGNORECASE,
 )
 
 
 @dataclass
 class Parameter:
-    """A ``{{parameter: NAME, value: VALUE}}`` written in the document."""
+    """A ``{{parameter: NAME, value: VALUE}}`` or ``{{variable: NAME, value: VALUE}}``
+    written in the document; ``kind`` is ``parameter`` or ``variable``."""
 
     name: str
     value: str
+    kind: str = "parameter"
 
 
 @dataclass
@@ -101,10 +108,26 @@ def _replace_parameters(line: str, parameters: list) -> str:
 
     def _placeholder(match: re.Match) -> str:
         name = match.group("name").strip()
-        parameters.append(Parameter(name=name, value=match.group("value").strip()))
+        parameters.append(
+            Parameter(
+                name=name,
+                value=match.group("value").strip(),
+                kind=match.group("kind").lower(),
+            )
+        )
         return "{{" + name + "}}"
 
     return _PARAM_RE.sub(_placeholder, line)
+
+
+def _fence_state(line: str, fence: Optional[str]) -> tuple:
+    """Whether the line belongs to a fenced code block, and the fence open after it."""
+    if fence is None:
+        match = _FENCE_RE.match(line)
+        return (True, match.group("fence")) if match else (False, None)
+    marker = line.strip()
+    closes = len(marker) >= len(fence) and set(marker) == {fence[0]}
+    return True, None if closes else fence
 
 
 def parse_markdown_document(text: str, default_type: Optional[str] = None) -> ParsedMarkdown:
@@ -116,9 +139,16 @@ def parse_markdown_document(text: str, default_type: Optional[str] = None) -> Pa
     parameters = []
     sections = []
     current = None
+    tagged_level = 0
+    fence = None
 
     for raw_line in body_lines:
         line = _replace_parameters(raw_line, parameters)
+        in_fence, fence = _fence_state(line, fence)
+        if in_fence:
+            if current is not None:
+                current.body += line + "\n"
+            continue
         tag_match = _HEADING_TAG_RE.match(line)
         if tag_match:
             current = Section(
@@ -127,13 +157,17 @@ def parse_markdown_document(text: str, default_type: Optional[str] = None) -> Pa
                 body="",
             )
             sections.append(current)
+            tagged_level = len(tag_match.group("hashes"))
             continue
         heading_match = _HEADING_RE.match(line)
-        if heading_match:
+        if heading_match and not (
+            current is not None and 0 < tagged_level < len(heading_match.group("hashes"))
+        ):
             current = Section(
                 type_code=doc_type, title=heading_match.group("title").strip(), body=""
             )
             sections.append(current)
+            tagged_level = 0
             continue
         if current is not None and current.type_code == "TC":
             row = parse_row(line, len(current.steps))
@@ -176,7 +210,8 @@ def rename_parameters(text: str, renames: dict) -> str:
         new = lookup.get(match.group("name").strip().lower())
         if not new:
             return match.group(0)
-        return "{{parameter: " + new + ", value: " + match.group("value").strip() + "}}"
+        kind = match.group("kind").lower()
+        return "{{" + kind + ": " + new + ", value: " + match.group("value").strip() + "}}"
 
     def _bare(match: re.Match) -> str:
         raw = match.group(1)

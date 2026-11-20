@@ -142,3 +142,119 @@ def rows_to_text(steps) -> str:
 def has_precondition_rows(steps: Iterable) -> bool:
     """Whether stored steps already carry precondition rows."""
     return any(isinstance(s, dict) and s.get("row_type") == "precondition" for s in steps or [])
+
+
+ROW_TYPE_VALUES = ("precondition", "pre-condition", "step", "loop")
+
+
+class StepRowError(ValueError):
+    """A step row whose ``row_type`` is none of the accepted values."""
+
+    def __init__(self, position: int, value) -> None:
+        self.position = position
+        self.value = value
+        super().__init__(
+            f"Step row {position}: row_type {value!r} is not one of "
+            + ", ".join(ROW_TYPE_VALUES)
+            + " (in any letter case)."
+        )
+
+
+def row_type_of(value) -> Optional[str]:
+    """The row type a ``row_type`` or ``label`` value names in any letter case, or None."""
+    if not isinstance(value, str):
+        return None
+    return _ROW_TYPES.get(value.strip().lower())
+
+
+def _first_text(step: dict, keys: tuple) -> str:
+    """The first of the keys holding non-empty text, else an empty string."""
+    for key in keys:
+        value = step.get(key)
+        if value is not None and str(value) != "":
+            return str(value)
+    return ""
+
+
+def _indent(value) -> int:
+    """An indent level of 0 or more; 0 for anything that is not a whole number."""
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int):
+        return max(0, value)
+    if isinstance(value, float) and value.is_integer():
+        return max(0, int(value))
+    return 0
+
+
+def _normal_row(step, position: int, strict: bool) -> dict:
+    """One stored row in the editor's form, with its other keys kept.
+
+    A ``row_type`` is read in any letter case; a row without one takes it from its
+    ``label``, else is a step. Another ``row_type`` raises ``StepRowError`` when
+    ``strict``, else the row is a step."""
+    if not isinstance(step, dict):
+        return {**make_row("step", str(step), index=position - 1), "id": None}
+    raw_type = step.get("row_type")
+    if raw_type is None or (isinstance(raw_type, str) and not raw_type.strip()):
+        row_type = row_type_of(step.get("label")) or "step"
+    else:
+        row_type = row_type_of(raw_type)
+        if row_type is None:
+            if strict:
+                raise StepRowError(position, raw_type)
+            row_type = "step"
+    label = step.get("label")
+    row_id = step.get("id")
+    return {
+        **step,
+        "id": row_id if isinstance(row_id, str) and row_id.strip() else None,
+        "row_type": row_type,
+        "label": label if isinstance(label, str) and label.strip() else LABELS[row_type],
+        "description": _first_text(step, ("description", "action", "step")),
+        "expected_result": _first_text(step, ("expected_result", "expected")),
+        "indent_level": _indent(step.get("indent_level")),
+        "collapsed": bool(step.get("collapsed")),
+    }
+
+
+def _give_ids(rows: list) -> None:
+    """Give each row without an id ``row-N`` by its position, unique within the rows."""
+    taken = {row["id"] for row in rows if row["id"]}
+    for position, row in enumerate(rows, start=1):
+        if row["id"]:
+            continue
+        candidate = f"row-{position}"
+        suffix = 1
+        while candidate in taken:
+            suffix += 1
+            candidate = f"row-{position}-{suffix}"
+        row["id"] = candidate
+        taken.add(candidate)
+
+
+def normalize_rows(steps, preconditions: Optional[str] = None, strict: bool = True):
+    """Stored test case rows in the editor's form, with the precondition text folded in.
+
+    Each row gets ``id``, ``row_type``, ``label``, ``description``, ``expected_result``,
+    ``indent_level`` and ``collapsed``: the description from ``description``, else
+    ``action``, else ``step``, and the expected result from ``expected_result``, else
+    ``expected``. Each non-empty line of ``preconditions`` becomes a precondition row
+    before the other rows, unless a precondition row with that description exists.
+    With ``strict`` an unknown ``row_type`` raises ``StepRowError``. A ``{"steps": [...]}``
+    object is read as its list. None when there are no steps and no precondition lines."""
+    if isinstance(steps, dict) and isinstance(steps.get("steps"), list):
+        steps = steps["steps"]
+    rows = [_normal_row(step, index, strict) for index, step in enumerate(steps or [], start=1)]
+    held = {row["description"].strip() for row in rows if row["row_type"] == "precondition"}
+    added = []
+    for line in (preconditions or "").splitlines():
+        text = line.strip()
+        if text and text not in held:
+            held.add(text)
+            added.append({**make_row("precondition", text), "id": None})
+    rows = added + rows
+    if steps is None and not rows:
+        return None
+    _give_ids(rows)
+    return rows

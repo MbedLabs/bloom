@@ -80,4 +80,5 @@ SUITES = [
     "tests.api.BLOOM_visions_http.VisionsHttpTest",
     "tests.api.BLOOM_visions_workflow.VisionsWorkflowTest",
     "tests.api.BLOOM_docs_facade_lookups.DocsFacadeLookupsTest",
+    "tests.api.BLOOM_test_case_preconditions.TestCasePreconditionsTest",
 ]

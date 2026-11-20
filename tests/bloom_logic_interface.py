@@ -68,6 +68,7 @@ from app.api import (
     integrations,
 )
 from app.api import project_variables as project_variables_api
+from app.api import test_concepts as test_concepts_api
 from app.api import users as users_api
 from app.api.artefacts import create_comment
 from app.api.attachments import download_attachment, publish_test_report
@@ -1475,7 +1476,8 @@ class BloomLogicInterface(BloomInterface):
 
     def bloom_artefact_titled(self, kind, title):
         model = next(model for model in ARTEFACT_MODELS if model.__name__ == kind)
-        return self._run(self._scalar(select(model).where(model.title == title)))
+        column = model.title if hasattr(model, "title") else model.name
+        return self._run(self._scalar(select(model).where(column == title)))
 
     def bloom_notification_bodies(self):
         return [
@@ -1485,6 +1487,109 @@ class BloomLogicInterface(BloomInterface):
 
     def bloom_rename_parameters(self, text, names):
         return rename_parameters(text, names)
+
+    def bloom_project_variable_kinds(self):
+        rows = self._run(self._all(select(ProjectVariable).order_by(ProjectVariable.id)))
+        return {row.key: row.kind for row in rows}
+
+    def bloom_imported_contents(self):
+        """Return the rich content of every artefact by its title, for the types that hold one."""
+        found = {}
+        for model in ARTEFACT_MODELS:
+            if not hasattr(model, "content_json"):
+                continue
+            for row in self._run(self._all(select(model))):
+                found[getattr(row, "title", None) or getattr(row, "name", None)] = row.content_json
+        return found
+
+    def bloom_import_format_examples(self):
+        """Return the fenced Markdown examples of the import format document."""
+        text = (Path(__file__).resolve().parent.parent / "docs" / "md-import-format.md").read_text()
+        return re.findall(r"^```markdown\n(.*?)^```", text, flags=re.S | re.M)
+
+    def bloom_imported_descriptions(self):
+        """Return the description of every artefact that holds rich content, by its title."""
+        found = {}
+        for model in ARTEFACT_MODELS:
+            if not hasattr(model, "content_json"):
+                continue
+            for row in self._run(self._all(select(model))):
+                found[getattr(row, "title", None) or getattr(row, "name", None)] = row.description
+        return found
+
+    def bloom_test_concept_answer(self, concept_id, user_id):
+        """Return what the test concept route answers for one concept."""
+
+        async def work(db):
+            return await test_concepts_api.get_test_concept(
+                concept_id=concept_id, db=db, current_user=await db.get(User, user_id)
+            )
+
+        return self._run(self._with_db(work))
+
+    def bloom_heading_levels(self, content):
+        """Return the level of each heading in rich content, in reading order."""
+        found = []
+
+        def walk(node):
+            if isinstance(node, dict):
+                if node.get("type") == "heading":
+                    found.append((node.get("attrs") or {}).get("level"))
+                for child in node.get("content") or []:
+                    walk(child)
+
+        walk(content)
+        return found
+
+    def bloom_artefact_mentions(self, content):
+        """Return the ids of the artefact mentions in rich content, in reading order."""
+        found = []
+
+        def walk(node):
+            if isinstance(node, dict):
+                attrs = node.get("attrs") or {}
+                if node.get("type") == "mention" and attrs.get("mentionSuggestionChar") == "#":
+                    found.append(attrs.get("id"))
+                for child in node.get("content") or []:
+                    walk(child)
+
+        walk(content)
+        return found
+
+    def bloom_artefact_links(self, source_type, source_id):
+        """Return the links of one source artefact as sorted (target type, target id, role)."""
+        rows = self._run(
+            self._all(
+                select(ArtefactLink).where(
+                    ArtefactLink.source_type == source_type,
+                    ArtefactLink.source_id == source_id,
+                )
+            )
+        )
+        return sorted((row.target_type, row.target_id, row.role) for row in rows)
+
+    def bloom_rich_content_parts(self, content):
+        """Return the node types, the mark types, the parameter chips and the plain text of rich content."""
+        nodes, marks, chips, text = set(), set(), [], []
+
+        def walk(node):
+            if not isinstance(node, dict):
+                return
+            nodes.add(node.get("type"))
+            marks.update(mark.get("type") for mark in node.get("marks") or [])
+            if node.get("type") == "mention":
+                attrs = node.get("attrs") or {}
+                chips.append((attrs.get("label"), attrs.get("mentionSuggestionChar")))
+            if isinstance(node.get("text"), str):
+                text.append(node["text"])
+                return
+            for child in node.get("content") or []:
+                walk(child)
+            if node.get("type") not in ("mention", "hardBreak"):
+                text.append(" ")
+
+        walk(content)
+        return nodes, marks, chips, " ".join("".join(text).split())
 
     def bloom_add_requirement_importer(self, project_id):
         async def work(db):

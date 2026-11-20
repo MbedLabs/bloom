@@ -3662,6 +3662,223 @@ MSG_MDI_RENAME_TEXT = "every reference in the imported text uses the new name"
 MSG_MDI_EITHER_KIND = "a name also collides with a parameter of the other kind, whatever its case"
 MSG_MDI_REFUSED = "{what} is refused with 422"
 MSG_MDI_BROKEN = "collision actions that are not JSON are refused, and nothing is imported"
+MDF_REFUSAL_RULE = "A wrong password is refused without saying which part was wrong"
+MDF_IDLE_RULE = "A session ends after a period without requests"
+MDF_SIGN_IN = (
+    "## [SPEC] Sign-in\n"
+    "Sign-in is how a person proves who they are before they see any project data. "
+    "This area covers signing in with an email and a password and ending a session that "
+    "is no longer used. Signing in through an identity provider is not part of it.\n"
+    "\n"
+    "### Credentials\n"
+    "How the product treats the email and the password a person enters.\n"
+    "\n"
+    f"- [[{MDF_REFUSAL_RULE}]]\n"
+    "\n"
+    "### Sessions\n"
+    "How long a signed-in session lasts.\n"
+    "\n"
+    f"- [[{MDF_IDLE_RULE}]]\n"
+    "\n"
+    f"## [REQ] {MDF_REFUSAL_RULE}\n"
+    "A refusal that names the wrong part tells an attacker which emails exist. The product "
+    "shall refuse a sign-in whose password does not match the account, with the same answer "
+    "whether the email or the password was wrong. A refused sign-in does not lock the account.\n"
+    "\n"
+    f"## [REQ] {MDF_IDLE_RULE}\n"
+    "A session left open on a shared machine is a way into the project. The product shall end "
+    "a session that has received no request for {{parameter: IDLE_MINUTES, value: 30}} "
+    "minutes. A session that is in use is never ended by this rule.\n"
+).encode()
+MDF_SIGN_IN_TITLE = "Sign-in"
+MDF_SIGN_IN_OPENING = (
+    "Sign-in is how a person proves who they are before they see any project data."
+)
+MDF_SPECIFICATION_NODES = {"paragraph", "heading", "bulletList", "listItem"}
+MDF_EXISTING_RULE = "A locked account cannot sign in"
+MDF_EXISTING_REQUIREMENT = (
+    f"## [REQ] {MDF_EXISTING_RULE}\n"
+    "A locked account protects its owner while a reset is pending. The product shall refuse "
+    "every sign-in to a locked account until it is unlocked.\n"
+).encode()
+MDF_EXISTING_SPECIFICATION_TITLE = "Account locking"
+MDF_EXISTING_SPECIFICATION = (
+    f"## [SPEC] {MDF_EXISTING_SPECIFICATION_TITLE}\n"
+    "Account locking is how the product keeps a suspicious account closed until its owner "
+    "acts. Unlocking by an administrator is not part of it.\n"
+    "\n"
+    f"- [[{MDF_EXISTING_RULE}]]\n"
+).encode()
+MDF_UNKNOWN_TITLE = "A rule that is not in this document"
+MDF_TWIN_TITLE = "Sessions are listed per user"
+MDF_UNMATCHED = (
+    "## [SPEC] Session overview\n"
+    "The session overview is how a person sees where they are signed in. Ending a session "
+    "from another device is not part of it.\n"
+    "\n"
+    f"- [[{MDF_UNKNOWN_TITLE}]]\n"
+    f"- [[{MDF_TWIN_TITLE}]]\n"
+    "\n"
+    f"## [REQ] {MDF_TWIN_TITLE}\n"
+    "A person needs to see their own sessions. The product shall list the sessions of the "
+    "signed-in user.\n"
+    "\n"
+    f"## [DES] {MDF_TWIN_TITLE}\n"
+    "The list reads the session table filtered by the user ID.\n"
+).encode()
+MDF_LINK_ROLE = "references"
+MDF_TEST_CONCEPT_NAME = "Sign-in verification"
+MDF_TEST_CONCEPT = (
+    f"## [CPT] {MDF_TEST_CONCEPT_NAME}\n"
+    "The sign-in rules are verified **black box**, through the API and the UI of a test instance.\n"
+).encode()
+MDF_TEST_CONCEPT_TEXT = (
+    "The sign-in rules are verified black box, through the API and the UI of a test instance."
+)
+MSG_MDF_CONCEPT_ROUTE = (
+    "the test concept route returns the imported concept's rich content and its HTML"
+)
+MDF_LOCK_RULE = "An account is locked after repeated refused sign-ins"
+MDF_SAME_ANSWER_RULE = "Every refused sign-in gets the same answer"
+MDF_REQUIREMENT_MENTION = (
+    f"## [REQ] {MDF_LOCK_RULE}\n"
+    "Repeated refusals suggest that someone is guessing. The product shall lock an account "
+    "after {{parameter: REFUSAL_LIMIT, value: 5}} refused sign-ins in a row. The answer to "
+    f"each refusal follows [[{MDF_SAME_ANSWER_RULE}]].\n"
+    "\n"
+    f"## [REQ] {MDF_SAME_ANSWER_RULE}\n"
+    "An answer that differs tells an attacker what was wrong. The product shall answer "
+    "every refused sign-in with the same message.\n"
+).encode()
+MDF_EVERY_ELEMENT = (
+    b"## [DES] Formatted design\n"
+    b"### Scope\n"
+    b"A **bold** word, an *italic* word, `inline code` and a [link](https://example.com).\n"
+    b"\n"
+    b"- first item\n"
+    b"- second item\n"
+    b"\n"
+    b"1. first step\n"
+    b"2. second step\n"
+    b"\n"
+    b"| Event | Effect |\n"
+    b"| --- | --- |\n"
+    b"| Idle | The session ends |\n"
+    b"\n"
+    b"```text\n"
+    b"# not a heading\n"
+    b"- Step: not a row\n"
+    b"```\n"
+)
+MDF_EVERY_ELEMENT_TITLE = "Formatted design"
+MDF_EVERY_ELEMENT_SECTIONS = {"Formatted design": "DES"}
+MDF_ELEMENT_NODES = {
+    "heading",
+    "paragraph",
+    "bulletList",
+    "orderedList",
+    "listItem",
+    "table",
+    "tableRow",
+    "tableHeader",
+    "tableCell",
+    "codeBlock",
+}
+MDF_ELEMENT_MARKS = {"bold", "italic", "code", "link"}
+MDF_PARAMETER_REFERENCE_TITLE = "Idle session timer"
+MDF_PARAMETER_REFERENCE = (
+    b"## [DES] Idle session timer\n"
+    b"Each request resets a timer of {{parameter: IDLE_MINUTES, value: 30}} minutes on the "
+    b"session row.\n"
+)
+MDF_PARAMETER_CHIPS = [("IDLE_MINUTES", "{{")]
+MDF_TEST_CASE = (
+    b"## [TC] Relay boot\n"
+    b"Checks the **relay-driven** boot.\n"
+    b"- Pre-Condition: relay open\n"
+    b"- Step: close the relay => boot banner within {{parameter: RELAY_MS, value: 200}} ms\n"
+)
+MDF_TEST_CASE_TEXT = "Checks the relay-driven boot."
+MDF_EVERY_TYPE = (
+    b"## [REQ] Typed requirement\nText with **bold**.\n"
+    b"## [DEF] Typed defect\nText with **bold**.\n"
+    b"## [DES] Typed design\nText with **bold**.\n"
+    b"## [RSK] Typed risk\nText with **bold**.\n"
+    b"## [CHG] Typed change\nText with **bold**.\n"
+    b"## [CPT] Typed concept\nText with **bold**.\n"
+    b"## [TC] Typed case\nText with **bold**.\n"
+    b"## [SPEC] Typed specification\nText with **bold**.\n"
+    b"## [STD] Typed standard\nText with **bold**.\n"
+    b"## [VIS] Typed vision\nText with **bold**.\n"
+)
+MDF_PLAIN_TYPES = [("Requirement", "Typed requirement"), ("Defect", "Typed defect")]
+MDF_PLAIN_BODY = "Text with **bold**."
+MDF_EVERY_TYPE_TITLES = [
+    "Typed design",
+    "Typed risk",
+    "Typed change",
+    "Typed concept",
+    "Typed case",
+    "Typed specification",
+    "Typed standard",
+    "Typed vision",
+]
+MDF_TYPED_TEXT = "Text with bold."
+MDF_TWO_KINDS = (
+    b"## [REQ] Two kinds\n"
+    b"Uses {{parameter: P_ONE, value: 1}} and {{variable: V_ONE, value: 2}}.\n"
+)
+MDF_TWO_KINDS_VALUES = {"BOOT_MS": "variable", "P_ONE": "parameter", "V_ONE": "variable"}
+MDF_TWO_KINDS_TEXT = "Uses {{P_ONE}} and {{V_ONE}}."
+MDF_VARIABLE_COLLISION = b"## [REQ] Limit\nStay under {{variable: BOOT_MS, value: 9}}\n"
+MDF_VARIABLE_COLLISION_FOUND = [{"name": "BOOT_MS", "existing_value": "old", "imported_value": "9"}]
+MSG_MDF_SPECIFICATION = (
+    "an imported specification holds its body as rich content with its sub-headings and lists"
+)
+MSG_MDF_SPEC_MENTIONS = (
+    "the specification mentions each requirement of its document as the editor's artefact mention"
+)
+MSG_MDF_SPEC_LINKS = "each mention links the specification to its requirement"
+MSG_MDF_SPEC_DESCRIPTION = (
+    "the specification's description, its one-line brief description, stays unset"
+)
+MSG_MDF_REQ_MENTION = (
+    "a requirement names its mention by # ID in its plain description, gets no rich content "
+    "and links the mentioned requirement"
+)
+MSG_MDF_NO_UNLINKED_NOTICE = (
+    "artefacts the import links get no notification that they have no links"
+)
+MSG_MDF_EXISTING_MENTION = (
+    "the title of an existing requirement becomes its mention and links the specification to it"
+)
+MDF_DOCUMENT_ID = r"\b[A-Z]{3}-[A-Z]+-\d+\b"
+MSG_MDF_DOC_EXAMPLES = (
+    "no import example of the format document holds a document ID, and every specification "
+    "example mentions its requirements as [[Title]]"
+)
+MSG_MDF_PLAIN = "{title} keeps its body as plain description with no rich content"
+MSG_MDF_SIGN_IN_REQUIREMENTS = (
+    "the requirements stay plain text, the second keeps {{IDLE_MINUTES}} in its text, "
+    "and IDLE_MINUTES is a parameter"
+)
+MSG_MDF_UNMATCHED = (
+    "an unknown or ambiguous section title stays text, is listed in the errors and links nothing"
+)
+MSG_MDF_ELEMENTS = (
+    "a sub-heading and a fenced block stay in their section, and every Markdown element "
+    "becomes its editor node or mark"
+)
+MSG_MDF_CHIPS = "a parameter in imported text becomes the editor's parameter chip"
+MSG_MDF_TEST_CASE = (
+    "a test case keeps its step rows, and only the text around them becomes rich content"
+)
+MSG_MDF_EVERY_TYPE = "{title} holds its imported body as rich content"
+MSG_MDF_KINDS = (
+    "a declared parameter is a parameter, a declared variable is a variable, "
+    "and both are referenced by name"
+)
+MSG_MDF_VARIABLE_COLLISION = "a declared variable whose name exists blocks the import with 409"
 MSG_MDI_FRESH = "an import without a collision creates every parameter"
 MSG_MDI_REWRITE = "renaming rewrites the declaration and the reference of that parameter only"
 MSG_MDI_RELAY_TEST_CASE = "a test case section is imported with its id, description and step rows"
@@ -5732,4 +5949,115 @@ MSG_DM_GROUP = "the default Defect Managers group holds Read Internal, Read Cust
 MSG_DM_RECIPIENTS = (
     "a failed send emails the administrators and the project's Product Owners and Defect Managers, "
     "no Tester and no Defect Manager of another project"
+)
+PRE_PREFIX = "PRC"
+PRE_ACCOUNT = "a test account exists"
+PRE_SIGN_IN = ("sign in", "the project list opens")
+PRE_CAPITALISED = [
+    {"row_type": "Precondition", "description": PRE_ACCOUNT},
+    {"row_type": "Step", "description": PRE_SIGN_IN[0], "expected_result": PRE_SIGN_IN[1]},
+]
+PRE_LABELLED = [
+    {"row_type": "Pre-Condition", "description": PRE_ACCOUNT},
+    {"row_type": "loop", "description": "repeat 3 times"},
+    {
+        "row_type": "STEP",
+        "description": PRE_SIGN_IN[0],
+        "expected_result": PRE_SIGN_IN[1],
+        "indent_level": 1,
+    },
+]
+PRE_UNTYPED = [{"description": PRE_SIGN_IN[0], "expected_result": PRE_SIGN_IN[1]}]
+PRE_OLD_NAMES = [{"action": PRE_SIGN_IN[0], "expected": PRE_SIGN_IN[1]}]
+PRE_BY_LABEL = [{"label": "Pre-Condition", "description": PRE_ACCOUNT}]
+PRE_TEXT = f"{PRE_ACCOUNT}\n\nthe browser is open"
+PRE_ONE_STEP = [
+    {"row_type": "step", "description": PRE_SIGN_IN[0], "expected_result": PRE_SIGN_IN[1]}
+]
+PRE_UNKNOWN = [
+    {"row_type": "step", "description": PRE_SIGN_IN[0], "expected_result": PRE_SIGN_IN[1]},
+    {"row_type": "setup", "description": "prepare the bench"},
+]
+PRE_ROW_FIELDS = [
+    "collapsed",
+    "description",
+    "expected_result",
+    "id",
+    "indent_level",
+    "label",
+    "row_type",
+]
+PRE_ROWS_CAPITALISED = [("precondition", PRE_ACCOUNT, "", 0), ("step", *PRE_SIGN_IN, 0)]
+PRE_ROWS_LABELLED = [
+    ("precondition", PRE_ACCOUNT, "", 0),
+    ("loop", "repeat 3 times", "", 0),
+    ("step", *PRE_SIGN_IN, 1),
+]
+PRE_ROWS_ONE_STEP = [("step", *PRE_SIGN_IN, 0)]
+PRE_ROWS_BY_LABEL = [("precondition", PRE_ACCOUNT, "", 0)]
+PRE_ROWS_FROM_TEXT = [
+    ("precondition", PRE_ACCOUNT, "", 0),
+    ("precondition", "the browser is open", "", 0),
+    ("step", *PRE_SIGN_IN, 0),
+]
+PRE_LABELS = {"precondition": "Pre-Condition", "step": "Step", "loop": "Loop"}
+PRE_ACCEPTED_TYPES = ("precondition", "step", "loop")
+MSG_PRE_CAPITALISED = (
+    "a capitalised Precondition row is stored as a precondition and Step as a step"
+)
+MSG_PRE_LABELLED = "Pre-Condition, loop and STEP keep their type and indent"
+MSG_PRE_UNTYPED = "a row without a type is stored as a step with its expected result"
+MSG_PRE_OLD_NAMES = "a row with action and expected is stored as description and expected_result"
+MSG_PRE_BY_LABEL = "a row without a type takes it from its label"
+MSG_PRE_TEXT = "each line of the preconditions text becomes a precondition row before the steps, and the field is emptied"
+MSG_PRE_TEXT_TWICE = "a preconditions line that is already a precondition row is not added again"
+MSG_PRE_UNKNOWN = "an unknown row type is refused with 422 naming the row and the accepted types, and nothing is stored"
+MSG_PRE_EDITOR_FORM = "every stored row has the editor's fields and the label of its type"
+MSG_PRE_UPDATE = "an update applies the same rules to its rows and its preconditions text"
+
+TCS_ROWS_MIGRATION = "e7a9c2d4f6b8_test_case_rows.py"
+TCS_MIGRATION_FIELDS = (
+    "id",
+    "row_type",
+    "label",
+    "description",
+    "expected_result",
+    "indent_level",
+    "collapsed",
+)
+TCS_MIGRATION_EDITOR_ROWS = [
+    {
+        "id": "row-1",
+        "row_type": "precondition",
+        "label": "Pre-Condition",
+        "description": "Powered",
+        "expected_result": "",
+        "indent_level": 0,
+        "collapsed": False,
+    },
+    {
+        "id": "row-2",
+        "row_type": "step",
+        "label": "Step",
+        "description": "Boot",
+        "expected_result": "Ready",
+        "indent_level": 0,
+        "collapsed": False,
+    },
+]
+TCS_MIGRATION_MIXED_ROWS = [
+    {"row_type": "Pre-Condition", "description": "Relay open"},
+    {"action": "Close the relay", "expected": "Banner shown"},
+    {"row_type": "setup", "description": "Unknown kind"},
+]
+TCS_MIGRATION_PRECONDITIONS = "Cable connected\nRelay open"
+TCS_MIGRATION_EXPECTED = [
+    ("precondition", "Cable connected", ""),
+    ("precondition", "Relay open", ""),
+    ("step", "Close the relay", "Banner shown"),
+    ("step", "Unknown kind", ""),
+]
+MSG_TCS_MIGRATION = (
+    "the test case rows migration keeps rows in the editor form, reads any case and the older names, "
+    "folds new precondition lines in front, and stores an unknown type as a step"
 )
